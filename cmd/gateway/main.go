@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"context"
 	"fmt"
 	"net/http"
@@ -233,6 +234,8 @@ func main() {
 		// Reports
 		r.Get("/api/v1/vsp/run_report_html/{rid}", reportH.HTML)
 		r.Get("/api/v1/vsp/run_report_pdf/{rid}",  reportH.PDF)
+		r.Get("/api/v1/vsp/executive_report_pdf/{rid}", reportH.ExecutivePDF)
+		r.Get("/api/v1/vsp/executive_report_html/{rid}", reportH.ExecutiveHTML)
 		// SLA + Sandbox + Imports
 		r.Get("/api/v1/vsp/sla_tracker",        slaH.Tracker)
 		r.Get("/api/v1/vsp/metrics_slos",       slaH.MetricsSLOs)
