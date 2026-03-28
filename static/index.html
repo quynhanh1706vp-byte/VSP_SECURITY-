@@ -1785,6 +1785,16 @@ async function loadRACI() {
   } catch(e) { console.error('raci', e) }
 }
 
+async function freezeEvidence(id) {
+  try {
+    await api('POST', '/governance/evidence/' + id + '/freeze');
+    showToast('Evidence frozen — tamper-proof ✓', 'success');
+    loadGovernance?.();
+  } catch(e) {
+    showToast('Freeze failed: ' + e.message, 'error');
+  }
+}
+
 async function loadOwnership() {
   try {
     const data = await api('GET', '/governance/ownership')
@@ -1803,7 +1813,7 @@ async function loadScorecard() {
     const data = await api('GET', '/soc/framework-scorecard')
     const fws = data.frameworks || []
     document.getElementById('scorecard-list').innerHTML = fws.map(f => {
-      const color = f.score >= 80 ? '#4ade80' : f.score >= 60 ? '#fbbf24' : '#f87171'
+      const color = f.score >= 80 ? 'var(--green)' : f.score >= 60 ? 'var(--amber)' : 'var(--red)'
       return `<div style="margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
           <span style="font-size:13px;color:#e2e8f0">${f.framework}</span>
@@ -1821,7 +1831,7 @@ async function loadZeroTrust() {
     const data = await api('GET', '/soc/zero-trust')
     const pillars = data.pillars || []
     document.getElementById('zerotrust-list').innerHTML = pillars.map(p => {
-      const color = p.score >= 80 ? '#4ade80' : p.score >= 60 ? '#fbbf24' : '#f87171'
+      const color = p.score >= 80 ? 'var(--green)' : p.score >= 60 ? 'var(--amber)' : 'var(--red)'
       return `<div style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:baseline">
           <span style="font-size:12px;color:#e2e8f0">${p.pillar}</span>
@@ -1856,12 +1866,20 @@ async function loadIncidents() {
     const data = await api('GET', '/soc/incidents')
     const inc = data.incidents || []
     document.getElementById('incidents-table').innerHTML = inc.length
-      ? inc.map(i => `<tr>
-          <td style="font-family:monospace;font-size:11px;color:#94a3b8">${i.id}</td>
-          <td>${sevPill(i.severity)}</td>
-          <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title)}</td>
-        </tr>`).join('')
-      : '<tr><td colspan="3" style="color:#64748b;padding:16px;text-align:center">No active incidents</td></tr>'
+      ? inc.map(i => {
+          const statusColor = i.status==='open'?'var(--red)':i.status==='investigating'?'var(--amber)':i.status==='resolved'?'var(--green)':'var(--text3)';
+          const statusIcon  = i.status==='open'?'○':i.status==='investigating'?'◑':i.status==='resolved'?'●':'—';
+          return `<tr>
+            <td style="font-family:monospace;font-size:11px;color:var(--text3)">${i.id}</td>
+            <td>${sevPill(i.severity)}</td>
+            <td style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title)}</td>
+            <td><span style="font-size:11px;color:${statusColor}">${statusIcon} ${i.status||'open'}</span></td>
+            <td style="font-size:10px;color:var(--text3)">${i.detected_at ? new Date(i.detected_at).toLocaleDateString() : '—'}</td>
+            <td><button class="btn-sm" style="font-size:10px;padding:2px 8px"
+              onclick="showToast('Incident ${i.id} — ${esc(i.title).slice(0,30)}','info')">View</button></td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="6" style="color:var(--text3);padding:16px;text-align:center">No active incidents</td></tr>'
   } catch(e) { console.error('incidents', e) }
 }
 
@@ -2304,7 +2322,11 @@ async function loadExecutive() {
     document.getElementById('exec-cmmc-bar').style.width    = cp+'%'
 
     // SLA list
-    document.getElementById('exec-sla-list').innerHTML = slaData.map(s => `
+    document.getElementById('exec-sla-list').innerHTML = slaData.map(s => {
+      const overdue = s.days_remaining !== undefined && s.days_remaining < 0;
+      const urgent  = s.days_remaining !== undefined && s.days_remaining >= 0 && s.days_remaining <= 3;
+      const borderColor = overdue ? 'var(--red)' : urgent ? 'var(--amber)' : 'var(--border)';
+      return `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
         <div>
           <span style="font-size:11px;color:${s.severity==='CRITICAL'?'var(--red)':s.severity==='HIGH'?'#ff8c00':'var(--text2)'};font-weight:600">${s.severity}</span>
