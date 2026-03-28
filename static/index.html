@@ -1278,6 +1278,7 @@ pre  { font-family: var(--mono); font-size: 11px; color: var(--text2); line-heig
       <div style="display:flex;gap:8px">
         <button class="btn-sm" onclick="loadExecutive()">↻ Refresh</button>
         <button class="btn-sm btn-primary" onclick="downloadExecutivePDF()">↓ PDF Report</button>
+        <button class="btn-sm" onclick="exportOSCAL('ar')">↓ OSCAL</button>
       </div>
     </div>
 
@@ -2344,7 +2345,7 @@ async function downloadExecutivePDF() {
   showToast('Generating PDF report...', 'info')
   try {
     const rid = (await api('GET', '/vsp/run/latest')).rid
-    const res = await fetch('/api/v1/vsp/run_report_pdf/' + rid, {
+    const res = await fetch('/api/v1/vsp/executive_report_pdf/' + rid, {
       headers: {'Authorization': 'Bearer ' + TOKEN}
     })
     if (!res.ok) throw new Error('PDF failed')
