@@ -4669,6 +4669,11 @@ function drawGauge(canvasId, value, color) {
       if (sel) {
         sel.innerHTML = '<option value="">— select run —</option>' +
           runs.map(r=>`<option value="${r.rid}">${r.rid.slice(-20)} · ${r.mode} · ${r.status}</option>`).join('');
+        // Auto-load latest run on first open
+        if (runs.length > 0 && !sel.value) {
+          sel.value = runs[0].rid;
+          window.loadRunLog(runs[0].rid);
+        }
       }
     } catch(e){}
   };
@@ -4730,12 +4735,48 @@ function drawGauge(canvasId, value, color) {
 
       _allLogs = lines;
       document.getElementById('log-run-info').textContent = `${lines.length} lines`;
-      if (dot) dot.style.background = 'var(--green)';
+      if (dot) dot.style.background = run?.status==='RUNNING' ? 'var(--amber)' : 'var(--green)';
       if (lbl) lbl.textContent = run?.status||'Done';
       filterLogs();
 
       // Update tool grid
       tools.forEach(t => updateToolCell(t,'done',toolCounts[t]));
+
+      // Live tail: nếu RUNNING thì poll mỗi 3s
+      if (run?.status === 'RUNNING') {
+        if (window._logPollInterval) clearInterval(window._logPollInterval);
+        window._logPollRID = rid;
+        window._logPollInterval = setInterval(async () => {
+          if (!window._logPollRID) return;
+          try {
+            const rd = await window.api('GET', '/vsp/run/' + window._logPollRID);
+            if (rd.status !== 'RUNNING') {
+              clearInterval(window._logPollInterval);
+              window._logPollInterval = null;
+              window._logPollRID = null;
+              // Reload final state
+              window.loadRunLog(rid);
+              return;
+            }
+            // Update progress
+            const pct = rd.tools_total > 0 ? Math.round(rd.tools_done / rd.tools_total * 100) : 0;
+            const prog = document.getElementById('log-prog-fill');
+            const progPct = document.getElementById('log-prog-pct');
+            const progLbl = document.getElementById('log-prog-label');
+            const progBar = document.getElementById('log-progress');
+            if (progBar) progBar.style.display = 'block';
+            if (prog) prog.style.width = pct + '%';
+            if (progPct) progPct.textContent = pct + '%';
+            if (progLbl) progLbl.textContent = rd.tools_done + '/' + rd.tools_total + ' tools done';
+            // Add live log line
+            const now = new Date();
+            const ts = String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+            _allLogs.push({ts: '~' + ts, level:'INFO', tool:'scanner',
+              msg: `Running… ${rd.tools_done}/${rd.tools_total} tools · ${rd.total_findings||0} findings so far`});
+            filterLogs();
+          } catch(e) {}
+        }, 3000);
+      }
     } catch(e) {
       if (dot) dot.style.background = 'var(--red)';
       if (lbl) lbl.textContent = 'Error';
@@ -4985,6 +5026,11 @@ window.showPanel = function(name, btn) {
   if (name==='compliance2') setTimeout(()=>window.loadFedRAMP?.(), 200);
   if (name==='users')       setTimeout(()=>window.loadUsers?.(), 100);
   if (name==='scanlog')     setTimeout(()=>window.initLogViewer?.(), 100);
+  if (name!=='scanlog' && window._logPollInterval) {
+    clearInterval(window._logPollInterval);
+    window._logPollInterval = null;
+    window._logPollRID = null;
+  }
 };
 
 console.log('[VSP Upgrade v0.9.0] A(fix+gauges+users) + B(scanlog) + C(bulk) loaded ✓');
