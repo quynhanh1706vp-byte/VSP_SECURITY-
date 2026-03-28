@@ -1,0 +1,32 @@
+# Binaries
+gateway
+scanner
+soc-shell
+seed
+
+# CodeQL
+.codeql-db/
+
+# Backup & temp files
+*.bak*
+*.bak_*
+*.sidebar_*
+*.v0*_stable
+*.v0*_final
+fix.sh
+fix2.sh
+fix3.sh
+fix_port.sh
+phase*.sh
+upgrade_*.sh
+remediation_workflow.sh
+scheduled_scans.sh
+setup.sh
+sso_oidc.sh
+fedramp_cmmc_sbom.sh
+vsp_*.js
+vsp_features_patch.js
+static/vsp_features_patch.js
+
+# Build cache
+*.test
