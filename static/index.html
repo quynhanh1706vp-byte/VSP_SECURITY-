@@ -1378,6 +1378,11 @@ pre  { font-family: var(--mono); font-size: 11px; color: var(--text2); line-heig
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>Severity</th><th>Tool</th><th>Finding</th><th>Path</th><th>Status</th></tr></thead>
+          <!-- Trend chart -->
+          <div style="height:150px;margin-bottom:20px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px">
+            <div style="font-size:10px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:6px">Score trend — last 30 runs</div>
+            <div style="height:110px"><canvas id="exec-trend-canvas"></canvas></div>
+          </div>
           <tbody id="exec-top-findings"></tbody>
         </table>
       </div>
@@ -2311,6 +2316,8 @@ async function loadExecutive() {
     // Top findings
     const findData = await api('GET', '/vsp/findings?limit=5&severity=CRITICAL')
     const findings = findData.findings || []
+    // Render trend
+    renderExecTrend((runsData.runs||[]).slice(0,30).reverse());
     document.getElementById('exec-top-findings').innerHTML = findings.length
       ? findings.map(f => `<tr>
           <td>${sevPill(f.severity)}</td>
