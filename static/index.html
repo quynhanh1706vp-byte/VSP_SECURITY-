@@ -5025,7 +5025,7 @@ function closeNotifCenter() {
 }
 async function loadNotifications() {
   try {
-    const r = await api('GET', '/api/v1/notifications');
+    const r = await api('GET', '/notifications');
     _notifData = r.notifications || [];
     renderNotifList();
     updateNotifBadge();
@@ -5173,7 +5173,7 @@ async function createSchedule() {
 // ── Tenant switcher ────────────────────────────────────────────────────────
 async function loadTenants() {
   try {
-    const r = await api('GET', '/api/v1/tenants');
+    const r = await api('GET', '/tenants');
     const tenants = r.tenants || [];
     const currentID = r.current_tenant_id;
     const el = document.getElementById('tenant-switcher-list');
