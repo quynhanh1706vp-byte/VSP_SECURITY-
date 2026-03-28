@@ -7,6 +7,8 @@ import (
 	"syscall"
 	"time"
 
+	"strings"
+
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -24,6 +26,10 @@ func main() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config")
 	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.BindEnv("database.url", "DATABASE_URL")
+	viper.BindEnv("redis.addr", "REDIS_ADDR")
+	viper.BindEnv("redis.password", "REDIS_PASSWORD")
 	viper.ReadInConfig()
 
 	level, _ := zerolog.ParseLevel(viper.GetString("log.level"))
