@@ -3943,7 +3943,7 @@ const SEV_C = {CRITICAL:'#f87171',HIGH:'#fb923c',MEDIUM:'#fbbf24',LOW:'#4ade80',
     } catch(e){}
   }
   updateTicker();
-  setInterval(updateTicker, 20000);
+  setInterval(() => { if(window.TOKEN) updateTicker(); }, 20000);
 
   // Patch loadDashboard to update ticker
   const _orig = window.loadDashboard;
@@ -4176,7 +4176,7 @@ function updateTicker() {
   }).catch(()=>{});
 }
 setTimeout(()=>{ if(window.TOKEN) updateTicker(); }, 2000);
-setInterval(updateTicker, 20000);
+setInterval(() => { if(window.TOKEN) updateTicker(); }, 20000);
 
 // ── QUICK SEARCH ──────────────────────────────────────
 const PANELS_QS = [
