@@ -3919,7 +3919,7 @@ const SEV_C = {CRITICAL:'#f87171',HIGH:'#fb923c',MEDIUM:'#fbbf24',LOW:'#4ade80',
 
   if(window.TOKEN) setTimeout(updateTicker, 200);
 
-  updateTicker();
+  if(typeof updateTicker === 'function' && window.TOKEN) updateTicker();
   setInterval(() => { if(window.TOKEN) updateTicker(); }, 20000);
 
   // Patch loadDashboard to update ticker
