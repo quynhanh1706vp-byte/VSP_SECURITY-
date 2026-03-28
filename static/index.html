@@ -1239,6 +1239,10 @@ pre  { font-family: var(--mono); font-size: 11px; color: var(--text2); line-heig
     <div style="display:flex;gap:10px;margin-bottom:20px">
       <button class="btn-sm btn-primary" onclick="loadFedRAMP()" id="btn-fedramp">FedRAMP Moderate</button>
       <button class="btn-sm" onclick="loadCMMC()" id="btn-cmmc">CMMC Level 2</button>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <button class="btn-sm" onclick="exportOSCAL('ar')" title="Download OSCAL Assessment Report">↓ OSCAL AR</button>
+        <button class="btn-sm" onclick="exportOSCAL('poam')" title="Download OSCAL POA&M">↓ OSCAL POA&M</button>
+      </div>
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
@@ -2510,6 +2514,7 @@ function renderCompliance2(data,title,items,idKey,famKey,titleKey) {
     <td style="font-size:12px">${c[titleKey]}</td>
     <td style="font-size:10px;color:var(--text3)">${c.tool||'—'}</td>
     <td><span class="pill ${c.status==='assessed'?'pill-done':'pill-queued'}">${c.status}</span></td>
+    <td>${c.finding_count > 0 ? `<span style="color:var(--red);font-size:11px;font-weight:600">${c.finding_count} findings</span>` : '<span style="color:var(--green);font-size:11px">✓ clean</span>'}</td>
   </tr>`).join('')
 }
 
@@ -5457,6 +5462,60 @@ function renderRemTimeline(rem, comments) {
       </div>
     </div>
   `).join('');
+}
+
+// ── OSCAL export ─────────────────────────────────────────────────────────────
+function exportOSCAL(type) {
+  const url = '/api/v1/compliance/oscal/' + type + '?format=download';
+  fetch('/api/v1/compliance/oscal/' + type, {
+    headers: {'Authorization': 'Bearer ' + TOKEN}
+  }).then(r => r.blob()).then(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'oscal-' + type + '-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    showToast('OSCAL ' + type.toUpperCase() + ' downloaded', 'success');
+  }).catch(() => showToast('Export failed', 'error'));
+}
+
+// ── SBOM CVE badge enhancement ────────────────────────────────────────────────
+async function loadSBOMWithCVE() {
+  try {
+    const data = await api('GET', '/vsp/runs/index');
+    const runs = (data.runs||[]).filter(r=>r.status==='DONE').slice(0,20);
+    document.getElementById('sbom-tbody').innerHTML = runs.map(r => {
+      const critColor = r.summary?.CRITICAL > 0 ? 'var(--red)' : 'var(--green)';
+      const highColor = r.summary?.HIGH > 0 ? 'var(--amber)' : 'var(--text3)';
+      return `<tr>
+        <td><code style="font-size:11px">${r.rid.slice(-16)}</code></td>
+        <td><span class="pill pill-queued">${r.mode}</span></td>
+        <td>${r.gate ? gatePill(r.gate) : '—'}</td>
+        <td>
+          ${r.summary?.CRITICAL > 0 ? `<span style="color:var(--red);font-weight:700;font-size:11px">C:${r.summary.CRITICAL}</span> ` : ''}
+          ${r.summary?.HIGH > 0 ? `<span style="color:var(--amber);font-size:11px">H:${r.summary.HIGH}</span> ` : ''}
+          ${(!r.summary?.CRITICAL && !r.summary?.HIGH) ? '<span style="color:var(--green);font-size:11px">Clean</span>' : ''}
+        </td>
+        <td style="color:var(--text3);font-size:11px">${new Date(r.created_at).toLocaleDateString()}</td>
+        <td style="display:flex;gap:4px">
+          <a href="#" onclick="downloadSBOM(event,'${r.rid}')"
+            style="color:var(--amber);font-size:10px;text-decoration:none;border:1px solid var(--amber);padding:2px 6px;border-radius:3px">↓ CDX</a>
+          <a href="#" onclick="downloadSBOMGrype(event,'${r.rid}')"
+            style="color:var(--cyan);font-size:10px;text-decoration:none;border:1px solid var(--cyan);padding:2px 6px;border-radius:3px">↓ Grype</a>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { console.error('sbom', e); }
+}
+
+function downloadSBOMGrype(e, rid) {
+  e.preventDefault();
+  fetch('/api/v1/sbom/'+rid+'/grype', {headers:{'Authorization':'Bearer '+TOKEN}})
+    .then(r=>r.blob()).then(blob=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download='grype-'+rid.slice(-8)+'.json';
+      a.click();
+    }).catch(()=>showToast('Grype export failed','error'));
 }
 </script>
 </body>
