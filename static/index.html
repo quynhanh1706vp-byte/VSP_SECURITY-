@@ -3311,6 +3311,129 @@ const REC_COLOR = {CRITICAL:'var(--red)',HIGH:'#ff8c00',MEDIUM:'var(--amber)',LO
     btn.title = isOn ? 'Enabled' : 'Disabled';
     if (typeof showToast === 'function') showToast('Rule '+(isOn?'enabled':'disabled'), 'info');
   };
+
+  // ── Rule builder form ─────────────────────────────────────────────────────
+  // Inject "New rule" button + form vào panel
+  const rulesEl = document.getElementById('rules-list');
+  if (rulesEl && !document.getElementById('policy-create-btn')) {
+    const createBtn = document.createElement('button');
+    createBtn.id = 'policy-create-btn';
+    createBtn.className = 'btn-sm btn-primary';
+    createBtn.style.cssText = 'margin-bottom:16px;font-size:11px';
+    createBtn.textContent = '+ New rule';
+    createBtn.onclick = () => {
+      const f = document.getElementById('policy-rule-form');
+      if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+    };
+
+    const form = document.createElement('div');
+    form.id = 'policy-rule-form';
+    form.style.cssText = 'display:none;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:16px;margin-bottom:16px';
+    form.innerHTML = `
+      <div style="font-size:12px;font-weight:600;color:var(--text1);margin-bottom:12px;letter-spacing:.05em">Create policy rule</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px">Rule name</label>
+          <input id="pr-name" class="form-ctrl" placeholder="e.g. Block Critical" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px">Repo pattern</label>
+          <input id="pr-pattern" class="form-ctrl" placeholder="* (all repos)" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px">Fail on</label>
+          <select id="pr-fail-on" class="form-ctrl" style="width:100%">
+            <option value="FAIL">Any gate FAIL</option>
+            <option value="CRITICAL">Any CRITICAL finding</option>
+            <option value="HIGH">Any HIGH finding</option>
+            <option value="SECRETS">Any secret detected</option>
+            <option value="SCORE">Score below threshold</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px">Max HIGH findings</label>
+          <input id="pr-max-high" type="number" class="form-ctrl" placeholder="-1 (unlimited)" style="width:100%" value="-1">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px">Min score (0-100)</label>
+          <input id="pr-min-score" type="number" class="form-ctrl" placeholder="0" style="width:100%" value="0" min="0" max="100">
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:12px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);cursor:pointer">
+            <input type="checkbox" id="pr-block-critical" checked> Block CRITICAL
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);cursor:pointer">
+            <input type="checkbox" id="pr-block-secrets" checked> Block secrets
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-sm" onclick="document.getElementById('policy-rule-form').style.display='none'">Cancel</button>
+        <button class="btn-sm btn-primary" onclick="submitPolicyRule()" style="background:var(--amber);color:#000;border-color:var(--amber)">Create rule</button>
+      </div>
+    `;
+
+    rulesEl.parentNode.insertBefore(form, rulesEl);
+    rulesEl.parentNode.insertBefore(createBtn, form);
+    console.log('[VSP] Policy rule builder injected');
+  }
+
+  window.submitPolicyRule = async function() {
+    const name       = document.getElementById('pr-name')?.value?.trim();
+    const pattern    = document.getElementById('pr-pattern')?.value?.trim() || '*';
+    const failOn     = document.getElementById('pr-fail-on')?.value || 'FAIL';
+    const maxHigh    = parseInt(document.getElementById('pr-max-high')?.value ?? -1);
+    const minScore   = parseInt(document.getElementById('pr-min-score')?.value ?? 0);
+    const blkCrit    = document.getElementById('pr-block-critical')?.checked ?? true;
+    const blkSec     = document.getElementById('pr-block-secrets')?.checked ?? true;
+
+    if (!name) { showToast('Rule name is required', 'error'); return; }
+
+    try {
+      await window.api('POST', '/policy/rules', {
+        name, repo_pattern: pattern, fail_on: failOn,
+        max_high: maxHigh, min_score: minScore,
+        block_critical: blkCrit, block_secrets: blkSec,
+        active: true
+      });
+      showToast('Rule created!', 'success');
+      document.getElementById('policy-rule-form').style.display = 'none';
+      // Reset form
+      ['pr-name','pr-pattern','pr-max-high','pr-min-score'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = id.includes('max') ? '-1' : id.includes('score') ? '0' : '';
+      });
+      window.loadRules?.();
+    } catch(e) {
+      showToast('Failed: ' + (e.message || 'unknown error'), 'error');
+    }
+  };
+
+  // Test rule against last run
+  window.testPolicyRule = async function() {
+    try {
+      const run = await window.api('GET', '/vsp/run/latest');
+      const result = await window.api('POST', '/policy/evaluate', {
+        repo: '*', rid: run.rid
+      });
+      const color = result.decision === 'PASS' ? 'success' : result.decision === 'WARN' ? 'info' : 'error';
+      showToast(`Gate: ${result.decision} | Score: ${result.score}/100`, color);
+    } catch(e) {
+      showToast('Test failed: ' + e.message, 'error');
+    }
+  };
+
+  // Add "Test against latest run" button
+  if (rulesEl && !document.getElementById('policy-test-btn')) {
+    const testBtn = document.createElement('button');
+    testBtn.id = 'policy-test-btn';
+    testBtn.className = 'btn-sm';
+    testBtn.style.cssText = 'margin-bottom:16px;margin-left:8px;font-size:11px';
+    testBtn.textContent = '▷ Test latest run';
+    testBtn.onclick = window.testPolicyRule;
+    const createBtn = document.getElementById('policy-create-btn');
+    if (createBtn) createBtn.parentNode.insertBefore(testBtn, createBtn.nextSibling);
+  }
 })();
 
 
