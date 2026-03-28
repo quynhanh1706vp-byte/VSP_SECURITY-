@@ -2333,7 +2333,8 @@ async function loadExecutive() {
           <span style="font-size:10px;color:var(--text3);margin-left:8px">SLA: ${s.sla_days}d · ${s.open_count} open</span>
         </div>
         <span style="font-size:10px;font-weight:600;color:${s.status==='green'?'var(--green)':'var(--red)'}">${s.status.toUpperCase()}</span>
-      </div>`).join('')
+      </div>`;
+    }).join('')
 
     // Top findings
     const findData = await api('GET', '/vsp/findings?limit=5&severity=CRITICAL')
