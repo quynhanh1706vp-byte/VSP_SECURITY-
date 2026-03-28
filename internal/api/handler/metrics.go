@@ -2,41 +2,74 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// ── VSP custom Prometheus metrics ───────────────────────────────────────────
+
 var (
-	RunsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "vsp_runs_total",
-		Help: "Total scan runs by mode and gate decision",
-	}, []string{"mode", "gate"})
+	ScansTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vsp_scans_total",
+		Help: "Total number of scans triggered, by mode and status.",
+	}, []string{"mode", "status"})
 
-	FindingsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "vsp_findings_total",
-		Help: "Total findings by severity and tool",
-	}, []string{"severity", "tool"})
+	ScanDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "vsp_scan_duration_seconds",
+		Help:    "Scan duration in seconds.",
+		Buckets: []float64{5, 15, 30, 60, 120, 300, 600},
+	}, []string{"mode", "profile"})
 
-	RunDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "vsp_run_duration_seconds",
-		Help:    "Scan run duration in seconds",
-		Buckets: []float64{1, 5, 10, 30, 60, 120, 300},
-	}, []string{"mode"})
+	FindingsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "vsp_findings_current",
+		Help: "Current finding counts by severity.",
+	}, []string{"severity"})
 
-	ActiveRuns = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "vsp_active_runs",
-		Help: "Currently running scans",
+	GateDecisions = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vsp_gate_decisions_total",
+		Help: "Gate decisions by outcome.",
+	}, []string{"decision"})
+
+	ActiveSSEClients = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "vsp_sse_clients_active",
+		Help: "Number of active SSE connections.",
 	})
 
-	HTTPRequests = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "vsp_http_requests_total",
-		Help: "Total HTTP requests",
+	APIRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "vsp_api_request_duration_seconds",
+		Help:    "API request duration.",
+		Buckets: prometheus.DefBuckets,
 	}, []string{"method", "path", "status"})
+
+	WebhookDeliveries = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vsp_webhook_deliveries_total",
+		Help: "SIEM webhook delivery attempts.",
+	}, []string{"type", "status"})
 )
 
-// MetricsHandler returns the Prometheus metrics endpoint handler.
+// MetricsHandler returns the Prometheus HTTP handler.
 func MetricsHandler() http.Handler {
 	return promhttp.Handler()
+}
+
+// RecordScan is called by the pipeline after a scan completes.
+func RecordScan(mode, status string, duration time.Duration) {
+	ScansTotal.WithLabelValues(mode, status).Inc()
+	ScanDurationSeconds.WithLabelValues(mode, "").Observe(duration.Seconds())
+}
+
+// RecordGate records a gate decision.
+func RecordGate(decision string) {
+	GateDecisions.WithLabelValues(decision).Inc()
+}
+
+// RecordFindings updates the current findings gauge.
+func RecordFindings(critical, high, medium, low int) {
+	FindingsGauge.WithLabelValues("CRITICAL").Set(float64(critical))
+	FindingsGauge.WithLabelValues("HIGH").Set(float64(high))
+	FindingsGauge.WithLabelValues("MEDIUM").Set(float64(medium))
+	FindingsGauge.WithLabelValues("LOW").Set(float64(low))
 }

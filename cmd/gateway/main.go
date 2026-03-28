@@ -138,9 +138,10 @@ func main() {
 	r.Get("/auth/sso/login",     ssoH.Login)
 	r.Get("/auth/sso/callback",  ssoH.Callback)
 	r.Get("/api/v1/events", handler.SSEHandler)
+	r.Get("/api/v1/ws",     handler.WSUpgradeHandler)
 	r.Get("/api/docs", handler.SwaggerUI)
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
-	r.Post("/api/v1/auth/login", authH.Login)
+	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
 
 	authMw := auth.Middleware(jwtSecret, keyStore)
 	r.Group(func(r chi.Router) {
