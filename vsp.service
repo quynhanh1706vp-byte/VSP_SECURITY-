@@ -1,0 +1,16 @@
+[Unit]
+Description=VSP Security Platform
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/vsp
+EnvironmentFile=/opt/vsp/.env
+ExecStart=/usr/bin/docker compose -f docker/compose.prod.yml up -d
+ExecStop=/usr/bin/docker compose -f docker/compose.prod.yml down
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

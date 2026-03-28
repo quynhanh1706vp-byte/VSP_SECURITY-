@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vsp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vsp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vsp}
+      POSTGRES_DB: ${POSTGRES_DB:-vsp_go}
+    volumes:
+      - vsp_pgdata:/var/lib/postgresql/data
+      - ../migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vsp -d vsp_go"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: vsp_redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-VspRedis2026!} --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-VspRedis2026!}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    container_name: vsp_gateway
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-vsp}:${POSTGRES_PASSWORD:-vsp}@postgres:5432/${POSTGRES_DB:-vsp_go}?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-VspRedis2026!}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      SERVER_ENV: production
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8922}
+    ports:
+      - "8921:8921"
+
+  scanner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.scanner
+    container_name: vsp_scanner
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-vsp}:${POSTGRES_PASSWORD:-vsp}@postgres:5432/${POSTGRES_DB:-vsp_go}?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-VspRedis2026!}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  shell:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.shell
+    container_name: vsp_shell
+    restart: unless-stopped
+    depends_on:
+      - gateway
+    environment:
+      GATEWAY_PORT: 8921
+      SHELL_PORT: 8922
+    ports:
+      - "8922:8922"
+
+volumes:
+  vsp_pgdata:
