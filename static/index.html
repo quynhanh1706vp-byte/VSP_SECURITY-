@@ -742,7 +742,7 @@ pre  { font-family: var(--mono); font-size: 11px; color: var(--text2); line-heig
       </select>
     </div>
     <!-- Notifications -->
-    <div onclick="toggleNotifPanel()" style="display:flex;align-items:center;gap:8px;
+    <div onclick="openNotifCenter()" id="notif-bell-btn" style="position:relative" style="display:flex;align-items:center;gap:8px;position:relative;cursor:pointer;
       padding:7px 10px;cursor:pointer;color:var(--text3);font-size:12px;border-radius:4px;
       transition:all .12s" onmouseover="this.style.color='var(--amber)';this.style.background='rgba(240,165,0,.06)'"
       onmouseout="this.style.color='var(--text3)';this.style.background='none'">
@@ -2514,6 +2514,46 @@ s.textContent = `
 .policy-rule-card:hover { border-color:var(--border2); }
 .policy-rule-header { display:flex;align-items:center;gap:10px;margin-bottom:10px; }
 .policy-rule-name { font-size:13px;font-weight:700;color:var(--text1);flex:1; }
+/* ── Notification center ─────────────────────────────── */
+#notif-center {
+  position:fixed;top:0;right:0;bottom:0;width:340px;
+  background:var(--navy);border-left:1px solid var(--border);
+  z-index:300;transform:translateX(100%);transition:transform .25s ease;
+  display:flex;flex-direction:column;
+}
+#notif-center.open { transform:translateX(0); }
+.notif-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px;border-bottom:1px solid var(--border);
+  font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text2);
+}
+.notif-item {
+  display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .15s;
+}
+.notif-item:hover { background:var(--surface); }
+.notif-item.unread { border-left:3px solid var(--amber); }
+.notif-item.unread.level-warn { border-left-color:var(--amber); }
+.notif-item.unread.level-critical { border-left-color:var(--red); }
+.notif-icon {
+  width:32px;height:32px;border-radius:8px;background:var(--surface);
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;
+}
+.notif-title { font-size:11px;font-weight:600;color:var(--text1);margin-bottom:2px; }
+.notif-body  { font-size:11px;color:var(--text2);line-height:1.4; }
+.notif-time  { font-size:10px;color:var(--text3);margin-top:4px; }
+.notif-empty { padding:40px 20px;text-align:center;color:var(--text3);font-size:12px; }
+#notif-overlay {
+  position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:299;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+#notif-overlay.open { opacity:1;pointer-events:all; }
+.notif-badge {
+  position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;
+  font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;min-width:16px;
+  text-align:center;line-height:14px;
+}
 .policy-toggle {
   width:36px;height:20px;border-radius:10px;background:var(--border2);
   cursor:pointer;position:relative;transition:.2s;flex-shrink:0;
@@ -4097,6 +4137,33 @@ setTimeout(()=>{
   }
 }, 800);
 </script>
+
+<!-- ── NOTIFICATION CENTER ──────────────────────────────────────── -->
+<div id="notif-overlay" onclick="closeNotifCenter()"></div>
+<div id="notif-center">
+  <div class="notif-header">
+    <span>Notifications</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="markAllRead()" style="font-size:10px;background:none;border:1px solid var(--border2);
+        border-radius:4px;padding:2px 8px;color:var(--text2);cursor:pointer;letter-spacing:.05em">
+        Mark all read
+      </button>
+      <button onclick="closeNotifCenter()" style="background:none;border:none;color:var(--text2);
+        cursor:pointer;font-size:16px;line-height:1">×</button>
+    </div>
+  </div>
+  <div id="notif-list" style="flex:1;overflow-y:auto;scrollbar-width:thin">
+    <div class="notif-empty">Loading...</div>
+  </div>
+  <div style="padding:12px 20px;border-top:1px solid var(--border)">
+    <button onclick="showPanel('audit',null);closeNotifCenter()"
+      style="width:100%;padding:8px;background:var(--surface);border:1px solid var(--border2);
+             border-radius:6px;color:var(--text2);cursor:pointer;font-size:11px;
+             letter-spacing:.05em">
+      View full audit log →
+    </button>
+  </div>
+</div>
 </body><script>
 /**
  * VSP Upgrade v0.9.0
@@ -4865,6 +4932,88 @@ function toggleTheme() {
     });
   }
 })();
+
+// ── Notification center ───────────────────────────────────────────────────
+let _notifData = [];
+let _notifRead = new Set(JSON.parse(localStorage.getItem('vsp-notif-read') || '[]'));
+
+function openNotifCenter() {
+  document.getElementById('notif-center').classList.add('open');
+  document.getElementById('notif-overlay').classList.add('open');
+  loadNotifications();
+}
+function closeNotifCenter() {
+  document.getElementById('notif-center').classList.remove('open');
+  document.getElementById('notif-overlay').classList.remove('open');
+}
+async function loadNotifications() {
+  try {
+    const r = await api('GET', '/api/v1/notifications');
+    _notifData = r.notifications || [];
+    renderNotifList();
+    updateNotifBadge();
+  } catch(e) {
+    document.getElementById('notif-list').innerHTML =
+      '<div class="notif-empty">Failed to load</div>';
+  }
+}
+function renderNotifList() {
+  const el = document.getElementById('notif-list');
+  if (!_notifData.length) {
+    el.innerHTML = '<div class="notif-empty">No notifications</div>';
+    return;
+  }
+  el.innerHTML = _notifData.map(n => {
+    const read = _notifRead.has(n.id);
+    const ago  = timeAgo(new Date(n.created_at));
+    return `<div class="notif-item ${read?'':'unread'} level-${n.level}"
+              onclick="markRead(${n.id})">
+      <div class="notif-icon">${n.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="notif-title">${n.title}</div>
+        <div class="notif-body">${n.body}</div>
+        <div class="notif-time">${ago}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function markRead(id) {
+  _notifRead.add(id);
+  localStorage.setItem('vsp-notif-read', JSON.stringify([..._notifRead]));
+  renderNotifList();
+  updateNotifBadge();
+}
+function markAllRead() {
+  _notifData.forEach(n => _notifRead.add(n.id));
+  localStorage.setItem('vsp-notif-read', JSON.stringify([..._notifRead]));
+  renderNotifList();
+  updateNotifBadge();
+}
+function updateNotifBadge() {
+  const unread = _notifData.filter(n => !_notifRead.has(n.id)).length;
+  const badge = document.getElementById('notif-badge');
+  if (badge) {
+    badge.textContent = unread > 9 ? '9+' : unread;
+    badge.style.display = unread > 0 ? 'block' : 'none';
+  }
+}
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - date) / 1000);
+  if (s < 60)    return `${s}s ago`;
+  if (s < 3600)  return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
+// Auto-refresh notifications every 30s when center is open
+setInterval(() => {
+  if (document.getElementById('notif-center').classList.contains('open')) {
+    loadNotifications();
+  }
+}, 30000);
+// Load badge count on startup (after login)
+function initNotifications() {
+  loadNotifications();
+}
 </script>
 </body>
 </html>

@@ -181,6 +181,7 @@ func main() {
 
 		// Audit
 		r.Get("/api/v1/audit/log", auditH.List)
+		r.Get("/api/v1/notifications", auditH.Notifications)
 		r.Post("/api/v1/audit/verify", auditH.Verify)
 
 		// SIEM
