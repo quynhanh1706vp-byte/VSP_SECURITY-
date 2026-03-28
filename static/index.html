@@ -1419,6 +1419,11 @@ function showApp() {
   loadDashboard()
   loadDashboardCharts()
   startPolling()
+  // Load sidebar data
+  setTimeout(() => {
+    if (typeof loadTenants === 'function') loadTenants()
+    if (typeof initNotifications === 'function') initNotifications()
+  }, 300)
 }
 
 // ── API helper ────────────────────────────────────────────────────────────────
@@ -2161,22 +2166,8 @@ if (TOKEN) {
 let currentTenantID = ''
 let tenants = []
 
-async function loadTenants() {
-  try {
-    // Use current user's tenant from JWT
-    const user = JSON.parse(localStorage.getItem('vsp_user') || '{}')
-    currentTenantID = user.tenant_id || ''
-    // For now show single tenant — extensible to multi
-    const opt = document.getElementById('tenantSwitcher')
-    if (opt) {
-      opt.innerHTML = `<option value="${currentTenantID}">${user.email?.split('@')[1] || 'default'} tenant</option>`
-    }
-  } catch(e) {}
-}
-
 function switchTenant(tid) {
   currentTenantID = tid
-  // Reload all panels
   loadDashboard()
   loadDashboardCharts()
   showToast('Switched to tenant: ' + tid.slice(0,8), 'info')
@@ -2949,6 +2940,8 @@ const REC_COLOR = {CRITICAL:'var(--red)',HIGH:'#ff8c00',MEDIUM:'var(--amber)',LO
   };
 
   let _pollInterval = null;
+  let _runsRefreshInterval = null;
+
   function startSSEFallbackPoll() {
     if (_pollInterval) return;
     _pollInterval = setInterval(async () => {
@@ -2958,6 +2951,44 @@ const REC_COLOR = {CRITICAL:'var(--red)',HIGH:'#ff8c00',MEDIUM:'var(--amber)',LO
         const latestRunning = runs.find(r=>r.status==='RUNNING');
         if (latestRunning) {
           handleSSEMsg({type:'scan_started', rid:latestRunning.rid, mode:latestRunning.mode, tools_total:latestRunning.tools_total||0});
+          // Auto-refresh runs table mỗi 5s khi có RUNNING
+          if (!_runsRefreshInterval) {
+            _runsRefreshInterval = setInterval(async () => {
+              try {
+                const d = await window.api('GET', '/vsp/runs?limit=20');
+                const rs = d.runs || [];
+                const stillRunning = rs.some(r => r.status === 'RUNNING' || r.status === 'QUEUED');
+                if (typeof window.renderRunsTable === 'function') window.renderRunsTable(rs);
+                if (typeof window.loadRuns === 'function') window.loadRuns();
+                // Cập nhật progress bar nếu có
+                const running = rs.find(r => r.status === 'RUNNING');
+                if (running) {
+                  const pct = running.tools_total > 0
+                    ? Math.round(running.tools_done / running.tools_total * 100) : 0;
+                  const bar = document.getElementById('scan-prog-bar');
+                  if (bar) bar.style.width = pct + '%';
+                  const lbl = document.getElementById('scan-prog-label');
+                  if (lbl) lbl.textContent = running.tools_done + '/' + running.tools_total + ' tools';
+                }
+                // Stop polling khi không còn RUNNING/QUEUED
+                if (!stillRunning) {
+                  clearInterval(_runsRefreshInterval);
+                  _runsRefreshInterval = null;
+                  // Reload dashboard sau khi scan xong
+                  setTimeout(() => {
+                    if (typeof window.loadDashboard === 'function') window.loadDashboard();
+                    if (typeof window.loadDashboardCharts === 'function') window.loadDashboardCharts();
+                  }, 1000);
+                }
+              } catch(e) {}
+            }, 5000);
+          }
+        } else {
+          // Không còn RUNNING — dừng refresh interval
+          if (_runsRefreshInterval) {
+            clearInterval(_runsRefreshInterval);
+            _runsRefreshInterval = null;
+          }
         }
       } catch(e){}
     }, 15000);
@@ -5188,15 +5219,25 @@ function switchTenant(id, name) {
 // Load on startup
 const _origInitApp = typeof initApp === 'function' ? initApp : null;
 document.addEventListener('DOMContentLoaded', function() {
-  // Hook vào sau login
-  const origDoLogin = window.doLogin;
-  if (origDoLogin) {
-    window.doLogin = async function() {
-      await origDoLogin.apply(this, arguments);
-      setTimeout(() => { loadTenants(); initNotifications(); }, 500);
-    };
+  // Restore saved theme
+  const saved = localStorage.getItem('vsp-theme');
+  if (saved === 'light' && document.documentElement.getAttribute('data-theme') !== 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    const icon = document.getElementById('theme-icon');
+    const lbl  = document.getElementById('theme-label');
+    if (icon) icon.textContent = '◑';
+    if (lbl)  lbl.textContent  = 'Dark mode';
   }
 });
+
+// ── Filter state persistence across tab switches ──────────────────────────
+window._filterState = {};
+function saveFilterState(panel, state) {
+  window._filterState[panel] = state;
+}
+function restoreFilterState(panel) {
+  return window._filterState[panel] || {};
+}
 </script>
 </body>
 </html>
