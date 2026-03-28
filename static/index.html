@@ -1435,6 +1435,9 @@ async function loadTenants() {
         <span>${current ? current.name : 'Default'}</span>
         <span style="margin-left:auto;font-size:9px;color:var(--text3)">${current ? current.plan : ''}</span>
       </div>`;
+      // Update bottom tenantSwitcher
+      const sel = document.getElementById('tenantSwitcher');
+      if (sel) sel.innerHTML = `<option value="${current ? current.id : ''}">${current ? current.name : 'Default'}</option>`;
       return;
     }
 
@@ -1469,7 +1472,8 @@ function showApp() {
   setTimeout(() => {
     if (typeof loadTenants === 'function') loadTenants()
     if (typeof initNotifications === 'function') initNotifications()
-  }, 300)
+    if (typeof updateTicker === 'function') updateTicker()
+  }, 500)
 }
 
 // ── API helper ────────────────────────────────────────────────────────────────
@@ -4170,6 +4174,7 @@ console.log('[VSP Upgrade v0.8.0] Governance+SOC+Pagination+Ticker+QuickSearch l
 <script>
 // ── TICKER UPDATE ─────────────────────────────────────
 function updateTicker() {
+  if (!window.TOKEN) return;
   window.api && window.api('GET','/vsp/run/latest').then(r=>{
     const el = document.getElementById('ticker-content');
     if (el) el.textContent = (r.rid||'').slice(-20)+' · '+(r.mode||'')+' · '+(r.status||'')+(r.gate?' · '+r.gate:'')+(r.total_findings>0?' · '+r.total_findings+' findings':'');
@@ -4365,16 +4370,15 @@ const e9 = s2 => String(s2||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 // ══════════════════════════════════════════════════════════════════
 // A1. FIX setInterval ticker — guard TOKEN
 // ══════════════════════════════════════════════════════════════════
-const origTick = window.updateTicker;
-window.updateTicker = async function() {
-  if (!window.TOKEN) return;
-  return origTick?.();
-};
-// Replace interval
+// Ticker interval — guard with TOKEN
 if (window._tickerInterval) clearInterval(window._tickerInterval);
 window._tickerInterval = setInterval(() => {
-  if (window.TOKEN) window.updateTicker();
+  if (window.TOKEN && typeof updateTicker === 'function') updateTicker();
 }, 20000);
+// Trigger once after short delay
+setTimeout(() => {
+  if (window.TOKEN && typeof updateTicker === 'function') updateTicker();
+}, 1000);
 
 // ══════════════════════════════════════════════════════════════════
 // A2. COMPLIANCE RADIAL GAUGES
