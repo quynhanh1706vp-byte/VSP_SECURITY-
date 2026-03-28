@@ -1,0 +1,171 @@
+# ================================================================
+# VSP Go Enterprise — CI/CD Pipeline
+# GitHub Actions: tích hợp scan vào pull request workflow
+# ================================================================
+
+name: VSP Security Scan
+
+on:
+  push:
+    branches: [main, develop, release/*]
+  pull_request:
+    branches: [main]
+
+env:
+  VSP_URL: http://your-server:8921
+  VSP_EMAIL: ci@vsp.local
+  VSP_PASSWORD: ${{ secrets.VSP_PASSWORD }}
+
+jobs:
+  security-scan:
+    name: VSP Security Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get VSP token
+        id: auth
+        run: |
+          TOKEN=$(curl -sf -X POST "$VSP_URL/api/v1/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$VSP_EMAIL\",\"password\":\"$VSP_PASSWORD\"}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Trigger SAST scan
+        id: scan
+        run: |
+          RID=$(curl -sf -X POST "$VSP_URL/api/v1/vsp/run" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"mode\":\"SAST\",\"profile\":\"FAST\",\"src\":\"$(pwd)\"}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rid'])")
+          echo "rid=$RID" >> $GITHUB_OUTPUT
+          echo "Scan triggered: $RID"
+
+      - name: Poll for results
+        run: |
+          TOKEN="${{ steps.auth.outputs.token }}"
+          RID="${{ steps.scan.outputs.rid }}"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+              "$VSP_URL/api/v1/vsp/run/$RID" \
+              | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+            echo "Poll $i: $STATUS"
+            if [ "$STATUS" = "DONE" ] || [ "$STATUS" = "FAILED" ]; then break; fi
+            sleep 10
+          done
+
+      - name: Evaluate gate
+        id: gate
+        run: |
+          TOKEN="${{ steps.auth.outputs.token }}"
+          RID="${{ steps.scan.outputs.rid }}"
+          RESULT=$(curl -sf -X POST "$VSP_URL/api/v1/policy/evaluate" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"repo\":\"$GITHUB_REPOSITORY\",\"rid\":\"$RID\"}")
+          DECISION=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['decision'])")
+          SCORE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['score'])")
+          POSTURE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['posture'])")
+          echo "decision=$DECISION" >> $GITHUB_OUTPUT
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          echo "posture=$POSTURE" >> $GITHUB_OUTPUT
+          echo "Gate: $DECISION | Score: $SCORE | Posture: $POSTURE"
+
+      - name: Download SARIF report
+        run: |
+          TOKEN="${{ steps.auth.outputs.token }}"
+          RID="${{ steps.scan.outputs.rid }}"
+          curl -sf -H "Authorization: Bearer $TOKEN" \
+            "$VSP_URL/api/v1/export/sarif/$RID" \
+            -o vsp-results.sarif
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: vsp-results.sarif
+
+      - name: Download CSV report
+        run: |
+          TOKEN="${{ steps.auth.outputs.token }}"
+          RID="${{ steps.scan.outputs.rid }}"
+          curl -sf -H "Authorization: Bearer $TOKEN" \
+            "$VSP_URL/api/v1/export/csv/$RID" \
+            -o vsp-findings.csv
+
+      - name: Upload findings artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vsp-security-report
+          path: |
+            vsp-results.sarif
+            vsp-findings.csv
+
+      - name: Fail on gate FAIL
+        if: steps.gate.outputs.decision == 'FAIL'
+        run: |
+          echo "❌ Security gate FAILED"
+          echo "Score: ${{ steps.gate.outputs.score }}/100"
+          echo "Posture: ${{ steps.gate.outputs.posture }}"
+          exit 1
+
+      - name: Warn on gate WARN
+        if: steps.gate.outputs.decision == 'WARN'
+        run: |
+          echo "⚠️ Security gate WARNING"
+          echo "Score: ${{ steps.gate.outputs.score }}/100"
+
+      - name: Success
+        if: steps.gate.outputs.decision == 'PASS'
+        run: |
+          echo "✅ Security gate PASSED"
+          echo "Score: ${{ steps.gate.outputs.score }}/100"
+          echo "Posture: ${{ steps.gate.outputs.posture }}"
+
+  # Full scan on main branch only
+  full-scan:
+    name: Full Security Audit
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 60
+    needs: security-scan
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get token
+        id: auth
+        run: |
+          TOKEN=$(curl -sf -X POST "$VSP_URL/api/v1/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$VSP_EMAIL\",\"password\":\"$VSP_PASSWORD\"}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Trigger FULL scan
+        run: |
+          RID=$(curl -sf -X POST "$VSP_URL/api/v1/vsp/run" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"mode\":\"FULL\",\"profile\":\"EXT\",\"src\":\"$(pwd)\"}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['rid'])")
+          echo "Full scan: $RID"
+
+      - name: Download OSCAL POA&M
+        run: |
+          TOKEN="${{ steps.auth.outputs.token }}"
+          curl -sf -H "Authorization: Bearer $TOKEN" \
+            "$VSP_URL/api/v1/compliance/oscal/poam?format=download" \
+            -o oscal-poam.json
+
+      - name: Upload compliance artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: oscal-poam.json
