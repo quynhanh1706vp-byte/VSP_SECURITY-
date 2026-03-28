@@ -1545,16 +1545,9 @@ async function loadDashboard() {
       </tr>`).join('')
   } catch(e) { console.error('dashboard', e) }
   // Ensure ticker exists
-  if (!document.getElementById('dash-ticker')) {
-    const panel = document.getElementById('panel-dashboard');
-    if (panel) {
-      const t = document.createElement('div');
-      t.id = 'dash-ticker';
-      t.style.cssText = 'display:flex;align-items:center;gap:12px;padding:8px 16px;background:rgba(240,165,0,.06);border:1px solid rgba(240,165,0,.15);border-radius:6px;margin-bottom:14px;font-size:11px;font-family:var(--mono)';
-      t.innerHTML = '<div style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:ssePulse 2s infinite"></div><span style="color:var(--text3)">LATEST:</span><span id="ticker-content" style="color:var(--text2)">—</span>';
-      panel.insertBefore(t, panel.firstChild);
-    }
-  }
+  // ticker already in DOM — just update
+  if(window.TOKEN) setTimeout(updateTicker, 100);
+
   const tc = document.getElementById('ticker-content');
   if (tc) {
     api('GET','/vsp/run/latest').then(r=>{
@@ -3924,28 +3917,8 @@ const SEV_C = {CRITICAL:'#f87171',HIGH:'#fb923c',MEDIUM:'#fbbf24',LOW:'#4ade80',
   const panel = document.getElementById('panel-dashboard');
   if (!panel) return;
 
-  const ticker = document.createElement('div');
-  ticker.id = 'dash-ticker';
-  ticker.innerHTML = `
-    <div class="ticker-dot"></div>
-    <span class="ticker-label">LATEST:</span>
-    <span class="ticker-content" id="ticker-content">Loading last scan…</span>
-    <span class="ticker-time" id="ticker-time"></span>
-  `;
-  panel.insertBefore(ticker, panel.firstChild);
+  if(window.TOKEN) setTimeout(updateTicker, 200);
 
-  async function updateTicker() {
-    try {
-      if (!window.TOKEN) return;
-      const r = await fetch('/api/v1/vsp/run/latest', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>{if(!r.ok)return null;return r.json()}).catch(()=>null);
-      if (!r) return;
-      const content = `${r.rid?.slice(-16)||'—'} · ${r.mode||'?'} · ${r.status||'?'}${r.gate?' · '+r.gate:''}${(r.total_findings||0)>0?' · '+r.total_findings+' findings':''}`;
-      const el = document.getElementById('ticker-content');
-      const tel = document.getElementById('ticker-time');
-      if (el) el.textContent = content;
-      if (tel) tel.textContent = r.created_at ? new Date(r.created_at).toLocaleTimeString() : '';
-    } catch(e){}
-  }
   updateTicker();
   setInterval(() => { if(window.TOKEN) updateTicker(); }, 20000);
 
@@ -4136,19 +4109,9 @@ window.showPanel = function(name, btn) {
 
 // Force re-init ticker và QS nếu chưa có
 setTimeout(function(){
-  if (!document.getElementById('dash-ticker')) {
-    const panel = document.getElementById('panel-dashboard');
-    if (panel) {
-      const ticker = document.createElement('div');
-      ticker.id = 'dash-ticker';
-      ticker.innerHTML = '<div class="ticker-dot"></div><span class="ticker-label">LATEST:</span><span class="ticker-content" id="ticker-content">Loading...</span><span class="ticker-time" id="ticker-time"></span>';
-      panel.insertBefore(ticker, panel.firstChild);
-      window.api('GET','/vsp/run/latest').then(r=>{
-        const el=document.getElementById('ticker-content');
-        if(el) el.textContent=r.rid?.slice(-16)+'·'+r.mode+'·'+r.status+(r.gate?'·'+r.gate:'');
-      }).catch(()=>{});
-    }
-  }
+  // ticker already in DOM — just update
+  if(window.TOKEN) setTimeout(updateTicker, 100);
+
   if (!document.getElementById('quick-search-overlay')) {
     const ov = document.createElement('div');
     ov.id = 'quick-search-overlay';
