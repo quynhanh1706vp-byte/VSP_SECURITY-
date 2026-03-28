@@ -2348,6 +2348,40 @@ async function loadExecutive() {
   } catch(e) { console.error('executive', e) }
 }
 
+function renderExecTrend(runs) {
+  const canvas = document.getElementById('exec-trend-canvas');
+  if (!canvas || !runs.length) return;
+  const labels = runs.map(r => r.rid.slice(-8));
+  const scores = runs.map(r => {
+    const s = r.summary || {};
+    const raw = (s.CRITICAL||0)*25 + (s.HIGH||0)*10 + (s.MEDIUM||0)*3 + (s.LOW||0);
+    return Math.max(0, 100 - Math.min(100, raw));
+  });
+  const ptColors = runs.map(r =>
+    r.gate==='PASS' ? 'rgba(0,230,118,.8)' :
+    r.gate==='WARN' ? 'rgba(240,165,0,.8)' : 'rgba(255,61,87,.8)'
+  );
+  if (window._execTrendChart) window._execTrendChart.destroy();
+  window._execTrendChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets: [{
+      label: 'Score', data: scores,
+      borderColor: 'rgba(0,212,255,.8)', backgroundColor: 'rgba(0,212,255,.06)',
+      borderWidth: 2, pointBackgroundColor: ptColors, pointRadius: 5,
+      tension: 0.3, fill: true
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false} },
+      scales: {
+        x: { ticks: { color:'#64748b', font:{size:9}, maxRotation:45, maxTicksLimit:10 } },
+        y: { min:0, max:100, ticks:{color:'#64748b',font:{size:9}},
+             grid:{color:'rgba(255,255,255,.05)'} }
+      }
+    }
+  });
+}
+
 async function downloadExecutivePDF() {
   showToast('Generating PDF report...', 'info')
   try {
