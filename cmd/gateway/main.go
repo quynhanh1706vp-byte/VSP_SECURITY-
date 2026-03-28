@@ -270,7 +270,7 @@ func main() {
 			log.Fatal().Err(err).Msg("server error")
 		}
 	}()
-	log.Info().Str("addr", addr).Msg("VSP Gateway v0.9.0 — Enterprise Premium LIVE ✓")
+	log.Info().Str("addr", addr).Msg("VSP Gateway v0.10.0 — Enterprise Premium LIVE ✓")
 	<-quit
 	sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -280,7 +280,7 @@ func main() {
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status":"ok","version":"0.9.0","port":%d,"tier":"enterprise"}`,
+	fmt.Fprintf(w, `{"status":"ok","version":"0.10.0","port":%d,"tier":"enterprise"}`,
 		viper.GetInt("server.gateway_port"))
 }
 func corsMiddleware(next http.Handler) http.Handler {

@@ -1412,6 +1412,52 @@ function doLogout() { window._loggingOut=false;
   handleSSOCallback()
 }
 
+// ── Tenant switcher ────────────────────────────────────────────────────────
+async function loadTenants() {
+  try {
+    const r = await api('GET', '/tenants');
+    const tenants = r.tenants || [];
+    const currentID = r.current_tenant_id;
+    const el = document.getElementById('tenant-switcher-list');
+    if (!el) return;
+
+    // Update sidebar name
+    const current = tenants.find(t => t.current);
+    if (current) {
+      const nameEl = document.getElementById('current-tenant-name');
+      if (nameEl) nameEl.textContent = current.name;
+    }
+
+    if (tenants.length <= 1) {
+      // Single tenant — show name only, no dropdown
+      el.innerHTML = `<div class="tenant-item active">
+        <div class="tenant-dot"></div>
+        <span>${current ? current.name : 'Default'}</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--text3)">${current ? current.plan : ''}</span>
+      </div>`;
+      return;
+    }
+
+    // Multi-tenant — show switcher
+    el.innerHTML = tenants.map(t => `
+      <div class="tenant-item ${t.current ? 'active' : ''}"
+           onclick="switchTenant('${t.id}', '${t.name}')">
+        <div class="tenant-dot"></div>
+        <span>${t.name}</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--text3)">${t.plan}</span>
+        ${t.current ? '<span style="font-size:9px;color:var(--amber)">●</span>' : ''}
+      </div>
+    `).join('');
+  } catch(e) { console.error('loadTenants:', e); }
+}
+
+function switchTenant(id, name) {
+  // Note: full multi-tenant switch requires re-auth with tenant scope
+  // Hiện tại: show info, chuẩn bị cho Phase 3
+  showToast(`Switched to: ${name}`, 'info');
+  loadTenants();
+}
+
 function showApp() {
   document.getElementById('loginScreen').style.display = 'none'
   document.getElementById('appScreen').style.display   = 'block'
@@ -5170,51 +5216,6 @@ async function createSchedule() {
   } catch(e) { showToast('Failed to create: ' + e.message, 'error'); }
 }
 
-// ── Tenant switcher ────────────────────────────────────────────────────────
-async function loadTenants() {
-  try {
-    const r = await api('GET', '/tenants');
-    const tenants = r.tenants || [];
-    const currentID = r.current_tenant_id;
-    const el = document.getElementById('tenant-switcher-list');
-    if (!el) return;
-
-    // Update sidebar name
-    const current = tenants.find(t => t.current);
-    if (current) {
-      const nameEl = document.getElementById('current-tenant-name');
-      if (nameEl) nameEl.textContent = current.name;
-    }
-
-    if (tenants.length <= 1) {
-      // Single tenant — show name only, no dropdown
-      el.innerHTML = `<div class="tenant-item active">
-        <div class="tenant-dot"></div>
-        <span>${current ? current.name : 'Default'}</span>
-        <span style="margin-left:auto;font-size:9px;color:var(--text3)">${current ? current.plan : ''}</span>
-      </div>`;
-      return;
-    }
-
-    // Multi-tenant — show switcher
-    el.innerHTML = tenants.map(t => `
-      <div class="tenant-item ${t.current ? 'active' : ''}"
-           onclick="switchTenant('${t.id}', '${t.name}')">
-        <div class="tenant-dot"></div>
-        <span>${t.name}</span>
-        <span style="margin-left:auto;font-size:9px;color:var(--text3)">${t.plan}</span>
-        ${t.current ? '<span style="font-size:9px;color:var(--amber)">●</span>' : ''}
-      </div>
-    `).join('');
-  } catch(e) { console.error('loadTenants:', e); }
-}
-
-function switchTenant(id, name) {
-  // Note: full multi-tenant switch requires re-auth with tenant scope
-  // Hiện tại: show info, chuẩn bị cho Phase 3
-  showToast(`Switched to: ${name}`, 'info');
-  loadTenants();
-}
 
 // Load on startup
 const _origInitApp = typeof initApp === 'function' ? initApp : null;

@@ -192,6 +192,7 @@ func buildExecData(run *store.Run, findings []store.Finding) execData {
 // ── Executive HTML template ──────────────────────────────────────────────────
 
 var execTmpl = template.Must(template.New("exec").Funcs(template.FuncMap{
+	"inc": func(i int) int { return i + 1 },
 	"sevColor": func(s string) string {
 		m := map[string]string{
 			"CRITICAL": "#dc2626", "HIGH": "#ea580c",
