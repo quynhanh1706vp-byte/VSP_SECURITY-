@@ -132,3 +132,10 @@ func (db *DB) ListStoreDriftEvents(ctx context.Context, tenantID string, limit i
 	}
 	return list, nil
 }
+
+func (db *DB) UpdateScheduleEnabled(ctx context.Context, tenantID, id string, enabled bool) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE scan_schedules SET enabled=$1 WHERE id=$2 AND tenant_id=$3`,
+		enabled, id, tenantID)
+	return err
+}

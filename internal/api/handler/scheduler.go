@@ -90,3 +90,20 @@ func (h *Scheduler) RunNow(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonError(w, "schedule not found", http.StatusNotFound)
 }
+
+// PATCH /api/v1/schedules/{id}/toggle — enable/disable
+func (h *Scheduler) Toggle(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	id := chi.URLParam(r, "id")
+	scheds := h.Engine.ListSchedules(r.Context())
+	for _, s := range scheds {
+		if s.ID == id && s.TenantID == claims.TenantID {
+			s.Enabled = !s.Enabled
+			h.DB.UpdateScheduleEnabled(r.Context(), claims.TenantID, id, s.Enabled) //nolint
+			h.Engine.Reload(r.Context())
+			jsonOK(w, map[string]any{"id": id, "enabled": s.Enabled})
+			return
+		}
+	}
+	jsonError(w, "schedule not found", http.StatusNotFound)
+}

@@ -488,6 +488,41 @@ tr:last-child td { border-bottom: none; }
 .notif-msg { font-size: 11px; color: var(--text1); font-weight: 500; }
 .notif-detail { font-size: 10px; color: var(--text3); margin-top: 2px; }
 .notif-time { font-size: 9px; color: var(--text3); flex-shrink: 0; }
+.sched-card {
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:16px;
+}
+.sched-card-info { flex:1;min-width:0; }
+.sched-card-name { font-size:12px;font-weight:600;color:var(--text1);margin-bottom:2px; }
+.sched-card-meta { font-size:11px;color:var(--text2); }
+.sched-toggle { position:relative;width:38px;height:22px;flex-shrink:0; }
+.sched-toggle input { opacity:0;width:0;height:0; }
+.sched-track {
+  position:absolute;inset:0;background:var(--border2);border-radius:11px;
+  cursor:pointer;transition:background .2s;
+}
+.sched-toggle input:checked + .sched-track { background:var(--green); }
+.sched-track::after {
+  content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;
+  background:#fff;border-radius:50%;transition:transform .2s;
+}
+.sched-toggle input:checked + .sched-track::after { transform:translateX(16px); }
+
+/* Tenant switcher */
+.tenant-switcher {
+  margin:0 10px 8px;border-radius:6px;background:var(--surface);
+  border:1px solid var(--border);overflow:hidden;
+}
+.tenant-item {
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  cursor:pointer;font-size:11px;color:var(--text2);transition:background .15s;
+  border-bottom:1px solid var(--border);
+}
+.tenant-item:last-child { border-bottom:none; }
+.tenant-item:hover { background:var(--border); }
+.tenant-item.active { color:var(--amber);font-weight:600; }
+.tenant-dot { width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0; }
+.tenant-item.active .tenant-dot { background:var(--amber); }
 .notif-empty { padding: 24px; text-align: center; font-size: 11px; color: var(--text3); letter-spacing: .1em; }
 
 /* ── REMEDIATION MODAL ─────────────────────────────────────────── */
@@ -673,6 +708,17 @@ pre  { font-family: var(--mono); font-size: 11px; color: var(--text2); line-heig
   <!-- Nav sections -->
   <div style="flex:1;padding:12px 0">
 
+    <!-- Tenant switcher -->
+    <div style="padding:8px 10px 4px">
+      <div style="font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase;
+        padding:4px 10px 6px;font-weight:600">Workspace</div>
+      <div id="tenant-switcher-list" class="tenant-switcher">
+        <div class="tenant-item active">
+          <div class="tenant-dot"></div>
+          <span id="current-tenant-name">Loading...</span>
+        </div>
+      </div>
+    </div>
     <div style="font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase;
       padding:12px 20px 6px;font-weight:600">Operations</div>
     <div id="sidebar-nav" style="display:flex;flex-direction:column;gap:1px;padding:0 10px">
@@ -5014,6 +5060,143 @@ setInterval(() => {
 function initNotifications() {
   loadNotifications();
 }
+
+// ── Scheduled scan UI ─────────────────────────────────────────────────────
+async function loadSchedules() {
+  try {
+    const r = await api('GET', '/api/v1/schedules');
+    const scheds = r.schedules || [];
+    const el = document.getElementById('sched-list');
+    if (!el) return;
+    if (!scheds.length) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px">No scheduled scans</div>';
+      return;
+    }
+    el.innerHTML = scheds.map(s => `
+      <div class="sched-card" id="sched-card-${s.id}">
+        <div class="sched-card-info">
+          <div class="sched-card-name">${s.name}</div>
+          <div class="sched-card-meta">
+            ${s.mode} · ${s.profile} · <code style="font-size:10px">${s.cron}</code>
+          </div>
+          <div class="sched-card-meta" style="margin-top:2px">
+            ${s.last_run_at ? 'Last: ' + new Date(s.last_run_at).toLocaleString() : 'Never run'}
+            · Next: ${new Date(s.next_run_at).toLocaleString()}
+          </div>
+        </div>
+        <button onclick="runSchedNow('${s.id}')" title="Run now"
+          style="background:none;border:1px solid var(--border2);border-radius:4px;
+                 padding:4px 10px;color:var(--text2);cursor:pointer;font-size:10px;margin-right:8px">
+          ▷ Now
+        </button>
+        <label class="sched-toggle" title="${s.enabled?'Enabled':'Disabled'}">
+          <input type="checkbox" ${s.enabled?'checked':''} onchange="toggleSched('${s.id}',this)">
+          <span class="sched-track"></span>
+        </label>
+        <button onclick="deleteSched('${s.id}')"
+          style="background:none;border:none;color:var(--text3);cursor:pointer;
+                 font-size:16px;margin-left:8px;padding:0 4px" title="Delete">×</button>
+      </div>
+    `).join('');
+  } catch(e) { console.error('loadSchedules:', e); }
+}
+
+async function toggleSched(id, cb) {
+  try {
+    const r = await api('PATCH', `/api/v1/schedules/${id}/toggle`);
+    showToast(r.enabled ? 'Schedule enabled' : 'Schedule disabled', 'success');
+  } catch(e) {
+    cb.checked = !cb.checked;
+    showToast('Failed to toggle schedule', 'error');
+  }
+}
+
+async function runSchedNow(id) {
+  try {
+    await api('POST', `/api/v1/schedules/${id}/run`);
+    showToast('Scan triggered!', 'success');
+  } catch(e) { showToast('Failed to trigger', 'error'); }
+}
+
+async function deleteSched(id) {
+  if (!confirm('Delete this schedule?')) return;
+  await api('DELETE', `/api/v1/schedules/${id}`);
+  showToast('Schedule deleted', 'info');
+  loadSchedules();
+}
+
+async function createSchedule() {
+  const name    = document.getElementById('sched-name')?.value || 'Scheduled scan';
+  const mode    = document.getElementById('sched-mode')?.value || 'SAST';
+  const profile = document.getElementById('sched-profile')?.value || 'FAST';
+  const cron    = document.getElementById('sched-cron')?.value || '0 2 * * *';
+  const src     = document.getElementById('sched-src')?.value || '';
+  try {
+    await api('POST', '/api/v1/schedules', {name, mode, profile, cron, src, enabled: true});
+    showToast('Schedule created!', 'success');
+    loadSchedules();
+    document.getElementById('sched-create-form').style.display = 'none';
+  } catch(e) { showToast('Failed to create: ' + e.message, 'error'); }
+}
+
+// ── Tenant switcher ────────────────────────────────────────────────────────
+async function loadTenants() {
+  try {
+    const r = await api('GET', '/api/v1/tenants');
+    const tenants = r.tenants || [];
+    const currentID = r.current_tenant_id;
+    const el = document.getElementById('tenant-switcher-list');
+    if (!el) return;
+
+    // Update sidebar name
+    const current = tenants.find(t => t.current);
+    if (current) {
+      const nameEl = document.getElementById('current-tenant-name');
+      if (nameEl) nameEl.textContent = current.name;
+    }
+
+    if (tenants.length <= 1) {
+      // Single tenant — show name only, no dropdown
+      el.innerHTML = `<div class="tenant-item active">
+        <div class="tenant-dot"></div>
+        <span>${current ? current.name : 'Default'}</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--text3)">${current ? current.plan : ''}</span>
+      </div>`;
+      return;
+    }
+
+    // Multi-tenant — show switcher
+    el.innerHTML = tenants.map(t => `
+      <div class="tenant-item ${t.current ? 'active' : ''}"
+           onclick="switchTenant('${t.id}', '${t.name}')">
+        <div class="tenant-dot"></div>
+        <span>${t.name}</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--text3)">${t.plan}</span>
+        ${t.current ? '<span style="font-size:9px;color:var(--amber)">●</span>' : ''}
+      </div>
+    `).join('');
+  } catch(e) { console.error('loadTenants:', e); }
+}
+
+function switchTenant(id, name) {
+  // Note: full multi-tenant switch requires re-auth with tenant scope
+  // Hiện tại: show info, chuẩn bị cho Phase 3
+  showToast(`Switched to: ${name}`, 'info');
+  loadTenants();
+}
+
+// Load on startup
+const _origInitApp = typeof initApp === 'function' ? initApp : null;
+document.addEventListener('DOMContentLoaded', function() {
+  // Hook vào sau login
+  const origDoLogin = window.doLogin;
+  if (origDoLogin) {
+    window.doLogin = async function() {
+      await origDoLogin.apply(this, arguments);
+      setTimeout(() => { loadTenants(); initNotifications(); }, 500);
+    };
+  }
+});
 </script>
 </body>
 </html>

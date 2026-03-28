@@ -182,6 +182,7 @@ func main() {
 		// Audit
 		r.Get("/api/v1/audit/log", auditH.List)
 		r.Get("/api/v1/notifications", auditH.Notifications)
+		r.Get("/api/v1/tenants", usersH.ListTenants)
 		r.Post("/api/v1/audit/verify", auditH.Verify)
 
 		// SIEM
@@ -219,6 +220,7 @@ func main() {
 		r.Get("/api/v1/schedules",           schedH.List)
 		r.Post("/api/v1/schedules",          schedH.Create)
 		r.Delete("/api/v1/schedules/{id}",   schedH.Delete)
+		r.Patch("/api/v1/schedules/{id}/toggle", schedH.Toggle)
 		r.Post("/api/v1/schedules/{id}/run", schedH.RunNow)
 		r.Get("/api/v1/drift",               schedH.DriftEvents)
 
