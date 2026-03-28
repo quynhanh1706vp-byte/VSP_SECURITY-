@@ -2101,22 +2101,36 @@ function openRemModal(findingId, title, severity) {
     document.getElementById('rem-ticket').value   = rem.ticket_url || ''
     document.getElementById('rem-notes').value    = rem.notes || ''
 
+    // Due date
+    const dueEl = document.getElementById('rem-due-date')
+    if (dueEl) dueEl.value = rem.due_date ? rem.due_date.slice(0,10) : ''
+
+    // Timeline
+    renderRemTimeline(rem, data.comments || [])
+
     const comments = data.comments || []
     document.getElementById('rem-comments').innerHTML = comments.length
       ? comments.map(c => `
-          <div style="padding:8px;border-bottom:1px solid #1e293b;font-size:12px">
-            <span style="color:#38bdf8;font-weight:500">${esc(c.author || 'user')}</span>
-            <span style="color:#64748b;font-size:10px;margin-left:8px">${new Date(c.created_at).toLocaleString()}</span>
-            <div style="color:#e2e8f0;margin-top:4px">${esc(c.body)}</div>
+          <div style="padding:8px;border-bottom:1px solid var(--border);font-size:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="width:28px;height:28px;border-radius:50%;background:var(--surface);
+                display:inline-flex;align-items:center;justify-content:center;font-size:11px;
+                font-weight:600;color:var(--amber);flex-shrink:0">
+                ${(c.author||'?')[0].toUpperCase()}
+              </span>
+              <span style="color:var(--cyan);font-weight:500;font-size:11px">${esc(c.author || 'user')}</span>
+              <span style="color:var(--text3);font-size:10px">${new Date(c.created_at).toLocaleString()}</span>
+            </div>
+            <div style="color:var(--text1);margin-top:6px;margin-left:36px;font-size:12px;line-height:1.5">${esc(c.body)}</div>
           </div>`).join('')
-      : '<div style="color:#64748b;font-size:12px;padding:8px">No comments yet</div>'
+      : '<div style="color:var(--text3);font-size:12px;padding:8px">No comments yet</div>'
   }).catch(() => {
     document.getElementById('rem-status').value = 'open'
     document.getElementById('rem-priority').value = 'P3'
     document.getElementById('rem-assignee').value = ''
     document.getElementById('rem-ticket').value = ''
     document.getElementById('rem-notes').value = ''
-    document.getElementById('rem-comments').innerHTML = '<div style="color:#64748b;font-size:12px;padding:8px">No comments yet</div>'
+    document.getElementById('rem-comments').innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px">No comments yet</div>'
   })
 }
 
@@ -5251,6 +5265,63 @@ function saveFilterState(panel, state) {
 }
 function restoreFilterState(panel) {
   return window._filterState[panel] || {};
+}
+
+// ── Remediation timeline ─────────────────────────────────────────────────
+function renderRemTimeline(rem, comments) {
+  const el = document.getElementById('rem-timeline');
+  if (!el) return;
+
+  const statusColors = {
+    open: 'var(--text3)', in_progress: 'var(--amber)',
+    resolved: 'var(--green)', accepted: 'var(--cyan)',
+    false_positive: 'var(--purple)', suppressed: 'var(--text3)'
+  };
+  const statusIcons = {
+    open: '○', in_progress: '◑', resolved: '●',
+    accepted: '✓', false_positive: '✗', suppressed: '—'
+  };
+
+  // Build timeline events
+  const events = [];
+  if (rem.created_at) events.push({
+    ts: rem.created_at, icon: '○', color: 'var(--text3)',
+    label: 'Finding opened', sub: rem.priority ? 'Priority: ' + rem.priority : ''
+  });
+  if (rem.status && rem.status !== 'open') events.push({
+    ts: rem.updated_at || rem.created_at, 
+    icon: statusIcons[rem.status] || '◑',
+    color: statusColors[rem.status] || 'var(--amber)',
+    label: 'Status → ' + rem.status.replace('_',' '),
+    sub: rem.assignee ? 'Assigned to: ' + rem.assignee : ''
+  });
+  comments.forEach(c => events.push({
+    ts: c.created_at, icon: '◎', color: 'var(--cyan)',
+    label: 'Comment by ' + (c.author || 'user'),
+    sub: (c.body || '').slice(0, 60) + (c.body?.length > 60 ? '…' : '')
+  }));
+  if (rem.due_date) events.push({
+    ts: rem.due_date, icon: '⚑', color: new Date(rem.due_date) < new Date() ? 'var(--red)' : 'var(--amber)',
+    label: 'Due date', sub: new Date(rem.due_date).toLocaleDateString()
+  });
+
+  events.sort((a,b) => new Date(a.ts) - new Date(b.ts));
+
+  if (!events.length) { el.innerHTML = '<div style="color:var(--text3);font-size:11px">No history yet</div>'; return; }
+
+  el.innerHTML = events.map((e,i) => `
+    <div style="display:flex;gap:10px;position:relative;padding-bottom:${i<events.length-1?'12':'0'}px">
+      <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+        <span style="font-size:14px;color:${e.color};line-height:1">${e.icon}</span>
+        ${i<events.length-1?`<div style="width:1px;flex:1;background:var(--border);margin-top:4px;min-height:12px"></div>`:''}
+      </div>
+      <div style="padding-top:1px">
+        <div style="font-size:11px;font-weight:600;color:var(--text1)">${esc(e.label)}</div>
+        ${e.sub ? `<div style="font-size:10px;color:var(--text3);margin-top:1px">${esc(e.sub)}</div>` : ''}
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${new Date(e.ts).toLocaleString()}</div>
+      </div>
+    </div>
+  `).join('');
 }
 </script>
 </body>
