@@ -30,3 +30,4 @@ static/vsp_features_patch.js
 
 # Build cache
 *.test
+start.sh
