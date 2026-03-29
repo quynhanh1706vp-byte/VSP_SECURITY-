@@ -5,8 +5,24 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o scanner ./cmd/scanner/
 
-FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata
+FROM python:3.12-alpine
+RUN apk add --no-cache ca-certificates tzdata nodejs npm git curl
+
+# Install security tools
+RUN pip install --no-cache-dir checkov bandit semgrep 2>/dev/null || true
+
+# Install kics
+RUN curl -sfL https://raw.githubusercontent.com/Checkmarx/kics/master/install.sh \
+    | sh -s -- -b /usr/local/bin 2>/dev/null || true
+
+# Install gitleaks
+RUN curl -sfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz \
+    | tar xz -C /usr/local/bin gitleaks 2>/dev/null || true
+
+# Install trivy
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+    | sh -s -- -b /usr/local/bin 2>/dev/null || true
+
 WORKDIR /app
 COPY --from=builder /app/scanner .
 COPY config/config.yaml ./config/
