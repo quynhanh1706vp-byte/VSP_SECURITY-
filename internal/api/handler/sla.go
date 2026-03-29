@@ -22,7 +22,10 @@ type slaEntry struct {
 // GET /api/v1/vsp/sla_tracker
 func (h *SLA) Tracker(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	findings, _, err := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{Limit: 5000})
+	latestRun, _ := h.DB.GetLatestRun(r.Context(), claims.TenantID)
+	runID := ""
+	if latestRun != nil && latestRun.Status == "DONE" { runID = latestRun.ID }
+	findings, _, err := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{RunID: runID, Limit: 5000})
 	if err != nil { jsonError(w, "db error", http.StatusInternalServerError); return }
 
 	sla := map[string]int{"CRITICAL": 3, "HIGH": 14, "MEDIUM": 30, "LOW": 90}

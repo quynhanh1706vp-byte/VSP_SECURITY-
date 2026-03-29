@@ -44,7 +44,7 @@ func (db *DB) EnsureRemediationTable(ctx context.Context) error {
 	_, err := db.pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS remediations (
 			id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			finding_id  UUID NOT NULL,
+			finding_id  UUID NOT NULL UNIQUE,
 			tenant_id   UUID NOT NULL,
 			status      TEXT NOT NULL DEFAULT 'open',
 			assignee    TEXT NOT NULL DEFAULT '',

@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
@@ -56,21 +58,41 @@ func (h *Compliance) FedRAMP(w http.ResponseWriter, r *http.Request) {
 	
 	// Get latest run findings to determine control status
 	runs, _ := h.DB.ListRuns(r.Context(), claims.TenantID, 5, 0)
+	// Map mode → tools actually used
+	modeTools := map[string][]string{
+		"SAST":    {"bandit", "semgrep", "codeql"},
+		"SCA":     {"grype", "trivy"},
+		"SECRETS": {"gitleaks"},
+		"IAC":     {"kics", "checkov"},
+		"DAST":    {"nikto", "nuclei"},
+		"FULL":    {"bandit", "semgrep", "codeql", "grype", "trivy", "gitleaks", "kics", "checkov", "nikto", "nuclei"},
+	}
 	toolsUsed := map[string]bool{}
 	for _, run := range runs {
 		if run.Status == "DONE" {
-			toolsUsed[run.Mode] = true
+			for _, t := range modeTools[run.Mode] {
+				toolsUsed[t] = true
+			}
 		}
 	}
 
-	// Score controls based on tools run
+	// Score controls based on tools actually run
 	controls := make([]map[string]any, len(fedRAMPControls))
 	for i, c := range fedRAMPControls {
 		ctrl := map[string]any{}
 		for k, v := range c { ctrl[k] = v }
 		ctrl["status"] = "not_assessed"
-		if c["tool"] == "all" || len(toolsUsed) > 0 {
-			ctrl["status"] = "assessed"
+		toolStr := fmt.Sprintf("%v", c["tool"])
+		if toolStr == "all" {
+			if len(toolsUsed) > 0 { ctrl["status"] = "assessed" }
+		} else {
+			// Check if at least one required tool was run
+			for tool := range toolsUsed {
+				if strings.Contains(toolStr, tool) {
+					ctrl["status"] = "assessed"
+					break
+				}
+			}
 		}
 		controls[i] = ctrl
 	}

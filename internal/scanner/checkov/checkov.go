@@ -37,25 +37,57 @@ type checkovCheck struct {
 	Guideline string `json:"guideline"`
 }
 
+// checkovSeverity maps check_id prefix to severity since checkov
+// community version does not populate the severity field.
+func checkovSeverity(checkID, raw string) scanner.Severity {
+	if raw != "" && raw != "None" && raw != "null" {
+		return scanner.NormaliseSeverity(raw)
+	}
+	// Fallback: CKV_AWS / CKV2_AWS → HIGH, CKV_K8S → MEDIUM, others → LOW
+	switch {
+	case len(checkID) > 7 && (checkID[:7] == "CKV_AWS" || checkID[:8] == "CKV2_AWS"):
+		return scanner.SevHigh
+	case len(checkID) > 7 && checkID[:7] == "CKV_K8S":
+		return scanner.SevMedium
+	case len(checkID) > 8 && checkID[:8] == "CKV_AZUR":
+		return scanner.SevHigh
+	case len(checkID) > 7 && checkID[:7] == "CKV_GCP":
+		return scanner.SevHigh
+	default:
+		return scanner.SevMedium
+	}
+}
+
 func parse(data []byte) ([]scanner.Finding, error) {
-	var out checkovOutput
-	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("checkov: JSON: %w", err)
+	// checkov may return a single object or an array of objects (multi-type scan)
+	var outputs []checkovOutput
+	if data[0] == '[' {
+		if err := json.Unmarshal(data, &outputs); err != nil {
+			return nil, fmt.Errorf("checkov: JSON: %w", err)
+		}
+	} else {
+		var single checkovOutput
+		if err := json.Unmarshal(data, &single); err != nil {
+			return nil, fmt.Errorf("checkov: JSON: %w", err)
+		}
+		outputs = append(outputs, single)
 	}
 	var findings []scanner.Finding
-	for _, c := range out.Results.FailedChecks {
-		line := 0
-		if len(c.Line) > 0 { line = c.Line[0] }
-		findings = append(findings, scanner.Finding{
-			Tool:      "checkov",
-			Severity:  scanner.NormaliseSeverity(c.Severity),
-			RuleID:    c.CheckID,
-			Message:   c.CheckName,
-			Path:      c.File,
-			Line:      line,
-			FixSignal: c.Guideline,
-			Raw:       map[string]any{"resource": c.Resource},
-		})
+	for _, out := range outputs {
+		for _, c := range out.Results.FailedChecks {
+			line := 0
+			if len(c.Line) > 0 { line = c.Line[0] }
+			findings = append(findings, scanner.Finding{
+				Tool:      "checkov",
+				Severity:  checkovSeverity(c.CheckID, c.Severity),
+				RuleID:    c.CheckID,
+				Message:   c.CheckName,
+				Path:      c.File,
+				Line:      line,
+				FixSignal: c.Guideline,
+				Raw:       map[string]any{"resource": c.Resource, "check_id": c.CheckID},
+			})
+		}
 	}
 	return findings, nil
 }

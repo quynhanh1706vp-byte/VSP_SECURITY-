@@ -81,16 +81,25 @@ func BuildFrameworkScorecard(findings []store.Finding) []FrameworkScore {
 		},
 	}
 
+	// Count findings per severity
+	sevCount := map[string]int{}
 	for _, f := range findings {
-		penalty := map[string]int{"CRITICAL": 15, "HIGH": 8, "MEDIUM": 3, "LOW": 1}[f.Severity]
-		for _, fw := range frameworks {
-			fw.Score = max0(fw.Score - penalty/len(frameworks))
-			for i := range fw.Domains {
-				if fw.Domains[i].Score > 0 {
-					fw.Domains[i].Score = max0(fw.Domains[i].Score - penalty)
-					break // affect one domain per finding
-				}
-			}
+		sevCount[f.Severity]++
+	}
+	// Capped penalty: each bucket has diminishing impact
+	penaltyTotal := capInt2(sevCount["CRITICAL"],3)*15 +
+		capInt2(sevCount["HIGH"],5)*6 +
+		capInt2(sevCount["MEDIUM"],10)*2 +
+		capInt2(sevCount["LOW"],10)*1
+	// Max penalty = 45+30+20+10 = 105 → cap at 60 so min score = 40
+	if penaltyTotal > 60 { penaltyTotal = 60 }
+
+	for _, fw := range frameworks {
+		fw.Score = max0(100 - penaltyTotal)
+		// Distribute penalty across domains proportionally
+		domainPenalty := penaltyTotal / len(fw.Domains)
+		for i := range fw.Domains {
+			fw.Domains[i].Score = max0(100 - domainPenalty)
 		}
 	}
 
@@ -101,38 +110,61 @@ func BuildFrameworkScorecard(findings []store.Finding) []FrameworkScore {
 	return result
 }
 
-// BuildZeroTrust computes DoD Zero Trust 7 pillars scores.
+// BuildZeroTrust computes DoD Zero Trust 7 pillars scores from findings.
 func BuildZeroTrust(findings []store.Finding) []ZeroTrustPillar {
-	pillars := []ZeroTrustPillar{
-		{Pillar: "User", Score: 95, Level: "Advanced",
-			Controls: []string{"MFA", "RBAC", "Session management"}},
-		{Pillar: "Device", Score: 80, Level: "Advanced",
-			Controls: []string{"Endpoint detection", "Device compliance"}},
-		{Pillar: "Network", Score: 85, Level: "Advanced",
-			Controls: []string{"Micro-segmentation", "Encrypted transport"}},
-		{Pillar: "Application & Workload", Score: 0, Level: "Traditional",
-			Controls: []string{"SAST", "DAST", "SCA", "Secrets scanning"}},
-		{Pillar: "Data", Score: 75, Level: "Advanced",
-			Controls: []string{"Encryption at rest", "DLP", "Classification"}},
-		{Pillar: "Visibility & Analytics", Score: 90, Level: "Optimal",
-			Controls: []string{"SIEM", "Audit log", "Prometheus metrics"}},
-		{Pillar: "Automation & Orchestration", Score: 88, Level: "Advanced",
-			Controls: []string{"CI/CD gates", "Policy as code", "Auto-remediation"}},
+	// Count findings by tool to derive pillar scores
+	toolFindings := map[string]int{}
+	sevFindings  := map[string]int{}
+	for _, f := range findings {
+		toolFindings[f.Tool]++
+		sevFindings[f.Severity]++
 	}
 
-	// Application pillar score derived from findings
-	appScore := 100
-	for _, f := range findings {
-		appScore -= map[string]int{"CRITICAL": 20, "HIGH": 10, "MEDIUM": 4, "LOW": 1}[f.Severity]
-		pillars[3].Findings++
-	}
-	pillars[3].Score = max0(appScore)
-	pillars[3].Level = func() string {
-		if appScore >= 80 { return "Advanced" }
-		if appScore >= 50 { return "Traditional" }
+	// Penalty per pillar based on relevant tools/findings
+	appPenalty  := capInt2(toolFindings["bandit"]+toolFindings["semgrep"]+toolFindings["codeql"], 20)*4 +
+		capInt2(sevFindings["CRITICAL"], 3)*15 + capInt2(sevFindings["HIGH"], 10)*5
+	dataPenalty := capInt2(toolFindings["gitleaks"], 5) * 10
+	netPenalty  := capInt2(toolFindings["nikto"]+toolFindings["nuclei"], 5) * 8
+
+	zeroTrustLevel := func(score int) string {
+		if score >= 80 { return "Advanced" }
+		if score >= 60 { return "Initial" }
 		return "Traditional"
-	}()
+	}
+
+	appScore  := max0(100 - appPenalty)
+	dataScore := max0(100 - dataPenalty)
+	netScore  := max0(100 - netPenalty)
+
+	pillars := []ZeroTrustPillar{
+		{Pillar: "User",   Score: 95, Level: "Advanced",
+			Findings: 0,
+			Controls: []string{"MFA", "RBAC", "Session management"}},
+		{Pillar: "Device", Score: 80, Level: "Advanced",
+			Findings: 0,
+			Controls: []string{"Endpoint detection", "Device compliance"}},
+		{Pillar: "Network", Score: netScore, Level: zeroTrustLevel(netScore),
+			Findings: toolFindings["nikto"] + toolFindings["nuclei"],
+			Controls: []string{"Micro-segmentation", "Encrypted transport"}},
+		{Pillar: "Application & Workload", Score: appScore, Level: zeroTrustLevel(appScore),
+			Findings: toolFindings["bandit"] + toolFindings["semgrep"] + toolFindings["codeql"],
+			Controls: []string{"SAST", "DAST", "SCA", "Secrets scanning"}},
+		{Pillar: "Data", Score: dataScore, Level: zeroTrustLevel(dataScore),
+			Findings: toolFindings["gitleaks"],
+			Controls: []string{"Encryption at rest", "DLP", "Classification"}},
+		{Pillar: "Visibility & Analytics", Score: 90, Level: "Optimal",
+			Findings: 0,
+			Controls: []string{"SIEM", "Audit log", "Prometheus metrics"}},
+		{Pillar: "Automation & Orchestration", Score: 88, Level: "Advanced",
+			Findings: 0,
+			Controls: []string{"CI/CD gates", "Policy as code", "Auto-remediation"}},
+	}
 	return pillars
+}
+
+func capInt2(v, max int) int {
+	if v > max { return max }
+	return v
 }
 
 // BuildSecurityRoadmap generates a maturity roadmap.

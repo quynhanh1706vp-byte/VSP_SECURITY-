@@ -57,7 +57,8 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 // detectLang returns the primary codeql language for the source tree.
 func detectLang(src string) string {
 	counts := map[string]int{}
-	filepath.WalkDir(src, func(p string, d os.DirEntry, _ error) error {
+	filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d == nil { return nil }
 		if d.IsDir() { return nil }
 		switch strings.ToLower(filepath.Ext(p)) {
 		case ".py":          counts["python"]++

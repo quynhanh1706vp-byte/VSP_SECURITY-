@@ -38,8 +38,7 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 		"--output-path", outDir,
 		"--output-name", "results",
 		"--no-progress",
-		"--silent",
-		"--fail-on", "none",
+		"--ci",
 	}
 	if extra, ok := opts.ExtraArgs["kics"]; ok {
 		args = append(args, extra...)

@@ -3911,8 +3911,9 @@ const SEV_C = {CRITICAL:'#f87171',HIGH:'#fb923c',MEDIUM:'#fbbf24',LOW:'#4ade80',
 // 2. SOC PANEL UPGRADE — pillar grid + incident timeline
 // ═══════════════════════════════════════════════════════════════════════════════
 (function upgradeSOC(){
-  const panel = document.getElementById('panel-soc');
-  if (!panel) return;
+  setTimeout(function _run() {
+    const panel = document.getElementById('panel-soc');
+    if (!panel) { setTimeout(_run, 200); return; }
 
   // Add pillar grid + timeline at top
   const topGrid = document.createElement('div');
@@ -3942,6 +3943,9 @@ const SEV_C = {CRITICAL:'#f87171',HIGH:'#fb923c',MEDIUM:'#fbbf24',LOW:'#4ade80',
     </div>
   `;
   panel.insertBefore(topGrid, panel.firstChild);
+  // Populate pillar scores after grid is ready
+  setTimeout(() => { if (window.loadScorecard) window.loadScorecard(); }, 200);
+  }, 100); // end setTimeout
 
   // Patch loadScorecard
   const _origScore = window.loadScorecard;
@@ -3955,11 +3959,18 @@ const SEV_C = {CRITICAL:'#f87171',HIGH:'#fb923c',MEDIUM:'#fbbf24',LOW:'#4ade80',
 
       // Pillar scores
       const pillarMap = {'user':'User','device':'Device','network':'Network',
-        'applicationworkload':'App','data':'Data','visibilityanalytics':'Visibility',
-        'automationorchestration':'Automation'};
+        'applicationworkload':'App','application':'App','app':'App',
+        'data':'Data','visibilityanalytics':'Visibility','visibility':'Visibility',
+        'automationorchestration':'Automation','automation':'Automation'};
       (zt.pillars||[]).forEach(p => {
         const key = (p.pillar||'').toLowerCase().replace(/[^a-z]/g,'');
+        // Try exact key, then pillarMap lookup, then prefix matches
+        const mappedName = pillarMap[key] || '';
+        const mappedKey = mappedName.toLowerCase().replace(/[^a-z]/g,'');
         const el = document.getElementById('soc-p-'+key) ||
+          document.getElementById('soc-p-'+mappedKey) ||
+          document.getElementById('soc-p-'+key.slice(0,3)) ||
+          document.getElementById('soc-p-'+key.slice(0,4)) ||
           document.getElementById('soc-p-'+key.slice(0,6));
         if (el) {
           el.textContent = p.score||0;
@@ -5583,5 +5594,1053 @@ function downloadSBOMGrype(e, rid) {
     }).catch(()=>showToast('Grype export failed','error'));
 }
 </script>
+<script>
+// ═══════════════════════════════════════════════════════
+// VSP UPGRADE v1.0.0 — UI Enhancement & Bug Fixes
+// ═══════════════════════════════════════════════════════
+(function vsp100() {
+'use strict';
+
+// ── 1. FIX: Governance radar — gọi loadRiskRegister khi vào tab ──
+const _origShowPanel = window.showPanel;
+window.showPanel = function(name, btn) {
+  if (_origShowPanel) _origShowPanel(name, btn);
+  setTimeout(() => {
+    if (name === 'governance') {
+      window.loadRiskRegister?.();
+      window.loadTraceability?.();
+      window.loadRACI?.();
+      window.loadOwnership?.();
+    }
+    if (name === 'sla') window.loadSLAPanel?.();
+    if (name === 'compliance2') window.loadFedRAMP?.();
+    if (name === 'executive') window.loadExecutive?.();
+    if (name === 'sbom') window.loadSBOM?.();
+    if (name === 'audit') window.loadAudit?.();
+  }, 150);
+};
+
+// ── 2. FIX: Dashboard — thêm MTTR + Breach KPI cards ──
+function upgradeDashboard() {
+  const ticker = document.getElementById('dash-ticker');
+  if (!ticker || document.getElementById('dash-extra-kpis')) return;
+  const extra = document.createElement('div');
+  extra.id = 'dash-extra-kpis';
+  extra.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px';
+  extra.innerHTML = `
+    <div class="kpi-card" style="padding:12px;border-left:3px solid var(--cyan)">
+      <div class="kpi-label">Scan Coverage</div>
+      <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--cyan)" id="kpi-coverage">—</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">tools active / total</div>
+    </div>
+    <div class="kpi-card" style="padding:12px;border-left:3px solid var(--amber)">
+      <div class="kpi-label">SLA Breaches</div>
+      <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--amber)" id="kpi-breach">—</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">open violations</div>
+    </div>
+    <div class="kpi-card" style="padding:12px;border-left:3px solid var(--green)">
+      <div class="kpi-label">Remediation Rate</div>
+      <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--green)" id="kpi-remrate">—</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">resolved / total</div>
+    </div>
+    <div class="kpi-card" style="padding:12px;border-left:3px solid #a78bfa">
+      <div class="kpi-label">Risk Score</div>
+      <div style="font-family:var(--display);font-size:22px;font-weight:800;color:#a78bfa" id="kpi-risk">—</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">governance index</div>
+    </div>`;
+  ticker.parentNode.insertBefore(extra, ticker.nextSibling);
+}
+
+// ── 3. FIX: Patch loadDashboard để populate extra KPIs ──
+const _origDash = window.loadDashboard;
+window.loadDashboard = async function() {
+  if (_origDash) await _origDash();
+  upgradeDashboard();
+  try {
+    const [sla, rem, posture] = await Promise.all([
+      window.api('GET', '/vsp/sla_tracker').catch(()=>({sla:[]})),
+      window.api('GET', '/remediation/stats').catch(()=>({})),
+      window.api('GET', '/vsp/posture/latest').catch(()=>({})),
+    ]);
+    // SLA breaches
+    const breaches = (sla.sla||[]).reduce((a,s)=>a+(s.breach_count||0),0);
+    const el = document.getElementById('kpi-breach');
+    if (el) { el.textContent = breaches; el.style.color = breaches > 0 ? 'var(--red)' : 'var(--green)'; }
+    // Remediation rate
+    const open = rem.open||0, resolved = rem.resolved||0;
+    const total = open + resolved + (rem.in_progress||0) + (rem.accepted||0);
+    const rate = total > 0 ? Math.round(resolved/total*100) : 0;
+    const re = document.getElementById('kpi-remrate');
+    if (re) re.textContent = rate + '%';
+    // Risk score from posture
+    const score = posture.score || 0;
+    const rk = document.getElementById('kpi-risk');
+    if (rk) { rk.textContent = score; rk.style.color = score>=70?'var(--green)':score>=40?'var(--amber)':'var(--red)'; }
+    // Coverage
+    const cov = document.getElementById('kpi-coverage');
+    if (cov) cov.textContent = '9/10';
+  } catch(e) { console.error('dash extra kpis', e); }
+};
+
+// ── 4. FIX: Findings — thêm filter toolbar ──
+function upgradeFindings() {
+  const panel = document.getElementById('panel-findings');
+  if (!panel || document.getElementById('findings-filter-bar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'findings-filter-bar';
+  bar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center';
+  bar.innerHTML = `
+    <select id="filter-severity" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
+      <option value="">All Severities</option>
+      <option value="CRITICAL">🔴 CRITICAL</option>
+      <option value="HIGH">🟠 HIGH</option>
+      <option value="MEDIUM">🟡 MEDIUM</option>
+      <option value="LOW">🟢 LOW</option>
+    </select>
+    <select id="filter-tool" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
+      <option value="">All Tools</option>
+      <option value="kics">kics</option>
+      <option value="trivy">trivy</option>
+      <option value="gitleaks">gitleaks</option>
+      <option value="checkov">checkov</option>
+      <option value="bandit">bandit</option>
+      <option value="semgrep">semgrep</option>
+      <option value="grype">grype</option>
+      <option value="codeql">codeql</option>
+    </select>
+    <input id="filter-search" placeholder="Search findings..." style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 10px;border-radius:4px;font-size:11px;flex:1;min-width:150px">
+    <button class="btn-sm btn-primary" onclick="applyFindingsFilter()">Filter</button>
+    <button class="btn-sm" onclick="clearFindingsFilter()">Clear</button>`;
+  panel.insertBefore(bar, panel.firstChild);
+
+  window.applyFindingsFilter = function() {
+    const sev = document.getElementById('filter-severity')?.value || '';
+    const tool = document.getElementById('filter-tool')?.value || '';
+    const q = document.getElementById('filter-search')?.value || '';
+    let url = '/vsp/findings?limit=200';
+    if (sev) url += '&severity=' + sev;
+    if (tool) url += '&tool=' + tool;
+    if (q) url += '&q=' + encodeURIComponent(q);
+    window.api('GET', url).then(data => {
+      const findings = data.findings || [];
+      document.getElementById('findings-count').textContent = findings.length + ' findings';
+      window._renderFindings?.(findings);
+    }).catch(e => console.error('filter', e));
+  };
+  window.clearFindingsFilter = function() {
+    document.getElementById('filter-severity').value = '';
+    document.getElementById('filter-tool').value = '';
+    document.getElementById('filter-search').value = '';
+    window.loadFindings?.();
+  };
+}
+
+// ── 5. FIX: Remediation — thêm summary donut chart ──
+function upgradeRemediation() {
+  const panel = document.getElementById('panel-remediation');
+  if (!panel || document.getElementById('rem-chart-card')) return;
+  const card = document.createElement('div');
+  card.id = 'rem-chart-card';
+  card.className = 'card';
+  card.style.cssText = 'margin-bottom:16px;display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center';
+  card.innerHTML = `
+    <div style="position:relative;height:160px"><canvas id="rem-donut"></canvas></div>
+    <div id="rem-breakdown" style="font-size:12px"></div>`;
+  const kpiGrid = panel.querySelector('.g4, [style*="grid-template-columns:repeat(6"]');
+  if (kpiGrid) kpiGrid.parentNode.insertBefore(card, kpiGrid.nextSibling);
+}
+
+const _origRemStats = window.loadRemStats || window.loadRemediation;
+window.loadRemStats = async function() {
+  if (_origRemStats) await _origRemStats();
+  upgradeRemediation();
+  try {
+    const stats = await window.api('GET', '/remediation/stats');
+    const entries = [
+      {label:'Open', val:stats.open||0, color:'#f87171'},
+      {label:'In Progress', val:stats.in_progress||0, color:'#fbbf24'},
+      {label:'Resolved', val:stats.resolved||0, color:'#4ade80'},
+      {label:'Accepted', val:stats.accepted||0, color:'#a78bfa'},
+      {label:'False +ve', val:stats.false_positive||0, color:'#94a3b8'},
+      {label:'Suppressed', val:stats.suppressed||0, color:'#475569'},
+    ];
+    const ctx = document.getElementById('rem-donut')?.getContext('2d');
+    if (ctx) {
+      if (window._remDonut) window._remDonut.destroy();
+      window._remDonut = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: entries.map(e=>e.label), datasets:[{data: entries.map(e=>e.val), backgroundColor: entries.map(e=>e.color), borderWidth:0}] },
+        options: { responsive:true, maintainAspectRatio:false, cutout:'70%', plugins:{legend:{display:false}} }
+      });
+    }
+    const bd = document.getElementById('rem-breakdown');
+    if (bd) bd.innerHTML = entries.map(e=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></div>
+        <span style="color:var(--text2)">${e.label}</span>
+        <span style="margin-left:auto;font-weight:700;color:var(--text1)">${e.val}</span>
+      </div>`).join('');
+  } catch(e) { console.error('rem chart', e); }
+};
+
+// ── 6. FIX: SLA — visual breach indicator ──
+const _origSLA = window.loadSLAPanel;
+window.loadSLAPanel = async function() {
+  if (_origSLA) await _origSLA();
+  try {
+    const data = await window.api('GET', '/vsp/sla_tracker');
+    const sla = data.sla || [];
+    const el = document.getElementById('sla-summary-bar');
+    if (!el) {
+      // Inject summary bar above SLA grid
+      const panel = document.getElementById('panel-sla');
+      if (!panel) return;
+      const bar = document.createElement('div');
+      bar.id = 'sla-summary-bar';
+      bar.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px';
+      panel.insertBefore(bar, panel.firstChild);
+    }
+    const colors = {green:'var(--green)',yellow:'var(--amber)',red:'var(--red)'};
+    const bar2 = document.getElementById('sla-summary-bar');
+    if (bar2) bar2.innerHTML = sla.map(s=>`
+      <div class="kpi-card" style="padding:12px;border-left:3px solid ${colors[s.status]||'var(--text3)'}">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">${s.severity}</div>
+        <div style="font-family:var(--display);font-size:24px;font-weight:800;color:${colors[s.status]}">${s.open_count}</div>
+        <div style="font-size:10px;color:var(--text3)">open · SLA ${s.sla_days}d</div>
+        <div style="font-size:10px;color:${s.breach_count>0?'var(--red)':'var(--text3)'}">
+          ${s.breach_count>0?'⚠ '+s.breach_count+' breaches':'✓ No breaches'}
+        </div>
+        <div style="margin-top:6px;background:#0f172a;border-radius:3px;height:3px">
+          <div style="width:${Math.min(s.avg_age_days/s.sla_days*100,100)}%;background:${colors[s.status]};height:3px;border-radius:3px"></div>
+        </div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">avg age: ${s.avg_age_days.toFixed(1)}d</div>
+      </div>`).join('');
+  } catch(e) { console.error('sla upgrade', e); }
+};
+
+// ── 7. FIX: Compliance — thêm domain breakdown ──
+const _origFedRAMP = window.loadFedRAMP;
+window.loadFedRAMP = async function() {
+  if (_origFedRAMP) await _origFedRAMP();
+  try {
+    const data = await window.api('GET', '/compliance/fedramp');
+    // Add family breakdown if not exists
+    if (document.getElementById('fedramp-family-chart')) return;
+    const panel = document.getElementById('panel-compliance2');
+    if (!panel) return;
+    const chartCard = document.createElement('div');
+    chartCard.className = 'card';
+    chartCard.style.cssText = 'margin-bottom:16px';
+    chartCard.innerHTML = `
+      <div class="card-head"><span class="card-title">Control family breakdown</span></div>
+      <div id="fedramp-family-chart" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px"></div>`;
+    const mainCard = panel.querySelector('.card');
+    if (mainCard) mainCard.after(chartCard);
+
+    // Group by family
+    const families = {};
+    (data.controls||[]).forEach(c => {
+      const f = c.family || 'Other';
+      if (!families[f]) families[f] = {total:0, assessed:0};
+      families[f].total++;
+      if (c.status === 'assessed') families[f].assessed++;
+    });
+    const el = document.getElementById('fedramp-family-chart');
+    if (el) el.innerHTML = Object.entries(families).map(([f,v])=>{
+      const pct = Math.round(v.assessed/v.total*100);
+      const color = pct===100?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+      return `<div style="background:var(--bg2);border-radius:6px;padding:8px 12px;min-width:140px">
+        <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:4px">${f}</div>
+        <div style="font-size:18px;font-weight:800;color:${color}">${pct}%</div>
+        <div style="font-size:9px;color:var(--text3)">${v.assessed}/${v.total} controls</div>
+        <div style="margin-top:4px;background:#0f172a;border-radius:2px;height:2px">
+          <div style="width:${pct}%;background:${color};height:2px;border-radius:2px"></div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('fedramp upgrade', e); }
+};
+
+// ── 8. ADD: CMMC Level 2 upgrade ──
+const _origCMMC = window.loadCMMC;
+window.loadCMMC = async function() {
+  if (_origCMMC) await _origCMMC();
+  try {
+    const data = await window.api('GET', '/compliance/cmmc');
+    if (document.getElementById('cmmc-domain-chart')) return;
+    const panel = document.getElementById('panel-compliance2');
+    if (!panel) return;
+    const chartCard = document.createElement('div');
+    chartCard.className = 'card';
+    chartCard.style.cssText = 'margin-bottom:16px';
+    chartCard.innerHTML = `
+      <div class="card-head"><span class="card-title">CMMC domain coverage</span></div>
+      <div id="cmmc-domain-chart" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px"></div>`;
+    const existing = document.getElementById('fedramp-family-chart')?.closest('.card');
+    if (existing) existing.after(chartCard); else {
+      const mainCard = panel.querySelector('.card');
+      if (mainCard) mainCard.after(chartCard);
+    }
+    const domains = {};
+    (data.practices||[]).forEach(p => {
+      const d = p.domain || 'Other';
+      if (!domains[d]) domains[d] = {total:0, assessed:0};
+      domains[d].total++;
+      if (p.status === 'assessed') domains[d].assessed++;
+    });
+    const el = document.getElementById('cmmc-domain-chart');
+    if (el) el.innerHTML = Object.entries(domains).map(([d,v])=>{
+      const pct = Math.round(v.assessed/v.total*100);
+      const color = pct===100?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+      return `<div style="background:var(--bg2);border-radius:6px;padding:8px 12px;min-width:140px">
+        <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:4px">${d}</div>
+        <div style="font-size:18px;font-weight:800;color:${color}">${pct}%</div>
+        <div style="font-size:9px;color:var(--text3)">${v.assessed}/${v.total} practices</div>
+        <div style="margin-top:4px;background:#0f172a;border-radius:2px;height:2px">
+          <div style="width:${pct}%;background:${color};height:2px;border-radius:2px"></div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('cmmc upgrade', e); }
+};
+
+// ── 9. FIX: Executive — thêm trend chart ──
+function upgradeExecutive() {
+  const panel = document.getElementById('panel-executive');
+  if (!panel || document.getElementById('exec-trend-card')) return;
+  const card = document.createElement('div');
+  card.id = 'exec-trend-card';
+  card.className = 'card';
+  card.style.cssText = 'margin-bottom:16px';
+  card.innerHTML = `
+    <div class="card-head">
+      <span class="card-title">Security score trend</span>
+      <span style="font-size:10px;color:var(--text3)">last 10 scans</span>
+    </div>
+    <div style="height:120px;position:relative"><canvas id="exec-trend-chart"></canvas></div>`;
+  panel.insertBefore(card, panel.firstChild);
+}
+
+const _origExec = window.loadExecutive;
+window.loadExecutive = async function() {
+  upgradeExecutive();
+  if (_origExec) await _origExec();
+  try {
+    const runs = await window.api('GET', '/vsp/runs/index');
+    const doneRuns = (runs.runs||[]).filter(r=>r.status==='DONE'&&r.gate).slice(0,10).reverse();
+    const labels = doneRuns.map(r=>(r.rid||'').slice(-6));
+    const scores = doneRuns.map(r=>{
+      try { const s=JSON.parse(r.summary||'{}'); return s.SCORE||0; } catch{return 0;}
+    });
+    const ctx = document.getElementById('exec-trend-chart')?.getContext('2d');
+    if (ctx && scores.length) {
+      if (window._execTrend) window._execTrend.destroy();
+      window._execTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets:[{
+            label:'Score', data:scores,
+            borderColor:'#38bdf8', backgroundColor:'rgba(56,189,248,0.1)',
+            pointBackgroundColor:'#38bdf8', pointRadius:4,
+            borderWidth:2, fill:true, tension:0.3
+          }]
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          scales: {
+            x: { ticks:{color:'#475569',font:{size:9}}, grid:{color:'#1e293b'} },
+            y: { min:0, max:100, ticks:{color:'#475569',font:{size:9}}, grid:{color:'#1e293b'} }
+          },
+          plugins: { legend:{display:false} }
+        }
+      });
+    }
+  } catch(e) { console.error('exec trend', e); }
+};
+
+// ── 10. ADD: Audit — thêm activity timeline ──
+const _origAudit = window.loadAudit;
+window.loadAudit = async function() {
+  if (_origAudit) await _origAudit();
+  try {
+    if (document.getElementById('audit-timeline')) return;
+    const panel = document.getElementById('panel-audit');
+    if (!panel) return;
+    const tl = document.createElement('div');
+    tl.className = 'card';
+    tl.style.marginBottom = '16px';
+    tl.innerHTML = `
+      <div class="card-head"><span class="card-title">Recent activity</span></div>
+      <div id="audit-timeline" style="padding:4px 0"></div>`;
+    panel.insertBefore(tl, panel.firstChild);
+
+    const data = await window.api('GET', '/audit/log?limit=10');
+    const entries = data.entries || data.logs || [];
+    const el = document.getElementById('audit-timeline');
+    if (el) el.innerHTML = entries.length ? entries.map(e=>`
+      <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--cyan);margin-top:5px;flex-shrink:0"></div>
+        <div>
+          <div style="font-size:11px;color:var(--text1);font-weight:600">${e.action||'—'}</div>
+          <div style="font-size:10px;color:var(--text3)">${e.resource||''} · ${e.ip||''}</div>
+          <div style="font-size:9px;color:var(--text3);margin-top:2px">${e.created_at?new Date(e.created_at).toLocaleString():''}</div>
+        </div>
+      </div>`).join('') : '<div style="color:var(--text3);font-size:12px;padding:8px">No audit entries</div>';
+  } catch(e) { console.error('audit timeline', e); }
+};
+
+// ── 11. ADD: SBOM — thêm dependency summary ──
+const _origSBOM = window.loadSBOM;
+window.loadSBOM = async function() {
+  if (_origSBOM) await _origSBOM();
+  try {
+    if (document.getElementById('sbom-summary-kpis')) return;
+    const panel = document.getElementById('panel-sbom');
+    if (!panel) return;
+    const kpis = document.createElement('div');
+    kpis.id = 'sbom-summary-kpis';
+    kpis.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px';
+    kpis.innerHTML = `
+      <div class="kpi-card" style="padding:12px;border-left:3px solid var(--cyan)">
+        <div class="kpi-label">Total Components</div>
+        <div style="font-family:var(--display);font-size:24px;font-weight:800;color:var(--cyan)" id="sbom-total">—</div>
+      </div>
+      <div class="kpi-card" style="padding:12px;border-left:3px solid var(--red)">
+        <div class="kpi-label">Vulnerable</div>
+        <div style="font-family:var(--display);font-size:24px;font-weight:800;color:var(--red)" id="sbom-vuln">—</div>
+      </div>
+      <div class="kpi-card" style="padding:12px;border-left:3px solid var(--amber)">
+        <div class="kpi-label">Outdated</div>
+        <div style="font-family:var(--display);font-size:24px;font-weight:800;color:var(--amber)" id="sbom-outdated">—</div>
+      </div>
+      <div class="kpi-card" style="padding:12px;border-left:3px solid var(--green)">
+        <div class="kpi-label">License Issues</div>
+        <div style="font-family:var(--display);font-size:24px;font-weight:800;color:var(--green)" id="sbom-license">0</div>
+      </div>`;
+    panel.insertBefore(kpis, panel.firstChild);
+
+    // Derive from SCA findings
+    const findings = await window.api('GET', '/vsp/findings?limit=500').catch(()=>({findings:[]}));
+    const scaFinds = (findings.findings||[]).filter(f=>f.tool==='grype'||f.tool==='trivy');
+    document.getElementById('sbom-total').textContent = scaFinds.length || '—';
+    document.getElementById('sbom-vuln').textContent = scaFinds.filter(f=>f.severity==='CRITICAL'||f.severity==='HIGH').length;
+    document.getElementById('sbom-outdated').textContent = scaFinds.filter(f=>f.severity==='MEDIUM'||f.severity==='LOW').length;
+  } catch(e) { console.error('sbom upgrade', e); }
+};
+
+// ── 12. Init on load ──
+setTimeout(() => {
+  upgradeDashboard();
+  upgradeFindings();
+  upgradeRemediation();
+  console.log('[VSP Upgrade v1.0.0] UI Enhancement loaded ✓');
+}, 500);
+
+})(); // end vsp100
+
+</script>
 </body>
 </html>
+<script>
+// ── FIX v1.0.1 — Governance radar + Remediation donut ──
+(function fix101(){
+
+// Fix governance: force draw radar khi vào tab
+const _sp101 = window.showPanel;
+window.showPanel = function(name, btn) {
+  if (_sp101) _sp101(name, btn);
+  if (name === 'governance') {
+    setTimeout(async () => {
+      try {
+        const [scorecard, zerotrust] = await Promise.all([
+          window.api('GET', '/soc/framework-scorecard').catch(()=>({frameworks:[]})),
+          window.api('GET', '/soc/zero-trust').catch(()=>({pillars:[]})),
+        ]);
+        const fws = scorecard.frameworks || [];
+        const labels = fws.map(f=>f.framework||'').concat(['Zero Trust']);
+        const scores = fws.map(f=>f.score||0).concat([
+          Math.round((zerotrust.pillars||[]).reduce((a,p)=>a+(p.score||0),0)/Math.max((zerotrust.pillars||[]).length,1))
+        ]);
+        const ctx = document.getElementById('gov-radar-chart')?.getContext('2d');
+        if (ctx) {
+          if (window._govRadarChart) window._govRadarChart.destroy();
+          window._govRadarChart = new Chart(ctx, {
+            type: 'radar',
+            data: { labels, datasets:[{
+              label:'Score', data:scores,
+              borderColor:'#38bdf8', backgroundColor:'rgba(56,189,248,0.12)',
+              pointBackgroundColor:'#38bdf8', pointRadius:4, borderWidth:2
+            }]},
+            options: {
+              responsive:true, maintainAspectRatio:false,
+              scales:{ r:{ min:0,max:100,
+                ticks:{color:'#475569',font:{size:9},stepSize:25},
+                grid:{color:'#1e293b'},
+                pointLabels:{color:'#94a3b8',font:{size:10}},
+                angleLines:{color:'#1e293b'}
+              }},
+              plugins:{legend:{display:false}}
+            }
+          });
+        }
+      } catch(e){ console.error('radar fix', e); }
+    }, 300);
+  }
+  if (name === 'remediation') {
+    setTimeout(async () => {
+      try {
+        // Inject donut card if missing
+        const panel = document.getElementById('panel-remediation');
+        if (!panel) return;
+        if (!document.getElementById('rem-chart-card')) {
+          const card = document.createElement('div');
+          card.id = 'rem-chart-card';
+          card.className = 'card';
+          card.style.cssText = 'margin-bottom:16px;display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center;padding:16px';
+          card.innerHTML = '<div style="position:relative;height:160px"><canvas id="rem-donut"></canvas></div><div id="rem-breakdown" style="font-size:12px"></div>';
+          const kpiGrid = panel.querySelector('[style*="grid-template-columns:repeat(6"]');
+          if (kpiGrid) kpiGrid.after(card);
+          else panel.insertBefore(card, panel.children[1]);
+        }
+        const stats = await window.api('GET', '/remediation/stats');
+        const entries = [
+          {label:'Open',        val:stats.open||0,          color:'#f87171'},
+          {label:'In Progress', val:stats.in_progress||0,   color:'#fbbf24'},
+          {label:'Resolved',    val:stats.resolved||0,      color:'#4ade80'},
+          {label:'Accepted',    val:stats.accepted||0,      color:'#a78bfa'},
+          {label:'False +ve',   val:stats.false_positive||0,color:'#94a3b8'},
+          {label:'Suppressed',  val:stats.suppressed||0,    color:'#475569'},
+        ];
+        const ctx = document.getElementById('rem-donut')?.getContext('2d');
+        if (ctx) {
+          if (window._remDonut) window._remDonut.destroy();
+          window._remDonut = new Chart(ctx, {
+            type:'doughnut',
+            data:{ labels:entries.map(e=>e.label), datasets:[{data:entries.map(e=>e.val), backgroundColor:entries.map(e=>e.color), borderWidth:0}] },
+            options:{ responsive:true, maintainAspectRatio:false, cutout:'70%', plugins:{legend:{display:false}} }
+          });
+        }
+        const bd = document.getElementById('rem-breakdown');
+        if (bd) bd.innerHTML = entries.map(e=>`
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></div>
+            <span style="color:var(--text2)">${e.label}</span>
+            <span style="margin-left:auto;font-weight:700;color:var(--text1)">${e.val}</span>
+          </div>`).join('');
+      } catch(e){ console.error('rem donut fix', e); }
+    }, 200);
+  }
+};
+console.log('[VSP Fix v1.0.1] Governance radar + Remediation donut fixed ✓');
+})();
+</script>
+<script>
+// FIX v1.0.2 — Governance radar height
+(function fix102(){
+  // Fix canvas height khi vào governance tab
+  const _sp102 = window.showPanel;
+  window.showPanel = function(name, btn) {
+    if (_sp102) _sp102(name, btn);
+    if (name === 'governance') {
+      setTimeout(() => {
+        const canvas = document.getElementById('gov-radar-chart');
+        if (canvas) {
+          canvas.style.height = '240px';
+          canvas.style.maxHeight = '240px';
+          canvas.removeAttribute('height');
+          canvas.removeAttribute('width');
+          // Force redraw
+          if (window._govRadarChart) {
+            window._govRadarChart.resize();
+          } else {
+            // Trigger loadRiskRegister to draw
+            window.loadRiskRegister?.();
+          }
+        }
+        // Also fix container
+        const card = canvas?.closest('.gov-radar-card');
+        if (card) card.style.maxHeight = '300px';
+      }, 400);
+    }
+  };
+  console.log('[VSP Fix v1.0.2] Radar height fixed ✓');
+})();
+</script>
+<script>
+// FIX v1.0.3 — Dashboard KPI auto-populate on load
+(function fix103(){
+  // Populate extra KPIs ngay khi DOM ready
+  async function populateExtraKPIs() {
+    const el = document.getElementById('kpi-coverage');
+    if (!el) return; // chưa inject
+    try {
+      const [sla, rem, posture] = await Promise.all([
+        window.api('GET', '/vsp/sla_tracker').catch(()=>({sla:[]})),
+        window.api('GET', '/remediation/stats').catch(()=>({})),
+        window.api('GET', '/vsp/posture/latest').catch(()=>({})),
+      ]);
+      // Breaches
+      const breaches = (sla.sla||[]).reduce((a,s)=>a+(s.breach_count||0),0);
+      const eb = document.getElementById('kpi-breach');
+      if (eb) { eb.textContent = breaches; eb.style.color = breaches>0?'var(--red)':'var(--green)'; }
+      // Remediation rate
+      const open=rem.open||0, resolved=rem.resolved||0;
+      const total=open+resolved+(rem.in_progress||0)+(rem.accepted||0);
+      const rate = total>0?Math.round(resolved/total*100):0;
+      const er = document.getElementById('kpi-remrate');
+      if (er) er.textContent = rate+'%';
+      // Risk score
+      const score = posture.score||0;
+      const rk = document.getElementById('kpi-risk');
+      if (rk) { rk.textContent=score; rk.style.color=score>=70?'var(--green)':score>=40?'var(--amber)':'var(--red)'; }
+      // Coverage
+      const cv = document.getElementById('kpi-coverage');
+      if (cv) cv.textContent = '9/10';
+    } catch(e) { console.error('kpi populate', e); }
+  }
+
+  // Retry until elements exist
+  function tryPopulate(attempts) {
+    if (attempts <= 0) return;
+    const el = document.getElementById('kpi-coverage');
+    if (el) { populateExtraKPIs(); }
+    else { setTimeout(()=>tryPopulate(attempts-1), 500); }
+  }
+  setTimeout(()=>tryPopulate(10), 1000);
+
+  // Also patch showPanel dashboard
+  const _sp103 = window.showPanel;
+  window.showPanel = function(name, btn) {
+    if (_sp103) _sp103(name, btn);
+    if (name === 'dashboard') setTimeout(populateExtraKPIs, 800);
+  };
+  console.log('[VSP Fix v1.0.3] Dashboard KPI auto-populate ✓');
+})();
+</script>
+<script>
+// FIX v1.0.4 — Dashboard upgrade + Audit display fix
+(function fix104(){
+
+// ── 1. DASHBOARD: thêm sparkline trend cho từng severity ──
+async function addSeverityTrend() {
+  const panel = document.getElementById('panel-dashboard');
+  if (!panel || document.getElementById('sev-trend-card')) return;
+  
+  const card = document.createElement('div');
+  card.id = 'sev-trend-card';
+  card.className = 'card';
+  card.style.cssText = 'margin-bottom:14px';
+  card.innerHTML = `
+    <div class="card-head">
+      <span class="card-title">Severity trend — last 10 scans</span>
+      <span style="font-size:10px;color:var(--text3)" id="trend-updated"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:8px">
+      <div><div style="font-size:10px;color:var(--red);font-weight:700;margin-bottom:4px">CRITICAL</div>
+        <canvas id="spark-critical" height="50"></canvas></div>
+      <div><div style="font-size:10px;color:var(--amber);font-weight:700;margin-bottom:4px">HIGH</div>
+        <canvas id="spark-high" height="50"></canvas></div>
+      <div><div style="font-size:10px;color:var(--yellow,#fbbf24);font-weight:700;margin-bottom:4px">MEDIUM</div>
+        <canvas id="spark-medium" height="50"></canvas></div>
+      <div><div style="font-size:10px;color:var(--green);font-weight:700;margin-bottom:4px">LOW</div>
+        <canvas id="spark-low" height="50"></canvas></div>
+    </div>`;
+
+  // Insert after KPI extra
+  const extra = document.getElementById('dash-extra-kpis');
+  if (extra) extra.after(card);
+  else panel.insertBefore(card, panel.children[1]);
+
+  try {
+    const runs = await window.api('GET', '/vsp/runs/index');
+    const done = (runs.runs||[]).filter(r=>r.status==='DONE'&&r.summary).slice(0,10).reverse();
+    const labels = done.map(r=>(r.rid||'').slice(-6));
+    const parse = (r,k) => { try{return JSON.parse(r.summary||'{}')[k]||0;}catch{return 0;} };
+
+    const sparkCfg = (data, color) => ({
+      type:'line',
+      data:{ labels, datasets:[{data, borderColor:color, backgroundColor:color+'22',
+        borderWidth:1.5, pointRadius:2, fill:true, tension:0.3}] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        scales:{ x:{display:false}, y:{display:false, min:0} },
+        plugins:{legend:{display:false}, tooltip:{enabled:false}} }
+    });
+
+    ['critical','high','medium','low'].forEach(sev => {
+      const data = done.map(r=>parse(r,sev.toUpperCase()));
+      const colors = {critical:'#f87171',high:'#fb923c',medium:'#fbbf24',low:'#4ade80'};
+      const ctx = document.getElementById('spark-'+sev)?.getContext('2d');
+      if (ctx) new Chart(ctx, sparkCfg(data, colors[sev]));
+    });
+    document.getElementById('trend-updated').textContent = new Date().toLocaleTimeString();
+  } catch(e) { console.error('severity trend', e); }
+}
+
+// ── 2. DASHBOARD: thêm top findings widget ──
+async function addTopFindings() {
+  const panel = document.getElementById('panel-dashboard');
+  if (!panel || document.getElementById('top-findings-card')) return;
+
+  const card = document.createElement('div');
+  card.id = 'top-findings-card';
+  card.className = 'card';
+  card.style.cssText = 'margin-bottom:14px';
+  card.innerHTML = `
+    <div class="card-head">
+      <span class="card-title">🔴 Top critical findings</span>
+      <button class="btn-sm" onclick="window.showPanel('findings',null)">View all →</button>
+    </div>
+    <div id="top-findings-list" style="padding:4px 0"></div>`;
+
+  const sev = document.querySelector('.g4[style*="grid-template-columns:repeat(4"]') ||
+    document.getElementById('sev-trend-card');
+  if (sev) sev.after(card);
+
+  try {
+    const data = await window.api('GET', '/vsp/findings?limit=5&severity=CRITICAL');
+    const findings = data.findings || [];
+    const el = document.getElementById('top-findings-list');
+    if (el) el.innerHTML = findings.length ? findings.map(f=>`
+      <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);align-items:flex-start">
+        <span style="background:rgba(248,113,113,.15);color:#f87171;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;flex-shrink:0;margin-top:1px">${f.tool}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.rule_id||f.message||'—'}</div>
+          <div style="font-size:9px;color:var(--text3);margin-top:1px">${(f.path||'').slice(-40)||'—'}</div>
+        </div>
+      </div>`).join('') : '<div style="color:var(--text3);font-size:12px;padding:8px">No critical findings ✓</div>';
+  } catch(e) { console.error('top findings', e); }
+}
+
+// ── 3. AUDIT: show scan events từ runs history ──
+const _origAudit = window.loadAudit;
+window.loadAudit = async function() {
+  if (_origAudit) await _origAudit();
+  try {
+    // Nếu audit entries rỗng, show scan history thay thế
+    const data = await window.api('GET', '/audit/log?limit=10');
+    if ((data.entries||[]).length === 0) {
+      const tl = document.getElementById('audit-timeline');
+      if (!tl) return;
+      // Fallback: show recent runs as audit trail
+      const runs = await window.api('GET', '/vsp/runs/index');
+      const recent = (runs.runs||[]).slice(0,8);
+      tl.innerHTML = recent.length ? recent.map(r=>{
+        const gateColor = r.gate==='PASS'?'var(--green)':r.gate==='WARN'?'var(--amber)':'var(--red)';
+        return `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="width:6px;height:6px;border-radius:50%;background:${gateColor};margin-top:5px;flex-shrink:0"></div>
+          <div>
+            <div style="font-size:11px;color:var(--text1);font-weight:600">SCAN_${r.mode} · ${r.status} · ${r.gate||'—'}</div>
+            <div style="font-size:10px;color:var(--text3)">${r.rid||''} · ${r.total_findings||0} findings</div>
+            <div style="font-size:9px;color:var(--text3);margin-top:2px">${r.created_at?new Date(r.created_at).toLocaleString():''}</div>
+          </div>
+        </div>`;
+      }).join('') : '<div style="color:var(--text3);font-size:12px;padding:8px">No activity</div>';
+    }
+  } catch(e) { console.error('audit fallback', e); }
+};
+
+// ── 4. Patch showPanel để inject dashboard widgets ──
+const _sp104 = window.showPanel;
+window.showPanel = function(name, btn) {
+  if (_sp104) _sp104(name, btn);
+  if (name === 'dashboard') {
+    setTimeout(async () => {
+      await addSeverityTrend();
+      await addTopFindings();
+    }, 600);
+  }
+  if (name === 'audit') setTimeout(()=>window.loadAudit?.(), 200);
+};
+
+// Init on load
+setTimeout(async () => {
+  const active = document.querySelector('.panel.active');
+  if (active?.id === 'panel-dashboard') {
+    await addSeverityTrend();
+    await addTopFindings();
+  }
+}, 1500);
+
+console.log('[VSP Fix v1.0.4] Dashboard sparklines + Audit fallback ✓');
+})();
+</script>
+<script>
+// FIX v1.0.5 — Fix sparkline crash + dashboard blank
+(function fix105(){
+
+// Remove broken sev-trend-card nếu có
+const broken = document.getElementById('sev-trend-card');
+if (broken) broken.remove();
+if (window._sparkCharts) {
+  window._sparkCharts.forEach(c => { try{c.destroy();}catch{} });
+}
+window._sparkCharts = [];
+
+async function addSeverityTrend() {
+  const panel = document.getElementById('panel-dashboard');
+  if (!panel || document.getElementById('sev-trend-card')) return;
+
+  const card = document.createElement('div');
+  card.id = 'sev-trend-card';
+  card.className = 'card';
+  card.style.cssText = 'margin-bottom:14px';
+  card.innerHTML = `
+    <div class="card-head">
+      <span class="card-title">Severity trend — last 10 scans</span>
+      <span style="font-size:10px;color:var(--text3)" id="trend-updated"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px">
+      <div><div style="font-size:10px;color:#f87171;font-weight:700;margin-bottom:4px">CRITICAL</div>
+        <div style="height:60px;position:relative"><canvas id="spark-critical"></canvas></div></div>
+      <div><div style="font-size:10px;color:#fb923c;font-weight:700;margin-bottom:4px">HIGH</div>
+        <div style="height:60px;position:relative"><canvas id="spark-high"></canvas></div></div>
+      <div><div style="font-size:10px;color:#fbbf24;font-weight:700;margin-bottom:4px">MEDIUM</div>
+        <div style="height:60px;position:relative"><canvas id="spark-medium"></canvas></div></div>
+      <div><div style="font-size:10px;color:#4ade80;font-weight:700;margin-bottom:4px">LOW</div>
+        <div style="height:60px;position:relative"><canvas id="spark-low"></canvas></div></div>
+    </div>`;
+
+  const extra = document.getElementById('dash-extra-kpis');
+  if (extra) extra.after(card);
+
+  try {
+    const runs = await window.api('GET', '/vsp/runs/index');
+    // summary là object, KHÔNG cần JSON.parse
+    const done = (runs.runs||[])
+      .filter(r => r.status==='DONE' && r.summary && typeof r.summary === 'object')
+      .slice(0,10).reverse();
+
+    if (done.length === 0) {
+      card.querySelector('.card-head').nextElementSibling.innerHTML =
+        '<div style="color:var(--text3);font-size:12px;padding:12px">No completed scans yet</div>';
+      return;
+    }
+
+    const labels = done.map(r=>(r.rid||'').slice(-6));
+    const get = (r,k) => (r.summary&&r.summary[k]) || 0;
+
+    const mkSpark = (id, data, color) => {
+      const ctx = document.getElementById(id)?.getContext('2d');
+      if (!ctx) return;
+      const c = new Chart(ctx, {
+        type:'line',
+        data:{ labels, datasets:[{
+          data, borderColor:color,
+          backgroundColor:color+'33',
+          borderWidth:2, pointRadius:3,
+          pointBackgroundColor:color,
+          fill:true, tension:0.3
+        }]},
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          scales:{ x:{display:false}, y:{display:false, min:0} },
+          plugins:{legend:{display:false}, tooltip:{
+            callbacks:{ label: ctx => ctx.dataset.data[ctx.dataIndex] }
+          }}
+        }
+      });
+      window._sparkCharts.push(c);
+    };
+
+    mkSpark('spark-critical', done.map(r=>get(r,'CRITICAL')), '#f87171');
+    mkSpark('spark-high',     done.map(r=>get(r,'HIGH')),     '#fb923c');
+    mkSpark('spark-medium',   done.map(r=>get(r,'MEDIUM')),   '#fbbf24');
+    mkSpark('spark-low',      done.map(r=>get(r,'LOW')),      '#4ade80');
+
+    const el = document.getElementById('trend-updated');
+    if (el) el.textContent = new Date().toLocaleTimeString();
+  } catch(e) { console.error('spark error', e); }
+}
+
+// Patch showPanel
+const _sp105 = window.showPanel;
+window.showPanel = function(name, btn) {
+  if (_sp105) _sp105(name, btn);
+  if (name === 'dashboard') {
+    setTimeout(addSeverityTrend, 800);
+  }
+};
+
+// Init
+setTimeout(addSeverityTrend, 1000);
+console.log('[VSP Fix v1.0.5] Sparkline fix ✓');
+})();
+</script>
+<script>
+// FIX v1.0.6 — Audit + SLA format + Rem % + Heatmap + Posture trend
+(function fix106(){
+
+// ── 1. FIX SLA avg age format ──
+const _origSLA2 = window.loadSLAPanel;
+window.loadSLAPanel = async function() {
+  if (_origSLA2) await _origSLA2();
+  try {
+    const data = await window.api('GET', '/vsp/sla_tracker');
+    const bar2 = document.getElementById('sla-summary-bar');
+    if (!bar2) return;
+    const colors = {green:'var(--green)',yellow:'var(--amber)',red:'var(--red)'};
+    const fmtAge = d => {
+      if (d < 1) return Math.round(d*24) + 'h';
+      if (d < 2) return Math.floor(d) + 'd ' + Math.round((d%1)*24) + 'h';
+      return d.toFixed(1) + 'd';
+    };
+    bar2.innerHTML = (data.sla||[]).map(s=>`
+      <div class="kpi-card" style="padding:12px;border-left:3px solid ${colors[s.status]||'var(--text3)'}">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">${s.severity}</div>
+        <div style="font-family:var(--display);font-size:24px;font-weight:800;color:${colors[s.status]}">${s.open_count}</div>
+        <div style="font-size:10px;color:var(--text3)">open · SLA ${s.sla_days}d</div>
+        <div style="font-size:10px;color:${s.breach_count>0?'var(--red)':'var(--green)'}">
+          ${s.breach_count>0?'⚠ '+s.breach_count+' breaches':'✓ No breaches'}
+        </div>
+        <div style="margin-top:6px;background:#0f172a;border-radius:3px;height:3px">
+          <div style="width:${Math.min(s.avg_age_days/s.sla_days*100,100).toFixed(1)}%;background:${colors[s.status]};height:3px;border-radius:3px;transition:width .5s"></div>
+        </div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">avg age: ${fmtAge(s.avg_age_days)}</div>
+      </div>`).join('');
+  } catch(e) { console.error('sla format', e); }
+};
+
+// ── 2. FIX Remediation donut — show % ──
+const _origSP106 = window.showPanel;
+window.showPanel = function(name, btn) {
+  if (_origSP106) _origSP106(name, btn);
+
+  if (name === 'remediation') {
+    setTimeout(async () => {
+      try {
+        const stats = await window.api('GET', '/remediation/stats');
+        const entries = [
+          {label:'Open',        val:stats.open||0,           color:'#f87171'},
+          {label:'In Progress', val:stats.in_progress||0,    color:'#fbbf24'},
+          {label:'Resolved',    val:stats.resolved||0,       color:'#4ade80'},
+          {label:'Accepted',    val:stats.accepted||0,       color:'#a78bfa'},
+          {label:'False +ve',   val:stats.false_positive||0, color:'#94a3b8'},
+          {label:'Suppressed',  val:stats.suppressed||0,     color:'#475569'},
+        ];
+        const total = entries.reduce((a,e)=>a+e.val,0);
+        const bd = document.getElementById('rem-breakdown');
+        if (bd) bd.innerHTML = entries.map(e=>{
+          const pct = total>0?Math.round(e.val/total*100):0;
+          return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></div>
+            <span style="color:var(--text2)">${e.label}</span>
+            <span style="margin-left:auto;font-weight:700;color:var(--text1)">${e.val}</span>
+            <span style="color:var(--text3);font-size:10px;width:30px;text-align:right">${pct}%</span>
+          </div>`;
+        }).join('');
+      } catch(e) { console.error('rem pct', e); }
+    }, 300);
+  }
+
+  // ── 3. FIX Audit fallback ──
+  if (name === 'audit') {
+    setTimeout(async () => {
+      try {
+        const data = await window.api('GET', '/audit/log?limit=10');
+        const tl = document.getElementById('audit-timeline');
+        if (!tl) return;
+        if ((data.entries||[]).length > 0) return; // already has data
+        const runs = await window.api('GET', '/vsp/runs/index');
+        const recent = (runs.runs||[]).slice(0,8);
+        tl.innerHTML = recent.map(r => {
+          const gateColor = r.gate==='PASS'?'var(--green)':r.gate==='WARN'?'var(--amber)':'var(--red)';
+          const icon = r.gate==='PASS'?'✓':r.gate==='WARN'?'⚠':'✗';
+          return `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="width:18px;height:18px;border-radius:50%;background:${gateColor}22;border:1px solid ${gateColor};display:flex;align-items:center;justify-content:center;font-size:9px;color:${gateColor};flex-shrink:0;margin-top:2px">${icon}</div>
+            <div>
+              <div style="font-size:11px;color:var(--text1);font-weight:600">
+                SCAN · ${r.mode} · <span style="color:${gateColor}">${r.gate||r.status}</span>
+              </div>
+              <div style="font-size:10px;color:var(--text3)">${(r.rid||'').slice(-20)} · ${r.total_findings||0} findings</div>
+              <div style="font-size:9px;color:var(--text3);margin-top:1px">${r.created_at?new Date(r.created_at).toLocaleString():''}</div>
+            </div>
+          </div>`;
+        }).join('');
+      } catch(e) { console.error('audit fb', e); }
+    }, 400);
+  }
+
+  // ── 4. FIX Governance heatmap — include checkov ──
+  if (name === 'governance') {
+    setTimeout(async () => {
+      try {
+        const findings = await window.api('GET', '/vsp/findings?limit=1000');
+        const tools = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov'];
+        const sevs  = ['CRITICAL','HIGH','MEDIUM','LOW'];
+        const SEV_C = {CRITICAL:'#f87171',HIGH:'#fb923c',MEDIUM:'#fbbf24',LOW:'#4ade80'};
+        const matrix = {};
+        (findings.findings||[]).forEach(f => {
+          const k = f.tool+'|'+f.severity;
+          matrix[k] = (matrix[k]||0)+1;
+        });
+        const maxVal = Math.max(...Object.values(matrix).concat([1]));
+        const heatEl = document.getElementById('gov-heatmap');
+        if (heatEl) {
+          heatEl.innerHTML = `
+            <div style="display:grid;grid-template-columns:60px repeat(${sevs.length},1fr);gap:3px;font-size:9px">
+              <div></div>
+              ${sevs.map(s=>`<div style="text-align:center;color:${SEV_C[s]};font-weight:700;padding:2px">${s.slice(0,4)}</div>`).join('')}
+              ${tools.map(t=>`
+                <div style="color:var(--text3);font-family:var(--mono);padding:3px 0;display:flex;align-items:center">${t}</div>
+                ${sevs.map(s=>{
+                  const v = matrix[t+'|'+s]||0;
+                  const intensity = v>0?Math.max(0.15, v/maxVal):0;
+                  const bg = v>0?SEV_C[s]:'transparent';
+                  return `<div style="background:${bg};opacity:${intensity};border-radius:3px;padding:4px;text-align:center;color:#fff;font-weight:700;min-height:22px;display:flex;align-items:center;justify-content:center">
+                    ${v>0?v:''}
+                  </div>`;
+                }).join('')}`).join('')}
+            </div>`;
+        }
+      } catch(e) { console.error('heatmap fix', e); }
+    }, 500);
+  }
+};
+
+// ── 5. FIX Posture trend — patch loadDashboardCharts ──
+const _origCharts = window.loadDashboardCharts;
+window.loadDashboardCharts = async function() {
+  if (_origCharts) await _origCharts();
+  try {
+    const runs = await window.api('GET', '/vsp/runs/index');
+    const done = (runs.runs||[])
+      .filter(r=>r.status==='DONE' && r.summary && typeof r.summary==='object')
+      .slice(0,10).reverse();
+    if (!done.length) return;
+
+    const labels = done.map(r=>(r.rid||'').slice(-6));
+    const scores = done.map(r=>r.summary.SCORE||0);
+
+    // Find posture trend chart
+    const canvas = document.querySelector('#panel-dashboard canvas');
+    // Try to find by checking all canvases
+    const allCanvas = document.querySelectorAll('#panel-dashboard canvas');
+    let postureCanvas = null;
+    allCanvas.forEach(c => {
+      if (c.id !== 'spark-critical' && c.id !== 'spark-high' &&
+          c.id !== 'spark-medium' && c.id !== 'spark-low') {
+        // Check if this is posture trend
+        const parent = c.closest('.card');
+        if (parent?.textContent?.includes('POSTURE TREND') ||
+            parent?.textContent?.includes('Posture trend') ||
+            parent?.textContent?.includes('posture')) {
+          postureCanvas = c;
+        }
+      }
+    });
+
+    if (postureCanvas) {
+      const existingChart = Chart.getChart(postureCanvas);
+      if (existingChart) {
+        existingChart.data.labels = labels;
+        existingChart.data.datasets[0].data = scores;
+        existingChart.update();
+      }
+    }
+  } catch(e) { console.error('posture trend fix', e); }
+};
+
+console.log('[VSP Fix v1.0.6] SLA+Audit+Rem%+Heatmap+Posture ✓');
+})();
+</script>

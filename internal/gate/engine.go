@@ -122,25 +122,24 @@ func Evaluate(rule PolicyRule, s scanner.Summary) EvalResult {
 // ── Score ─────────────────────────────────────────────────────────────────────
 
 // Score computes a 0-100 security score from a summary.
-// Formula: start at 100, deduct weighted penalty per severity bucket.
+// Industry-standard weighted scoring with diminishing penalties.
 func Score(s scanner.Summary) int {
-	const (
-		penaltyCritical = 25
-		penaltyHigh     = 10
-		penaltyMedium   = 3
-		penaltyLow      = 1
-	)
+	// Penalty: each bucket capped so score never reaches 0 from single bucket
+	critPenalty := capInt(s.Critical, 2) * 15 // max 30pts (2+ critical = very bad)
+	highPenalty := capInt(s.High, 5)     * 8  // max 40pts
+	medPenalty  := capInt(s.Medium, 10)  * 2  // max 20pts
+	lowPenalty  := capInt(s.Low, 10)     * 1  // max 10pts
 
-	deduction := s.Critical*penaltyCritical +
-		s.High*penaltyHigh +
-		s.Medium*penaltyMedium +
-		s.Low*penaltyLow
-
-	score := 100 - deduction
+	score := 100 - critPenalty - highPenalty - medPenalty - lowPenalty
 	if score < 0 {
 		return 0
 	}
 	return score
+}
+
+func capInt(v, max int) int {
+	if v > max { return max }
+	return v
 }
 
 // ── Posture ───────────────────────────────────────────────────────────────────

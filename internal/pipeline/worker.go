@@ -66,6 +66,9 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
+	// Use background context for DB ops — task ctx may be cancelled after Execute
+	dbCtx := context.Background()
+
 	// Persist findings
 	dbFindings := make([]store.Finding, 0, len(result.Findings))
 	for _, f := range result.Findings {
@@ -85,18 +88,31 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	}
 
 	// Get run ID for findings FK
-	run, _ := h.DB.GetRunByRID(ctx, payload.TenantID, payload.RID)
+	run, _ := h.DB.GetRunByRID(dbCtx, payload.TenantID, payload.RID)
 	if run != nil {
 		for i := range dbFindings {
 			dbFindings[i].RunID = run.ID
 		}
 	}
-	h.DB.InsertFindings(ctx, dbFindings)
+	h.DB.InsertFindings(dbCtx, dbFindings)
+
+	// Auto-create remediation record (status=open) for each new finding
+	saved, _, _ := h.DB.ListFindings(dbCtx, payload.TenantID, store.FindingFilter{
+		Limit: len(dbFindings) + 100,
+	})
+	for _, f := range saved {
+		_, _ = h.DB.UpsertRemediation(dbCtx, store.Remediation{
+			FindingID: f.ID,
+			TenantID:  payload.TenantID,
+			Status:    store.RemOpen,
+			Priority:  severityToPriority(f.Severity),
+		})
+	}
 
 	// Compute gate + posture
 	s := result.Summary
 	policyRule := gate.DefaultRule()
-	rules, _ := h.DB.ListPolicyRules(ctx, payload.TenantID)
+	rules, _ := h.DB.ListPolicyRules(dbCtx, payload.TenantID)
 	if len(rules) > 0 {
 		r0 := rules[0]
 		policyRule = gate.PolicyRule{
@@ -116,7 +132,7 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		"SCORE":       eval.Score,
 	})
 
-	h.DB.UpdateRunResult(ctx, payload.TenantID, payload.RID,
+	h.DB.UpdateRunResult(dbCtx, payload.TenantID, payload.RID,
 		string(eval.Decision), eval.Posture,
 		len(result.Findings), summaryJSON)
 
@@ -161,3 +177,12 @@ var broadcastSSE func([]byte) = func([]byte) {} // no-op default
 
 // SetBroadcast wires the SSE hub broadcast function.
 func SetBroadcast(fn func([]byte)) { broadcastSSE = fn }
+
+func severityToPriority(sev string) string {
+	switch sev {
+	case "CRITICAL": return "P1"
+	case "HIGH":     return "P2"
+	case "MEDIUM":   return "P3"
+	default:         return "P4"
+	}
+}

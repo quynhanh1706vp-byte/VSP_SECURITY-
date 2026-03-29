@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/governance"
@@ -13,13 +14,21 @@ type Governance struct {
 }
 
 func (h *Governance) getFindings(r *http.Request, tenantID string) []store.Finding {
-	findings, _, _ := h.DB.ListFindings(r.Context(), tenantID, store.FindingFilter{Limit: 1000})
+	// Only use findings from the latest DONE run to avoid duplicates across runs
+	run, _ := h.DB.GetLatestRun(r.Context(), tenantID)
+	if run == nil || run.Status != "DONE" {
+		return []store.Finding{}
+	}
+	findings, _, _ := h.DB.ListFindings(r.Context(), tenantID, store.FindingFilter{
+		RunID: run.ID,
+		Limit: 5000,
+	})
 	return findings
 }
 
 func (h *Governance) getLatestPosture(r *http.Request, tenantID string) string {
 	run, _ := h.DB.GetLatestRun(r.Context(), tenantID)
-	if run == nil { return "A" }
+	if run == nil || run.Posture == "" { return "F" }
 	return run.Posture
 }
 
@@ -205,7 +214,7 @@ func (h *Governance) ReleaseGovernance(w http.ResponseWriter, r *http.Request) {
 }
 
 func timeNowStr() string {
-	return "2026-03-27"
+	return time.Now().UTC().Format("2006-01-02T15:04:05Z")
 }
 
 func min(a, b int) int {

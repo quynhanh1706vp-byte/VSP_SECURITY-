@@ -25,6 +25,7 @@ type Finding struct {
 }
 
 type FindingFilter struct {
+	RunID    string
 	Severity string
 	Tool     string
 	Search   string // message/rule/path substring
@@ -58,6 +59,10 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 	args  := []any{tenantID}
 	i := 2
 
+	if f.RunID != "" {
+		where = append(where, fmt.Sprintf("run_id = $%d", i))
+		args = append(args, f.RunID); i++
+	}
 	if f.Severity != "" {
 		where = append(where, fmt.Sprintf("severity = $%d", i))
 		args = append(args, strings.ToUpper(f.Severity)); i++
