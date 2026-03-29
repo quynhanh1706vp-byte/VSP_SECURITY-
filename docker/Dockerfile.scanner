@@ -5,11 +5,13 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o scanner ./cmd/scanner/
 
-FROM python:3.12-alpine
-RUN apk add --no-cache ca-certificates tzdata git curl wget tar ruby ruby-dev build-base nodejs npm
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git curl wget tar unzip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Python tools
-RUN pip install --no-cache-dir checkov bandit semgrep grype-python 2>/dev/null || true
+# Python security tools — install vào system Python
+RUN pip install --no-cache-dir bandit semgrep checkov 2>/dev/null || true
 
 # gitleaks
 RUN wget -qO- https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz \
@@ -23,16 +25,8 @@ RUN wget -qO- https://github.com/aquasecurity/trivy/releases/download/v0.50.0/tr
 RUN wget -qO- https://github.com/anchore/grype/releases/download/v0.74.0/grype_0.74.0_linux_amd64.tar.gz \
     | tar xz -C /usr/local/bin grype 2>/dev/null || true
 
-# nikto
-RUN apk add --no-cache perl perl-net-ssleay && \
-    wget -qO /tmp/nikto.tar.gz https://github.com/sullo/nikto/archive/master.tar.gz && \
-    tar xz -C /opt -f /tmp/nikto.tar.gz && \
-    ln -sf /opt/nikto-master/program/nikto.pl /usr/local/bin/nikto && \
-    chmod +x /opt/nikto-master/program/nikto.pl 2>/dev/null || true
-
-# nuclei
-RUN wget -qO- https://github.com/projectdiscovery/nuclei/releases/download/v3.1.10/nuclei_3.1.10_linux_amd64.zip \
-    2>/dev/null | unzip -o -d /usr/local/bin - nuclei 2>/dev/null || true
+# Verify tools
+RUN bandit --version && semgrep --version && echo "✓ Python tools OK"
 
 WORKDIR /app
 COPY --from=builder /app/scanner .

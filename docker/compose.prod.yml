@@ -63,8 +63,11 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-vsp}:${POSTGRES_PASSWORD:-vsp}@postgres:5432/${POSTGRES_DB:-vsp_go}?sslmode=disable
       REDIS_ADDR: redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-VspRedis2026!}
+      PATH: /usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /home/test:/home/test:ro
+      - /tmp:/tmp
 
   shell:
     build:
