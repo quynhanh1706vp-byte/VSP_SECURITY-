@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/hibiken/asynq"
+	"github.com/vsp/platform/internal/pipeline"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -60,9 +61,10 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: enqueue to asynq scanner worker
-	// task, _ := asynq.NewTask(pipeline.TaskTypeScan, payload)
-	// client.Enqueue(task)
+	go h.enqueueOrLog(run.RID, claims.TenantID, pipeline.Mode(req.Mode), pipeline.Profile(req.Profile), req.Src, req.URL)
+
+
+
 
 	w.WriteHeader(http.StatusAccepted)
 	jsonOK(w, map[string]any{

@@ -45,11 +45,12 @@ func main() {
 
 	handler := pipeline.NewScanHandler(db)
 
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" { redisAddr = viper.GetString("redis.addr") }
+	redisPass := os.Getenv("REDIS_PASSWORD")
+	if redisPass == "" { redisPass = viper.GetString("redis.password") }
 	srv := asynq.NewServer(
-		asynq.RedisClientOpt{
-            Addr:     viper.GetString("redis.addr"),
-            Password: viper.GetString("redis.password"),
-        },
+		asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass},
 		asynq.Config{
 			Concurrency: viper.GetInt("scanner.concurrency"),
 			Queues:      map[string]int{"critical": 6, "default": 3, "low": 1},

@@ -32,19 +32,20 @@ func main() {
 	viper.AddConfigPath("./config")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	// Docker env var mappings
-	viper.BindEnv("database.url", "DATABASE_URL")
-	viper.BindEnv("redis.addr", "REDIS_ADDR")
-	viper.BindEnv("redis.password", "REDIS_PASSWORD")
-	viper.BindEnv("auth.jwt_secret", "JWT_SECRET")
-	viper.BindEnv("server.env", "SERVER_ENV")
-	viper.BindEnv("server.allowed_origins", "ALLOWED_ORIGINS")
+	// SetDefault TRƯỚC BindEnv
 	viper.SetDefault("server.gateway_port", 8921)
 	viper.SetDefault("auth.jwt_secret", "dev-secret-change-in-prod")
 	viper.SetDefault("auth.jwt_ttl", "24h")
 	viper.SetDefault("database.url", "postgres://vsp:vsp@localhost:5432/vsp_go")
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("redis.addr", "localhost:6379")
+	// Docker env var mappings — sau SetDefault để override
+	viper.BindEnv("database.url", "DATABASE_URL")
+	viper.BindEnv("redis.addr", "REDIS_ADDR")
+	viper.BindEnv("redis.password", "REDIS_PASSWORD")
+	viper.BindEnv("auth.jwt_secret", "JWT_SECRET")
+	viper.BindEnv("server.env", "SERVER_ENV")
+	viper.BindEnv("server.allowed_origins", "ALLOWED_ORIGINS")
 	if err := viper.ReadInConfig(); err != nil {
 		log.Warn().Err(err).Msg("no config file — using defaults")
 	}
@@ -90,9 +91,19 @@ func main() {
 	viper.SetDefault("sso.provider", "google")
 	viper.SetDefault("sso.default_role", "analyst")
 
+	// Đọc Redis config trực tiếp từ env để đảm bảo Docker env vars được dùng
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = viper.GetString("redis.addr")
+	}
+	redisPass := os.Getenv("REDIS_PASSWORD")
+	if redisPass == "" {
+		redisPass = viper.GetString("redis.password")
+	}
+	log.Info().Str("redis", redisAddr).Msg("connecting asynq client")
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{
-		Addr:     viper.GetString("redis.addr"),
-		Password: viper.GetString("redis.password"),
+		Addr:     redisAddr,
+		Password: redisPass,
 	})
 	defer asynqClient.Close()
 
