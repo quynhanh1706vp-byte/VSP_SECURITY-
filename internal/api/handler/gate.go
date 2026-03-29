@@ -158,15 +158,27 @@ func runSummary(run *store.Run) scanner.Summary {
 	if run == nil {
 		return scanner.Summary{}
 	}
-	var m map[string]int
+	// Use map[string]any to handle mixed types (int + bool + string)
+	var m map[string]any
 	if err := json.Unmarshal(run.Summary, &m); err != nil {
 		return scanner.Summary{}
 	}
+	toInt := func(v any) int {
+		switch n := v.(type) {
+		case int:    return n
+		case float64: return int(n)
+		default:     return 0
+		}
+	}
+	toBool := func(v any) bool {
+		b, ok := v.(bool); return ok && b
+	}
 	return scanner.Summary{
-		Critical: m["CRITICAL"],
-		High:     m["HIGH"],
-		Medium:   m["MEDIUM"],
-		Low:      m["LOW"],
-		Info:     m["INFO"],
+		Critical:   toInt(m["CRITICAL"]),
+		High:       toInt(m["HIGH"]),
+		Medium:     toInt(m["MEDIUM"]),
+		Low:        toInt(m["LOW"]),
+		Info:       toInt(m["INFO"]),
+		HasSecrets: toBool(m["HAS_SECRETS"]),
 	}
 }

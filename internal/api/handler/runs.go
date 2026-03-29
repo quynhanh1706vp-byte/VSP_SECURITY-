@@ -139,25 +139,31 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return minimal fields only
 	type indexRow struct {
-		RID        string     `json:"rid"`
-		Status     string     `json:"status"`
-		Mode       string     `json:"mode"`
-		Gate       string     `json:"gate"`
-		Total      int        `json:"total"`
-		ToolsDone  int        `json:"tools_done"`
-		ToolsTotal int        `json:"tools_total"`
-		CreatedAt  time.Time  `json:"created_at"`
+		RID        string          `json:"rid"`
+		Status     string          `json:"status"`
+		Mode       string          `json:"mode"`
+		Profile    string          `json:"profile"`
+		Gate       string          `json:"gate"`
+		Total      int             `json:"total"`
+		ToolsDone  int             `json:"tools_done"`
+		ToolsTotal int             `json:"tools_total"`
+		Summary    json.RawMessage `json:"summary"`
+		CreatedAt  time.Time       `json:"created_at"`
 	}
 	rows := make([]indexRow, 0, len(runs))
 	for _, run := range runs {
+		summ := run.Summary
+		if summ == nil { summ = json.RawMessage("{}") }
 		rows = append(rows, indexRow{
 			RID:        run.RID,
 			Status:     run.Status,
 			Mode:       run.Mode,
+			Profile:    run.Profile,
 			Gate:       run.Gate,
 			Total:      run.TotalFindings,
 			ToolsDone:  run.ToolsDone,
 			ToolsTotal: run.ToolsTotal,
+			Summary:    summ,
 			CreatedAt:  run.CreatedAt,
 		})
 	}
