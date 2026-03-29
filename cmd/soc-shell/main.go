@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"strings"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -21,6 +23,9 @@ func main() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config")
 	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.BindEnv("server.gateway_host", "GATEWAY_HOST")
+	viper.BindEnv("server.gateway_port", "GATEWAY_PORT")
 	viper.ReadInConfig()
 
 	level, _ := zerolog.ParseLevel(viper.GetString("log.level"))
@@ -29,7 +34,11 @@ func main() {
 
 	shellPort   := viper.GetInt("server.shell_port")
 	gatewayPort := viper.GetInt("server.gateway_port")
-	gatewayURL, _ := url.Parse(fmt.Sprintf("http://localhost:%d", gatewayPort))
+	gatewayHost := viper.GetString("server.gateway_host")
+	if gatewayHost == "" {
+		gatewayHost = "localhost"
+	}
+	gatewayURL, _ := url.Parse(fmt.Sprintf("http://%s:%d", gatewayHost, gatewayPort))
 	proxy := httputil.NewSingleHostReverseProxy(gatewayURL)
 
 	mux := http.NewServeMux()
