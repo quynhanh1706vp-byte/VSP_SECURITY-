@@ -106,9 +106,14 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	}
 	eval := gate.Evaluate(policyRule, s)
 
-	summaryJSON, _ := json.Marshal(map[string]int{
-		"CRITICAL": s.Critical, "HIGH": s.High,
-		"MEDIUM": s.Medium, "LOW": s.Low, "INFO": s.Info,
+	summaryJSON, _ := json.Marshal(map[string]any{
+		"CRITICAL":    s.Critical,
+		"HIGH":        s.High,
+		"MEDIUM":      s.Medium,
+		"LOW":         s.Low,
+		"INFO":        s.Info,
+		"HAS_SECRETS": s.HasSecrets,
+		"SCORE":       eval.Score,
 	})
 
 	h.DB.UpdateRunResult(ctx, payload.TenantID, payload.RID,

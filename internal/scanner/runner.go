@@ -38,9 +38,9 @@ func (s Severity) Rank() int {
 // NormaliseSeverity maps arbitrary tool-specific strings to canonical Severity.
 func NormaliseSeverity(raw string) Severity {
 	switch raw {
-	case "critical", "CRITICAL", "error", "ERROR":
+	case "critical", "CRITICAL":
 		return SevCritical
-	case "high", "HIGH":
+	case "high", "HIGH", "error", "ERROR": // semgrep "error" = HIGH
 		return SevHigh
 	case "medium", "MEDIUM", "warning", "WARNING", "warn", "WARN":
 		return SevMedium

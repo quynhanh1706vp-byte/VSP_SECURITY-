@@ -48,8 +48,12 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 
 	// Tools total depends on mode
 	toolsTotal := map[string]int{
-		"SAST": 3, "SCA": 2, "SECRETS": 1,
-		"IAC": 1,  "DAST": 1, "FULL": 8,
+		"SAST":    3, // bandit + semgrep + codeql
+		"SCA":     2, // grype + trivy
+		"SECRETS": 1, // gitleaks
+		"IAC":     2, // kics + checkov
+		"DAST":    2, // nikto + nuclei
+		"FULL":    9, // all tools
 	}[req.Mode]
 	if toolsTotal == 0 { toolsTotal = 3 }
 
