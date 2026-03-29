@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/vsp/platform/internal/scanner"
@@ -18,6 +19,10 @@ func (a *Adapter) Name() string { return "kics" }
 func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Finding, error) {
 	if opts.Src == "" {
 		return nil, fmt.Errorf("kics: Src required")
+	}
+	// Check if kics is available
+	if _, err := exec.LookPath("kics"); err != nil {
+		return nil, fmt.Errorf("tool not found on PATH: kics")
 	}
 
 	outDir, err := os.MkdirTemp("", "kics_out_*")

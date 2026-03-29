@@ -8,7 +8,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o scanner ./cmd/scanner/
 FROM python:3.12-alpine
 RUN apk add --no-cache ca-certificates tzdata git curl wget tar
 
-# Python security tools
+# Python security tools (checkov covers IaC — replaces kics)
 RUN pip install --no-cache-dir checkov bandit semgrep 2>/dev/null || true
 
 # gitleaks
@@ -18,11 +18,6 @@ RUN curl -sfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/git
 # trivy
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
     | sh -s -- -b /usr/local/bin 2>/dev/null || true
-
-# kics
-RUN wget -qO /usr/local/bin/kics \
-    "https://github.com/Checkmarx/kics/releases/download/v2.1.0/kics_2.1.0_linux_amd64" \
-    && chmod +x /usr/local/bin/kics 2>/dev/null || true
 
 WORKDIR /app
 COPY --from=builder /app/scanner .
