@@ -49,6 +49,18 @@ var (
 		Buckets: prometheus.DefBuckets,
 	}, []string{"method", "path", "status"})
 
+	LoginAttempts = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vsp_login_attempts_total",
+		Help: "Login attempts by result (success/failed/mfa_required/locked).",
+	}, []string{"result"})
+	CacheHits = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vsp_cache_hits_total",
+		Help: "API cache hits by endpoint.",
+	}, []string{"endpoint"})
+	CacheMisses = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vsp_cache_misses_total",
+		Help: "API cache misses by endpoint.",
+	}, []string{"endpoint"})
 	WebhookDeliveries = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "vsp_webhook_deliveries_total",
 		Help: "SIEM webhook delivery attempts.",

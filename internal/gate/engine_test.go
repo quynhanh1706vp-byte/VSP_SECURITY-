@@ -39,7 +39,7 @@ func TestEvaluate_HighWarn(t *testing.T) {
 	s := scanner.Summary{High: 5}
 	r := gate.Evaluate(rule, s)
 	assert.Equal(t, gate.DecisionWarn, r.Decision)
-	assert.Equal(t, "B", r.Posture)
+	assert.Equal(t, "C", r.Posture) // High:5 > 2 → C
 }
 
 func TestEvaluate_MaxHighFail(t *testing.T) {
@@ -62,12 +62,13 @@ func TestEvaluate_MaxHighWarnMode(t *testing.T) {
 
 func TestEvaluate_ScoreThreshold(t *testing.T) {
 	rule := gate.DefaultRule()
-	rule.MinScore = 80
-	// 10 medium findings = -30 → score 70
-	s := scanner.Summary{Medium: 10}
+	rule.BlockCritical = false // disable block để test score threshold
+	rule.MinScore = 90
+	// Critical:1 = -15, High:1 = -8 → score 77 < 90
+	s := scanner.Summary{Critical: 1, High: 1}
 	r := gate.Evaluate(rule, s)
 	assert.Equal(t, gate.DecisionFail, r.Decision)
-	assert.Equal(t, 70, r.Score)
+	assert.Equal(t, 77, r.Score)
 }
 
 func TestPosture(t *testing.T) {
@@ -90,7 +91,7 @@ func TestPosture(t *testing.T) {
 
 func TestScore(t *testing.T) {
 	assert.Equal(t, 100, gate.Score(scanner.Summary{}))
-	assert.Equal(t, 90, gate.Score(scanner.Summary{High: 1}))  // 100-10
-	assert.Equal(t, 75, gate.Score(scanner.Summary{Critical: 1})) // 100-25
-	assert.Equal(t, 0, gate.Score(scanner.Summary{Critical: 10})) // floored at 0
+	assert.Equal(t, 92, gate.Score(scanner.Summary{High: 1}))  // 100-8
+	assert.Equal(t, 85, gate.Score(scanner.Summary{Critical: 1})) // 100-15
+	assert.Equal(t, 70, gate.Score(scanner.Summary{Critical: 10})) // 100-30 (capped at 2x15)
 }

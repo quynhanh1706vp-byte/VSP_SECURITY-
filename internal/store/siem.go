@@ -410,13 +410,15 @@ func (db *DB) SeedIOCsFromFindings(ctx context.Context) {
 		FROM   findings
 		WHERE  rule_id ILIKE 'CVE-%'
 		  AND  rule_id NOT IN (SELECT value FROM iocs WHERE type='cve')
-		LIMIT  200
-		ON CONFLICT (value) DO NOTHING`) //nolint:errcheck
+		LIMIT  500
+		ON CONFLICT (value) DO NOTHING`)
 }
 
 func (db *DB) FindingCWECount(ctx context.Context, cwe string) int {
 	var cnt int
-	db.pool.QueryRow(ctx, `SELECT COUNT(*) FROM findings WHERE cwe=$1`, cwe).Scan(&cnt) //nolint:errcheck
+	if err := db.pool.QueryRow(ctx, `SELECT COUNT(*) FROM findings WHERE cwe=$1`, cwe).Scan(&cnt); err != nil {
+		log.Warn().Err(err).Str("cwe", cwe).Msg("FindingCWECount scan failed")
+	}
 	return cnt
 }
 
