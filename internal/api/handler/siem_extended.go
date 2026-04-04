@@ -12,6 +12,7 @@ import (
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/siem"
 	"github.com/vsp/platform/internal/store"
+	"github.com/rs/zerolog/log"
 )
 
 // ── Correlation ───────────────────────────────────────────────
@@ -206,13 +207,12 @@ func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
 
 	// Parse run context
 	var runCtxMap map[string]string
-	json.Unmarshal(ctxRaw, &runCtxMap) //nolint:errcheck
+	if err := json.Unmarshal(ctxRaw, &runCtxMap); err != nil { log.Warn().Err(err).Caller().Msg("ignored error") }
 	if runCtxMap == nil { runCtxMap = map[string]string{} }
 
 	// Parse steps
 	var rawSteps []map[string]string
-	json.Unmarshal(stepsRaw, &rawSteps) //nolint:errcheck
-
+	if err := json.Unmarshal(stepsRaw, &rawSteps); err != nil { log.Warn().Err(err).Caller().Msg("ignored error") }
 	// Load executor config từ env/config
 	rc := siem.RunCtx{
 		TenantID:        claims.TenantID,

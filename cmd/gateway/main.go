@@ -751,7 +751,8 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
-		var lastSeen string
+		// Khôi phục lastSeen từ Redis để không broadcast lại sau restart
+		lastSeen, _ := ca.GetString(ctx, "vsp:sse:last_rid")
 		for {
 			select {
 			case <-ticker.C:
@@ -776,6 +777,7 @@ func main() {
 					if err := rows.Scan(&id, &rid, &tenantID, &gate, &findings, &summary, &createdAt); err != nil { continue }
 					if rid <= lastSeen { continue }
 					lastSeen = rid
+					ca.Set(ctx, "vsp:sse:last_rid", []byte(rid), 30*24*time.Hour)
 					// Broadcast SSE
 					msg, _ := json.Marshal(map[string]any{
 						"type": "scan_complete", "rid": rid,

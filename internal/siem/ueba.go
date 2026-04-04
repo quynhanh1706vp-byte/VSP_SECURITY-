@@ -140,7 +140,7 @@ func (e *UEBAEngine) updateBaseline(ctx context.Context) error {
 		defer rows.Close()
 		for rows.Next() {
 			var tool string; var cnt int
-			rows.Scan(&tool, &cnt) //nolint:errcheck
+			if err := rows.Scan(&tool, &cnt); err != nil { log.Warn().Err(err).Msg("scan error") }
 			b.Tools[tool] = cnt
 		}
 	}
@@ -221,7 +221,7 @@ func (e *UEBAEngine) checkGateFailStreak(ctx context.Context) *Anomaly {
 	streak := 0
 	for rows.Next() {
 		var gate string
-		rows.Scan(&gate) //nolint:errcheck
+		if err := rows.Scan(&gate); err != nil { log.Warn().Err(err).Msg("scan error") }
 		if gate == "FAIL" { streak++ } else { break }
 	}
 	if streak >= 3 {
@@ -256,7 +256,7 @@ func (e *UEBAEngine) checkOffHoursScans(ctx context.Context) []Anomaly {
 	var anomalies []Anomaly
 	for rows.Next() {
 		var rid string; var ts time.Time
-		rows.Scan(&rid, &ts) //nolint:errcheck
+		if err := rows.Scan(&rid, &ts); err != nil { log.Warn().Err(err).Msg("scan error") }
 		h := ts.UTC().Hour()
 		anomalies = append(anomalies, Anomaly{
 			Type:      AnomalyOffHoursScan,
@@ -285,7 +285,7 @@ func (e *UEBAEngine) checkNewCriticalTools(ctx context.Context) []Anomaly {
 	var anomalies []Anomaly
 	for rows.Next() {
 		var tool string; var cnt int
-		rows.Scan(&tool, &cnt) //nolint:errcheck
+		if err := rows.Scan(&tool, &cnt); err != nil { log.Warn().Err(err).Msg("scan error") }
 		if _, existed := e.baseline.Tools[tool]; !existed && cnt > 0 {
 			anomalies = append(anomalies, Anomaly{
 				Type:      AnomalyNewCriticalTool,
@@ -348,7 +348,7 @@ func RunUEBA(ctx context.Context, db *store.DB) {
 	defer rows.Close()
 	for rows.Next() {
 		var tenantID string
-		rows.Scan(&tenantID) //nolint:errcheck
+		if err := rows.Scan(&tenantID); err != nil { log.Warn().Err(err).Msg("scan error") }
 		engine := NewUEBAEngine(db, tenantID)
 		anomalies, err := engine.Analyze(ctx)
 		if err != nil {

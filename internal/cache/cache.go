@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -131,4 +132,12 @@ func (rc *responseCapture) WriteHeader(code int) {
 func (rc *responseCapture) Write(b []byte) (int, error) {
 	rc.body.Write(b)
 	return rc.ResponseWriter.Write(b)
+}
+
+// GetString lấy cached value dưới dạng string.
+func (c *Client) GetString(ctx context.Context, key string) (string, error) {
+	if c.rdb == nil {
+		return "", fmt.Errorf("cache disabled")
+	}
+	return c.rdb.Get(ctx, key).Result()
 }

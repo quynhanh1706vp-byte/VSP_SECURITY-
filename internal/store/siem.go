@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"time"
+	"github.com/rs/zerolog/log"
 )
 
 // ── Types ─────────────────────────────────────────────────────
@@ -308,7 +309,7 @@ func (db *DB) FindEnabledPlaybooks(ctx context.Context, tenantID, trigger, sev s
 	var out []Playbook
 	for rows.Next() {
 		var p Playbook
-		rows.Scan(&p.ID, &p.Name) //nolint:errcheck
+		if err := rows.Scan(&p.ID, &p.Name); err != nil { log.Warn().Err(err).Caller().Msg("ignored error") }
 		out = append(out, p)
 	}
 	return out, nil
