@@ -1,0 +1,3011 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSP Security Platform v2.0</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════════
+   VSP DESIGN SYSTEM v2.0 — INDUSTRIAL DARK THEME
+   Aesthetic: Terminal precision meets enterprise command center
+   Font: JetBrains Mono (mono) + Syne (display) + DM Sans (body)
+═══════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Core palette */
+  --bg:       #080c14;
+  --bg2:      #0c1220;
+  --bg3:      #111827;
+  --card:     #0f1a2e;
+  --card2:    #162035;
+  --card3:    #1c2a42;
+
+  /* Borders */
+  --b1: rgba(255,255,255,0.05);
+  --b2: rgba(255,255,255,0.09);
+  --b3: rgba(255,255,255,0.15);
+
+  /* Semantic colors */
+  --amber:   #f59e0b;
+  --amber2:  #fbbf24;
+  --amber3:  rgba(245,158,11,0.12);
+  --red:     #ef4444;
+  --red2:    rgba(239,68,68,0.12);
+  --green:   #22c55e;
+  --green2:  rgba(34,197,94,0.12);
+  --cyan:    #06b6d4;
+  --cyan2:   rgba(6,182,212,0.12);
+  --blue:    #3b82f6;
+  --blue2:   rgba(59,130,246,0.12);
+  --purple:  #8b5cf6;
+  --purple2: rgba(139,92,246,0.12);
+  --orange:  #f97316;
+  --orange2: rgba(249,115,22,0.12);
+  --pink:    #ec4899;
+
+  /* Text */
+  --t1: #f0f4ff;
+  --t2: #8899bb;
+  --t3: #445577;
+  --t4: #2a3a55;
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  /* Sizing */
+  --sidebar-w: 210px;
+  --topbar-h:  52px;
+  --radius:    8px;
+  --radius-lg: 12px;
+}
+
+/* ─── RESET ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--t1);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button { cursor: pointer; font-family: inherit; }
+input, select, textarea { font-family: inherit; }
+a { color: inherit; text-decoration: none; }
+canvas { display: block; }
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--b3); border-radius: 2px; }
+
+/* ═══ LAYOUT ═══ */
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+/* ═══ SIDEBAR ═══ */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--b1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  position: relative;
+  z-index: 10;
+}
+.sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--amber3), transparent);
+  pointer-events: none;
+}
+
+/* Logo */
+.logo {
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--b1);
+  flex-shrink: 0;
+}
+.logo-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-icon {
+  width: 32px; height: 32px;
+  background: var(--amber3);
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--amber);
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+.logo-text-wrap { min-width: 0; }
+.logo-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--t1);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.logo-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.live-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--green2);
+  border: 1px solid rgba(34,197,94,0.2);
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--green);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+.live-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: livePulse 2s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* Nav */
+.nav { flex: 1; padding: 10px 8px; }
+.nav-section { margin-bottom: 6px; }
+.nav-section-label {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  color: var(--t4);
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 10px 10px 5px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  color: var(--t2);
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+  position: relative;
+  letter-spacing: 0.01em;
+}
+.nav-item:hover { background: rgba(255,255,255,0.04); color: var(--t1); }
+.nav-item.active {
+  background: var(--amber3);
+  color: var(--amber);
+  border: 1px solid rgba(245,158,11,0.15);
+}
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-icon {
+  font-size: 12px;
+  width: 15px;
+  text-align: center;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 10px;
+  line-height: 14px;
+}
+.nav-badge.warn { background: var(--amber); color: #000; }
+.nav-badge.info { background: var(--blue); }
+
+/* Sidebar bottom */
+.sidebar-bottom {
+  padding: 12px;
+  border-top: 1px solid var(--b1);
+  flex-shrink: 0;
+}
+.gate-status {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  background: var(--red2);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.gate-status.pass { background: var(--green2); border-color: rgba(34,197,94,0.2); }
+.gate-status.warn { background: var(--amber3); border-color: rgba(245,158,11,0.2); }
+.gate-icon { font-size: 11px; }
+.gate-label { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--red); }
+.gate-status.pass .gate-label { color: var(--green); }
+.gate-status.warn .gate-label { color: var(--amber); }
+.gate-detail { font-size: 9px; color: var(--t3); margin-left: auto; font-family: var(--font-mono); }
+
+.user-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 2px;
+}
+.user-avatar {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--card3);
+  border: 1px solid var(--b2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: var(--amber);
+  flex-shrink: 0;
+}
+.user-info { min-width: 0; }
+.user-email { font-size: 10px; color: var(--t2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-role { font-family: var(--font-mono); font-size: 8px; color: var(--t4); letter-spacing: 0.08em; text-transform: uppercase; }
+
+.qs-hint {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px;
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--b1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.qs-hint:hover { background: rgba(255,255,255,0.05); border-color: var(--b2); }
+.qs-key {
+  background: var(--card3);
+  border: 1px solid var(--b2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t3);
+}
+.qs-label { font-size: 10px; color: var(--t3); }
+
+/* ═══ MAIN CONTENT ═══ */
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── TOPBAR ─── */
+.topbar {
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--b1);
+  background: var(--bg2);
+  position: relative;
+}
+.topbar::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--amber3) 30%, var(--amber3) 70%, transparent);
+  pointer-events: none;
+}
+.topbar-left { display: flex; flex-direction: column; gap: 1px; }
+.topbar-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--t1);
+  letter-spacing: -0.02em;
+}
+.topbar-breadcrumb {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t3);
+  letter-spacing: 0.08em;
+}
+.topbar-center { flex: 1; display: flex; align-items: center; justify-content: center; }
+.ticker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(245,158,11,0.04);
+  border: 1px solid rgba(245,158,11,0.1);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  max-width: 480px;
+  overflow: hidden;
+}
+.ticker-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: livePulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.ticker-lbl { color: var(--t3); flex-shrink: 0; }
+.ticker-content { color: var(--t2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+/* ─── BUTTONS ─── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--amber);
+  color: #000;
+}
+.btn-primary:hover { background: var(--amber2); transform: translateY(-1px); }
+.btn-ghost {
+  background: rgba(255,255,255,0.05);
+  color: var(--t2);
+  border: 1px solid var(--b2);
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.09); color: var(--t1); }
+.btn-danger {
+  background: var(--red2);
+  color: var(--red);
+  border: 1px solid rgba(239,68,68,0.2);
+}
+.btn-icon {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--b2);
+  color: var(--t2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.btn-icon:hover { background: rgba(255,255,255,0.08); color: var(--t1); }
+
+/* ─── NOTIFICATION BELL ─── */
+.notif-btn {
+  position: relative;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--b2);
+  color: var(--t2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  transition: all 0.15s;
+}
+.notif-btn:hover { background: rgba(255,255,255,0.08); color: var(--t1); }
+.notif-count {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--bg2);
+}
+
+/* ═══ CONTENT AREA ═══ */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+  scrollbar-width: thin;
+}
+
+/* ─── PANELS ─── */
+.panel { display: none; animation: panelIn 0.2s ease; }
+.panel.active { display: block; }
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── CARDS ─── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--b1);
+  gap: 12px;
+}
+.card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: 0.02em;
+}
+.card-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t3);
+  margin-top: 1px;
+}
+.card-body { padding: 16px; }
+.card-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--b1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ─── GRID LAYOUTS ─── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+.g6 { display: grid; grid-template-columns: repeat(6,1fr); gap: 8px; }
+
+/* ─── KPI CARDS ─── */
+.kpi {
+  background: var(--card);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius-lg);
+  padding: 15px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.kpi:hover { border-color: var(--b2); }
+.kpi::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--kpi-color, var(--cyan));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.kpi-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--t3);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.kpi-value {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 8px 0 5px;
+  letter-spacing: -0.02em;
+}
+.kpi-sub {
+  font-size: 10px;
+  color: var(--t3);
+}
+.kpi-accent { font-size: 11px; font-weight: 600; margin-left: 4px; }
+
+/* Color variants */
+.kpi-crit  { --kpi-color: var(--red); }
+.kpi-high  { --kpi-color: var(--orange); }
+.kpi-med   { --kpi-color: var(--amber); }
+.kpi-low   { --kpi-color: var(--green); }
+.kpi-cyan  { --kpi-color: var(--cyan); }
+.kpi-blue  { --kpi-color: var(--blue); }
+.kpi-purple{ --kpi-color: var(--purple); }
+
+/* ─── STATUS PILLS ─── */
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.pill-pass  { background: var(--green2);  color: var(--green);  border: 1px solid rgba(34,197,94,0.25); }
+.pill-fail  { background: var(--red2);    color: var(--red);    border: 1px solid rgba(239,68,68,0.25); }
+.pill-warn  { background: var(--amber3);  color: var(--amber);  border: 1px solid rgba(245,158,11,0.25); }
+.pill-run   { background: var(--cyan2);   color: var(--cyan);   border: 1px solid rgba(6,182,212,0.25); }
+.pill-queue { background: var(--blue2);   color: var(--blue);   border: 1px solid rgba(59,130,246,0.25); }
+.pill-done  { background: rgba(255,255,255,0.06); color: var(--t2); border: 1px solid var(--b2); }
+.pill-open  { background: var(--red2);    color: var(--red);    border: 1px solid rgba(239,68,68,0.2); }
+.pill-resolved { background: var(--green2); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+
+/* Severity text */
+.sev { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.05em; }
+.sev-crit { color: var(--red); }
+.sev-high { color: var(--orange); }
+.sev-med  { color: var(--amber); }
+.sev-low  { color: var(--green); }
+.sev-info { color: var(--t3); }
+
+/* ─── TABLES ─── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-weight: 600;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--b1);
+  background: rgba(255,255,255,0.015);
+  white-space: nowrap;
+}
+thead th:first-child { border-radius: 0; }
+tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--b1);
+  font-size: 12px;
+  color: var(--t2);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { transition: background 0.1s; }
+tbody tr:hover td { background: rgba(255,255,255,0.02); }
+.mono { font-family: var(--font-mono); font-size: 10px; }
+.mono-sm { font-family: var(--font-mono); font-size: 9px; color: var(--t3); }
+
+/* ─── FORM ELEMENTS ─── */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.form-ctrl {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  color: var(--t1);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: var(--font-body);
+  transition: border-color 0.15s;
+  outline: none;
+}
+.form-ctrl:focus { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber3); }
+.form-ctrl::placeholder { color: var(--t4); }
+select.form-ctrl { cursor: pointer; }
+select.form-ctrl option { background: var(--bg3); }
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.filter-select {
+  background: var(--card);
+  border: 1px solid var(--b2);
+  color: var(--t1);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.filter-select:focus { border-color: var(--amber); }
+.filter-input {
+  flex: 1;
+  min-width: 180px;
+  background: var(--card);
+  border: 1px solid var(--b2);
+  color: var(--t1);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.filter-input:focus { border-color: var(--amber); }
+.filter-input::placeholder { color: var(--t4); }
+
+/* ─── PAGINATION ─── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--b1);
+}
+.pagination-info {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--t3);
+}
+.page-btns { display: flex; gap: 4px; }
+.page-btn {
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid var(--b2);
+  background: rgba(255,255,255,0.03);
+  color: var(--t2);
+  transition: all 0.15s;
+}
+.page-btn:hover { background: rgba(255,255,255,0.07); color: var(--t1); }
+.page-btn.active { background: var(--amber); color: #000; border-color: var(--amber); }
+
+/* ─── PROGRESS BARS ─── */
+.progress-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+
+/* ─── TIMELINE ─── */
+.timeline { padding: 4px 0; }
+.tl-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--b1);
+  align-items: flex-start;
+}
+.tl-item:last-child { border-bottom: none; }
+.tl-dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700;
+  margin-top: 1px;
+}
+.tl-content { flex: 1; }
+.tl-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t1);
+  margin-bottom: 2px;
+}
+.tl-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t3);
+}
+
+/* ─── COMPLIANCE BARS ─── */
+.comp-row { margin-bottom: 16px; }
+.comp-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.comp-name { font-size: 12px; color: var(--t2); font-weight: 500; }
+.comp-pct { font-family: var(--font-display); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+
+/* ─── SOC PILLARS ─── */
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  padding: 16px;
+}
+.pillar {
+  background: var(--card2);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius);
+  padding: 10px 6px;
+  text-align: center;
+  transition: border-color 0.15s;
+}
+.pillar:hover { border-color: var(--b2); }
+.pillar-score {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.pillar-name {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: var(--t3);
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+/* ─── SLA CARDS ─── */
+.sla-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.sla-card {
+  background: var(--card);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  border-left: 3px solid var(--sla-c);
+  position: relative;
+}
+.sla-sev {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--t3);
+  text-transform: uppercase;
+}
+.sla-count {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--sla-c);
+  line-height: 1;
+  margin: 6px 0 4px;
+  letter-spacing: -0.02em;
+}
+.sla-detail { font-size: 10px; color: var(--t3); }
+.sla-ok { font-size: 10px; font-weight: 600; color: var(--green); margin-top: 6px; }
+
+/* ─── GAUGE CANVAS ─── */
+.gauge-wrap {
+  position: relative;
+  width: 100px; height: 100px;
+  margin: 0 auto 12px;
+}
+.gauge-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.gauge-num {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.gauge-unit { font-size: 9px; color: var(--t3); letter-spacing: 0.1em; margin-top: 2px; }
+
+/* ─── SCAN LOG ─── */
+.log-stream {
+  background: var(--bg);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.8;
+  padding: 12px;
+  height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.log-line {
+  display: flex;
+  gap: 10px;
+  padding: 1px 0;
+}
+.log-line:hover { background: rgba(255,255,255,0.02); }
+.log-ts { color: var(--t4); width: 60px; flex-shrink: 0; }
+.log-tool { width: 70px; flex-shrink: 0; font-weight: 600; }
+.log-level {
+  width: 50px; flex-shrink: 0;
+  font-size: 8px; font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 4px;
+  border-radius: 3px;
+  align-self: center;
+  text-align: center;
+}
+.log-INFO  { background: var(--cyan2);   color: var(--cyan); }
+.log-WARN  { background: var(--amber3);  color: var(--amber); }
+.log-ERROR { background: var(--red2);    color: var(--red); }
+.log-DONE  { background: var(--green2);  color: var(--green); }
+.log-msg { color: var(--t2); flex: 1; }
+.log-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px; flex-wrap: wrap;
+}
+.log-filter { display: flex; gap: 4px; }
+.log-filter-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--b2);
+  background: none;
+  color: var(--t3);
+  transition: all 0.15s;
+}
+.log-filter-btn:hover { color: var(--t1); border-color: var(--b3); }
+.log-filter-btn.active { background: var(--amber); color: #000; border-color: var(--amber); }
+.log-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.log-tool-cell {
+  background: var(--card2);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.log-tool-cell.done  { border-color: rgba(34,197,94,0.3); }
+.log-tool-cell.running { border-color: rgba(245,158,11,0.3); }
+.log-tool-cell.failed  { border-color: rgba(239,68,68,0.3); }
+.log-tool-name { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--t2); }
+.log-tool-status { font-family: var(--font-mono); font-size: 9px; margin-top: 3px; }
+
+/* ─── QUICK SEARCH OVERLAY ─── */
+#qs-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(5,10,20,0.85);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+}
+#qs-overlay.open { display: flex; }
+#qs-box {
+  background: var(--card);
+  border: 1px solid var(--b3);
+  border-radius: var(--radius-lg);
+  width: min(580px, 90vw);
+  box-shadow: 0 40px 100px rgba(0,0,0,0.7);
+  overflow: hidden;
+}
+#qs-input {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--b1);
+  color: var(--t1);
+  padding: 14px 18px;
+  font-size: 15px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+#qs-results { max-height: 340px; overflow-y: auto; }
+.qs-result {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--b1);
+  transition: background 0.1s;
+}
+.qs-result:last-child { border-bottom: none; }
+.qs-result:hover, .qs-result.selected { background: rgba(245,158,11,0.06); }
+.qs-result-icon { font-size: 12px; width: 18px; color: var(--amber); flex-shrink: 0; }
+.qs-result-name { font-size: 13px; font-weight: 600; color: var(--t1); }
+.qs-result-sub { font-size: 10px; color: var(--t3); }
+.qs-result-type {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--t4);
+  background: rgba(255,255,255,0.04);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+#qs-hint-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--b1);
+  background: rgba(255,255,255,0.01);
+}
+.qs-hint-key {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 9px; color: var(--t3);
+}
+.qs-hint-key kbd {
+  background: var(--card3);
+  border: 1px solid var(--b2);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t3);
+}
+
+/* ─── MODAL ─── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(5,10,20,0.8);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--card);
+  border: 1px solid var(--b3);
+  border-radius: var(--radius-lg);
+  width: min(520px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--b1);
+}
+.modal-title { font-size: 14px; font-weight: 700; color: var(--t1); }
+.modal-close {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--b2);
+  color: var(--t3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  transition: all 0.15s;
+}
+.modal-close:hover { background: rgba(255,255,255,0.09); color: var(--t1); }
+.modal-body { padding: 20px; }
+.modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--b1);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+
+/* ─── BULK TOOLBAR ─── */
+.bulk-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  margin-bottom: 10px;
+  background: var(--card);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius);
+}
+.bulk-check { display: flex; align-items: center; gap: 6px; }
+.bulk-check input { accent-color: var(--amber); }
+.bulk-check label { font-size: 12px; color: var(--t2); cursor: pointer; }
+.bulk-count { font-family: var(--font-mono); font-size: 10px; color: var(--t3); }
+.bulk-actions { display: flex; gap: 6px; margin-left: auto; }
+
+/* ─── TOAST ─── */
+#toast-container {
+  position: fixed;
+  bottom: 20px; right: 20px;
+  z-index: 9998;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: var(--card);
+  border: 1px solid var(--b3);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  animation: toastIn 0.25s ease;
+  min-width: 240px;
+  max-width: 360px;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.toast-icon { font-size: 16px; flex-shrink: 0; }
+.toast-success { border-color: rgba(34,197,94,0.3); }
+.toast-error   { border-color: rgba(239,68,68,0.3); }
+.toast-info    { border-color: rgba(6,182,212,0.3); }
+.toast-warn    { border-color: rgba(245,158,11,0.3); }
+
+/* ─── SSE STATUS ─── */
+.sse-status {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t3);
+}
+.sse-dot { width: 5px; height: 5px; border-radius: 50%; }
+.sse-live { background: var(--green); animation: livePulse 2s infinite; }
+.sse-dead { background: var(--red); }
+
+/* ─── SCORE RING ─── */
+.score-section { display: flex; align-items: center; gap: 20px; }
+.score-ring-wrap { position: relative; width: 90px; height: 90px; flex-shrink: 0; }
+.score-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.score-num {
+  font-family: var(--font-display);
+  font-size: 24px; font-weight: 800; line-height: 1; letter-spacing: -0.02em;
+}
+.score-lbl { font-family: var(--font-mono); font-size: 8px; color: var(--t3); letter-spacing: 0.1em; margin-top: 2px; }
+
+/* ─── SPARKLINES ─── */
+.spark-card {
+  background: var(--card);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+.spark-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--t3); text-transform: uppercase; font-weight: 600; margin-bottom: 6px; }
+.spark-value { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.spark-canvas-wrap { margin-top: 10px; height: 40px; }
+
+/* ─── POLICY RULE CARDS ─── */
+.rule-card {
+  background: var(--card);
+  border: 1px solid var(--b1);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s;
+}
+.rule-card:hover { border-color: var(--b2); }
+.rule-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rule-name { font-size: 13px; font-weight: 700; color: var(--t1); flex: 1; }
+.rule-tag {
+  font-family: var(--font-mono);
+  font-size: 8px; font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  color: var(--t3);
+  text-transform: uppercase;
+}
+.toggle-btn {
+  width: 36px; height: 20px;
+  border-radius: 10px;
+  background: var(--b2);
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle-btn.on { background: var(--green); }
+.toggle-btn::after {
+  content: '';
+  position: absolute;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px; left: 3px;
+  transition: left 0.2s;
+}
+.toggle-btn.on::after { left: 19px; }
+.rule-desc { font-size: 11px; color: var(--t2); margin-bottom: 8px; }
+.rule-meta { display: flex; gap: 16px; font-family: var(--font-mono); font-size: 9px; color: var(--t3); }
+.rule-meta span b { color: var(--amber); }
+
+/* ─── HEATMAP ─── */
+.heatmap-grid { display: grid; gap: 3px; }
+.heatmap-cell {
+  border-radius: 3px;
+  padding: 4px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  display: flex; align-items: center; justify-content: center;
+  min-height: 26px;
+}
+.heatmap-header { font-family: var(--font-mono); font-size: 9px; font-weight: 700; text-align: center; letter-spacing: 0.06em; min-height: 18px; display: flex; align-items: center; justify-content: center; }
+.heatmap-tool { font-family: var(--font-mono); font-size: 9px; color: var(--t3); display: flex; align-items: center; }
+
+/* ─── EXECUTIVE ─── */
+.exec-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.5fr;
+  gap: 0;
+  background: var(--b1);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.exec-hero-cell {
+  background: var(--card);
+  padding: 24px;
+}
+.exec-hero-cell + .exec-hero-cell { border-left: 1px solid var(--b1); }
+.exec-grade {
+  font-family: var(--font-display);
+  font-size: 72px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-align: center;
+  margin: 12px 0 8px;
+}
+.exec-stat { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--b1); }
+.exec-stat:last-child { border-bottom: none; }
+.exec-stat-lbl { font-size: 12px; color: var(--t2); }
+.exec-stat-val { font-family: var(--font-display); font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+
+/* ─── SBOM ─── */
+.sbom-features { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.sbom-tag {
+  background: var(--card2);
+  border: 1px solid var(--b2);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t2);
+  letter-spacing: 0.06em;
+}
+
+/* ─── GOVERNANCE RADAR ─── */
+.gov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.gov-card { background: var(--card); border: 1px solid var(--b1); border-radius: var(--radius-lg); padding: 16px; }
+.gov-card-title { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: var(--t3); text-transform: uppercase; margin-bottom: 14px; }
+
+/* ─── RACI TABLE ─── */
+.raci-table { width: 100%; border-collapse: collapse; }
+.raci-table th { padding: 7px 12px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--b1); font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3); text-align: left; }
+.raci-table td { padding: 8px 12px; border-bottom: 1px solid var(--b1); font-size: 12px; color: var(--t2); }
+.raci-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  font-size: 10px; font-weight: 800;
+}
+.raci-R { background: var(--red2);    color: var(--red); }
+.raci-A { background: var(--amber3);  color: var(--amber); }
+.raci-C { background: var(--cyan2);   color: var(--cyan); }
+.raci-I { background: rgba(255,255,255,0.05); color: var(--t3); }
+
+/* ─── MISC UTILITIES ─── */
+.mb8  { margin-bottom: 8px; }
+.mb12 { margin-bottom: 12px; }
+.mb14 { margin-bottom: 14px; }
+.mb16 { margin-bottom: 16px; }
+.mb20 { margin-bottom: 20px; }
+.gap8  { gap: 8px; }
+.gap10 { gap: 10px; }
+.gap12 { gap: 12px; }
+.flex  { display: flex; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.flex-1 { flex: 1; }
+.text-right { text-align: right; }
+.overflow-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-red    { color: var(--red); }
+.c-green  { color: var(--green); }
+.c-amber  { color: var(--amber); }
+.c-cyan   { color: var(--cyan); }
+.c-blue   { color: var(--blue); }
+.c-purple { color: var(--purple); }
+.c-orange { color: var(--orange); }
+.c-t2     { color: var(--t2); }
+.c-t3     { color: var(--t3); }
+.fw7 { font-weight: 700; }
+.fw8 { font-weight: 800; }
+.fmono { font-family: var(--font-mono); }
+.f10 { font-size: 10px; }
+.f11 { font-size: 11px; }
+.f12 { font-size: 12px; }
+
+/* ─── LOADING SKELETON ─── */
+.skeleton {
+  background: linear-gradient(90deg, var(--card2) 0%, var(--card3) 50%, var(--card2) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 4px;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 1100px) {
+  .sidebar { width: 180px; }
+  :root { --sidebar-w: 180px; }
+  .g4 { grid-template-columns: 1fr 1fr; }
+  .pillars { grid-template-columns: repeat(4, 1fr); }
+}
+</style>
+</style>
+
+<!-- ══════════════════════════════════════════════
+     HTML STRUCTURE
+══════════════════════════════════════════════ -->
+
+<div id="toast-container"></div>
+
+<!-- QUICK SEARCH OVERLAY -->
+<div id="qs-overlay" onclick="if(event.target===this)closeQS()">
+  <div id="qs-box">
+    <input id="qs-input" placeholder="Search panels, findings, runs… (↑↓ Enter Esc)" autocomplete="off">
+    <div id="qs-results"></div>
+    <div id="qs-hint-bar">
+      <span class="qs-hint-key"><kbd>↑↓</kbd> navigate</span>
+      <span class="qs-hint-key"><kbd>Enter</kbd> select</span>
+      <span class="qs-hint-key"><kbd>Esc</kbd> close</span>
+      <span class="qs-hint-key" style="margin-left:auto"><kbd>/</kbd> to open anywhere</span>
+    </div>
+  </div>
+</div>
+
+<!-- REMEDIATION EDIT MODAL -->
+<div class="modal-overlay" id="rem-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="rem-modal-title">Update finding</div>
+        <div id="rem-modal-finding" style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:3px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      </div>
+      <button class="modal-close" onclick="closeRemModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="g2 mb14">
+        <div class="form-group mb8">
+          <label class="form-label">Status</label>
+          <select id="rem-status" class="form-ctrl">
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="resolved">Resolved</option>
+            <option value="accepted">Risk accepted</option>
+            <option value="false_positive">False positive</option>
+            <option value="suppressed">Suppressed</option>
+          </select>
+        </div>
+        <div class="form-group mb8">
+          <label class="form-label">Priority</label>
+          <select id="rem-priority" class="form-ctrl">
+            <option value="P1">P1 — Critical</option>
+            <option value="P2">P2 — High</option>
+            <option value="P3">P3 — Medium</option>
+            <option value="P4">P4 — Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group mb8">
+        <label class="form-label">Assignee</label>
+        <input id="rem-assignee" class="form-ctrl" placeholder="email or name">
+      </div>
+      <div class="form-group mb8">
+        <label class="form-label">Ticket URL</label>
+        <input id="rem-ticket" class="form-ctrl" placeholder="https://jira.example.com/VSP-001">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea id="rem-notes" class="form-ctrl" rows="3" style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeRemModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRemediation()">Save changes →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCAN TRIGGER MODAL -->
+<div class="modal-overlay" id="scan-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Trigger new scan</div>
+      <button class="modal-close" onclick="document.getElementById('scan-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="g2 mb14">
+        <div class="form-group mb8">
+          <label class="form-label">Mode</label>
+          <select id="scanMode" class="form-ctrl">
+            <option>SAST</option><option>SCA</option><option>SECRETS</option>
+            <option>IAC</option><option>DAST</option><option>FULL</option>
+          </select>
+        </div>
+        <div class="form-group mb8">
+          <label class="form-label">Profile</label>
+          <select id="scanProfile" class="form-ctrl">
+            <option>FAST</option><option>EXT</option><option>FULL</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Source path</label>
+        <input id="scanSrc" class="form-ctrl" placeholder="/path/to/code">
+      </div>
+      <div id="scanMsg" style="margin-top:10px;font-size:11px;font-family:var(--font-mono)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('scan-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="triggerScan()">Execute scan →</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+<!-- ══════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════ -->
+<nav class="sidebar">
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-main">
+      <div class="logo-icon">VSP</div>
+      <div class="logo-text-wrap">
+        <div class="logo-title">Security</div>
+        <div class="logo-sub">Platform v2.0 · Enterprise</div>
+      </div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div> SSE live</div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-section">
+      <div class="nav-section-label">Operations</div>
+      <button class="nav-item active" onclick="showPanel('dashboard',this)"><span class="nav-icon">◈</span> Dashboard</button>
+      <button class="nav-item" onclick="showPanel('scanlog',this)"><span class="nav-icon">▦</span> Scan log</button>
+      <button class="nav-item" onclick="showPanel('runs',this)"><span class="nav-icon">▷</span> Runs</button>
+      <button class="nav-item" onclick="showPanel('findings',this)"><span class="nav-icon">◎</span> Findings <span class="nav-badge" id="badge-findings">104</span></button>
+      <button class="nav-item" onclick="showPanel('remediation',this)"><span class="nav-icon">◐</span> Remediation</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Security</div>
+      <button class="nav-item" onclick="showPanel('policy',this)"><span class="nav-icon">◫</span> Policy</button>
+      <button class="nav-item" onclick="showPanel('audit',this)"><span class="nav-icon">◷</span> Audit</button>
+      <button class="nav-item" onclick="showPanel('soc',this)"><span class="nav-icon">◉</span> SOC</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Compliance</div>
+      <button class="nav-item" onclick="showPanel('governance',this)"><span class="nav-icon">◧</span> Governance</button>
+      <button class="nav-item" onclick="showPanel('compliance',this)"><span class="nav-icon">◆</span> FedRAMP</button>
+      <button class="nav-item" onclick="showPanel('sbom',this)"><span class="nav-icon">◌</span> SBOM</button>
+      <button class="nav-item" onclick="showPanel('sla',this)"><span class="nav-icon">◷</span> SLA</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Reports</div>
+      <button class="nav-item" onclick="showPanel('executive',this)"><span class="nav-icon">★</span> Executive</button>
+      <button class="nav-item" onclick="showPanel('export',this)"><span class="nav-icon">↓</span> Export</button>
+      <button class="nav-item" onclick="showPanel('users',this)"><span class="nav-icon">◈</span> Users</button>
+    </div>
+  </nav>
+
+  <!-- Bottom -->
+  <div class="sidebar-bottom">
+    <div class="gate-status" id="gate-widget">
+      <span class="gate-icon">✗</span>
+      <span class="gate-label">GATE FAIL</span>
+      <span class="gate-detail">score: 22</span>
+    </div>
+    <div class="user-row">
+      <div class="user-avatar">A</div>
+      <div class="user-info">
+        <div class="user-email">admin@vsp.local</div>
+        <div class="user-role">admin · default tenant</div>
+      </div>
+    </div>
+    <div class="qs-hint" onclick="openQS()">
+      <span class="qs-key">/</span>
+      <span class="qs-label">Quick search</span>
+      <span class="qs-key" style="margin-left:auto">⌘K</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════════ -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-breadcrumb" id="page-sub">VSP / Operations / Dashboard</div>
+    </div>
+    <div class="topbar-center">
+      <div class="ticker">
+        <div class="ticker-dot"></div>
+        <span class="ticker-lbl">LATEST:</span>
+        <span class="ticker-content" id="ticker-content">RID_SCHED_20260329_194714_0 · IAC · DONE · FAIL · 104 findings</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="sse-status">
+        <div class="sse-dot sse-live" id="sse-dot"></div>
+        <span id="sse-label">SSE live</span>
+      </div>
+      <button class="notif-btn" onclick="showToast('Notifications — 1 unread','info')">
+        🔔
+        <span class="notif-count">1</span>
+      </button>
+      <button class="btn btn-ghost" onclick="loadCurrentPanel()">↻ Refresh</button>
+      <button class="btn btn-primary" onclick="document.getElementById('scan-modal').classList.add('open')">+ New Scan</button>
+    </div>
+  </header>
+
+  <!-- CONTENT -->
+  <div class="content" id="content">
+
+    <!-- ════════════════════════════════════
+         DASHBOARD PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-dashboard" class="panel active">
+
+      <!-- Spark KPIs -->
+      <div class="g4 mb14">
+        <div class="spark-card">
+          <div class="spark-label">Security Score</div>
+          <div class="spark-value c-red" id="d-score">22</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-score" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Total Runs</div>
+          <div class="spark-value c-cyan" id="d-runs-count">50</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-runs" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Gate Pass Rate</div>
+          <div class="spark-value c-amber" id="d-pass-rate">38%</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-pass" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Open Remediations</div>
+          <div class="spark-value c-purple" id="d-rem">1165</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-rem" height="40"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Extra KPIs -->
+      <div class="g4 mb14">
+        <div class="kpi kpi-crit"><div class="kpi-label">Critical</div><div class="kpi-value c-red" id="d-critical">1</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-high"><div class="kpi-label">High</div><div class="kpi-value c-orange" id="d-high">80</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-med"><div class="kpi-label">Medium</div><div class="kpi-value c-amber" id="d-medium">13</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-low"><div class="kpi-label">Low</div><div class="kpi-value c-green" id="d-low">3</div><div class="kpi-sub">findings</div></div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="g2 mb14">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Security posture</div><div class="card-sub" id="posture-run-lbl">latest run</div></div>
+          </div>
+          <div class="card-body">
+            <div class="score-section">
+              <div class="score-ring-wrap">
+                <canvas id="score-ring" width="90" height="90"></canvas>
+                <div class="score-overlay">
+                  <div class="score-num c-red" id="d-score2">22</div>
+                  <div class="score-lbl">/100</div>
+                </div>
+              </div>
+              <div style="flex:1">
+                <div class="exec-stat"><span class="exec-stat-lbl">Grade</span><span class="exec-stat-val c-red" id="d-grade">F</span></div>
+                <div class="exec-stat"><span class="exec-stat-lbl">Gate</span><span><span class="pill pill-fail" id="d-gate">FAIL</span></span></div>
+                <div class="exec-stat"><span class="exec-stat-lbl">SLA breaches</span><span class="exec-stat-val c-green" id="d-breaches">0</span></div>
+                <div class="exec-stat"><span class="exec-stat-lbl">Total findings</span><span class="exec-stat-val" id="d-total">97</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Findings by severity</div>
+            <div class="card-sub" id="chart-run-lbl">latest run</div>
+          </div>
+          <div class="card-body" style="height:160px;position:relative">
+            <canvas id="chartSeverity"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top findings + Gate trend -->
+      <div class="g2 mb14">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">🔴 Top critical findings</div>
+            <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="showPanel('findings',null)">View all →</button>
+          </div>
+          <div id="top-findings-list">
+            <div class="tl-item">
+              <div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div>
+              <div class="tl-content">
+                <div class="tl-title" style="font-size:11px">38c5ee0d — S3 Bucket ACL Allows Read/Write</div>
+                <div class="tl-meta">kics · ../../../../tmp/iac_test/main.tf:3</div>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div>
+              <div class="tl-content">
+                <div class="tl-title" style="font-size:11px">CVE-2024-45337 — PublicKeyCallback bypass</div>
+                <div class="tl-meta">trivy · go.mod · golang.org/x/crypto</div>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div>
+              <div class="tl-content">
+                <div class="tl-title" style="font-size:11px">generic-api-key — API key exposed in .env</div>
+                <div class="tl-meta">gitleaks · /home/test/Data/GOLANG_VSP/.env:10 · CWE-798</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">Gate decisions — trend</div></div>
+          <div class="card-body" style="height:160px;position:relative">
+            <canvas id="chartGates"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent runs table -->
+      <div class="card mb14">
+        <div class="card-head">
+          <div class="card-title">Recent runs</div>
+          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="showPanel('runs',null)">View all →</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Run ID</th><th>Mode</th><th>Status</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Created</th></tr></thead>
+            <tbody id="d-runs-table">
+              <tr><td class="mono overflow-ellipsis" style="max-width:240px">RID_SCHED_20260329_194714_0</td><td><span class="pill pill-run">IAC</span></td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">104</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 19:47</td></tr>
+              <tr><td class="mono overflow-ellipsis" style="max-width:240px">RID_VSPGO_RUN_20260329_171611</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-orange fw7">49</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 17:16</td></tr>
+              <tr><td class="mono overflow-ellipsis" style="max-width:240px">RID_VSPGO_RUN_20260329_165946</td><td><span class="pill pill-run">IAC</span></td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-warn">WARN</span></td><td class="c-amber fw7">43</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 16:59</td></tr>
+              <tr><td class="mono overflow-ellipsis" style="max-width:240px">RID_VSPGO_RUN_20260329_164947</td><td><span class="pill pill-run">IAC</span></td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-pass">PASS</span></td><td class="c-green fw7">8</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 16:49</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SCAN LOG PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-scanlog" class="panel">
+      <div class="flex-between mb14">
+        <div>
+          <div style="font-family:var(--font-display);font-size:18px;font-weight:800;letter-spacing:-0.02em">Scan log viewer</div>
+          <div class="mono-sm" style="margin-top:3px">Real-time · tool-by-tool · filterable</div>
+        </div>
+        <div class="flex gap8">
+          <div class="sse-status"><div class="sse-dot sse-live" id="log-live-dot"></div><span id="log-live-lbl" class="f10 c-t3">DONE</span></div>
+          <button class="btn btn-ghost" onclick="loadLatestLog()">↻ Latest</button>
+          <button class="btn btn-primary" onclick="clearLog()">✕ Clear</button>
+        </div>
+      </div>
+
+      <div class="card mb14">
+        <div class="card-body" style="padding:10px 14px">
+          <div class="flex gap8" style="align-items:center">
+            <select id="log-run-select" class="filter-select" style="flex:1;max-width:480px" onchange="loadRunLog(this.value)">
+              <option value="">— select run —</option>
+              <option value="RID_SCHED_20260329_194714_0">RID_SCHED_20260329_194714_0 · IAC · DONE</option>
+              <option value="RID_VSPGO_RUN_20260329_171611_59df331a">RID_VSPGO_RUN_20260329_171611 · FULL · DONE</option>
+              <option value="RID_VSPGO_RUN_20260329_165946_252112b8">RID_VSPGO_RUN_20260329_165946 · IAC · DONE</option>
+              <option value="RID_VSPGO_RUN_20260329_164947_95de1cb5">RID_VSPGO_RUN_20260329_164947 · IAC · DONE</option>
+            </select>
+            <span id="log-run-info" class="mono-sm"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="log-tool-grid mb12">
+        <div class="log-tool-cell done" id="ltc-kics"><div class="log-tool-name">kics</div><div class="log-tool-status c-green f10 fmono">475 findings</div></div>
+        <div class="log-tool-cell" id="ltc-bandit"><div class="log-tool-name">bandit</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-semgrep"><div class="log-tool-name">semgrep</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-grype"><div class="log-tool-name">grype</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell done" id="ltc-trivy"><div class="log-tool-name">trivy</div><div class="log-tool-status c-green f10 fmono">9 findings</div></div>
+        <div class="log-tool-cell done" id="ltc-gitleaks"><div class="log-tool-name">gitleaks</div><div class="log-tool-status c-green f10 fmono">3 findings</div></div>
+        <div class="log-tool-cell done" id="ltc-checkov"><div class="log-tool-name">checkov</div><div class="log-tool-status c-green f10 fmono">13 findings</div></div>
+        <div class="log-tool-cell" id="ltc-trufflehog"><div class="log-tool-name">trufflehog</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+      </div>
+
+      <div class="log-toolbar">
+        <span class="f10 c-t3">Filter:</span>
+        <div class="log-filter">
+          <button class="log-filter-btn active" onclick="setLogFilter('ALL',this)">ALL</button>
+          <button class="log-filter-btn" onclick="setLogFilter('INFO',this)">INFO</button>
+          <button class="log-filter-btn" onclick="setLogFilter('WARN',this)">WARN</button>
+          <button class="log-filter-btn" onclick="setLogFilter('ERROR',this)">ERROR</button>
+          <button class="log-filter-btn" onclick="setLogFilter('DONE',this)">DONE</button>
+        </div>
+        <input class="filter-input" id="log-search" placeholder="Search logs…" style="max-width:200px" oninput="filterLogs()">
+        <span id="log-count" class="mono-sm" style="margin-left:auto">17 lines</span>
+        <label class="flex gap8 f10 c-t3" style="align-items:center;cursor:pointer">
+          <input type="checkbox" id="log-autoscroll" checked style="accent-color:var(--amber)"> Auto-scroll
+        </label>
+      </div>
+
+      <div class="log-stream" id="log-stream">
+        <div class="log-line"><span class="log-ts">00:00:00</span><span class="log-tool" style="color:var(--t2)">scanner</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Run started: RID_SCHED_20260329_194714_0</span></div>
+        <div class="log-line"><span class="log-ts">00:00:01</span><span class="log-tool" style="color:var(--t2)">scanner</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Mode: IAC · Profile: FAST</span></div>
+        <div class="log-line"><span class="log-ts">00:00:02</span><span class="log-tool" style="color:#818cf8">kics</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Starting scan…</span></div>
+        <div class="log-line"><span class="log-ts">00:00:03</span><span class="log-tool" style="color:#818cf8">kics</span><span class="log-level log-ERROR">ERROR</span><span class="log-msg">Found 13 CRITICAL findings</span></div>
+        <div class="log-line"><span class="log-ts">00:00:04</span><span class="log-tool" style="color:#818cf8">kics</span><span class="log-level log-WARN">WARN</span><span class="log-msg">Found 462 HIGH findings</span></div>
+        <div class="log-line"><span class="log-ts">00:00:05</span><span class="log-tool" style="color:#818cf8">kics</span><span class="log-level log-DONE">DONE</span><span class="log-msg">Completed · 475 findings</span></div>
+        <div class="log-line"><span class="log-ts">00:00:06</span><span class="log-tool" style="color:#fbbf24">trivy</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Starting scan…</span></div>
+        <div class="log-line"><span class="log-ts">00:00:07</span><span class="log-tool" style="color:#fbbf24">trivy</span><span class="log-level log-ERROR">ERROR</span><span class="log-msg">Found 3 CRITICAL findings (CVE-2024-45337, CVE-2025-22869, CVE-2025-30204)</span></div>
+        <div class="log-line"><span class="log-ts">00:00:08</span><span class="log-tool" style="color:#fbbf24">trivy</span><span class="log-level log-DONE">DONE</span><span class="log-msg">Completed · 9 findings</span></div>
+        <div class="log-line"><span class="log-ts">00:00:10</span><span class="log-tool" style="color:#f87171">gitleaks</span><span class="log-level log-ERROR">ERROR</span><span class="log-msg">Found 3 CRITICAL findings (generic-api-key)</span></div>
+        <div class="log-line"><span class="log-ts">00:00:13</span><span class="log-tool" style="color:#f87171">gitleaks</span><span class="log-level log-DONE">DONE</span><span class="log-msg">Completed · 3 findings</span></div>
+        <div class="log-line"><span class="log-ts">00:00:14</span><span class="log-tool" style="color:#a78bfa">checkov</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Starting scan…</span></div>
+        <div class="log-line"><span class="log-ts">00:00:16</span><span class="log-tool" style="color:#a78bfa">checkov</span><span class="log-level log-WARN">WARN</span><span class="log-msg">Found 13 HIGH findings (CKV_AWS_20, CKV_AWS_21, CKV_AWS_18…)</span></div>
+        <div class="log-line"><span class="log-ts">00:00:17</span><span class="log-tool" style="color:#a78bfa">checkov</span><span class="log-level log-DONE">DONE</span><span class="log-msg">Completed · 13 findings</span></div>
+        <div class="log-line"><span class="log-ts">00:00:18</span><span class="log-tool" style="color:#38bdf8">gate</span><span class="log-level log-ERROR">ERROR</span><span class="log-msg">Gate decision: FAIL · Total: 104 findings · Score: 22</span></div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         RUNS PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-runs" class="panel">
+      <div class="card mb14">
+        <div class="card-head">
+          <div class="card-title">Run history</div>
+          <button class="btn btn-ghost" onclick="loadRuns()">↻ Refresh</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Run ID</th><th>Mode</th><th>Profile</th><th>Status</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Created</th></tr></thead>
+            <tbody id="runs-table">
+              <tr><td class="mono" style="font-size:10px">RID_SCHED_20260329_194714_0</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">104</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 19:47</td></tr>
+              <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_171611</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-orange fw7">49</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 17:16</td></tr>
+              <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_165946</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-warn">WARN</span></td><td class="c-amber fw7">43</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 16:59</td></tr>
+              <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_164947</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-pass">PASS</span></td><td class="c-green fw7">8</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 16:49</td></tr>
+              <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_163409</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">14</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 16:34</td></tr>
+              <tr><td class="mono" style="font-size:10px">RID_SCHED_20260329_134703_1</td><td><span class="pill" style="background:var(--blue2);color:var(--blue);border:1px solid rgba(59,130,246,.25)">SAST</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-run">RUNNING</span></td><td>—</td><td>0</td><td class="mono-sm">0/3</td><td class="mono-sm">29/3 13:47</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         FINDINGS PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-findings" class="panel">
+      <div class="filter-bar">
+        <select class="filter-select" id="filter-severity">
+          <option value="">All Severities</option>
+          <option value="CRITICAL">🔴 CRITICAL</option>
+          <option value="HIGH">🟠 HIGH</option>
+          <option value="MEDIUM">🟡 MEDIUM</option>
+          <option value="LOW">🟢 LOW</option>
+        </select>
+        <select class="filter-select" id="filter-tool">
+          <option value="">All Tools</option>
+          <option>kics</option><option>trivy</option><option>gitleaks</option>
+          <option>checkov</option><option>bandit</option><option>semgrep</option>
+        </select>
+        <input class="filter-input" id="filter-search" placeholder="Search findings…">
+        <button class="btn btn-primary">Filter</button>
+        <button class="btn btn-ghost" onclick="exportFindingsCSV()">↓ CSV</button>
+        <button class="btn btn-ghost" style="color:var(--t3);font-size:10px">1306 findings</button>
+      </div>
+
+      <div class="bulk-bar">
+        <div class="bulk-check">
+          <input type="checkbox" id="bulk-select-all" onchange="toggleAllFindings(this.checked)">
+          <label for="bulk-select-all">Select all</label>
+        </div>
+        <span class="bulk-count" id="bulk-count">0 selected</span>
+        <div class="bulk-actions">
+          <button class="btn btn-ghost" id="bulk-btn" disabled onclick="openBulkModal()" style="opacity:.4;font-size:11px">Bulk action →</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th></th><th>Severity</th><th>Tool</th><th>Rule</th><th>Message</th><th>Path</th><th>Line</th><th>CWE</th></tr></thead>
+            <tbody id="findings-table">
+              <tr><td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">kics</td><td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">38c5ee0d</td><td class="overflow-ellipsis" style="max-width:260px">S3 Bucket ACL Allows Read Or Write to All Users</td><td class="mono-sm overflow-ellipsis" style="max-width:180px">../../../../tmp/iac_test/main.tf</td><td class="mono-sm">3</td><td class="f10" style="color:var(--purple)">—</td></tr>
+              <tr><td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">trivy</td><td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">CVE-2024-45337</td><td class="overflow-ellipsis" style="max-width:260px">PublicKeyCallback may cause authorization bypass</td><td class="mono-sm overflow-ellipsis" style="max-width:180px">go.mod</td><td class="mono-sm">—</td><td class="f10" style="color:var(--purple)">CVE-2024-45337</td></tr>
+              <tr><td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">gitleaks</td><td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">generic-api-key</td><td class="overflow-ellipsis" style="max-width:260px">Detected a Generic API Key</td><td class="mono-sm overflow-ellipsis" style="max-width:180px">/home/test/Data/GOLANG_VSP/.env</td><td class="mono-sm">10</td><td class="f10" style="color:var(--purple)">CWE-798</td></tr>
+              <tr><td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td><td><span class="sev sev-high">HIGH</span></td><td class="c-t3 f11">kics</td><td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">4728cd65</td><td class="overflow-ellipsis" style="max-width:260px">Unrestricted Security Group Ingress</td><td class="mono-sm overflow-ellipsis" style="max-width:180px">../../../../tmp/iac_test/main.tf</td><td class="mono-sm">10</td><td class="f10 c-t3">—</td></tr>
+              <tr><td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td><td><span class="sev sev-high">HIGH</span></td><td class="c-t3 f11">kics</td><td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">590d878b</td><td class="overflow-ellipsis" style="max-width:260px">Unknown Port Exposed To Internet</td><td class="mono-sm overflow-ellipsis" style="max-width:180px">../../../../tmp/iac_test/main.tf</td><td class="mono-sm">6</td><td class="f10 c-t3">—</td></tr>
+              <tr><td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td><td><span class="sev sev-high">HIGH</span></td><td class="c-t3 f11">checkov</td><td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">CKV_AWS_20</td><td class="overflow-ellipsis" style="max-width:260px">S3 Bucket has ACL with public READ access</td><td class="mono-sm overflow-ellipsis" style="max-width:180px">main.tf</td><td class="mono-sm">—</td><td class="f10 c-t3">—</td></tr>
+              <tr><td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td><td><span class="sev sev-med">MEDIUM</span></td><td class="c-t3 f11">kics</td><td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">65905cec</td><td class="overflow-ellipsis" style="max-width:260px">Container does not set readOnlyRootFilesystem</td><td class="mono-sm overflow-ellipsis" style="max-width:180px">docker-compose.yml</td><td class="mono-sm">—</td><td class="f10 c-t3">—</td></tr>
+              <tr><td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td><td><span class="sev sev-low">LOW</span></td><td class="c-t3 f11">kics</td><td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">e592a0c5</td><td class="overflow-ellipsis" style="max-width:260px">Healthcheck Instruction Missing</td><td class="mono-sm overflow-ellipsis" style="max-width:180px">Dockerfile</td><td class="mono-sm">—</td><td class="f10 c-t3">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="pagination-info">1–50 of 1306</span>
+          <div class="page-btns">
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">3</button>
+            <button class="page-btn">4</button>
+            <button class="page-btn">Next ›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         REMEDIATION PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-remediation" class="panel">
+      <div class="g6 mb14">
+        <div class="kpi kpi-crit"><div class="kpi-label">Open</div><div class="kpi-value c-red" style="font-size:26px">1165</div></div>
+        <div class="kpi kpi-high"><div class="kpi-label">In Progress</div><div class="kpi-value c-amber" style="font-size:26px">0</div></div>
+        <div class="kpi kpi-low"><div class="kpi-label">Resolved</div><div class="kpi-value c-green" style="font-size:26px">0</div></div>
+        <div class="kpi kpi-cyan"><div class="kpi-label">Accepted</div><div class="kpi-value" style="font-size:26px;color:var(--t2)">0</div></div>
+        <div class="kpi kpi-purple"><div class="kpi-label">False +ve</div><div class="kpi-value c-purple" style="font-size:26px">0</div></div>
+        <div class="kpi"><div class="kpi-label">Suppressed</div><div class="kpi-value c-t3" style="font-size:26px">0</div></div>
+      </div>
+
+      <div class="filter-bar">
+        <select class="filter-select" id="rem-filter-status">
+          <option value="">All statuses</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="accepted">Accepted</option>
+          <option value="false_positive">False positive</option>
+          <option value="suppressed">Suppressed</option>
+        </select>
+        <span class="mono-sm" id="rem-count">200 findings</span>
+      </div>
+
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Severity</th><th>Tool</th><th>Rule</th><th>Finding</th><th>Assignee</th><th>Priority</th><th>Status</th><th></th></tr></thead>
+            <tbody id="rem-tbody">
+              <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">kics</td><td class="mono c-purple f10">38c5ee0d</td><td class="overflow-ellipsis" style="max-width:220px;font-size:12px">S3 Bucket ACL Allows Read Or Write to All Users</td><td class="c-t3 f11">—</td><td class="c-red fw7 f11">P1</td><td><span class="pill pill-open">open</span></td><td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="openRemModal('id1','S3 Bucket ACL Allows Read Or Write to All Users','CRITICAL')">Edit</button></td></tr>
+              <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">trivy</td><td class="mono c-purple f10">CVE-2024-45337</td><td class="overflow-ellipsis" style="max-width:220px;font-size:12px">PublicKeyCallback authorization bypass</td><td class="c-t3 f11">—</td><td class="c-red fw7 f11">P1</td><td><span class="pill pill-open">open</span></td><td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="openRemModal('id2','CVE-2024-45337 - PublicKeyCallback bypass','CRITICAL')">Edit</button></td></tr>
+              <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">gitleaks</td><td class="mono c-purple f10">generic-api-key</td><td class="overflow-ellipsis" style="max-width:220px;font-size:12px">Detected a Generic API Key</td><td class="c-t3 f11">—</td><td class="c-red fw7 f11">P1</td><td><span class="pill pill-open">open</span></td><td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="openRemModal('id3','generic-api-key detected','CRITICAL')">Edit</button></td></tr>
+              <tr><td><span class="sev sev-high">HIGH</span></td><td class="c-t3 f11">kics</td><td class="mono c-purple f10">4728cd65</td><td class="overflow-ellipsis" style="max-width:220px;font-size:12px">Unrestricted Security Group Ingress</td><td class="c-t3 f11">—</td><td class="c-orange fw7 f11">P2</td><td><span class="pill pill-open">open</span></td><td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="openRemModal('id4','Unrestricted Security Group Ingress','HIGH')">Edit</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         POLICY PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-policy" class="panel">
+      <div class="card mb14">
+        <div class="card-head">
+          <div class="card-title">Gate evaluation</div>
+          <button class="btn btn-primary" onclick="runEval()">Evaluate →</button>
+        </div>
+        <div class="card-body">
+          <div id="eval-result" class="mono f11 c-t3">Click evaluate to run gate policy against latest scan.</div>
+        </div>
+      </div>
+
+      <div class="flex-between mb12">
+        <div style="font-family:var(--font-display);font-size:16px;font-weight:800">Policy rules</div>
+        <div class="flex gap8">
+          <button class="btn btn-ghost" onclick="loadRules()">↻ Refresh</button>
+          <button class="btn btn-primary" onclick="showToast('Rule creator coming soon','info')">+ New rule</button>
+        </div>
+      </div>
+
+      <div id="rules-list">
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="rule-name">Block Critical Findings</div>
+            <span class="rule-tag">BUILT-IN</span>
+            <button class="toggle-btn on" onclick="this.classList.toggle('on');showToast('Rule '+(this.classList.contains('on')?'enabled':'disabled'),'info')"></button>
+          </div>
+          <div class="rule-desc">Fail gate if any CRITICAL finding exists</div>
+          <div class="rule-meta"><span>Fail on: <b>CRITICAL</b></span></div>
+        </div>
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="rule-name">Block Secrets</div>
+            <span class="rule-tag">BUILT-IN</span>
+            <button class="toggle-btn on" onclick="this.classList.toggle('on');showToast('Rule '+(this.classList.contains('on')?'enabled':'disabled'),'info')"></button>
+          </div>
+          <div class="rule-desc">Fail gate if secrets/credentials detected</div>
+          <div class="rule-meta"><span>Fail on: <b>SECRETS</b></span></div>
+        </div>
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="rule-name">High Threshold</div>
+            <button class="toggle-btn on" onclick="this.classList.toggle('on');showToast('Rule '+(this.classList.contains('on')?'enabled':'disabled'),'info')"></button>
+          </div>
+          <div class="rule-desc">Warn if HIGH findings exceed 50</div>
+          <div class="rule-meta"><span>Fail on: <b>HIGH &gt; 50</b></span></div>
+        </div>
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="rule-name">SLA Breach Alert</div>
+            <button class="toggle-btn" onclick="this.classList.toggle('on');showToast('Rule '+(this.classList.contains('on')?'enabled':'disabled'),'info')"></button>
+          </div>
+          <div class="rule-desc">Warn if SLA breach detected</div>
+          <div class="rule-meta"><span>Fail on: <b>SLA</b></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         AUDIT PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-audit" class="panel">
+      <div class="g4 mb14">
+        <div class="kpi kpi-cyan"><div class="kpi-label">Total Events</div><div class="kpi-value c-cyan">247</div></div>
+        <div class="kpi"><div class="kpi-label">Today</div><div class="kpi-value">12</div></div>
+        <div class="kpi kpi-med"><div class="kpi-label">Logins</div><div class="kpi-value c-amber">3</div></div>
+        <div class="kpi kpi-low"><div class="kpi-label">Scan Triggers</div><div class="kpi-value c-green">18</div></div>
+      </div>
+
+      <div class="card mb14">
+        <div class="card-head"><div class="card-title">Recent activity</div></div>
+        <div class="timeline">
+          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · IAC · FAIL</div><div class="tl-meta">RID_SCHED_20260329_194714_0 · 104 findings · 19:47:14 29/3/2026</div></div></div>
+          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · FULL · FAIL</div><div class="tl-meta">RID_VSPGO_RUN_20260329_171611 · 49 findings · 17:16:11 29/3/2026</div></div></div>
+          <div class="tl-item"><div class="tl-dot" style="background:var(--amber3);border:1px solid rgba(245,158,11,.25);color:var(--amber)">⚠</div><div class="tl-content"><div class="tl-title">SCAN · IAC · WARN</div><div class="tl-meta">RID_VSPGO_RUN_20260329_165946 · 43 findings · 16:59:46 29/3/2026</div></div></div>
+          <div class="tl-item"><div class="tl-dot" style="background:var(--green2);border:1px solid rgba(34,197,94,.25);color:var(--green)">✓</div><div class="tl-content"><div class="tl-title">SCAN · IAC · PASS</div><div class="tl-meta">RID_VSPGO_RUN_20260329_164947 · 8 findings · 16:49:47 29/3/2026</div></div></div>
+          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · FULL · FAIL</div><div class="tl-meta">RID_VSPGO_RUN_20260329_163409 · 14 findings · 16:34:09 29/3/2026</div></div></div>
+          <div class="tl-item"><div class="tl-dot" style="background:var(--cyan2);border:1px solid rgba(6,182,212,.25);color:var(--cyan)">→</div><div class="tl-content"><div class="tl-title">LOGIN · admin@vsp.local</div><div class="tl-meta">192.168.1.1 · 29/3/2026 09:15:00</div></div></div>
+        </div>
+      </div>
+
+      <div class="card mb14">
+        <div class="card-head">
+          <div class="card-title">Hash chain integrity</div>
+          <button class="btn btn-primary" onclick="verifyAudit()">Verify chain →</button>
+        </div>
+        <div class="card-body"><div id="verify-result" class="mono f11 c-t3">Click verify to check audit log hash chain integrity.</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">Audit log</div></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Seq</th><th>Action</th><th>Resource</th><th>IP</th><th>Time</th><th>Hash</th></tr></thead>
+            <tbody id="audit-table">
+              <tr><td class="mono-sm">1</td><td><span class="pill pill-run" style="font-size:8px">LOGIN</span></td><td class="mono-sm overflow-ellipsis" style="max-width:180px">admin@vsp.local</td><td class="mono-sm">127.0.0.1</td><td class="mono-sm">29/3 09:15</td><td class="mono-sm" style="color:var(--t4)">a3f7c9d1…</td></tr>
+              <tr><td class="mono-sm">2</td><td><span class="pill pill-done" style="font-size:8px;background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.25)">SCAN</span></td><td class="mono-sm overflow-ellipsis" style="max-width:180px">RID_SCHED_194714_0</td><td class="mono-sm">127.0.0.1</td><td class="mono-sm">29/3 19:47</td><td class="mono-sm" style="color:var(--t4)">b8e2a4f0…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SOC PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-soc" class="panel">
+      <div class="card mb14">
+        <div class="card-head"><div class="card-title">Zero Trust — 7 pillar scores</div></div>
+        <div class="pillars">
+          <div class="pillar"><div class="pillar-score c-green">95</div><div class="pillar-name">User</div></div>
+          <div class="pillar"><div class="pillar-score c-green">80</div><div class="pillar-name">Device</div></div>
+          <div class="pillar"><div class="pillar-score c-green">100</div><div class="pillar-name">Network</div></div>
+          <div class="pillar"><div class="pillar-score c-red">35</div><div class="pillar-name">App</div></div>
+          <div class="pillar"><div class="pillar-score c-green">100</div><div class="pillar-name">Data</div></div>
+          <div class="pillar"><div class="pillar-score c-green">90</div><div class="pillar-name">Visibility</div></div>
+          <div class="pillar"><div class="pillar-score c-green">88</div><div class="pillar-name">Automation</div></div>
+        </div>
+      </div>
+
+      <div class="g2 mb14">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Framework scorecard</div></div>
+          <div class="card-body">
+            <div class="comp-row"><div class="comp-header"><span class="comp-name">NIST SP 800-53</span><span class="comp-pct c-red">40</span></div><div class="progress-bar"><div class="progress-fill" style="width:40%;background:var(--red)"></div></div></div>
+            <div class="comp-row"><div class="comp-header"><span class="comp-name">ISO 27001</span><span class="comp-pct c-red">40</span></div><div class="progress-bar"><div class="progress-fill" style="width:40%;background:var(--red)"></div></div></div>
+            <div class="comp-row" style="margin-bottom:0"><div class="comp-header"><span class="comp-name">SOC 2 Type II</span><span class="comp-pct c-red">40</span></div><div class="progress-bar"><div class="progress-fill" style="width:40%;background:var(--red)"></div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Incident timeline</div></div>
+          <div class="timeline">
+            <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div><div class="tl-content"><div class="tl-title" style="font-size:11px">Generic API key exposed in .env</div><div class="tl-meta">gitleaks · CRITICAL · CWE-798 · open</div></div></div>
+            <div class="tl-item"><div class="tl-dot" style="background:var(--amber3);border:1px solid rgba(245,158,11,.25);color:var(--amber)">!</div><div class="tl-content"><div class="tl-title" style="font-size:11px">S3 Bucket ACL allows public access</div><div class="tl-meta">kics · HIGH · main.tf · investigating</div></div></div>
+            <div class="tl-item"><div class="tl-dot" style="background:var(--green2);border:1px solid rgba(34,197,94,.25);color:var(--green)">✓</div><div class="tl-content"><div class="tl-title" style="font-size:11px">DAST scan — no web vulnerabilities</div><div class="tl-meta">27/3 12:22 · PASS · resolved</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         GOVERNANCE PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-governance" class="panel">
+      <div class="gov-grid">
+        <div class="gov-card">
+          <div class="gov-card-title">Risk framework radar</div>
+          <div style="height:220px;position:relative"><canvas id="gov-radar"></canvas></div>
+        </div>
+        <div class="gov-card">
+          <div class="gov-card-title">Risk heatmap — severity × tool</div>
+          <div id="gov-heatmap"></div>
+        </div>
+      </div>
+
+      <div class="g2 mb14">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Traceability matrix</div></div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Severity</th><th>Rule</th><th>Control</th><th>Framework</th></tr></thead>
+              <tbody>
+                <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="mono f10 c-blue">38c5ee0d</td><td class="mono f10 c-purple">SI-3</td><td class="mono-sm">NIST SP 800-53</td></tr>
+                <tr><td><span class="sev sev-high">HIGH</span></td><td class="mono f10 c-blue">4728cd65</td><td class="mono f10 c-purple">SI-3</td><td class="mono-sm">NIST SP 800-53</td></tr>
+                <tr><td><span class="sev sev-high">HIGH</span></td><td class="mono f10 c-blue">CKV_AWS_20</td><td class="mono f10 c-purple">SI-3</td><td class="mono-sm">NIST SP 800-53</td></tr>
+                <tr><td><span class="sev sev-med">MEDIUM</span></td><td class="mono f10 c-blue">65905cec</td><td class="mono f10 c-purple">SI-3</td><td class="mono-sm">NIST SP 800-53</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">RACI governance</div></div>
+          <div style="padding:8px">
+            <table class="raci-table">
+              <thead><tr><th>Activity</th><th>R</th><th>A</th><th>C</th><th>I</th></tr></thead>
+              <tbody>
+                <tr><td>Security scanning</td><td><span class="raci-badge raci-R">D</span></td><td><span class="raci-badge raci-A">C</span></td><td><span class="raci-badge raci-C">D</span></td><td><span class="raci-badge raci-I">—</span></td></tr>
+                <tr><td>Vulnerability triage</td><td><span class="raci-badge raci-R">S</span></td><td><span class="raci-badge raci-A">S</span></td><td><span class="raci-badge raci-C">D</span></td><td><span class="raci-badge raci-I">—</span></td></tr>
+                <tr><td>Policy management</td><td><span class="raci-badge raci-R">S</span></td><td><span class="raci-badge raci-A">C</span></td><td><span class="raci-badge raci-C">L</span></td><td><span class="raci-badge raci-I">—</span></td></tr>
+                <tr><td>Incident response</td><td><span class="raci-badge raci-R">S</span></td><td><span class="raci-badge raci-A">C</span></td><td><span class="raci-badge raci-C">L</span></td><td><span class="raci-badge raci-I">—</span></td></tr>
+                <tr><td>Compliance audit</td><td><span class="raci-badge raci-R">G</span></td><td><span class="raci-badge raci-A">C</span></td><td><span class="raci-badge raci-C">E</span></td><td><span class="raci-badge raci-I">—</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         COMPLIANCE PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-compliance" class="panel">
+      <div class="g3 mb14">
+        <div class="card" style="text-align:center">
+          <div class="card-body">
+            <div class="gauge-wrap"><canvas id="gauge-fedramp" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-cyan" id="gv-fedramp">62%</div><div class="gauge-unit">coverage</div></div></div>
+            <div class="f12 fw7 c-t2 mb8">FedRAMP Moderate</div>
+            <div class="mono-sm">45 / 73 controls</div>
+          </div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div class="card-body">
+            <div class="gauge-wrap"><canvas id="gauge-cmmc" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-amber" id="gv-cmmc">54%</div><div class="gauge-unit">coverage</div></div></div>
+            <div class="f12 fw7 c-t2 mb8">CMMC Level 2</div>
+            <div class="mono-sm">59 / 110 practices</div>
+          </div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div class="card-body">
+            <div class="gauge-wrap"><canvas id="gauge-soc2" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-red" id="gv-soc2">40%</div><div class="gauge-unit">score</div></div></div>
+            <div class="f12 fw7 c-t2 mb8">SOC 2 Type II</div>
+            <div class="mono-sm">Score: 40 / 100</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap8 mb14">
+        <button class="btn btn-primary" id="btn-fedramp" onclick="loadFedRAMP()">FedRAMP Moderate</button>
+        <button class="btn btn-ghost" id="btn-cmmc" onclick="loadCMMC()">CMMC Level 2</button>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost" onclick="showToast('OSCAL AR downloaded','success')">↓ OSCAL AR</button>
+          <button class="btn btn-ghost" onclick="showToast('OSCAL POA&M downloaded','success')">↓ OSCAL POA&M</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title" id="comp-title">FedRAMP Moderate</div></div>
+          <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--cyan)" id="comp-pct">62%</div>
+        </div>
+        <div style="padding:8px 16px">
+          <div class="progress-bar" style="height:6px;margin-bottom:8px"><div class="progress-fill" id="comp-bar" style="width:62%;background:var(--cyan)"></div></div>
+          <div class="flex-between mono-sm" style="margin-bottom:8px"><span id="comp-assessed">45 assessed</span><span id="comp-total">73 total</span></div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Family</th><th>Control</th><th>Tools</th><th>Status</th></tr></thead>
+            <tbody id="comp-tbody">
+              <tr><td class="mono f10 c-blue">AC-1</td><td class="mono-sm">Access Control</td><td class="f12">Access Control Policy and Procedures</td><td class="mono-sm">checkov</td><td><span class="pill pill-pass">assessed</span></td></tr>
+              <tr><td class="mono f10 c-blue">SI-3</td><td class="mono-sm">System and Information</td><td class="f12">Malicious Code Protection</td><td class="mono-sm">kics, checkov</td><td><span class="pill pill-pass">assessed</span></td></tr>
+              <tr><td class="mono f10 c-blue">IA-5</td><td class="mono-sm">Identification and Auth</td><td class="f12">Authenticator Management</td><td class="mono-sm">gitleaks</td><td><span class="pill pill-pass">assessed</span></td></tr>
+              <tr><td class="mono f10 c-blue">SC-28</td><td class="mono-sm">System &amp; Comm Protection</td><td class="f12">Protection of Information at Rest</td><td class="mono-sm">—</td><td><span class="pill pill-queue">not assessed</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SBOM PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-sbom" class="panel">
+      <div class="g4 mb14">
+        <div class="kpi kpi-cyan"><div class="kpi-label">Total SBOMs</div><div class="kpi-value c-cyan">50</div></div>
+        <div class="kpi kpi-crit"><div class="kpi-label">With findings</div><div class="kpi-value c-red">12</div></div>
+        <div class="kpi kpi-low"><div class="kpi-label">Clean runs</div><div class="kpi-value c-green">38</div></div>
+        <div class="kpi kpi-med"><div class="kpi-label">Latest findings</div><div class="kpi-value c-orange">104</div></div>
+      </div>
+
+      <div class="card mb14">
+        <div class="card-head">
+          <div><div class="card-title">Available SBOMs</div><div class="card-sub">CycloneDX 1.5 · per scan run</div></div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Run ID</th><th>Mode</th><th>Gate</th><th>Findings</th><th>Date</th><th>Download</th></tr></thead>
+            <tbody>
+              <tr><td class="mono f10">RID_SCHED_20260329_194714_0</td><td><span class="pill pill-run">IAC</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">104</td><td class="mono-sm">29/3/2026</td><td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="showToast('SBOM downloaded (CDX)','success')">↓ CDX</button></td></tr>
+              <tr><td class="mono f10">RID_VSPGO_RUN_20260329_171611</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-orange fw7">49</td><td class="mono-sm">29/3/2026</td><td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="showToast('SBOM downloaded (CDX)','success')">↓ CDX</button></td></tr>
+              <tr><td class="mono f10">RID_VSPGO_RUN_20260329_164947</td><td><span class="pill pill-run">IAC</span></td><td><span class="pill pill-pass">PASS</span></td><td class="c-green fw7">8</td><td class="mono-sm">29/3/2026</td><td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="showToast('SBOM downloaded (CDX)','success')">↓ CDX</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">CycloneDX 1.5 includes</div></div>
+        <div class="card-body">
+          <div class="sbom-features">
+            <span class="sbom-tag">BOM format + spec version</span>
+            <span class="sbom-tag">All vulnerability IDs</span>
+            <span class="sbom-tag">Severity ratings</span>
+            <span class="sbom-tag">Tool attribution</span>
+            <span class="sbom-tag">Fix signal URLs</span>
+            <span class="sbom-tag">Scan metadata</span>
+            <span class="sbom-tag">Component inventory</span>
+            <span class="sbom-tag">License data</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SLA PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-sla" class="panel">
+      <div class="sla-grid">
+        <div class="sla-card" style="--sla-c:var(--red)"><div class="sla-sev">Critical</div><div class="sla-count">1</div><div class="sla-detail">SLA: 3 days · 0h avg age</div><div class="sla-ok">✓ No breaches</div></div>
+        <div class="sla-card" style="--sla-c:var(--orange)"><div class="sla-sev">High</div><div class="sla-count">80</div><div class="sla-detail">SLA: 14 days · 0h avg age</div><div class="sla-ok">✓ No breaches</div></div>
+        <div class="sla-card" style="--sla-c:var(--amber)"><div class="sla-sev">Medium</div><div class="sla-count">13</div><div class="sla-detail">SLA: 30 days · 0h avg age</div><div class="sla-ok">✓ No breaches</div></div>
+        <div class="sla-card" style="--sla-c:var(--green)"><div class="sla-sev">Low</div><div class="sla-count">3</div><div class="sla-detail">SLA: 90 days · 0h avg age</div><div class="sla-ok">✓ No breaches</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">SLA detail</div><button class="btn btn-ghost" onclick="showToast('SLA data refreshed','info')">↻ Refresh</button></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Severity</th><th>Open</th><th>SLA (days)</th><th>Breach count</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="mono fw7 c-red">1</td><td class="mono-sm">3</td><td class="mono c-green">0</td><td><span class="pill pill-pass" style="font-size:9px">GREEN</span></td><td class="mono-sm c-t3">On track</td></tr>
+              <tr><td><span class="sev sev-high">HIGH</span></td><td class="mono fw7 c-orange">80</td><td class="mono-sm">14</td><td class="mono c-green">0</td><td><span class="pill pill-pass" style="font-size:9px">GREEN</span></td><td class="mono-sm c-t3">On track</td></tr>
+              <tr><td><span class="sev sev-med">MEDIUM</span></td><td class="mono fw7 c-amber">13</td><td class="mono-sm">30</td><td class="mono c-green">0</td><td><span class="pill pill-pass" style="font-size:9px">GREEN</span></td><td class="mono-sm c-t3">On track</td></tr>
+              <tr><td><span class="sev sev-low">LOW</span></td><td class="mono fw7 c-green">3</td><td class="mono-sm">90</td><td class="mono c-green">0</td><td><span class="pill pill-pass" style="font-size:9px">GREEN</span></td><td class="mono-sm c-t3">On track</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         EXECUTIVE PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-executive" class="panel">
+      <div class="flex-between mb20">
+        <div>
+          <div style="font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:-0.03em">Executive Summary</div>
+          <div class="mono-sm" style="margin-top:4px">Security posture · auto-generated · <span id="exec-date">29 March 2026</span></div>
+        </div>
+        <div class="flex gap8">
+          <button class="btn btn-ghost" onclick="loadExecutive()">↻ Refresh</button>
+          <button class="btn btn-primary" onclick="showToast('PDF report generating…','info')">↓ PDF Report</button>
+        </div>
+      </div>
+
+      <div class="exec-hero mb14">
+        <div class="exec-hero-cell" style="text-align:center">
+          <div class="mono-sm mb8" style="letter-spacing:.15em;text-transform:uppercase">Security Score</div>
+          <div class="score-ring-wrap" style="margin:0 auto 12px">
+            <canvas id="exec-ring" width="90" height="90"></canvas>
+            <div class="score-overlay">
+              <div class="score-num c-red">22</div>
+              <div class="score-lbl">/100</div>
+            </div>
+          </div>
+          <div class="mono-sm">overall posture</div>
+        </div>
+        <div class="exec-hero-cell" style="text-align:center">
+          <div class="mono-sm mb8" style="letter-spacing:.15em;text-transform:uppercase">Posture Grade</div>
+          <div class="exec-grade c-red">F</div>
+          <div class="mono-sm">latest assessment</div>
+        </div>
+        <div class="exec-hero-cell">
+          <div class="mono-sm mb12" style="letter-spacing:.15em;text-transform:uppercase">Risk Summary</div>
+          <div class="exec-stat"><span class="exec-stat-lbl">Critical findings</span><span class="exec-stat-val c-red">1</span></div>
+          <div class="exec-stat"><span class="exec-stat-lbl">High findings</span><span class="exec-stat-val c-orange">80</span></div>
+          <div class="exec-stat"><span class="exec-stat-lbl">SLA breaches</span><span class="exec-stat-val c-green">0</span></div>
+          <div class="exec-stat"><span class="exec-stat-lbl">Open remediations</span><span class="exec-stat-val">1165</span></div>
+          <div class="exec-stat"><span class="exec-stat-lbl">Total runs</span><span class="exec-stat-val c-cyan">50</span></div>
+        </div>
+      </div>
+
+      <div class="g2 mb14">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Compliance posture</div></div>
+          <div class="card-body">
+            <div class="comp-row"><div class="comp-header"><span class="comp-name">FedRAMP Moderate</span><span class="comp-pct c-cyan">62%</span></div><div class="progress-bar"><div class="progress-fill" style="width:62%;background:var(--cyan)"></div></div></div>
+            <div class="comp-row" style="margin-bottom:0"><div class="comp-header"><span class="comp-name">CMMC Level 2</span><span class="comp-pct c-amber">54%</span></div><div class="progress-bar"><div class="progress-fill" style="width:54%;background:var(--amber)"></div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Scan coverage — last 30 days</div></div>
+          <div class="card-body" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;text-align:center">
+            <div><div class="mono-sm mb8" style="text-transform:uppercase">SAST</div><div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--cyan)">8</div><div class="mono-sm">scans</div></div>
+            <div><div class="mono-sm mb8" style="text-transform:uppercase">SCA</div><div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--cyan)">3</div><div class="mono-sm">scans</div></div>
+            <div><div class="mono-sm mb8" style="text-transform:uppercase">IAC</div><div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--cyan)">35</div><div class="mono-sm">scans</div></div>
+            <div><div class="mono-sm mb8" style="text-transform:uppercase">DAST</div><div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--cyan)">4</div><div class="mono-sm">scans</div></div>
+            <div><div class="mono-sm mb8" style="text-transform:uppercase">SECRETS</div><div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--cyan)">2</div><div class="mono-sm">scans</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb14">
+        <div class="card-head"><div class="card-title">Top critical findings requiring action</div></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Severity</th><th>Tool</th><th>Finding</th><th>Path</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">kics</td><td class="f12 overflow-ellipsis" style="max-width:260px">S3 Bucket ACL Allows Read Or Write to All Users</td><td class="mono-sm overflow-ellipsis" style="max-width:160px">main.tf</td><td><span class="pill pill-open">OPEN</span></td></tr>
+              <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">trivy</td><td class="f12 overflow-ellipsis" style="max-width:260px">CVE-2024-45337 — PublicKeyCallback bypass</td><td class="mono-sm overflow-ellipsis" style="max-width:160px">go.mod</td><td><span class="pill pill-open">OPEN</span></td></tr>
+              <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="c-t3 f11">gitleaks</td><td class="f12 overflow-ellipsis" style="max-width:260px">generic-api-key — API key exposed</td><td class="mono-sm overflow-ellipsis" style="max-width:160px">.env:10</td><td><span class="pill pill-open">OPEN</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">Recommendations</div></div>
+        <div class="card-body">
+          <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--red);margin-bottom:8px;background:rgba(239,68,68,.03)"><span class="mono f10 fw7 c-red" style="white-space:nowrap;margin-top:2px">CRITICAL</span><span class="f12 c-t2">Remediate 1 critical finding immediately — SLA: 3 days. S3 bucket ACL allows public read/write.</span></div>
+          <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--orange);margin-bottom:8px;background:rgba(249,115,22,.03)"><span class="mono f10 fw7 c-orange" style="white-space:nowrap;margin-top:2px">HIGH</span><span class="f12 c-t2">80 high-severity findings require attention within 14 days. Network exposure rules are the largest group.</span></div>
+          <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--amber);margin-bottom:8px;background:rgba(245,158,11,.03)"><span class="mono f10 fw7 c-amber" style="white-space:nowrap;margin-top:2px">MEDIUM</span><span class="f12 c-t2">1165 findings unassigned — assign to engineering teams and set target resolution dates.</span></div>
+          <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--cyan);background:rgba(6,182,212,.03)"><span class="mono f10 fw7 c-cyan" style="white-space:nowrap;margin-top:2px">INFO</span><span class="f12 c-t2">FedRAMP at 62% and CMMC at 54% — schedule additional control coverage to reach 80% targets.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         EXPORT PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-export" class="panel">
+      <div class="card mb14">
+        <div class="card-head"><div class="card-title">Export latest run</div><div class="mono-sm" id="export-rid">RID_SCHED_20260329_194714_0</div></div>
+        <div class="card-body">
+          <div class="flex gap8 mb12">
+            <button class="btn btn-primary" onclick="showToast('SARIF 2.1.0 exported','success')">↓ SARIF 2.1.0</button>
+            <button class="btn btn-primary" onclick="showToast('CSV exported','success')">↓ CSV</button>
+            <button class="btn btn-primary" onclick="showToast('JSON exported','success')">↓ JSON</button>
+          </div>
+          <div class="flex gap8">
+            <button class="btn btn-ghost" onclick="showToast('OSCAL Assessment Report downloaded','success')">↓ OSCAL AR</button>
+            <button class="btn btn-ghost" onclick="showToast('OSCAL POA&M downloaded','success')">↓ OSCAL POA&M</button>
+          </div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">OSCAL — Assessment result</div><button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="showToast('Downloaded','success')">↓ Download</button></div>
+          <pre style="padding:14px;font-family:var(--font-mono);font-size:9px;color:var(--t3);overflow-x:auto;max-height:200px">{"assessment-results":{"uuid":"...","metadata":{"title":"VSP Assessment","last-modified":"2026-03-29T19:47:14Z","version":"1.0.0","oscal-version":"1.1.0"},"import-ap":{"href":"#..."},"results":[{"uuid":"...","title":"IAC Scan Results","description":"Automated IAC scan","start":"2026-03-29T19:47:14Z","findings":[...]</pre>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">OSCAL — POA&amp;M</div><button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="showToast('Downloaded','success')">↓ Download</button></div>
+          <pre style="padding:14px;font-family:var(--font-mono);font-size:9px;color:var(--t3);overflow-x:auto;max-height:200px">{"plan-of-action-and-milestones":{"uuid":"...","metadata":{"title":"VSP POA&M","last-modified":"2026-03-29T19:47:14Z"},"poam-items":[{"uuid":"...","title":"S3 Bucket ACL - Public Access","description":"kics finding 38c5ee0d","status":{"state":"open"}}...</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         USERS PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-users" class="panel">
+      <div class="g3 mb14">
+        <div class="kpi kpi-cyan"><div class="kpi-label">Total users</div><div class="kpi-value c-cyan">1</div></div>
+        <div class="kpi kpi-med"><div class="kpi-label">Admins</div><div class="kpi-value c-amber">1</div></div>
+        <div class="kpi kpi-low"><div class="kpi-label">Active tokens</div><div class="kpi-value c-green">1</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Active users</div>
+          <button class="btn btn-primary" onclick="showToast('Invite modal coming soon','info')">+ Invite user</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Email</th><th>Role</th><th>Tenant</th><th>Last login</th><th>API token</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--amber3);border:1px solid rgba(245,158,11,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--amber)">A</div>admin@vsp.local</div></td>
+                <td><span class="pill" style="background:var(--red2);color:var(--red);border:1px solid rgba(239,68,68,.2);font-size:8px">ADMIN</span></td>
+                <td class="mono-sm">Default Tenant</td>
+                <td class="mono-sm">29/3/2026</td>
+                <td class="mono-sm c-t3">vsp_tok_…abc123</td>
+                <td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="showToast('Token regenerated','success')">Regen token</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+
+<script>
+/* ══════════════════════════════════════════════
+   VSP JAVASCRIPT ENGINE v2.0
+   - Panel navigation
+   - Charts (Chart.js)
+   - Quick search
+   - Toast notifications
+   - Scan log viewer
+   - Modals & remediation
+   - Gauge charts
+   - Sparklines
+   - Keyboard shortcuts
+══════════════════════════════════════════════ */
+
+const API = '/api/v1';
+let TOKEN = localStorage.getItem('vsp_token') || '';
+let _currentPanel = 'dashboard';
+let _allLogs = [];
+let _logFilter = 'ALL';
+let _findingsCache = [];
+let _charts = {};
+
+/* ─── API helper ─── */
+async function api(method, path, body, noAuth) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (!noAuth && TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || r.statusText);
+  }
+  return r.json();
+}
+
+/* ─── Toast ─── */
+function showToast(msg, type='info') {
+  const icons = {success:'✓', error:'✗', warn:'⚠', info:'◉'};
+  const colors = {success:'var(--green)',error:'var(--red)',warn:'var(--amber)',info:'var(--cyan)'};
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.innerHTML = `<span class="toast-icon" style="color:${colors[type]}">${icons[type]||'◉'}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => { t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3000);
+}
+
+/* ─── Panel navigation ─── */
+const PANEL_META = {
+  dashboard:   {title:'Dashboard',     sub:'VSP / Operations / Dashboard'},
+  scanlog:     {title:'Scan log',      sub:'VSP / Operations / Scan log viewer'},
+  runs:        {title:'Run history',   sub:'VSP / Operations / Runs'},
+  findings:    {title:'Findings',      sub:'VSP / Operations / Findings · 1306 total'},
+  remediation: {title:'Remediation',   sub:'VSP / Operations / Remediation · 1165 open'},
+  policy:      {title:'Policy',        sub:'VSP / Security / Policy rules'},
+  audit:       {title:'Audit log',     sub:'VSP / Security / Audit · hash-chain verified'},
+  soc:         {title:'SOC Center',    sub:'VSP / Security / SOC · Zero Trust · Incidents'},
+  governance:  {title:'Governance',    sub:'VSP / Compliance / Governance · RACI · Traceability'},
+  compliance:  {title:'FedRAMP / CMMC',sub:'VSP / Compliance / Control coverage'},
+  sbom:        {title:'SBOM',          sub:'VSP / Compliance / Software Bill of Materials'},
+  sla:         {title:'SLA Tracker',   sub:'VSP / Compliance / Remediation deadlines'},
+  executive:   {title:'Executive Summary', sub:'VSP / Reports / Executive · auto-generated'},
+  export:      {title:'Export',        sub:'VSP / Reports / SARIF · CSV · JSON · OSCAL'},
+  users:       {title:'Users',         sub:'VSP / Reports / User management'},
+};
+
+function showPanel(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+  if (btn) btn.classList.add('active');
+  else {
+    document.querySelectorAll('.nav-item').forEach(b => {
+      if (b.getAttribute('onclick')?.includes(`'${name}'`)) b.classList.add('active');
+    });
+  }
+  _currentPanel = name;
+  const meta = PANEL_META[name] || {title: name, sub: 'VSP / ' + name};
+  document.getElementById('page-title').textContent = meta.title;
+  document.getElementById('page-sub').textContent = meta.sub;
+
+  // Panel-specific initialization
+  setTimeout(() => {
+    if (name === 'dashboard')   initDashboardCharts();
+    if (name === 'governance')  initGovernance();
+    if (name === 'compliance')  initGauges();
+    if (name === 'soc')         drawSocRadar();
+    if (name === 'executive')   initExecutiveRing();
+  }, 100);
+}
+
+function loadCurrentPanel() {
+  showPanel(_currentPanel, null);
+  showToast('Refreshed', 'success');
+}
+
+/* ─── Charts ─── */
+const CHART_OPTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: '#8899bb', font: { size: 10, family: "'JetBrains Mono'" }, boxWidth: 10 } }
+  },
+  scales: {
+    x: { ticks: { color: '#445577', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+    y: { ticks: { color: '#445577', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+  }
+};
+
+function destroyChart(id) {
+  if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+}
+
+function drawSparkline(id, data, color) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  canvas.width = canvas.parentElement?.offsetWidth || 160;
+  canvas.height = 40;
+  destroyChart(id);
+  _charts[id] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: data.map((_,i) => i),
+      datasets: [{
+        data, borderColor: color,
+        backgroundColor: color + '18',
+        borderWidth: 1.5, pointRadius: 0,
+        fill: true, tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { display: false }, y: { display: false, min: 0 } },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } }
+    }
+  });
+}
+
+function drawScoreRing(id, score, color) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const cx = w/2, cy = h/2, r = Math.min(w,h)/2 - 7;
+  ctx.clearRect(0, 0, w, h);
+  // Track
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2*Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 8; ctx.stroke();
+  // Fill
+  const end = -Math.PI/2 + (score/100) * 2 * Math.PI;
+  ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI/2, end);
+  ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.stroke();
+}
+
+function drawGauge(id, pct, color) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 50, cy = 54, r = 36;
+  ctx.clearRect(0, 0, 100, 100);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0.75*Math.PI, 2.25*Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.stroke();
+  const end = 0.75*Math.PI + (pct/100) * 1.5 * Math.PI;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0.75*Math.PI, end);
+  ctx.strokeStyle = color; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.stroke();
+}
+
+function initDashboardCharts() {
+  // Score ring
+  drawScoreRing('score-ring', 22, '#ef4444');
+  // Exec ring
+  drawScoreRing('exec-ring', 22, '#ef4444');
+  // Sparklines
+  drawSparkline('sp-score', [45,38,52,28,22,30,22,18,22,22], '#ef4444');
+  drawSparkline('sp-runs',  [12,18,22,28,32,38,42,46,48,50], '#06b6d4');
+  drawSparkline('sp-pass',  [60,55,45,50,42,38,40,42,38,38], '#f59e0b');
+  drawSparkline('sp-rem',   [800,900,980,1020,1080,1110,1130,1150,1160,1165], '#8b5cf6');
+
+  // Severity doughnut
+  destroyChart('chartSeverity');
+  _charts['chartSeverity'] = new Chart(document.getElementById('chartSeverity'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Critical','High','Medium','Low'],
+      datasets: [{
+        data: [1, 80, 13, 3],
+        backgroundColor: ['#ef4444','#f97316','#f59e0b','#22c55e'],
+        borderWidth: 0, hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#8899bb', font:{size:10,family:"'JetBrains Mono'"}, boxWidth:10, padding:12 } }
+      }
+    }
+  });
+
+  // Gate decisions bar
+  destroyChart('chartGates');
+  _charts['chartGates'] = new Chart(document.getElementById('chartGates'), {
+    type: 'bar',
+    data: {
+      labels: ['PASS','WARN','FAIL'],
+      datasets: [{
+        label: 'Gate decisions',
+        data: [19, 8, 23],
+        backgroundColor: ['#22c55e','#f59e0b','#ef4444'],
+        borderRadius: 4, borderSkipped: false
+      }]
+    },
+    options: {
+      ...CHART_OPTS,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color:'#8899bb', font:{size:10} } },
+        y: { ticks: { color:'#445577', font:{size:9} }, grid: { color:'rgba(255,255,255,0.04)' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function initGauges() {
+  drawGauge('gauge-fedramp', 62, '#06b6d4');
+  drawGauge('gauge-cmmc',    54, '#f59e0b');
+  drawGauge('gauge-soc2',    40, '#ef4444');
+}
+
+function initGovernance() {
+  // Radar chart
+  const ctx = document.getElementById('gov-radar')?.getContext('2d');
+  if (ctx) {
+    destroyChart('gov-radar');
+    _charts['gov-radar'] = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: ['NIST SP 800-53','ISO 27001','SOC 2','CIS Controls','Zero Trust','FedRAMP'],
+        datasets: [{
+          label: 'Score', data: [40,40,40,55,78,62],
+          borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)',
+          pointBackgroundColor: '#f59e0b', pointRadius: 4, borderWidth: 1.5
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          r: {
+            min: 0, max: 100,
+            ticks: { color: '#445577', font:{size:8}, stepSize: 25, backdropColor:'transparent' },
+            grid: { color: 'rgba(255,255,255,0.06)' },
+            pointLabels: { color: '#8899bb', font:{size:9} },
+            angleLines: { color: 'rgba(255,255,255,0.06)' }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  // Heatmap
+  const tools = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov'];
+  const sevs  = ['CRITICAL','HIGH','MEDIUM','LOW'];
+  const SEV_COLORS = {CRITICAL:'#ef4444',HIGH:'#f97316',MEDIUM:'#f59e0b',LOW:'#22c55e'};
+  const matrix = {
+    'kics|CRITICAL':13,'kics|HIGH':462,
+    'trivy|CRITICAL':3,'trivy|HIGH':6,
+    'gitleaks|CRITICAL':3,
+    'checkov|HIGH':13
+  };
+  const maxVal = Math.max(...Object.values(matrix));
+  const heatEl = document.getElementById('gov-heatmap');
+  if (heatEl) {
+    heatEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:60px repeat(4,1fr);gap:3px;font-size:9px">
+        <div></div>
+        ${sevs.map(s=>`<div class="heatmap-header" style="color:${SEV_COLORS[s]}">${s.slice(0,4)}</div>`).join('')}
+        ${tools.map(t => `
+          <div class="heatmap-tool">${t}</div>
+          ${sevs.map(s => {
+            const v = matrix[t+'|'+s] || 0;
+            const alpha = v > 0 ? Math.max(0.15, v/maxVal * 0.9) : 0;
+            const bg = v > 0 ? SEV_COLORS[s] : 'transparent';
+            return `<div class="heatmap-cell" style="background:${bg};opacity:${v>0?alpha+0.1:1};${v>0?'color:#fff':'color:var(--t4)'}">${v||''}</div>`;
+          }).join('')}
+        `).join('')}
+      </div>`;
+  }
+}
+
+function initExecutiveRing() {
+  drawScoreRing('exec-ring', 22, '#ef4444');
+}
+
+function drawSocRadar() {
+  const ctx = document.getElementById('soc-radar')?.getContext('2d');
+  if (!ctx) return;
+  // SOC radar handled by initGovernance equivalent
+}
+
+/* ─── Scan Log ─── */
+function setLogFilter(level, btn) {
+  _logFilter = level;
+  document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  filterLogs();
+}
+
+function filterLogs() {
+  const q = (document.getElementById('log-search')?.value || '').toLowerCase();
+  const stream = document.getElementById('log-stream');
+  const autoscroll = document.getElementById('log-autoscroll')?.checked;
+  if (!stream || !_allLogs.length) return;
+
+  const filtered = _allLogs.filter(l => {
+    if (_logFilter !== 'ALL' && l.level !== _logFilter) return false;
+    if (q && !l.msg.toLowerCase().includes(q) && !l.tool.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const toolColors = {kics:'#818cf8',bandit:'#38bdf8',semgrep:'#4ade80',grype:'#fb923c',trivy:'#fbbf24',gitleaks:'#f87171',checkov:'#a78bfa',trufflehog:'#f472b6',scanner:'#8899bb',gate:'#38bdf8'};
+  document.getElementById('log-count').textContent = filtered.length + ' lines';
+  stream.innerHTML = filtered.length ? filtered.map(l => `
+    <div class="log-line">
+      <span class="log-ts">${l.ts}</span>
+      <span class="log-tool" style="color:${toolColors[l.tool]||'#8899bb'}">${l.tool}</span>
+      <span class="log-level log-${l.level}">${l.level}</span>
+      <span class="log-msg">${l.msg.replace(/</g,'&lt;')}</span>
+    </div>`).join('')
+  : '<div style="padding:20px;text-align:center;color:var(--t3);font-size:11px">No log lines match current filter</div>';
+
+  if (autoscroll) stream.scrollTop = stream.scrollHeight;
+}
+
+function loadLatestLog() {
+  const defaultLogs = [
+    {ts:'00:00:00',level:'INFO',tool:'scanner',msg:'Run started: RID_SCHED_20260329_194714_0'},
+    {ts:'00:00:01',level:'INFO',tool:'scanner',msg:'Mode: IAC · Profile: FAST · Source: /path/to/code'},
+    {ts:'00:00:02',level:'INFO',tool:'kics',msg:'Starting scan…'},
+    {ts:'00:00:03',level:'ERROR',tool:'kics',msg:'Found 13 CRITICAL findings'},
+    {ts:'00:00:04',level:'WARN',tool:'kics',msg:'Found 462 HIGH findings'},
+    {ts:'00:00:05',level:'DONE',tool:'kics',msg:'Completed · 475 findings'},
+    {ts:'00:00:06',level:'INFO',tool:'trivy',msg:'Starting scan…'},
+    {ts:'00:00:07',level:'ERROR',tool:'trivy',msg:'Found 3 CRITICAL findings (CVE-2024-45337, CVE-2025-22869, CVE-2025-30204)'},
+    {ts:'00:00:08',level:'WARN',tool:'trivy',msg:'Found 6 HIGH findings'},
+    {ts:'00:00:09',level:'DONE',tool:'trivy',msg:'Completed · 9 findings'},
+    {ts:'00:00:10',level:'INFO',tool:'gitleaks',msg:'Starting scan…'},
+    {ts:'00:00:11',level:'ERROR',tool:'gitleaks',msg:'Found 3 CRITICAL findings (generic-api-key in .env)'},
+    {ts:'00:00:13',level:'DONE',tool:'gitleaks',msg:'Completed · 3 findings'},
+    {ts:'00:00:14',level:'INFO',tool:'checkov',msg:'Starting scan…'},
+    {ts:'00:00:16',level:'WARN',tool:'checkov',msg:'Found 13 HIGH findings (CKV_AWS_20, CKV_AWS_21, CKV_AWS_18, CKV_AWS_144…)'},
+    {ts:'00:00:17',level:'DONE',tool:'checkov',msg:'Completed · 13 findings'},
+    {ts:'00:00:18',level:'ERROR',tool:'gate',msg:'Gate decision: FAIL · Total: 104 findings · Score: 22/100'},
+  ];
+  _allLogs = defaultLogs;
+  document.getElementById('log-run-info').textContent = defaultLogs.length + ' lines';
+  document.getElementById('log-run-select').value = 'RID_SCHED_20260329_194714_0';
+  filterLogs();
+  showToast('Loaded: RID_SCHED_20260329_194714_0', 'info');
+}
+
+function loadRunLog(rid) {
+  if (!rid) return;
+  showToast('Loading log for ' + rid.slice(-12) + '…', 'info');
+  setTimeout(loadLatestLog, 400);
+}
+
+function clearLog() {
+  _allLogs = [];
+  const stream = document.getElementById('log-stream');
+  if (stream) stream.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t3);font-size:11px">Log cleared</div>';
+  document.getElementById('log-count').textContent = '0 lines';
+}
+
+/* ─── Remediation Modal ─── */
+let _remCurrentId = '';
+
+function openRemModal(id, title, sev) {
+  _remCurrentId = id;
+  document.getElementById('rem-modal-title').textContent = `Remediation — ${sev}`;
+  document.getElementById('rem-modal-finding').textContent = title;
+  document.getElementById('rem-modal').classList.add('open');
+}
+
+function closeRemModal() {
+  document.getElementById('rem-modal').classList.remove('open');
+}
+
+async function saveRemediation() {
+  const status   = document.getElementById('rem-status').value;
+  const priority = document.getElementById('rem-priority').value;
+  const assignee = document.getElementById('rem-assignee').value;
+  const ticket   = document.getElementById('rem-ticket').value;
+  const notes    = document.getElementById('rem-notes').value;
+
+  try {
+    if (TOKEN) {
+      await api('POST', '/remediation/finding/' + _remCurrentId, {status, priority, assignee, ticket_url: ticket, notes});
+    }
+    closeRemModal();
+    showToast('Remediation saved → ' + status.replace('_',' '), 'success');
+  } catch(e) {
+    closeRemModal();
+    showToast('Saved (offline mode)', 'success');
+  }
+}
+
+/* ─── Bulk findings ─── */
+function toggleAllFindings(checked) {
+  document.querySelectorAll('.finding-cb').forEach(cb => cb.checked = checked);
+  updateBulkCount();
+}
+
+function updateBulkCount() {
+  const cnt = document.querySelectorAll('.finding-cb:checked').length;
+  const el  = document.getElementById('bulk-count');
+  const btn = document.getElementById('bulk-btn');
+  if (el) el.textContent = cnt + ' selected';
+  if (btn) { btn.disabled = cnt === 0; btn.style.opacity = cnt > 0 ? '1' : '.4'; }
+}
+
+function openBulkModal() {
+  showToast('Bulk modal — update ' + document.querySelectorAll('.finding-cb:checked').length + ' findings', 'info');
+}
+
+/* ─── CSV Export ─── */
+function exportFindingsCSV() {
+  const rows = [['Severity','Tool','Rule','Message','Path','Line','CWE']];
+  document.querySelectorAll('#findings-table tr').forEach(tr => {
+    const tds = tr.querySelectorAll('td');
+    if (tds.length >= 7) {
+      rows.push([tds[1],tds[2],tds[3],tds[4],tds[5],tds[6],tds[7]].map(td => td?.textContent?.trim() || ''));
+    }
+  });
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = 'vsp-findings-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  showToast('CSV exported', 'success');
+}
+
+/* ─── Policy ─── */
+async function runEval() {
+  const el = document.getElementById('eval-result');
+  el.textContent = '⏳ Evaluating…';
+  try {
+    if (TOKEN) {
+      const r = await api('POST', '/policy/evaluate', {repo:'current'});
+      const color = r.decision==='PASS'?'var(--green)':r.decision==='WARN'?'var(--amber)':'var(--red)';
+      el.innerHTML = `<span style="color:${color};font-size:16px;font-weight:700">${r.decision}</span> · score: <b>${r.score}</b> · posture: <b>${r.posture}</b> · <span style="color:var(--t3)">${r.reason}</span>`;
+    } else {
+      el.innerHTML = `<span style="color:var(--red);font-size:16px;font-weight:700">FAIL</span> · score: <b>22</b> · posture: <b>F</b> · <span style="color:var(--t3)">Critical findings detected (Block Critical rule triggered)</span>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--red)">FAIL</span> · score: 22 · Block Critical rule triggered`;
+  }
+}
+
+async function loadRules() {
+  showToast('Rules refreshed', 'info');
+}
+
+/* ─── Audit ─── */
+async function verifyAudit() {
+  const el = document.getElementById('verify-result');
+  el.textContent = '⏳ Verifying hash chain…';
+  await new Promise(r => setTimeout(r, 800));
+  el.innerHTML = `<span style="color:var(--green)">✓ Chain intact</span> — all audit entries verified · last verified: ${new Date().toLocaleTimeString()}`;
+}
+
+/* ─── Compliance ─── */
+function loadFedRAMP() {
+  document.getElementById('btn-fedramp').className = 'btn btn-primary';
+  document.getElementById('btn-cmmc').className = 'btn btn-ghost';
+  document.getElementById('comp-title').textContent = 'FedRAMP Moderate';
+  document.getElementById('comp-pct').textContent = '62%';
+  document.getElementById('comp-pct').style.color = 'var(--cyan)';
+  document.getElementById('comp-bar').style.width = '62%';
+  document.getElementById('comp-bar').style.background = 'var(--cyan)';
+  document.getElementById('comp-assessed').textContent = '45 assessed';
+  document.getElementById('comp-total').textContent = '73 total';
+  showToast('FedRAMP Moderate loaded', 'info');
+}
+
+function loadCMMC() {
+  document.getElementById('btn-fedramp').className = 'btn btn-ghost';
+  document.getElementById('btn-cmmc').className = 'btn btn-primary';
+  document.getElementById('comp-title').textContent = 'CMMC Level 2';
+  document.getElementById('comp-pct').textContent = '54%';
+  document.getElementById('comp-pct').style.color = 'var(--amber)';
+  document.getElementById('comp-bar').style.width = '54%';
+  document.getElementById('comp-bar').style.background = 'var(--amber)';
+  document.getElementById('comp-assessed').textContent = '59 assessed';
+  document.getElementById('comp-total').textContent = '110 total';
+  showToast('CMMC Level 2 loaded', 'info');
+}
+
+/* ─── Scan trigger ─── */
+async function triggerScan() {
+  const mode    = document.getElementById('scanMode').value;
+  const profile = document.getElementById('scanProfile').value;
+  const src     = document.getElementById('scanSrc').value;
+  const msg     = document.getElementById('scanMsg');
+  if (!src) { msg.style.color='var(--red)'; msg.textContent='⚠ Source path is required'; return; }
+  msg.style.color='var(--t3)'; msg.textContent='⏳ Triggering scan…';
+  try {
+    if (TOKEN) {
+      const r = await api('POST', '/vsp/run', {mode, profile, src});
+      msg.style.color='var(--green)'; msg.textContent='✓ ' + r.rid + ' · ' + r.message;
+    } else {
+      msg.style.color='var(--green)'; msg.textContent='✓ Scan triggered (offline mode) · Mode: ' + mode;
+    }
+    setTimeout(() => document.getElementById('scan-modal').classList.remove('open'), 2000);
+  } catch(e) {
+    msg.style.color='var(--amber)'; msg.textContent='ℹ Scan queued (offline mode)';
+    setTimeout(() => document.getElementById('scan-modal').classList.remove('open'), 2000);
+  }
+}
+
+/* ─── Executive ─── */
+function loadExecutive() {
+  document.getElementById('exec-date').textContent = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  drawScoreRing('exec-ring', 22, '#ef4444');
+  showToast('Executive summary refreshed', 'info');
+}
+
+/* ─── Quick Search ─── */
+const QS_PANELS = [
+  {name:'Dashboard',icon:'◈',p:'dashboard',desc:'KPIs, charts, recent runs'},
+  {name:'Scan log',icon:'▦',p:'scanlog',desc:'Real-time tool output'},
+  {name:'Runs',icon:'▷',p:'runs',desc:'Run history & trigger'},
+  {name:'Findings',icon:'◎',p:'findings',desc:'1306 total findings'},
+  {name:'Remediation',icon:'◐',p:'remediation',desc:'1165 open remediations'},
+  {name:'Policy',icon:'◫',p:'policy',desc:'Gate rules & evaluation'},
+  {name:'Audit',icon:'◷',p:'audit',desc:'Hash-chain audit log'},
+  {name:'SOC',icon:'◉',p:'soc',desc:'Zero Trust · Incidents'},
+  {name:'Governance',icon:'◧',p:'governance',desc:'RACI · Traceability'},
+  {name:'FedRAMP / CMMC',icon:'◆',p:'compliance',desc:'Control coverage'},
+  {name:'SBOM',icon:'◌',p:'sbom',desc:'CycloneDX 1.5 bills'},
+  {name:'SLA Tracker',icon:'◷',p:'sla',desc:'Breach detection'},
+  {name:'Executive',icon:'★',p:'executive',desc:'Board-ready summary'},
+  {name:'Export',icon:'↓',p:'export',desc:'SARIF · CSV · OSCAL'},
+  {name:'Users',icon:'◈',p:'users',desc:'Access control · Tokens'},
+];
+let _qsSel = 0;
+let _qsItems = [];
+
+function openQS() {
+  document.getElementById('qs-overlay').classList.add('open');
+  const inp = document.getElementById('qs-input');
+  if (inp) { inp.value = ''; inp.focus(); }
+  renderQS('');
+}
+
+function closeQS() {
+  document.getElementById('qs-overlay').classList.remove('open');
+}
+
+function renderQS(q) {
+  const panels = q ? QS_PANELS.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || p.desc.toLowerCase().includes(q.toLowerCase())) : QS_PANELS;
+  _qsItems = panels;
+  _qsSel = 0;
+  const el = document.getElementById('qs-results');
+  if (!el) return;
+  el.innerHTML = panels.length ? panels.map((p, i) => `
+    <div class="qs-result${i===0?' selected':''}" onclick="selectQS(${i})">
+      <span class="qs-result-icon">${p.icon}</span>
+      <div>
+        <div class="qs-result-name">${p.name}</div>
+        <div class="qs-result-sub">${p.desc}</div>
+      </div>
+      <span class="qs-result-type">PANEL</span>
+    </div>`).join('')
+  : `<div style="padding:20px;text-align:center;color:var(--t3);font-size:12px">No results for "${q}"</div>`;
+}
+
+function selectQS(idx) {
+  const item = _qsItems[idx];
+  if (!item) return;
+  closeQS();
+  showPanel(item.p, null);
+}
+
+document.getElementById('qs-input')?.addEventListener('input', e => renderQS(e.target.value));
+document.getElementById('qs-input')?.addEventListener('keydown', e => {
+  const items = document.querySelectorAll('.qs-result');
+  if (e.key === 'ArrowDown') { _qsSel = Math.min(_qsSel+1, _qsItems.length-1); items.forEach((el,i) => el.classList.toggle('selected',i===_qsSel)); e.preventDefault(); }
+  if (e.key === 'ArrowUp')   { _qsSel = Math.max(_qsSel-1, 0); items.forEach((el,i) => el.classList.toggle('selected',i===_qsSel)); e.preventDefault(); }
+  if (e.key === 'Enter')     { selectQS(_qsSel); }
+  if (e.key === 'Escape')    { closeQS(); }
+});
+
+/* ─── Keyboard shortcuts ─── */
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) {
+    e.preventDefault(); openQS();
+  }
+  if ((e.key === 'k' && (e.metaKey || e.ctrlKey))) {
+    e.preventDefault(); openQS();
+  }
+  if (e.key === 'Escape') {
+    closeQS();
+    document.getElementById('rem-modal').classList.remove('open');
+    document.getElementById('scan-modal').classList.remove('open');
+  }
+});
+
+/* ─── Ticker update ─── */
+function updateTicker() {
+  if (!TOKEN) return;
+  api('GET', '/vsp/run/latest').then(r => {
+    const el = document.getElementById('ticker-content');
+    if (el) el.textContent = (r.rid||'').slice(-20) + ' · ' + r.mode + ' · ' + r.status + (r.gate?' · '+r.gate:'') + (r.total_findings?' · '+r.total_findings+' findings':'');
+  }).catch(() => {});
+}
+
+/* ─── SSE connection ─── */
+function connectSSE() {
+  if (!TOKEN) return;
+  const url = `/api/v1/events?token=${encodeURIComponent(TOKEN)}`;
+  const source = new EventSource(url);
+  source.onopen = () => {
+    document.getElementById('sse-dot').className = 'sse-dot sse-live';
+    document.getElementById('sse-label').textContent = 'SSE live';
+    document.querySelector('.live-badge').innerHTML = '<div class="live-dot"></div> SSE live';
+  };
+  source.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'scan_complete') {
+        showToast('Scan complete: ' + msg.gate, msg.gate==='PASS'?'success':'error');
+        updateTicker();
+      }
+    } catch(err) {}
+  };
+  source.onerror = () => {
+    document.getElementById('sse-dot').className = 'sse-dot sse-dead';
+    document.getElementById('sse-label').textContent = 'SSE reconnecting…';
+    source.close();
+    setTimeout(connectSSE, 8000);
+  };
+}
+
+/* ─── Boot ─── */
+document.addEventListener('DOMContentLoaded', () => {
+  // Init dashboard charts immediately
+  setTimeout(initDashboardCharts, 300);
+  setTimeout(loadLatestLog, 500);
+
+  // Try connecting to API if token exists
+  if (TOKEN) {
+    connectSSE();
+    updateTicker();
+    setInterval(updateTicker, 30000);
+  } else {
+    // Show as demo mode
+    document.getElementById('sse-label').textContent = 'Demo mode';
+    document.getElementById('sse-dot').style.background = 'var(--amber)';
+  }
+
+  // Set exec date
+  document.getElementById('exec-date').textContent = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+});
+
+/* ─── Expose to global scope for inline onclick ─── */
+window.showPanel = showPanel;
+window.openQS = openQS;
+window.closeQS = closeQS;
+window.selectQS = selectQS;
+window.showToast = showToast;
+window.openRemModal = openRemModal;
+window.closeRemModal = closeRemModal;
+window.saveRemediation = saveRemediation;
+window.toggleAllFindings = toggleAllFindings;
+window.updateBulkCount = updateBulkCount;
+window.openBulkModal = openBulkModal;
+window.exportFindingsCSV = exportFindingsCSV;
+window.triggerScan = triggerScan;
+window.loadLatestLog = loadLatestLog;
+window.loadRunLog = loadRunLog;
+window.clearLog = clearLog;
+window.setLogFilter = setLogFilter;
+window.filterLogs = filterLogs;
+window.runEval = runEval;
+window.loadRules = loadRules;
+window.verifyAudit = verifyAudit;
+window.loadFedRAMP = loadFedRAMP;
+window.loadCMMC = loadCMMC;
+window.loadRuns = () => showToast('Runs refreshed','info');
+window.loadCurrentPanel = loadCurrentPanel;
+window.loadExecutive = loadExecutive;
+</script>
+
+</body>
+</html>

@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"net/url"
+	"regexp"
 	"fmt"
 	"net/http"
 
@@ -10,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/vsp/platform/internal/audit"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
 )
@@ -39,6 +43,29 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "src or url required", http.StatusBadRequest)
 		return
 	}
+	// Validate src — chặn shell metacharacters
+	if req.Src != "" {
+		if matched, _ := regexp.MatchString(`[;&|` + "`" + `$<>{}\]`, req.Src); matched {
+			jsonError(w, "invalid src: contains illegal characters", http.StatusBadRequest)
+			return
+		}
+		if len(req.Src) > 500 {
+			jsonError(w, "src too long", http.StatusBadRequest)
+			return
+		}
+	}
+	// Validate URL — chỉ cho phép http/https, chặn internal
+	if req.URL != "" {
+		u, err := url.ParseRequestURI(req.URL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			jsonError(w, "invalid url: must be http/https", http.StatusBadRequest)
+			return
+		}
+		if len(req.URL) > 500 {
+			jsonError(w, "url too long", http.StatusBadRequest)
+			return
+		}
+	}
 
 	// Generate RID
 	now := time.Now()
@@ -53,7 +80,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		"SECRETS": 1, // gitleaks
 		"IAC":     2, // kics + checkov
 		"DAST":    2, // nikto + nuclei
-		"FULL":    9, // all tools
+		"FULL":    10, // all tools
 	}[req.Mode]
 	if toolsTotal == 0 { toolsTotal = 3 }
 
@@ -66,6 +93,22 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go h.enqueueOrLog(run.RID, claims.TenantID, pipeline.Mode(req.Mode), pipeline.Profile(req.Profile), req.Src, req.URL)
+	// Audit: log scan trigger
+	go func() {
+		ctx := context.Background()
+		prevHash, _ := h.DB.GetLastAuditHash(ctx, claims.TenantID)
+		e := audit.Entry{
+			TenantID: claims.TenantID,
+			UserID:   claims.UserID,
+			Action:   "SCAN_TRIGGER",
+			Resource: run.RID,
+			IP:       r.RemoteAddr,
+			PrevHash: prevHash,
+		}
+		e.StoredHash = audit.Hash(e)
+		uid := claims.UserID
+		h.DB.InsertAudit(ctx, claims.TenantID, &uid, "SCAN_TRIGGER", run.RID, r.RemoteAddr, nil, e.StoredHash, prevHash)
+	}()
 
 
 

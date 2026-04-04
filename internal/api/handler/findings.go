@@ -15,11 +15,21 @@ type Findings struct {
 func (h *Findings) List(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	q := r.URL.Query()
+
+	// Cap limit tối đa 2000, search tối đa 200 chars
+	limit := queryInt(r, "limit", 50)
+	if limit > 2000 { limit = 2000 }
+	if limit < 1   { limit = 1   }
+
+	search := q.Get("q")
+	if len(search) > 200 { search = search[:200] }
+
 	findings, total, err := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{
+		RunID:    q.Get("run_id"),
 		Severity: q.Get("severity"),
 		Tool:     q.Get("tool"),
-		Search:   q.Get("q"),
-		Limit:    queryInt(r, "limit", 50),
+		Search:   search,
+		Limit:    limit,
 		Offset:   queryInt(r, "offset", 0),
 	})
 	if err != nil {
@@ -32,7 +42,7 @@ func (h *Findings) List(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{
 		"findings": findings,
 		"total":    total,
-		"limit":    queryInt(r, "limit", 50),
+		"limit":    limit,
 		"offset":   queryInt(r, "offset", 0),
 	})
 }

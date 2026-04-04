@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 
 	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/gate"
@@ -25,6 +26,15 @@ type ScanCompletePayload struct {
 }
 
 func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
+	// Auth: internal endpoint chỉ được gọi từ scanner worker
+	// Validate bằng INTERNAL_SECRET header
+	secret := os.Getenv("INTERNAL_SECRET")
+	if secret == "" { secret = "dev-internal-secret" }
+	if r.Header.Get("X-Internal-Secret") != secret {
+		http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+		return
+	}
+
 	var payload ScanCompletePayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		jsonError(w, "invalid payload", http.StatusBadRequest)

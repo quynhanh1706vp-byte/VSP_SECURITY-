@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>VSP — Threat Intel</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--font-mono:'JetBrains Mono','Fira Mono',monospace;--font-ui:'Inter','Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5;padding:16px}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.3)}.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}.pill-purple{background:var(--purple2);color:var(--purple);border-color:rgba(139,92,246,.3)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}.btn:hover{background:var(--surface)}.btn-sm{padding:3px 8px;font-size:10px}.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}.card-title{font-size:12px;font-weight:600}.card-sub{font-size:11px;color:var(--t3);margin-top:1px}.card-body{padding:12px 14px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px;cursor:pointer;transition:border-color .15s}.kpi:hover{border-color:var(--border2)}.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}.kpi-val{font-size:20px;font-weight:700;font-family:var(--font-mono)}.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.ioc{border-left:3px solid var(--border2);padding:9px 11px;margin-bottom:7px;border-radius:0 8px 8px 0;background:var(--surface);cursor:pointer;transition:all .15s}.ioc:hover{transform:translateX(2px)}.ioc.crit{border-left-color:var(--red)}.ioc.high{border-left-color:var(--amber)}.ioc.med{border-left-color:var(--blue)}.ioc.matched{border-left-color:var(--green)}
+.ioc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:4px}.ioc-type{font-size:9px;font-family:var(--font-mono);padding:1px 5px;border-radius:3px;background:var(--bg);border:1px solid var(--border2);color:var(--t3);flex-shrink:0}.ioc-val{font-size:11px;font-family:var(--font-mono);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ioc-feed{font-size:10px;color:var(--t3);margin-bottom:3px}.ioc-tags{display:flex;gap:4px;flex-wrap:wrap}
+.feed-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border-radius:7px;margin-bottom:6px;border:1px solid var(--border)}.feed-name{font-size:12px;font-weight:500;flex:1}.feed-count{font-size:10px;font-family:var(--font-mono);color:var(--t3)}.feed-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.mitre-cell{border-radius:5px;padding:8px 6px;text-align:center;cursor:pointer;transition:all .15s;border:1px solid transparent}.mitre-cell:hover{border-color:rgba(255,255,255,.2);transform:scale(1.05)}.mitre-tactic{font-size:9px;font-weight:600;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em}.mitre-count{font-size:16px;font-weight:700;font-family:var(--font-mono)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;padding-top:32px;overflow-y:auto}.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(660px,95vw);margin-bottom:32px}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}.modal-title{font-size:15px;font-weight:700;margin-bottom:3px}.modal-sub{font-size:11px;color:var(--t3)}.modal-body{padding:16px 20px}.modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px}
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}.detail-card{background:var(--surface);border-radius:8px;padding:10px 12px}.detail-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}.detail-val{font-size:14px;font-weight:700}
+.slbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-mono);margin:14px 0 8px;padding-bottom:3px;border-bottom:1px solid var(--border)}
+.code-block{font-family:var(--font-mono);font-size:10px;background:var(--bg);padding:8px 10px;border-radius:6px;border:1px solid var(--border);white-space:pre-wrap;word-break:break-all;color:var(--cyan);margin-top:4px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.hdr h2{font-size:15px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.search-bar{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:7px 10px;border-radius:7px;font-size:12px;font-family:var(--font-ui);outline:none;margin-bottom:10px;transition:border-color .15s}.search-bar:focus{border-color:var(--blue)}
+.cve-row{cursor:pointer;transition:background .12s;border-bottom:1px solid var(--border)}.cve-row:hover{background:var(--surface)}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div><h2>Threat intelligence</h2><p>IOC matching · CVE enrichment · MITRE ATT&CK · feed management</p></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="pill pill-green" id="sync-badge">&#10003; synced 3m ago</span>
+    <button class="btn btn-primary btn-sm" onclick="syncFeeds()">&#8635; Sync feeds</button>
+  </div>
+</div>
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-lbl">IOC database</div><div class="kpi-val" style="color:var(--cyan)" id="k-iocs">48.2k</div><div class="kpi-sub">indicators loaded</div></div>
+  <div class="kpi"><div class="kpi-lbl">Matches today</div><div class="kpi-val" style="color:var(--red)" id="k-matches">7</div><div class="kpi-sub">in current scans</div></div>
+  <div class="kpi"><div class="kpi-lbl">CVEs enriched</div><div class="kpi-val" style="color:var(--amber)" id="k-cves">23</div><div class="kpi-sub">with TI context</div></div>
+  <div class="kpi"><div class="kpi-lbl">Active feeds</div><div class="kpi-val" style="color:var(--green)" id="k-feeds">5</div><div class="kpi-sub">of 6 connected</div></div>
+</div>
+<div class="grid2">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">IOC matches</div><div class="card-sub">findings matched against TI</div></div>
+      <div style="display:flex;gap:6px">
+        <select id="ioc-type-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderIOCs()">
+          <option value="">All types</option><option value="IP">IP</option><option value="DOMAIN">Domain</option><option value="CVE">CVE</option><option value="HASH">Hash</option><option value="URL">URL</option>
+        </select>
+      </div>
+    </div>
+    <div style="padding:8px 10px">
+      <input class="search-bar" id="ioc-search" placeholder="Search IOCs…" oninput="renderIOCs()">
+      <div style="max-height:280px;overflow-y:auto" id="ioc-list"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div><div class="card-title">Feed sources</div><div class="card-sub">active threat intelligence feeds</div></div></div>
+    <div class="card-body" id="feeds-list"></div>
+  </div>
+</div>
+<div class="card" style="margin-bottom:12px">
+  <div class="card-head"><div><div class="card-title">CVE enrichment</div><div class="card-sub">CVEs found in scans with TI context · CVSS · EPSS · KEV</div></div></div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse" id="cve-table">
+      <thead><tr style="border-bottom:1px solid var(--border)">
+        <th style="text-align:left;font-size:10px;color:var(--t3);padding:6px 10px;font-family:var(--font-mono);text-transform:uppercase">CVE</th>
+        <th style="text-align:left;font-size:10px;color:var(--t3);padding:6px 10px;font-family:var(--font-mono);text-transform:uppercase">Description</th>
+        <th style="text-align:left;font-size:10px;color:var(--t3);padding:6px 10px;font-family:var(--font-mono);text-transform:uppercase">CVSS</th>
+        <th style="text-align:left;font-size:10px;color:var(--t3);padding:6px 10px;font-family:var(--font-mono);text-transform:uppercase">EPSS</th>
+        <th style="text-align:left;font-size:10px;color:var(--t3);padding:6px 10px;font-family:var(--font-mono);text-transform:uppercase">KEV</th>
+        <th style="text-align:left;font-size:10px;color:var(--t3);padding:6px 10px;font-family:var(--font-mono);text-transform:uppercase">TTP</th>
+      </tr></thead>
+      <tbody id="cve-tbody"></tbody>
+    </table>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><div><div class="card-title">MITRE ATT&CK coverage</div><div class="card-sub">tactics mapped from findings</div></div><div style="font-size:10px;color:var(--t3)">Color intensity = finding count mapped to tactic</div></div>
+  <div class="card-body"><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px" id="mitre-grid"></div></div>
+</div>
+<!-- IOC detail modal -->
+<div class="modal-overlay" id="ioc-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title" id="imod-title">IOC detail</div><div class="modal-sub" id="imod-sub"></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><span id="imod-sev"></span><span id="imod-matched"></span><button class="modal-close" onclick="closeModal('ioc-modal')">&#10005;</button></div>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="imod-kpis"></div>
+      <div class="slbl" style="margin-top:0">&#9656; Indicator value</div>
+      <div class="code-block" id="imod-val"></div>
+      <div class="slbl">&#9656; Context</div>
+      <div id="imod-context" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:12px"></div>
+      <div class="slbl">&#9656; Associated findings</div>
+      <div id="imod-findings"></div>
+      <div class="slbl">&#9656; Related MITRE techniques</div>
+      <div id="imod-mitre" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('ioc-modal')">Close</button>
+      <button class="btn btn-primary btn-sm">Block indicator &#8594;</button>
+    </div>
+  </div>
+</div>
+<!-- CVE detail modal -->
+<div class="modal-overlay" id="cve-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title" id="cmod-title">CVE detail</div><div class="modal-sub" id="cmod-sub"></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><span id="cmod-sev"></span><button class="modal-close" onclick="closeModal('cve-modal')">&#10005;</button></div>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="cmod-kpis"></div>
+      <div class="slbl" style="margin-top:0">&#9656; Description</div>
+      <div id="cmod-desc" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:12px"></div>
+      <div class="slbl">&#9656; Affected component</div>
+      <div class="code-block" id="cmod-comp"></div>
+      <div class="slbl">&#9656; Remediation</div>
+      <div id="cmod-rem" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:8px"></div>
+      <div class="slbl">&#9656; TTP mapping</div>
+      <div id="cmod-ttp" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('cve-modal')">Close</button>
+      <button class="btn btn-primary btn-sm">Create remediation &#8594;</button>
+    </div>
+  </div>
+</div>
+<script>
+var TOKEN='',API='';
+var IOCS=[
+  {id:'i1',type:'CVE',val:'CVE-2024-45337',severity:'CRITICAL',feed:'NVD',matched:true,context:'PublicKeyCallback auth bypass in golang.org/x/crypto · CVSS 9.1 · EPSS 0.72 · KEV listed',mitre:['T1190','T1203'],findings:['CVE-2024-45337 — golang.org/x/crypto @ v0.28.0']},
+  {id:'i2',type:'CVE',val:'CVE-2025-22869',severity:'CRITICAL',feed:'NVD',matched:true,context:'Denial of service in golang.org/x/crypto · CVSS 8.7 · EPSS 0.41',mitre:['T1190'],findings:['CVE-2025-22869 in Auth service']},
+  {id:'i3',type:'CVE',val:'CVE-2025-30204',severity:'HIGH',feed:'OSV',matched:true,context:'JWT claim confusion in golang-jwt · CVSS 7.5',mitre:['T1078'],findings:[]},
+  {id:'i4',type:'HASH',val:'a3f8c1d9e2b4...',severity:'HIGH',feed:'OTX',matched:true,context:'Known malicious build artifact hash · associated with supply chain attack campaigns',mitre:['T1195.002'],findings:['Build artifact hash matches known malware']},
+  {id:'i5',type:'DOMAIN',val:'malicious-cdn[.]io',severity:'HIGH',feed:'MISP',matched:false,context:'C2 domain used in supply chain attacks · registered 2024-11-03 · GeoIP: RU',mitre:['T1071','T1584'],findings:[]},
+  {id:'i6',type:'IP',val:'185.220.101.47',severity:'MEDIUM',feed:'AbuseIPDB',matched:true,context:'Known Tor exit node · scan origin · abuse confidence 94%',mitre:['T1090'],findings:['Port scan from 185.220.101.47']},
+  {id:'i7',type:'IP',val:'45.142.212.100',severity:'HIGH',feed:'AbuseIPDB',matched:true,context:'SSH brute force origin · associated with threat actor group',mitre:['T1110'],findings:['SSH brute force attempt']},
+  {id:'i8',type:'URL',val:'https://evil[.]example/payload',severity:'CRITICAL',feed:'MISP',matched:false,context:'Malware distribution URL · payload: ransomware dropper',mitre:['T1204'],findings:[]},
+  {id:'i9',type:'HASH',val:'d41d8cd98f00b204...',severity:'MEDIUM',feed:'OTX',matched:false,context:'Suspicious PowerShell script hash',mitre:['T1059.001'],findings:[]},
+  {id:'i10',type:'CVE',val:'CVE-2024-45338',severity:'MEDIUM',feed:'NVD',matched:false,context:'DoS via malformed HTTP/2 frames · CVSS 6.5',mitre:['T1499'],findings:[]},
+  {id:'i11',type:'DOMAIN',val:'api.legitimate-but-suspicious[.]com',severity:'LOW',feed:'OTX',matched:false,context:'Recently registered domain · DGA score 0.72',mitre:[],findings:[]},
+];
+var FEEDS=[
+  {name:'NVD / NIST',count:'28.4k',lastSync:'5m',status:'ok',icon:'◈'},
+  {name:'OSV database',count:'11.2k',lastSync:'5m',status:'ok',icon:'◉'},
+  {name:'MISP community',count:'6.1k',lastSync:'12m',status:'ok',icon:'◆'},
+  {name:'AlienVault OTX',count:'2.3k',lastSync:'18m',status:'ok',icon:'◎'},
+  {name:'AbuseIPDB',count:'204',lastSync:'2h',status:'warn',icon:'◇'},
+  {name:'STIX / TAXII',count:'—',lastSync:'—',status:'offline',icon:'○'},
+];
+var CVES=[
+  {id:'CVE-2024-45337',desc:'PublicKeyCallback auth bypass',component:'golang.org/x/crypto@0.28.0',cvss:9.1,epss:0.72,kev:true,ttp:'T1190,T1203',fix:'Update to v0.31.0',severity:'CRITICAL'},
+  {id:'CVE-2025-22869',desc:'DoS via SSH handshake',component:'golang.org/x/crypto@0.28.0',cvss:8.7,epss:0.41,kev:false,ttp:'T1499',fix:'Update to v0.35.0',severity:'CRITICAL'},
+  {id:'CVE-2025-30204',desc:'JWT claim confusion',component:'golang-jwt/jwt@4.5.0',cvss:7.5,epss:0.33,kev:false,ttp:'T1078',fix:'Update to v4.5.2',severity:'HIGH'},
+];
+var MITRE=[
+  {tactic:'Initial Access',id:'TA0001',count:3,techniques:['T1190','T1078']},
+  {tactic:'Execution',id:'TA0002',count:1,techniques:['T1059.001']},
+  {tactic:'Persistence',id:'TA0003',count:0,techniques:[]},
+  {tactic:'Priv. Escalation',id:'TA0004',count:0,techniques:[]},
+  {tactic:'Defense Evasion',id:'TA0005',count:1,techniques:['T1090']},
+  {tactic:'Collection',id:'TA0009',count:0,techniques:[]},
+  {tactic:'C&C',id:'TA0011',count:2,techniques:['T1071','T1584']},
+  {tactic:'Lateral Mov.',id:'TA0008',count:0,techniques:[]},
+  {tactic:'Discovery',id:'TA0007',count:1,techniques:['T1046']},
+  {tactic:'Exfiltration',id:'TA0010',count:0,techniques:[]},
+];
+function sevClass(s){return {CRITICAL:'crit',HIGH:'high',MEDIUM:'med',LOW:'low'}[(s||'').toUpperCase()]||'';}
+function sevBadge(s){var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};return '<span class="pill '+(m[(s||'').toUpperCase()]||'pill-gray')+'">'+(s||'?')+'</span>';}
+function sevColor(s){return {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--green)'}[(s||'').toUpperCase()]||'var(--t3)';}
+function renderIOCs(){
+  var tf=document.getElementById('ioc-type-filter').value;
+  var q=(document.getElementById('ioc-search').value||'').toLowerCase();
+  var list=IOCS.filter(function(i){
+    if(tf&&i.type!==tf)return false;
+    if(q&&!(i.val.toLowerCase().includes(q)||(i.context||'').toLowerCase().includes(q)))return false;
+    return true;
+  });
+  document.getElementById('ioc-list').innerHTML=list.map(function(i){
+    var cls=i.matched?'matched':sevClass(i.severity);
+    return '<div class="ioc '+cls+'" data-id="'+i.id+'" onclick="openIOCDetail(this.dataset.id)">'
+      +'<div class="ioc-hdr"><span class="ioc-type">'+i.type+'</span>'+sevBadge(i.severity)+(i.matched?'<span class="pill pill-green">&#10003; matched</span>':'')+'<span class="ioc-val">'+i.val+'</span></div>'
+      +'<div class="ioc-feed">feed: '+i.feed+'</div>'
+      +'<div class="ioc-tags">'+(i.mitre||[]).map(function(m){return '<span class="pill pill-purple">'+m+'</span>';}).join('')+'</div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('k-matches').textContent=IOCS.filter(function(i){return i.matched;}).length;
+}
+function renderFeeds(){
+  var statusColor={ok:'var(--green)',warn:'var(--amber)',offline:'var(--red)'};
+  document.getElementById('feeds-list').innerHTML=FEEDS.map(function(f){
+    return '<div class="feed-item"><div class="feed-dot" style="background:'+statusColor[f.status]+'"></div>'
+      +'<div><div class="feed-name">'+f.name+'</div><div class="feed-count">'+f.count+' indicators · last sync: '+f.lastSync+'</div></div>'
+      +'<span class="pill '+(f.status==='ok'?'pill-green':f.status==='warn'?'pill-amber':'pill-red')+'">'+f.status+'</span>'
+      +'</div>';
+  }).join('');
+  document.getElementById('k-feeds').textContent=FEEDS.filter(function(f){return f.status==='ok';}).length;
+}
+function renderCVEs(){
+  document.getElementById('cve-tbody').innerHTML=CVES.map(function(c){
+    var cvssColor=c.cvss>=9?'var(--red)':c.cvss>=7?'var(--amber)':'var(--blue)';
+    return '<tr data-cid="'+c.id+'" class="cve-row" onclick="openCVEDetail(this.dataset.cid)">'
+      +'<td style="padding:8px 10px;font-family:var(--font-mono);font-size:10px;color:var(--cyan)">'+c.id+'</td>'
+      +'<td style="padding:8px 10px;font-size:11px">'+c.desc+'<br><span style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+c.component+'</span></td>'
+      +'<td style="padding:8px 10px"><span style="font-family:var(--font-mono);font-weight:700;font-size:12px;color:'+cvssColor+'">'+c.cvss+'</span></td>'
+      +'<td style="padding:8px 10px;font-family:var(--font-mono);font-size:11px;color:var(--t2)">'+c.epss+'</td>'
+      +'<td style="padding:8px 10px">'+(c.kev?'<span class="pill pill-red">KEV</span>':'<span class="pill pill-gray">No</span>')+'</td>'
+      +'<td style="padding:8px 10px">'+c.ttp.split(',').map(function(t){return '<span class="pill pill-purple" style="margin-right:2px">'+t.trim()+'</span>';}).join('')+'</td>'
+      +'</tr>';
+  }).join('');
+}
+function renderMITRE(){
+  var maxCount=Math.max.apply(null,MITRE.map(function(m){return m.count;}));
+  document.getElementById('mitre-grid').innerHTML=MITRE.map(function(m){
+    var intensity=m.count>0?Math.max(0.2,m.count/Math.max(maxCount,1)):0;
+    var bg=m.count>0?'rgba(139,92,246,'+intensity+')':'rgba(255,255,255,.03)';
+    var textColor=m.count>0?'var(--purple)':'var(--t4)';
+    return '<div class="mitre-cell" style="background:'+bg+'" '+( m.count>0 ? 'data-id="'+m.id+'" onclick="showMITREDetail(this.dataset.id)"' : '')+'>'
+      +'<div class="mitre-tactic" style="color:'+textColor+';font-size:8px">'+m.tactic+'</div>'
+      +'<div class="mitre-count" style="color:'+(m.count>0?'var(--purple)':'var(--t4)')+'">'+m.count+'</div>'
+      +'<div style="font-size:8px;color:var(--t4)">'+m.id+'</div>'
+      +'</div>';
+  }).join('');
+}
+async function openIOCDetail(id){
+  var ioc=IOCS.find(function(i){return i.id===id;});
+  // Enrich from API
+  if(TOKEN&&ioc){
+    try{
+      // Get matched findings via hunt
+      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(ioc.val||'')+'&hours=72&limit=5',
+        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
+      if(hunted.events&&hunted.events.length){
+        ioc._log_hits=hunted.events.length;
+        ioc.findings=(hunted.events||[]).slice(0,3).map(function(e){return e.message;});
+      }
+    }catch(e){}
+  }
+  if(!ioc)return;
+  document.getElementById('imod-title').textContent=ioc.type+': '+ioc.val.slice(0,40)+(ioc.val.length>40?'…':'');
+  document.getElementById('imod-sub').textContent='Feed: '+ioc.feed+' · Source: Threat Intelligence DB';
+  document.getElementById('imod-sev').innerHTML=sevBadge(ioc.severity);
+  document.getElementById('imod-matched').innerHTML=ioc.matched?'<span class="pill pill-green">&#10003; matched in scans</span>':'<span class="pill pill-gray">not matched</span>';
+  document.getElementById('imod-kpis').innerHTML=[
+    {lbl:'Type',val:ioc.type,color:'var(--cyan)'},{lbl:'Severity',val:ioc.severity,color:sevColor(ioc.severity)},{lbl:'Feed',val:ioc.feed,color:'var(--t1)'},
+  ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
+  document.getElementById('imod-val').textContent=ioc.val;
+  document.getElementById('imod-context').textContent=ioc.context||'No additional context available.';
+  document.getElementById('imod-findings').innerHTML=(ioc.findings||[]).length
+    ?ioc.findings.map(function(f){return '<div style="padding:6px 8px;background:var(--surface);border-radius:5px;font-size:11px;margin-bottom:4px;border-left:2px solid var(--amber)">'+f+'</div>';}).join('')
+    :'<div style="color:var(--t3);font-size:11px">No findings matched this indicator</div>';
+  document.getElementById('imod-mitre').innerHTML=(ioc.mitre||[]).map(function(m){return '<span class="pill pill-purple">'+m+'</span>';}).join('');
+  document.getElementById('ioc-modal').classList.add('open');
+}
+async function openCVEDetail(id){
+  var c=CVES.find(function(x){return x.id===id;});
+  if(!c&&TOKEN){
+    // Try fetch from top-cves API
+    try{
+      var d=await fetch(API+'/api/v1/vulns/top-cves',{headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({cves:[]}));
+      var found=(d.cves||[]).find(function(x){return x.cve===id;});
+      if(found) c={id:found.cve,severity:found.severity,cvss:found.cvss||'N/A',epss:found.epss||'N/A',kev:false,desc:found.cve+' — '+found.severity+' vulnerability',component:found.tools,fix:'Update affected component',ttp:'T1190',refs:[]};
+    }catch(e){}
+  }
+  if(!c) return;
+  // Fetch related findings count
+  if(TOKEN){
+    try{
+      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(id)+'&hours=168&limit=10',
+        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
+      if(hunted.count) c._log_hits=hunted.count;
+    }catch(e){}
+  }
+  var cvssColor=c.cvss>=9?'var(--red)':c.cvss>=7?'var(--amber)':'var(--blue)';
+  document.getElementById('cmod-title').textContent=c.id;
+  document.getElementById('cmod-sub').textContent=c.desc;
+  document.getElementById('cmod-sev').innerHTML=sevBadge(c.severity);
+  document.getElementById('cmod-kpis').innerHTML=[
+    {lbl:'CVSS',val:c.cvss,color:cvssColor},{lbl:'EPSS',val:c.epss,color:'var(--t1)'},{lbl:'KEV',val:c.kev?'YES':'NO',color:c.kev?'var(--red)':'var(--green)'},{lbl:'Severity',val:c.severity,color:sevColor(c.severity)},
+  ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
+  if(c._log_hits) document.getElementById('cmod-sub').textContent+=' · '+c._log_hits+' log matches';
+  document.getElementById('cmod-desc').textContent=c.desc+'. This vulnerability affects '+c.component+' and may allow attackers to exploit the affected system.';
+  document.getElementById('cmod-comp').textContent=c.component;
+  document.getElementById('cmod-rem').textContent=c.fix+'. Update as soon as possible, especially if KEV listed.';
+  document.getElementById('cmod-ttp').innerHTML=c.ttp.split(',').map(function(t){return '<span class="pill pill-purple">'+t.trim()+'</span>';}).join('');
+  document.getElementById('cve-modal').classList.add('open');
+}
+function showMITREDetail(id){
+  var m=MITRE.find(function(x){return x.id===id;});
+  if(m&&m.count>0) alert('Tactic: '+m.tactic+' ('+m.id+')\nTechniques: '+m.techniques.join(', ')+'\nFindings mapped: '+m.count);
+}
+
+
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function syncFeeds(){
+  var b=document.getElementById('sync-badge');
+  b.textContent='⏳ Syncing…';b.className='pill pill-amber';
+  setTimeout(function(){b.textContent='✓ synced just now';b.className='pill pill-green';},2000);
+  if(TOKEN)fetch(API+'/api/v1/ti/feeds/sync',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+}
+function loadFromAPI(){
+  if(!TOKEN)return;
+  var h={Authorization:'Bearer '+TOKEN};
+  Promise.all([
+    fetch(API+'/api/v1/ti/iocs?limit=20',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch(API+'/api/v1/ti/feeds',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch(API+'/api/v1/ti/matches',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+  ]).then(function(res){
+    if(res[0]&&res[0].iocs&&res[0].iocs.length){IOCS=res[0].iocs.map(function(i){return Object.assign({id:i.id||Math.random().toString(36).slice(2),matched:false,findings:[],mitre:[]},i);});renderIOCs();}
+    if(res[1]&&res[1].feeds&&res[1].feeds.length){FEEDS=res[1].feeds.map(function(f){return Object.assign({icon:'◈',lastSync:'—'},f);});renderFeeds();}
+    if(res[2]&&res[2].matches)document.getElementById('k-matches').textContent=res[2].matches.length||0;
+  });
+}
+function _onTokenReady(){}
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;loadFromAPI();}}
+  if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
+});
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
+function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}}
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'},'*');
+renderIOCs();renderFeeds();renderCVEs();renderMITRE();
+</script>
+</body>
+</html>

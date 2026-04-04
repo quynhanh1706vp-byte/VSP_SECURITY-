@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>VSP — Network flow</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--font-mono:'JetBrains Mono','Fira Mono',monospace;--font-ui:'Inter','Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5;padding:16px}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.3)}.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}.btn:hover{background:var(--surface)}.btn-sm{padding:3px 8px;font-size:10px}.btn-danger{background:var(--red2);border-color:rgba(239,68,68,.4);color:var(--red)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}.card-title{font-size:12px;font-weight:600}.card-sub{font-size:11px;color:var(--t3);margin-top:1px}.card-body{padding:12px 14px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px}.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}.kpi-val{font-size:20px;font-weight:700;font-family:var(--font-mono)}.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.conn-table{width:100%;border-collapse:collapse}.conn-table th{text-align:left;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;border-bottom:1px solid var(--border);font-family:var(--font-mono)}.conn-table td{padding:7px 8px;border-bottom:1px solid var(--border);font-size:11px}.conn-table tr:last-child td{border-bottom:none}.conn-table tr{cursor:pointer;transition:background .12s}.conn-table tr:hover td{background:var(--surface)}
+.alert-item{border-left:2px solid var(--border2);padding:8px 10px;margin-bottom:6px;background:var(--surface);border-radius:0 6px 6px 0;cursor:pointer;transition:all .15s}.alert-item:hover{transform:translateX(2px)}.alert-item.crit{border-left-color:var(--red)}.alert-item.high{border-left-color:var(--amber)}.alert-item.info{border-left-color:var(--blue)}
+.proto-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:1px;margin-bottom:8px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;padding-top:32px;overflow-y:auto}.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(600px,95vw);margin-bottom:32px}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}.modal-title{font-size:14px;font-weight:700;margin-bottom:2px}.modal-sub{font-size:11px;color:var(--t3)}.modal-body{padding:14px 18px}.modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px}
+.detail-card{background:var(--surface);border-radius:7px;padding:9px 11px;margin-bottom:6px}.detail-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}.detail-val{font-size:13px;font-weight:600;font-family:var(--font-mono)}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.hdr h2{font-size:15px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+canvas{display:block}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div><h2>Network flow / NDR</h2><p>Netflow v9 · connection map · protocol breakdown · anomaly detection</p></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="pill pill-green" id="flow-badge">&#9679; Collecting</span>
+    <button class="btn btn-sm" onclick="refreshAll()">&#8635; Refresh</button>
+  </div>
+</div>
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-lbl">Flows / min</div><div class="kpi-val" style="color:var(--cyan)" id="k-flows">2,847</div><div class="kpi-sub">netflow v9</div></div>
+  <div class="kpi"><div class="kpi-lbl">Active conns</div><div class="kpi-val" style="color:var(--green)" id="k-conns">142</div><div class="kpi-sub">TCP + UDP</div></div>
+  <div class="kpi"><div class="kpi-lbl">Suspicious</div><div class="kpi-val" style="color:var(--red)" id="k-sus">7</div><div class="kpi-sub">flagged flows</div></div>
+  <div class="kpi"><div class="kpi-lbl">Bandwidth</div><div class="kpi-val" style="color:var(--amber)" id="k-bw">847</div><div class="kpi-sub">Mbps total</div></div>
+</div>
+<!-- Connection map -->
+<div class="card">
+  <div class="card-head">
+    <div><div class="card-title">Connection map</div><div class="card-sub">click node to filter · suspicious flows highlighted</div></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-sm" id="show-sus-btn" onclick="toggleSuspicious()">&#9888; Show suspicious only</button>
+      <button class="btn btn-sm" onclick="resetMap()">Reset view</button>
+    </div>
+  </div>
+  <div class="card-body" style="padding:8px;position:relative">
+    <canvas id="flow-canvas" style="width:100%;cursor:pointer;border-radius:6px;background:var(--bg)"></canvas>
+    <div id="node-tooltip" style="display:none;position:absolute;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;font-size:11px;pointer-events:none;z-index:10"></div>
+  </div>
+</div>
+<div class="grid2">
+  <div class="card">
+    <div class="card-head"><div class="card-title">Protocol breakdown</div><div class="card-sub">by traffic volume</div></div>
+    <div class="card-body">
+      <div class="proto-bar" id="proto-bar"></div>
+      <div class="legend" id="proto-legend"></div>
+      <div id="proto-list"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">NDR alerts</div><div class="card-sub">anomalous traffic patterns</div></div>
+    <div class="card-body" style="padding:8px 10px" id="ndr-alerts"></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head">
+    <div><div class="card-title">Top connections</div><div class="card-sub">by bytes transferred</div></div>
+    <div style="display:flex;gap:6px">
+      <select id="conn-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderConns()">
+        <option value="">All</option><option value="suspicious">Suspicious</option><option value="ok">Clean</option>
+      </select>
+    </div>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="conn-table">
+      <thead><tr><th>Source</th><th>Destination</th><th>Protocol</th><th>Port</th><th>Bytes</th><th>Packets</th><th>Duration</th><th>Status</th></tr></thead>
+      <tbody id="conn-tbody"></tbody>
+    </table>
+  </div>
+</div>
+<!-- Connection detail modal -->
+<div class="modal-overlay" id="conn-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title" id="cmod-title">Connection detail</div><div class="modal-sub" id="cmod-sub"></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><span id="cmod-status"></span><button class="modal-close" onclick="closeModal('conn-modal')">&#10005;</button></div>
+    </div>
+    <div class="modal-body" id="cmod-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('conn-modal')">Close</button>
+      <button class="btn btn-danger btn-sm" id="cmod-block-btn">&#9724; Block flow</button>
+    </div>
+  </div>
+</div>
+<script>
+var TOKEN='',API='',_showSusOnly=false,_selectedNode=null;
+
+async function loadNetworkFlow(){
+  if(!TOKEN)return;
+  try{
+    var d=await fetch(API+'/api/v1/logs/network-flow',
+      {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
+    if(d.flows_per_min!==undefined)
+      document.getElementById('k-flows').textContent=(d.flows_per_min||0).toLocaleString();
+    if(d.suspicious!==undefined)
+      document.getElementById('k-sus').textContent=d.suspicious||0;
+    if(d.total_1h!==undefined)
+      document.getElementById('k-conns').textContent=d.total_1h||0;
+    // Update NDR alerts từ top hosts suspicious
+    if(d.top_hosts&&d.top_hosts.length){
+      var alEl=document.getElementById('ndr-alerts');
+      if(alEl){
+        var items=d.top_hosts.filter(h=>h.severity==='CRITICAL'||h.severity==='HIGH').slice(0,5);
+        if(items.length){
+          alEl.innerHTML=items.map(h=>
+            '<div class="alert-item '+(h.severity==='CRITICAL'?'crit':'high')+'">'
+            +'<div style="font-size:11px;font-weight:600">'+h.ip+'</div>'
+            +'<div style="font-size:10px;color:var(--t3)">'+h.count+' events · '+h.severity+'</div>'
+            +'</div>'
+          ).join('');
+        }
+      }
+    }
+  }catch(e){}
+}
+var NODES=[
+  {id:'fw',  label:'Firewall',      x:.06,y:.50,color:'#f59e0b',bg:'rgba(245,158,11,.15)',type:'gateway'},
+  {id:'web', label:'10.0.1.11',     x:.28,y:.18,color:'#06b6d4',bg:'rgba(6,182,212,.15)', type:'server'},
+  {id:'app', label:'10.0.1.10',     x:.28,y:.50,color:'#22c55e',bg:'rgba(34,197,94,.15)', type:'server'},
+  {id:'db',  label:'10.0.1.20',     x:.28,y:.82,color:'#3b82f6',bg:'rgba(59,130,246,.15)',type:'db'},
+  {id:'k8s', label:'10.0.3.1',      x:.50,y:.50,color:'#8b5cf6',bg:'rgba(139,92,246,.15)',type:'infra'},
+  {id:'ext1',label:'185.220.101.47',x:.75,y:.20,color:'#ef4444',bg:'rgba(239,68,68,.15)', type:'external'},
+  {id:'ext2',label:'45.142.212.100',x:.75,y:.80,color:'#ef4444',bg:'rgba(239,68,68,.15)', type:'external'},
+  {id:'gw',  label:'api.github.com',x:.75,y:.50,color:'#9aa3b8',bg:'rgba(154,163,184,.1)',type:'external'},
+];
+var EDGES=[
+  {from:'fw', to:'web',bytes:'1.2GB',suspicious:false,width:3,proto:'HTTPS'},
+  {from:'fw', to:'app',bytes:'842MB',suspicious:false,width:2,proto:'HTTPS'},
+  {from:'fw', to:'db', bytes:'234MB',suspicious:false,width:1.5,proto:'TCP'},
+  {from:'ext1',to:'fw',bytes:'28MB', suspicious:true, width:2,proto:'TCP/22'},
+  {from:'ext2',to:'fw',bytes:'12MB', suspicious:true, width:1.5,proto:'TCP/22'},
+  {from:'app', to:'db',bytes:'512MB',suspicious:false,width:2,proto:'PostgreSQL'},
+  {from:'k8s', to:'app',bytes:'156MB',suspicious:false,width:1.5,proto:'HTTP'},
+  {from:'app', to:'gw',bytes:'48MB', suspicious:false,width:1,proto:'HTTPS'},
+];
+var CONNS=[
+  {src:'185.220.101.47',dst:'10.0.1.10',proto:'TCP',port:22,   bytes:'28.4MB',pkts:'124K',dur:'2m 14s',status:'suspicious',geo:'RU',asn:'AS1337'},
+  {src:'10.0.1.11',    dst:'0.0.0.0',  proto:'TCP',port:443,  bytes:'1.2GB', pkts:'2.1M', dur:'4h 22m',status:'ok',geo:'—',asn:'—'},
+  {src:'10.0.1.10',    dst:'10.0.1.20',proto:'TCP',port:5432, bytes:'512MB', pkts:'891K', dur:'3h 45m',status:'ok',geo:'—',asn:'—'},
+  {src:'10.0.3.1',     dst:'10.0.1.10',proto:'TCP',port:8080, bytes:'156MB', pkts:'312K', dur:'1h 12m',status:'ok',geo:'—',asn:'—'},
+  {src:'45.142.212.100',dst:'10.0.1.10',proto:'TCP',port:22,  bytes:'12.1MB',pkts:'48K',  dur:'45s',   status:'suspicious',geo:'NL',asn:'AS4242'},
+  {src:'10.0.1.10',    dst:'8.8.8.8',  proto:'UDP',port:53,   bytes:'2.4MB', pkts:'48K',  dur:'ongoing',status:'warn',geo:'US',asn:'AS15169'},
+  {src:'10.0.1.10',    dst:'api.github.com',proto:'TCP',port:443,bytes:'48MB',pkts:'96K', dur:'22m',   status:'ok',geo:'US',asn:'AS36459'},
+];
+var PROTOS=[
+  {name:'HTTPS',pct:42,color:'#3b82f6',bytes:'2.1GB'},
+  {name:'HTTP', pct:18,color:'#06b6d4',bytes:'890MB'},
+  {name:'SSH',  pct:12,color:'#22c55e',bytes:'594MB'},
+  {name:'DNS',  pct:11,color:'#8b5cf6',bytes:'544MB'},
+  {name:'SMTP', pct:8, color:'#f59e0b',bytes:'396MB'},
+  {name:'Other',pct:9, color:'#5a6278',bytes:'446MB'},
+];
+var NDR_ALERTS=[
+  {sev:'crit',msg:'Port scan from 185.220.101.47 — 4,847 ports in 30s',ts:'2m ago'},
+  {sev:'high',msg:'Unusual DNS volume — 10.0.1.10 → 8.8.8.8 (847 q/min)',ts:'5m ago'},
+  {sev:'high',msg:'SSH brute force — 45.142.212.100 → 10.0.1.10:22',ts:'8m ago'},
+  {sev:'info',msg:'New external conn — api.github.com:443 from 10.0.1.10',ts:'12m ago'},
+  {sev:'info',msg:'Large transfer — 10.0.1.20 → 10.0.1.11 (512MB in 5m)',ts:'18m ago'},
+];
+// Canvas map
+var canvas,ctx,W,H;
+function initCanvas(){
+  canvas=document.getElementById('flow-canvas');
+  var dpr=window.devicePixelRatio||1;
+  W=canvas.parentElement.clientWidth-16;
+  H=Math.round(W*0.38);
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  drawMap();
+}
+function nodePos(n){return {x:Math.round(n.x*W),y:Math.round(n.y*H)};}
+function drawMap(){
+  if(!ctx)return;
+  ctx.clearRect(0,0,W,H);
+  var nodeMap={};NODES.forEach(function(n){nodeMap[n.id]=n;});
+  // Edges
+  EDGES.forEach(function(e){
+    if(_showSusOnly&&!e.suspicious)return;
+    if(_selectedNode&&e.from!==_selectedNode&&e.to!==_selectedNode)return;
+    var from=nodeMap[e.from],to=nodeMap[e.to];
+    if(!from||!to)return;
+    var fp=nodePos(from),tp=nodePos(to);
+    ctx.beginPath();ctx.moveTo(fp.x,fp.y);ctx.lineTo(tp.x,tp.y);
+    ctx.strokeStyle=e.suspicious?'rgba(239,68,68,.7)':'rgba(255,255,255,.12)';
+    ctx.lineWidth=e.suspicious?2:1.5;
+    if(e.suspicious){ctx.setLineDash([6,4]);}else{ctx.setLineDash([]);}
+    ctx.stroke();ctx.setLineDash([]);
+    // Arrow
+    var angle=Math.atan2(tp.y-fp.y,tp.x-fp.x);
+    var mx=(fp.x+tp.x)/2,my=(fp.y+tp.y)/2;
+    ctx.beginPath();ctx.moveTo(mx,my);
+    ctx.lineTo(mx-8*Math.cos(angle-0.4),my-8*Math.sin(angle-0.4));
+    ctx.lineTo(mx-8*Math.cos(angle+0.4),my-8*Math.sin(angle+0.4));
+    ctx.closePath();ctx.fillStyle=e.suspicious?'rgba(239,68,68,.5)':'rgba(255,255,255,.15)';ctx.fill();
+    // Label
+    ctx.font='9px monospace';ctx.fillStyle='rgba(255,255,255,.35)';ctx.textAlign='center';
+    ctx.fillText(e.bytes,mx+10,my-5);
+  });
+  // Nodes
+  NODES.forEach(function(n){
+    var p=nodePos(n);
+    var isSelected=_selectedNode===n.id;
+    var isExternal=n.type==='external';
+    // Glow
+    if(isExternal||isSelected){
+      var grad=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,32);
+      grad.addColorStop(0,isExternal?'rgba(239,68,68,.15)':'rgba(59,130,246,.2)');
+      grad.addColorStop(1,'transparent');
+      ctx.beginPath();ctx.arc(p.x,p.y,32,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();
+    }
+    // Node bg
+    ctx.beginPath();ctx.roundRect(p.x-38,p.y-14,76,28,5);
+    ctx.fillStyle=isSelected?n.color.replace(')',',0.3)').replace('rgb','rgba'):n.bg;
+    ctx.fill();
+    ctx.strokeStyle=isSelected?n.color:'rgba(255,255,255,.15)';
+    ctx.lineWidth=isSelected?2:1;ctx.stroke();
+    // Label
+    ctx.font='bold 9px monospace';ctx.fillStyle=n.color;ctx.textAlign='center';
+    ctx.fillText(n.label,p.x,p.y+3);
+    // External warning dot
+    if(isExternal){
+      ctx.beginPath();ctx.arc(p.x+32,p.y-12,4,0,Math.PI*2);
+      ctx.fillStyle='#ef4444';ctx.fill();
+    }
+  });
+}
+canvas && initCanvas();
+window.addEventListener('load',initCanvas);
+window.addEventListener('resize',function(){setTimeout(initCanvas,100);});
+// Click on canvas
+document.getElementById('flow-canvas').addEventListener('click',function(ev){
+  var rect=canvas.getBoundingClientRect();
+  var mx=ev.clientX-rect.left,my=ev.clientY-rect.top;
+  var hit=null;
+  NODES.forEach(function(n){
+    var p=nodePos(n);
+    if(Math.abs(mx-p.x)<42&&Math.abs(my-p.y)<16)hit=n;
+  });
+  if(hit){
+    _selectedNode=_selectedNode===hit.id?null:hit.id;
+    drawMap();
+    if(_selectedNode){
+      var tt=document.getElementById('node-tooltip');
+      tt.style.display='block';
+      tt.style.left=(nodePos(hit).x+44)+'px';
+      tt.style.top=(nodePos(hit).y-10)+'px';
+      var conns=EDGES.filter(function(e){return e.from===hit.id||e.to===hit.id;}).length;
+      tt.innerHTML='<b style="color:'+hit.color+'">'+hit.label+'</b><br>Type: '+hit.type+'<br>Connections: '+conns;
+    } else {
+      document.getElementById('node-tooltip').style.display='none';
+    }
+  } else {
+    _selectedNode=null;
+    document.getElementById('node-tooltip').style.display='none';
+    drawMap();
+  }
+});
+function toggleSuspicious(){
+  _showSusOnly=!_showSusOnly;
+  document.getElementById('show-sus-btn').textContent=_showSusOnly?'Show all connections':'⚠ Show suspicious only';
+  drawMap();
+}
+function resetMap(){_selectedNode=null;_showSusOnly=false;document.getElementById('node-tooltip').style.display='none';document.getElementById('show-sus-btn').textContent='⚠ Show suspicious only';drawMap();}
+function renderProtos(){
+  document.getElementById('proto-bar').innerHTML=PROTOS.map(function(p){return '<div style="flex:'+p.pct+';height:8px;background:'+p.color+'"></div>';}).join('');
+  document.getElementById('proto-legend').innerHTML=PROTOS.map(function(p){return '<div class="legend-item"><div class="legend-dot" style="background:'+p.color+'"></div>'+p.name+' '+p.pct+'%</div>';}).join('');
+  document.getElementById('proto-list').innerHTML=PROTOS.map(function(p){
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0"></div><span style="flex:1;font-size:11px">'+p.name+'</span><div style="flex:2;height:4px;background:var(--border);border-radius:2px"><div style="width:'+p.pct+'%;height:4px;background:'+p.color+';border-radius:2px"></div></div><span style="font-size:10px;font-family:var(--font-mono);color:var(--t3);width:44px;text-align:right">'+p.bytes+'</span></div>';
+  }).join('');
+}
+function renderAlerts(){
+  document.getElementById('ndr-alerts').innerHTML=NDR_ALERTS.map(function(a){
+    var cls={crit:'crit',high:'high',info:'info'}[a.sev]||'';
+    return '<div class="alert-item '+cls+'" data-msg="'+a.msg+'" onclick="alert(this.dataset.msg)">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:11px;font-weight:500">'+a.msg+'</span><span style="font-size:10px;color:var(--t3);flex-shrink:0;margin-left:8px">'+a.ts+'</span></div>'
+      +'<div style="font-size:10px;color:var(--t3)">'+(a.sev==='crit'?'CRITICAL':a.sev==='high'?'HIGH':'INFO')+' · Network anomaly detection</div>'
+      +'</div>';
+  }).join('');
+}
+function renderConns(){
+  var f=document.getElementById('conn-filter').value;
+  var list=CONNS.filter(function(c){return !f||(f==='suspicious'?c.status==='suspicious':c.status==='ok');});
+  document.getElementById('conn-tbody').innerHTML=list.map(function(c,i){
+    var sc={suspicious:'pill-red',warn:'pill-amber',ok:'pill-green'}[c.status]||'pill-gray';
+    return '<tr onclick="openConnDetail('+i+')">'
+      +'<td style="font-family:var(--font-mono);font-size:10px">'+c.src+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px">'+c.dst+'</td>'
+      +'<td><span class="pill pill-blue">'+c.proto+'</span></td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px">'+c.port+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">'+c.bytes+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">'+c.pkts+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">'+c.dur+'</td>'
+      +'<td><span class="pill '+sc+'">'+c.status+'</span></td>'
+      +'</tr>';
+  }).join('');
+}
+function openConnDetail(idx){
+  var c=CONNS[idx];if(!c)return;
+  document.getElementById('cmod-title').textContent=c.src+' → '+c.dst;
+  document.getElementById('cmod-sub').textContent=c.proto+':'+c.port+' · '+c.bytes+' · '+c.dur;
+  document.getElementById('cmod-status').innerHTML='<span class="pill '+(c.status==='suspicious'?'pill-red':c.status==='warn'?'pill-amber':'pill-green')+'">'+c.status+'</span>';
+  document.getElementById('cmod-body').innerHTML=
+    '<div class="detail-card"><div class="detail-lbl">Source IP</div><div class="detail-val">'+c.src+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Destination</div><div class="detail-val">'+c.dst+':'+c.port+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Protocol</div><div class="detail-val">'+c.proto+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Bytes transferred</div><div class="detail-val" style="color:var(--cyan)">'+c.bytes+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Packets</div><div class="detail-val">'+c.pkts+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Duration</div><div class="detail-val">'+c.dur+'</div></div>'
+    +(c.geo&&c.geo!=='—'?'<div class="detail-card"><div class="detail-lbl">GeoIP</div><div class="detail-val">'+c.geo+' · '+c.asn+'</div></div>':'')
+    +(c.status==='suspicious'?'<div style="background:var(--red2);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px 11px;font-size:11px;color:var(--red);margin-top:8px">&#9888; This flow matches known malicious patterns. Consider blocking the source IP.</div>':'');
+  document.getElementById('cmod-block-btn').onclick=function(){alert('Flow blocked: '+c.src+' → '+c.dst);closeModal('conn-modal');};
+  document.getElementById('conn-modal').classList.add('open');
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function refreshAll(){
+  document.getElementById('k-flows').textContent=(2500+Math.floor(Math.random()*800)).toLocaleString();
+  document.getElementById('k-conns').textContent=130+Math.floor(Math.random()*30);
+  document.getElementById('k-bw').textContent=700+Math.floor(Math.random()*300);
+  drawMap();
+}
+// Live updates
+setInterval(function(){
+  document.getElementById('k-flows').textContent=(2500+Math.floor(Math.random()*800)).toLocaleString();
+  document.getElementById('k-conns').textContent=130+Math.floor(Math.random()*30);
+  drawMap();
+},3000);
+function _onTokenReady(){}
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;loadNetworkFlow();}}
+  if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
+});
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
+function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}setTimeout(drawMap,100);}
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'},'*');
+window.addEventListener('load',function(){initCanvas();renderProtos();renderAlerts();renderConns();});
+renderProtos();renderAlerts();renderConns();
+</script>
+</body>
+</html>

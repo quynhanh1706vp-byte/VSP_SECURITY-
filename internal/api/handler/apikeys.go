@@ -45,12 +45,23 @@ func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "label required", http.StatusBadRequest)
 		return
 	}
+	// Whitelist roles
+	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
 	if req.Role == "" { req.Role = "analyst" }
+	if !validRoles[req.Role] {
+		jsonError(w, "invalid role: must be admin|analyst|dev|auditor", http.StatusBadRequest)
+		return
+	}
+	// ExpiryDays: max 365
 	if req.ExpiryDays == 0 { req.ExpiryDays = 90 }
+	if req.ExpiryDays > 365 { req.ExpiryDays = 365 }
 
 	// Generate: 32-byte random → hex → prefix(8) + full(64)
 	buf := make([]byte, 32)
-	rand.Read(buf)
+	if _, err := rand.Read(buf); err != nil {
+		jsonError(w, "internal error: rng failed", http.StatusInternalServerError)
+		return
+	}
 	fullKey := "vspk_" + hex.EncodeToString(buf) // shown once
 	prefix  := fullKey[:12]
 

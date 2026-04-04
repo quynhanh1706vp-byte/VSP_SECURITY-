@@ -8,6 +8,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog/log"
+	"github.com/vsp/platform/internal/audit"
 	"github.com/vsp/platform/internal/gate"
 	"github.com/vsp/platform/internal/scanner"
 "github.com/vsp/platform/internal/store"
@@ -135,6 +136,21 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	h.DB.UpdateRunResult(dbCtx, payload.TenantID, payload.RID,
 		string(eval.Decision), eval.Posture,
 		len(result.Findings), summaryJSON)
+	// Audit: log scan completion (synchronous - context.Background avoids cancellation)
+	{
+		auditCtx := context.Background()
+		action := fmt.Sprintf("SCAN_%s", string(eval.Decision))
+		resource := fmt.Sprintf("%s · %s · %d findings", payload.RID, string(payload.Mode), len(result.Findings))
+		prevHash, _ := h.DB.GetLastAuditHash(auditCtx, payload.TenantID)
+		e := audit.Entry{
+			TenantID: payload.TenantID,
+			Action:   action,
+			Resource: resource,
+			PrevHash: prevHash,
+		}
+		e.StoredHash = audit.Hash(e)
+		h.DB.InsertAudit(auditCtx, payload.TenantID, nil, action, resource, "pipeline", nil, e.StoredHash, prevHash)
+	}
 
 	// Write tool errors as audit
 	for tool, terr := range result.ToolErrors {
@@ -148,6 +164,39 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		Int("findings", len(result.Findings)).
 		Dur("duration", result.Duration).
 		Msg("scan complete")
+
+	// Broadcast scan_complete to SSE clients
+	if msg, err := json.Marshal(map[string]any{
+		"type":           "scan_complete",
+		"rid":            payload.RID,
+		"gate":           string(eval.Decision),
+		"posture":        eval.Posture,
+		"score":          eval.Score,
+		"total_findings": len(result.Findings),
+		"critical":       s.Critical,
+		"high":           s.High,
+	}); err == nil {
+		broadcastSSE(msg)
+	}
+
+	// Auto-trigger SOAR on gate FAIL
+	if string(eval.Decision) == "FAIL" {
+		go func() {
+			sev := "HIGH"
+			if s.Critical > 0 { sev = "CRITICAL" }
+			pbs, err := h.DB.FindEnabledPlaybooks(context.Background(), payload.TenantID, "gate_fail", sev)
+			if err != nil { return }
+			for _, pb := range pbs {
+				ctxJSON, _ := json.Marshal(map[string]any{
+					"trigger":"gate_fail","gate":string(eval.Decision),
+					"severity":sev,"run_id":payload.RID,"findings":len(result.Findings),
+				})
+				runID, err := h.DB.CreatePlaybookRun(context.Background(), pb.ID, payload.TenantID, "gate_fail", ctxJSON)
+				if err != nil { continue }
+				log.Info().Str("playbook", pb.Name).Str("run_id", runID).Msg("soar: auto-triggered")
+			}
+		}()
+	}
 
 	return nil
 }

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>VSP — AI Analyst</title>
+<style>
+:root{--bg:#080a0f;--bg2:#0d1017;--surface:#141920;--surface2:#1a2230;--border:rgba(99,179,237,.08);--border2:rgba(99,179,237,.18);--t1:#e2eaf5;--t2:#8ba4c0;--t3:#4a6080;--t4:#2a3a50;--red:#f56565;--red2:rgba(245,101,101,.1);--amber:#ed8936;--amber2:rgba(237,137,54,.1);--green:#48bb78;--green2:rgba(72,187,120,.1);--blue:#63b3ed;--blue2:rgba(99,179,237,.1);--cyan:#4fd1c5;--cyan2:rgba(79,209,197,.1);--purple:#9f7aea;--purple2:rgba(159,122,234,.1);--ai:#4fd1c5;--ai2:rgba(79,209,197,.08);--font-mono:'JetBrains Mono','Cascadia Code',monospace;--font-ui:'IBM Plex Sans','Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.ai-logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--cyan),var(--purple));display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.ai-title{font-size:13px;font-weight:700;letter-spacing:-.01em}
+.ai-sub{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
+.ai-status{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t3)}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.layout{display:grid;grid-template-columns:240px 1fr;flex:1;overflow:hidden;min-height:0}
+.sidebar{border-right:1px solid var(--border);background:var(--bg2);overflow-y:auto;display:flex;flex-direction:column}
+.sb-section{padding:10px 12px;border-bottom:1px solid var(--border)}
+.sb-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);font-family:var(--font-mono);margin-bottom:8px}
+.ctx-item{padding:8px 10px;border-radius:7px;border:1px solid var(--border);margin-bottom:5px;cursor:pointer;transition:all .15s;background:var(--surface)}
+.ctx-item:hover{border-color:var(--border2);background:var(--surface2)}
+.ctx-item.active{border-color:var(--ai);background:var(--ai2)}
+.ctx-title{font-size:11px;font-weight:600;margin-bottom:2px}
+.ctx-sub{font-size:10px;color:var(--t3)}
+.ctx-badge{display:inline-block;font-size:9px;font-family:var(--font-mono);padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px}
+.sev-crit{background:rgba(245,101,101,.15);color:#f56565}.sev-high{background:rgba(237,137,54,.15);color:#ed8936}
+.quick-btn{width:100%;text-align:left;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--t2);cursor:pointer;font-size:11px;font-family:var(--font-ui);transition:all .15s;margin-bottom:4px;display:flex;align-items:center;gap:7px}
+.quick-btn:hover{background:var(--surface2);border-color:var(--border2);color:var(--t1)}
+.chat-wrap{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.chat-msgs{flex:1;overflow-y:auto;padding:16px;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:var(--t4) transparent}
+.msg{display:flex;gap:10px;margin-bottom:16px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{flex-direction:row-reverse}
+.msg-avatar{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+.msg.ai .msg-avatar{background:linear-gradient(135deg,var(--cyan),var(--purple))}
+.msg.user .msg-avatar{background:var(--surface2);border:1px solid var(--border2);color:var(--t2)}
+.msg-body{max-width:82%}
+.msg-name{font-size:10px;color:var(--t3);margin-bottom:4px;font-family:var(--font-mono)}
+.msg.user .msg-name{text-align:right}
+.msg-bubble{padding:10px 13px;border-radius:10px;font-size:12px;line-height:1.75}
+.msg.ai .msg-bubble{background:var(--surface);border:1px solid var(--border);border-radius:3px 10px 10px 10px;color:var(--t1)}
+.msg.user .msg-bubble{background:var(--blue2);border:1px solid rgba(99,179,237,.2);border-radius:10px 3px 10px 10px}
+.msg-bubble code{font-family:var(--font-mono);font-size:10px;background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px;color:var(--cyan)}
+.msg-bubble pre{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:6px 0;overflow-x:auto;font-family:var(--font-mono);font-size:10px;color:var(--cyan)}
+.msg-bubble strong{color:var(--t1);font-weight:600}
+.msg-bubble ul,.msg-bubble ol{padding-left:18px;margin:4px 0}
+.msg-bubble li{margin-bottom:3px}
+.typing{display:flex;gap:4px;align-items:center;padding:4px 0}
+.typing span{width:6px;height:6px;border-radius:50%;background:var(--ai);animation:bounce .8s infinite}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+.input-wrap{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.input-inner{display:flex;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px 10px;transition:border-color .2s}
+.input-inner:focus-within{border-color:var(--ai)}
+.chat-input{flex:1;background:transparent;border:none;color:var(--t1);font-size:12px;font-family:var(--font-ui);resize:none;outline:none;max-height:100px;min-height:20px;line-height:1.5}
+.chat-input::placeholder{color:var(--t3)}
+.send-btn{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--cyan),var(--purple));border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}
+.send-btn:hover{opacity:.85}
+.send-btn:disabled{opacity:.4;cursor:not-allowed}
+.input-hints{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.hint{font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);color:var(--t3);cursor:pointer;transition:all .15s}
+.hint:hover{border-color:var(--border2);color:var(--t2);background:var(--surface)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="ai-logo">&#9672;</div>
+  <div>
+    <div class="ai-title">VSP AI Security Analyst</div>
+    <div class="ai-sub">powered by Claude &middot; incident triage &middot; threat analysis</div>
+  </div>
+  <div class="ai-status">
+    <div class="status-dot"></div>
+    <span id="ai-status-txt">Ready</span>
+  </div>
+</div>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-section">
+      <div class="sb-label">Context</div>
+      <div class="ctx-item active" onclick="setContext('all',this)">
+        <div class="ctx-title">Full SIEM context</div>
+        <div class="ctx-sub">All incidents &middot; findings &middot; logs</div>
+      </div>
+      <div class="ctx-item" onclick="setContext('incidents',this)">
+        <div class="ctx-title">Active incidents <span class="ctx-badge sev-crit">4</span></div>
+        <div class="ctx-sub">Correlation engine alerts</div>
+      </div>
+      <div class="ctx-item" onclick="setContext('findings',this)">
+        <div class="ctx-title">Critical findings <span class="ctx-badge sev-high">7</span></div>
+        <div class="ctx-sub">Latest scan results</div>
+      </div>
+      <div class="ctx-item" onclick="setContext('threats',this)">
+        <div class="ctx-title">Threat intel</div>
+        <div class="ctx-sub">IOCs &middot; CVEs &middot; MITRE</div>
+      </div>
+    </div>
+    <div class="sb-section" style="flex:1">
+      <div class="sb-label">Quick analysis</div>
+      <button class="quick-btn" onclick="quickAsk('Phan tich tat ca incidents dang mo va danh gia muc do nguy hiem, de xuat xu ly theo thu tu uu tien')">&#128308; Triage incidents</button>
+      <button class="quick-btn" onclick="quickAsk('Giai thich CVE-2024-45337 va cach va lo trong project Go nay cu the')">&#128737;&#65039; Explain CVE</button>
+      <button class="quick-btn" onclick="quickAsk('Top 5 critical findings can fix ngay hom nay la gi? Viet remediation steps cu the')">&#9889; Priority fixes</button>
+      <button class="quick-btn" onclick="quickAsk('Viet executive summary ve tinh trang bao mat hien tai cho CISO')">&#128202; Executive summary</button>
+      <button class="quick-btn" onclick="quickAsk('Phan tich MITRE ATT&CK coverage va cac gaps can bo sung')">&#128506;&#65039; MITRE analysis</button>
+      <button class="quick-btn" onclick="quickAsk('Tao playbook SOAR de tu dong xu ly khi phat hien secret trong code, viet ca cac steps cu the')">&#9654; Generate playbook</button>
+      <button class="quick-btn" onclick="quickAsk('Dua tren IOC va log hien tai, co dau hieu lateral movement hoac exfiltration khong?')">&#128269; Threat hunting</button>
+      <button class="quick-btn" onclick="clearChat()">&#128465;&#65039; Clear chat</button>
+    </div>
+  </div>
+  <div class="chat-wrap">
+    <div class="chat-msgs" id="chat-msgs"></div>
+    <div class="input-wrap">
+      <div class="input-inner">
+        <textarea class="chat-input" id="chat-input" placeholder="Hoi ve incidents, findings, CVEs, threats... (Enter de gui)" rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M14 8L2 2l3 6-3 6 12-6z" fill="white"/></svg>
+        </button>
+      </div>
+      <div class="input-hints">
+        <span class="hint" onclick="setHint('Giai thich incident INC-001 va cach xu ly')">Explain incident</span>
+        <span class="hint" onclick="setHint('Cach fix CVE-2024-45337 trong Go?')">Fix CVE</span>
+        <span class="hint" onclick="setHint('Risk score 22 co nghia la gi va can lam gi?')">Risk score</span>
+        <span class="hint" onclick="setHint('Prioritize findings cho sprint nay')">Prioritize</span>
+        <span class="hint" onclick="setHint('Tao Jira ticket cho critical findings')">Create tickets</span>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var TOKEN='', _ctx='all', _loading=false, _history=[];
+
+var SYS = {
+all: "Ban la VSP AI Security Analyst - chuyen gia bao mat AI trong VSP Security Platform.\n\nCONTEXT:\n- Security score: 22/100 (FAIL) - giam tu 81 xuong 22\n- Gate: FAIL - 104 findings (7 Critical, 80 High, 13 Medium, 3 Low)\n\nINCIDENTS DANG MO:\n1. INC-001 [CRITICAL] - API key exposed + gate FAIL: 3 secrets trong .env, gate 22/100\n2. INC-002 [CRITICAL] - CVE-2024-45337: CVSS 9.1, EPSS 0.72, KEV listed, golang.org/x/crypto\n3. INC-003 [HIGH] - Score dropped 28pts: tu 81 xuong 22, 82 new HIGH findings\n4. INC-004 [MEDIUM] - SLA breach: 3 HIGH findings unassigned > 14 ngay\n\nTOP CRITICAL FINDINGS:\n- S3 Bucket ACL public read/write (main.tf:3, CWE-284, CVSS 9.1)\n- CVE-2024-45337 PublicKeyCallback bypass (go.mod:12, CVSS 9.1, KEV)\n- generic-api-key in .env:10 (CWE-798, CVSS 8.8)\n- CVE-2025-22869 DoS golang crypto (go.mod:18, CVSS 8.7)\n- Security group unrestricted SSH 0.0.0.0/0 (network.tf:24)\n- Hardcoded JWT secret (auth/middleware.go:47)\n\nIOCs MATCHED: 185.220.101.47 (port scan, Tor), 45.142.212.100 (SSH brute force)\n\nSIEM: 8 log sources (1 offline), 7 correlation rules, 4 SOAR playbooks, 3 UEBA anomalies\n\nTra loi bang tieng Viet (hoac tieng Anh neu user hoi bang tieng Anh).\nDua ra phan tich cu the, actionable, voi muc do uu tien ro rang.\nFormat voi markdown. Ket thuc bang recommended actions.",
+incidents: "Ban la VSP AI Security Analyst. Focus vao INCIDENT TRIAGE.\n4 incidents dang mo: INC-001 API key+gate FAIL (CRITICAL), INC-002 CVE-2024-45337 KEV (CRITICAL), INC-003 Score drop (HIGH), INC-004 SLA breach (MEDIUM).\nTra loi ngan gon, uu tien ro rang, actionable.",
+findings: "Ban la VSP AI Security Analyst. Focus vao FINDINGS ANALYSIS.\n104 findings (7 Critical, 80 High). Score 22/100 FAIL.\nTop: S3 ACL public, CVE-2024-45337, API key in .env, JWT hardcoded.\nCho remediation steps cu the.",
+threats: "Ban la VSP AI Security Analyst. Focus vao THREAT INTELLIGENCE.\nIOCs: 185.220.101.47 (port scan), 45.142.212.100 (SSH brute). CVE-2024-45337 KEV, EPSS 0.72.\nMITRE: T1190, T1078, T1552. Phan tich threat landscape."
+};
+
+var WELCOME = "**Xin chao! Toi la VSP AI Security Analyst** powered by Claude.\n\nToi da phan tich SIEM data va phat hien cac van de can xu ly ngay:\n\n**[CRITICAL]** 2 incidents critical dang mo - can xu ly trong 1 gio\n**[CRITICAL]** CVE-2024-45337 duoc KEV listed, EPSS 0.72 - nguy co exploit cao\n**[HIGH]** API key exposed trong .env - can rotate ngay\n**[CRITICAL]** Security score: 22/100 - giam manh tu 81, gate FAIL\n\nToi co the giup ban:\n- Triage va phan tich incidents theo do uu tien\n- Explain CVEs va remediation cu the\n- Prioritize findings cho sprint fix\n- Generate executive reports\n- Create SOAR playbooks tu dong\n- Threat hunting tu IOC va log data\n\nHoi toi bat cu dieu gi ve bao mat cua he thong!";
+
+function md2html(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`([^`\n]+)`/g,'<code>$1</code>')
+    .replace(/```[\w]*\n?([\s\S]*?)```/g,'<pre>$1</pre>')
+    .replace(/^#{1,3} (.+)$/gm,'<strong style="font-size:13px;display:block;margin:8px 0 4px">$1</strong>')
+    .replace(/^\* (.+)$/gm,'<li>$1</li>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/,'<ul style="padding-left:16px;margin:4px 0">$1</ul>')
+    .replace(/\n\n/g,'<br><br>')
+    .replace(/\n/g,'<br>');
+}
+
+function addMsg(role, content) {
+  var d = document.createElement('div');
+  d.className = 'msg ' + role;
+  var avatar = role==='ai' ? '&#9672;' : '&#128100;';
+  var name = role==='ai' ? 'VSP AI Analyst' : 'You';
+  d.innerHTML = '<div class="msg-avatar">'+avatar+'</div>'
+    +'<div class="msg-body"><div class="msg-name">'+name+'</div>'
+    +'<div class="msg-bubble">'+md2html(content)+'</div></div>';
+  var c = document.getElementById('chat-msgs');
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+
+function showTyping() {
+  var d = document.createElement('div');
+  d.className='msg ai'; d.id='typing-ind';
+  d.innerHTML='<div class="msg-avatar">&#9672;</div><div class="msg-body"><div class="msg-name">VSP AI Analyst</div><div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div></div>';
+  var c=document.getElementById('chat-msgs');
+  c.appendChild(d); c.scrollTop=c.scrollHeight;
+}
+
+function removeTyping() {
+  var t=document.getElementById('typing-ind'); if(t)t.remove();
+}
+
+async function sendMessage() {
+  if(_loading)return;
+  var inp=document.getElementById('chat-input');
+  var text=inp.value.trim(); if(!text)return;
+  addMsg('user',text);
+  _history.push({role:'user',content:text});
+  inp.value=''; inp.style.height='auto';
+  _loading=true;
+  document.getElementById('send-btn').disabled=true;
+  document.getElementById('ai-status-txt').textContent='Analyzing...';
+  showTyping();
+  try {
+    var r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:SYS[_ctx]||SYS.all,
+        messages:_history.slice(-8)
+      })
+    });
+    var data=await r.json();
+    var reply=data.content&&data.content[0]&&data.content[0].text
+      ?data.content[0].text
+      :'Xin loi, co loi xay ra. Vui long thu lai.';
+    removeTyping();
+    addMsg('ai',reply);
+    _history.push({role:'assistant',content:reply});
+  } catch(e) {
+    removeTyping();
+    addMsg('ai','Khong the ket noi API. Kiem tra network va thu lai.');
+  }
+  _loading=false;
+  document.getElementById('send-btn').disabled=false;
+  document.getElementById('ai-status-txt').textContent='Ready';
+}
+
+function quickAsk(q){document.getElementById('chat-input').value=q;sendMessage();}
+function setHint(t){document.getElementById('chat-input').value=t;document.getElementById('chat-input').focus();}
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
+function setContext(ctx,el){
+  _ctx=ctx; _history=[];
+  document.querySelectorAll('.ctx-item').forEach(function(x){x.classList.remove('active');});
+  el.classList.add('active');
+  var lbl={all:'Full context',incidents:'Incidents',findings:'Findings',threats:'Threat Intel'}[ctx];
+  addMsg('ai','**Context: '+lbl+'**\n\nToi se focus vao '+lbl.toLowerCase()+'. Ban muon phan tich gi?');
+}
+function clearChat(){document.getElementById('chat-msgs').innerHTML='';_history=[];addMsg('ai',WELCOME);}
+
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;
+  if(e.data.type==='vsp:theme'){}
+});
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
+
+addMsg('ai',WELCOME);
+</script>
+</body>
+</html>

@@ -16,6 +16,14 @@ import (
 func WSUpgradeHandler(w http.ResponseWriter, r *http.Request) {
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	if upgrade == "websocket" {
+		rawToken := r.URL.Query().Get("token")
+		if rawToken == "" {
+			rawToken = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		}
+		if rawToken == "" {
+			http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+			return
+		}
 		wsServe(w, r)
 		return
 	}

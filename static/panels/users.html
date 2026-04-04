@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>VSP — Users</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--font-mono:"JetBrains Mono","Fira Mono",monospace;--font-ui:"Inter","Segoe UI",sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5;padding:16px}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.3)}.pill-purple{background:var(--purple2);color:var(--purple);border-color:rgba(139,92,246,.3)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}.btn:hover{background:var(--surface)}.btn-sm{padding:3px 8px;font-size:10px}.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}.btn-danger{background:var(--red2);border-color:rgba(239,68,68,.4);color:var(--red)}.btn-success{background:var(--green2);border-color:rgba(34,197,94,.4);color:var(--green)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}.card-title{font-size:12px;font-weight:600}.card-sub{font-size:11px;color:var(--t3);margin-top:1px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px}.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}.kpi-val{font-size:20px;font-weight:700;font-family:var(--font-mono)}.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+.user-table{width:100%;border-collapse:collapse}.user-table th{text-align:left;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--font-mono)}.user-table td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px}.user-table tr:last-child td{border-bottom:none}.user-table tr:hover td{background:var(--surface)}
+.avatar{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.audit-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:11px}.audit-row:last-child{border-bottom:none}
+.audit-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;padding-top:60px}.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(520px,95vw)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}.modal-title{font-size:14px;font-weight:700}.modal-body{padding:16px 18px}.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px}
+.form-group{margin-bottom:12px}.form-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:block}
+.form-ctrl{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:7px 10px;border-radius:6px;font-size:12px;outline:none;transition:border-color .15s}.form-ctrl:focus{border-color:var(--blue)}
+select.form-ctrl option{background:var(--bg2)}
+.role-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:4px}
+.role-card{padding:9px 11px;border-radius:7px;border:1px solid var(--border);cursor:pointer;transition:all .15s}
+.role-card:hover{border-color:var(--border2)}.role-card.selected{border-color:var(--blue);background:var(--blue2)}
+.role-name{font-size:11px;font-weight:600;margin-bottom:2px}.role-desc{font-size:10px;color:var(--t3)}
+.perm-list{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.hdr h2{font-size:15px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.tab-bar{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.tab{font-size:11px;padding:6px 12px;border-radius:6px 6px 0 0;cursor:pointer;color:var(--t3);transition:all .15s;border:1px solid transparent;border-bottom:none;margin-bottom:-1px}
+.tab.active{color:var(--t1);background:var(--bg2);border-color:var(--border)}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div><h2>User management</h2><p>RBAC roles &middot; permissions &middot; audit trail &middot; API keys</p></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-sm" onclick="loadUsers()">&#8635; Refresh</button>
+    <button class="btn btn-primary btn-sm" onclick="openNewUser()">+ New user</button>
+  </div>
+</div>
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-lbl">Total users</div><div class="kpi-val" style="color:var(--cyan)" id="k-total">—</div><div class="kpi-sub">in tenant</div></div>
+  <div class="kpi"><div class="kpi-lbl">Active</div><div class="kpi-val" style="color:var(--green)" id="k-active">—</div><div class="kpi-sub">last 30 days</div></div>
+  <div class="kpi"><div class="kpi-lbl">Admins</div><div class="kpi-val" style="color:var(--amber)" id="k-admins">—</div><div class="kpi-sub">full access</div></div>
+  <div class="kpi"><div class="kpi-lbl">API keys</div><div class="kpi-val" style="color:var(--purple)" id="k-keys">—</div><div class="kpi-sub">active tokens</div></div>
+</div>
+<div class="tab-bar">
+  <div class="tab active" id="tab-users" onclick="switchTab(0)">Users</div>
+  <div class="tab" id="tab-roles" onclick="switchTab(1)">Roles & permissions</div>
+  <div class="tab" id="tab-audit" onclick="switchTab(2)">Audit log</div>
+  <div class="tab" id="tab-keys" onclick="switchTab(3)">API keys</div>
+</div>
+<!-- Users tab -->
+<div id="pane-0">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">Users</div><div class="card-sub" id="users-sub">—</div></div>
+      <div style="display:flex;gap:6px">
+        <input id="user-search" placeholder="Search users..." class="btn" style="width:160px;text-align:left;font-size:11px" oninput="renderUsers()">
+        <select id="role-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderUsers()">
+          <option value="">All roles</option>
+          <option value="admin">Admin</option>
+          <option value="analyst">Analyst</option>
+          <option value="viewer">Viewer</option>
+          <option value="api">API</option>
+        </select>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="user-table">
+        <thead><tr><th>User</th><th>Role</th><th>Last login</th><th>Status</th><th>MFA</th><th>Actions</th></tr></thead>
+        <tbody id="user-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<!-- Roles tab -->
+<div id="pane-1" style="display:none">
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px" id="roles-grid"></div>
+</div>
+<!-- Audit tab -->
+<div id="pane-2" style="display:none">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">Audit log</div><div class="card-sub">user actions &middot; last 100 events</div></div>
+      <select id="audit-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderAudit()">
+        <option value="">All actions</option>
+        <option value="login">Login</option>
+        <option value="scan">Scan</option>
+        <option value="admin">Admin</option>
+        <option value="api">API</option>
+      </select>
+    </div>
+    <div style="padding:8px 14px;max-height:400px;overflow-y:auto" id="audit-list"></div>
+  </div>
+</div>
+<!-- API keys tab -->
+<div id="pane-3" style="display:none">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">API keys</div><div class="card-sub">service accounts &middot; CI/CD tokens</div></div>
+      <button class="btn btn-primary btn-sm" onclick="openNewKey()">+ New API key</button>
+    </div>
+    <div style="padding:12px 14px" id="keys-list"></div>
+  </div>
+</div>
+<!-- User modal -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="umod-title">New user</div><button class="modal-close" onclick="closeModal('user-modal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label">Full name</label><input class="form-ctrl" id="u-name" placeholder="Jane Smith"></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-ctrl" id="u-email" placeholder="jane@company.com" type="email"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Password</label><input class="form-ctrl" id="u-pass" placeholder="Min 12 chars" type="password"></div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <div class="role-grid" id="role-picker"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Clearance level</label>
+        <select class="form-ctrl" id="u-clearance">
+          <option value="UNCLASS">UNCLASSIFIED</option>
+          <option value="CUI">CUI</option>
+          <option value="SECRET">SECRET</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('user-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Create user &#8594;</button>
+    </div>
+  </div>
+</div>
+<!-- API key modal -->
+<div class="modal-overlay" id="key-modal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="kmod-title">New API key</div><button class="modal-close" onclick="closeModal('key-modal')">&#10005;</button></div>
+    <div class="modal-body" id="kmod-body">
+      <div class="form-group"><label class="form-label">Key name</label><input class="form-ctrl" id="k-name" placeholder="e.g. CI/CD pipeline"></div>
+      <div class="form-group"><label class="form-label">Permissions</label>
+        <div class="perm-list">
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" id="p-scan" checked> Scans</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:10px"><input type="checkbox" id="p-read"> Read-only</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:10px"><input type="checkbox" id="p-report"> Reports</label>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Expires</label>
+        <select class="form-ctrl" id="k-expires">
+          <option value="30">30 days</option>
+          <option value="90" selected>90 days</option>
+          <option value="365">1 year</option>
+          <option value="0">Never</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('key-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createKey()">Generate key &#8594;</button>
+    </div>
+  </div>
+</div>
+<script>
+var TOKEN='',API='';
+var USERS=[
+  {id:'u1',name:'Admin User',email:'admin@vsp.local',role:'admin',last_login:'just now',status:'active',mfa:true,clearance:'UNCLASS'},
+  {id:'u2',name:'SOC Analyst',email:'analyst@vsp.local',role:'analyst',last_login:'2h ago',status:'active',mfa:true,clearance:'UNCLASS'},
+  {id:'u3',name:'Security Engineer',email:'sec-eng@vsp.local',role:'analyst',last_login:'1d ago',status:'active',mfa:false,clearance:'UNCLASS'},
+  {id:'u4',name:'Auditor',email:'audit@vsp.local',role:'viewer',last_login:'3d ago',status:'active',mfa:false,clearance:'UNCLASS'},
+  {id:'u5',name:'CI/CD Bot',email:'cicd@vsp.local',role:'api',last_login:'5m ago',status:'active',mfa:false,clearance:'UNCLASS'},
+];
+var ROLES=[
+  {id:'admin',name:'Administrator',color:'var(--red)',desc:'Full access to all features, user management, system config',perms:['scans.*','findings.*','users.*','admin.*','reports.*','policy.*']},
+  {id:'analyst',name:'SOC Analyst',color:'var(--amber)',desc:'Create scans, manage findings, view all data, no user admin',perms:['scans.*','findings.*','reports.read','policy.read']},
+  {id:'viewer',name:'Read-only Viewer',color:'var(--blue)',desc:'View findings and reports, no modifications',perms:['scans.read','findings.read','reports.read']},
+  {id:'api',name:'API Service Account',color:'var(--purple)',desc:'Programmatic access for CI/CD and integrations',perms:['scans.create','findings.read','reports.read']},
+];
+var AUDIT=[
+  {action:'login',user:'admin@vsp.local',detail:'Login from 127.0.0.1',ts:'just now',level:'info'},
+  {action:'scan',user:'admin@vsp.local',detail:'Triggered SAST scan on /home/test/Data/GOLANG_VSP',ts:'29m ago',level:'info'},
+  {action:'admin',user:'admin@vsp.local',detail:'Created user analyst@vsp.local with role analyst',ts:'2h ago',level:'warn'},
+  {action:'scan',user:'analyst@vsp.local',detail:'Viewed findings — 104 results',ts:'2h ago',level:'info'},
+  {action:'api',user:'cicd@vsp.local',detail:'API scan triggered via token vsp_xxxxxxxx',ts:'5m ago',level:'info'},
+  {action:'admin',user:'admin@vsp.local',detail:'Policy updated — gate threshold changed to 30',ts:'1d ago',level:'warn'},
+  {action:'login',user:'sec-eng@vsp.local',detail:'Login from 192.168.1.50',ts:'1d ago',level:'info'},
+  {action:'scan',user:'cicd@vsp.local',detail:'Scheduled scan complete — gate FAIL 104 findings',ts:'1d ago',level:'info'},
+];
+var API_KEYS=[
+  {id:'k1',name:'CI/CD pipeline',prefix:'vsp_ci_',perms:'scans,read',created:'30d ago',expires:'60d',status:'active'},
+  {id:'k2',name:'SIEM integration',prefix:'vsp_si_',perms:'read,reports',created:'90d ago',expires:'never',status:'active'},
+  {id:'k3',name:'Old deployment key',prefix:'vsp_od_',perms:'scans',created:'180d ago',expires:'expired',status:'expired'},
+];
+var _selectedRole='analyst',_editId=null;
+
+function roleColor(r){return {admin:'var(--red)',analyst:'var(--amber)',viewer:'var(--blue)',api:'var(--purple)'}[r]||'var(--t3)';}
+function roleBadge(r){var m={admin:'pill-red',analyst:'pill-amber',viewer:'pill-blue',api:'pill-purple'};return '<span class="pill '+(m[r]||'pill-gray')+'">'+r+'</span>';}
+function statusBadge(s){return '<span class="pill '+(s==='active'?'pill-green':'pill-gray')+'">'+s+'</span>';}
+function avatarColor(n){var colors=['#ef4444','#f59e0b','#22c55e','#3b82f6','#8b5cf6','#06b6d4'];return colors[n.charCodeAt(0)%colors.length];}
+
+function updateKPIs(){
+  document.getElementById('k-total').textContent=USERS.length;
+  document.getElementById('k-active').textContent=USERS.filter(function(u){return u.status==='active';}).length;
+  document.getElementById('k-admins').textContent=USERS.filter(function(u){return u.role==='admin';}).length;
+  document.getElementById('k-keys').textContent=API_KEYS.filter(function(k){return k.status==='active';}).length;
+}
+
+function renderUsers(){
+  var q=(document.getElementById('user-search').value||'').toLowerCase();
+  var rf=document.getElementById('role-filter').value;
+  var list=USERS.filter(function(u){
+    if(q&&!(u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)))return false;
+    if(rf&&u.role!==rf)return false;
+    return true;
+  });
+  document.getElementById('users-sub').textContent=list.length+' users';
+  document.getElementById('user-tbody').innerHTML=list.map(function(u,idx){
+    var av=u.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    return '<tr>'
+      +'<td><div style="display:flex;align-items:center;gap:10px">'
+      +'<div class="avatar" style="background:'+avatarColor(u.name)+'22;color:'+avatarColor(u.name)+'">'+av+'</div>'
+      +'<div><div style="font-weight:500">'+u.name+'</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+u.email+'</div></div>'
+      +'</div></td>'
+      +'<td>'+roleBadge(u.role)+'</td>'
+      +'<td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+u.last_login+'</td>'
+      +'<td>'+statusBadge(u.status)+'</td>'
+      +'<td>'+(u.mfa?'<span class="pill pill-green">MFA on</span>':'<span class="pill pill-amber">no MFA</span>')+'</td>'
+      +'<td><div style="display:flex;gap:5px">'
+      +'<button class="btn btn-sm" onclick="editUser('+idx+')">&#9998;</button>'
+      +(u.email!=='admin@vsp.local'?'<button class="btn btn-danger btn-sm" onclick="deleteUser('+idx+')">&#10005;</button>':'')
+      +'</div></td>'
+      +'</tr>';
+  }).join('');
+}
+
+function renderRoles(){
+  document.getElementById('roles-grid').innerHTML=ROLES.map(function(r){
+    return '<div class="card" style="margin-bottom:0">'
+      +'<div class="card-head"><div><div class="card-title" style="color:'+r.color+'">'+r.name+'</div><div class="card-sub">'+r.desc+'</div></div></div>'
+      +'<div style="padding:10px 14px"><div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Permissions</div>'
+      +'<div class="perm-list">'+r.perms.map(function(p){return '<span class="pill pill-gray" style="font-size:9px">'+p+'</span>';}).join('')+'</div>'
+      +'<div style="margin-top:8px;font-size:10px;color:var(--t3)">Users with this role: <strong style="color:var(--t1)">'+USERS.filter(function(u){return u.role===r.id;}).length+'</strong></div>'
+      +'</div></div>';
+  }).join('');
+}
+
+function renderAudit(){
+  var af=document.getElementById('audit-filter').value;
+  var list=AUDIT.filter(function(a){return !af||a.action===af;});
+  var dotColor={info:'var(--blue)',warn:'var(--amber)',error:'var(--red)'}
+  document.getElementById('audit-list').innerHTML=list.map(function(a){
+    return '<div class="audit-row">'
+      +'<div class="audit-dot" style="background:'+(dotColor[a.level]||'var(--t3)')+'"></div>'
+      +'<div style="flex:1"><div style="font-weight:500;margin-bottom:2px">'+a.detail+'</div>'
+      +'<div style="color:var(--t3);font-size:10px;font-family:var(--font-mono)">'+a.user+' &middot; '+a.action+'</div></div>'
+      +'<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);flex-shrink:0">'+a.ts+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderKeys(){
+  document.getElementById('keys-list').innerHTML=API_KEYS.map(function(k,idx){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="flex:1"><div style="font-weight:500;margin-bottom:3px">'+k.name+'</div>'
+      +'<div style="font-size:10px;font-family:var(--font-mono);color:var(--cyan)">'+k.prefix+'••••••••</div>'
+      +'<div style="font-size:10px;color:var(--t3);margin-top:2px">perms: '+k.perms+' &middot; created '+k.created+'</div></div>'
+      +'<span class="pill '+(k.status==='active'?'pill-green':'pill-red')+'">'+k.expires+'</span>'
+      +(k.status==='active'?'<button class="btn btn-danger btn-sm" onclick="revokeKey('+idx+')">Revoke</button>':'')
+      +'</div>';
+  }).join('');
+}
+
+function switchTab(idx){
+  for(var i=0;i<4;i++){
+    document.getElementById('tab-'+['users','roles','audit','keys'][i]).classList.toggle('active',i===idx);
+    document.getElementById('pane-'+i).style.display=i===idx?'':'none';
+  }
+  if(idx===1)renderRoles();
+  if(idx===2)renderAudit();
+  if(idx===3)renderKeys();
+}
+
+function openNewUser(){
+  _editId=null;
+  document.getElementById('umod-title').textContent='New user';
+  document.getElementById('u-name').value='';
+  document.getElementById('u-email').value='';
+  document.getElementById('u-pass').value='';
+  _selectedRole='analyst';
+  document.getElementById('role-picker').innerHTML=ROLES.map(function(r){
+    return '<div class="role-card'+(r.id===_selectedRole?' selected':'')+'" onclick="selectRole(this,'+r.id+')" data-rid="'+r.id+'">'
+      +'<div class="role-name" style="color:'+r.color+'">'+r.name+'</div>'
+      +'<div class="role-desc">'+r.desc.slice(0,50)+'...</div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('user-modal').classList.add('open');
+}
+
+function selectRole(el,role){
+  _selectedRole=role;
+  document.querySelectorAll('.role-card').forEach(function(x){x.classList.remove('selected');});
+  el.classList.add('selected');
+}
+
+function editUser(idx){
+  var u=USERS[idx];if(!u)return;
+  _editId=idx;
+  document.getElementById('umod-title').textContent='Edit: '+u.name;
+  document.getElementById('u-name').value=u.name;
+  document.getElementById('u-email').value=u.email;
+  document.getElementById('u-pass').value='';
+  _selectedRole=u.role;
+  document.getElementById('role-picker').innerHTML=ROLES.map(function(r){
+    return '<div class="role-card'+(r.id===_selectedRole?' selected':'')+'" onclick="selectRole(this,'+r.id+')" data-rid="'+r.id+'">'
+      +'<div class="role-name" style="color:'+r.color+'">'+r.name+'</div>'
+      +'<div class="role-desc">'+r.desc.slice(0,50)+'...</div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('user-modal').classList.add('open');
+}
+
+function saveUser(){
+  var name=document.getElementById('u-name').value.trim();
+  var email=document.getElementById('u-email').value.trim();
+  if(!name||!email)return;
+  var payload={name:name,email:email,role:_selectedRole,clearance:document.getElementById('u-clearance').value};
+  if(_editId!==null){
+    Object.assign(USERS[_editId],payload);
+    AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Updated user '+email+' role to '+_selectedRole,ts:'just now',level:'warn'});
+  } else {
+    USERS.push(Object.assign({id:'u'+Date.now(),last_login:'never',status:'active',mfa:false},payload));
+    AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Created user '+email+' with role '+_selectedRole,ts:'just now',level:'warn'});
+    if(TOKEN)fetch(API+'/api/v1/admin/users',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(){});
+  }
+  closeModal('user-modal');
+  updateKPIs();renderUsers();
+}
+
+function deleteUser(idx){
+  var u=USERS[idx];if(!u)return;
+  if(!confirm('Delete user '+u.email+'?'))return;
+  AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Deleted user '+u.email,ts:'just now',level:'warn'});
+  USERS.splice(idx,1);
+  if(TOKEN)fetch(API+'/api/v1/admin/users/'+u.id,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+  updateKPIs();renderUsers();
+}
+
+function openNewKey(){
+  document.getElementById('kmod-title').textContent='New API key';
+  document.getElementById('k-name').value='';
+  document.getElementById('key-modal').classList.add('open');
+}
+
+function createKey(){
+  var name=document.getElementById('k-name').value.trim();
+  if(!name)return;
+  var newKey={id:'k'+Date.now(),name:name,prefix:'vsp_'+name.slice(0,3).toLowerCase()+'_',perms:'scans,read',created:'just now',expires:document.getElementById('k-expires').value+'d',status:'active'};
+  API_KEYS.unshift(newKey);
+  AUDIT.unshift({action:'api',user:'admin@vsp.local',detail:'Created API key: '+name,ts:'just now',level:'info'});
+  closeModal('key-modal');
+  updateKPIs();renderKeys();
+  document.getElementById('kmod-body').innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:11px;color:var(--t3);margin-bottom:8px">Your API key (shown once):</div><div style="font-family:var(--font-mono);font-size:12px;background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border2);color:var(--cyan)">vsp_'+name.slice(0,3).toLowerCase()+'_'+Math.random().toString(36).slice(2,18)+'</div><div style="font-size:10px;color:var(--amber);margin-top:8px">Copy this key — it will not be shown again</div></div>';
+}
+
+function revokeKey(idx){
+  if(!confirm('Revoke this API key?'))return;
+  API_KEYS[idx].status='revoked';API_KEYS[idx].expires='revoked';
+  AUDIT.unshift({action:'api',user:'admin@vsp.local',detail:'Revoked API key: '+API_KEYS[idx].name,ts:'just now',level:'warn'});
+  updateKPIs();renderKeys();
+}
+
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+async function loadUsers(){
+  if(!TOKEN)return;
+  var h={Authorization:'Bearer '+TOKEN};
+  try{
+    var r=await fetch(API+'/api/v1/admin/users',{headers:h});
+    if(r.ok){
+      var d=await r.json();
+      if(d.users&&d.users.length){
+        USERS=d.users.map(function(u){return Object.assign({last_login:'—',status:'active',mfa:false,clearance:'UNCLASS'},u);});
+        updateKPIs();renderUsers();
+      }
+    }
+  }catch(e){}
+}
+
+function _onTokenReady(){}
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;loadUsers();}}
+  if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
+});
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
+function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}}
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'},'*');
+updateKPIs();renderUsers();
+</script>
+</body>
+</html>

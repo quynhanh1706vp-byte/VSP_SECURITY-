@@ -5,7 +5,7 @@ server:
   read_timeout:  30s
   write_timeout: 60s
   env: development
-  allowed_origins: "http://localhost:3000,http://localhost:8922"
+  allowed_origins: "http://localhost:3000,http://localhost:8922,http://127.0.0.1:8922,http://127.0.0.1:8921"
 
 database:
   url: postgres://vsp:vsp@localhost:5432/vsp_go?sslmode=disable
@@ -13,7 +13,7 @@ database:
   min_conns: 2
 
 auth:
-  jwt_secret: "change-me-in-production"
+  jwt_secret: ""  # set via env JWT_SECRET
   jwt_ttl: 24h
   api_key_ttl: 90d
 
@@ -27,4 +27,24 @@ log:
 
 redis:
   addr: localhost:6379
-  password: "VspRedis2026!"
+  password: ""  # set via env REDIS_PASSWORD
+integrations:
+  slack_webhook: "https://hooks.slack.com/services/xxx"
+  jira_url: "https://your-org.atlassian.net"
+  jira_token: "xxx"
+  jira_project: "VSP-SECURITY"
+  github_token: "ghp_xxx"
+  github_repo: "your-org/your-repo"
+  pagerduty_key: "xxx"
+
+smtp:
+  host: "smtp.gmail.com"
+  port: 587
+  user: "vsp-alerts@agency.gov"
+  pass: ""  # set via env SMTP_PASSWORD
+  from: "VSP Security Platform <vsp-alerts@agency.gov>"
+  to:   ["soc@agency.gov", "ciso@agency.gov"]
+  enabled: false
+
+anthropic:
+  api_key: ""

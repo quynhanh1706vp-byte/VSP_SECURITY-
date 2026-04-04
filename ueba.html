@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VSP — UEBA</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--orange:#f97316;--font-mono:'JetBrains Mono','Fira Mono',monospace;--font-ui:'Inter','Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5;padding:16px}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}
+.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}
+.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}
+.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}
+.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.3)}
+.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--surface)}
+.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}
+.btn-run{background:var(--purple2);border-color:rgba(139,92,246,.4);color:var(--purple)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:12px;font-weight:600}
+.card-sub{font-size:11px;color:var(--t3);margin-top:1px}
+.card-body{padding:12px 14px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.kpi-val{font-size:20px;font-weight:700;font-family:var(--font-mono)}
+.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.anomaly{border-left:2px solid var(--border2);padding:9px 12px;margin-bottom:7px;border-radius:0 6px 6px 0;background:var(--surface);cursor:pointer;transition:background .15s}
+.anomaly:hover{background:rgba(255,255,255,.04)}
+.anomaly.crit{border-left-color:var(--red)}
+.anomaly.high{border-left-color:var(--amber)}
+.anomaly.med{border-left-color:var(--blue)}
+.anomaly.low{border-left-color:var(--green)}
+.a-hdr{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.a-title{font-size:12px;font-weight:500;flex:1}
+.a-score{font-size:11px;font-family:var(--font-mono);color:var(--t3)}
+.a-meta{font-size:11px;color:var(--t3);margin-bottom:4px}
+.a-bar-wrap{background:var(--border);border-radius:2px;height:4px;margin-top:5px}
+.a-bar{height:4px;border-radius:2px;transition:width .5s}
+.baseline-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px}
+.baseline-row:last-child{border-bottom:none}
+.bl-lbl{color:var(--t3)}
+.bl-val{font-family:var(--font-mono);font-weight:600}
+.check-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border-radius:7px;margin-bottom:6px;border:1px solid var(--border)}
+.check-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.check-name{font-size:12px;font-weight:500;flex:1}
+.check-status{font-size:10px;font-family:var(--font-mono)}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-size:15px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}
+.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.sparkline{display:flex;gap:2px;align-items:flex-end;height:40px}
+.sp-bar{flex:1;border-radius:2px 2px 0 0;min-width:6px}
+.score-ring-wrap{position:relative;display:inline-block}
+.score-ring-wrap canvas{display:block}
+.score-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.spinner{width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);border-top-color:var(--blue);animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h2>UEBA — behavioral analytics</h2>
+    <p>Baseline · anomaly detection · behavioral scoring · entity risk</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="pill pill-cyan" id="last-run-badge">&#9675; Not analyzed yet</span>
+    <button class="btn btn-run" id="analyze-btn" onclick="runAnalysis()">&#9654; Analyze now</button>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-lbl">Anomalies</div><div class="kpi-val" style="color:var(--red)" id="k-anom">—</div><div class="kpi-sub">detected today</div></div>
+  <div class="kpi"><div class="kpi-lbl">Risk score</div><div class="kpi-val" style="color:var(--amber)" id="k-risk">—</div><div class="kpi-sub">vs baseline</div></div>
+  <div class="kpi"><div class="kpi-lbl">Baseline score</div><div class="kpi-val" style="color:var(--cyan)" id="k-base">—</div><div class="kpi-sub">30-day avg</div></div>
+  <div class="kpi"><div class="kpi-lbl">Gate pass rate</div><div class="kpi-val" style="color:var(--green)" id="k-pass">—</div><div class="kpi-sub">30-day baseline</div></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">Detected anomalies</div><div class="card-sub" id="anom-sub">—</div></div>
+      <button class="btn" style="font-size:10px" onclick="loadAnomalies()">&#8635;</button>
+    </div>
+    <div class="card-body" id="anom-list" style="padding:8px 10px">
+      <div style="text-align:center;padding:20px;color:var(--t3);font-size:12px">Click "Analyze now" to detect anomalies</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">Behavioral checks</div><div class="card-sub">6 active monitors</div></div>
+    <div class="card-body" id="checks-list"></div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="card-head"><div class="card-title">30-day baseline</div><div class="card-sub">statistical norms</div></div>
+    <div class="card-body" id="baseline-body"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">Score trend</div><div class="card-sub">security score vs baseline</div></div>
+    <div class="card-body">
+      <div class="sparkline" id="score-spark"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px">
+        <span style="font-size:10px;color:var(--t3)">-30d</span>
+        <span style="font-size:10px;color:var(--t3)">today</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var TOKEN = '';
+var API = 'http://127.0.0.1:8921';
+
+var CHECKS = [
+  {name:'Score spike detection',   type:'score_spike',     status:'active',  desc:'Alert when score drops >2σ from baseline'},
+  {name:'Findings surge',          type:'findings_surge',  status:'active',  desc:'Alert when findings count exceeds baseline+2σ'},
+  {name:'Gate FAIL streak',        type:'gate_fail_streak',status:'active',  desc:'Alert on 3+ consecutive gate FAILs'},
+  {name:'Off-hours scans',         type:'off_hours_scan',  status:'active',  desc:'Flag scans between 20:00–07:00 UTC'},
+  {name:'New critical tool',       type:'new_critical_tool',status:'active', desc:'Alert when new tool generates criticals'},
+  {name:'SLA breach detection',    type:'sla_breach',      status:'active',  desc:'Alert when findings exceed SLA deadlines'},
+];
+
+var SPARK_DATA = [45,38,52,28,22,30,22,18,22,35,28,22,40,35,28,22,18,22,22,25,22,18,15,22,28,22,18,22,22,22];
+
+function sevClass(s){return {CRITICAL:'crit',HIGH:'high',MEDIUM:'med',LOW:'low'}[s]||''}
+function sevBadge(s){if(!s)return '';var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};return '<span class="pill '+(m[s]||'pill-gray')+'">'+s.charAt(0)+s.slice(1).toLowerCase()+'</span>'}
+
+function renderChecks(){
+  var el = document.getElementById('checks-list');
+  el.innerHTML = CHECKS.map(function(c){
+    return '<div class="check-item">'
+      +'<div class="check-dot" style="background:var(--green)"></div>'
+      +'<div style="flex:1"><div class="check-name">'+c.name+'</div>'
+      +'<div style="font-size:10px;color:var(--t3)">'+c.desc+'</div></div>'
+      +'<span class="check-status" style="color:var(--green)">active</span>'
+      +'</div>';
+  }).join('');
+}
+
+function renderBaseline(b){
+  if(!b){
+    document.getElementById('baseline-body').innerHTML='<div style="color:var(--t3);font-size:11px;text-align:center;padding:12px">No baseline data yet</div>';
+    return;
+  }
+  document.getElementById('k-base').textContent = Math.round(b.avg_score||0);
+  document.getElementById('k-pass').textContent = Math.round((b.gate_pass_rate||0)*100)+'%';
+  document.getElementById('baseline-body').innerHTML = [
+    {lbl:'Avg security score',val: Math.round(b.avg_score||0)+' / 100'},
+    {lbl:'Score std deviation',val: (b.std_score||0).toFixed(1)+' pts'},
+    {lbl:'Avg findings / scan', val: Math.round(b.avg_findings||0)},
+    {lbl:'Gate pass rate',      val: Math.round((b.gate_pass_rate||0)*100)+'%'},
+    {lbl:'Avg scans / day',     val: (b.avg_scans_per_day||0).toFixed(1)},
+    {lbl:'Baseline period',     val: b.period||'30d'},
+  ].map(function(r){
+    return '<div class="baseline-row"><span class="bl-lbl">'+r.lbl+'</span><span class="bl-val">'+r.val+'</span></div>';
+  }).join('');
+}
+
+function renderAnomalies(anomalies){
+  var el = document.getElementById('anom-list');
+  document.getElementById('anom-sub').textContent = (anomalies.length||0)+' anomalies';
+  document.getElementById('k-anom').textContent = anomalies.length||0;
+  if(!anomalies.length){
+    el.innerHTML='<div style="text-align:center;padding:16px;color:var(--green);font-size:12px">&#10003; No anomalies detected — behavior is normal</div>';
+    return;
+  }
+  el.innerHTML = anomalies.map(function(a){
+    var sc = sevClass(a.severity||a.Severity);
+    var score = Math.round(a.score||0);
+    var barColor = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--green)'}[a.severity]||'var(--t3)';
+    var msg = a.message||a.title||a.Message||'Anomaly detected';
+    var entity = a.entity||a.Entity||'';
+    return '<div class="anomaly '+sc+'">'
+      +'<div class="a-hdr">'+sevBadge(a.severity||a.Severity)
+      +'<span class="a-title">'+msg+'</span>'
+      +'<span class="a-score">score: '+score+'</span>'
+      +'</div>'
+      +(entity?'<div class="a-meta">entity: '+entity+'</div>':'')
+      +'<div class="a-bar-wrap"><div class="a-bar" style="width:'+score+'%;background:'+barColor+'"></div></div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderSparkline(){
+  var el = document.getElementById('score-spark');
+  var max = Math.max.apply(null,SPARK_DATA)||1;
+  var baseAvg = SPARK_DATA.reduce(function(a,b){return a+b},0)/SPARK_DATA.length;
+  el.innerHTML = SPARK_DATA.map(function(v){
+    var h = Math.round(v/max*36)+4;
+    var color = v < baseAvg*0.7 ? 'var(--red)' : v < baseAvg*0.9 ? 'var(--amber)' : 'var(--cyan)';
+    return '<div class="sp-bar" style="height:'+h+'px;background:'+color+';opacity:.8"></div>';
+  }).join('');
+}
+
+async function loadBaseline(){
+  if(!TOKEN) return;
+  try {
+    var r = await fetch(API+'/api/v1/ueba/baseline',{headers:{Authorization:'Bearer '+TOKEN}});
+    if(r.ok) renderBaseline(await r.json());
+  } catch(e){}
+}
+
+async function loadAnomalies(){
+  if(!TOKEN) return;
+  try {
+    var r = await fetch(API+'/api/v1/ueba/anomalies',{headers:{Authorization:'Bearer '+TOKEN}});
+    if(r.ok){
+      var d = await r.json();
+      renderAnomalies(d.anomalies||[]);
+    }
+  } catch(e){}
+}
+
+async function loadTimeline(){
+  if(!TOKEN) return;
+  try {
+    var r = await fetch(API+'/api/v1/ueba/timeline',{headers:{Authorization:'Bearer '+TOKEN}});
+    if(r.ok){
+      var d = await r.json();
+      var pts = d.timeline||[];
+      if(pts.length > 0){
+        SPARK_DATA = pts.map(function(p){return Math.round(p.score||0)});
+        renderSparkline();
+      }
+    }
+  } catch(e){}
+}
+
+async function runAnalysis(){
+  if(!TOKEN){ alert('Not authenticated'); return; }
+  var btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="display:inline-block;vertical-align:middle"></div> Analyzing…';
+  var badge = document.getElementById('last-run-badge');
+  badge.textContent = '⏳ Running…';
+  badge.className = 'pill pill-amber';
+  try {
+    var r = await fetch(API+'/api/v1/ueba/analyze',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body: '{}'
+    });
+    if(r.ok){
+      var d = await r.json();
+      var anomalies = d.anomalies||[];
+      renderAnomalies(anomalies);
+      document.getElementById('k-risk').textContent = anomalies.length > 0
+        ? Math.round(Math.max.apply(null,anomalies.map(function(a){return a.score||0})))
+        : 0;
+      badge.textContent = '✓ Analyzed '+new Date().toLocaleTimeString('en-GB',{hour12:false});
+      badge.className = 'pill pill-green';
+    }
+  } catch(e){
+    badge.textContent = '✗ Analysis failed';
+    badge.className = 'pill pill-red';
+  }
+  btn.disabled = false;
+  btn.textContent = '▶ Analyze now';
+}
+
+window.addEventListener('message', function(e){
+  if(!e.data) return;
+  if(e.data.type==='vsp:token' && e.data.token){
+    TOKEN = e.data.token;
+    loadBaseline();
+    loadAnomalies();
+    loadTimeline();
+  }
+});
+if(window.parent !== window) window.parent.postMessage({type:'vsp:request_token'},'*');
+
+renderChecks();
+renderSparkline();
+</script>
+</body>
+</html>

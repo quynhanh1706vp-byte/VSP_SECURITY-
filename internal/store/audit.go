@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/vsp/platform/internal/audit"
 	"time"
 )
 
@@ -20,16 +21,30 @@ type AuditEntry struct {
 	CreatedAt time.Time      `json:"created_at"`
 }
 
-func (db *DB) InsertAudit(ctx context.Context, tenantID string, userID *string, action, resource, ip string, payload json.RawMessage, hash, prevHash string) (int64, string, error) {
+func (db *DB) InsertAudit(ctx context.Context, tenantID string, userID *string, action, resource, ip string, payload json.RawMessage, _ , prevHash string) (int64, string, error) {
+	// Step 1: insert to get seq assigned by DB
 	var seq int64
-	var h string
 	err := db.pool.QueryRow(ctx,
 		`INSERT INTO audit_log (tenant_id, user_id, action, resource, ip, payload, hash, prev_hash)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-		 RETURNING seq, hash`,
-		tenantID, userID, action, resource, ip, payload, hash, prevHash).Scan(&seq, &h)
+		 RETURNING seq`,
+		tenantID, userID, action, resource, ip, payload, "pending", prevHash).Scan(&seq)
 	if err != nil {
 		return 0, "", fmt.Errorf("insert audit: %w", err)
+	}
+	// Step 2: recompute hash with real seq
+	e := audit.Entry{
+		Seq:      seq,
+		TenantID: tenantID,
+		Action:   action,
+		Resource: resource,
+		PrevHash: prevHash,
+	}
+	h := audit.Hash(e)
+	_, err = db.pool.Exec(ctx,
+		`UPDATE audit_log SET hash=$1 WHERE seq=$2`, h, seq)
+	if err != nil {
+		return seq, h, fmt.Errorf("update audit hash: %w", err)
 	}
 	return seq, h, nil
 }

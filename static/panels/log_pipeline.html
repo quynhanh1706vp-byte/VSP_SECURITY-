@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>VSP — Log ingestion</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--font-mono:'JetBrains Mono','Fira Mono',monospace;--font-ui:'Inter','Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5;padding:16px}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.3)}.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}.btn:hover{background:var(--surface)}.btn-sm{padding:3px 8px;font-size:10px}.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}.btn-danger{background:var(--red2);border-color:rgba(239,68,68,.4);color:var(--red)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}.card-title{font-size:12px;font-weight:600}.card-sub{font-size:11px;color:var(--t3);margin-top:1px}.card-body{padding:12px 14px}
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px}.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}.kpi-val{font-size:18px;font-weight:700;font-family:var(--font-mono)}.kpi-sub{font-size:10px;color:var(--t3);margin-top:1px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.source-card{border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}.source-card:hover{border-color:var(--border2);background:var(--surface)}.source-card.active{border-color:var(--blue);background:var(--blue2)}.source-card.err{border-color:var(--red)}
+.sc-hdr{display:flex;align-items:center;gap:8px;margin-bottom:4px}.sc-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}.sc-name{font-size:12px;font-weight:600;flex:1}.sc-eps{font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--cyan)}.sc-meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.pr-bar{height:3px;border-radius:2px;position:absolute;bottom:0;left:0;transition:width .5s}.pr-track{height:3px;background:var(--border);border-radius:2px;margin-top:6px}.pr-fill{height:3px;border-radius:2px;transition:width .5s}
+.live-log{font-family:var(--font-mono);font-size:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;height:280px;overflow-y:auto;scrollbar-width:thin;padding:6px 8px}
+.ll{display:flex;gap:8px;line-height:1.7;border-bottom:1px solid rgba(255,255,255,.03);padding:1px 0;cursor:pointer;transition:background .1s}.ll:hover{background:rgba(255,255,255,.03)}
+.ll-ts{color:var(--t4);flex-shrink:0;user-select:none;width:80px}.ll-src{color:var(--purple);flex-shrink:0;width:60px;overflow:hidden;text-overflow:ellipsis}.ll-sev{flex-shrink:0;width:52px;font-weight:700}
+.ll-INFO{color:var(--cyan)}.ll-WARN{color:var(--amber)}.ll-ERROR{color:var(--red)}.ll-CRIT{color:var(--red)}.ll-DEBUG{color:var(--t4)}
+.ll-msg{color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stream-controls{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:8px}
+.stream-input{flex:1;background:transparent;border:none;color:var(--t1);font-size:11px;font-family:var(--font-mono);outline:none}
+.stream-input::placeholder{color:var(--t4)}
+.tab-bar{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.tab{font-size:11px;padding:6px 12px;border-radius:6px 6px 0 0;cursor:pointer;color:var(--t3);transition:all .15s;border:1px solid transparent;border-bottom:none;margin-bottom:-1px}
+.tab.active{color:var(--t1);background:var(--bg2);border-color:var(--border)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;padding-top:32px;overflow-y:auto}.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(580px,95vw);margin-bottom:32px}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}.modal-title{font-size:14px;font-weight:700}.modal-body{padding:14px 18px}.modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px}
+.detail-card{background:var(--surface);border-radius:7px;padding:9px 11px;margin-bottom:6px}.detail-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}.detail-val{font-size:12px;font-family:var(--font-mono)}
+.code-block{font-family:var(--font-mono);font-size:10px;background:var(--bg);padding:8px 10px;border-radius:6px;border:1px solid var(--border);white-space:pre-wrap;word-break:break-all;color:var(--cyan);margin-top:6px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.hdr h2{font-size:15px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.throughput-bars{display:flex;gap:2px;align-items:flex-end;height:60px}
+.tp-bar{flex:1;border-radius:2px 2px 0 0;min-height:2px;transition:height .3s}
+.norm-row{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px}.norm-row:last-child{border-bottom:none}
+.norm-rule{flex:1}.norm-pat{font-family:var(--font-mono);font-size:10px;color:var(--t3)}.norm-badge{flex-shrink:0}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div><h2>Log ingestion pipeline</h2><p>Syslog · CEF · JSON · LEEF · Netflow · agent · normalization</p></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="pill pill-green" id="pipeline-badge">&#9679; Pipeline live</span>
+    <button class="btn btn-primary btn-sm" onclick="openAddSource()">+ Add source</button>
+    <button class="btn btn-sm" id="pause-btn" onclick="togglePause()">&#9646;&#9646; Pause</button>
+  </div>
+</div>
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-lbl">Events / min</div><div class="kpi-val" style="color:var(--cyan)" id="k-eps">3,375</div><div class="kpi-sub">across 8 sources</div></div>
+  <div class="kpi"><div class="kpi-lbl">Events today</div><div class="kpi-val" style="color:var(--blue)" id="k-today">4.7M</div><div class="kpi-sub">since 00:00 UTC</div></div>
+  <div class="kpi"><div class="kpi-lbl">Parse rate</div><div class="kpi-val" style="color:var(--green)" id="k-parse">99.2%</div><div class="kpi-sub" id="k-errors">0.8% errors</div></div>
+  <div class="kpi"><div class="kpi-lbl">Sources</div><div class="kpi-val" id="k-sources">8</div><div class="kpi-sub" id="k-sources-sub">7 ok · 1 err</div></div>
+  <div class="kpi"><div class="kpi-lbl">Queue depth</div><div class="kpi-val" style="color:var(--amber)" id="k-queue">146</div><div class="kpi-sub">events pending</div></div>
+</div>
+<!-- Pipeline architecture -->
+<div class="card">
+  <div class="card-head"><div class="card-title">Pipeline architecture</div><div class="card-sub">data flow: source → VSP findings</div></div>
+  <div class="card-body">
+    <div style="display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:4px">
+      <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⇌</div><div style="font-size:10px;font-weight:600">Receive</div><div style="font-size:9px;color:var(--t3)">UDP/TCP/TLS</div></div>
+      <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
+      <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⊞</div><div style="font-size:10px;font-weight:600">Buffer</div><div style="font-size:9px;color:var(--t3)">in-memory queue</div></div>
+      <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
+      <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⊗</div><div style="font-size:10px;font-weight:600">Parse</div><div style="font-size:9px;color:var(--t3)">format decode</div></div>
+      <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
+      <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--blue2);border:1px solid rgba(59,130,246,.4);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⊕</div><div style="font-size:10px;font-weight:600">Normalize</div><div style="font-size:9px;color:var(--t3)">common schema</div></div>
+      <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
+      <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--green2);border:1px solid rgba(34,197,94,.4);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">◈</div><div style="font-size:10px;font-weight:600">Enrich</div><div style="font-size:9px;color:var(--t3)">GeoIP · IOC · ASN</div></div>
+      <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
+      <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--amber2);border:1px solid rgba(245,158,11,.4);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">▽</div><div style="font-size:10px;font-weight:600">Filter</div><div style="font-size:9px;color:var(--t3)">drop noise</div></div>
+      <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
+      <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--purple2);border:1px solid rgba(139,92,246,.4);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">▶</div><div style="font-size:10px;font-weight:600">Route</div><div style="font-size:9px;color:var(--t3)">rules engine</div></div>
+      <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
+      <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--cyan2);border:1px solid rgba(6,182,212,.4);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⊟</div><div style="font-size:10px;font-weight:600">Store</div><div style="font-size:9px;color:var(--t3)">VSP event DB</div></div>
+    </div>
+  </div>
+</div>
+<!-- Tabs -->
+<div class="tab-bar">
+  <div class="tab active" id="tab-sources" onclick="switchTab('sources')">Sources</div>
+  <div class="tab" id="tab-stream" onclick="switchTab('stream')">Live stream</div>
+  <div class="tab" id="tab-throughput" onclick="switchTab('throughput')">Throughput</div>
+  <div class="tab" id="tab-normalizer" onclick="switchTab('normalizer')">Normalizer</div>
+</div>
+<!-- Sources tab -->
+<div id="pane-sources">
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px" id="sources-grid"></div>
+</div>
+<!-- Live stream tab -->
+<div id="pane-stream" style="display:none">
+  <div class="stream-controls">
+    <span style="font-size:11px;color:var(--t3);font-family:var(--font-mono);flex-shrink:0">filter:</span>
+    <input class="stream-input" id="stream-filter" placeholder="severity:ERROR source:auth keyword…" oninput="applyFilter()">
+    <select id="stream-sev" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
+      <option value="">All levels</option><option value="ERROR">ERROR</option><option value="WARN">WARN</option><option value="INFO">INFO</option><option value="CRIT">CRIT</option>
+    </select>
+    <select id="stream-src" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
+      <option value="">All sources</option>
+      <option value="auth">auth</option><option value="scan">scan</option><option value="nginx">nginx</option><option value="k8s">k8s</option><option value="aws">aws</option>
+    </select>
+    <button class="btn btn-sm btn-danger" onclick="clearStream()">&#10005; Clear</button>
+  </div>
+  <div class="live-log" id="live-stream"></div>
+  <div style="display:flex;gap:10px;margin-top:8px;font-size:10px;color:var(--t3);font-family:var(--font-mono)">
+    <span>Total: <b id="stream-total" style="color:var(--t1)">0</b></span>
+    <span>Shown: <b id="stream-shown" style="color:var(--t1)">0</b></span>
+    <span>Errors: <b id="stream-errors" style="color:var(--red)">0</b></span>
+    <span style="margin-left:auto">&#9679; <span id="stream-rate" style="color:var(--cyan)">0</span> evt/s</span>
+  </div>
+</div>
+<!-- Throughput tab -->
+<div id="pane-throughput" style="display:none">
+  <div class="card" style="margin-bottom:0">
+    <div class="card-head"><div class="card-title">Events per minute — last 60 samples</div><div class="card-sub">rolling window · auto-refresh 2s</div></div>
+    <div class="card-body">
+      <div class="throughput-bars" id="tp-bars"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--t3)"><span>-60 samples</span><span>now</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px">
+        <div class="detail-card"><div class="detail-lbl">Peak EPS</div><div class="detail-val" style="color:var(--red)" id="tp-peak">—</div></div>
+        <div class="detail-card"><div class="detail-lbl">Avg EPS</div><div class="detail-val" style="color:var(--cyan)" id="tp-avg">—</div></div>
+        <div class="detail-card"><div class="detail-lbl">Parse errors</div><div class="detail-val" style="color:var(--amber)" id="tp-err">—</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Normalizer tab -->
+<div id="pane-normalizer" style="display:none">
+  <div class="card" style="margin-bottom:0">
+    <div class="card-head"><div class="card-title">Normalization rules</div><div class="card-sub">field mapping · extraction patterns</div></div>
+    <div class="card-body" id="normalizer-list"></div>
+  </div>
+</div>
+<!-- Source detail modal -->
+<div class="modal-overlay" id="source-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="smod-title">Source detail</div>
+      <button class="modal-close" onclick="closeModal('source-modal')">&#10005;</button>
+    </div>
+    <div class="modal-body" id="smod-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('source-modal')">Close</button>
+      <button class="btn btn-sm" id="smod-test-btn">&#9654; Test connection</button>
+      <button class="btn btn-danger btn-sm" id="smod-del-btn">&#10005; Remove</button>
+    </div>
+  </div>
+</div>
+<!-- Add source modal -->
+<div class="modal-overlay" id="add-source-modal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Add log source</div><button class="modal-close" onclick="closeModal('add-source-modal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px" id="source-type-grid"></div>
+      <div id="add-source-form" style="display:none">
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Source name</label><input id="ns-name" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;outline:none" placeholder="e.g. Production syslog"></div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Address</label><input id="ns-addr" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;font-family:var(--font-mono);outline:none" placeholder="10.0.1.10:514"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('add-source-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addSource()">Add source &#8594;</button>
+    </div>
+  </div>
+</div>
+<script>
+var TOKEN='',API='',_paused=false,_tab='sources';
+var SOURCES=[
+  {id:'s1',name:'Linux syslog (prod)',proto:'syslog-udp',format:'syslog-rfc3164',addr:'10.0.1.10:514',eps:905,lastEvent:'1s',parseRate:99.8,status:'ok',events:4200000},
+  {id:'s2',name:'Nginx access log',proto:'syslog-tcp',format:'json-raw',addr:'10.0.1.11:514',eps:1240,lastEvent:'0s',parseRate:100,status:'ok',events:1200000},
+  {id:'s3',name:'AWS CloudTrail',proto:'s3',format:'aws-cloudtrail',addr:'s3://logs',eps:77,lastEvent:'4s',parseRate:98.1,status:'ok',events:320000},
+  {id:'s4',name:'Windows Event Log',proto:'agent',format:'windows-evtx',addr:'10.0.1.45:8514',eps:0,lastEvent:'14m',parseRate:0,status:'err',events:0},
+  {id:'s5',name:'Firewall (Palo Alto)',proto:'syslog-tls',format:'cef-v25',addr:'10.0.2.1:6514',eps:380,lastEvent:'1s',parseRate:99.5,status:'ok',events:890000},
+  {id:'s6',name:'VSP scan engine',proto:'http-json',format:'json-raw',addr:'127.0.0.1:8922',eps:28,lastEvent:'2s',parseRate:100,status:'ok',events:42000},
+  {id:'s7',name:'GitHub audit log',proto:'http-json',format:'json-raw',addr:'api.github.com:443',eps:12,lastEvent:'8s',parseRate:97.2,status:'ok',events:28000},
+  {id:'s8',name:'Kubernetes events',proto:'agent',format:'json-raw',addr:'10.0.3.1:8514',eps:718,lastEvent:'1s',parseRate:98.8,status:'warn',events:1400000},
+];
+var STREAM_BUFFER=[],STREAM_ALL=[],_streamErrors=0,_streamTotal=0;
+var TP_DATA=[];for(var i=0;i<60;i++)TP_DATA.push(Math.round(2800+Math.random()*1200));
+var NORM_RULES=[
+  {input:'syslog-rfc3164',output:'VSP Common Schema',fields:'timestamp,host,severity,message',pattern:'<PRI>MMM DD HH:MM:SS HOST TAG: MSG',status:'active'},
+  {input:'json-raw',output:'VSP Common Schema',fields:'ts,src_ip,level,msg,user',pattern:'JSON field extraction with jq',status:'active'},
+  {input:'cef-v25',output:'VSP Common Schema',fields:'rt,src,dst,sev,act,msg',pattern:'CEF:0|vendor|product|ver|sig|name|sev|ext',status:'active'},
+  {input:'aws-cloudtrail',output:'VSP Common Schema',fields:'eventTime,sourceIPAddress,eventName,userIdentity',pattern:'CloudTrail JSON array unwrap',status:'active'},
+  {input:'windows-evtx',output:'VSP Common Schema',fields:'TimeCreated,EventID,Level,Message',pattern:'EVTX XML parser via agent',status:'inactive'},
+];
+var SOURCE_TYPES=[
+  {type:'syslog-udp',label:'Syslog UDP',icon:'📡',proto:'udp'},{type:'syslog-tcp',label:'Syslog TCP',icon:'🔌',proto:'tcp'},
+  {type:'syslog-tls',label:'Syslog TLS',icon:'🔒',proto:'tls'},{type:'http-json',label:'HTTP/JSON',icon:'🌐',proto:'http'},
+  {type:'s3',label:'S3 bucket',icon:'☁️',proto:'s3'},{type:'agent',label:'VSP agent',icon:'⚙️',proto:'agent'},
+];
+var LOG_WORDS=['Authentication failed','Connection established','File accessed','Permission denied','Service started','Scan complete','Alert triggered','Policy violation','Rate limit hit','SSL handshake','DNS query','HTTP 200','HTTP 403','HTTP 500','Config changed','User login','Token expired','Backup started','Sync completed','Queue overflow'];
+var LOG_SRCS=['auth','nginx','scan','k8s','aws','firewall','github','syslog'];
+var LOG_SEVS=['INFO','INFO','INFO','INFO','WARN','WARN','ERROR','CRIT','DEBUG'];
+function statusColor(s){return {ok:'var(--green)',warn:'var(--amber)',err:'var(--red)'}[s]||'var(--t3)';}
+function renderSources(){
+  document.getElementById('k-sources').textContent=SOURCES.length;
+  var ok=SOURCES.filter(function(s){return s.status==='ok';}).length;
+  var err=SOURCES.filter(function(s){return s.status==='err';}).length;
+  document.getElementById('k-sources-sub').textContent=ok+' ok · '+err+' err';
+  document.getElementById('sources-grid').innerHTML=SOURCES.map(function(s){
+    return '<div class="source-card '+(s.status==='err'?'err':'')+'" onclick="openSourceDetail(this.dataset.sid)" data-sid="'+s.id+'">'
+      +'<div class="sc-hdr"><div class="sc-dot" style="background:'+statusColor(s.status)+'"></div><div class="sc-name">'+s.name+'</div></div>'
+      +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px"><div class="sc-eps">'+s.eps.toLocaleString()+'</div><div style="font-size:10px;color:var(--t3)">evt/min</div></div>'
+      +'<div style="font-size:10px;color:var(--t3);margin-bottom:5px">last event: '+s.lastEvent+' ago · '+s.addr+'</div>'
+      +'<div class="sc-meta"><span class="pill pill-cyan" style="font-size:9px">'+s.proto+'</span><span class="pill pill-gray" style="font-size:9px">'+s.format+'</span></div>'
+      +'<div class="pr-track" style="margin-top:6px"><div class="pr-fill" style="width:'+s.parseRate+'%;background:'+statusColor(s.status)+'"></div></div>'
+      +'<div style="display:flex;justify-content:space-between;margin-top:2px;font-size:9px;color:var(--t3)"><span>parse rate</span><span style="color:'+statusColor(s.status)+'">'+s.parseRate+'%</span></div>'
+      +'</div>';
+  }).join('');
+}
+function openSourceDetail(id){
+  var s=SOURCES.find(function(x){return x.id===id;});if(!s)return;
+  document.getElementById('smod-title').textContent=s.name;
+  document.getElementById('smod-body').innerHTML=
+    '<div class="detail-card"><div class="detail-lbl">Protocol</div><div class="detail-val">'+s.proto+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Format</div><div class="detail-val">'+s.format+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Address</div><div class="detail-val">'+s.addr+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Events/min</div><div class="detail-val" style="color:var(--cyan)">'+s.eps.toLocaleString()+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Parse rate</div><div class="detail-val" style="color:'+statusColor(s.status)+'">'+s.parseRate+'%</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Status</div><div class="detail-val" style="color:'+statusColor(s.status)+'">'+s.status+'</div></div>'
+    +'<div class="detail-card"><div class="detail-lbl">Total events</div><div class="detail-val">'+s.events.toLocaleString()+'</div></div>'
+    +(s.status==='err'?'<div style="background:var(--red2);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px 11px;font-size:11px;color:var(--red);margin-top:8px">&#9888; Source offline: last heartbeat '+s.lastEvent+' ago. Auto-reconnect in progress.</div>':'');
+  document.getElementById('smod-test-btn').onclick=function(){
+    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id+'/test',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json();}).then(function(d){alert('Test result: '+(d.ok?'✓ connected':'✗ failed'));}).catch(function(){alert('Test: ✓ simulated OK');});
+    else alert('Test: ✓ simulated OK (no token)');
+  };
+  document.getElementById('source-modal').classList.add('open');
+}
+function switchTab(tab){
+  _tab=tab;
+  ['sources','stream','throughput','normalizer'].forEach(function(t){
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('pane-'+t).style.display=t===tab?'':'none';
+  });
+  if(tab==='throughput')renderThroughput();
+  if(tab==='normalizer')renderNormalizer();
+}
+var _filterActive={sev:'',src:'',kw:''};
+function applyFilter(){
+  var q=document.getElementById('stream-filter').value;
+  _filterActive.sev=document.getElementById('stream-sev').value;
+  _filterActive.src=document.getElementById('stream-src').value;
+  _filterActive.kw=q;
+  renderStream();
+}
+function renderStream(){
+  var list=STREAM_ALL.filter(function(e){
+    if(_filterActive.sev&&e.sev!==_filterActive.sev)return false;
+    if(_filterActive.src&&e.src!==_filterActive.src)return false;
+    if(_filterActive.kw&&!e.msg.toLowerCase().includes(_filterActive.kw.toLowerCase()))return false;
+    return true;
+  });
+  var el=document.getElementById('live-stream');
+  el.innerHTML=list.slice(-200).map(function(e){
+    return '<div class="ll" onclick="alert(e.raw||e.msg)"><span class="ll-ts">'+e.ts+'</span><span class="ll-src">'+e.src+'</span><span class="ll-sev ll-'+e.sev+'">'+e.sev+'</span><span class="ll-msg">'+e.msg+'</span></div>';
+  }).join('');
+  el.scrollTop=el.scrollHeight;
+  document.getElementById('stream-total').textContent=_streamTotal;
+  document.getElementById('stream-shown').textContent=list.length;
+  document.getElementById('stream-errors').textContent=_streamErrors;
+}
+function clearStream(){STREAM_ALL=[];_streamTotal=0;_streamErrors=0;renderStream();}
+function addStreamLine(){
+  if(_paused)return;
+  var sev=LOG_SEVS[Math.floor(Math.random()*LOG_SEVS.length)];
+  var src=LOG_SRCS[Math.floor(Math.random()*LOG_SRCS.length)];
+  var msg=LOG_WORDS[Math.floor(Math.random()*LOG_WORDS.length)]+' — '+src+' '+Math.floor(Math.random()*200)+' uid='+Math.floor(Math.random()*9999);
+  var now=new Date();
+  var ts=now.toTimeString().slice(0,8)+'.'+String(now.getMilliseconds()).padStart(3,'0');
+  var entry={ts:ts,sev:sev,src:src,msg:msg};
+  STREAM_ALL.push(entry);if(STREAM_ALL.length>2000)STREAM_ALL.shift();
+  _streamTotal++;if(sev==='ERROR'||sev==='CRIT')_streamErrors++;
+  if(_tab==='stream')renderStream();
+}
+function renderThroughput(){
+  var max=Math.max.apply(null,TP_DATA)||1;
+  var avg=Math.round(TP_DATA.reduce(function(a,b){return a+b;},0)/TP_DATA.length);
+  var peak=Math.max.apply(null,TP_DATA);
+  document.getElementById('tp-peak').textContent=peak.toLocaleString();
+  document.getElementById('tp-avg').textContent=avg.toLocaleString();
+  document.getElementById('tp-err').textContent=Math.round(_streamErrors);
+  document.getElementById('tp-bars').innerHTML=TP_DATA.map(function(v){
+    var h=Math.round(v/max*55)+4;
+    var color=v>avg*1.5?'var(--red)':v>avg*1.1?'var(--amber)':'var(--cyan)';
+    return '<div class="tp-bar" style="height:'+h+'px;background:'+color+';opacity:.75;flex:1"></div>';
+  }).join('');
+}
+function renderNormalizer(){
+  document.getElementById('normalizer-list').innerHTML=NORM_RULES.map(function(r){
+    return '<div class="norm-row"><div class="norm-rule"><div style="font-size:11px;font-weight:500;margin-bottom:2px">'+r.input+' → '+r.output+'</div><div class="norm-pat">Fields: '+r.fields+'</div><div class="norm-pat" style="color:var(--t4)">Pattern: '+r.pattern+'</div></div><span class="pill '+(r.status==='active'?'pill-green':'pill-gray')+'">'+r.status+'</span></div>';
+  }).join('');
+}
+function openAddSource(){
+  document.getElementById('source-type-grid').innerHTML=SOURCE_TYPES.map(function(t){
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:border-color .15s" onclick="selectSourceType(this.dataset.type)" data-type="'+t.type+'">'
+      +'<div style="font-size:20px;margin-bottom:4px">'+t.icon+'</div>'
+      +'<div style="font-size:11px;font-weight:600">'+t.label+'</div>'
+      +'<div style="font-size:10px;color:var(--t3)">'+t.proto+'</div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('add-source-form').style.display='none';
+  document.getElementById('add-source-modal').classList.add('open');
+}
+var _selectedType='';
+function selectSourceType(type){_selectedType=type;document.getElementById('add-source-form').style.display='block';}
+function addSource(){
+  var name=document.getElementById('ns-name').value.trim();
+  var addr=document.getElementById('ns-addr').value.trim();
+  if(!name||!addr)return;
+  var newSrc={id:'s'+Date.now(),name:name,proto:_selectedType,format:'json-raw',addr:addr,eps:0,lastEvent:'never',parseRate:0,status:'ok',events:0};
+  SOURCES.push(newSrc);
+  closeModal('add-source-modal');renderSources();
+  if(TOKEN)fetch(API+'/api/v1/logs/sources',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({name:name,protocol:_selectedType,address:addr})}).catch(function(){});
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function togglePause(){
+  _paused=!_paused;
+  document.getElementById('pause-btn').textContent=_paused?'▶ Resume':'⏸ Pause';
+  document.getElementById('pipeline-badge').textContent=_paused?'⏸ Paused':'● Pipeline live';
+  document.getElementById('pipeline-badge').className='pill '+(_paused?'pill-amber':'pill-green');
+}
+// Live updates
+var _tick=0;
+setInterval(function(){
+  _tick++;
+  // Update EPS
+  SOURCES.forEach(function(s){if(s.status!=='err')s.eps=Math.max(0,s.eps+Math.round(Math.random()*100-50));});
+  var totalEps=SOURCES.reduce(function(a,s){return a+s.eps;},0);
+  document.getElementById('k-eps').textContent=totalEps.toLocaleString();
+  // Update queue
+  document.getElementById('k-queue').textContent=Math.round(100+Math.random()*200);
+  // Add stream lines
+  for(var i=0;i<Math.floor(2+Math.random()*4);i++)addStreamLine();
+  document.getElementById('stream-rate').textContent=Math.round(totalEps/60);
+  // Update TP data
+  TP_DATA.push(totalEps);if(TP_DATA.length>60)TP_DATA.shift();
+  if(_tab==='throughput')renderThroughput();
+  if(_tab==='sources'&&_tick%5===0)renderSources();
+},1000);
+async function loadSources(){
+  if(!TOKEN)return;
+  var h={Authorization:'Bearer '+TOKEN};
+  try{
+    var [sr,st]=await Promise.all([
+      fetch(API+'/api/v1/logs/sources',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(API+'/api/v1/logs/stats',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    ]);
+    if(sr&&sr.sources&&sr.sources.length){SOURCES=sr.sources.map(function(s){return Object.assign({eps:0,lastEvent:'—',parseRate:100,events:0,status:s.status||'ok'},s);});renderSources();}
+    if(st&&st.eps)document.getElementById('k-eps').textContent=(st.eps||0).toLocaleString();
+    if(st&&st.total_today)document.getElementById('k-today').textContent=((st.total_today||0)/1e6).toFixed(1)+'M';
+  }catch(e){}
+}
+function _onTokenReady(){}
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;loadSources();}}
+  if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
+});
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
+function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}}
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'},'*');
+renderSources();
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -94,7 +95,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	go a.DB.UpdateLastLogin(r.Context(), user.ID) //nolint:errcheck
 
 	// Write audit log (best-effort)
-	go a.writeAudit(r, tenantID, &user.ID, "LOGIN_OK", "/auth/login")
+	go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_OK", "/auth/login")
 
 	jsonOK(w, loginResponse{
 		Token:     token,
@@ -112,7 +113,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 func (a *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
 	if ok {
-		go a.writeAudit(r, claims.TenantID, &claims.UserID, "LOGOUT", "/auth/logout")
+		go a.writeAudit(r.Clone(context.Background()), claims.TenantID, &claims.UserID, "LOGOUT", "/auth/logout")
 	}
 	jsonOK(w, map[string]string{"message": "logged out"})
 }

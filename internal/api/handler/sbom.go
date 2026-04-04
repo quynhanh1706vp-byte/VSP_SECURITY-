@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"os/exec"
 	"time"
 
@@ -56,6 +57,15 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 	if target == "" { target = run.TargetURL }
 	if target == "" {
 		jsonError(w, "no src/url for this run", http.StatusBadRequest); return
+	}
+	// Validate target — chặn metacharacters
+	for _, c := range []string{";", "&", "|", "`", "$", "<", ">", "{", "}", "\\"} {
+		if strings.Contains(target, c) {
+			jsonError(w, "invalid target", http.StatusBadRequest); return
+		}
+	}
+	if len(target) > 500 {
+		jsonError(w, "target too long", http.StatusBadRequest); return
 	}
 
 	// grype sbom output

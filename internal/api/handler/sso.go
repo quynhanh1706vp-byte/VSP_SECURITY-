@@ -115,8 +115,19 @@ func (h *SSO) Callback(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// Redirect to dashboard with token stored in sessionStorage via fragment
-	http.Redirect(w, r, "/#sso_token="+token, http.StatusFound)
+	// Trả về HTML page tự inject token vào localStorage rồi redirect
+	// Không để token trong URL fragment (lộ vào browser history/logs)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`<!DOCTYPE html><html><head><title>SSO Login</title></head><body>
+<script>
+try {
+  localStorage.setItem('vsp_token', ` + "`" + `"` + token + `"` + "`" + `);
+} catch(e) {}
+window.location.replace('/');
+</script>
+<noscript>JavaScript required. <a href="/">Go to dashboard</a></noscript>
+</body></html>`))
 }
 
 // GET /auth/sso/providers — list configured providers

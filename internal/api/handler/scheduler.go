@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/vsp/platform/internal/scheduler"
@@ -41,6 +42,20 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Mode == "" { req.Mode = "SAST" }
 	if req.Profile == "" { req.Profile = "FAST" }
 	if req.Cron == "" { req.Cron = "0 2 * * *" }
+	// Validate cron: chỉ cho phép standard 5-field cron, chặn injection
+	cronParts := strings.Fields(req.Cron)
+	if len(cronParts) != 5 {
+		jsonError(w, "invalid cron: must be 5 fields (min hour dom month dow)", http.StatusBadRequest)
+		return
+	}
+	for _, p := range cronParts {
+		for _, c := range []string{";", "&", "|", "`", "$", "<", ">", "\\"} {
+			if strings.Contains(p, c) {
+				jsonError(w, "invalid cron: contains illegal characters", http.StatusBadRequest)
+				return
+			}
+		}
+	}
 	req.Enabled = true
 
 	s, err := h.Engine.AddSchedule(r.Context(), store.StoreSchedule{

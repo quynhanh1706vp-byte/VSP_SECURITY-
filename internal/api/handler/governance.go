@@ -139,20 +139,38 @@ func (h *Governance) ZeroTrust(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/v1/soc/detection
+// GET /api/v1/soc/detection
 func (h *Governance) Detection(w http.ResponseWriter, r *http.Request) {
-	jsonOK(w, map[string]any{
-		"use_cases": []map[string]any{
-			{"id": "UC-001", "name": "Secrets in code", "tool": "gitleaks", "severity": "CRITICAL", "status": "active"},
-			{"id": "UC-002", "name": "Command injection", "tool": "bandit/semgrep", "severity": "HIGH", "status": "active"},
-			{"id": "UC-003", "name": "Weak cryptography", "tool": "bandit", "severity": "HIGH", "status": "active"},
-			{"id": "UC-004", "name": "Vulnerable dependencies", "tool": "grype/trivy", "severity": "HIGH", "status": "active"},
-			{"id": "UC-005", "name": "IaC misconfiguration", "tool": "kics", "severity": "MEDIUM", "status": "active"},
-			{"id": "UC-006", "name": "Web vulnerabilities", "tool": "nikto/semgrep", "severity": "HIGH", "status": "active"},
-			{"id": "UC-007", "name": "Hardcoded credentials", "tool": "bandit/gitleaks", "severity": "HIGH", "status": "active"},
-			{"id": "UC-008", "name": "Pickle deserialization", "tool": "bandit", "severity": "MEDIUM", "status": "active"},
-		},
-		"total": 8,
-	})
+	claims, _ := auth.FromContext(r.Context())
+	findings := h.getFindings(r, claims.TenantID)
+	// Build detection use cases from real findings
+	toolMap := map[string]string{}
+	for _, f := range findings {
+		if f.Tool != "" { toolMap[f.Tool] = f.Severity }
+	}
+	type UseCase struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Tool     string `json:"tool"`
+		Severity string `json:"severity"`
+		Status   string `json:"status"`
+		Count    int    `json:"count"`
+	}
+	baseUC := []UseCase{
+		{"UC-001","Secrets detection","gitleaks","CRITICAL","active",0},
+		{"UC-002","Code injection","bandit","HIGH","active",0},
+		{"UC-003","IaC misconfig","kics","HIGH","active",0},
+		{"UC-004","Container CVEs","trivy","HIGH","active",0},
+		{"UC-005","Dependency CVEs","grype","MEDIUM","active",0},
+		{"UC-006","DAST findings","nuclei","HIGH","active",0},
+	}
+	toolCount := map[string]int{}
+	for _, f := range findings { toolCount[f.Tool]++ }
+	for i, uc := range baseUC {
+		baseUC[i].Count = toolCount[uc.Tool]
+		if toolCount[uc.Tool] == 0 { baseUC[i].Status = "no_data" }
+	}
+	jsonOK(w, map[string]any{"use_cases": baseUC, "total": len(baseUC)})
 }
 
 // GET /api/v1/soc/incidents

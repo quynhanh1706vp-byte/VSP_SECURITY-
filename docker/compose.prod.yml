@@ -20,9 +20,9 @@ services:
     image: redis:7-alpine
     container_name: vsp_redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-VspRedis2026!} --save "" --appendonly no
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set} --save "" --appendonly no
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-VspRedis2026!}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -41,7 +41,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-vsp}:${POSTGRES_PASSWORD:-vsp}@postgres:5432/${POSTGRES_DB:-vsp_go}?sslmode=disable
       REDIS_ADDR: redis:6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-VspRedis2026!}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       SERVER_ENV: production
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8922}
@@ -62,11 +62,15 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-vsp}:${POSTGRES_PASSWORD:-vsp}@postgres:5432/${POSTGRES_DB:-vsp_go}?sslmode=disable
       REDIS_ADDR: redis:6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-VspRedis2026!}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
       PATH: /usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
     volumes:
+      # SECURITY: docker socket mount — chỉ dùng nếu scanner cần build image
+      # Cân nhắc dùng rootless Docker hoặc Podman thay thế
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /home/test:/home/test:ro
+      # SECURITY: mount home dir — thay bằng specific scan target path
+      # - /home/test:/home/test:ro
+      - ${SCAN_TARGET_PATH:-/tmp/scan}:/scan:ro
       - /tmp:/tmp
 
   shell:

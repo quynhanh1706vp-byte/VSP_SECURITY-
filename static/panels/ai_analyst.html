@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VSP AI Analyst</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg:#080a0f;--bg2:#0d1117;--surface:#131920;--surface2:#1a2332;
+  --border:rgba(56,139,253,.12);--border2:rgba(56,139,253,.25);--border3:rgba(56,139,253,.4);
+  --t1:#e6edf3;--t2:#8b949e;--t3:#484f58;--t4:#2d333b;
+  --blue:#388bfd;--blue2:rgba(56,139,253,.12);
+  --green:#3fb950;--green2:rgba(63,185,80,.12);
+  --red:#f85149;--red2:rgba(248,81,73,.12);
+  --amber:#d29922;--amber2:rgba(210,153,34,.12);
+  --purple:#bc8cff;--purple2:rgba(188,140,255,.12);
+  --cyan:#39d353;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-ui:'Inter',sans-serif;
+  --radius:8px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* Top bar */
+.topbar{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:44px}
+.logo{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#388bfd,#bc8cff);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.topbar-title{font-size:12px;font-weight:700;letter-spacing:-.01em}
+.topbar-sub{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:1px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:auto;flex-shrink:0;transition:background .3s}
+.status-dot.loading{background:var(--amber);animation:blink .8s ease-in-out infinite}
+.status-dot.error{background:var(--red)}
+.status-txt{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-left:4px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* KPI bar */
+.kpi-bar{display:flex;gap:1px;background:var(--border);border-bottom:1px solid var(--border);flex-shrink:0}
+.kpi-item{flex:1;padding:6px 10px;background:var(--bg2);display:flex;align-items:center;gap:6px;cursor:default}
+.kpi-item:first-child{border-left:none}
+.kpi-val{font-size:13px;font-weight:700;font-family:var(--font-mono)}
+.kpi-lbl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-top:1px}
+
+/* Layout */
+.layout{display:grid;grid-template-columns:220px 1fr;flex:1;overflow:hidden;min-height:0}
+
+/* Sidebar */
+.sidebar{border-right:1px solid var(--border);background:var(--bg2);overflow-y:auto;display:flex;flex-direction:column;min-height:0}
+.sidebar::-webkit-scrollbar{width:3px}.sidebar::-webkit-scrollbar-thumb{background:var(--t4);border-radius:2px}
+.sb-section{padding:10px 10px 4px}
+.sb-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);font-family:var(--font-mono);margin-bottom:6px;padding:0 2px}
+.ctx{padding:7px 9px;border-radius:6px;border:1px solid transparent;margin-bottom:3px;cursor:pointer;transition:all .15s}
+.ctx:hover{background:var(--surface);border-color:var(--border)}
+.ctx.active{border-color:var(--border3);background:var(--blue2)}
+.ctx-t{font-size:11px;font-weight:600;margin-bottom:1px}
+.ctx-s{font-size:9px;color:var(--t3)}
+.ctx.active .ctx-s{color:rgba(56,139,253,.7)}
+
+.qbtn{width:100%;text-align:left;padding:6px 9px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--t2);cursor:pointer;font-size:11px;margin-bottom:2px;transition:all .15s;font-family:var(--font-ui);display:flex;align-items:center;gap:6px}
+.qbtn:hover{background:var(--surface);color:var(--t1);border-color:var(--border)}
+.qbtn .icon{font-size:11px;flex-shrink:0;width:16px;text-align:center}
+.qbtn.danger{color:var(--red)}
+.qbtn.danger:hover{background:var(--red2);border-color:rgba(248,81,73,.3)}
+
+.sb-divider{height:1px;background:var(--border);margin:8px 10px}
+
+/* Chat */
+.chat{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.msgs{flex:1;overflow-y:auto;padding:14px;scroll-behavior:smooth;min-height:0}
+.msgs::-webkit-scrollbar{width:3px}.msgs::-webkit-scrollbar-thumb{background:var(--t4);border-radius:2px}
+
+.msg{display:flex;gap:8px;margin-bottom:12px;animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{flex-direction:row-reverse}
+.av{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:2px}
+.msg.ai .av{background:linear-gradient(135deg,#388bfd,#bc8cff)}
+.msg.user .av{background:var(--surface2);border:1px solid var(--border2);color:var(--t2)}
+.mb{max-width:85%;min-width:0}
+.mn{font-size:9px;color:var(--t3);margin-bottom:3px;font-family:var(--font-mono)}
+.msg.user .mn{text-align:right}
+.bub{padding:9px 12px;border-radius:8px;font-size:12px;line-height:1.7;word-wrap:break-word}
+.msg.ai .bub{background:var(--surface);border:1px solid var(--border);border-radius:3px 8px 8px 8px}
+.msg.user .bub{background:var(--blue2);border:1px solid var(--border2);border-radius:8px 3px 8px 8px;color:var(--t1)}
+
+/* Message content styling */
+.bub pre{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:6px 0;font-size:10px;font-family:var(--font-mono);color:var(--blue);overflow-x:auto;white-space:pre-wrap}
+.bub code{font-family:var(--font-mono);font-size:10px;background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px;color:var(--blue)}
+.badge{display:inline-block;font-size:9px;font-family:var(--font-mono);padding:1px 5px;border-radius:3px;font-weight:700;margin:0 2px;vertical-align:middle}
+.badge-crit{background:var(--red2);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+.badge-high{background:var(--amber2);color:var(--amber);border:1px solid rgba(210,153,34,.3)}
+.badge-med{background:var(--blue2);color:var(--blue);border:1px solid var(--border2)}
+.badge-low{background:var(--green2);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+.badge-pass{background:var(--green2);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+.badge-fail{background:var(--red2);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+.badge-warn{background:var(--amber2);color:var(--amber);border:1px solid rgba(210,153,34,.3)}
+
+/* Typing indicator */
+.typing{display:flex;gap:3px;align-items:center;padding:4px 0}
+.typing span{width:5px;height:5px;border-radius:50%;background:var(--blue);animation:bo .9s infinite}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bo{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-4px);opacity:1}}
+
+/* Input */
+.inp-wrap{padding:8px 12px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.inp-inner{display:flex;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;transition:border-color .2s}
+.inp-inner:focus-within{border-color:var(--border3)}
+textarea{flex:1;background:transparent;border:none;color:var(--t1);font-size:12px;resize:none;outline:none;max-height:80px;min-height:18px;line-height:1.5;font-family:var(--font-ui)}
+textarea::placeholder{color:var(--t3)}
+.sbtn{width:26px;height:26px;border-radius:5px;background:linear-gradient(135deg,#388bfd,#bc8cff);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}
+.sbtn:hover{opacity:.85}.sbtn:disabled{opacity:.3;cursor:not-allowed}
+
+.hints{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.hint{font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid var(--border);color:var(--t3);cursor:pointer;transition:all .15s;font-family:var(--font-mono)}
+.hint:hover{border-color:var(--border2);color:var(--t2);background:var(--surface)}
+
+/* Export button */
+.export-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--t3);cursor:pointer;font-family:var(--font-ui);transition:all .15s;margin-left:auto}
+.export-btn:hover{border-color:var(--border2);color:var(--t2)}
+
+/* Incidents panel */
+.inc-item{padding:7px 9px;border-radius:6px;border:1px solid var(--border);margin-bottom:4px;cursor:pointer;transition:all .15s}
+.inc-item:hover{border-color:var(--border2);background:var(--surface)}
+.inc-title{font-size:10px;font-weight:500;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inc-meta{font-size:9px;color:var(--t3);font-family:var(--font-mono)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">◈</div>
+  <div>
+    <div class="topbar-title">VSP AI Security Analyst</div>
+    <div class="topbar-sub">Claude · incident triage · threat analysis</div>
+  </div>
+  <div class="status-dot" id="status-dot"></div>
+  <span class="status-txt" id="status-txt">Ready</span>
+</div>
+
+<!-- KPI bar với real data -->
+<div class="kpi-bar" id="kpi-bar">
+  <div class="kpi-item">
+    <div><div class="kpi-val" id="k-score" style="color:var(--amber)">—</div><div class="kpi-lbl">Score</div></div>
+  </div>
+  <div class="kpi-item">
+    <div><div class="kpi-val" id="k-gate" style="color:var(--red)">—</div><div class="kpi-lbl">Gate</div></div>
+  </div>
+  <div class="kpi-item">
+    <div><div class="kpi-val" id="k-findings" style="color:var(--t1)">—</div><div class="kpi-lbl">Findings</div></div>
+  </div>
+  <div class="kpi-item">
+    <div><div class="kpi-val" id="k-incidents" style="color:var(--red)">—</div><div class="kpi-lbl">Incidents</div></div>
+  </div>
+  <div class="kpi-item">
+    <div><div class="kpi-val" id="k-crit" style="color:var(--red)">—</div><div class="kpi-lbl">Critical</div></div>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-section">
+      <div class="sb-lbl">Context</div>
+      <div class="ctx active" onclick="setCtx('all',this)">
+        <div class="ctx-t">Full SIEM context</div>
+        <div class="ctx-s">Incidents · findings · logs</div>
+      </div>
+      <div class="ctx" onclick="setCtx('incidents',this)">
+        <div class="ctx-t">Incidents</div>
+        <div class="ctx-s" id="ctx-inc-sub">Loading…</div>
+      </div>
+      <div class="ctx" onclick="setCtx('findings',this)">
+        <div class="ctx-t">Latest scan</div>
+        <div class="ctx-s" id="ctx-scan-sub">Loading…</div>
+      </div>
+      <div class="ctx" onclick="setCtx('threats',this)">
+        <div class="ctx-t">Threat intel</div>
+        <div class="ctx-s">IOCs · CVEs · MITRE</div>
+      </div>
+      <div class="ctx" onclick="setCtx('schedules',this)">
+        <div class="ctx-t">Schedules</div>
+        <div class="ctx-s" id="ctx-sched-sub">Loading…</div>
+      </div>
+    </div>
+
+    <div class="sb-divider"></div>
+
+    <div class="sb-section">
+      <div class="sb-lbl">Quick analysis</div>
+      <button class="qbtn" onclick="qa('Triage tất cả incidents đang mở theo độ ưu tiên, cái nào cần xử lý ngay?')"><span class="icon">🔴</span>Triage incidents</button>
+      <button class="qbtn" onclick="qa('Phân tích và giải thích tất cả CVEs trong latest scan, cách vá lỗi cụ thể?')"><span class="icon">🛡</span>Explain CVEs</button>
+      <button class="qbtn" onclick="qa('Top 5 critical findings cần fix ngay, viết remediation steps cụ thể với file và line number')"><span class="icon">⚡</span>Priority fixes</button>
+      <button class="qbtn" onclick="qa('Viết executive summary về bảo mật cho CISO, ngắn gọn và rõ ràng với risk rating')"><span class="icon">📊</span>Executive summary</button>
+      <button class="qbtn" onclick="qa('Phân tích MITRE ATT&CK coverage từ incidents và findings hiện tại, gaps cần bổ sung')"><span class="icon">🗺</span>MITRE mapping</button>
+      <button class="qbtn" onclick="qa('Tạo SOAR playbook tự động xử lý khi phát hiện SLA breach incident')"><span class="icon">▶</span>Generate playbook</button>
+      <button class="qbtn" onclick="qa('Có dấu hiệu lateral movement hoặc data exfiltration trong incidents không? Phân tích chi tiết')"><span class="icon">🔍</span>Threat hunting</button>
+      <button class="qbtn" onclick="qa('Dự đoán risk trend 30 ngày tới dựa trên data hiện tại và đề xuất cải thiện score')"><span class="icon">📈</span>Risk forecast</button>
+    </div>
+
+    <div class="sb-divider"></div>
+
+    <div class="sb-section" id="incidents-sidebar" style="display:none">
+      <div class="sb-lbl">Open incidents</div>
+      <div id="inc-list-sidebar"></div>
+    </div>
+
+    <div class="sb-divider" id="inc-divider" style="display:none"></div>
+
+    <div class="sb-section" style="margin-top:auto;padding-bottom:10px">
+      <button class="qbtn danger" onclick="clr()"><span class="icon">🗑</span>Clear chat</button>
+    </div>
+  </div>
+
+  <div class="chat">
+    <div class="msgs" id="msgs"></div>
+    <div class="inp-wrap">
+      <div class="inp-inner">
+        <textarea id="inp"
+          placeholder="Hỏi về incidents, CVEs, findings, threats... (Enter để gửi, Shift+Enter xuống dòng)"
+          rows="1"
+          onkeydown="onKey(event)"
+          oninput="resize(this)"></textarea>
+        <button class="sbtn" id="sbtn" onclick="send()" title="Send">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+            <path d="M14 8L2 2l3 6-3 6 12-6z" fill="white"/>
+          </svg>
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+        <div class="hints">
+          <span class="hint" onclick="sh('Giải thích INC-001')">Explain incident</span>
+          <span class="hint" onclick="sh('Fix CVE trong latest scan?')">Fix CVE</span>
+          <span class="hint" onclick="sh('Risk score nghĩa là gì?')">Risk score</span>
+          <span class="hint" onclick="sh('Prioritize findings tuần này')">Prioritize</span>
+          <span class="hint" onclick="sh('SLA breach xử lý thế nào?')">SLA breach</span>
+        </div>
+        <button class="export-btn" onclick="exportChat()">↓ Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+var TOKEN = '', API_BASE = window.location.origin;
+var _ctx = 'all', _loading = false, _hist = [];
+var _ctxData = {};
+
+// ── Token init (same pattern as scheduler) ─────────────────
+function _initWithToken(tk) {
+  if (!tk || tk.length < 50 || TOKEN) return;
+  TOKEN = tk;
+  loadAllData();
+}
+
+window.addEventListener('message', function(e) {
+  if (!e.data) return;
+  if (e.data.type === 'vsp:token') _initWithToken(e.data.token);
+});
+
+if (window.parent !== window) {
+  window.parent.postMessage({ type: 'vsp:request_token' }, '*');
+  window.parent.postMessage({ type: 'vsp:request_theme' }, '*');
+}
+
+(function() {
+  var tk = '';
+  try { tk = localStorage.getItem('vsp_token') || ''; } catch(e) {}
+  if (tk && tk.length > 50) { setTimeout(function(){ _initWithToken(tk); }, 150); return; }
+  var _p = setInterval(function() {
+    if (TOKEN) { clearInterval(_p); return; }
+    try { tk = localStorage.getItem('vsp_token') || ''; } catch(e) {}
+    if (tk && tk.length > 50) { clearInterval(_p); _initWithToken(tk); }
+  }, 300);
+  setTimeout(function(){ clearInterval(_p); if (!TOKEN) init(); }, 5000);
+})();
+
+// ── Load all VSP data ──────────────────────────────────────
+async function loadAllData() {
+  setStatus('loading', 'Loading data…');
+  var h = { Authorization: 'Bearer ' + TOKEN };
+  try {
+    var results = await Promise.all([
+      fetch(API_BASE + '/api/v1/vsp/run/latest', { headers: h }).then(function(r){ return r.json(); }).catch(function(){ return {}; }),
+      fetch(API_BASE + '/api/v1/correlation/incidents?limit=20&status=open', { headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { incidents:[] }; }),
+      fetch(API_BASE + '/api/v1/schedules', { headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { schedules:[] }; }),
+      fetch(API_BASE + '/api/v1/vsp/runs?limit=5', { headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { runs:[] }; }),
+    ]);
+
+    var run = results[0], incData = results[1], schedData = results[2], runsData = results[3];
+    var incs = incData.incidents || [];
+    var scheds = schedData.schedules || [];
+    var runs = runsData.runs || [];
+
+    _ctxData = { run: run, incidents: incs, schedules: scheds, recentRuns: runs };
+
+    // Update KPIs
+    var score = run.summary ? run.summary.SCORE : null;
+    var gate = run.gate || '—';
+    var findings = run.total_findings || 0;
+    var crit = run.summary ? run.summary.CRITICAL : 0;
+
+    var scoreEl = document.getElementById('k-score');
+    scoreEl.textContent = score !== null ? score + '/100' : '—';
+    scoreEl.style.color = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--amber)' : 'var(--red)';
+
+    var gateEl = document.getElementById('k-gate');
+    gateEl.textContent = gate;
+    gateEl.style.color = gate === 'PASS' ? 'var(--green)' : gate === 'WARN' ? 'var(--amber)' : 'var(--red)';
+
+    document.getElementById('k-findings').textContent = findings;
+    document.getElementById('k-incidents').textContent = incs.length;
+    document.getElementById('k-crit').textContent = crit;
+
+    // Update sidebar context labels
+    var openIncs = incs.filter(function(i){ return i.status === 'open'; });
+    document.getElementById('ctx-inc-sub').textContent = openIncs.length + ' open incidents';
+    document.getElementById('ctx-scan-sub').textContent = run.mode ? run.mode + ' · ' + findings + ' findings' : 'No data';
+    document.getElementById('ctx-sched-sub').textContent = scheds.length + ' schedules configured';
+
+    // Render incidents in sidebar
+    if (openIncs.length > 0) {
+      document.getElementById('incidents-sidebar').style.display = 'block';
+      document.getElementById('inc-divider').style.display = 'block';
+      var sevColor = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--green)' };
+      document.getElementById('inc-list-sidebar').innerHTML = openIncs.slice(0, 5).map(function(inc) {
+        var color = sevColor[inc.severity] || 'var(--t2)';
+        return '<div class="inc-item" onclick="qa(\'Phân tích incident: ' + inc.title.replace(/'/g, '') + '\')">'
+          + '<div class="inc-title" title="' + inc.title + '">' + inc.title + '</div>'
+          + '<div class="inc-meta" style="color:' + color + '">' + inc.severity + ' · ' + (inc.created_at||'').slice(0,10) + '</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    setStatus('ready', 'Ready');
+    init();
+  } catch(e) {
+    setStatus('error', 'Error loading data');
+    init();
+  }
+}
+
+// ── System prompt builder ──────────────────────────────────
+function buildSystem() {
+  var d = _ctxData;
+  var run = d.run || {};
+  var incs = d.incidents || [];
+  var scheds = d.schedules || [];
+  var runs = d.recentRuns || [];
+
+  var score = run.summary ? run.summary.SCORE : 22;
+  var gate = run.gate || 'FAIL';
+  var findings = run.total_findings || 0;
+  var summary = run.summary || {};
+
+  var incText = incs.length > 0
+    ? incs.slice(0, 10).map(function(i){ return '- [' + i.severity + '] ' + i.title + ' (created: ' + (i.created_at||'').slice(0,10) + ')'; }).join('\n')
+    : '- No open incidents';
+
+  var schedText = scheds.map(function(s){
+    return '- ' + s.name + ' [' + s.mode + '] cron:' + s.cron + ' enabled:' + s.enabled;
+  }).join('\n') || '- No schedules';
+
+  var runsText = runs.slice(0, 3).map(function(r){
+    return '- ' + (r.rid||r.id) + ' [' + r.mode + '] gate:' + r.gate + ' findings:' + r.total_findings;
+  }).join('\n') || '- No recent runs';
+
+  var base = 'Bạn là VSP AI Security Analyst trong VSP Security Platform v0.10.0 Enterprise.\n'
+    + 'Bạn có quyền truy cập vào toàn bộ dữ liệu bảo mật real-time của hệ thống.\n\n'
+    + '=== TRẠNG THÁI HỆ THỐNG ===\n'
+    + 'Security Score: ' + score + '/100\n'
+    + 'Gate: ' + gate + '\n'
+    + 'Mode: ' + (run.mode || 'SAST') + ' | Profile: ' + (run.profile || 'FAST') + '\n'
+    + 'Total findings: ' + findings + '\n'
+    + 'Critical: ' + (summary.CRITICAL || 0) + ' | High: ' + (summary.HIGH || 0) + ' | Medium: ' + (summary.MEDIUM || 0) + ' | Low: ' + (summary.LOW || 0) + '\n'
+    + 'Latest run: ' + (run.rid || 'N/A') + '\n'
+    + 'Source: ' + (run.src || 'N/A') + '\n\n'
+    + '=== INCIDENTS ĐANG MỞ (' + incs.length + ') ===\n' + incText + '\n\n'
+    + '=== SCHEDULES ===\n' + schedText + '\n\n'
+    + '=== RECENT RUNS ===\n' + runsText + '\n\n'
+    + '=== HƯỚNG DẪN ===\n'
+    + 'Trả lời bằng tiếng Việt (hoặc tiếng Anh nếu user dùng tiếng Anh).\n'
+    + 'Cụ thể, actionable, có mức độ ưu tiên rõ ràng.\n'
+    + 'Dùng markdown: **bold**, `code`, ## headers, - bullets.\n'
+    + 'Dùng [CRITICAL], [HIGH], [MEDIUM], [LOW] để tag severity.\n'
+    + 'Luôn đề xuất next steps cụ thể.';
+
+  var ctxMap = {
+    incidents: base + '\n\n=== FOCUS: INCIDENT TRIAGE ===\nTập trung phân tích và ưu tiên xử lý incidents.',
+    findings: base + '\n\n=== FOCUS: FINDINGS & REMEDIATION ===\nTập trung remediation steps cụ thể cho findings.',
+    threats: base + '\n\n=== FOCUS: THREAT INTELLIGENCE ===\nTập trung threat landscape, IOC analysis, MITRE ATT&CK mapping.',
+    schedules: base + '\n\n=== FOCUS: SCAN SCHEDULES ===\nTập trung tối ưu hóa scan schedules và coverage.',
+  };
+
+  return ctxMap[_ctx] || base;
+}
+
+// ── Send message with streaming ────────────────────────────
+async function send() {
+  if (_loading) return;
+  var inp = document.getElementById('inp');
+  var txt = inp.value.trim();
+  if (!txt) return;
+
+  add('user', txt);
+  _hist.push({ role: 'user', content: txt });
+  inp.value = '';
+  inp.style.height = 'auto';
+
+  _loading = true;
+  document.getElementById('sbtn').disabled = true;
+  setStatus('loading', 'Analyzing…');
+  showTyping();
+
+  try {
+    // Try streaming via gateway first
+    var response = await fetch(API_BASE + '/api/v1/ai/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + TOKEN
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        system: buildSystem(),
+        messages: _hist.slice(-12)
+      })
+    });
+
+    var data = await response.json();
+    var reply = '';
+
+    if (data.content && data.content[0] && data.content[0].text) {
+      reply = data.content[0].text;
+    } else if (data.reply) {
+      reply = data.reply;
+    } else if (data.error) {
+      // Gateway API key invalid — use Anthropic directly via fetch
+      reply = await callAnthropicDirect(txt);
+    } else {
+      reply = await callAnthropicDirect(txt);
+    }
+
+    rmTyping();
+    addStreaming('ai', reply);
+    _hist.push({ role: 'assistant', content: reply });
+
+  } catch(e) {
+    rmTyping();
+    var fallback = await callAnthropicDirect(txt).catch(function(){
+      return 'Không kết nối được API. Kiểm tra network và thử lại.';
+    });
+    addStreaming('ai', fallback);
+    if (fallback !== 'Không kết nối được API. Kiểm tra network và thử lại.') {
+      _hist.push({ role: 'assistant', content: fallback });
+    }
+  }
+
+  _loading = false;
+  document.getElementById('sbtn').disabled = false;
+  setStatus('ready', 'Ready');
+}
+
+async function callAnthropicDirect(txt) {
+  var r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: buildSystem(),
+      messages: _hist.slice(-12)
+    })
+  });
+  var d = await r.json();
+  if (d.content && d.content[0]) return d.content[0].text;
+  throw new Error('No content');
+}
+
+// ── UI helpers ─────────────────────────────────────────────
+function setStatus(type, txt) {
+  var dot = document.getElementById('status-dot');
+  dot.className = 'status-dot' + (type !== 'ready' ? ' ' + type : '');
+  document.getElementById('status-txt').textContent = txt;
+}
+
+function showTyping() {
+  var d = document.createElement('div');
+  d.className = 'msg ai'; d.id = 'typ';
+  d.innerHTML = '<div class="av">◈</div><div class="mb"><div class="mn">VSP AI</div><div class="bub"><div class="typing"><span></span><span></span><span></span></div></div></div>';
+  var c = document.getElementById('msgs');
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+function rmTyping() { var t = document.getElementById('typ'); if (t) t.remove(); }
+
+function md(s) {
+  s = s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  s = s.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre>$1</pre>');
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:var(--t1)">$1</strong>');
+  s = s.replace(/^### (.+)$/gm, '<div style="font-size:11px;font-weight:700;color:var(--blue);margin:8px 0 3px;text-transform:uppercase;letter-spacing:.04em">$1</div>');
+  s = s.replace(/^## (.+)$/gm, '<div style="font-size:12px;font-weight:700;color:var(--t1);margin:10px 0 4px">$1</div>');
+  s = s.replace(/^# (.+)$/gm, '<div style="font-size:13px;font-weight:700;color:var(--t1);margin:10px 0 5px">$1</div>');
+  s = s.replace(/\[CRITICAL\]/g, '<span class="badge badge-crit">CRITICAL</span>');
+  s = s.replace(/\[HIGH\]/g, '<span class="badge badge-high">HIGH</span>');
+  s = s.replace(/\[MEDIUM\]/g, '<span class="badge badge-med">MEDIUM</span>');
+  s = s.replace(/\[LOW\]/g, '<span class="badge badge-low">LOW</span>');
+  s = s.replace(/\[PASS\]/g, '<span class="badge badge-pass">PASS</span>');
+  s = s.replace(/\[FAIL\]/g, '<span class="badge badge-fail">FAIL</span>');
+  s = s.replace(/\[WARN\]/g, '<span class="badge badge-warn">WARN</span>');
+  s = s.replace(/^[*\-] (.+)$/gm, '<div style="display:flex;gap:5px;margin:2px 0"><span style="color:var(--blue);flex-shrink:0">›</span><span>$1</span></div>');
+  s = s.replace(/^(\d+)\. (.+)$/gm, '<div style="display:flex;gap:5px;margin:3px 0"><span style="color:var(--blue);font-family:var(--font-mono);flex-shrink:0;min-width:14px">$1.</span><span>$2</span></div>');
+  s = s.replace(/\n\n/g, '<br><br>');
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
+
+function add(role, txt) {
+  var d = document.createElement('div');
+  d.className = 'msg ' + role;
+  var av = role === 'ai' ? '◈' : '👤';
+  var nm = role === 'ai' ? 'VSP AI' : 'You';
+  d.innerHTML = '<div class="av">' + av + '</div><div class="mb"><div class="mn">' + nm + '</div><div class="bub">' + md(txt) + '</div></div>';
+  var c = document.getElementById('msgs');
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+  return d;
+}
+
+function addStreaming(role, txt) {
+  // Simulate streaming by revealing text progressively
+  var d = document.createElement('div');
+  d.className = 'msg ' + role;
+  var av = role === 'ai' ? '◈' : '👤';
+  var nm = role === 'ai' ? 'VSP AI' : 'You';
+  var bub = document.createElement('div');
+  bub.className = 'bub';
+  d.innerHTML = '<div class="av">' + av + '</div>';
+  var mb = document.createElement('div');
+  mb.className = 'mb';
+  var mn = document.createElement('div');
+  mn.className = 'mn';
+  mn.textContent = nm;
+  mb.appendChild(mn);
+  mb.appendChild(bub);
+  d.appendChild(mb);
+  var c = document.getElementById('msgs');
+  c.appendChild(d);
+
+  // Chunk render
+  var words = txt.split(' ');
+  var i = 0, chunkSize = 8;
+  function renderChunk() {
+    var end = Math.min(i + chunkSize, words.length);
+    bub.innerHTML = md(words.slice(0, end).join(' '));
+    i = end;
+    c.scrollTop = c.scrollHeight;
+    if (i < words.length) {
+      chunkSize = Math.min(chunkSize + 2, 20);
+      setTimeout(renderChunk, 20);
+    }
+  }
+  renderChunk();
+}
+
+function qa(q) { document.getElementById('inp').value = q; send(); }
+function sh(t) { document.getElementById('inp').value = t; document.getElementById('inp').focus(); }
+
+function onKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+}
+function resize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 80) + 'px'; }
+
+function setCtx(c, el) {
+  _ctx = c;
+  _hist = [];
+  document.querySelectorAll('.ctx').forEach(function(x){ x.classList.remove('active'); });
+  el.classList.add('active');
+  var labels = { all:'Full SIEM', incidents:'Incidents', findings:'Scan findings', threats:'Threat Intel', schedules:'Schedules' };
+  add('ai', '**Context: ' + (labels[c]||c) + '**\n\nSẵn sàng phân tích! Bạn muốn biết gì?');
+}
+
+function clr() {
+  document.getElementById('msgs').innerHTML = '';
+  _hist = [];
+  init();
+}
+
+function exportChat() {
+  var msgs = document.querySelectorAll('.msg');
+  var lines = ['# VSP AI Analyst — Chat Export', '**Date:** ' + new Date().toISOString(), '---', ''];
+  msgs.forEach(function(m) {
+    var isUser = m.classList.contains('user');
+    var txt = m.querySelector('.bub') ? m.querySelector('.bub').innerText : '';
+    lines.push((isUser ? '**You:** ' : '**VSP AI:** ') + txt);
+    lines.push('');
+  });
+  var blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vsp-ai-chat-' + Date.now() + '.md';
+  a.click();
+}
+
+// ── Welcome message với real data ─────────────────────────
+function buildWelcome() {
+  var d = _ctxData;
+  var run = d.run || {};
+  var incs = d.incidents || [];
+  var score = run.summary ? run.summary.SCORE : null;
+  var gate = run.gate || '?';
+  var findings = run.total_findings || 0;
+  var crit = run.summary ? run.summary.CRITICAL : 0;
+  var high = run.summary ? run.summary.HIGH : 0;
+
+  var gateTag = gate === 'PASS' ? '[PASS]' : gate === 'WARN' ? '[WARN]' : '[FAIL]';
+  var critLine = crit > 0 ? '\n' + gateTag + ' ' + crit + ' critical findings cần xử lý ngay' : '';
+  var highLine = high > 0 ? '\n[HIGH] ' + high + ' high severity findings' : '';
+  var incLine = incs.length > 0 ? '\n[CRITICAL] ' + incs.length + ' incidents đang mở' : '';
+  var scoreLine = score !== null ? '\n[' + (score >= 80 ? 'PASS' : score >= 60 ? 'WARN' : 'FAIL') + '] Security score: ' + score + '/100' : '';
+
+  return '**Xin chào! Tôi là VSP AI Security Analyst** powered by Claude\n\n'
+    + '**Trạng thái hiện tại:**'
+    + scoreLine + critLine + highLine + incLine + '\n\n'
+    + 'Tôi có thể giúp: triage incidents, explain CVEs, priority fixes, SOAR playbooks, MITRE analysis, threat hunting.\n\n'
+    + 'Hỏi tôi bất cứ điều gì về bảo mật hệ thống!';
+}
+
+function init() {
+  add('ai', buildWelcome());
+}
+</script>
+</body>
+</html>

@@ -7,12 +7,49 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/store"
 )
+
+// validateWebhookURL chặn SSRF — chỉ cho phép HTTPS đến external hosts
+func ValidateWebhookURL(rawURL string) error {
+	u, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("scheme must be http/https")
+	}
+	host := u.Hostname()
+	// Chặn localhost và private ranges
+	blocked := []string{"localhost", "127.", "0.0.0.0", "::1",
+		"169.254.", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
+		"172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+		"172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+		"192.168.", "metadata.google", "metadata.aws"}
+	for _, b := range blocked {
+		if strings.HasPrefix(host, b) || host == strings.TrimSuffix(b, ".") {
+			return fmt.Errorf("URL host %q is not allowed (private/internal)", host)
+		}
+	}
+	// Resolve DNS và check IP
+	ips, err := net.LookupHost(host)
+	if err != nil { return nil } // nếu không resolve được thì skip check này
+	for _, ip := range ips {
+		parsed := net.ParseIP(ip)
+		if parsed == nil { continue }
+		if parsed.IsLoopback() || parsed.IsPrivate() || parsed.IsLinkLocalUnicast() {
+			return fmt.Errorf("URL resolves to private IP %s — blocked", ip)
+		}
+	}
+	return nil
+}
 
 // WebhookType defines the payload format.
 type WebhookType string
@@ -88,6 +125,10 @@ func deliverOne(ctx context.Context, db *store.DB, hook store.SIEMWebhook, event
 }
 
 func send(ctx context.Context, hook store.SIEMWebhook, payload []byte) error {
+	// Validate URL mỗi lần gửi — chặn SSRF
+	if err := ValidateWebhookURL(hook.URL); err != nil {
+		return fmt.Errorf("webhook URL blocked: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, "POST", hook.URL,
 		bytes.NewReader(payload))
 	if err != nil {

@@ -51,8 +51,17 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "email and password required", http.StatusBadRequest)
 		return
 	}
-	if req.Role == "" {
-		req.Role = "analyst"
+	// Whitelist roles — không cho phép role tùy ý
+	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
+	if req.Role == "" { req.Role = "analyst" }
+	if !validRoles[req.Role] {
+		jsonError(w, "invalid role: must be admin|analyst|dev|auditor", http.StatusBadRequest)
+		return
+	}
+	// Password strength check
+	if len(req.Password) < 8 {
+		jsonError(w, "password must be at least 8 characters", http.StatusBadRequest)
+		return
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)

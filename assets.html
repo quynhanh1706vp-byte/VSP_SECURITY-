@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VSP — Assets</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--font-mono:'JetBrains Mono','Fira Mono',monospace;--font-ui:'Inter','Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5;padding:16px}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}
+.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}
+.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}
+.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}
+.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.3)}
+.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--surface)}
+.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:12px;font-weight:600}
+.card-sub{font-size:11px;color:var(--t3);margin-top:1px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.kpi-val{font-size:20px;font-weight:700;font-family:var(--font-mono)}
+.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;padding:7px 10px;border-bottom:1px solid var(--border);font-family:var(--font-mono)}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:11px;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr{cursor:pointer;transition:background .12s}
+.tbl tr:hover td{background:var(--surface)}
+.risk-bar-wrap{background:var(--border);border-radius:2px;height:5px;width:60px;display:inline-block;vertical-align:middle}
+.risk-bar{height:5px;border-radius:2px}
+.asset-icon{width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.filter-row{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)}
+select,input[type=text]{font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--bg);color:var(--t1);outline:none}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-size:15px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}
+.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.modal-bg{display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);align-items:flex-start;justify-content:center;padding-top:40px;z-index:10}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;width:min(480px,95%);padding:0}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:14px;font-weight:700}
+.modal-body{padding:16px}
+.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px}
+.form-group{margin-bottom:10px}
+.form-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:block}
+.form-ctrl{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;outline:none}
+.wrap{position:relative}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+
+<div class="hdr">
+  <div>
+    <h2>Asset inventory</h2>
+    <p>CMDB · risk scoring · finding correlation · coverage map</p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn" onclick="loadAssets()">&#8635; Refresh</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ Add asset</button>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-lbl">Total assets</div><div class="kpi-val" style="color:var(--cyan)" id="k-total">—</div><div class="kpi-sub">discovered + manual</div></div>
+  <div class="kpi"><div class="kpi-lbl">Critical risk</div><div class="kpi-val" style="color:var(--red)" id="k-crit">—</div><div class="kpi-sub">assets with criticals</div></div>
+  <div class="kpi"><div class="kpi-lbl">High risk</div><div class="kpi-val" style="color:var(--amber)" id="k-high">—</div><div class="kpi-sub">assets with highs</div></div>
+  <div class="kpi"><div class="kpi-lbl">Clean assets</div><div class="kpi-val" style="color:var(--green)" id="k-clean">—</div><div class="kpi-sub">no findings</div></div>
+</div>
+
+<div class="card" style="margin-bottom:0">
+  <div class="card-head">
+    <div><div class="card-title">Asset inventory</div><div class="card-sub" id="asset-count-lbl">—</div></div>
+    <div style="display:flex;gap:7px">
+      <select id="filter-type" onchange="renderAssets()">
+        <option value="">All types</option>
+        <option value="server">Server</option>
+        <option value="host">Host</option>
+        <option value="workstation">Workstation</option>
+      </select>
+      <select id="filter-risk" onchange="renderAssets()">
+        <option value="">All risk</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="clean">Clean</option>
+      </select>
+      <input type="text" id="filter-search" placeholder="Search…" oninput="renderAssets()">
+    </div>
+  </div>
+  <div class="filter-row" style="font-size:10px;color:var(--t3)">
+    <span id="filter-info">— assets</span>
+    <div style="margin-left:auto;display:flex;gap:6px">
+      <button class="btn" style="font-size:9px;padding:2px 8px" onclick="exportCSV()">&#8595; CSV</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:32px"></th>
+          <th>Asset</th>
+          <th>Type</th>
+          <th>IP / host</th>
+          <th>Env</th>
+          <th>Critical</th>
+          <th>High</th>
+          <th>Total findings</th>
+          <th>Risk score</th>
+          <th>Last scan</th>
+        </tr>
+      </thead>
+      <tbody id="asset-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-bg" id="add-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Add asset</div>
+      <button class="modal-close" onclick="closeModal()">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Name</label><input class="form-ctrl" id="a-name" placeholder="e.g. prod-web-01"></div>
+      <div class="form-group"><label class="form-label">IP / hostname</label><input class="form-ctrl" id="a-ip" placeholder="10.0.1.50"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group"><label class="form-label">Type</label>
+          <select class="form-ctrl" id="a-type">
+            <option value="server">Server</option>
+            <option value="workstation">Workstation</option>
+            <option value="host">Host</option>
+            <option value="container">Container</option>
+            <option value="cloud">Cloud resource</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Environment</label>
+          <select class="form-ctrl" id="a-env">
+            <option value="prod">Production</option>
+            <option value="staging">Staging</option>
+            <option value="dev">Development</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Tags (comma-separated)</label><input class="form-ctrl" id="a-tags" placeholder="linux, web, prod"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border)">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addAsset()">Add asset &#8594;</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+var TOKEN = '';
+var API = 'http://127.0.0.1:8921';
+var ALL_ASSETS = [];
+
+var TYPE_COLORS = {server:'rgba(59,130,246,.2)',host:'rgba(6,182,212,.2)',workstation:'rgba(139,92,246,.2)',container:'rgba(20,184,166,.2)',cloud:'rgba(245,158,11,.2)',local:'rgba(255,255,255,.08)'};
+var TYPE_TEXT   = {server:'var(--blue)',host:'var(--cyan)',workstation:'var(--purple)',container:'var(--teal)',cloud:'var(--amber)',local:'var(--t3)'};
+
+function riskColor(score){return score>=70?'var(--red)':score>=40?'var(--amber)':score>0?'var(--blue)':'var(--green)'}
+function riskPill(score){
+  if(score>=70) return '<span class="pill pill-red">Critical</span>';
+  if(score>=40) return '<span class="pill pill-amber">High</span>';
+  if(score>0)   return '<span class="pill pill-blue">Medium</span>';
+  return '<span class="pill pill-green">Clean</span>';
+}
+
+function renderAssets(){
+  var typeF   = document.getElementById('filter-type').value;
+  var riskF   = document.getElementById('filter-risk').value;
+  var searchF = document.getElementById('filter-search').value.toLowerCase();
+
+  var list = ALL_ASSETS.filter(function(a){
+    if(typeF && (a.type||a.Type||'') !== typeF) return false;
+    if(riskF === 'critical' && (a.risk_score||a.RiskScore||0) < 70) return false;
+    if(riskF === 'high'     && ((a.risk_score||0) < 40 || (a.risk_score||0) >= 70)) return false;
+    if(riskF === 'clean'    && (a.risk_score||0) > 0) return false;
+    if(searchF && !(a.name||'').toLowerCase().includes(searchF) &&
+                  !(a.ip||a.IP||a.host||'').toLowerCase().includes(searchF)) return false;
+    return true;
+  });
+
+  document.getElementById('filter-info').textContent = list.length+' assets';
+  document.getElementById('asset-count-lbl').textContent = list.length+' of '+ALL_ASSETS.length+' assets';
+
+  var tbody = document.getElementById('asset-tbody');
+  if(!list.length){
+    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--t3)">No assets found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(function(a){
+    var name     = a.name||a.Name||'—';
+    var type     = a.type||a.Type||'host';
+    var ip       = a.ip||a.IP||a.host||'—';
+    var env      = a.environment||a.env||'prod';
+    var crit     = a.critical||a.CritCount||0;
+    var high     = a.high||a.HighCount||0;
+    var total    = a.total_findings||a.TotalFinds||0;
+    var risk     = a.risk_score||a.RiskScore||0;
+    var lastScan = a.last_scan||a.LastScan||'';
+    var iconBg   = TYPE_COLORS[type]||TYPE_COLORS.host;
+    var iconCol  = TYPE_TEXT[type]||'var(--t2)';
+    var initials = name.slice(0,2).toUpperCase();
+    var lastStr  = lastScan ? new Date(lastScan).toLocaleDateString('vi-VN') : '—';
+    return '<tr onclick="showAssetDetail(\''+name+'\',\''+ip+'\')">'
+      +'<td><div class="asset-icon" style="background:'+iconBg+';color:'+iconCol+'">'+initials+'</div></td>'
+      +'<td><div style="font-weight:500;font-size:12px">'+name+'</div>'
+      +(type?'<div style="font-size:10px;color:var(--t3)">'+type+'</div>':'')
+      +'</td>'
+      +'<td><span class="pill pill-gray">'+type+'</span></td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">'+ip+'</td>'
+      +'<td><span class="pill pill-gray">'+env+'</span></td>'
+      +'<td style="font-weight:600;color:var(--red)">'+crit+'</td>'
+      +'<td style="font-weight:600;color:var(--amber)">'+high+'</td>'
+      +'<td style="color:var(--t2)">'+total+'</td>'
+      +'<td>'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+      +'<div class="risk-bar-wrap"><div class="risk-bar" style="width:'+risk+'%;background:'+riskColor(risk)+'"></div></div>'
+      +'<span style="font-family:var(--font-mono);font-size:10px;color:'+riskColor(risk)+'">'+risk+'</span>'
+      +'</div>'
+      +'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">'+lastStr+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function showAssetDetail(name, ip){
+  window.parent && window.parent.postMessage({
+    type:'vsp:nav',
+    panel:'findings',
+    filter:{search:ip||name}
+  },'*');
+}
+
+async function loadAssets(){
+  if(!TOKEN) return;
+  var h = {Authorization:'Bearer '+TOKEN};
+  try {
+    var [aR, sR] = await Promise.all([
+      fetch(API+'/api/v1/assets',{headers:h}).then(function(r){return r.json()}).catch(function(){return{assets:[]}}),
+      fetch(API+'/api/v1/assets/summary',{headers:h}).then(function(r){return r.json()}).catch(function(){return{}}),
+    ]);
+    ALL_ASSETS = aR.assets||[];
+    document.getElementById('k-total').textContent = sR.total||ALL_ASSETS.length||0;
+    document.getElementById('k-crit').textContent  = sR.critical||ALL_ASSETS.filter(function(a){return (a.risk_score||0)>=70}).length||0;
+    document.getElementById('k-high').textContent  = sR.high||ALL_ASSETS.filter(function(a){return (a.risk_score||0)>=40&&(a.risk_score||0)<70}).length||0;
+    document.getElementById('k-clean').textContent = sR.clean||ALL_ASSETS.filter(function(a){return (a.risk_score||0)===0}).length||0;
+    renderAssets();
+  } catch(e){ console.error('loadAssets',e); }
+}
+
+function openAddModal(){ document.getElementById('add-modal').classList.add('open'); }
+function closeModal(){ document.getElementById('add-modal').classList.remove('open'); }
+
+async function addAsset(){
+  if(!TOKEN) return;
+  var name = document.getElementById('a-name').value.trim();
+  var ip   = document.getElementById('a-ip').value.trim();
+  var type = document.getElementById('a-type').value;
+  var env  = document.getElementById('a-env').value;
+  var tags = document.getElementById('a-tags').value.split(',').map(function(t){return t.trim()}).filter(Boolean);
+  if(!name){ alert('Name required'); return; }
+  try {
+    var r = await fetch(API+'/api/v1/assets',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body: JSON.stringify({name,ip,type,env,tags})
+    });
+    if(r.ok){
+      closeModal();
+      document.getElementById('a-name').value='';
+      document.getElementById('a-ip').value='';
+      loadAssets();
+    }
+  } catch(e){}
+}
+
+function exportCSV(){
+  var rows=[['Name','Type','IP','Env','Critical','High','Total','Risk']];
+  ALL_ASSETS.forEach(function(a){
+    rows.push([a.name,a.type||'host',a.ip||a.host||'',a.environment||'prod',
+               a.critical||0,a.high||0,a.total_findings||0,a.risk_score||0]);
+  });
+  var csv=rows.map(function(r){return r.map(function(v){return '"'+v+'"'}).join(',')}).join('\n');
+  var el=document.createElement('a');
+  el.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  el.download='vsp-assets-'+new Date().toISOString().slice(0,10)+'.csv';
+  el.click();
+}
+
+window.addEventListener('message', function(e){
+  if(!e.data) return;
+  if(e.data.type==='vsp:token' && e.data.token){
+    TOKEN = e.data.token;
+    loadAssets();
+  }
+});
+if(window.parent !== window) window.parent.postMessage({type:'vsp:request_token'},'*');
+</script>
+</body>
+</html>

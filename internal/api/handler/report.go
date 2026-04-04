@@ -89,7 +89,7 @@ func (h *Report) HTML(w http.ResponseWriter, r *http.Request) {
 	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
 	if err != nil || run == nil { jsonError(w, "run not found", http.StatusNotFound); return }
 
-	findings, _, _ := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{Limit: 1000})
+	findings, _, _ := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{RunID: run.ID, Limit: 1000})
 	var rf []store.Finding
 	for _, f := range findings { if f.RunID == run.ID { rf = append(rf, f) } }
 

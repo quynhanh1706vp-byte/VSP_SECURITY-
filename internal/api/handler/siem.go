@@ -47,7 +47,21 @@ func (h *SIEM) Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "label and url required", http.StatusBadRequest)
 		return
 	}
-	if req.Type == ""   { req.Type = "generic" }
+	// Validate URL trước khi lưu — chặn SSRF
+	if err := siem.ValidateWebhookURL(req.URL); err != nil {
+		jsonError(w, "invalid webhook URL: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	// Whitelist webhook type
+	validTypes := map[string]bool{
+		"generic": true, "slack": true, "splunk_hec": true,
+		"sentinel": true, "datadog": true, "cef": true,
+	}
+	if req.Type == "" { req.Type = "generic" }
+	if !validTypes[req.Type] {
+		jsonError(w, "invalid type", http.StatusBadRequest)
+		return
+	}
 	if req.MinSev == "" { req.MinSev = "HIGH" }
 
 	hook, err := h.DB.CreateSIEMWebhook(r.Context(), store.SIEMWebhook{

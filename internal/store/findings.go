@@ -53,7 +53,8 @@ func (db *DB) InsertFindings(ctx context.Context, findings []Finding) error {
 }
 
 func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter) ([]Finding, int64, error) {
-	if f.Limit == 0 { f.Limit = 50 }
+	if f.Limit == 0  { f.Limit = 50   }
+	if f.Limit > 2000 { f.Limit = 2000 } // hard cap tại store layer
 
 	where := []string{"tenant_id = $1"}
 	args  := []any{tenantID}
@@ -72,8 +73,11 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 		args = append(args, f.Tool); i++
 	}
 	if f.Search != "" {
+		// Defense in depth: cap search length tại store layer
+		s := f.Search
+		if len(s) > 200 { s = s[:200] }
 		where = append(where, fmt.Sprintf("(message ILIKE $%d OR rule_id ILIKE $%d OR path ILIKE $%d)", i, i, i))
-		args = append(args, "%"+f.Search+"%"); i++
+		args = append(args, "%"+s+"%"); i++
 	}
 
 	whereSQL := strings.Join(where, " AND ")

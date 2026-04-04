@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
@@ -51,6 +52,10 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 	tmpHTML.Close()
 
 	// Try wkhtmltopdf first, then weasyprint, then fallback to HTML
+	// Sanitize rid — chặn path traversal
+	ridSafe := regexp.MustCompile(`[^a-zA-Z0-9_\-]`).ReplaceAllString(rid, "")
+	if ridSafe == "" { ridSafe = "unknown" }
+	rid = ridSafe
 	pdfPath := filepath.Join(os.TempDir(), "vsp-report-"+rid+".pdf")
 	defer os.Remove(pdfPath)
 

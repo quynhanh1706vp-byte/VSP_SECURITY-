@@ -33,6 +33,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"email\":\"$VSP_EMAIL\",\"password\":\"$VSP_PASSWORD\"}" \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+          echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Trigger SAST scan
@@ -146,6 +147,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"email\":\"$VSP_EMAIL\",\"password\":\"$VSP_PASSWORD\"}" \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+          echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Trigger FULL scan
