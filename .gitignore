@@ -32,3 +32,4 @@ static/vsp_features_patch.js
 *.test
 start.sh
 .env
+.env
