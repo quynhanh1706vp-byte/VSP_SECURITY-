@@ -27,7 +27,7 @@ log:
 
 redis:
   addr: localhost:6379
-  password: ""  # set via env REDIS_PASSWORD
+  password: "VspRedis2026!"
 integrations:
   slack_webhook: "https://hooks.slack.com/services/xxx"
   jira_url: "https://your-org.atlassian.net"
