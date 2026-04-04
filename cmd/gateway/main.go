@@ -25,6 +25,7 @@ import (
 	"github.com/vsp/platform/internal/api/handler"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/cache"
 	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/pipeline"
 	"github.com/vsp/platform/internal/scheduler"
@@ -121,6 +122,9 @@ func main() {
 		Password: redisPass,
 	})
 	defer asynqClient.Close()
+	// ── Redis API cache ──────────────────────────────────────────────────────
+	ca := cache.New(redisAddr, redisPass)
+
 
 	// ── All handlers ──────────────────────────────────────────────
 	authH       := &handler.Auth{DB: db, JWTSecret: jwtSecret, JWTTTL: jwtTTL, DefaultTID: defaultTID}
@@ -238,13 +242,13 @@ func main() {
 		r.Get("/api/v1/vsp/run/latest", runsH.Latest)
 		r.Get("/api/v1/vsp/run/{rid}", runsH.Get)
 		r.Get("/api/v1/vsp/runs", runsH.List)
-		r.Get("/api/v1/vsp/runs/index", runsH.Index)
+		r.With(ca.Middleware("runs-index", 10*time.Second)).Get("/api/v1/vsp/runs/index", runsH.Index)
 		r.Get("/api/v1/vsp/findings", findingsH.List)
-		r.Get("/api/v1/vsp/findings/summary", findingsH.Summary)
+		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
 
 		// Gate + Policy
 		r.Get("/api/v1/vsp/gate/latest", gateH.Latest)
-		r.Get("/api/v1/vsp/posture/latest", gateH.PostureLatest)
+		r.With(ca.Middleware("posture", 10*time.Second)).Get("/api/v1/vsp/posture/latest", gateH.PostureLatest)
 		r.Post("/api/v1/policy/evaluate", gateH.Evaluate)
 		r.Get("/api/v1/policy/rules", gateH.ListRules)
 		r.Post("/api/v1/policy/rules", gateH.CreateRule)
@@ -779,6 +783,8 @@ func main() {
 						"tenant_id": tenantID,
 					})
 					handler.Hub.Broadcast(msg)
+					// Invalidate cache khi có scan mới
+					ca.Invalidate(ctx, "vsp:api:*")
 					log.Info().Str("rid", rid).Str("gate", gate).Msg("sse: broadcast scan_complete")
 					if gate == "FAIL" {
 						toTrigger = append(toTrigger, struct{ rid, tenantID, gate string; findings int }{rid, tenantID, gate, findings})

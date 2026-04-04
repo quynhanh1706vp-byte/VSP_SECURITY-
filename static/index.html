@@ -3826,8 +3826,6 @@ function showPanel(name, btn) {
     if (name === 'compliance')  { initGauges(); setTimeout(loadFedRAMP, 300); }
     if (name === 'sbom') setTimeout(loadSBOM, 200);
     if (name === 'analytics') setTimeout(loadAnalytics, 300);
-    if (name === 'analytics') setTimeout(loadAnalytics, 300);
-    if (name === 'analytics') setTimeout(loadAnalytics, 300);
     if (name === 'sla') setTimeout(loadSLA, 200);
     if (name === 'findings') loadFindings(0);
     if (name === 'export') setTimeout(loadExportRuns, 200);
@@ -10294,6 +10292,99 @@ var _siemKPIpoll = setInterval(function() {
   setInterval(loadSIEMKPIs, 60000);
 }, 1000);
 </script>
-<script src="/vsp_upgrade_v100.js"></script>
+<script src="/vsp_upgrade_v100.js">
+// ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
+(function() {
+  // Giảm polling: chỉ refresh dashboard mỗi 30s thay vì 3s
+  const POLL_INTERVAL = 30000;
+  const FAST_INTERVAL = 5000; // sau scan complete
+
+  // Override các hàm poll nếu có
+  if (typeof window._vspPollTimer === 'undefined') {
+    window._vspPollTimer = null;
+    window._vspFastMode = false;
+  }
+
+  // Throttle helper: đảm bảo hàm không gọi quá 1 lần trong window ms
+  function throttle(fn, ms) {
+    let last = 0;
+    return function(...args) {
+      const now = Date.now();
+      if (now - last >= ms) {
+        last = now;
+        return fn.apply(this, args);
+      }
+    };
+  }
+
+  // Batch dashboard refresh — gộp tất cả calls thành 1
+  const refreshDashboard = throttle(function() {
+    if (typeof loadDashboard === 'function') {
+      loadDashboard();
+    } else if (typeof loadRuns === 'function') {
+      loadRuns();
+    }
+  }, 2000); // throttle 2s để tránh burst
+
+  // Smart poll: tự điều chỉnh interval
+  function startSmartPoll() {
+    if (window._vspPollTimer) clearInterval(window._vspPollTimer);
+    const interval = window._vspFastMode ? FAST_INTERVAL : POLL_INTERVAL;
+    window._vspPollTimer = setInterval(refreshDashboard, interval);
+    console.log(`[VSP] Poll interval: ${interval/1000}s`);
+  }
+
+  // SSE scan_complete → fast mode 30s, sau đó về normal
+  const _origSSE = window.connectSSE;
+  function patchSSEHandler(source) {
+    source.addEventListener('message', function(e) {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'scan_complete') {
+          console.log('[VSP] SSE scan_complete → triggering refresh');
+          window._vspFastMode = true;
+          refreshDashboard();
+          // Về normal sau 30s
+          setTimeout(function() {
+            window._vspFastMode = false;
+            startSmartPoll();
+          }, 30000);
+        }
+      } catch(e) {}
+    });
+  }
+
+  // Patch connectSSE để inject handler
+  if (typeof connectSSE === 'function') {
+    const _orig = connectSSE;
+    window.connectSSE = function() {
+      const src = _orig.apply(this, arguments);
+      if (src && src.addEventListener) patchSSEHandler(src);
+      return src;
+    };
+  }
+
+  // Patch EventSource constructor để catch SSE events
+  const _OrigEventSource = window.EventSource;
+  window.EventSource = function(url, opts) {
+    const src = new _OrigEventSource(url, opts);
+    if (url && url.includes('/api/v1/events')) {
+      patchSSEHandler(src);
+    }
+    return src;
+  };
+  window.EventSource.prototype = _OrigEventSource.prototype;
+
+  // Start smart polling sau khi page load
+  window.addEventListener('load', function() {
+    setTimeout(startSmartPoll, 3000);
+  });
+
+  // Expose để debug
+  window._vsp = { refreshDashboard, startSmartPoll };
+
+  console.log('[VSP] Smart polling loaded — interval: 30s, SSE-driven refresh: enabled');
+})();
+</script>
 </body>
 </html>
