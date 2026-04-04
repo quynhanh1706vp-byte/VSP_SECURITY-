@@ -483,8 +483,9 @@ window.addEventListener('message', function(e) {
   if (e.data.type === 'vsp:token' && e.data.token && e.data.token.length > 50) {
     if (!TOKEN) {
       TOKEN = e.data.token;
+      // Dùng origin của parent frame để tránh CORS
       API = window.location.origin === 'null'
-        ? '' : window.location.origin.replace(/:\d+$/, ':8921');
+        ? '' : window.location.origin;
       loadAll();
     }
   }

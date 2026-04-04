@@ -621,7 +621,7 @@ async function loadRecentRuns() {
 function _initWithToken(tk) {
   if (!tk || tk.length < 50 || TOKEN) return;
   TOKEN = tk;
-  API = 'http://127.0.0.1:8921';
+  API = window.location.origin === 'null' ? '' : window.location.origin;
   loadSchedules();
   loadRecentRuns();
 }

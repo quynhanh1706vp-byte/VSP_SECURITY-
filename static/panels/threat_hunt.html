@@ -343,7 +343,8 @@ window.addEventListener('message',function(e){
   if(!e.data)return;
   if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){
     TOKEN=e.data.token;
-    API=window.location.origin==='null'?'':window.location.origin.replace(/:[\d]+$/,':8921');
+    // Dùng origin của parent frame để tránh CORS
+    API=window.parent!==window?(window.location.origin==='null'?'':window.location.origin):(window.location.origin.replace(/:\d+$/,':8921'));
     renderSavedQueries();
     // Auto-run initial hunt
     runHunt();
