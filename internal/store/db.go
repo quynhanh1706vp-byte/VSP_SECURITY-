@@ -41,3 +41,14 @@ func (db *DB) Close() { db.pool.Close() }
 
 // Pool exposes the raw pool for advanced use (transactions, etc).
 func (db *DB) Pool() *pgxpool.Pool { return db.pool }
+
+// PoolStats returns current connection pool statistics for monitoring.
+func (db *DB) PoolStats() map[string]int32 {
+	s := db.pool.Stat()
+	return map[string]int32{
+		"total_conns":    s.TotalConns(),
+		"acquired_conns": s.AcquiredConns(),
+		"idle_conns":     s.IdleConns(),
+		"max_conns":      s.MaxConns(),
+	}
+}

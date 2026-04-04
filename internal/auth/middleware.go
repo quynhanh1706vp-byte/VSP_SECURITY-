@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -126,15 +128,34 @@ type jwtClaims struct {
 	jwt.RegisteredClaims
 }
 
+// Blacklist interface — implemented by auth.TokenBlacklist
+type BlacklistChecker interface {
+	IsRevoked(ctx context.Context, tokenID string) bool
+	IsUserRevoked(ctx context.Context, userID string, issuedAt time.Time) bool
+}
+
+// SetBlacklist wires a blacklist checker into JWT validation
+var globalBlacklist BlacklistChecker
+
+func SetBlacklist(b BlacklistChecker) { globalBlacklist = b }
+
 // IssueJWT creates a signed JWT for the given user.
 func IssueJWT(secret string, c Claims, ttl time.Duration) (string, error) {
 	now := time.Now()
+	// Generate unique JWT ID for revocation support
+	jtiBytes := make([]byte, 16)
+	if _, err := rand.Read(jtiBytes); err != nil {
+		return "", fmt.Errorf("jti generate: %w", err)
+	}
+	jti := fmt.Sprintf("%x", jtiBytes)
+
 	claims := jwtClaims{
 		UserID:   c.UserID,
 		TenantID: c.TenantID,
 		Role:     c.Role,
 		Email:    c.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 		},
@@ -156,6 +177,16 @@ func parseJWT(tokenStr, secret string) (Claims, error) {
 	c, ok := token.Claims.(*jwtClaims)
 	if !ok {
 		return Claims{}, jwt.ErrTokenInvalidClaims
+	}
+	// Check blacklist if configured
+	if globalBlacklist != nil {
+		jti := c.ID // JWT ID
+		if jti != "" && globalBlacklist.IsRevoked(context.Background(), jti) {
+			return Claims{}, fmt.Errorf("token revoked")
+		}
+		if globalBlacklist.IsUserRevoked(context.Background(), c.UserID, c.IssuedAt.Time) {
+			return Claims{}, fmt.Errorf("user tokens revoked")
+		}
 	}
 	return Claims{
 		UserID:   c.UserID,

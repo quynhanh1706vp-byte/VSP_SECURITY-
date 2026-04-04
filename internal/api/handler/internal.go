@@ -3,7 +3,11 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"crypto/hmac"
+	"crypto/sha256"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/gate"
@@ -26,11 +30,31 @@ type ScanCompletePayload struct {
 }
 
 func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
-	// Auth: internal endpoint chỉ được gọi từ scanner worker
-	// Validate bằng INTERNAL_SECRET header
+	// Auth: internal endpoint — support cả static secret và time-based HMAC ticket
+	// Static secret: X-Internal-Secret: <secret>
+	// Time-based: X-Internal-Secret: <hmac-sha256(secret + timestamp_minute)>
 	secret := os.Getenv("INTERNAL_SECRET")
 	if secret == "" { secret = "dev-internal-secret" }
-	if r.Header.Get("X-Internal-Secret") != secret {
+
+	provided := r.Header.Get("X-Internal-Secret")
+	// Check 1: static secret match
+	staticOK := provided == secret
+	// Check 2: time-based HMAC (valid for current + prev minute)
+	hmacOK := false
+	if !staticOK {
+		mac := hmac.New(sha256.New, []byte(secret))
+		for _, delta := range []int64{0, -1} {
+			minute := (time.Now().Unix()/60 + delta) * 60
+			mac.Reset()
+			mac.Write([]byte(fmt.Sprintf("%d", minute)))
+			expected := fmt.Sprintf("%x", mac.Sum(nil))
+			if provided == expected {
+				hmacOK = true
+				break
+			}
+		}
+	}
+	if !staticOK && !hmacOK {
 		http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
 		return
 	}

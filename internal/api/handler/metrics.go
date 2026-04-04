@@ -38,6 +38,11 @@ var (
 		Help: "Number of active SSE connections.",
 	})
 
+	DBPoolConns = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "vsp_db_pool_connections",
+		Help: "Database connection pool stats.",
+	}, []string{"state"}) // state: total, acquired, idle
+
 	APIRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "vsp_api_request_duration_seconds",
 		Help:    "API request duration.",
@@ -72,4 +77,11 @@ func RecordFindings(critical, high, medium, low int) {
 	FindingsGauge.WithLabelValues("HIGH").Set(float64(high))
 	FindingsGauge.WithLabelValues("MEDIUM").Set(float64(medium))
 	FindingsGauge.WithLabelValues("LOW").Set(float64(low))
+}
+
+// RecordDBPool updates DB pool metrics.
+func RecordDBPool(stats map[string]int32) {
+	for k, v := range stats {
+		DBPoolConns.WithLabelValues(k).Set(float64(v))
+	}
 }

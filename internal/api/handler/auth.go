@@ -27,15 +27,22 @@ type Auth struct {
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	MFACode  string `json:"mfa_code,omitempty"` // TOTP code nếu MFA enabled
 }
 
 type loginResponse struct {
-	Token    string `json:"token"`
-	UserID   string `json:"user_id"`
-	Email    string `json:"email"`
-	Role     string `json:"role"`
-	TenantID string `json:"tenant_id"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Token       string    `json:"token"`
+	UserID      string    `json:"user_id"`
+	Email       string    `json:"email"`
+	Role        string    `json:"role"`
+	TenantID    string    `json:"tenant_id"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	MFAEnabled  bool      `json:"mfa_enabled"`
+}
+
+type mfaRequiredResponse struct {
+	MFARequired bool   `json:"mfa_required"`
+	Message     string `json:"message"`
 }
 
 func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
@@ -65,13 +72,50 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PwHash), []byte(req.Password)); err != nil {
-		// Log but return same message to prevent user enumeration
-		log.Warn().Str("email", req.Email).Msg("login: wrong password")
-		jsonError(w, "invalid credentials", http.StatusUnauthorized)
+	// Check account lockout
+	if user.LockedUntil != nil && time.Now().Before(*user.LockedUntil) {
+		log.Warn().Str("email", req.Email).Msg("login: account locked")
+		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_LOCKED", "/auth/login")
+		jsonError(w, "account temporarily locked — too many failed attempts", http.StatusTooManyRequests)
 		return
 	}
+
+	// Verify password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PwHash), []byte(req.Password)); err != nil {
+		log.Warn().Str("email", req.Email).Msg("login: wrong password")
+		// Record failed login + possible lockout
+		count, _ := a.DB.RecordFailedLogin(r.Context(), user.ID)
+		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_FAILED", "/auth/login")
+		if count >= 5 {
+			jsonError(w, "account locked for 15 minutes after too many failed attempts", http.StatusTooManyRequests)
+		} else {
+			jsonError(w, "invalid credentials", http.StatusUnauthorized)
+		}
+		return
+	}
+
+	// Verify MFA if enabled
+	if user.MFAEnabled && user.MFAVerified {
+		if req.MFACode == "" {
+			// Trả về mfa_required để frontend hiển thị form nhập code
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(mfaRequiredResponse{
+				MFARequired: true,
+				Message:     "MFA code required",
+			})
+			return
+		}
+		if !auth.VerifyTOTP(user.MFASecret, req.MFACode) {
+			log.Warn().Str("email", req.Email).Msg("login: invalid MFA code")
+			go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_MFA_FAILED", "/auth/login")
+			jsonError(w, "invalid MFA code", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	// Reset failed logins on success
+	go a.DB.ResetFailedLogins(r.Context(), user.ID)
 
 	// Issue JWT
 	ttl := a.JWTTTL
@@ -98,12 +142,13 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_OK", "/auth/login")
 
 	jsonOK(w, loginResponse{
-		Token:     token,
-		UserID:    user.ID,
-		Email:     user.Email,
-		Role:      user.Role,
-		TenantID:  user.TenantID,
-		ExpiresAt: time.Now().Add(ttl),
+		Token:      token,
+		UserID:     user.ID,
+		Email:      user.Email,
+		Role:       user.Role,
+		TenantID:   user.TenantID,
+		ExpiresAt:  time.Now().Add(ttl),
+		MFAEnabled: user.MFAEnabled,
 	})
 }
 

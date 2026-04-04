@@ -115,6 +115,7 @@ func main() {
 	authH       := &handler.Auth{DB: db, JWTSecret: jwtSecret, JWTTTL: jwtTTL, DefaultTID: defaultTID}
 	handler.SetJWTSecret(jwtSecret)
 	usersH      := &handler.Users{DB: db}
+	mfaH        := &handler.MFA{DB: db}
 	apiKeysH    := &handler.APIKeys{DB: db}
 	runsH       := &handler.Runs{DB: db}
 	runsH.SetAsynqClient(asynqClient)
@@ -180,8 +181,11 @@ func main() {
 		r.Use(authMw)
 
 		// Auth
-		r.Post("/api/v1/auth/logout", authH.Logout)
-		r.Post("/api/v1/auth/refresh", authH.Refresh)
+		r.Post("/api/v1/auth/logout",      authH.Logout)
+		r.Post("/api/v1/auth/refresh",     authH.Refresh)
+		r.Post("/api/v1/auth/mfa/setup",   mfaH.Setup)
+		r.Post("/api/v1/auth/mfa/verify",  mfaH.Verify)
+		r.Delete("/api/v1/auth/mfa",       mfaH.Disable)
 
 		// Admin
 		r.Group(func(r chi.Router) {
@@ -713,6 +717,9 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
+				// Update DB pool metrics
+				handler.RecordDBPool(db.PoolStats())
+
 				// Find runs completed since last check
 				rows, err := db.Pool().Query(ctx, `
 					SELECT r.id, r.rid, r.tenant_id, r.gate, r.total_findings,
@@ -814,9 +821,14 @@ func main() {
 	}
 
 	<-quit
-	sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	log.Info().Msg("shutting down gracefully — draining connections (30s)...")
+	sctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	srv.Shutdown(sctx) //nolint:errcheck
+	if err := srv.Shutdown(sctx); err != nil {
+		log.Error().Err(err).Msg("server shutdown error")
+	}
+	db.Close()
+	asynqClient.Close()
 	log.Info().Msg("stopped")
 }
 

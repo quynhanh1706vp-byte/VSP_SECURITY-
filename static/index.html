@@ -4783,17 +4783,26 @@ function connectSSE() {
   };
   source.onerror = () => {
     document.getElementById('sse-dot').className = 'sse-dot sse-dead';
-    document.getElementById('sse-label').textContent = 'SSE reconnecting…';
     source.close();
     window._sseRetry = (window._sseRetry || 0) + 1;
-    if (window._sseRetry <= 10) {
-      setTimeout(connectSSE, Math.min(8000 * window._sseRetry, 60000));
+    if (!window.TOKEN) return; // không reconnect nếu đã logout
+    if (window._sseRetry <= 12) {
+      // Exponential backoff với jitter: 1s, 2s, 4s, ... max 60s + random jitter
+      var base = Math.min(1000 * Math.pow(2, window._sseRetry - 1), 60000);
+      var jitter = Math.random() * 1000;
+      var delay = base + jitter;
+      document.getElementById('sse-label').textContent = 'SSE reconnecting… (' + window._sseRetry + ')';
+      setTimeout(function() {
+        if (window.TOKEN) connectSSE();
+      }, delay);
     } else {
-      document.getElementById('sse-label').textContent = 'SSE offline';
+      document.getElementById('sse-label').textContent = 'SSE offline — reload to reconnect';
     }
   };
   source.onopen = function() {
     window._sseRetry = 0;
+    document.getElementById('sse-dot').className = 'sse-dot sse-live';
+    document.getElementById('sse-label').textContent = 'SSE live';
   };
 }
 

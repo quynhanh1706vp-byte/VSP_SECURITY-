@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"os"
+	"strings"
 	"net/http"
 	"time"
 )
@@ -35,8 +37,24 @@ func SwaggerJSON(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
-// GET /api/docs  — Swagger UI HTML
+// GET /api/docs  — Swagger UI HTML (chỉ cho localhost và internal)
 func SwaggerUI(w http.ResponseWriter, r *http.Request) {
+	// Restrict swagger UI — chỉ cho internal/dev access
+	// Trong production, remove route này hoặc thêm IP whitelist
+	serverEnv := os.Getenv("SERVER_ENV")
+	if serverEnv == "production" {
+		remoteIP := r.RemoteAddr
+		if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
+			remoteIP = remoteIP[:idx]
+		}
+		allowedIPs := map[string]bool{
+			"127.0.0.1": true, "::1": true, "[::1]": true,
+		}
+		if !allowedIPs[remoteIP] {
+			http.Error(w, "API docs not available in production", http.StatusForbidden)
+			return
+		}
+	}
 	host := r.Host
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(`<!DOCTYPE html>
