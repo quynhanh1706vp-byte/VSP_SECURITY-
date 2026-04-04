@@ -43,3 +43,5 @@ vsp-gateway
 vsp_*.pdf
 vsp_*.xlsx
 .fuse_hidden*
+coverage.out
+coverage.html
