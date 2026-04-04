@@ -107,3 +107,35 @@ func StrictLimiter(max int, window time.Duration) func(http.Handler) http.Handle
 	rl := NewRateLimiter(max, window)
 	return rl.Middleware
 }
+
+// UserMiddleware là rate limiter per user_id (dùng sau auth middleware).
+// Khắc phục bypass dùng proxy của IP-based limiter.
+// Lấy user_id từ chi context key "user_id".
+func (rl *RateLimiter) UserMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Lấy user_id từ context (được inject bởi auth middleware)
+		userID, _ := r.Context().Value("user_id").(string)
+		key := userID
+		if key == "" {
+			// Fallback về IP nếu chưa auth
+			key = "ip:" + realIP(r)
+		} else {
+			key = "uid:" + userID
+		}
+		if !rl.Allow(key) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Retry-After", "60")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error":"rate limit exceeded","retry_after":60}`)) //nolint
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// NewUserRateLimiter tạo per-user rate limiter với Redis backend (nếu có).
+// Dùng sau auth group để áp dụng per-user limits.
+func NewUserRateLimiter(max int, window time.Duration) func(http.Handler) http.Handler {
+	rl := NewRateLimiter(max, window)
+	return rl.UserMiddleware
+}

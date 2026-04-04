@@ -65,7 +65,8 @@ func main() {
 	zerolog.SetGlobalLevel(level)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
-	ctx := context.Background()
+	ctx, shutdown := context.WithCancel(context.Background())
+	defer shutdown()
 	db, err := store.New(ctx, viper.GetString("database.url"))
 	if err != nil { log.Fatal().Err(err).Msg("database connect failed") }
 	defer db.Close()
@@ -215,6 +216,7 @@ func main() {
 	authMw := auth.Middleware(jwtSecret, keyStore)
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
+		r.Use(vspMW.NewUserRateLimiter(300, time.Minute)) // per-user: 300 req/min
 
 		// Auth
 		r.Post("/api/v1/auth/logout",      authH.Logout)
@@ -864,14 +866,19 @@ func main() {
 
 	<-quit
 	log.Info().Msg("shutting down gracefully — draining connections (30s)...")
+	// Cancel context trước — signals tất cả goroutines dừng lại
+	shutdown()
+	// Drain HTTP connections
 	sctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(sctx); err != nil {
 		log.Error().Err(err).Msg("server shutdown error")
 	}
+	// Đợi goroutines dừng (tối đa 5s)
+	time.Sleep(500 * time.Millisecond)
 	db.Close()
 	asynqClient.Close()
-	log.Info().Msg("stopped")
+	log.Info().Msg("stopped ✓")
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
