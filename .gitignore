@@ -36,3 +36,10 @@ static/vsp_features_patch.js
 start.sh
 .env
 .env
+vsp-gateway
+*.py
+*.sh
+!setup_vsp.sh
+vsp_*.pdf
+vsp_*.xlsx
+.fuse_hidden*
