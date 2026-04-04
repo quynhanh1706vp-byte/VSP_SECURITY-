@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"database/sql"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -24,11 +25,16 @@ import (
 	"github.com/vsp/platform/internal/api/handler"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/pipeline"
 	"github.com/vsp/platform/internal/scheduler"
 	"github.com/vsp/platform/internal/siem"
 	"github.com/vsp/platform/internal/store"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+var startTime = time.Now()
 
 func main() {
 	viper.SetConfigName("config")
@@ -64,6 +70,11 @@ func main() {
 	defer db.Close()
 	log.Info().Msg("database connected ✓")
 
+	// Auto-run migrations
+	stdDB, err2 := sql.Open("pgx", viper.GetString("database.url"))
+	if err2 != nil { log.Fatal().Err(err2).Msg("open db for migrations") }
+	if err2 = migrate.Run(ctx, stdDB); err2 != nil { log.Fatal().Err(err2).Msg("migration failed") }
+	stdDB.Close()
 	ensureDefaultTenant(ctx, db)
 	db.EnsureSchedulerTables(ctx) //nolint:errcheck
 	db.EnsureRemediationTable(ctx) //nolint:errcheck
@@ -158,14 +169,35 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
-	r.Use(chimw.Logger)
+	r.Use(vspMW.CSPNonce)
+	r.Use(vspMW.RequestLogger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(60 * time.Second))
 	r.Use(corsMiddleware)
 	r.Use(rl.Middleware)
 
 	r.Handle("/metrics", handler.MetricsHandler())
-	r.Get("/health", healthHandler)
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		ctx2, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		checks := map[string]any{}
+		overall := "ok"
+		t0 := time.Now()
+		if err := db.Pool().Ping(ctx2); err != nil {
+			checks["database"] = map[string]string{"status":"error","error":err.Error()}
+			overall = "error"
+		} else {
+			checks["database"] = map[string]string{"status":"ok","latency":time.Since(t0).String()}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if overall == "error" { w.WriteHeader(503) }
+		json.NewEncoder(w).Encode(map[string]any{
+			"status": overall, "version": "0.10.0",
+			"port": viper.GetInt("server.gateway_port"),
+			"tier": "enterprise", "checks": checks,
+			"uptime": time.Since(startTime).Round(time.Second).String(),
+		})
+	})
 	// SSO routes (public)
 	r.Get("/auth/sso/providers", ssoH.Providers)
 	r.Get("/auth/sso/login",     ssoH.Login)
@@ -186,6 +218,8 @@ func main() {
 		r.Post("/api/v1/auth/mfa/setup",   mfaH.Setup)
 		r.Post("/api/v1/auth/mfa/verify",  mfaH.Verify)
 		r.Delete("/api/v1/auth/mfa",       mfaH.Disable)
+		r.Post("/api/v1/auth/password/change", authH.ChangePassword)
+		r.Post("/api/v1/auth/password/change", authH.ChangePassword)
 
 		// Admin
 		r.Group(func(r chi.Router) {
