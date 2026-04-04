@@ -25,6 +25,9 @@ setup.sh
 sso_oidc.sh
 fedramp_cmmc_sbom.sh
 vsp_*.js
+# But keep these:
+!static/vsp_upgrade_v100.js
+!static/panels/vsp_siem_patch.js
 vsp_features_patch.js
 static/vsp_features_patch.js
 
