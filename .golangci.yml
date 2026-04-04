@@ -1,0 +1,22 @@
+run:
+  go: "1.24"
+  timeout: 5m
+  skip-dirs:
+    - internal/migrate/sql
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+  disable:
+    - depguard
+
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - (io.Closer).Close
+      - (*os.File).Close

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"regexp"
+	"strings"
 	"fmt"
 	"net/http"
 
@@ -45,7 +45,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 	}
 	// Validate src — chặn shell metacharacters
 	if req.Src != "" {
-		if matched, _ := regexp.MatchString(`[;&|` + "`" + `$<>{}\]`, req.Src); matched {
+		if strings.ContainsAny(req.Src, ";&|`$<>{}\\") {
 			jsonError(w, "invalid src: contains illegal characters", http.StatusBadRequest)
 			return
 		}

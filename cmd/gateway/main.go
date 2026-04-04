@@ -346,7 +346,7 @@ func main() {
 			if apiKey != "" { req.Header.Set("x-api-key", apiKey) }
 			client := &http.Client{Timeout: 60 * time.Second}
 			resp, err := client.Do(req)
-			if err != nil { http.Error(w, `{"error":"upstream error"}`+err.Error(), 502); return }
+			if err != nil { http.Error(w, `{"error":"upstream error"}`+err.Error(), http.StatusBadGateway); return }
 			defer resp.Body.Close()
 			w.WriteHeader(resp.StatusCode)
 			io.Copy(w, resp.Body) //nolint:errcheck
@@ -881,11 +881,6 @@ func main() {
 	log.Info().Msg("stopped ✓")
 }
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status":"ok","version":"0.10.0","port":%d,"tier":"enterprise"}`,
-		viper.GetInt("server.gateway_port"))
-}
 func corsMiddleware(next http.Handler) http.Handler {
 	raw := viper.GetString("server.allowed_origins")
 	if raw == "" {
@@ -943,11 +938,3 @@ func getDefaultTenantID(ctx context.Context, db *store.DB) string {
 	return id
 }
 
-func containsAny(s string, subs ...string) bool {
-	for _, sub := range subs {
-		if strings.Contains(strings.ToLower(s), strings.ToLower(sub)) {
-			return true
-		}
-	}
-	return false
-}
