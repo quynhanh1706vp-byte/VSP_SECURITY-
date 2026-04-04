@@ -15,19 +15,19 @@ func TestChangePasswordValidation(t *testing.T) {
 		wantStatus int
 	}{
 		{
-			name:       "missing fields",
+			name:       "missing fields — no auth returns 401",
 			body:       map[string]string{},
-			wantStatus: http.StatusBadRequest,
+			wantStatus: http.StatusUnauthorized,
 		},
 		{
-			name:       "password too short",
+			name:       "password too short — no auth returns 401",
 			body:       map[string]string{"current_password": "old", "new_password": "short"},
-			wantStatus: http.StatusBadRequest,
+			wantStatus: http.StatusUnauthorized,
 		},
 		{
-			name:       "same password",
+			name:       "same password — no auth returns 401",
 			body:       map[string]string{"current_password": "samepass", "new_password": "samepass"},
-			wantStatus: http.StatusBadRequest,
+			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "no auth",
