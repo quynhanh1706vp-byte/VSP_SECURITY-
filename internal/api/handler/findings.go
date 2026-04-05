@@ -21,8 +21,7 @@ func (h *Findings) List(w http.ResponseWriter, r *http.Request) {
 	if limit > 2000 { limit = 2000 }
 	if limit < 1   { limit = 1   }
 
-	search := q.Get("q")
-	if len(search) > 200 { search = search[:200] }
+	search := sanitizeString(q.Get("q"), 200)
 
 	findings, total, err := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{
 		RunID:    q.Get("run_id"),

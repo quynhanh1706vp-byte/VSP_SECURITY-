@@ -149,6 +149,10 @@ func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
 func (h *Gate) DeleteRule(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	id := chi.URLParam(r, "id")
+	if !validateUUID(id) {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
 	h.DB.DeletePolicyRule(r.Context(), claims.TenantID, id) //nolint:errcheck
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/vsp/platform/internal/auth"
@@ -93,7 +92,6 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 func queryInt(r *http.Request, key string, def int) int {
 	v := r.URL.Query().Get(key)
 	if v == "" { return def }
-	n, err := strconv.Atoi(v)
-	if err != nil { return def }
-	return n
+	if n, ok := validatePositiveInt(v, 100000); ok { return n }
+	return def
 }

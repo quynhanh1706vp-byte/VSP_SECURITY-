@@ -129,6 +129,10 @@ func (h *Assets) Summary(w http.ResponseWriter, r *http.Request) {
 func (h *Assets) Findings(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	id := chi.URLParam(r, "id")
+	if !validateUUID(id) {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
 
 	// Strip "scanner-" prefix if present
 	tool := id
