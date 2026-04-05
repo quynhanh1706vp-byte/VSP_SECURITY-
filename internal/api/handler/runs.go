@@ -88,7 +88,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		rid, claims.TenantID, req.Mode, req.Profile,
 		req.Src, req.URL, toolsTotal)
 	if err != nil {
-		jsonError(w, "create run failed: "+err.Error(), http.StatusInternalServerError)
+		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 

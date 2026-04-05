@@ -68,7 +68,7 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 		CronExpr: req.Cron,
 		Enabled:  req.Enabled,
 	})
-	if err != nil { jsonError(w, "create failed: "+err.Error(), http.StatusInternalServerError); return }
+	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, s)
 }

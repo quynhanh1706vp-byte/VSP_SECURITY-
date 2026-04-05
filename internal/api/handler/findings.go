@@ -32,7 +32,7 @@ func (h *Findings) List(w http.ResponseWriter, r *http.Request) {
 		Offset:   queryInt(r, "offset", 0),
 	})
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	if findings == nil {

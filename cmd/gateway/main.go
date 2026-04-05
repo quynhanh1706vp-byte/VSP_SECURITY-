@@ -179,6 +179,13 @@ func main() {
 	r.Use(vspMW.RequestLogger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(60 * time.Second))
+	// Limit request body to 4MB để chặn DoS
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, 4<<20) // 4MB
+			next.ServeHTTP(w, r)
+		})
+	})
 	r.Use(corsMiddleware)
 	r.Use(rl.Middleware)
 
@@ -225,7 +232,6 @@ func main() {
 		r.Post("/api/v1/auth/mfa/setup",   mfaH.Setup)
 		r.Post("/api/v1/auth/mfa/verify",  mfaH.Verify)
 		r.Delete("/api/v1/auth/mfa",       mfaH.Disable)
-		r.Post("/api/v1/auth/password/change", authH.ChangePassword)
 		r.Post("/api/v1/auth/password/change", authH.ChangePassword)
 
 		// Admin

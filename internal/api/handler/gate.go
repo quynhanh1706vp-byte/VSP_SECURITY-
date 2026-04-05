@@ -138,7 +138,7 @@ func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
 
 	rule, err := h.DB.CreatePolicyRule(r.Context(), req)
 	if err != nil {
-		jsonError(w, "create failed: "+err.Error(), http.StatusInternalServerError)
+		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)

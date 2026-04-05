@@ -69,7 +69,7 @@ func (h *Remediation) Upsert(w http.ResponseWriter, r *http.Request) {
 		Notes:     req.Notes,
 		TicketURL: req.TicketURL,
 	})
-	if err != nil { jsonError(w, "upsert failed: "+err.Error(), http.StatusInternalServerError); return }
+	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
 	jsonOK(w, rem)
 }
 

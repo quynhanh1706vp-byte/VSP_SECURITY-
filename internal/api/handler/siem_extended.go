@@ -54,7 +54,7 @@ func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
 		Condition: req.Condition,
 		Enabled:   req.Enabled,
 	})
-	if err != nil { jsonError(w, "create failed: "+err.Error(), http.StatusInternalServerError); return }
+	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{"id": id, "name": req.Name, "status": "created"})
 }
@@ -107,7 +107,7 @@ func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
 		RuleID:     ruleID,
 		SourceRefs: req.SourceRefs,
 	})
-	if err != nil { jsonError(w, "create failed: "+err.Error(), http.StatusInternalServerError); return }
+	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{"id": id, "status": "created"})
 }
@@ -173,7 +173,7 @@ func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
 		Steps:       req.Steps,
 		Enabled:     req.Enabled,
 	})
-	if err != nil { jsonError(w, "create failed: "+err.Error(), http.StatusInternalServerError); return }
+	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{"id": id, "name": req.Name, "status": "created"})
 }
@@ -203,7 +203,7 @@ func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
 	if ctxRaw == nil { ctxRaw = json.RawMessage(`{"trigger":"manual"}`) }
 
 	runID, err := h.DB.CreatePlaybookRun(r.Context(), id, claims.TenantID, "manual", ctxRaw)
-	if err != nil { jsonError(w, "run failed: "+err.Error(), http.StatusInternalServerError); return }
+	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
 
 	// Parse run context
 	var runCtxMap map[string]string
@@ -294,7 +294,7 @@ func (h *LogSources) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Port == 0      { req.Port = 514 }
 	req.TenantID = claims.TenantID
 	id, err := h.DB.CreateLogSource(r.Context(), req)
-	if err != nil { jsonError(w, "create failed: "+err.Error(), http.StatusInternalServerError); return }
+	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{"id": id, "name": req.Name, "status": "created"})
 }

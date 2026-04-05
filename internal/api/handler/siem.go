@@ -73,7 +73,7 @@ func (h *SIEM) Create(w http.ResponseWriter, r *http.Request) {
 		MinSev:     req.MinSev,
 	})
 	if err != nil {
-		jsonError(w, "create failed: "+err.Error(), http.StatusInternalServerError)
+		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
