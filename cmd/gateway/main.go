@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof" // profiling endpoint /debug/pprof/
 	"os"
 	"os/signal"
 	"syscall"
@@ -189,6 +190,10 @@ func main() {
 	r.Use(corsMiddleware)
 	r.Use(rl.Middleware)
 
+	// pprof — chỉ enable trong dev mode
+	if viper.GetString("server.env") != "production" {
+		r.Mount("/debug", http.DefaultServeMux)
+	}
 	r.Handle("/metrics", handler.MetricsHandler())
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		ctx2, cancel := context.WithTimeout(r.Context(), 5*time.Second)

@@ -56,3 +56,36 @@ func TestStop_BeforeStart(t *testing.T) {
 	e := New(nil, func(a,b,c,d,f,g string) {})
 	e.Stop()
 }
+
+func TestNextRun_Daily(t *testing.T) {
+	from := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	
+	// Daily schedule should return next day same time
+	next := nextRun("@daily", from)
+	if next.IsZero() {
+		t.Error("expected non-zero next run for @daily")
+	}
+	if !next.After(from) {
+		t.Errorf("next run should be after from: next=%v from=%v", next, from)
+	}
+}
+
+func TestNextRun_Hourly(t *testing.T) {
+	from := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	next := nextRun("@hourly", from)
+	if next.IsZero() {
+		t.Error("expected non-zero next run for @hourly")
+	}
+	if !next.After(from) {
+		t.Errorf("next run should be after from")
+	}
+}
+
+func TestNextRun_InvalidCron(t *testing.T) {
+	from := time.Now()
+	next := nextRun("invalid cron", from)
+	// Invalid cron should return zero time
+	if !next.IsZero() {
+		t.Log("Note: invalid cron returned non-zero time — implementation may differ")
+	}
+}

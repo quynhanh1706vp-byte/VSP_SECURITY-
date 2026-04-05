@@ -147,6 +147,7 @@ func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/v1/policy/rules/{id}
 func (h *Gate) DeleteRule(w http.ResponseWriter, r *http.Request) {
+	defer logAudit(r, h.DB, "POLICY_RULE_DELETED", "/policy/rules/"+chi.URLParam(r, "id"))
 	claims, _ := auth.FromContext(r.Context())
 	id := chi.URLParam(r, "id")
 	if !validateUUID(id) {

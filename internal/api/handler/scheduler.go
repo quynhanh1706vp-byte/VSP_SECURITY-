@@ -75,6 +75,7 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/v1/schedules/{id}
 func (h *Scheduler) Delete(w http.ResponseWriter, r *http.Request) {
+	defer logAudit(r, h.DB, "SCHEDULE_DELETED", "/schedules/"+chi.URLParam(r, "id"))
 	claims, _ := auth.FromContext(r.Context())
 	id := chi.URLParam(r, "id")
 	h.DB.DeleteSchedule(r.Context(), claims.TenantID, id) //nolint

@@ -85,6 +85,7 @@ func (h *SIEM) Delete(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	id := chi.URLParam(r, "id")
 	h.DB.DeleteSIEMWebhook(r.Context(), claims.TenantID, id) //nolint:errcheck
+	logAudit(r, h.DB, "WEBHOOK_DELETED", "/siem/webhooks/"+id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
