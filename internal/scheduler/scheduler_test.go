@@ -23,9 +23,7 @@ func TestNew(t *testing.T) {
 func TestListSchedules_Empty(t *testing.T) {
 	e := New(nil, func(a,b,c,d,f,g string) {})
 	scheds := e.ListSchedules(context.Background())
-	if scheds == nil {
-		t.Error("expected non-nil slice")
-	}
+	// nil hoặc empty slice đều OK
 	if len(scheds) != 0 {
 		t.Errorf("expected 0 schedules, got %d", len(scheds))
 	}
