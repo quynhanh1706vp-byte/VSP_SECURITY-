@@ -56,8 +56,25 @@ func MustEnv(t *testing.T, key string) string {
 func CleanupTenant(t *testing.T, db *store.DB, tenantID string) {
 	t.Helper()
 	ctx := context.Background()
-	// Xóa theo thứ tự FK
-	for _, table := range []string{"findings", "runs", "audit_log", "api_keys", "users"} {
+	// Xóa theo thứ tự FK — bao gồm tất cả siem tables
+	tables := []string{
+		"remediation_comments",
+		"remediations",
+		"playbook_runs",
+		"playbooks",
+		"incidents",
+		"correlation_rules",
+		"log_sources",
+		"siem_webhooks",
+		"drift_events",
+		"scan_schedules",
+		"findings",
+		"runs",
+		"audit_log",
+		"api_keys",
+		"users",
+	}
+	for _, table := range tables {
 		db.Pool().Exec(ctx, "DELETE FROM "+table+" WHERE tenant_id=$1", tenantID) //nolint:errcheck
 	}
 	db.Pool().Exec(ctx, "DELETE FROM tenants WHERE id=$1", tenantID) //nolint:errcheck
