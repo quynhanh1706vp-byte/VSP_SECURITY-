@@ -105,7 +105,7 @@ func (h *APIKeys) Delete(w http.ResponseWriter, r *http.Request) {
 		prevHash, _ := h.DB.GetLastAuditHash(r.Context(), claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
-		h.DB.InsertAudit(r.Context(), claims.TenantID, &claims.UserID, "APIKEY_DELETED", "/admin/api-keys/"+id, r.RemoteAddr, nil, e.StoredHash, prevHash) //nolint:errcheck
+		h.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/"+ id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 	}()
 	w.WriteHeader(http.StatusNoContent)
 }

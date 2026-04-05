@@ -95,19 +95,25 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 			dbFindings[i].RunID = run.ID
 		}
 	}
-	h.DB.InsertFindings(dbCtx, dbFindings)
+	if err := h.DB.InsertFindingsBatch(dbCtx, dbFindings); err != nil {
+		log.Error().Err(err).Str("run_id", payload.RID).Msg("insert findings batch failed")
+	}
 
-	// Auto-create remediation record (status=open) for each new finding
+	// Auto-create remediation records trong 1 batch transaction
 	saved, _, _ := h.DB.ListFindings(dbCtx, payload.TenantID, store.FindingFilter{
-		Limit: len(dbFindings) + 100,
+		RunID: run.ID, Limit: len(dbFindings) + 100,
 	})
+	remItems := make([]store.Remediation, 0, len(saved))
 	for _, f := range saved {
-		_, _ = h.DB.UpsertRemediation(dbCtx, store.Remediation{
+		remItems = append(remItems, store.Remediation{
 			FindingID: f.ID,
 			TenantID:  payload.TenantID,
 			Status:    store.RemOpen,
 			Priority:  severityToPriority(f.Severity),
 		})
+	}
+	if err := h.DB.BulkUpsertRemediations(dbCtx, remItems); err != nil {
+		log.Error().Err(err).Str("run_id", payload.RID).Msg("bulk upsert remediations failed")
 	}
 
 	// Compute gate + posture
@@ -149,7 +155,7 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 			PrevHash: prevHash,
 		}
 		e.StoredHash = audit.Hash(e)
-		h.DB.InsertAudit(auditCtx, payload.TenantID, nil, action, resource, "pipeline", nil, e.StoredHash, prevHash)
+		h.DB.InsertAudit(auditCtx, store.AuditWriteParams{TenantID: payload.TenantID, Action: action, Resource: resource, IP: "pipeline", PrevHash: prevHash})
 	}
 
 	// Write tool errors as audit

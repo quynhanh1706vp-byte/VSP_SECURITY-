@@ -33,24 +33,6 @@ type FindingFilter struct {
 	Offset   int
 }
 
-func (db *DB) InsertFindings(ctx context.Context, findings []Finding) error {
-	if len(findings) == 0 {
-		return nil
-	}
-	// batch insert
-	for _, f := range findings {
-		_, err := db.pool.Exec(ctx,
-			`INSERT INTO findings
-			 (run_id, tenant_id, tool, severity, rule_id, message, path, line_num, cwe, fix_signal, raw)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			f.RunID, f.TenantID, f.Tool, f.Severity, f.RuleID,
-			f.Message, f.Path, f.LineNum, f.CWE, f.FixSignal, f.Raw)
-		if err != nil {
-			return fmt.Errorf("insert finding: %w", err)
-		}
-	}
-	return nil
-}
 
 func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter) ([]Finding, int64, error) {
 	if f.Limit == 0  { f.Limit = 50   }

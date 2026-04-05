@@ -23,8 +23,8 @@ func ValidateWebhookURL(rawURL string) error {
 	if err != nil {
 		return fmt.Errorf("invalid URL: %w", err)
 	}
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("scheme must be http/https")
+	if u.Scheme != "https" {
+		return fmt.Errorf("scheme must be https")
 	}
 	host := u.Hostname()
 	// Chặn localhost và private ranges
@@ -81,7 +81,7 @@ type Event struct {
 
 // Deliver sends event to all active webhooks for a tenant.
 // Errors are logged but do not fail the caller.
-func Deliver(ctx context.Context, db *store.DB, event Event) {
+func Deliver(ctx context.Context, db store.WebhookStore, event Event) {
 	hooks, err := db.ListSIEMWebhooks(ctx, event.TenantID)
 	if err != nil {
 		log.Error().Err(err).Msg("siem: list webhooks failed")
@@ -92,14 +92,14 @@ func Deliver(ctx context.Context, db *store.DB, event Event) {
 			continue
 		}
 		// Severity filter
-		if !severityMeetsMin(event, hook.MinSev) {
+		if !SeverityMeetsMin(event, hook.MinSev) {
 			continue
 		}
 		go deliverOne(ctx, db, hook, event)
 	}
 }
 
-func deliverOne(ctx context.Context, db *store.DB, hook store.SIEMWebhook, event Event) {
+func deliverOne(ctx context.Context, db store.WebhookStore, hook store.SIEMWebhook, event Event) {
 	payload, err := buildPayload(WebhookType(hook.Type), hook, event)
 	if err != nil {
 		log.Error().Err(err).Str("hook", hook.ID).Msg("siem: build payload failed")
@@ -195,7 +195,7 @@ func buildPayload(t WebhookType, hook store.SIEMWebhook, e Event) ([]byte, error
 	}
 }
 
-func severityMeetsMin(e Event, minSev string) bool {
+func SeverityMeetsMin(e Event, minSev string) bool {
 	switch minSev {
 	case "CRITICAL":
 		return e.Critical > 0

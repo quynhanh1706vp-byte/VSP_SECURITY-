@@ -31,8 +31,11 @@ func logAudit(r *http.Request, db *store.DB, action, resource string) {
 			PrevHash: prevHash,
 		}
 		e.StoredHash = audit.Hash(e)
-		_, _, err2 := db.InsertAudit(r.Context(), claims.TenantID, &claims.UserID,
-			action, resource, r.RemoteAddr, nil, e.StoredHash, prevHash)
+		_, _, err2 := db.InsertAudit(r.Context(), store.AuditWriteParams{
+			TenantID: claims.TenantID, UserID: &claims.UserID,
+			Action: action, Resource: resource,
+			IP: r.RemoteAddr, PrevHash: prevHash,
+		})
 		if err2 != nil {
 			log.Warn().Err(err2).Str("action", action).Msg("audit: insert failed")
 		}

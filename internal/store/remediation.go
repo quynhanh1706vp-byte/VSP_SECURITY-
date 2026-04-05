@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type RemediationStatus string
@@ -40,34 +42,6 @@ type RemediationComment struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-func (db *DB) EnsureRemediationTable(ctx context.Context) error {
-	_, err := db.pool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS remediations (
-			id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			finding_id  UUID NOT NULL UNIQUE,
-			tenant_id   UUID NOT NULL,
-			status      TEXT NOT NULL DEFAULT 'open',
-			assignee    TEXT NOT NULL DEFAULT '',
-			priority    TEXT NOT NULL DEFAULT 'P3',
-			due_date    TIMESTAMPTZ,
-			notes       TEXT NOT NULL DEFAULT '',
-			ticket_url  TEXT NOT NULL DEFAULT '',
-			resolved_at TIMESTAMPTZ,
-			created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-			updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		);
-		CREATE TABLE IF NOT EXISTS remediation_comments (
-			id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			remediation_id  UUID NOT NULL REFERENCES remediations(id) ON DELETE CASCADE,
-			author          TEXT NOT NULL,
-			body            TEXT NOT NULL,
-			created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		);
-		CREATE INDEX IF NOT EXISTS idx_rem_finding ON remediations(finding_id);
-		CREATE INDEX IF NOT EXISTS idx_rem_tenant  ON remediations(tenant_id);
-	`)
-	return err
-}
 
 func (db *DB) GetRemediation(ctx context.Context, tenantID, findingID string) (*Remediation, error) {
 	row := db.pool.QueryRow(ctx,
@@ -173,4 +147,38 @@ func (db *DB) RemediationStats(ctx context.Context, tenantID string) (map[string
 		stats[s] = n
 	}
 	return stats, nil
+}
+
+// BulkUpsertRemediations upsert nhiều remediations trong 1 transaction.
+// Thay thế vòng lặp N×UpsertRemediation trong pipeline/worker.go.
+func (db *DB) BulkUpsertRemediations(ctx context.Context, items []Remediation) error {
+	if len(items) == 0 {
+		return nil
+	}
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("bulk upsert remediation: begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	const q = `INSERT INTO remediations (finding_id, tenant_id, status, priority)
+		VALUES ($1,$2,$3,$4)
+		ON CONFLICT (finding_id) DO NOTHING`
+
+	batch := &pgx.Batch{}
+	for _, r := range items {
+		batch.Queue(q, r.FindingID, r.TenantID, r.Status, r.Priority)
+	}
+
+	results := tx.SendBatch(ctx, batch)
+	for range items {
+		if _, err := results.Exec(); err != nil {
+			results.Close()
+			return fmt.Errorf("bulk upsert remediation exec: %w", err)
+		}
+	}
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("bulk upsert remediation close: %w", err)
+	}
+	return tx.Commit(ctx)
 }

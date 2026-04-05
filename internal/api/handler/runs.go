@@ -107,7 +107,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		}
 		e.StoredHash = audit.Hash(e)
 		uid := claims.UserID
-		h.DB.InsertAudit(ctx, claims.TenantID, &uid, "SCAN_TRIGGER", run.RID, r.RemoteAddr, nil, e.StoredHash, prevHash)
+		h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: claims.TenantID, UserID: &uid, Action: "SCAN_TRIGGER", Resource: run.RID, IP: r.RemoteAddr, PrevHash: prevHash})
 	}()
 
 

@@ -80,7 +80,7 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 		prevHash, _ := u.DB.GetLastAuditHash(r.Context(), claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "USER_CREATED", Resource: "/admin/users/" + user.ID, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
-		u.DB.InsertAudit(r.Context(), claims.TenantID, &claims.UserID, "USER_CREATED", "/admin/users/"+user.ID, r.RemoteAddr, nil, e.StoredHash, prevHash) //nolint:errcheck
+		u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "USER_CREATED", Resource: "/admin/users/"+ user.ID, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 	}()
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, user)
@@ -98,7 +98,7 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 		prevHash, _ := u.DB.GetLastAuditHash(r.Context(), claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "USER_DELETED", Resource: "/admin/users/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
-		u.DB.InsertAudit(r.Context(), claims.TenantID, &claims.UserID, "USER_DELETED", "/admin/users/"+id, r.RemoteAddr, nil, e.StoredHash, prevHash) //nolint:errcheck
+		u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "USER_DELETED", Resource: "/admin/users/"+ id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 	}()
 	w.WriteHeader(http.StatusNoContent)
 }

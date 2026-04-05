@@ -33,6 +33,7 @@ import (
 	"github.com/vsp/platform/internal/scheduler"
 	"github.com/vsp/platform/internal/siem"
 	"github.com/vsp/platform/internal/store"
+	"github.com/vsp/platform/internal/telemetry"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -52,6 +53,7 @@ func main() {
 	viper.SetDefault("database.url", "postgres://vsp:vsp@localhost:5432/vsp_go")
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("redis.addr", "localhost:6379")
+	viper.SetDefault("telemetry.otlp_endpoint", "")
 	// Docker env var mappings — sau SetDefault để override
 	viper.BindEnv("database.url", "DATABASE_URL")
 	viper.BindEnv("redis.addr", "REDIS_ADDR")
@@ -79,9 +81,13 @@ func main() {
 	if err2 != nil { log.Fatal().Err(err2).Msg("open db for migrations") }
 	if err2 = migrate.Run(ctx, stdDB); err2 != nil { log.Fatal().Err(err2).Msg("migration failed") }
 	stdDB.Close()
+
+	// Telemetry — noop nếu OTLP_ENDPOINT không set
+	shutdownTracing, _ := telemetry.Init(ctx, "vsp-gateway", "1.0.0",
+		viper.GetString("telemetry.otlp_endpoint"))
+	defer shutdownTracing()
+
 	ensureDefaultTenant(ctx, db)
-	db.EnsureSchedulerTables(ctx) //nolint:errcheck
-	db.EnsureRemediationTable(ctx) //nolint:errcheck
 	defaultTID := getDefaultTenantID(ctx, db)
 
 	jwtSecret := viper.GetString("auth.jwt_secret")

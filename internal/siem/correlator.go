@@ -39,7 +39,7 @@ func (s *correlatorState) canFire(ruleID string, windowMin int) bool {
 	return false
 }
 
-func StartCorrelationEngine(ctx context.Context, db *store.DB, broadcast BroadcastFn) {
+func StartCorrelationEngine(ctx context.Context, db store.CorrelatorStore, broadcast BroadcastFn) {
 	state := newCorrelatorState()
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -56,12 +56,8 @@ func StartCorrelationEngine(ctx context.Context, db *store.DB, broadcast Broadca
 	}
 }
 
-func runCorrelationPass(ctx context.Context, db *store.DB, broadcast BroadcastFn, state *correlatorState) {
-	rows, err := db.Pool().Query(ctx, `
-		SELECT id, tenant_id, name, sources, window_min, severity, condition_expr
-		FROM   correlation_rules
-		WHERE  enabled = true
-		ORDER  BY tenant_id, created_at`)
+func runCorrelationPass(ctx context.Context, db store.CorrelatorStore, broadcast BroadcastFn, state *correlatorState) {
+	rows, err := db.ListAllEnabledRules(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("correlation: failed to load rules")
 		return
@@ -96,11 +92,7 @@ func runCorrelationPass(ctx context.Context, db *store.DB, broadcast BroadcastFn
 		}
 		// DB dedup: skip nếu đã có incident cùng rule trong cooldown window
 		var recentCount int
-		db.Pool().QueryRow(ctx, `
-			SELECT COUNT(*) FROM incidents
-			WHERE rule_id=$1 AND status='open'
-			  AND created_at > NOW() - make_interval(mins => $2)`,
-			rule.id, rule.windowMin*2).Scan(&recentCount) //nolint:errcheck
+		recentCount, _ = db.CountRecentIncidents(ctx, rule.id, rule.windowMin*2)
 		if recentCount > 0 {
 			log.Debug().Str("rule", rule.name).Msg("correlation: dedup skip")
 			continue
@@ -130,8 +122,7 @@ func runCorrelationPass(ctx context.Context, db *store.DB, broadcast BroadcastFn
 			log.Error().Err(err).Str("rule", rule.name).Msg("correlation: failed to create incident")
 			continue
 		}
-		db.Pool().Exec(ctx, //nolint:errcheck
-			`UPDATE correlation_rules SET hits = hits + 1, updated_at = NOW() WHERE id = $1`, rule.id)
+		db.UpdateCorrelationRuleHits(ctx, rule.id) //nolint:errcheck
 		log.Info().
 			Str("rule", rule.name).
 			Str("incident_id", incID).
@@ -171,7 +162,7 @@ func runCorrelationPass(ctx context.Context, db *store.DB, broadcast BroadcastFn
 	}
 }
 
-func countMatchingEvents(ctx context.Context, db *store.DB, tenantID string, sources []string, windowMin int, condExpr string) (int, []string, error) {
+func countMatchingEvents(ctx context.Context, db store.CorrelatorStore, tenantID string, sources []string, windowMin int, condExpr string) (int, []string, error) {
 	since := time.Now().Add(-time.Duration(windowMin) * time.Minute)
 	extraWhere, args := buildConditionWhere(condExpr, tenantID, since)
 	sourceFilter := ""
@@ -195,7 +186,7 @@ func countMatchingEvents(ctx context.Context, db *store.DB, tenantID string, sou
 		%s%s`, extraWhere, sourceFilter)
 	var count int
 	var hosts []string
-	err := db.Pool().QueryRow(ctx, q, args...).Scan(&count, &hosts)
+	count, hosts, err := db.QueryEventCount(ctx, q, args)
 	return count, hosts, err
 }
 

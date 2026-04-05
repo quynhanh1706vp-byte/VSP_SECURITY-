@@ -49,7 +49,9 @@ func (db *DB) CreateUser(ctx context.Context, tenantID, email, pwHash, role stri
 	row := db.pool.QueryRow(ctx,
 		`INSERT INTO users (tenant_id, email, pw_hash, role)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, tenant_id, email, pw_hash, role, mfa_enabled, created_at, last_login`,
+		 RETURNING id, tenant_id, email, pw_hash, role, mfa_enabled,
+		           COALESCE(mfa_secret,''), COALESCE(mfa_verified,false),
+		           COALESCE(failed_logins,0), locked_until, created_at, last_login`,
 		tenantID, email, pwHash, role)
 	return scanUser(row)
 }

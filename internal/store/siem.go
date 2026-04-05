@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"time"
+	"fmt"
+	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/log"
 )
 
@@ -107,7 +109,7 @@ func (db *DB) ListCorrelationRules(ctx context.Context, tenantID string) ([]Corr
 		r.TenantID = tenantID
 		if err := rows.Scan(&r.ID, &r.Name, &r.Sources, &r.WindowMin,
 			&r.Severity, &r.Condition, &r.Enabled, &r.Hits, &r.CreatedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("scan correlation rule: %w", err)
 		}
 		out = append(out, r)
 	}
@@ -164,7 +166,7 @@ func (db *DB) ListIncidents(ctx context.Context, tenantID, status, sev string, l
 		inc.TenantID = tenantID
 		if err := rows.Scan(&inc.ID, &inc.Title, &inc.Severity, &inc.Status,
 			&inc.SourceRefs, &inc.CreatedAt, &inc.RuleName); err != nil {
-			continue
+			return nil, fmt.Errorf("scan incident: %w", err)
 		}
 		out = append(out, inc)
 	}
@@ -221,7 +223,7 @@ func (db *DB) ListPlaybooks(ctx context.Context, tenantID string) ([]Playbook, e
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Trigger,
 			&p.SevFilter, &p.Steps, &p.Enabled, &p.RunCount,
 			&p.SuccessCount, &p.CreatedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("scan playbook: %w", err)
 		}
 		out = append(out, p)
 	}
@@ -291,7 +293,7 @@ func (db *DB) ListPlaybookRuns(ctx context.Context, tenantID string, limit int) 
 		ru.TenantID = tenantID
 		if err := rows.Scan(&ru.ID, &ru.PlaybookID, &ru.PlaybookName,
 			&ru.Status, &ru.Trigger, &ru.StartedAt, &ru.FinishedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("scan playbook run: %w", err)
 		}
 		out = append(out, ru)
 	}
@@ -331,7 +333,7 @@ func (db *DB) ListLogSources(ctx context.Context, tenantID string) ([]LogSource,
 		if err := rows.Scan(&s.ID, &s.Name, &s.Host, &s.Protocol, &s.Port,
 			&s.Format, &s.Tags, &s.Enabled, &s.EPS, &s.ParseRate,
 			&s.Status, &s.LastSeen, &s.CreatedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("scan log source: %w", err)
 		}
 		out = append(out, s)
 	}
@@ -390,7 +392,7 @@ func (db *DB) ListIOCs(ctx context.Context, iocType string, limit int) ([]IOC, e
 		var ioc IOC
 		if err := rows.Scan(&ioc.ID, &ioc.Type, &ioc.Value, &ioc.Severity,
 			&ioc.Feed, &ioc.Description, &ioc.Matched, &ioc.CreatedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("scan ioc: %w", err)
 		}
 		out = append(out, ioc)
 	}
@@ -500,7 +502,7 @@ func (db *DB) ListSIEMWebhooks(ctx context.Context, tenantID string) ([]SIEMWebh
 		if err := rows.Scan(&h.ID, &h.TenantID, &h.Label, &h.Type, &h.URL,
 			&h.SecretHash, &h.MinSev, &h.Active,
 			&h.LastFired, &h.FireCount, &h.CreatedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("scan webhook: %w", err)
 		}
 		out = append(out, h)
 	}
@@ -534,4 +536,50 @@ func (db *DB) TouchSIEMWebhook(ctx context.Context, id string) error {
 		SET last_fired=NOW(), fire_count=fire_count+1
 		WHERE id=$1`, id)
 	return err
+}
+
+// ── CorrelatorStore helpers ───────────────────────────────────────────────────
+
+func (db *DB) UpdateCorrelationRuleHits(ctx context.Context, id string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE correlation_rules SET hits = hits + 1, updated_at = NOW() WHERE id = $1`, id)
+	return err
+}
+
+func (db *DB) CountRecentIncidents(ctx context.Context, ruleID string, windowMin int) (int, error) {
+	var count int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM incidents
+		WHERE rule_id=$1 AND status='open'
+		  AND created_at > NOW() - make_interval(mins => $2)`,
+		ruleID, windowMin).Scan(&count)
+	return count, err
+}
+
+func (db *DB) QueryEventCount(ctx context.Context, q string, args []any) (int, []string, error) {
+	var count int
+	var hosts []string
+	err := db.pool.QueryRow(ctx, q, args...).Scan(&count, &hosts)
+	return count, hosts, err
+}
+
+func (db *DB) ListAllEnabledRules(ctx context.Context) (pgx.Rows, error) {
+	return db.pool.Query(ctx, `
+		SELECT id, tenant_id, name, sources, window_min, severity, condition_expr
+		FROM   correlation_rules
+		WHERE  enabled = true
+		ORDER  BY tenant_id, created_at`)
+}
+
+func (db *DB) CountEventsInWindow(ctx context.Context, tenantID string, since time.Time, extraWhere string, args []any) (int, []string, error) {
+	q := fmt.Sprintf(`
+		SELECT COUNT(*), COALESCE(array_agg(DISTINCT host) FILTER (WHERE host IS NOT NULL), '{}')
+		FROM   log_events
+		WHERE  tenant_id = $1
+		  AND  ts >= $2
+		%s`, extraWhere)
+	var count int
+	var hosts []string
+	err := db.pool.QueryRow(ctx, q, args...).Scan(&count, &hosts)
+	return count, hosts, err
 }

@@ -198,7 +198,7 @@ func (a *Auth) writeAudit(r *http.Request, tenantID string, userID *string, acti
 		PrevHash: prevHash,
 	}
 	e.StoredHash = audit.Hash(e)
-	a.DB.InsertAudit(r.Context(), tenantID, userID, action, resource, r.RemoteAddr, nil, e.StoredHash, prevHash) //nolint:errcheck
+	a.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: tenantID, UserID: userID, Action: action, Resource: resource, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 }
 
 func derefStr(s *string) string {

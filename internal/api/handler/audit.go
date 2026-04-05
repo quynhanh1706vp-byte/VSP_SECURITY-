@@ -97,7 +97,10 @@ func (a *auditStoreAdapter) WriteAudit(ctx context.Context, e audit.Entry) (int6
 	if e.UserID != "" {
 		uid = &e.UserID
 	}
-	seq, _, err := a.db.InsertAudit(ctx, e.TenantID, uid,
-		e.Action, e.Resource, e.IP, nil, e.StoredHash, e.PrevHash)
+	seq, _, err := a.db.InsertAudit(ctx, store.AuditWriteParams{
+		TenantID: e.TenantID, UserID: uid,
+		Action: e.Action, Resource: e.Resource,
+		IP: e.IP, PrevHash: e.PrevHash,
+	})
 	return seq, err
 }
