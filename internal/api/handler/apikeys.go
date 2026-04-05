@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/vsp/platform/internal/audit"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
 	"golang.org/x/crypto/bcrypt"
@@ -100,5 +101,11 @@ func (h *APIKeys) Delete(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
+	go func() {
+		prevHash, _ := h.DB.GetLastAuditHash(r.Context(), claims.TenantID)
+		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
+		e.StoredHash = audit.Hash(e)
+		h.DB.InsertAudit(r.Context(), claims.TenantID, &claims.UserID, "APIKEY_DELETED", "/admin/api-keys/"+id, r.RemoteAddr, nil, e.StoredHash, prevHash) //nolint:errcheck
+	}()
 	w.WriteHeader(http.StatusNoContent)
 }
