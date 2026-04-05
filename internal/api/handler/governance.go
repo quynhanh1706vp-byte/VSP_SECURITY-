@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/governance"
 	"github.com/vsp/platform/internal/store"
@@ -103,6 +104,7 @@ func (h *Governance) Evidence(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/governance/evidence/{id}/freeze
 func (h *Governance) FreezeEvidence(w http.ResponseWriter, r *http.Request) {
+	defer logAudit(r, h.DB, "EVIDENCE_FROZEN", "/governance/evidence/"+chi.URLParam(r, "id"))
 	jsonOK(w, map[string]string{"status": "frozen", "message": "evidence record locked for audit"})
 }
 

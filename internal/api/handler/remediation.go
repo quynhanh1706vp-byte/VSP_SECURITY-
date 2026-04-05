@@ -46,6 +46,7 @@ func (h *Remediation) Get(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/remediation/finding/{finding_id}
 func (h *Remediation) Upsert(w http.ResponseWriter, r *http.Request) {
+	defer logAudit(r, h.DB, "REMEDIATION_UPDATED", "/remediation/"+chi.URLParam(r, "finding_id"))
 	claims, _ := auth.FromContext(r.Context())
 	fid := chi.URLParam(r, "finding_id")
 	var req struct {
