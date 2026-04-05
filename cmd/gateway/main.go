@@ -28,6 +28,7 @@ import (
 	"github.com/vsp/platform/internal/cache"
 	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/pipeline"
+	"github.com/vsp/platform/internal/safe"
 	"github.com/vsp/platform/internal/scheduler"
 	"github.com/vsp/platform/internal/siem"
 	"github.com/vsp/platform/internal/store"
@@ -835,17 +836,17 @@ func main() {
 	log.Info().Msg("UEBA worker started — interval: 15m")
 
 	// ── Incident email alerter ───────────────────────────────────
-	go siem.WatchIncidents(ctx, db)
+	safe.GoCtx(ctx, func(ctx context.Context) { siem.WatchIncidents(ctx, db) })
 
 	// ── Correlation engine ──────────────────────
-	go siem.StartCorrelationEngine(ctx, db, handler.Hub.Broadcast)
+	safe.GoCtx(ctx, func(ctx context.Context) { siem.StartCorrelationEngine(ctx, db, handler.Hub.Broadcast) })
 	log.Info().Msg("Correlation engine started")
 
 
 	log.Info().Msg("Incident email alerter started — interval: 30s")
 
 	// ── Retention policy worker ──────────────────────────────────
-	go siem.StartRetentionWorker(ctx, db)
+	safe.GoCtx(ctx, func(ctx context.Context) { siem.StartRetentionWorker(ctx, db) })
 
 	// ── Syslog receiver UDP:514 + TCP:514 ───────────────────────
 	udpAddr := viper.GetString("siem.syslog_udp_addr")

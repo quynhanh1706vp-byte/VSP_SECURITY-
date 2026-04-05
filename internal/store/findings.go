@@ -83,7 +83,8 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 	whereSQL := strings.Join(where, " AND ")
 
 	var total int64
-	db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM findings WHERE "+whereSQL, args...).Scan(&total)
+	// whereSQL chỉ chứa $N placeholders — không có user input trực tiếp
+	db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM findings WHERE "+whereSQL, args...).Scan(&total) //nolint:errcheck
 
 	args = append(args, f.Limit, f.Offset)
 	rows, err := db.pool.Query(ctx,

@@ -94,7 +94,12 @@ func (c *Client) Middleware(name string, ttl time.Duration) func(next http.Handl
 			}
 
 			// Cache key = name + query string (tenant-aware qua JWT được inject context)
-			key := "vsp:api:" + name + ":" + r.URL.RawQuery
+			// CRITICAL: include tenant_id to prevent cross-tenant cache leak
+			tenantID := ""
+			if tid := r.Context().Value("tenant_id"); tid != nil {
+				if s, ok := tid.(string); ok { tenantID = s }
+			}
+			key := "vsp:api:" + name + ":" + tenantID + ":" + r.URL.RawQuery
 
 			// Cache hit
 			if cached := c.Get(r.Context(), key); cached != nil {
