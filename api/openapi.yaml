@@ -1,0 +1,383 @@
+openapi: "3.0.3"
+info:
+  title: VSP Security Platform API
+  version: "1.0.0"
+  description: |
+    VSP (Vulnerability Scanning Platform) — Enterprise Security API.
+    Authentication: Bearer JWT token từ POST /api/v1/auth/login.
+  contact:
+    name: VSP Security Team
+    email: soc@agency.gov
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8921
+    description: Development
+  - url: https://vsp.agency.gov
+    description: Production
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        mfa_code: { type: string, pattern: "^[0-9]{6}$" }
+
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user_id: { type: string, format: uuid }
+        email: { type: string }
+        role: { type: string, enum: [admin, analyst, dev, auditor] }
+        tenant_id: { type: string, format: uuid }
+        expires_at: { type: string, format: date-time }
+        mfa_enabled: { type: boolean }
+
+    MFARequired:
+      type: object
+      properties:
+        mfa_required: { type: boolean }
+        message: { type: string }
+
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded, error] }
+        version: { type: string }
+        timestamp: { type: string, format: date-time }
+        uptime: { type: string }
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status: { type: string }
+              latency: { type: string }
+              error: { type: string }
+
+    Run:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        rid: { type: string }
+        tenant_id: { type: string, format: uuid }
+        mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, FULL] }
+        profile: { type: string, enum: [FAST, STANDARD, DEEP] }
+        status: { type: string, enum: [QUEUED, RUNNING, DONE, FAILED, CANCELLED] }
+        gate: { type: string, enum: [PASS, WARN, FAIL] }
+        total_findings: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    Finding:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        tool: { type: string }
+        severity: { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW, INFO] }
+        rule_id: { type: string }
+        message: { type: string }
+        path: { type: string }
+        line_num: { type: integer }
+        cwe: { type: string }
+        fix_signal: { type: string }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        role: { type: string }
+        mfa_enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    PaginatedResponse:
+      type: object
+      properties:
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+
+paths:
+  /health:
+    get:
+      summary: Deep health check
+      security: []
+      tags: [System]
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+        "503":
+          description: Unhealthy
+
+  /api/v1/auth/login:
+    post:
+      summary: Login
+      security: []
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Login successful or MFA required
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/LoginResponse"
+                  - $ref: "#/components/schemas/MFARequired"
+        "401": { description: Invalid credentials }
+        "429": { description: Rate limited or account locked }
+
+  /api/v1/auth/logout:
+    post:
+      summary: Logout
+      tags: [Auth]
+      responses:
+        "200": { description: Logged out }
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Refresh JWT token
+      tags: [Auth]
+      responses:
+        "200":
+          description: New token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  expires_at: { type: string, format: date-time }
+
+  /api/v1/auth/password/change:
+    post:
+      summary: Change password
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password: { type: string, minLength: 8 }
+                mfa_code: { type: string }
+      responses:
+        "200": { description: Password changed }
+        "400": { description: Validation error }
+        "401": { description: Wrong current password }
+
+  /api/v1/auth/mfa/setup:
+    post:
+      summary: Setup MFA — generate TOTP secret
+      tags: [Auth]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret: { type: string }
+                  provisioning_uri: { type: string }
+
+  /api/v1/auth/mfa/verify:
+    post:
+      summary: Verify and enable MFA
+      tags: [Auth]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200": { description: MFA enabled }
+        "400": { description: Invalid code }
+
+  /api/v1/vsp/run:
+    post:
+      summary: Trigger a scan
+      tags: [Scans]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, FULL] }
+                profile: { type: string, enum: [FAST, STANDARD, DEEP] }
+                src: { type: string, description: "Path or URL to scan" }
+      responses:
+        "200": { description: Scan queued }
+
+  /api/v1/vsp/runs:
+    get:
+      summary: List scan runs
+      tags: [Scans]
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      runs:
+                        type: array
+                        items: { $ref: "#/components/schemas/Run" }
+
+  /api/v1/vsp/findings:
+    get:
+      summary: List findings
+      tags: [Findings]
+      parameters:
+        - in: query
+          name: severity
+          schema: { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW] }
+        - in: query
+          name: tool
+          schema: { type: string }
+        - in: query
+          name: run_id
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string, description: "Search in message, rule_id, path" }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 2000 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  findings:
+                    type: array
+                    items: { $ref: "#/components/schemas/Finding" }
+                  total: { type: integer }
+
+  /api/v1/admin/users:
+    get:
+      summary: List users (admin only)
+      tags: [Admin]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+    post:
+      summary: Create user (admin only)
+      tags: [Admin]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, role]
+              properties:
+                email: { type: string }
+                password: { type: string, minLength: 8 }
+                role: { type: string, enum: [admin, analyst, dev, auditor] }
+      responses:
+        "201": { description: User created }
+
+  /api/v1/correlation/incidents:
+    get:
+      summary: List security incidents
+      tags: [SIEM]
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, resolved, all] }
+        - in: query
+          name: severity
+          schema: { type: string }
+      responses:
+        "200": { description: Incidents list }
+
+  /api/v1/siem/webhooks:
+    get:
+      summary: List SIEM webhooks
+      tags: [SIEM]
+      responses:
+        "200": { description: Webhooks list }
+    post:
+      summary: Create SIEM webhook
+      tags: [SIEM]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label, type, url]
+              properties:
+                label: { type: string }
+                type: { type: string, enum: [slack, teams, generic] }
+                url: { type: string, format: uri }
+                min_sev: { type: string, enum: [CRITICAL, HIGH, MEDIUM] }
+      responses:
+        "200": { description: Webhook created }
+
+tags:
+  - name: System
+    description: Health, metrics
+  - name: Auth
+    description: Authentication, MFA, password
+  - name: Scans
+    description: Scan runs management
+  - name: Findings
+    description: Security findings
+  - name: Admin
+    description: User management (admin only)
+  - name: SIEM
+    description: Security incidents, webhooks, correlation

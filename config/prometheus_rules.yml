@@ -1,0 +1,122 @@
+groups:
+  - name: vsp_security
+    interval: 30s
+    rules:
+      # Critical findings spike
+      - alert: CriticalFindingsHigh
+        expr: vsp_findings_current{severity="CRITICAL"} > 5
+        for: 5m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "High number of CRITICAL findings"
+          description: "{{ $value }} CRITICAL findings detected — immediate action required"
+
+      # Gate FAIL rate
+      - alert: GateFailRateHigh
+        expr: rate(vsp_gate_decisions_total{decision="FAIL"}[15m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High gate FAIL rate"
+          description: "More than 50% of scans failing gate in last 15min"
+
+      # API error rate
+      - alert: APIErrorRateHigh
+        expr: |
+          rate(vsp_api_request_duration_seconds_count{status=~"5.."}[5m]) /
+          rate(vsp_api_request_duration_seconds_count[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API error rate above 5%"
+          description: "{{ $value | humanizePercentage }} of API requests returning 5xx"
+
+      # API latency
+      - alert: APILatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            rate(vsp_api_request_duration_seconds_bucket[5m])
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p95 latency above 2s"
+          description: "p95 latency: {{ $value }}s"
+
+  - name: vsp_infrastructure
+    interval: 60s
+    rules:
+      # DB pool exhausted
+      - alert: DBPoolExhausted
+        expr: |
+          vsp_db_pool_connections{state="acquired"} /
+          vsp_db_pool_connections{state="max_conns"} > 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DB connection pool nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of DB connections in use"
+
+      # SSE clients spike (potential DoS)
+      - alert: SSEClientsSpiking
+        expr: vsp_sse_clients_active > 500
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusually high SSE client count"
+          description: "{{ $value }} active SSE connections"
+
+      # Server down
+      - alert: VSPGatewayDown
+        expr: up{job="vsp-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          pagerduty: "true"
+        annotations:
+          summary: "VSP Gateway is down"
+          description: "VSP Gateway has been unreachable for more than 1 minute"
+
+      # Webhook delivery failures
+      - alert: WebhookDeliveryFailing
+        expr: |
+          rate(vsp_webhook_deliveries_total{status="error"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SIEM webhook delivery failures"
+          description: "{{ $value }} webhook failures per second"
+
+  - name: vsp_auth
+    interval: 30s
+    rules:
+      # Login brute force
+      - alert: LoginBruteForce
+        expr: |
+          rate(vsp_login_attempts_total{result="failed"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Possible brute force attack on login"
+          description: "{{ $value }} failed login attempts per second"
+
+      # High locked account rate
+      - alert: AccountLockoutSpike
+        expr: |
+          rate(vsp_login_attempts_total{result="locked"}[10m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High account lockout rate"
+          description: "Multiple accounts being locked — possible credential stuffing"
