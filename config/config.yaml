@@ -13,7 +13,7 @@ database:
   min_conns: 2
 
 auth:
-  jwt_secret: ""  # set via env JWT_SECRET
+  jwt_secret: "57639b491307d4989ef41e1b381599c3024cab37d4f6538f9dd0538c6defd953"  # generated — move to env JWT_SECRET in production
   jwt_ttl: 24h
   api_key_ttl: 90d
 

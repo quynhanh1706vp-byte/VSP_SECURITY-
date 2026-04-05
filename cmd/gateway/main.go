@@ -91,6 +91,9 @@ func main() {
 	defaultTID := getDefaultTenantID(ctx, db)
 
 	jwtSecret := viper.GetString("auth.jwt_secret")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret-change-in-prod" // fallback for dev only
+	}
 	if jwtSecret == "" || jwtSecret == "change-me-in-production" || jwtSecret == "dev-secret-change-in-prod" {
 		if viper.GetString("server.env") == "production" {
 			log.Fatal().Msg("JWT secret chưa được set — từ chối khởi động ở production")
