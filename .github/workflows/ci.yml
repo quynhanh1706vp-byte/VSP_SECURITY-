@@ -129,11 +129,17 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sanitize image name
+        id: image
+        run: |
+          NAME=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._/-]/-/g' | sed 's/-$//')
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
           tags: |
             type=ref,event=branch
             type=sha,prefix=sha-
