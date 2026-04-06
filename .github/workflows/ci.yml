@@ -160,7 +160,7 @@ jobs:
     name: Deploy Staging
     runs-on: ubuntu-latest
     needs: [docker]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.STAGING_HOST != ''
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.STAGING_ENABLED == 'true'
     environment:
       name: staging
       url: ${{ vars.STAGING_URL }}
