@@ -46,6 +46,7 @@ jobs:
       - name: Apply migrations
         run: |
           go install github.com/pressly/goose/v3/cmd/goose@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
           goose -dir internal/migrate/sql postgres \
             "postgres://vsp:vsp_test@localhost:5432/vsp_test?sslmode=disable" up
       - name: Integration tests store
@@ -99,7 +100,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install goose
-        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
       - name: Migration up
         run: |
           goose -dir internal/migrate/sql postgres \

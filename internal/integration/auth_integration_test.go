@@ -18,6 +18,7 @@ import (
 	"github.com/vsp/platform/internal/api/handler"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/testutil"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const testJWTSecret = "integration-test-secret-32bytes!"
@@ -67,9 +68,11 @@ func TestAuthFlow_LoginAndRefresh(t *testing.T) {
 
 	// ── Step 1: Create user ──────────────────────────────────────────────
 	// Dùng SQL trực tiếp vì chưa có signup endpoint
-	importPkg := "golang.org/x/crypto/bcrypt"
-	_ = importPkg // sẽ dùng trong production test
-	hash := "$2a$10$YourHashHere" // placeholder
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte("testpassword"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("bcrypt: %v", err)
+	}
+	hash := string(hashBytes)
 
 	// Skip nếu không có bcrypt hash thật
 	var userID string
