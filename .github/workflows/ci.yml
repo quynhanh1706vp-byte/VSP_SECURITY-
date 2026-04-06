@@ -171,6 +171,7 @@ jobs:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
         run: |
           go install github.com/pressly/goose/v3/cmd/goose@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
           goose -dir internal/migrate/sql postgres "$DATABASE_URL" up
           goose -dir internal/migrate/sql postgres "$DATABASE_URL" status
       - name: Deploy via SSH
