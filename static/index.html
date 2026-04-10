@@ -1617,19 +1617,7 @@ function esc(s) {
 }
 
 const API = '/api/v1';
-let TOKEN = (function(){
-  var t = localStorage.getItem('vsp_token') || '';
-  if (!t) return '';
-  try {
-    var p = decodeJwt(t);
-    if (!p) { localStorage.removeItem('vsp_token'); return ''; }
-    if (p.exp && p.exp * 1000 < Date.now()) {
-      localStorage.removeItem('vsp_token');
-      return '';
-    }
-  } catch(e) { localStorage.removeItem('vsp_token'); return ''; }
-  return t;
-})();
+let TOKEN = ''; /* cookie-based auth — JS never reads token */
 let _currentPanel = 'dashboard';
 let _allLogs = [];
 let _logFilter = 'ALL';
@@ -1641,8 +1629,8 @@ async function api(method, path, body, noAuth) {
   if (!noAuth && (!window.TOKEN || window.TOKEN === '')) {
     throw new Error('not_authenticated');
   }
-  const opts = { method, headers: {'Content-Type':'application/json'} };
-  if (!noAuth && window.TOKEN) opts.headers['Authorization'] = 'Bearer ' + window.TOKEN;
+  const opts = { method, credentials: 'same-origin', headers: {'Content-Type':'application/json'} };
+  /* Cookie sent automatically — no Authorization header needed for cookie sessions */
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(API + path, opts);
   if (!r.ok) {
@@ -2635,7 +2623,7 @@ function updateTicker() {
 /* ─── SSE connection ─── */
 function connectSSE() {
   if (!TOKEN) return;
-  const url = `/api/v1/events?token=${encodeURIComponent(TOKEN)}`;
+  const url = '/api/v1/events'; /* cookie sent automatically by browser */
   const source = new EventSource(url);
   source.onopen = () => {
     document.getElementById('sse-dot').className = 'sse-dot sse-live';
@@ -2738,7 +2726,7 @@ document.addEventListener('DOMContentLoaded', () => {
           updateTicker();
           setInterval(updateTicker, 30000);
         } else {
-          localStorage.removeItem('vsp_token');
+          /* vsp_token cookie cleared server-side */
           window.TOKEN = '';
         }
       } catch(e) {}
@@ -2785,29 +2773,15 @@ window.loadExecutive = loadExecutive;
 
 <script>
 // ── VSP PATCH v2.1 — Auth + SSE + All fixes ───────────────────────────────
-window.TOKEN = localStorage.getItem('vsp_token') || '';
+window.TOKEN = ''; /* cookie-based auth — no localStorage */
 
 // ── ensureToken: returns true if TOKEN available, else tries localStorage ──
 async function ensureToken() {
-  if (window.TOKEN) return true;
-  var stored = localStorage.getItem('vsp_token');
-  if (stored) {
-    // Validate JWT expiry
-    try {
-      var payload = decodeJwt(stored);
-      if (payload) {
-        if (payload.exp && payload.exp * 1000 > Date.now()) {
-          window.TOKEN = stored;
-          return true;
-        } else {
-          localStorage.removeItem('vsp_token');
-          return false;
-        }
-      }
-    } catch(e) {}
-    window.TOKEN = stored;
-    return true;
-  }
+  if (window.TOKEN === '✓') return true;
+  try {
+    var r = await fetch('/api/v1/auth/check', {credentials: 'same-origin'});
+    if (r.ok) { window.TOKEN = '✓'; return true; }
+  } catch(e) {}
   return false;
 }
 
@@ -2823,7 +2797,7 @@ async function ensureToken() {
       _handling401 = true;
       // Server từ chối token → clear và redirect về login
       window.TOKEN = '';
-      localStorage.removeItem('vsp_token');
+      /* cookie cleared by server 401 response (Set-Cookie: expired) */
       // Notify tất cả iframes
       document.querySelectorAll('iframe').forEach(function(f) {
         try { f.contentWindow.postMessage({type:'vsp:token', token:''}, '*'); } catch(e) {}
@@ -2957,10 +2931,10 @@ document.addEventListener('DOMContentLoaded', function() {
           if (overlay) overlay.classList.add('hidden');
           if (typeof loadCurrentPanel === 'function') setTimeout(loadCurrentPanel, 100);
         } else {
-          localStorage.removeItem('vsp_token');
+          /* vsp_token cookie cleared server-side */
         }
       }
-    } catch(e) { localStorage.removeItem('vsp_token'); }
+    } catch(e) { /* vsp_token cookie cleared server-side */ }
   }
 });
 // ── END GOV PATCH v1.1 Login Gate ────────────────────────────────────────
@@ -7339,21 +7313,25 @@ async function profileSubmitPassword() {
 }
 
 function profileCopyToken() {
-  var token = window.TOKEN || localStorage.getItem('vsp_token') || '';
-  if (!token) { showToast('No token available','error'); return; }
-  navigator.clipboard.writeText(token).then(function(){
-    showToast('API token copied to clipboard','success');
-  }).catch(function(){
-    showToast('Copy failed — check browser permissions','error');
-  });
+  /* Token not available in JS (httpOnly cookie).
+     For API access, use POST /api/v1/auth/token to get a short-lived API key. */
+  fetch('/api/v1/auth/api-token', {method:'POST', credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.token) {
+        navigator.clipboard.writeText(d.token)
+          .then(function(){ showToast('API token copied (valid 1h)','success'); })
+          .catch(function(){ showToast('Copy failed — check permissions','error'); });
+      } else { showToast('Could not generate API token','error'); }
+    })
+    .catch(function(){ showToast('Error generating API token','error'); });
   toggleProfilePanel();
 }
 
 function profileLogout() {
   toggleProfilePanel();
   window.TOKEN = '';
-  localStorage.removeItem('vsp_token');
-  localStorage.removeItem('vsp_user');
+  /* Cookie cleared server-side via POST /auth/logout (Set-Cookie: expired) */
   // Show login overlay
   var overlay = document.getElementById('gov-login-overlay');
   if (overlay) {
@@ -8209,7 +8187,7 @@ async function loadSIEMKPIs() {
 // Gọi sau khi login
 var _siemKPIpoll = setInterval(function() {
   if (!window.TOKEN || window.TOKEN.length < 50 || window.TOKEN.split('.').length !== 3) return;
-  try { var p=decodeJwt(window.TOKEN); if(!p||(p.exp&&p.exp*1000<Date.now())){localStorage.removeItem('vsp_token');window.TOKEN='';return;} } catch(e){return;}
+  try { var p=decodeJwt(window.TOKEN); if(!p||(p.exp&&p.exp*1000<Date.now())){/* vsp_token cookie cleared server-side */window.TOKEN='';return;} } catch(e){return;}
   clearInterval(_siemKPIpoll);
   loadSIEMKPIs();
   setInterval(loadSIEMKPIs, 60000);
@@ -8378,7 +8356,7 @@ async function submitMFA() {
     closeMFAOverlay();
     // Dùng token như login bình thường
     if (typeof onLoginSuccess === 'function') onLoginSuccess(data);
-    else { TOKEN = data.token; localStorage.setItem('vsp_token', TOKEN); location.reload(); }
+    else { window.TOKEN = '✓'; /* cookie set by server */ location.reload(); }
   } catch(err) {
     document.getElementById('mfa-err').textContent = err.message || 'Mã không hợp lệ';
     [0,1,2,3,4,5].forEach(i => { const el=document.getElementById('md'+i); el.value=''; el.classList.remove('filled'); });

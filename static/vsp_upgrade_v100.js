@@ -19,7 +19,8 @@ function scoreToGrade(score) {
 async function safeApi(method, url, fallback = {}) {
   try {
     // Nếu không có token thì không gọi API
-    if (!window.TOKEN && !localStorage.getItem('vsp_token')) {
+    if (!window.TOKEN) {
+      /* cookie-based: rely on server 401 if session expired */
       return fallback;
     }
     const result = await Promise.race([
@@ -32,7 +33,7 @@ async function safeApi(method, url, fallback = {}) {
     // 401/not_authenticated → stop polling, trigger logout
     if (msg === 'not_authenticated' || msg.includes('401')) {
       window.TOKEN = '';
-      localStorage.removeItem('vsp_token');
+      /* cookie cleared server-side on 401 */
       return fallback;
     }
     console.warn('[VSP] API failed:', url, msg);
@@ -511,6 +512,7 @@ window.loadSBOM = async function() {
 // Stop poller khi TOKEN bị clear (listen từ global 401 handler)
 (function() {
   var _origRemove = localStorage.removeItem.bind(localStorage);
+  /* vsp_token no longer in localStorage — monitor kept for other keys */
   localStorage.removeItem = function(key) {
     _origRemove(key);
     if (key === 'vsp_token' && window._posturePollerStop) {
