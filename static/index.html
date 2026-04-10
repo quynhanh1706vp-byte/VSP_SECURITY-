@@ -91,16 +91,28 @@
       <div class="g2 mb14">
         <div class="form-group mb8">
           <label class="form-label">Mode</label>
-          <select id="scanMode" class="form-ctrl">
-            <option>SAST</option><option>SCA</option><option>SECRETS</option>
-            <option>IAC</option><option>DAST</option><option>FULL</option>
+          <select id="scanMode" class="form-ctrl" onchange="updateModeHint(this.value)">
+            <option value="SAST">SAST — Static code analysis</option>
+            <option value="SCA">SCA — Software composition</option>
+            <option value="SECRETS">SECRETS — Secret &amp; credential leak</option>
+            <option value="IAC">IAC — Infrastructure as Code</option>
+            <option value="DAST">DAST — Dynamic app testing</option>
+            <option value="NETWORK">NETWORK — Deep L2-L7 packet analysis</option>
+            <option value="FULL">FULL — All tools combined</option>
           </select>
+          <div id="mode-hint" style="font-size:10px;color:var(--cyan);margin-top:4px;font-family:var(--font-mono)"></div>
         </div>
         <div class="form-group mb8">
           <label class="form-label">Profile</label>
-          <select id="scanProfile" class="form-ctrl">
-            <option>FAST</option><option>EXT</option><option>FULL</option>
+          <select id="scanProfile" class="form-ctrl" onchange="updateProfileHint(this.value)">
+            <option value="FAST">FAST — Core tools · 2 min/tool</option>
+            <option value="EXT">EXT — Extended · 5 min/tool</option>
+            <option value="AGGR">AGGR — Aggressive · 10 min/tool</option>
+            <option value="PREMIUM">PREMIUM — Deep scan · 15 min/tool</option>
+            <option value="FULL">FULL — All tools · 20 min/tool</option>
+            <option value="FULL_SOC">FULL_SOC — SOC max depth · 30 min/tool</option>
           </select>
+          <div id="profile-hint" style="font-size:10px;color:var(--amber);margin-top:4px;font-family:var(--font-mono)"></div>
         </div>
       </div>
       <div class="form-group">
@@ -676,7 +688,7 @@
         <div class="log-tool-cell done" id="ltc-trivy"><div class="log-tool-name">trivy</div><div class="log-tool-status c-green f10 fmono">9 findings</div></div>
         <div class="log-tool-cell done" id="ltc-gitleaks"><div class="log-tool-name">gitleaks</div><div class="log-tool-status c-green f10 fmono">3 findings</div></div>
         <div class="log-tool-cell done" id="ltc-checkov"><div class="log-tool-name">checkov</div><div class="log-tool-status c-green f10 fmono">13 findings</div></div>
-        <div class="log-tool-cell" id="ltc-trufflehog"><div class="log-tool-name">trufflehog</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-secretcheck"><div class="log-tool-name">secretcheck</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
       </div>
 
       <div class="log-toolbar">
@@ -840,7 +852,7 @@
           <option>kics</option><option>trivy</option><option>gitleaks</option>
           <option>checkov</option><option>bandit</option><option>semgrep</option>
           <option>codeql</option><option>grype</option><option>nuclei</option>
-          <option>nikto</option><option>trufflehog</option>
+          <option>nikto</option><option>secretcheck</option><option>sslscan</option><option>license</option><option>hadolint</option>
         </select>
         <input class="filter-input" id="filter-search" placeholder="Search findings…">
         <button class="btn btn-primary" onclick="loadFindings(0)">Filter</button>
@@ -2010,7 +2022,7 @@ function filterLogs() {
     return true;
   });
 
-  const toolColors = {kics:'#818cf8',bandit:'#38bdf8',semgrep:'#4ade80',grype:'#fb923c',trivy:'#fbbf24',gitleaks:'#f87171',checkov:'#a78bfa',trufflehog:'#f472b6',scanner:'#8899bb',gate:'#38bdf8'};
+  const toolColors = {kics:'#818cf8',bandit:'#38bdf8',semgrep:'#4ade80',grype:'#fb923c',trivy:'#fbbf24',gitleaks:'#f87171',checkov:'#a78bfa',secretcheck:'#f472b6',scanner:'#8899bb',gate:'#38bdf8'};
   document.getElementById('log-count').textContent = filtered.length + ' lines';
   stream.innerHTML = filtered.length ? filtered.map(l => `
     <div class="log-line">
@@ -3162,11 +3174,11 @@ const TOOLS_BY_MODE = {
   IAC:     ['kics','checkov'],
   SAST:    ['bandit','semgrep','codeql'],
   SCA:     ['trivy','grype'],
-  SECRETS: ['gitleaks','trufflehog'],
-  DAST:    ['nuclei','zap'],
-  FULL:    ['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+  SECRETS: ['gitleaks','secretcheck'],
+  DAST:    ['nikto','nuclei','sslscan'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'],
 };
-const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
+const ALL_TOOLS = ['kics','checkov','hadolint','bandit','semgrep','codeql','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'];
 
 // Load runs vào dropdown
 async function loadRunsDropdown() {
@@ -3315,9 +3327,9 @@ const TOOLS_BY_MODE_V2 = {
   IAC:     ['kics','checkov','trivy','gitleaks'],
   SAST:    ['bandit','semgrep','codeql'],
   SCA:     ['trivy','grype'],
-  SECRETS: ['gitleaks','trufflehog'],
-  DAST:    ['nuclei','zap'],
-  FULL:    ['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+  SECRETS: ['gitleaks','secretcheck'],
+  DAST:    ['nikto','nuclei','sslscan'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'],
 };
 
 async function loadRunLog(rid) {
@@ -3428,9 +3440,9 @@ async function loadRunLog(rid) {
     const mode = run.mode || 'FULL';
     const TOOLS_BY_MODE = {
       IAC:['kics','checkov'], SAST:['bandit','semgrep','codeql'],
-      SCA:['trivy','grype'], SECRETS:['gitleaks','trufflehog'],
-      DAST:['nuclei','zap'],
-      FULL:['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+      SCA:['trivy','grype','license'], SECRETS:['gitleaks','secretcheck'],
+      DAST:['nikto','nuclei','sslscan'],
+      FULL:['kics','checkov','hadolint','bandit','semgrep','codeql','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'],
     };
     const expectedTools = TOOLS_BY_MODE[mode] || ['kics','checkov'];
 
@@ -7737,7 +7749,7 @@ async function _updateFindingsKPI() {
         kics:'var(--cyan)', trivy:'var(--blue)', gitleaks:'var(--red)',
         checkov:'var(--amber)', bandit:'var(--orange)', semgrep:'var(--purple)',
         codeql:'var(--green)', grype:'var(--cyan)', nuclei:'var(--amber)',
-        nikto:'var(--orange)', trufflehog:'var(--red)'
+        nikto:'var(--orange)', secretcheck:'var(--red)'
       };
       var sorted = Object.keys(byTool).sort(function(a,b){ return byTool[b]-byTool[a]; });
       toolBreakdown.innerHTML = sorted.map(function(tool) {
@@ -8447,5 +8459,41 @@ window.addEventListener('message', async function(e) {
 });
 </script>
 
+<script>
+// ── Scan modal hints ──────────────────────────────────────────
+const MODE_HINTS = {
+  SAST:    'Tools: bandit · semgrep · codeql',
+  SCA:     'Tools: trivy · grype · license',
+  SECRETS: 'Tools: gitleaks · secretcheck',
+  IAC:     'Tools: kics · checkov · hadolint',
+  DAST:    'Tools: nikto · nuclei · sslscan',
+  NETWORK: 'Tools: netcap (L2-L7 live) · sslscan — requires active capture engine',
+  FULL:    'Tools: all 15 scanners combined',
+};
+const PROFILE_HINTS = {
+  FAST:     'Timeout 2min · skips codeql, nuclei, license',
+  EXT:      'Timeout 5min · adds semgrep, grype, secretcheck, sslscan',
+  AGGR:     'Timeout 10min · adds codeql, nuclei, license · fail on HIGH',
+  PREMIUM:  'Timeout 15min · full tool set for selected mode',
+  FULL:     'Timeout 20min · full tool set for selected mode',
+  FULL_SOC: 'Timeout 30min · max depth · SOC scheduled scans',
+};
+function updateModeHint(v) {
+  const el = document.getElementById('mode-hint');
+  if (el) el.textContent = MODE_HINTS[v] || '';
+}
+function updateProfileHint(v) {
+  const el = document.getElementById('profile-hint');
+  if (el) el.textContent = PROFILE_HINTS[v] || '';
+}
+// Init hints on modal open
+const _origScanModal = window.openScanModal || function(){};
+document.addEventListener('DOMContentLoaded', function() {
+  const modeEl = document.getElementById('scanMode');
+  const profEl = document.getElementById('scanProfile');
+  if (modeEl) { modeEl.addEventListener('change', () => updateModeHint(modeEl.value)); }
+  if (profEl) { profEl.addEventListener('change', () => updateProfileHint(profEl.value)); }
+});
+</script>
 </body>
 </html>

@@ -112,7 +112,7 @@ var fedRAMPControlsFull = []ControlDef{
 	{ID:"IA-2",  Family:"Ident & Auth",   Title:"Identification & Auth (Users)", Framework:"FedRAMP", Tools:[]string{"bandit","semgrep"},          NIST:"IA-2",  ILRequired:[]int{2,4,5}},
 	{ID:"IA-3",  Family:"Ident & Auth",   Title:"Device Identification",         Framework:"FedRAMP", Tools:[]string{"kics"},                     NIST:"IA-3",  ILRequired:[]int{4,5}},
 	{ID:"IA-4",  Family:"Ident & Auth",   Title:"Identifier Management",         Framework:"FedRAMP", Tools:[]string{"bandit","semgrep"},          NIST:"IA-4",  ILRequired:[]int{2,4,5}},
-	{ID:"IA-5",  Family:"Ident & Auth",   Title:"Authenticator Management",      Framework:"FedRAMP", Tools:[]string{"gitleaks","trufflehog"},     NIST:"IA-5",  ILRequired:[]int{2,4,5}},
+	{ID:"IA-5",  Family:"Ident & Auth",   Title:"Authenticator Management",      Framework:"FedRAMP", Tools:[]string{"gitleaks","secretcheck"},     NIST:"IA-5",  ILRequired:[]int{2,4,5}},
 	{ID:"IA-6",  Family:"Ident & Auth",   Title:"Authentication Feedback",       Framework:"FedRAMP", Tools:[]string{"bandit","semgrep"},          NIST:"IA-6",  ILRequired:[]int{2,4,5}},
 	{ID:"IA-7",  Family:"Ident & Auth",   Title:"Cryptographic Module Auth",     Framework:"FedRAMP", Tools:[]string{"bandit","semgrep"},          NIST:"IA-7",  ILRequired:[]int{2,4,5}},
 	{ID:"IA-8",  Family:"Ident & Auth",   Title:"Non-Org User Identification",   Framework:"FedRAMP", Tools:[]string{"bandit","semgrep"},          NIST:"IA-8",  ILRequired:[]int{2,4,5}},
@@ -229,7 +229,7 @@ var cmmcPracticesFull = []ControlDef{
 	{ID:"IA.L2-3.5.7",  Family:"Ident & Auth",   Title:"Enforce minimum password complexity",      Framework:"CMMC", Tools:[]string{"gitleaks","semgrep"},        NIST:"IA-5",  CUIScope:true},
 	{ID:"IA.L2-3.5.8",  Family:"Ident & Auth",   Title:"Prohibit password reuse",                  Framework:"CMMC", Tools:[]string{"bandit","semgrep"},          NIST:"IA-5",  CUIScope:true},
 	{ID:"IA.L2-3.5.9",  Family:"Ident & Auth",   Title:"Allow temporary password with change",     Framework:"CMMC", Tools:[]string{"bandit"},                   NIST:"IA-5",  CUIScope:true},
-	{ID:"IA.L2-3.5.10", Family:"Ident & Auth",   Title:"Employ cryptographically-protected passwords",Framework:"CMMC", Tools:[]string{"gitleaks","trufflehog"}, NIST:"IA-5",  CUIScope:true},
+	{ID:"IA.L2-3.5.10", Family:"Ident & Auth",   Title:"Employ cryptographically-protected passwords",Framework:"CMMC", Tools:[]string{"gitleaks","secretcheck"}, NIST:"IA-5",  CUIScope:true},
 	{ID:"IA.L2-3.5.11", Family:"Ident & Auth",   Title:"Obscure feedback of auth info",            Framework:"CMMC", Tools:[]string{"bandit","semgrep"},          NIST:"IA-6",  CUIScope:true},
 	// INCIDENT RESPONSE (IR) — 3 practices
 	{ID:"IR.L2-3.6.1",  Family:"Incident Response", Title:"Establish IR capability",              Framework:"CMMC", Tools:[]string{"nuclei"},                   NIST:"IR-4",  CUIScope:true},
@@ -339,11 +339,11 @@ func assessControls(ctx context.Context, db *store.DB, tenantID string, controls
 		  CASE mode
 		    WHEN 'SAST'    THEN ARRAY['bandit','semgrep','codeql']
 		    WHEN 'SCA'     THEN ARRAY['grype','trivy']
-		    WHEN 'SECRETS' THEN ARRAY['gitleaks','trufflehog']
+		    WHEN 'SECRETS' THEN ARRAY['gitleaks','secretcheck']
 		    WHEN 'IAC'     THEN ARRAY['kics','checkov']
-		    WHEN 'DAST'    THEN ARRAY['nuclei','zap','sslscan']
+		    WHEN 'DAST'    THEN ARRAY['nuclei','nikto','sslscan']
 		    WHEN 'NETWORK' THEN ARRAY['sslscan','netcap']
-		    WHEN 'FULL'    THEN ARRAY['bandit','semgrep','codeql','grype','trivy','gitleaks','trufflehog','kics','checkov','nuclei','sslscan']
+		    WHEN 'FULL'    THEN ARRAY['bandit','semgrep','codeql','grype','trivy','gitleaks','secretcheck','kics','checkov','nuclei','sslscan']
 		    ELSE ARRAY[]::text[]
 		  END
 		) as tool
