@@ -6325,7 +6325,7 @@ async function _saveRemediation(findingId) {
   try {
     await fetch('/api/v1/remediation/finding/'+findingId, {
       method:'POST',
-      headers:{,'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json'},
       body: JSON.stringify({status,priority,assignee,ticket_url:ticket,notes})
     });
     document.getElementById('rem-edit-modal').classList.remove('open');
@@ -6538,7 +6538,7 @@ async function _createUser() {
   try {
     var r = await fetch('/api/v1/admin/users', {
       method:'POST',
-      headers:{,'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json'},
       body: JSON.stringify({email, password, role})
     });
     var d = await r.json();
@@ -6925,7 +6925,7 @@ async function bulkAssign() {
   if (!assignee) return;
   var status = 'in_progress';
   await ensureToken();
-  var h = {,'Content-Type':'application/json'};
+  var h = {'Content-Type':'application/json'};
   var ids = Array.from(_bulkSelected);
   var ok = 0;
   for (var id of ids) {
@@ -6945,7 +6945,7 @@ async function bulkAssign() {
 async function bulkSetStatus(status) {
   if (!_bulkSelected.size) { showToast('No findings selected','error'); return; }
   await ensureToken();
-  var h = {,'Content-Type':'application/json'};
+  var h = {'Content-Type':'application/json'};
   var ids = Array.from(_bulkSelected);
   var ok = 0;
   for (var id of ids) {
@@ -7313,7 +7313,7 @@ async function profileSubmitPassword() {
     if (uid) {
       var r2 = await fetch('/api/v1/admin/users/'+uid+'/password', {
         method: 'PUT',
-        headers: {,'Content-Type':'application/json'},
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify({password: newpw})
       });
       if (!r2.ok) {
@@ -7732,7 +7732,7 @@ async function _updateFindingsKPI() {
   try {
     await ensureToken();
     var r = await fetch('/api/v1/vsp/findings/summary', {
-      headers: {,
+      headers: {
         'X-CSRF-Token': getCSRFToken()}
     });
     if (!r.ok) return;
@@ -8090,7 +8090,7 @@ async function _fetchRealNotifications() {
   if (!await ensureToken()) return;
   try {
     var d = await fetch('/api/v1/notifications', {
-      headers: {,
+      headers: {
         'X-CSRF-Token': getCSRFToken()}
     }).then(function(r){ return r.json(); });
 
