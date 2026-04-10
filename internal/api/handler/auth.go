@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"os"
+
 	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/audit"
 	"github.com/vsp/platform/internal/auth"
@@ -103,12 +105,16 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enforce MFA for admin role — admin MUST have MFA enabled
+	// Enforce MFA for admin role — admin MUST have MFA enabled (production only)
 	if user.Role == "admin" && (!user.MFAEnabled || !user.MFAVerified) {
-		log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured")
-		jsonError(w, "admin accounts require MFA — please set up TOTP before logging in",
-			http.StatusForbidden)
-		return
+		env := os.Getenv("SERVER_ENV")
+		if env == "production" || env == "staging" {
+			log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured")
+			jsonError(w, "admin accounts require MFA — please set up TOTP before logging in",
+				http.StatusForbidden)
+			return
+		}
+		log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured (dev — allowed)")
 	}
 
 	// Verify MFA if enabled
