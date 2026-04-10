@@ -18,7 +18,7 @@ func TestValidateScanURL(t *testing.T) {
 		{"https://169.254.169.254/latest/meta-data", true, "AWS metadata blocked"},
 		{"https://metadata.google.internal", true, "GCP metadata blocked"},
 		{"ftp://target.example.com", true, "non-http scheme blocked"},
-		{"", nil == nil, "empty URL allowed (optional field)"},
+		{"", false, "empty URL allowed (optional field)"},
 		{"not-a-url", true, "invalid URL blocked"},
 	}
 	for _, c := range cases {
