@@ -483,7 +483,7 @@ components:
         rid: { type: string }
         tenant_id: { type: string, format: uuid }
         mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, NETWORK, FULL] }
-        profile: { type: string, enum: [FAST, STANDARD, DEEP] }
+        profile: { type: string, enum: [FAST, EXT, AGGR, PREMIUM, FULL, FULL_SOC] }
         status: { type: string, enum: [QUEUED, RUNNING, DONE, FAILED, CANCELLED] }
         gate: { type: string, enum: [PASS, WARN, FAIL] }
         total_findings: { type: integer }
@@ -511,7 +511,7 @@ components:
         rid: {type: string}
         tenant_id: {type: string}
         mode: {type: string, enum: [SAST, SCA, IAC, SECRETS, DAST, FULL]}
-        profile: {type: string, enum: [FAST, STANDARD, THOROUGH]}
+        profile: {type: string, enum: [FAST, EXT, AGGR, PREMIUM, FULL, FULL_SOC]}
         src: {type: string}
         status: {type: string, enum: [QUEUED, RUNNING, DONE, FAILED]}
         gate: {type: string, enum: [PASS, WARN, FAIL]}
@@ -693,7 +693,7 @@ paths:
               type: object
               properties:
                 mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, NETWORK, FULL] }
-                profile: { type: string, enum: [FAST, STANDARD, DEEP] }
+                profile: { type: string, enum: [FAST, EXT, AGGR, PREMIUM, FULL, FULL_SOC] }
                 src: { type: string, description: "Path or URL to scan" }
       responses:
         "200": { description: Scan queued }
@@ -723,7 +723,7 @@ paths:
                     required: [mode, src]
                     properties:
                       mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, NETWORK, FULL] }
-                      profile: { type: string, enum: [FAST, STANDARD, DEEP], default: FAST }
+                      profile: { type: string, enum: [FAST, EXT, AGGR, PREMIUM, FULL, FULL_SOC], default: FAST }
                       src: { type: string }
                       label: { type: string }
       responses:
