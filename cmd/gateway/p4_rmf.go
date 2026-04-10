@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"math"
 	"fmt"
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -160,10 +160,10 @@ func seedDefaultATOPackage() *ATOPackage {
 		SystemName: "VSP — Vulnerability Security Platform", SystemID: "VSP-DOD-2025-001",
 		CategorizationLevel: "MODERATE", ATOStatus: "authorized",
 		AuthorizingOfficial: "CISO / Designated Authorizing Authority (DAA)",
-		AuthorizationDate: &authDate, ExpirationDate: &expDate,
+		AuthorizationDate:   &authDate, ExpirationDate: &expDate,
 		RMFSteps: steps, Artifacts: artifacts, POAMItems: poamItems,
 		ConMonScore: 94,
-		CreatedAt: now.AddDate(0, -6, 0), UpdatedAt: now,
+		CreatedAt:   now.AddDate(0, -6, 0), UpdatedAt: now,
 	}
 }
 
@@ -185,19 +185,39 @@ func handleRMFGet(w http.ResponseWriter, r *http.Request) {
 func handleRMFTaskUpdate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "same-origin")
-	if r.Method == http.MethodOptions { w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS"); w.Header().Set("Access-Control-Allow-Headers", "Content-Type"); return }
-	var req struct { TaskID string `json:"task_id"`; Status string `json:"status"` }
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { http.Error(w, `{"error":"invalid request body"}`, 400); return }
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		return
+	}
+	var req struct {
+		TaskID string `json:"task_id"`
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, 400)
+		return
+	}
 	rmfStore.mu.Lock()
 	pkg := rmfStore.packages["VSP-DOD-2025-001"]
 	if pkg != nil {
 		for i := range pkg.RMFSteps {
 			for j := range pkg.RMFSteps[i].Tasks {
-				if pkg.RMFSteps[i].Tasks[j].ID == req.TaskID { pkg.RMFSteps[i].Tasks[j].Status = req.Status }
+				if pkg.RMFSteps[i].Tasks[j].ID == req.TaskID {
+					pkg.RMFSteps[i].Tasks[j].Status = req.Status
+				}
 			}
 			allDone := true
-			for _, t := range pkg.RMFSteps[i].Tasks { if t.Status != "done" && t.Status != "na" { allDone = false } }
-			if allDone && pkg.RMFSteps[i].Status != "complete" { pkg.RMFSteps[i].Status = "complete"; n := time.Now(); pkg.RMFSteps[i].CompletedAt = &n }
+			for _, t := range pkg.RMFSteps[i].Tasks {
+				if t.Status != "done" && t.Status != "na" {
+					allDone = false
+				}
+			}
+			if allDone && pkg.RMFSteps[i].Status != "complete" {
+				pkg.RMFSteps[i].Status = "complete"
+				n := time.Now()
+				pkg.RMFSteps[i].CompletedAt = &n
+			}
 		}
 		pkg.UpdatedAt = time.Now()
 	}
@@ -208,11 +228,26 @@ func handleRMFTaskUpdate(w http.ResponseWriter, r *http.Request) {
 func handleGenerateATOLetter(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "same-origin")
-	rmfStore.mu.RLock(); pkg := rmfStore.packages["VSP-DOD-2025-001"]; rmfStore.mu.RUnlock()
-	if pkg == nil { pkg = seedDefaultATOPackage() }
+	rmfStore.mu.RLock()
+	pkg := rmfStore.packages["VSP-DOD-2025-001"]
+	rmfStore.mu.RUnlock()
+	if pkg == nil {
+		pkg = seedDefaultATOPackage()
+	}
 	completed, total, openPOAM, closedPOAM := 0, 0, 0, 0
-	for _, s := range pkg.RMFSteps { total++; if s.Status == "complete" { completed++ } }
-	for _, p := range pkg.POAMItems { if p.Status == "open" || p.Status == "in_remediation" { openPOAM++ } else { closedPOAM++ } }
+	for _, s := range pkg.RMFSteps {
+		total++
+		if s.Status == "complete" {
+			completed++
+		}
+	}
+	for _, p := range pkg.POAMItems {
+		if p.Status == "open" || p.Status == "in_remediation" {
+			openPOAM++
+		} else {
+			closedPOAM++
+		}
+	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"document_type": "AUTHORITY TO OPERATE (ATO)", "classification": "UNCLASSIFIED // FOR OFFICIAL USE ONLY",
 		"system_name": pkg.SystemName, "system_id": pkg.SystemID, "categorization": pkg.CategorizationLevel,
@@ -221,7 +256,7 @@ func handleGenerateATOLetter(w http.ResponseWriter, r *http.Request) {
 		"ato_status": pkg.ATOStatus, "authorization_date": pkg.AuthorizationDate, "expiration_date": pkg.ExpirationDate,
 		"conmon_score": pkg.ConMonScore, "generated_at": time.Now(),
 		"framework": "NIST SP 800-37 Rev 2 | DoD Instruction 8510.01 | FedRAMP Rev5",
-		"assessor": "Coalfire (3PAO)", "authorization_type": "Full ATO — 3 year",
+		"assessor":  "Coalfire (3PAO)", "authorization_type": "Full ATO — 3 year",
 		"notes": []string{
 			"All 6 RMF steps complete. System operating under full ATO.",
 			fmt.Sprintf("ConMon score: %d/100 — continuous monitoring active.", pkg.ConMonScore),
@@ -249,18 +284,31 @@ func handleRMFConMon(w http.ResponseWriter, r *http.Request) {
 		err := p4SQLDB.QueryRowContext(ctx, "SELECT summary FROM p4_pipeline_runs ORDER BY started_at DESC LIMIT 1").Scan(&summaryJSON)
 		if err == nil && len(summaryJSON) > 4 {
 			var s struct {
-				Score float64 `json:"score"`
-				Pass int `json:"pass"`
-				Fail int `json:"fail"`
-				Total int `json:"total"`
-				Frameworks map[string]struct{ Percent float64 `json:"percent"` } `json:"frameworks"`
+				Score      float64 `json:"score"`
+				Pass       int     `json:"pass"`
+				Fail       int     `json:"fail"`
+				Total      int     `json:"total"`
+				Frameworks map[string]struct {
+					Percent float64 `json:"percent"`
+				} `json:"frameworks"`
 			}
 			if json.Unmarshal(summaryJSON, &s) == nil {
-				pipelineScore = s.Score; passCount = s.Pass; failCount = s.Fail; totalCount = s.Total
-				if f, ok := s.Frameworks["FedRAMP"]; ok { fedrampPct = f.Percent }
-				if f, ok := s.Frameworks["CMMC"]; ok { cmmcPct = f.Percent }
-				if f, ok := s.Frameworks["NIST"]; ok { nistPct = f.Percent }
-				if f, ok := s.Frameworks["ZT"]; ok { ztPct = f.Percent }
+				pipelineScore = s.Score
+				passCount = s.Pass
+				failCount = s.Fail
+				totalCount = s.Total
+				if f, ok := s.Frameworks["FedRAMP"]; ok {
+					fedrampPct = f.Percent
+				}
+				if f, ok := s.Frameworks["CMMC"]; ok {
+					cmmcPct = f.Percent
+				}
+				if f, ok := s.Frameworks["NIST"]; ok {
+					nistPct = f.Percent
+				}
+				if f, ok := s.Frameworks["ZT"]; ok {
+					ztPct = f.Percent
+				}
 				controlComplianceRate = int((fedrampPct + cmmcPct + nistPct + ztPct) / 4)
 			}
 		}
@@ -268,35 +316,39 @@ func handleRMFConMon(w http.ResponseWriter, r *http.Request) {
 		p4SQLDB.QueryRowContext(ctx, "SELECT conmon_score FROM p4_ato_packages WHERE id = 'VSP-DOD-2025-001' OR id = 'TENANT-NGIT-001' ORDER BY CASE WHEN id='VSP-DOD-2025-001' THEN 0 ELSE 1 END LIMIT 1").Scan(&conmonScore)
 	}
 	patchCompliance := 97
-	if failCount > 0 { patchCompliance = int(float64(passCount) / float64(totalCount) * 100) }
+	if failCount > 0 {
+		patchCompliance = int(float64(passCount) / float64(totalCount) * 100)
+	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"control_compliance_rate": controlComplianceRate,
-		"controls_total": totalCount, "controls_effective": passCount,
+		"controls_total":          totalCount, "controls_effective": passCount,
 		"pipeline_score": math.Round(pipelineScore*100) / 100,
 		"frameworks": map[string]interface{}{
 			"FedRAMP": math.Round(fedrampPct*100) / 100,
-			"CMMC": math.Round(cmmcPct*100) / 100,
-			"NIST": math.Round(nistPct*100) / 100,
-			"ZT": math.Round(ztPct*100) / 100,
+			"CMMC":    math.Round(cmmcPct*100) / 100,
+			"NIST":    math.Round(nistPct*100) / 100,
+			"ZT":      math.Round(ztPct*100) / 100,
 		},
 		"vulnerabilities": map[string]int{"critical": critOpen, "high": highOpen, "medium": medOpen, "low": lowOpen},
 		"open_poam_items": totalOpen, "closed_poam_items": totalClosed,
 		"scan_coverage_pct": 100, "last_scan": now.AddDate(0, 0, -1).Format(time.RFC3339),
 		"patch_compliance_pct": patchCompliance,
-		"config_drift_events": failCount, "drift_auto_reverted": failCount == 0,
-		"audit_log_integrity": "verified — HMAC-SHA256",
+		"config_drift_events":  failCount, "drift_auto_reverted": failCount == 0,
+		"audit_log_integrity":   "verified — HMAC-SHA256",
 		"incidents_this_period": 0, "sla_breaches": failCount,
 		"conmon_score": conmonScore,
-		"trend": map[bool]string{true: "stable", false: "degraded"}[failCount == 0],
-		"ato_status":            "authorized",
+		"trend":        map[bool]string{true: "stable", false: "degraded"}[failCount == 0],
+		"ato_status":   "authorized",
 		"days_until_expiration": func() int {
-			rmfStore.mu.RLock(); p := rmfStore.packages["VSP-DOD-2025-001"]; rmfStore.mu.RUnlock()
+			rmfStore.mu.RLock()
+			p := rmfStore.packages["VSP-DOD-2025-001"]
+			rmfStore.mu.RUnlock()
 			if p != nil && p.ExpirationDate != nil {
 				return int(time.Until(*p.ExpirationDate).Hours() / 24)
 			}
 			return 1065
 		}(),
 		"next_assessment": now.AddDate(0, 6, 0).Format(time.RFC3339),
-		"generated_at": now.Format(time.RFC3339), "assessor": "Coalfire (3PAO)",
+		"generated_at":    now.Format(time.RFC3339), "assessor": "Coalfire (3PAO)",
 	})
 }

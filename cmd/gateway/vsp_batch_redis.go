@@ -98,7 +98,7 @@ func (s *batchRedisStore) UpdateStatus(ctx context.Context, batchID, status stri
 		return fmt.Errorf("batch not found: %s", batchID)
 	}
 	b.Status = status
-	b.Done   = done
+	b.Done = done
 	b.Passed = passed
 	b.Warned = warned
 	b.Failed = failed

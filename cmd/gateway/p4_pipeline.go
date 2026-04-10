@@ -86,31 +86,31 @@ func buildTestSuite(runID string) []ControlTest {
 	now := time.Now()
 	return []ControlTest{
 		// FedRAMP — 82%
-		{ID: "T-AC-2",  ControlID: "AC-2",  Framework: "FedRAMP", Name: "Account management — 0 orphaned accounts", TestType: "automated", Status: "pass", Score: 100, Evidence: "IAM scan: 0 orphaned; 42 active", LastRun: now, DurationMs: 1840, RunID: runID, AutoFix: true},
-		{ID: "T-AC-6",  ControlID: "AC-6",  Framework: "FedRAMP", Name: "Least privilege — 20/20 endpoints scoped", TestType: "automated", Status: "pass", Score: 100, Evidence: "All 20 API endpoints have explicit RBAC", LastRun: now, DurationMs: 2100, RunID: runID},
-		{ID: "T-AU-2",  ControlID: "AU-2",  Framework: "FedRAMP", Name: "Audit events — 100% coverage", TestType: "automated", Status: "pass", Score: 100, Evidence: "42 event categories logged", LastRun: now, DurationMs: 880, RunID: runID},
-		{ID: "T-AU-9",  ControlID: "AU-9",  Framework: "FedRAMP", Name: "Audit log integrity — HMAC-SHA256", TestType: "automated", Status: "pass", Score: 100, Evidence: "HMAC active; key rotated 45 days ago", LastRun: now, DurationMs: 540, RunID: runID},
-		{ID: "T-CM-6",  ControlID: "CM-6",  Framework: "FedRAMP", Name: "Config baseline — 0 drift events", TestType: "automated", Status: "pass", Score: 100, Evidence: "0 drift (30 days); 3 auto-reverted", LastRun: now, DurationMs: 3200, RunID: runID, AutoFix: true},
-		{ID: "T-IA-2",  ControlID: "IA-2",  Framework: "FedRAMP", Name: "MFA — 100% all users", TestType: "automated", Status: "pass", Score: 100, Evidence: "MFA: 42/42 users", LastRun: now, DurationMs: 920, RunID: runID},
-		{ID: "T-IR-4",  ControlID: "IR-4",  Framework: "FedRAMP", Name: "Incident handling — tabletop done", TestType: "manual", Status: "pass", Score: 100, Evidence: "Tabletop Q1 2025; IR plan v3.1", LastRun: now, DurationMs: 0, RunID: runID},
-		{ID: "T-MP-6",  ControlID: "MP-6",  Framework: "FedRAMP", Name: "Media sanitization — automated", TestType: "automated", Status: "pass", Score: 100, Evidence: "NIST 800-88 automated wipe in offboarding", LastRun: now, DurationMs: 540, RunID: runID},
-		{ID: "T-RA-5",  ControlID: "RA-5",  Framework: "FedRAMP", Name: "Vuln scanning — daily, 0 CRITICAL open", TestType: "automated", Status: "pass", Score: 100, Evidence: "Daily scans; 0 CRITICAL; 2 HIGH SLA", LastRun: now, DurationMs: 8200, RunID: runID},
+		{ID: "T-AC-2", ControlID: "AC-2", Framework: "FedRAMP", Name: "Account management — 0 orphaned accounts", TestType: "automated", Status: "pass", Score: 100, Evidence: "IAM scan: 0 orphaned; 42 active", LastRun: now, DurationMs: 1840, RunID: runID, AutoFix: true},
+		{ID: "T-AC-6", ControlID: "AC-6", Framework: "FedRAMP", Name: "Least privilege — 20/20 endpoints scoped", TestType: "automated", Status: "pass", Score: 100, Evidence: "All 20 API endpoints have explicit RBAC", LastRun: now, DurationMs: 2100, RunID: runID},
+		{ID: "T-AU-2", ControlID: "AU-2", Framework: "FedRAMP", Name: "Audit events — 100% coverage", TestType: "automated", Status: "pass", Score: 100, Evidence: "42 event categories logged", LastRun: now, DurationMs: 880, RunID: runID},
+		{ID: "T-AU-9", ControlID: "AU-9", Framework: "FedRAMP", Name: "Audit log integrity — HMAC-SHA256", TestType: "automated", Status: "pass", Score: 100, Evidence: "HMAC active; key rotated 45 days ago", LastRun: now, DurationMs: 540, RunID: runID},
+		{ID: "T-CM-6", ControlID: "CM-6", Framework: "FedRAMP", Name: "Config baseline — 0 drift events", TestType: "automated", Status: "pass", Score: 100, Evidence: "0 drift (30 days); 3 auto-reverted", LastRun: now, DurationMs: 3200, RunID: runID, AutoFix: true},
+		{ID: "T-IA-2", ControlID: "IA-2", Framework: "FedRAMP", Name: "MFA — 100% all users", TestType: "automated", Status: "pass", Score: 100, Evidence: "MFA: 42/42 users", LastRun: now, DurationMs: 920, RunID: runID},
+		{ID: "T-IR-4", ControlID: "IR-4", Framework: "FedRAMP", Name: "Incident handling — tabletop done", TestType: "manual", Status: "pass", Score: 100, Evidence: "Tabletop Q1 2025; IR plan v3.1", LastRun: now, DurationMs: 0, RunID: runID},
+		{ID: "T-MP-6", ControlID: "MP-6", Framework: "FedRAMP", Name: "Media sanitization — automated", TestType: "automated", Status: "pass", Score: 100, Evidence: "NIST 800-88 automated wipe in offboarding", LastRun: now, DurationMs: 540, RunID: runID},
+		{ID: "T-RA-5", ControlID: "RA-5", Framework: "FedRAMP", Name: "Vuln scanning — daily, 0 CRITICAL open", TestType: "automated", Status: "pass", Score: 100, Evidence: "Daily scans; 0 CRITICAL; 2 HIGH SLA", LastRun: now, DurationMs: 8200, RunID: runID},
 		{ID: "T-SA-12", ControlID: "SA-12", Framework: "FedRAMP", Name: "SBOM — 0 critical supply chain CVEs", TestType: "automated", Status: "pass", Score: 100, Evidence: "CycloneDX SBOM; 0 critical", LastRun: now, DurationMs: 6100, RunID: runID},
-		{ID: "T-SC-7",  ControlID: "SC-7",  Framework: "FedRAMP", Name: "Boundary protection — 0 direct exposure", TestType: "automated", Status: "pass", Score: 100, Evidence: "100% traffic through SDP/WAF", LastRun: now, DurationMs: 2800, RunID: runID},
-		{ID: "T-SC-8",  ControlID: "SC-8",  Framework: "FedRAMP", Name: "TLS 1.3 — SSL Labs A+", TestType: "automated", Status: "pass", Score: 100, Evidence: "0 deprecated ciphers", LastRun: now, DurationMs: 1900, RunID: runID},
+		{ID: "T-SC-7", ControlID: "SC-7", Framework: "FedRAMP", Name: "Boundary protection — 0 direct exposure", TestType: "automated", Status: "pass", Score: 100, Evidence: "100% traffic through SDP/WAF", LastRun: now, DurationMs: 2800, RunID: runID},
+		{ID: "T-SC-8", ControlID: "SC-8", Framework: "FedRAMP", Name: "TLS 1.3 — SSL Labs A+", TestType: "automated", Status: "pass", Score: 100, Evidence: "0 deprecated ciphers", LastRun: now, DurationMs: 1900, RunID: runID},
 		{ID: "T-SC-28", ControlID: "SC-28", Framework: "FedRAMP", Name: "Encryption at rest — AES-256-GCM", TestType: "automated", Status: "pass", Score: 100, Evidence: "AES-256-GCM + HSM key mgmt", LastRun: now, DurationMs: 2200, RunID: runID},
-		{ID: "T-SI-2",  ControlID: "SI-2",  Framework: "FedRAMP", Name: "Patch — CRITICAL auto-patched <24h", TestType: "automated", Status: "pass", Score: 100, Evidence: "97% patch SLA compliance", LastRun: now, DurationMs: 5100, RunID: runID, AutoFix: true},
-		{ID: "T-SI-3",  ControlID: "SI-3",  Framework: "FedRAMP", Name: "EDR — 42/42 endpoints", TestType: "automated", Status: "pass", Score: 100, Evidence: "CrowdStrike: 100%", LastRun: now, DurationMs: 1400, RunID: runID},
-		{ID: "T-CA-7",  ControlID: "CA-7",  Framework: "FedRAMP", Name: "ConMon — score 94/100", TestType: "automated", Status: "pass", Score: 100, Evidence: "Real-time ConMon dashboard active", LastRun: now, DurationMs: 890, RunID: runID},
-		{ID: "T-IA-5",  ControlID: "IA-5",  Framework: "FedRAMP", Name: "Secrets rotation — all within 90d", TestType: "automated", Status: "pass", Score: 100, Evidence: "14/14 secrets rotated within policy", LastRun: now, DurationMs: 1100, RunID: runID},
-		{ID: "T-CM-7",  ControlID: "CM-7",  Framework: "FedRAMP", Name: "Least functionality — port baseline match", TestType: "automated", Status: "pass", Score: 100, Evidence: "Port scan matches approved baseline", LastRun: now, DurationMs: 4100, RunID: runID},
-		{ID: "T-SI-4",  ControlID: "SI-4",  Framework: "FedRAMP", Name: "System monitoring — SIEM + NTA 100%", TestType: "automated", Status: "pass", Score: 100, Evidence: "Splunk + Zeek: 100% visibility", LastRun: now, DurationMs: 1600, RunID: runID},
-		{ID: "T-IR-5",  ControlID: "IR-5",  Framework: "FedRAMP", Name: "Incident monitoring — 0 unmonitored types", TestType: "automated", Status: "pass", Score: 100, Evidence: "SIEM covers all 42 incident categories", LastRun: now, DurationMs: 720, RunID: runID},
+		{ID: "T-SI-2", ControlID: "SI-2", Framework: "FedRAMP", Name: "Patch — CRITICAL auto-patched <24h", TestType: "automated", Status: "pass", Score: 100, Evidence: "97% patch SLA compliance", LastRun: now, DurationMs: 5100, RunID: runID, AutoFix: true},
+		{ID: "T-SI-3", ControlID: "SI-3", Framework: "FedRAMP", Name: "EDR — 42/42 endpoints", TestType: "automated", Status: "pass", Score: 100, Evidence: "CrowdStrike: 100%", LastRun: now, DurationMs: 1400, RunID: runID},
+		{ID: "T-CA-7", ControlID: "CA-7", Framework: "FedRAMP", Name: "ConMon — score 94/100", TestType: "automated", Status: "pass", Score: 100, Evidence: "Real-time ConMon dashboard active", LastRun: now, DurationMs: 890, RunID: runID},
+		{ID: "T-IA-5", ControlID: "IA-5", Framework: "FedRAMP", Name: "Secrets rotation — all within 90d", TestType: "automated", Status: "pass", Score: 100, Evidence: "14/14 secrets rotated within policy", LastRun: now, DurationMs: 1100, RunID: runID},
+		{ID: "T-CM-7", ControlID: "CM-7", Framework: "FedRAMP", Name: "Least functionality — port baseline match", TestType: "automated", Status: "pass", Score: 100, Evidence: "Port scan matches approved baseline", LastRun: now, DurationMs: 4100, RunID: runID},
+		{ID: "T-SI-4", ControlID: "SI-4", Framework: "FedRAMP", Name: "System monitoring — SIEM + NTA 100%", TestType: "automated", Status: "pass", Score: 100, Evidence: "Splunk + Zeek: 100% visibility", LastRun: now, DurationMs: 1600, RunID: runID},
+		{ID: "T-IR-5", ControlID: "IR-5", Framework: "FedRAMP", Name: "Incident monitoring — 0 unmonitored types", TestType: "automated", Status: "pass", Score: 100, Evidence: "SIEM covers all 42 incident categories", LastRun: now, DurationMs: 720, RunID: runID},
 		{ID: "T-AU-12", ControlID: "AU-12", Framework: "FedRAMP", Name: "Audit records — all 7 services", TestType: "automated", Status: "pass", Score: 100, Evidence: "7/7 services producing structured records", LastRun: now, DurationMs: 670, RunID: runID},
 		{ID: "T-AC-17", ControlID: "AC-17", Framework: "FedRAMP", Name: "Remote access — VPN + mTLS", TestType: "automated", Status: "pass", Score: 100, Evidence: "0 direct SSH; all via VPN + mTLS", LastRun: now, DurationMs: 1200, RunID: runID},
 		// FedRAMP warn (non-blocking)
-		{ID: "T-PE-2",  ControlID: "PE-2",  Framework: "FedRAMP", Name: "Physical access — annual review pending", TestType: "manual", Status: "warn", Score: 80, Evidence: "Physical access list update due Q3", LastRun: now, DurationMs: 0, RunID: runID},
-		{ID: "T-PL-8",  ControlID: "PL-8",  Framework: "FedRAMP", Name: "Security architecture — ZTA mapping in progress", TestType: "manual", Status: "warn", Score: 85, Evidence: "Architecture current; ZTA mapping update Q2", LastRun: now, DurationMs: 0, RunID: runID},
+		{ID: "T-PE-2", ControlID: "PE-2", Framework: "FedRAMP", Name: "Physical access — annual review pending", TestType: "manual", Status: "warn", Score: 80, Evidence: "Physical access list update due Q3", LastRun: now, DurationMs: 0, RunID: runID},
+		{ID: "T-PL-8", ControlID: "PL-8", Framework: "FedRAMP", Name: "Security architecture — ZTA mapping in progress", TestType: "manual", Status: "warn", Score: 85, Evidence: "Architecture current; ZTA mapping update Q2", LastRun: now, DurationMs: 0, RunID: runID},
 		// CMMC — 85%
 		{ID: "T-CMMC-AC1", ControlID: "AC.L2-3.1.1", Framework: "CMMC", Name: "Limit access to authorized users", TestType: "automated", Status: "pass", Score: 100, Evidence: "RBAC enforced; 0 unauthorized access", LastRun: now, DurationMs: 1200, RunID: runID},
 		{ID: "T-CMMC-AC3", ControlID: "AC.L2-3.1.3", Framework: "CMMC", Name: "CUI flow — all paths tagged", TestType: "automated", Status: "pass", Score: 100, Evidence: "DLP: all CUI export paths monitored", LastRun: now, DurationMs: 1800, RunID: runID},
@@ -126,7 +126,7 @@ func buildTestSuite(runID string) []ControlTest {
 		{ID: "T-CMMC-CM2", ControlID: "CM.L2-3.4.2", Framework: "CMMC", Name: "Change control — 0 manual changes", TestType: "automated", Status: "pass", Score: 100, Evidence: "All changes via PR with compliance gate", LastRun: now, DurationMs: 1400, RunID: runID},
 		{ID: "T-CMMC-SC1", ControlID: "SC.L2-3.13.3", Framework: "CMMC", Name: "Admin plane isolated", TestType: "automated", Status: "pass", Score: 100, Evidence: "Separate credentials required", LastRun: now, DurationMs: 1100, RunID: runID},
 		{ID: "T-CMMC-PE1", ControlID: "PE.L2-3.10.2", Framework: "CMMC", Name: "Visitor log — annual review due", TestType: "manual", Status: "warn", Score: 85, Evidence: "Visitor log current; escort policy annual review", LastRun: now, DurationMs: 0, RunID: runID},
-		{ID: "T-CMMC-PS1", ControlID: "PS.L2-3.9.2",  Framework: "CMMC", Name: "Personnel sanctions — training 94%", TestType: "manual", Status: "warn", Score: 80, Evidence: "94/100 users completed training", LastRun: now, DurationMs: 0, RunID: runID},
+		{ID: "T-CMMC-PS1", ControlID: "PS.L2-3.9.2", Framework: "CMMC", Name: "Personnel sanctions — training 94%", TestType: "manual", Status: "warn", Score: 80, Evidence: "94/100 users completed training", LastRun: now, DurationMs: 0, RunID: runID},
 		// Zero Trust — 100%
 		{ID: "T-ZT-APP-1", ControlID: "ZT-APP-1", Framework: "ZT", Name: "Micro-seg — 13 rules, mTLS all pairs", TestType: "automated", Status: "pass", Score: 100, Evidence: "Istio: 13 rules; mTLS 12/13 pairs", LastRun: now, DurationMs: 1700, RunID: runID},
 		{ID: "T-ZT-APP-2", ControlID: "ZT-APP-2", Framework: "ZT", Name: "RASP — 5/5 services active", TestType: "automated", Status: "pass", Score: 100, Evidence: "RASP v4.2.1: 5/5, 847 attacks blocked", LastRun: now, DurationMs: 890, RunID: runID},
@@ -138,10 +138,10 @@ func buildTestSuite(runID string) []ControlTest {
 		{ID: "T-ZT-AUT-1", ControlID: "ZT-AUT-1", Framework: "ZT", Name: "Automation pillar — 93/100", TestType: "automated", Status: "pass", Score: 100, Evidence: "SOAR 12 playbooks + OPA 47 policies", LastRun: now, DurationMs: 1500, RunID: runID},
 		{ID: "T-ZT-VIS-1", ControlID: "ZT-VIS-1", Framework: "ZT", Name: "Visibility pillar — 95/100", TestType: "automated", Status: "pass", Score: 100, Evidence: "Splunk SIEM + MISP CTI + dashboards", LastRun: now, DurationMs: 1100, RunID: runID},
 		// NIST
-		{ID: "T-NIST-AC3",  ControlID: "AC-3",  Framework: "NIST", Name: "Access enforcement — ABAC active", TestType: "automated", Status: "pass", Score: 100, Evidence: "ABAC on all sensitive data access", LastRun: now, DurationMs: 1100, RunID: runID},
-		{ID: "T-NIST-CP9",  ControlID: "CP-9",  Framework: "NIST", Name: "Backup — daily encrypted, tested", TestType: "automated", Status: "pass", Score: 100, Evidence: "Daily backups; restore 99.2% Q4 2024", LastRun: now, DurationMs: 2400, RunID: runID},
+		{ID: "T-NIST-AC3", ControlID: "AC-3", Framework: "NIST", Name: "Access enforcement — ABAC active", TestType: "automated", Status: "pass", Score: 100, Evidence: "ABAC on all sensitive data access", LastRun: now, DurationMs: 1100, RunID: runID},
+		{ID: "T-NIST-CP9", ControlID: "CP-9", Framework: "NIST", Name: "Backup — daily encrypted, tested", TestType: "automated", Status: "pass", Score: 100, Evidence: "Daily backups; restore 99.2% Q4 2024", LastRun: now, DurationMs: 2400, RunID: runID},
 		{ID: "T-NIST-SA11", ControlID: "SA-11", Framework: "NIST", Name: "CI/CD security gates — SAST+DAST+SCA", TestType: "automated", Status: "pass", Score: 100, Evidence: "0 CRITICAL released via pipeline", LastRun: now, DurationMs: 12400, RunID: runID},
-		{ID: "T-NIST-AT2",  ControlID: "AT-2",  Framework: "NIST", Name: "Security training — 94% complete", TestType: "manual", Status: "warn", Score: 94, Evidence: "94/100 users completed annual training", LastRun: now, DurationMs: 0, RunID: runID},
+		{ID: "T-NIST-AT2", ControlID: "AT-2", Framework: "NIST", Name: "Security training — 94% complete", TestType: "manual", Status: "warn", Score: 94, Evidence: "94/100 users completed annual training", LastRun: now, DurationMs: 0, RunID: runID},
 	}
 }
 
@@ -150,26 +150,36 @@ func buildSummary(tests []ControlTest) PipelineSummary {
 	for _, t := range tests {
 		s.Total++
 		switch t.Status {
-		case "pass": s.Pass++
-		case "fail": s.Fail++
-		case "warn": s.Warn++
-		case "skip": s.Skip++
+		case "pass":
+			s.Pass++
+		case "fail":
+			s.Fail++
+		case "warn":
+			s.Warn++
+		case "skip":
+			s.Skip++
 		}
 		if fs, ok := s.Frameworks[t.Framework]; ok {
 			fs.Total++
-			if t.Status == "pass" { fs.Pass++ }
+			if t.Status == "pass" {
+				fs.Pass++
+			}
 			s.Frameworks[t.Framework] = fs
 		}
 	}
-	if s.Total > 0 { s.Score = float64(s.Pass) / float64(s.Total) * 100 }
+	if s.Total > 0 {
+		s.Score = float64(s.Pass) / float64(s.Total) * 100
+	}
 	for k, fs := range s.Frameworks {
-		if fs.Total > 0 { fs.Percent = float64(fs.Pass) / float64(fs.Total) * 100 }
+		if fs.Total > 0 {
+			fs.Percent = float64(fs.Pass) / float64(fs.Total) * 100
+		}
 		// Delta = so sánh với run trước — dùng 0 nếu không có data
 		if p4SQLDB != nil {
 			var prevPct float64
 			if p4SQLDB.QueryRow(
-				"SELECT (summary->'frameworks'->$1->>'percent')::float " +
-				"FROM p4_pipeline_runs ORDER BY started_at DESC LIMIT 1 OFFSET 1", k).
+				"SELECT (summary->'frameworks'->$1->>'percent')::float "+
+					"FROM p4_pipeline_runs ORDER BY started_at DESC LIMIT 1 OFFSET 1", k).
 				Scan(&prevPct) == nil && prevPct > 0 {
 				fs.Delta = fs.Percent - prevPct
 			}
@@ -217,20 +227,28 @@ func seedPipelineStore() {
 }
 
 func handlePipelineLatest(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json"); w.Header().Set("Vary", "Origin")
-	pipeStore.mu.RLock(); defer pipeStore.mu.RUnlock()
-	if len(pipeStore.Runs) == 0 { json.NewEncoder(w).Encode(map[string]string{"status": "no_runs"}); return }
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Vary", "Origin")
+	pipeStore.mu.RLock()
+	defer pipeStore.mu.RUnlock()
+	if len(pipeStore.Runs) == 0 {
+		json.NewEncoder(w).Encode(map[string]string{"status": "no_runs"})
+		return
+	}
 	json.NewEncoder(w).Encode(pipeStore.Runs[0])
 }
 
 func handlePipelineHistory(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json"); w.Header().Set("Vary", "Origin")
-	pipeStore.mu.RLock(); defer pipeStore.mu.RUnlock()
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Vary", "Origin")
+	pipeStore.mu.RLock()
+	defer pipeStore.mu.RUnlock()
 	json.NewEncoder(w).Encode(pipeStore.Runs)
 }
 
 func handlePipelineTrigger(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json"); w.Header().Set("Vary", "Origin")
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Vary", "Origin")
 	runID := fmt.Sprintf("RUN-%s", time.Now().Format("20060102150405"))
 	now := time.Now()
 	go func() {
@@ -240,14 +258,17 @@ func handlePipelineTrigger(w http.ResponseWriter, r *http.Request) {
 		run := PipelineRun{ID: runID, TriggerType: "manual", TriggerRef: "manual", Branch: "main", Status: "pass", StartedAt: now, CompletedAt: &end, DurationSec: 3, Tests: tests, Summary: buildSummary(tests)}
 		pipeStore.mu.Lock()
 		pipeStore.Runs = append([]PipelineRun{run}, pipeStore.Runs...)
-		if len(pipeStore.Runs) > 100 { pipeStore.Runs = pipeStore.Runs[:100] } // cap at 100
+		if len(pipeStore.Runs) > 100 {
+			pipeStore.Runs = pipeStore.Runs[:100]
+		} // cap at 100
 		pipeStore.mu.Unlock()
 	}()
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "queued", "run_id": runID, "message": "Triggered. Results in ~3s."})
 }
 
 func handlePipelineDrift(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json"); w.Header().Set("Vary", "Origin")
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Vary", "Origin")
 
 	// Build drift log từ warn tests trong pipeline runs thật
 	// warn = potential drift/non-blocking issue
@@ -257,7 +278,7 @@ func handlePipelineDrift(w http.ResponseWriter, r *http.Request) {
 		// Load warn tests từ 3 runs gần nhất
 		rows, err := p4SQLDB.Query(
 			"SELECT id, started_at, tests FROM p4_pipeline_runs " +
-			"ORDER BY started_at DESC LIMIT 3")
+				"ORDER BY started_at DESC LIMIT 3")
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
@@ -265,11 +286,17 @@ func handlePipelineDrift(w http.ResponseWriter, r *http.Request) {
 				var startedAt time.Time
 				var testsJSON []byte
 				rows.Scan(&runID, &startedAt, &testsJSON)
-				if len(testsJSON) < 4 { continue }
+				if len(testsJSON) < 4 {
+					continue
+				}
 				var tests []ControlTest
-				if json.Unmarshal(testsJSON, &tests) != nil { continue }
+				if json.Unmarshal(testsJSON, &tests) != nil {
+					continue
+				}
 				for _, t := range tests {
-					if t.Status != "warn" { continue }
+					if t.Status != "warn" {
+						continue
+					}
 					driftLog = append(driftLog, DriftEvent{
 						ID:           "DRIFT-" + t.ID,
 						DetectedAt:   startedAt,
@@ -296,7 +323,9 @@ func handlePipelineDrift(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePipelineSchedules(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json"); w.Header().Set("Vary", "Origin")
-	pipeStore.mu.RLock(); defer pipeStore.mu.RUnlock()
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Vary", "Origin")
+	pipeStore.mu.RLock()
+	defer pipeStore.mu.RUnlock()
 	json.NewEncoder(w).Encode(pipeStore.Schedules)
 }

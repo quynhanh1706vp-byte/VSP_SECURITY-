@@ -39,11 +39,11 @@ func handleOSCALExport(w http.ResponseWriter, r *http.Request) {
 		"system-security-plan": map[string]interface{}{
 			"uuid": "a7e8b9c0-d1e2-f3a4-b5c6-d7e8f9a0b1c2",
 			"metadata": map[string]interface{}{
-				"title":          "VSP Security Platform — System Security Plan",
-				"last-modified":  now.Format(time.RFC3339),
-				"version":        "2.1",
-				"oscal-version":  "1.1.2",
-				"published":      authDate.Format(time.RFC3339),
+				"title":         "VSP Security Platform — System Security Plan",
+				"last-modified": now.Format(time.RFC3339),
+				"version":       "2.1",
+				"oscal-version": "1.1.2",
+				"published":     authDate.Format(time.RFC3339),
 				"document-ids": []map[string]string{
 					{"scheme": "https://fedramp.gov", "identifier": "VSP-DOD-2025-001"},
 				},
@@ -71,9 +71,9 @@ func handleOSCALExport(w http.ResponseWriter, r *http.Request) {
 				"system-ids": []map[string]string{
 					{"identifier-type": "https://fedramp.gov", "id": "VSP-DOD-2025-001"},
 				},
-				"system-name":       "VSP — Vulnerability Security Platform",
-				"system-name-short": "VSP",
-				"description":       "VSP is a DoD Zero Trust P4 compliant vulnerability security management platform providing automated scanning, compliance monitoring, SIEM integration, and continuous ATO management.",
+				"system-name":                "VSP — Vulnerability Security Platform",
+				"system-name-short":          "VSP",
+				"description":                "VSP is a DoD Zero Trust P4 compliant vulnerability security management platform providing automated scanning, compliance monitoring, SIEM integration, and continuous ATO management.",
 				"security-sensitivity-level": "moderate",
 				"system-information": map[string]interface{}{
 					"information-types": []map[string]interface{}{
@@ -114,34 +114,34 @@ func handleOSCALExport(w http.ResponseWriter, r *http.Request) {
 				"components": []map[string]interface{}{
 					{
 						"uuid": "c1", "type": "software", "title": "VSP API Gateway",
-						"description": "Core API gateway handling vulnerability scan management, findings tracking, and compliance monitoring",
-						"status": map[string]string{"state": "operational"},
+						"description":       "Core API gateway handling vulnerability scan management, findings tracking, and compliance monitoring",
+						"status":            map[string]string{"state": "operational"},
 						"responsible-roles": []map[string]string{{"role-id": "system-owner"}},
 					},
 					{
 						"uuid": "c2", "type": "software", "title": "RASP Agent",
 						"description": "Runtime Application Self-Protection deployed on all 5 VSP services. Blocks SQLi, XSS, SSRF, RCE, Path Traversal in real-time",
-						"status": map[string]string{"state": "operational"},
+						"status":      map[string]string{"state": "operational"},
 					},
 					{
 						"uuid": "c3", "type": "software", "title": "Istio Service Mesh",
 						"description": "Service mesh enforcing micro-segmentation with 13 rules and mTLS on all service pairs",
-						"status": map[string]string{"state": "operational"},
+						"status":      map[string]string{"state": "operational"},
 					},
 					{
 						"uuid": "c4", "type": "software", "title": "SIEM (Splunk)",
 						"description": "Security Information and Event Management with 100% log ingestion from all services",
-						"status": map[string]string{"state": "operational"},
+						"status":      map[string]string{"state": "operational"},
 					},
 					{
 						"uuid": "c5", "type": "software", "title": "PostgreSQL Database",
 						"description": "Primary data store with AES-256-GCM encryption at rest, HSM key management",
-						"status": map[string]string{"state": "operational"},
+						"status":      map[string]string{"state": "operational"},
 					},
 				},
 			},
 			"control-implementation": map[string]interface{}{
-				"description": fmt.Sprintf("VSP implements NIST SP 800-53 Rev 5 MODERATE baseline controls. Current compliance: 94%% effective. DoD Zero Trust P4 score: %d%%.", p4Score),
+				"description":              fmt.Sprintf("VSP implements NIST SP 800-53 Rev 5 MODERATE baseline controls. Current compliance: 94%% effective. DoD Zero Trust P4 score: %d%%.", p4Score),
 				"implemented-requirements": buildOSCALControls(),
 			},
 			"back-matter": map[string]interface{}{

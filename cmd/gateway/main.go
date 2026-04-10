@@ -1,44 +1,44 @@
 package main
 
 import (
-	"strings"
 	"bytes"
-	"io"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	_ "net/http/pprof" // profiling endpoint /debug/pprof/
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"database/sql"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
-	"database/sql"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/bcrypt"
 
+	"crypto/tls"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/vsp/platform/internal/api/handler"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/billing"
 	"github.com/vsp/platform/internal/cache"
 	"github.com/vsp/platform/internal/migrate"
+	"github.com/vsp/platform/internal/netcap"
 	"github.com/vsp/platform/internal/pipeline"
 	"github.com/vsp/platform/internal/safe"
 	"github.com/vsp/platform/internal/scheduler"
 	"github.com/vsp/platform/internal/siem"
-	"github.com/vsp/platform/internal/netcap"
 	"github.com/vsp/platform/internal/store"
 	"github.com/vsp/platform/internal/telemetry"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"crypto/tls")
+)
 
 var startTime = time.Now()
 
@@ -82,14 +82,20 @@ func main() {
 	ctx, shutdown := context.WithCancel(context.Background())
 	defer shutdown()
 	db, err := store.New(ctx, viper.GetString("database.url"))
-	if err != nil { log.Fatal().Err(err).Msg("database connect failed") }
+	if err != nil {
+		log.Fatal().Err(err).Msg("database connect failed")
+	}
 	defer db.Close()
 	log.Info().Msg("database connected ✓")
 
 	// Auto-run migrations
 	stdDB, err2 := sql.Open("pgx", viper.GetString("database.url"))
-	if err2 != nil { log.Fatal().Err(err2).Msg("open db for migrations") }
-	if err2 = migrate.Run(ctx, stdDB); err2 != nil { log.Fatal().Err(err2).Msg("migration failed") }
+	if err2 != nil {
+		log.Fatal().Err(err2).Msg("open db for migrations")
+	}
+	if err2 = migrate.Run(ctx, stdDB); err2 != nil {
+		log.Fatal().Err(err2).Msg("migration failed")
+	}
 	stdDB.Close()
 
 	// Telemetry — noop nếu OTLP_ENDPOINT không set
@@ -112,7 +118,9 @@ func main() {
 		log.Warn().Msg("⚠  JWT secret đang dùng giá trị mặc định — KHÔNG dùng ở production")
 	}
 	jwtTTL, _ := time.ParseDuration(viper.GetString("auth.jwt_ttl"))
-	if jwtTTL == 0 { jwtTTL = 24 * time.Hour }
+	if jwtTTL == 0 {
+		jwtTTL = 24 * time.Hour
+	}
 
 	// SSO/OIDC config (optional — disabled by default)
 	ssoConfig := auth.OIDCConfig{
@@ -155,38 +163,37 @@ func main() {
 	// ── Redis API cache ──────────────────────────────────────────────────────
 	ca := cache.New(redisAddr, redisPass)
 
-
 	// ── All handlers ──────────────────────────────────────────────
-	authH       := &handler.Auth{DB: db, JWTSecret: jwtSecret, JWTTTL: jwtTTL, DefaultTID: defaultTID}
+	authH := &handler.Auth{DB: db, JWTSecret: jwtSecret, JWTTTL: jwtTTL, DefaultTID: defaultTID}
 	handler.SetJWTSecret(jwtSecret)
-	usersH      := &handler.Users{DB: db}
-	mfaH        := &handler.MFA{DB: db}
-	apiKeysH    := &handler.APIKeys{DB: db}
-	runsH       := &handler.Runs{DB: db}
+	usersH := &handler.Users{DB: db}
+	mfaH := &handler.MFA{DB: db}
+	apiKeysH := &handler.APIKeys{DB: db}
+	runsH := &handler.Runs{DB: db}
 	runsH.SetAsynqClient(asynqClient)
-	findingsH   := &handler.Findings{DB: db}
-	gateH       := &handler.Gate{DB: db}
-	auditH      := &handler.Audit{DB: db}
-	siemH       := &handler.SIEM{DB: db}
-	billingH    := &billing.Handler{DB: db.Pool()}
+	findingsH := &handler.Findings{DB: db}
+	gateH := &handler.Gate{DB: db}
+	auditH := &handler.Audit{DB: db}
+	siemH := &handler.SIEM{DB: db}
+	billingH := &billing.Handler{DB: db.Pool()}
 	// ── SIEM handlers ────────────────────────────────────────
-	corrH      := &handler.Correlation{DB: db}
+	corrH := &handler.Correlation{DB: db}
 	// ── UEBA + Assets ────────────────────────────────────────
-	uebaH   := &handler.UEBA{DB: db}
+	uebaH := &handler.UEBA{DB: db}
 	assetsH := &handler.Assets{DB: db}
-	soarH      := &handler.SOAR{DB: db}
-	logSrcH    := &handler.LogSources{DB: db}
-	tiH        := &handler.ThreatIntel{DB: db}
+	soarH := &handler.SOAR{DB: db}
+	logSrcH := &handler.LogSources{DB: db}
+	tiH := &handler.ThreatIntel{DB: db}
 	complianceH := &handler.Compliance{DB: db}
-	govH        := &handler.Governance{DB: db}
-	exportH     := &handler.Export{DB: db}
-	reportH     := &handler.Report{DB: db}
-	sbomH       := &handler.SBOM{DB: db}
-	slaH        := &handler.SLA{DB: db}
-	sandboxH    := &handler.Sandbox{DB: db}
-	importsH    := &handler.Imports{DB: db}
-	remediationH   := &handler.Remediation{DB: db}
-	ssoH           := handler.NewSSO(ssoConfig, authH, db)
+	govH := &handler.Governance{DB: db}
+	exportH := &handler.Export{DB: db}
+	reportH := &handler.Report{DB: db}
+	sbomH := &handler.SBOM{DB: db}
+	slaH := &handler.SLA{DB: db}
+	sandboxH := &handler.Sandbox{DB: db}
+	importsH := &handler.Imports{DB: db}
+	remediationH := &handler.Remediation{DB: db}
+	ssoH := handler.NewSSO(ssoConfig, authH, db)
 
 	// Scheduler engine
 	schedEngine := scheduler.New(db, func(rid, tenantID, mode, profile, src, url string) {
@@ -197,8 +204,8 @@ func main() {
 	schedEngine.Start(ctx)
 	defer schedEngine.Stop()
 	schedH := &handler.Scheduler{DB: db, Engine: schedEngine}
-	keyStore    := &apiKeyStore{db: db}
-	rl          := vspMW.NewRateLimiter(600, time.Minute)
+	keyStore := &apiKeyStore{db: db}
+	rl := vspMW.NewRateLimiter(600, time.Minute)
 
 	// ── Router ────────────────────────────────────────────────────
 	r := chi.NewRouter()
@@ -222,13 +229,15 @@ func main() {
 	// pprof — chỉ enable trong dev mode
 	if viper.GetString("server.env") != "production" {
 		// pprof restricted to internal network only
-	r.Mount("/debug", http.DefaultServeMux) //nolint:gosec // G108: protected by authMw + network policy
+		r.Mount("/debug", http.DefaultServeMux) //nolint:gosec // G108: protected by authMw + network policy
 	}
 	// /metrics: restrict to localhost or internal network only
 	r.Handle("/metrics", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// Allow only loopback + private IPs
 		ip := req.RemoteAddr
-		if idx := strings.LastIndex(ip, ":"); idx >= 0 { ip = ip[:idx] }
+		if idx := strings.LastIndex(ip, ":"); idx >= 0 {
+			ip = ip[:idx]
+		}
 		if ip != "127.0.0.1" && ip != "::1" && ip != "[::1]" {
 			// Also allow if metrics token provided
 			token := req.Header.Get("X-Metrics-Token")
@@ -247,13 +256,15 @@ func main() {
 		overall := "ok"
 		t0 := time.Now()
 		if err := db.Pool().Ping(ctx2); err != nil {
-			checks["database"] = map[string]string{"status":"error","error":err.Error()}
+			checks["database"] = map[string]string{"status": "error", "error": err.Error()}
 			overall = "error"
 		} else {
-			checks["database"] = map[string]string{"status":"ok","latency":time.Since(t0).String()}
+			checks["database"] = map[string]string{"status": "ok", "latency": time.Since(t0).String()}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if overall == "error" { w.WriteHeader(503) }
+		if overall == "error" {
+			w.WriteHeader(503)
+		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"status": overall, "version": "0.10.0",
 			"port": viper.GetInt("server.gateway_port"),
@@ -263,8 +274,8 @@ func main() {
 	})
 	// SSO routes (public)
 	r.Get("/auth/sso/providers", ssoH.Providers)
-	r.Get("/auth/sso/login",     ssoH.Login)
-	r.Get("/auth/sso/callback",  ssoH.Callback)
+	r.Get("/auth/sso/login", ssoH.Login)
+	r.Get("/auth/sso/callback", ssoH.Callback)
 	r.Get("/api/docs", handler.SwaggerUI)
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
@@ -323,9 +334,8 @@ func main() {
 	r.Get("/api/p4/alerts/history", p4AuthMiddleware(handleAlertHistory))
 	r.Post("/api/p4/alerts/test", p4AuthMiddleware(handleAlertTest))
 	r.Post("/api/p4/email/send", p4AuthMiddleware(handleSendEmail))
-	r.Get("/api/p4/email/config",  p4AuthMiddleware(handleEmailConfig))
+	r.Get("/api/p4/email/config", p4AuthMiddleware(handleEmailConfig))
 	r.Post("/api/p4/email/config", p4AuthMiddleware(handleEmailConfig))
-
 
 	// ── Deep Packet Analysis (NetCap) ──────────────────────────────────────────
 	netCapEngine := netcap.NewEngine()
@@ -349,21 +359,21 @@ func main() {
 	}()
 	r.Route("/api/v1/netcap", func(r chi.Router) {
 		r.Use(authMw)
-		r.Get("/interfaces",            netCapH.Interfaces)
-		r.Post("/start",                netCapH.Start)
-		r.Post("/stop",                 netCapH.Stop)
-		r.Get("/stats",                 netCapH.Stats)
-		r.Get("/flows",                 netCapH.Flows)
-		r.Get("/anomalies",             netCapH.Anomalies)
-		r.Get("/tcp-flags",             netCapH.TCPFlags)
-		r.Get("/proto-breakdown",       netCapH.ProtoBreakdown)
-		r.Get("/full",                  netCapH.Full)
-		r.Get("/l7/http",               netCapH.L7HTTP)
-		r.Get("/l7/dns",                netCapH.L7DNS)
-		r.Get("/l7/sql",                netCapH.L7SQL)
-		r.Get("/l7/tls",                netCapH.L7TLS)
-		r.Get("/l7/grpc",               netCapH.L7GRPC)
-		r.Get("/export/flows.csv",      netCapH.ExportFlowsCSV)
+		r.Get("/interfaces", netCapH.Interfaces)
+		r.Post("/start", netCapH.Start)
+		r.Post("/stop", netCapH.Stop)
+		r.Get("/stats", netCapH.Stats)
+		r.Get("/flows", netCapH.Flows)
+		r.Get("/anomalies", netCapH.Anomalies)
+		r.Get("/tcp-flags", netCapH.TCPFlags)
+		r.Get("/proto-breakdown", netCapH.ProtoBreakdown)
+		r.Get("/full", netCapH.Full)
+		r.Get("/l7/http", netCapH.L7HTTP)
+		r.Get("/l7/dns", netCapH.L7DNS)
+		r.Get("/l7/sql", netCapH.L7SQL)
+		r.Get("/l7/tls", netCapH.L7TLS)
+		r.Get("/l7/grpc", netCapH.L7GRPC)
+		r.Get("/export/flows.csv", netCapH.ExportFlowsCSV)
 		r.Get("/export/anomalies.json", netCapH.ExportAnomaliesJSON)
 	})
 	// SSE stream — token via query param (EventSource cannot set headers)
@@ -379,17 +389,17 @@ func main() {
 		netCapH.Stream(w, r)
 	})
 	r.Get("/api/p4/conmon/report", p4AuthMiddleware(handleConMonReport))
-	r.With(auth.TokenFromQuery(jwtSecret, keyStore)).Get("/api/v1/ws",     handler.WSUpgradeHandler)
+	r.With(auth.TokenFromQuery(jwtSecret, keyStore)).Get("/api/v1/ws", handler.WSUpgradeHandler)
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
 		r.Use(vspMW.NewUserRateLimiter(600, time.Minute)) // per-user: 600 req/min
 
 		// Auth
-		r.Post("/api/v1/auth/logout",      authH.Logout)
-		r.Post("/api/v1/auth/refresh",     authH.Refresh)
-		r.Post("/api/v1/auth/mfa/setup",   mfaH.Setup)
-		r.Post("/api/v1/auth/mfa/verify",  mfaH.Verify)
-		r.Delete("/api/v1/auth/mfa",       mfaH.Disable)
+		r.Post("/api/v1/auth/logout", authH.Logout)
+		r.Post("/api/v1/auth/refresh", authH.Refresh)
+		r.Post("/api/v1/auth/mfa/setup", mfaH.Setup)
+		r.Post("/api/v1/auth/mfa/verify", mfaH.Verify)
+		r.Delete("/api/v1/auth/mfa", mfaH.Disable)
 		r.Post("/api/v1/auth/password/change", authH.ChangePassword)
 
 		// Admin
@@ -415,8 +425,8 @@ func main() {
 		// ── Batch scan ──────────────────────────────────────────────
 		batchH := newBatchHandler(db, runsH)
 		r.With(vspMW.StrictLimiter(5, time.Minute)).Post("/api/v1/vsp/batch", batchH.Submit)
-		r.Get("/api/v1/vsp/batches",             batchH.ListAll)
-		r.Get("/api/v1/vsp/batch/{batch_id}",    batchH.Status)
+		r.Get("/api/v1/vsp/batches", batchH.ListAll)
+		r.Get("/api/v1/vsp/batch/{batch_id}", batchH.Status)
 		r.Delete("/api/v1/vsp/batch/{batch_id}", batchH.Cancel)
 		r.Get("/api/v1/vsp/findings", findingsH.List)
 		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
@@ -442,15 +452,15 @@ func main() {
 		r.Get("/api/v1/siem/webhooks", siemH.List)
 
 		// ── Correlation engine ─────────────────────────────────
-		r.Get("/api/v1/correlation/rules",           corrH.ListRules)
-		r.Post("/api/v1/correlation/rules",          corrH.CreateRule)
+		r.Get("/api/v1/correlation/rules", corrH.ListRules)
+		r.Post("/api/v1/correlation/rules", corrH.CreateRule)
 		r.Post("/api/v1/correlation/rules/{id}/toggle", corrH.ToggleRule)
-		r.Delete("/api/v1/correlation/rules/{id}",   corrH.DeleteRule)
-		r.Get("/api/v1/correlation/incidents",       corrH.ListIncidents)
-		r.Get("/api/v1/correlation/incidents/{id}",  corrH.GetIncident)
+		r.Delete("/api/v1/correlation/rules/{id}", corrH.DeleteRule)
+		r.Get("/api/v1/correlation/incidents", corrH.ListIncidents)
+		r.Get("/api/v1/correlation/incidents/{id}", corrH.GetIncident)
 		r.Post("/api/v1/correlation/incidents/{id}/resolve", corrH.ResolveIncident)
 		r.Patch("/api/v1/correlation/incidents/{id}/status", corrH.ResolveIncident)
-		r.Post("/api/v1/correlation/incidents",      corrH.CreateIncident)
+		r.Post("/api/v1/correlation/incidents", corrH.CreateIncident)
 
 		// ── AI Analyst smart mock ────────────────────────────────
 		r.Post("/api/v1/ai/analyze", func(w http.ResponseWriter, r *http.Request) {
@@ -463,7 +473,10 @@ func main() {
 			incs, _ := db.ListIncidents(r.Context(), claims.TenantID, "open", "", 5)
 			rules, _ := db.ListCorrelationRules(r.Context(), claims.TenantID)
 			gate, findings := "UNKNOWN", 0
-			if run != nil { gate = run.Gate; findings = run.TotalFindings }
+			if run != nil {
+				gate = run.Gate
+				findings = run.TotalFindings
+			}
 			apiKey := viper.GetString("anthropic.api_key")
 			if apiKey != "" {
 				dbCtx := fmt.Sprintf("REAL-TIME: Gate=%s Findings=%d Incidents=%d Rules=%d", gate, findings, len(incs), len(rules))
@@ -486,7 +499,9 @@ func main() {
 				}
 			}
 			query := ""
-			if len(req.Messages) > 0 { query = req.Messages[len(req.Messages)-1]["content"] }
+			if len(req.Messages) > 0 {
+				query = req.Messages[len(req.Messages)-1]["content"]
+			}
 			var reply string
 			ql := strings.ToLower(query)
 			switch {
@@ -503,7 +518,8 @@ func main() {
 			default:
 				reply = fmt.Sprintf("Chao ban! Toi la VSP AI Security Analyst.\n\n**Trang thai hien tai**: Gate **%s** | %d findings | %d incidents.\n\nCo the giup: triage incidents, explain CVEs, priority fixes, executive summary, SOAR playbooks, threat hunting.", gate, findings, len(incs))
 			}
-			w.Header().Set("Content-Type", "application/json"); json.NewEncoder(w).Encode(map[string]any{"content": []map[string]string{{"type": "text", "text": reply}}, "model": "vsp-mock"})
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"content": []map[string]string{{"type": "text", "text": reply}}, "model": "vsp-mock"})
 		})
 
 		// ── AI Analyst proxy ──────────────────────────────────── ────────────────────────────────────
@@ -511,18 +527,29 @@ func main() {
 			w.Header().Set("Content-Type", "application/json")
 			// Forward to Anthropic API
 			body, err := io.ReadAll(io.LimitReader(r.Body, 10<<20)) // 10MB limit
-			if err != nil { http.Error(w, "bad request", 400); return }
+			if err != nil {
+				http.Error(w, "bad request", 400)
+				return
+			}
 			req, err := http.NewRequestWithContext(r.Context(), "POST",
 				"https://api.anthropic.com/v1/messages",
 				bytes.NewReader(body))
-			if err != nil { http.Error(w, "proxy error", 500); return }
+			if err != nil {
+				http.Error(w, "proxy error", 500)
+				return
+			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("anthropic-version", "2023-06-01")
 			apiKey := viper.GetString("anthropic.api_key")
-			if apiKey != "" { req.Header.Set("x-api-key", apiKey) }
+			if apiKey != "" {
+				req.Header.Set("x-api-key", apiKey)
+			}
 			client := &http.Client{Timeout: 60 * time.Second}
 			resp, err := client.Do(req)
-			if err != nil { http.Error(w, `{"error":"upstream error"}`, http.StatusBadGateway); return }
+			if err != nil {
+				http.Error(w, `{"error":"upstream error"}`, http.StatusBadGateway)
+				return
+			}
 			defer resp.Body.Close()
 			w.WriteHeader(resp.StatusCode)
 			io.Copy(w, resp.Body) //nolint:errcheck
@@ -543,30 +570,32 @@ func main() {
 
 		// ── UEBA ────────────────────────────────────────────────
 		r.Get("/api/v1/ueba/anomalies", uebaH.ListAnomalies)
-		r.Post("/api/v1/ueba/analyze",  uebaH.Analyze)
-		r.Get("/api/v1/ueba/baseline",  uebaH.Baseline)
-		r.Get("/api/v1/ueba/timeline",  uebaH.Timeline)
+		r.Post("/api/v1/ueba/analyze", uebaH.Analyze)
+		r.Get("/api/v1/ueba/baseline", uebaH.Baseline)
+		r.Get("/api/v1/ueba/timeline", uebaH.Timeline)
 
 		// ── Asset inventory ─────────────────────────────────────
-		r.Get("/api/v1/assets",                assetsH.List)
-		r.Post("/api/v1/assets",               assetsH.Create)
-		r.Get("/api/v1/assets/summary",        assetsH.Summary)
-		r.Get("/api/v1/assets/{id}/findings",  assetsH.Findings)
+		r.Get("/api/v1/assets", assetsH.List)
+		r.Post("/api/v1/assets", assetsH.Create)
+		r.Get("/api/v1/assets/summary", assetsH.Summary)
+		r.Get("/api/v1/assets/{id}/findings", assetsH.Findings)
 
 		// ── SOAR playbooks ──────────────────────────────────────
-		r.Get("/api/v1/soar/playbooks",              soarH.ListPlaybooks)
-		r.Post("/api/v1/soar/playbooks",             soarH.CreatePlaybook)
+		r.Get("/api/v1/soar/playbooks", soarH.ListPlaybooks)
+		r.Post("/api/v1/soar/playbooks", soarH.CreatePlaybook)
 		r.Post("/api/v1/soar/playbooks/{id}/toggle", soarH.TogglePlaybook)
-		r.Post("/api/v1/soar/playbooks/{id}/run",    soarH.RunPlaybook)
-		r.Post("/api/v1/soar/trigger",               soarH.Trigger)
-		r.Get("/api/v1/soar/runs",                   soarH.ListRuns)
+		r.Post("/api/v1/soar/playbooks/{id}/run", soarH.RunPlaybook)
+		r.Post("/api/v1/soar/trigger", soarH.Trigger)
+		r.Get("/api/v1/soar/runs", soarH.ListRuns)
 
-// ── Vulnerability management ───────────────────────────────
+		// ── Vulnerability management ───────────────────────────────
 		r.Get("/api/v1/vulns/trend", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
 			ctx := r.Context()
 			days := 30
-			if d := r.URL.Query().Get("days"); d != "" { fmt.Sscanf(d, "%d", &days) }
+			if d := r.URL.Query().Get("days"); d != "" {
+				fmt.Sscanf(d, "%d", &days)
+			}
 			type TrendPoint struct {
 				Date     string `json:"date"`
 				Critical int    `json:"critical"`
@@ -586,17 +615,23 @@ func main() {
 				WHERE f.tenant_id=$1 AND r.status='DONE'
 				  AND r.created_at >= NOW() - make_interval(days => $2)
 				GROUP BY 1 ORDER BY 1`, claims.TenantID, days)
-			if err != nil { w.Header().Set("Content-Type","application/json"); json.NewEncoder(w).Encode(map[string]any{"trend":[]any{}}); return }
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]any{"trend": []any{}})
+				return
+			}
 			defer rows.Close()
 			var points []TrendPoint
 			for rows.Next() {
 				var p TrendPoint
-				rows.Scan(&p.Date,&p.Critical,&p.High,&p.Medium,&p.Low,&p.Total) //nolint:errcheck
+				rows.Scan(&p.Date, &p.Critical, &p.High, &p.Medium, &p.Low, &p.Total) //nolint:errcheck
 				points = append(points, p)
 			}
-			if points == nil { points = []TrendPoint{} }
-			w.Header().Set("Content-Type","application/json")
-			json.NewEncoder(w).Encode(map[string]any{"trend":points,"days":days}) //nolint:errcheck
+			if points == nil {
+				points = []TrendPoint{}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"trend": points, "days": days}) //nolint:errcheck
 		})
 
 		r.Get("/api/v1/vulns/top-cves", func(w http.ResponseWriter, r *http.Request) {
@@ -618,17 +653,23 @@ func main() {
 				ORDER BY CASE MAX(severity)
 				  WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END,
 				  COUNT(*) DESC LIMIT 20`, claims.TenantID)
-			if err != nil { w.Header().Set("Content-Type","application/json"); json.NewEncoder(w).Encode(map[string]any{"cves":[]any{}}); return }
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]any{"cves": []any{}})
+				return
+			}
 			defer rows.Close()
 			var cves []CVERow
 			for rows.Next() {
 				var c CVERow
-				rows.Scan(&c.CVE,&c.Severity,&c.Count,&c.Tools,&c.Fixable) //nolint:errcheck
+				rows.Scan(&c.CVE, &c.Severity, &c.Count, &c.Tools, &c.Fixable) //nolint:errcheck
 				cves = append(cves, c)
 			}
-			if cves == nil { cves = []CVERow{} }
-			w.Header().Set("Content-Type","application/json")
-			json.NewEncoder(w).Encode(map[string]any{"cves":cves,"total":len(cves)}) //nolint:errcheck
+			if cves == nil {
+				cves = []CVERow{}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"cves": cves, "total": len(cves)}) //nolint:errcheck
 		})
 
 		r.Get("/api/v1/vulns/by-tool", func(w http.ResponseWriter, r *http.Request) {
@@ -652,34 +693,44 @@ func main() {
 				FROM findings f JOIN runs r ON r.id=f.run_id
 				WHERE f.tenant_id=$1 AND r.status='DONE'
 				GROUP BY tool ORDER BY COUNT(*) DESC`, claims.TenantID)
-			if err != nil { w.Header().Set("Content-Type","application/json"); json.NewEncoder(w).Encode(map[string]any{"tools":[]any{}}); return }
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]any{"tools": []any{}})
+				return
+			}
 			defer rows.Close()
 			var tools []ToolRow
 			for rows.Next() {
 				var t ToolRow
-				rows.Scan(&t.Tool,&t.Critical,&t.High,&t.Medium,&t.Low,&t.Total) //nolint:errcheck
+				rows.Scan(&t.Tool, &t.Critical, &t.High, &t.Medium, &t.Low, &t.Total) //nolint:errcheck
 				tools = append(tools, t)
 			}
-			if tools == nil { tools = []ToolRow{} }
-			w.Header().Set("Content-Type","application/json")
-			json.NewEncoder(w).Encode(map[string]any{"tools":tools}) //nolint:errcheck
+			if tools == nil {
+				tools = []ToolRow{}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"tools": tools}) //nolint:errcheck
 		})
 
-// ── Threat hunting ─────────────────────────────────────────
+		// ── Threat hunting ─────────────────────────────────────────
 		r.Get("/api/v1/logs/hunt", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
 			ctx := r.Context()
 			q := r.URL.Query()
-			keyword  := q.Get("q")
+			keyword := q.Get("q")
 			severity := q.Get("severity")
-			process  := q.Get("process")
+			process := q.Get("process")
 			sourceIP := q.Get("source_ip")
 			limitStr := q.Get("limit")
-			limit    := 100
-			if limitStr != "" { fmt.Sscanf(limitStr, "%d", &limit) }
-			if limit > 500 { limit = 500 }
+			limit := 100
+			if limitStr != "" {
+				fmt.Sscanf(limitStr, "%d", &limit)
+			}
+			if limit > 500 {
+				limit = 500
+			}
 			where := []string{"tenant_id=$1"}
-			args  := []any{claims.TenantID}
+			args := []any{claims.TenantID}
 			if keyword != "" {
 				args = append(args, "%"+keyword+"%")
 				where = append(where, fmt.Sprintf("message ILIKE $%d", len(args)))
@@ -698,7 +749,9 @@ func main() {
 			}
 			// Time range
 			hours := 24
-			if h := q.Get("hours"); h != "" { fmt.Sscanf(h, "%d", &hours) }
+			if h := q.Get("hours"); h != "" {
+				fmt.Sscanf(h, "%d", &hours)
+			}
 			args = append(args, hours)
 			where = append(where, fmt.Sprintf("ts >= NOW() - make_interval(hours => $%d)", len(args)))
 
@@ -713,8 +766,8 @@ func main() {
 
 			rows, err := db.Pool().Query(ctx, query, args...)
 			if err != nil {
-				w.Header().Set("Content-Type","application/json")
-				json.NewEncoder(w).Encode(map[string]any{"error":err.Error()})
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
 				return
 			}
 			defer rows.Close()
@@ -742,19 +795,21 @@ func main() {
 				}
 				events = append(events, e)
 			}
-			if events == nil { events = []Event{} }
+			if events == nil {
+				events = []Event{}
+			}
 
 			// Stats — dùng toàn bộ where + args (bao gồm time filter)
 			var total int
 			db.Pool().QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM log_events WHERE %s`,
 				strings.Join(where, " AND ")), args[:len(args)-1]...).Scan(&total) //nolint:errcheck
 
-			w.Header().Set("Content-Type","application/json")
+			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
 				"events": events,
 				"count":  len(events),
 				"total":  total,
-				"query":  map[string]any{"q":keyword,"severity":severity,"process":process,"hours":hours},
+				"query":  map[string]any{"q": keyword, "severity": severity, "process": process, "hours": hours},
 			})
 		})
 
@@ -786,7 +841,9 @@ func main() {
 				}
 				rows.Close()
 			}
-			if hosts == nil { hosts = []FlowHost{} }
+			if hosts == nil {
+				hosts = []FlowHost{}
+			}
 
 			// Stats tổng
 			var totalFlows, suspicious int
@@ -816,7 +873,9 @@ func main() {
 				}
 				prows.Close()
 			}
-			if procs == nil { procs = []ProcStat{} }
+			if procs == nil {
+				procs = []ProcStat{}
+			}
 
 			w.Header().Set("Content-Type", "application/json") //nolint:errcheck
 			json.NewEncoder(w).Encode(map[string]any{
@@ -829,96 +888,96 @@ func main() {
 		})
 
 		// ── Log sources ─────────────────────────────────────────
-		r.Get("/api/v1/logs/sources",                logSrcH.List)
-		r.Post("/api/v1/logs/sources",               logSrcH.Create)
-		r.Delete("/api/v1/logs/sources/{id}",        logSrcH.Delete)
-		r.Post("/api/v1/logs/sources/{id}/test",     logSrcH.Test)
-		r.Get("/api/v1/logs/stats",                  logSrcH.Stats)
+		r.Get("/api/v1/logs/sources", logSrcH.List)
+		r.Post("/api/v1/logs/sources", logSrcH.Create)
+		r.Delete("/api/v1/logs/sources/{id}", logSrcH.Delete)
+		r.Post("/api/v1/logs/sources/{id}/test", logSrcH.Test)
+		r.Get("/api/v1/logs/stats", logSrcH.Stats)
 
 		// ── Threat intelligence ─────────────────────────────────
-		r.Get("/api/v1/ti/iocs",                     tiH.ListIOCs)
-		r.Get("/api/v1/ti/feeds",                    tiH.ListFeeds)
-		r.Get("/api/v1/ti/matches",                  tiH.Matches)
-		r.Get("/api/v1/ti/mitre",                    tiH.MITRE)
-		r.Post("/api/v1/ti/feeds/sync",              tiH.SyncFeeds)
-		r.Get("/api/v1/ti/enrich",                  tiH.Enrich)
+		r.Get("/api/v1/ti/iocs", tiH.ListIOCs)
+		r.Get("/api/v1/ti/feeds", tiH.ListFeeds)
+		r.Get("/api/v1/ti/matches", tiH.Matches)
+		r.Get("/api/v1/ti/mitre", tiH.MITRE)
+		r.Post("/api/v1/ti/feeds/sync", tiH.SyncFeeds)
+		r.Get("/api/v1/ti/enrich", tiH.Enrich)
 		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/ti/enrich/batch", tiH.EnrichBatch)
-		r.Get("/api/v1/vsp/findings/dedup",         tiH.DedupFindings)
-		r.Get("/api/v1/vsp/findings/chains",        tiH.ExploitChains)
-		r.Post("/api/v1/ai/analyze/findings",       tiH.SemanticAnalyze)
-		r.Post("/api/v1/ti/secret/check",           tiH.CheckSecret)
+		r.Get("/api/v1/vsp/findings/dedup", tiH.DedupFindings)
+		r.Get("/api/v1/vsp/findings/chains", tiH.ExploitChains)
+		r.Post("/api/v1/ai/analyze/findings", tiH.SemanticAnalyze)
+		r.Post("/api/v1/ti/secret/check", tiH.CheckSecret)
 		r.With(vspMW.StrictLimiter(20, time.Minute)).Post("/api/v1/ti/secret/check/batch", tiH.CheckSecretBatch)
-		r.Get("/api/v1/compliance/license",          tiH.LicenseCompliance)
+		r.Get("/api/v1/compliance/license", tiH.LicenseCompliance)
 		r.Post("/api/v1/siem/webhooks", siemH.Create)
 		r.Delete("/api/v1/siem/webhooks/{id}", siemH.Delete)
 		r.Post("/api/v1/siem/webhooks/{id}/test", siemH.Test)
 
 		// Compliance
 		r.Get("/api/v1/compliance/fedramp", complianceH.FedRAMP)
-		r.Get("/api/v1/compliance/cmmc",    complianceH.CMMC)
-		r.Get("/api/v1/compliance/oscal/ar",   complianceH.OSCALAR)
+		r.Get("/api/v1/compliance/cmmc", complianceH.CMMC)
+		r.Get("/api/v1/compliance/oscal/ar", complianceH.OSCALAR)
 		r.Get("/api/v1/compliance/oscal/poam", complianceH.OSCALPOAM)
 
 		// Governance (all implemented now)
-		r.Get("/api/v1/governance/risk-register",     govH.RiskRegister)
-		r.Get("/api/v1/governance/ownership",          govH.Ownership)
-		r.Get("/api/v1/governance/evidence",           govH.Evidence)
+		r.Get("/api/v1/governance/risk-register", govH.RiskRegister)
+		r.Get("/api/v1/governance/ownership", govH.Ownership)
+		r.Get("/api/v1/governance/evidence", govH.Evidence)
 		r.Post("/api/v1/governance/evidence/{id}/freeze", govH.FreezeEvidence)
-		r.Get("/api/v1/governance/effectiveness",      govH.Effectiveness)
-		r.Get("/api/v1/governance/traceability",       govH.Traceability)
-		r.Get("/api/v1/governance/raci",               govH.RACI)
-		r.Get("/api/v1/governance/rule-overrides",     govH.RuleOverrides)
+		r.Get("/api/v1/governance/effectiveness", govH.Effectiveness)
+		r.Get("/api/v1/governance/traceability", govH.Traceability)
+		r.Get("/api/v1/governance/raci", govH.RACI)
+		r.Get("/api/v1/governance/rule-overrides", govH.RuleOverrides)
 
 		// SOC (all implemented now)
-		r.Get("/api/v1/soc/detection",           govH.Detection)
-		r.Get("/api/v1/soc/incidents",           govH.Incidents)
-		r.Get("/api/v1/soc/supply-chain",        govH.SupplyChain)
-		r.Get("/api/v1/soc/release-governance",  govH.ReleaseGovernance)
+		r.Get("/api/v1/soc/detection", govH.Detection)
+		r.Get("/api/v1/soc/incidents", govH.Incidents)
+		r.Get("/api/v1/soc/supply-chain", govH.SupplyChain)
+		r.Get("/api/v1/soc/release-governance", govH.ReleaseGovernance)
 		r.Get("/api/v1/soc/framework-scorecard", govH.FrameworkScorecard)
-		r.Get("/api/v1/soc/roadmap",             govH.Roadmap)
-		r.Get("/api/v1/soc/zero-trust",          govH.ZeroTrust)
+		r.Get("/api/v1/soc/roadmap", govH.Roadmap)
+		r.Get("/api/v1/soc/zero-trust", govH.ZeroTrust)
 
 		// Scheduler + Drift detection
-		r.Get("/api/v1/schedules",           schedH.List)
-		r.Post("/api/v1/schedules",          schedH.Create)
-		r.Delete("/api/v1/schedules/{id}",   schedH.Delete)
-			r.Patch("/api/v1/schedules/{id}",    schedH.Update)
+		r.Get("/api/v1/schedules", schedH.List)
+		r.Post("/api/v1/schedules", schedH.Create)
+		r.Delete("/api/v1/schedules/{id}", schedH.Delete)
+		r.Patch("/api/v1/schedules/{id}", schedH.Update)
 		r.Patch("/api/v1/schedules/{id}/toggle", schedH.Toggle)
 		r.Post("/api/v1/schedules/{id}/run", schedH.RunNow)
-		r.Get("/api/v1/drift",               schedH.DriftEvents)
+		r.Get("/api/v1/drift", schedH.DriftEvents)
 
 		// Remediation workflow
-		r.Get("/api/v1/remediation",                          remediationH.List)
-		r.Get("/api/v1/remediation/stats",                    remediationH.Stats)
-		r.Get("/api/v1/remediation/finding/{finding_id}",     remediationH.Get)
-		r.Post("/api/v1/remediation/finding/{finding_id}",    remediationH.Upsert)
-		r.Post("/api/v1/remediation/{rem_id}/comments",       remediationH.AddComment)
+		r.Get("/api/v1/remediation", remediationH.List)
+		r.Get("/api/v1/remediation/stats", remediationH.Stats)
+		r.Get("/api/v1/remediation/finding/{finding_id}", remediationH.Get)
+		r.Post("/api/v1/remediation/finding/{finding_id}", remediationH.Upsert)
+		r.Post("/api/v1/remediation/{rem_id}/comments", remediationH.AddComment)
 
 		// SBOM
-		r.Get("/api/v1/sbom/{rid}",       sbomH.Generate)
+		r.Get("/api/v1/sbom/{rid}", sbomH.Generate)
 		r.Get("/api/v1/sbom/{rid}/grype", sbomH.Grype)
 		// Reports
 		r.Get("/api/v1/vsp/run_report_html/{rid}", reportH.HTML)
-		r.Get("/api/v1/vsp/run_report_pdf/{rid}",  reportH.PDF)
+		r.Get("/api/v1/vsp/run_report_pdf/{rid}", reportH.PDF)
 		r.Get("/api/v1/vsp/executive_report_pdf/{rid}", reportH.ExecutivePDF)
 		r.Get("/api/v1/vsp/executive_report_html/{rid}", reportH.ExecutiveHTML)
 		// SLA + Sandbox + Imports
-		r.Get("/api/v1/vsp/sla_tracker",        slaH.Tracker)
-		r.Get("/api/v1/vsp/metrics_slos",       slaH.MetricsSLOs)
-		r.Get("/api/v1/vsp/sandbox",            sandboxH.List)
+		r.Get("/api/v1/vsp/sla_tracker", slaH.Tracker)
+		r.Get("/api/v1/vsp/metrics_slos", slaH.MetricsSLOs)
+		r.Get("/api/v1/vsp/sandbox", sandboxH.List)
 		r.Post("/api/v1/vsp/sandbox/test-fire", sandboxH.TestFire)
-		r.Delete("/api/v1/vsp/sandbox/clear",   sandboxH.Clear)
+		r.Delete("/api/v1/vsp/sandbox/clear", sandboxH.Clear)
 		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/import/policies", importsH.Policies)
 		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/import/findings", importsH.Findings)
-		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/import/users",    importsH.Users)
+		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/import/users", importsH.Users)
 		r.Post("/api/v1/vsp/rbac/session-timeout", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(`{"status":"ok","message":"session timeout updated"}`))
 		})
 		// Export
 		r.Get("/api/v1/export/sarif/{rid}", exportH.SARIF)
-		r.Get("/api/v1/export/csv/{rid}",   exportH.CSV)
-		r.Get("/api/v1/export/json/{rid}",  exportH.JSON)
+		r.Get("/api/v1/export/csv/{rid}", exportH.CSV)
+		r.Get("/api/v1/export/json/{rid}", exportH.JSON)
 	})
 
 	addr := fmt.Sprintf(":%d", viper.GetInt("server.gateway_port"))
@@ -954,15 +1013,24 @@ func main() {
 					WHERE r.status='DONE'
 					  AND r.rid > $1
 					ORDER BY r.rid DESC LIMIT 5`, lastSeen)
-				if err != nil { continue }
-				var toTrigger []struct{ rid, tenantID, gate string; findings int }
+				if err != nil {
+					continue
+				}
+				var toTrigger []struct {
+					rid, tenantID, gate string
+					findings            int
+				}
 				for rows.Next() {
 					var id, rid, tenantID, gate string
 					var findings int
 					var summary []byte
 					var createdAt time.Time
-					if err := rows.Scan(&id, &rid, &tenantID, &gate, &findings, &summary, &createdAt); err != nil { continue }
-					if rid <= lastSeen { continue }
+					if err := rows.Scan(&id, &rid, &tenantID, &gate, &findings, &summary, &createdAt); err != nil {
+						continue
+					}
+					if rid <= lastSeen {
+						continue
+					}
 					lastSeen = rid
 					ca.Set(ctx, "vsp:sse:last_rid", []byte(rid), 30*24*time.Hour)
 					// Broadcast SSE
@@ -976,26 +1044,33 @@ func main() {
 					ca.Invalidate(ctx, "vsp:api:*")
 					log.Info().Str("rid", rid).Str("gate", gate).Msg("sse: broadcast scan_complete")
 					if gate == "FAIL" {
-						toTrigger = append(toTrigger, struct{ rid, tenantID, gate string; findings int }{rid, tenantID, gate, findings})
+						toTrigger = append(toTrigger, struct {
+							rid, tenantID, gate string
+							findings            int
+						}{rid, tenantID, gate, findings})
 					}
 				}
 				rows.Close()
 				// Trigger SOAR for FAIL gates
 				for _, t := range toTrigger {
 					pbs, err := db.FindEnabledPlaybooks(ctx, t.tenantID, "gate_fail", "any")
-					if err != nil { continue }
+					if err != nil {
+						continue
+					}
 					for _, pb := range pbs {
 						ctxJSON, _ := json.Marshal(map[string]any{
-							"trigger":"gate_fail","gate":t.gate,
-							"run_id":t.rid,"findings":t.findings,
+							"trigger": "gate_fail", "gate": t.gate,
+							"run_id": t.rid, "findings": t.findings,
 						})
 						runID, err := db.CreatePlaybookRun(ctx, pb.ID, t.tenantID, "gate_fail", ctxJSON)
-						if err != nil { continue }
+						if err != nil {
+							continue
+						}
 						log.Info().Str("playbook", pb.Name).Str("run_id", runID).Msg("soar: auto-triggered on gate FAIL")
 					}
 				}
-				case <-ctx.Done():
-					return
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
@@ -1026,7 +1101,6 @@ func main() {
 	safe.GoCtx(ctx, func(ctx context.Context) { siem.StartCorrelationEngine(ctx, db, handler.Hub.Broadcast) })
 	log.Info().Msg("Correlation engine started")
 
-
 	log.Info().Msg("Incident email alerter started — interval: 30s")
 
 	// ── Retention policy worker ──────────────────────────────────
@@ -1034,9 +1108,13 @@ func main() {
 
 	// ── Syslog receiver UDP:514 + TCP:514 ───────────────────────
 	udpAddr := viper.GetString("siem.syslog_udp_addr")
-	if udpAddr == "" { udpAddr = ":10514" }
+	if udpAddr == "" {
+		udpAddr = ":10514"
+	}
 	tcpAddr := viper.GetString("siem.syslog_tcp_addr")
-	if tcpAddr == "" { tcpAddr = ":10515" }
+	if tcpAddr == "" {
+		tcpAddr = ":10515"
+	}
 	var tenantID string
 	db.Pool().QueryRow(ctx, `SELECT id FROM tenants WHERE slug='default' LIMIT 1`).Scan(&tenantID) //nolint:errcheck
 	if tenantID != "" {
@@ -1095,19 +1173,30 @@ func corsMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
 type apiKeyStore struct{ db *store.DB }
+
 func (s *apiKeyStore) ValidateAPIKey(ctx context.Context, rawKey string) (auth.Claims, error) {
-	if len(rawKey) < 12 { return auth.Claims{}, fmt.Errorf("key too short") }
+	if len(rawKey) < 12 {
+		return auth.Claims{}, fmt.Errorf("key too short")
+	}
 	prefix := rawKey[:12]
 	rows, err := s.db.Pool().Query(ctx,
 		`SELECT id, tenant_id, hash, role, expires_at FROM api_keys WHERE prefix=$1`, prefix)
-	if err != nil { return auth.Claims{}, err }
+	if err != nil {
+		return auth.Claims{}, err
+	}
 	defer rows.Close()
 	for rows.Next() {
-		var id, tenantID, hash, role string; var expiresAt *time.Time
+		var id, tenantID, hash, role string
+		var expiresAt *time.Time
 		rows.Scan(&id, &tenantID, &hash, &role, &expiresAt) //nolint:errcheck
-		if expiresAt != nil && time.Now().After(*expiresAt) { continue }
-		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(rawKey)); err != nil { continue }
+		if expiresAt != nil && time.Now().After(*expiresAt) {
+			continue
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(rawKey)); err != nil {
+			continue
+		}
 		go s.db.TouchAPIKey(ctx, id) //nolint:errcheck
 		return auth.Claims{TenantID: tenantID, Role: role, UserID: id}, nil
 	}
@@ -1119,7 +1208,9 @@ func ensureDefaultTenant(ctx context.Context, db *store.DB) {
 func getDefaultTenantID(ctx context.Context, db *store.DB) string {
 	var id string
 	db.Pool().QueryRow(ctx, `SELECT id FROM tenants WHERE slug='default' LIMIT 1`).Scan(&id) //nolint:errcheck
-	if id == "" { log.Fatal().Msg("default tenant not found") }
+	if id == "" {
+		log.Fatal().Msg("default tenant not found")
+	}
 	return id
 }
 

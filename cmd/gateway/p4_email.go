@@ -7,8 +7,8 @@ import (
 	"log"
 	"net/http"
 	"net/smtp"
-	"strings"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -39,7 +39,9 @@ var emailCfg = &EmailConfig{
 }
 
 func getEnvStr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" { return v }
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return fallback
 }
 
@@ -84,8 +86,12 @@ func buildAlertEmail(data map[string]interface{}) string {
 	title := fmt.Sprintf("%v", data["title"])
 	msg := fmt.Sprintf("%v", data["message"])
 	color := "#ef4444"
-	if sev == "HIGH" { color = "#f59e0b" }
-	if sev == "INFO" { color = "#10b981" }
+	if sev == "HIGH" {
+		color = "#f59e0b"
+	}
+	if sev == "INFO" {
+		color = "#10b981"
+	}
 	dashURL := getEnvStr("DASHBOARD_URL", "http://127.0.0.1:8922")
 	return fmt.Sprintf(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;margin:0;padding:40px 20px}
@@ -141,14 +147,17 @@ func handleSendEmail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req EmailRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request"}`, 400); return
+		http.Error(w, `{"error":"invalid request"}`, 400)
+		return
 	}
 	// Validate email address — prevent header injection
 	if req.To == "" || strings.ContainsAny(req.To, "\r\n\t;,") || len(req.To) > 254 {
-		http.Error(w, `{"error":"invalid email address"}`, 400); return
+		http.Error(w, `{"error":"invalid email address"}`, 400)
+		return
 	}
 	if !strings.Contains(req.To, "@") || strings.Count(req.To, "@") > 1 {
-		http.Error(w, `{"error":"invalid email format"}`, 400); return
+		http.Error(w, `{"error":"invalid email format"}`, 400)
+		return
 	}
 	var subject, body string
 	switch req.Type {
@@ -162,7 +171,8 @@ func handleSendEmail(w http.ResponseWriter, r *http.Request) {
 		subject = fmt.Sprintf("VSP ConMon Report — %v %s", req.Data["period"], time.Now().Format("January 2006"))
 		body = buildReportEmail(req.Data)
 	default:
-		http.Error(w, `{"error":"unknown type"}`, 400); return
+		http.Error(w, `{"error":"unknown type"}`, 400)
+		return
 	}
 	if err := sendSMTP(req.To, subject, body); err != nil {
 		log.Printf("[EMAIL] Error: %v", err)
@@ -178,7 +188,8 @@ func handleEmailConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		json.NewDecoder(r.Body).Decode(emailCfg)
 		emailCfg.Enabled = emailCfg.SMTPUser != "" && emailCfg.SMTPPassword != ""
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); return
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		return
 	}
 	safe := map[string]interface{}{
 		"smtp_host": emailCfg.SMTPHost, "smtp_port": emailCfg.SMTPPort,

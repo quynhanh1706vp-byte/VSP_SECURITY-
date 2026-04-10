@@ -19,10 +19,10 @@ type HealthStatus struct {
 }
 
 type P4HealthDetail struct {
-	Readiness  int    `json:"readiness"`
-	Achieved   bool   `json:"achieved"`
-	ATOStatus  string `json:"ato_status"`
-	ConMon     int    `json:"conmon_score"`
+	Readiness  int       `json:"readiness"`
+	Achieved   bool      `json:"achieved"`
+	ATOStatus  string    `json:"ato_status"`
+	ConMon     int       `json:"conmon_score"`
 	LastUpdate time.Time `json:"last_update"`
 }
 
@@ -52,7 +52,10 @@ func handleP4HealthDetailed(w http.ResponseWriter, r *http.Request) {
 	pkg := rmfStore.packages["VSP-DOD-2025-001"]
 	atoStatus := "unknown"
 	conmon := 0
-	if pkg != nil { atoStatus = pkg.ATOStatus; conmon = pkg.ConMonScore }
+	if pkg != nil {
+		atoStatus = pkg.ATOStatus
+		conmon = pkg.ConMonScore
+	}
 	rmfStore.mu.RUnlock()
 
 	// Check DB
@@ -62,7 +65,9 @@ func handleP4HealthDetailed(w http.ResponseWriter, r *http.Request) {
 			dbStatus = "error" // don't leak DB error details
 			log.Printf("[P4-HEALTH] DB ping failed: %v", err)
 		}
-	} else { dbStatus = "not configured" }
+	} else {
+		dbStatus = "not configured"
+	}
 
 	status := HealthStatus{
 		Status:  "ok",

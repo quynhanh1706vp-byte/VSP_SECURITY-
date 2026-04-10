@@ -17,7 +17,9 @@ func main() {
 		os.Exit(1)
 	}
 	db, err := sql.Open("pgx", dsn)
-	if err != nil { panic(err) }
+	if err != nil {
+		panic(err)
+	}
 	defer db.Close()
 	if err := migrate.Run(context.Background(), db); err != nil {
 		fmt.Fprintf(os.Stderr, "migrate failed: %v\n", err)

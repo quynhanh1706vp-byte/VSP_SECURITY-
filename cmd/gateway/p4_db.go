@@ -26,7 +26,9 @@ func initP4DB(db *sql.DB) {
 // ── Save ──────────────────────────────────────────────────
 
 func saveZTStateToDB() {
-	if p4SQLDB == nil { return }
+	if p4SQLDB == nil {
+		return
+	}
 	ztState.mu.RLock()
 	pillarsJSON, _ := json.Marshal(ztState.Pillars)
 	rulesJSON, _ := json.Marshal(ztState.SegRules)
@@ -55,7 +57,9 @@ func saveZTStateToDB() {
 }
 
 func savePOAMToDB(item POAMItem) {
-	if p4SQLDB == nil { return }
+	if p4SQLDB == nil {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := p4SQLDB.ExecContext(ctx, `
@@ -72,7 +76,9 @@ func savePOAMToDB(item POAMItem) {
 }
 
 func savePipelineRunToDB(run PipelineRun) {
-	if p4SQLDB == nil { return }
+	if p4SQLDB == nil {
+		return
+	}
 	summaryJSON, _ := json.Marshal(run.Summary)
 	testsJSON, _ := json.Marshal(run.Tests)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -91,7 +97,9 @@ func savePipelineRunToDB(run PipelineRun) {
 // ── Load ──────────────────────────────────────────────────
 
 func loadP4StateFromDB() {
-	if p4SQLDB == nil { return }
+	if p4SQLDB == nil {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -103,11 +111,21 @@ func loadP4StateFromDB() {
 	err := row.Scan(&pillarsJSON, &rulesJSON, &coverJSON, &polJSON, &sbomJSON, &overall, &p4r, &p4a)
 	if err == nil {
 		ztState.mu.Lock()
-		if len(pillarsJSON) > 2 { json.Unmarshal(pillarsJSON, &ztState.Pillars) }
-		if len(rulesJSON) > 2 { json.Unmarshal(rulesJSON, &ztState.SegRules) }
-		if len(coverJSON) > 2 { json.Unmarshal(coverJSON, &ztState.RASPCoverage) }
-		if len(polJSON) > 2 { json.Unmarshal(polJSON, &ztState.APIPolicies) }
-		if len(sbomJSON) > 2 { json.Unmarshal(sbomJSON, &ztState.SBOM) }
+		if len(pillarsJSON) > 2 {
+			json.Unmarshal(pillarsJSON, &ztState.Pillars)
+		}
+		if len(rulesJSON) > 2 {
+			json.Unmarshal(rulesJSON, &ztState.SegRules)
+		}
+		if len(coverJSON) > 2 {
+			json.Unmarshal(coverJSON, &ztState.RASPCoverage)
+		}
+		if len(polJSON) > 2 {
+			json.Unmarshal(polJSON, &ztState.APIPolicies)
+		}
+		if len(sbomJSON) > 2 {
+			json.Unmarshal(sbomJSON, &ztState.SBOM)
+		}
 		ztState.OverallScore = overall
 		ztState.P4Readiness = p4r
 		ztState.P4Achieved = p4a
@@ -125,7 +143,9 @@ func loadP4StateFromDB() {
 		pkg := rmfStore.packages["VSP-DOD-2025-001"]
 		if pkg != nil {
 			existing := map[string]bool{}
-			for _, p := range pkg.POAMItems { existing[p.ID] = true }
+			for _, p := range pkg.POAMItems {
+				existing[p.ID] = true
+			}
 			for rows.Next() {
 				var item POAMItem
 				rows.Scan(&item.ID, &item.WeaknessName, &item.ControlID, &item.Severity, &item.Status, &item.MitigationPlan, &item.FindingID, &item.ScheduledCompletion, &item.ClosedDate)
@@ -145,7 +165,9 @@ func loadP4StateFromDB() {
 		defer pRows.Close()
 		pipeStore.mu.Lock()
 		existingRuns := map[string]bool{}
-		for _, r := range pipeStore.Runs { existingRuns[r.ID] = true }
+		for _, r := range pipeStore.Runs {
+			existingRuns[r.ID] = true
+		}
 		for pRows.Next() {
 			var run PipelineRun
 			var summaryJSON []byte

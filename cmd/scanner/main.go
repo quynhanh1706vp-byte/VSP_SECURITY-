@@ -46,9 +46,13 @@ func main() {
 	handler := pipeline.NewScanHandler(db)
 
 	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" { redisAddr = viper.GetString("redis.addr") }
+	if redisAddr == "" {
+		redisAddr = viper.GetString("redis.addr")
+	}
 	redisPass := os.Getenv("REDIS_PASSWORD")
-	if redisPass == "" { redisPass = viper.GetString("redis.password") }
+	if redisPass == "" {
+		redisPass = viper.GetString("redis.password")
+	}
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass},
 		asynq.Config{

@@ -15,13 +15,12 @@ import (
 
 	ai "github.com/vsp/platform/internal/ai"
 
+	"encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"io"
-	"encoding/json"
 )
-
 
 // securityMiddleware adds security headers and a per-request CSP nonce to every response.
 func securityMiddleware(next http.Handler) http.Handler {
@@ -90,7 +89,7 @@ func main() {
 	zerolog.SetGlobalLevel(level)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
-	shellPort   := viper.GetInt("server.shell_port")
+	shellPort := viper.GetInt("server.shell_port")
 	gatewayPort := viper.GetInt("server.gateway_port")
 	gatewayHost := viper.GetString("server.gateway_host")
 	if gatewayHost == "" {
@@ -134,20 +133,34 @@ func main() {
 		http.ServeFile(w, r, "./static/landing.html")
 	})
 	// Reverse proxy /api/p4/* → gateway:8921
-mux.HandleFunc("/api/p4/", func(w http.ResponseWriter, r *http.Request) {
-    target := "http://127.0.0.1:8921" + r.URL.RequestURI()
-    req, err := http.NewRequest(r.Method, target, r.Body)
-    if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
-    for k, vv := range r.Header { for _, v := range vv { req.Header.Add(k, v) } }
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
-    defer resp.Body.Close()
-    for k, vv := range resp.Header { for _, v := range vv { w.Header().Add(k, v) } }
-    w.WriteHeader(resp.StatusCode)
-    io.Copy(w, resp.Body) //nolint:errcheck
-})
+	mux.HandleFunc("/api/p4/", func(w http.ResponseWriter, r *http.Request) {
+		target := "http://127.0.0.1:8921" + r.URL.RequestURI()
+		req, err := http.NewRequest(r.Method, target, r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		for k, vv := range r.Header {
+			for _, v := range vv {
+				req.Header.Add(k, v)
+			}
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+		for k, vv := range resp.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		io.Copy(w, resp.Body) //nolint:errcheck
+	})
 
-mux.HandleFunc("/p4", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/p4", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Content-Security-Policy", "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; connect-src *;")
 		w.Header().Set("Cache-Control", "no-store")
@@ -158,7 +171,7 @@ mux.HandleFunc("/p4", func(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				html := string(data)
 				tokenJSON, _ := json.Marshal(token)
-			inject := "<script>window.TOKEN=" + string(tokenJSON) + ";</script>"
+				inject := "<script>window.TOKEN=" + string(tokenJSON) + ";</script>"
 				html = strings.Replace(html, "<head>", "<head>"+inject, 1)
 				w.Write([]byte(html)) //nolint:errcheck
 				return

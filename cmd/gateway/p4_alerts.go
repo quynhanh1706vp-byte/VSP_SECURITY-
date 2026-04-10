@@ -3,30 +3,30 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
 // ── Webhook Alert System ───────────────────────────────────
 type AlertConfig struct {
-	SlackWebhook  string `json:"slack_webhook"`
-	EmailTo       string `json:"email_to"`
-	AlertOnCritical bool `json:"alert_on_critical"`
-	AlertOnATOExpiry int  `json:"alert_on_ato_expiry_days"`
-	Enabled       bool   `json:"enabled"`
+	SlackWebhook     string `json:"slack_webhook"`
+	EmailTo          string `json:"email_to"`
+	AlertOnCritical  bool   `json:"alert_on_critical"`
+	AlertOnATOExpiry int    `json:"alert_on_ato_expiry_days"`
+	Enabled          bool   `json:"enabled"`
 }
 
 type Alert struct {
-	ID        string    `json:"id"`
-	Type      string    `json:"type"` // critical_finding | ato_expiry | p4_drop | conmon_drop
-	Title     string    `json:"title"`
-	Message   string    `json:"message"`
-	Severity  string    `json:"severity"`
-	SentAt    time.Time `json:"sent_at"`
-	Channel   string    `json:"channel"` // slack | email | webhook
+	ID       string    `json:"id"`
+	Type     string    `json:"type"` // critical_finding | ato_expiry | p4_drop | conmon_drop
+	Title    string    `json:"title"`
+	Message  string    `json:"message"`
+	Severity string    `json:"severity"`
+	SentAt   time.Time `json:"sent_at"`
+	Channel  string    `json:"channel"` // slack | email | webhook
 }
 
 var alertConfig = &AlertConfig{
@@ -37,7 +37,9 @@ var alertConfig = &AlertConfig{
 var alertHistory []Alert
 
 func sendSlackAlert(webhook, title, message, color string) error {
-	if webhook == "" { return nil }
+	if webhook == "" {
+		return nil
+	}
 	// Validate webhook URL — prevent SSRF
 	if !strings.HasPrefix(webhook, "https://hooks.slack.com/") &&
 		!strings.HasPrefix(webhook, "https://discord.com/api/webhooks/") &&
@@ -47,11 +49,11 @@ func sendSlackAlert(webhook, title, message, color string) error {
 	payload := map[string]interface{}{
 		"attachments": []map[string]interface{}{
 			{
-				"color": color,
-				"title": "🚨 VSP P4 Alert: " + title,
-				"text":  message,
+				"color":  color,
+				"title":  "🚨 VSP P4 Alert: " + title,
+				"text":   message,
 				"footer": "VSP Security Platform",
-				"ts": time.Now().Unix(),
+				"ts":     time.Now().Unix(),
 				"fields": []map[string]string{
 					{"title": "System", "value": "VSP-DOD-2025-001", "short": "true"},
 					{"title": "Time", "value": time.Now().Format("2006-01-02 15:04 MST"), "short": "true"},
@@ -62,7 +64,9 @@ func sendSlackAlert(webhook, title, message, color string) error {
 	body, _ := json.Marshal(payload)
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(webhook, "application/json", bytes.NewReader(body))
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer resp.Body.Close()
 	return nil
 }
@@ -95,8 +99,10 @@ func handleAlertHistory(w http.ResponseWriter, r *http.Request) {
 		for _, p := range pkg.POAMItems {
 			if p.Status == "open" || p.Status == "in_remediation" {
 				switch p.Severity {
-				case "critical", "CRITICAL": critOpen++
-				case "HIGH", "high": highOpen++
+				case "critical", "CRITICAL":
+					critOpen++
+				case "HIGH", "high":
+					highOpen++
 				}
 			}
 		}
@@ -121,7 +127,11 @@ func handleAlertHistory(w http.ResponseWriter, r *http.Request) {
 			days := int(pkg.ExpirationDate.Sub(now).Hours() / 24)
 			if days <= 365 {
 				sev := "LOW"
-				if days <= 90 { sev = "CRITICAL" } else if days <= 180 { sev = "HIGH" }
+				if days <= 90 {
+					sev = "CRITICAL"
+				} else if days <= 180 {
+					sev = "HIGH"
+				}
 				alerts = append(alerts, Alert{
 					ID: "ALT-ATO-EXPIRY", Type: "ato_expiry",
 					Title:    fmt.Sprintf("ATO expires in %d days", days),
@@ -163,13 +173,13 @@ func handleAlertTest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	alert := Alert{
-		ID: fmt.Sprintf("ALT-TEST-%d", time.Now().Unix()),
-		Type: "test",
-		Title: "VSP Alert System Test",
-		Message: "This is a test alert from VSP P4 Compliance Platform. Alert system is operational.",
+		ID:       fmt.Sprintf("ALT-TEST-%d", time.Now().Unix()),
+		Type:     "test",
+		Title:    "VSP Alert System Test",
+		Message:  "This is a test alert from VSP P4 Compliance Platform. Alert system is operational.",
 		Severity: "INFO",
-		SentAt: time.Now(),
-		Channel: "slack",
+		SentAt:   time.Now(),
+		Channel:  "slack",
 	}
 	if alertConfig.SlackWebhook != "" {
 		err := sendSlackAlert(alertConfig.SlackWebhook, alert.Title, alert.Message, "#36a64f")
@@ -179,7 +189,7 @@ func handleAlertTest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	alertHistory = append([]Alert{alert}, alertHistory...)
-	json.NewEncoder(w).Encode(map[string]interface{}{"status":"ok","alert":alert})
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "alert": alert})
 }
 
 // ── ConMon Report Generator ────────────────────────────────
@@ -188,7 +198,9 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	period := r.URL.Query().Get("period")
-	if period == "" { period = "monthly" }
+	if period == "" {
+		period = "monthly"
+	}
 
 	now := time.Now()
 	var start time.Time
@@ -210,8 +222,12 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 		for _, p := range pkg.POAMItems {
 			if p.Status == "open" || p.Status == "in_remediation" {
 				openPOAM++
-				if p.Severity == "CRITICAL" && p.Status == "open" { criticalOpen++ }
-			} else { closedPOAM++ }
+				if p.Severity == "CRITICAL" && p.Status == "open" {
+					criticalOpen++
+				}
+			} else {
+				closedPOAM++
+			}
 		}
 	}
 	rmfStore.mu.RUnlock()
@@ -221,7 +237,9 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 	for _, r := range pipeStore.Runs {
 		if r.StartedAt.After(start) {
 			totalRuns++
-			if r.Status == "pass" { passRuns++ }
+			if r.Status == "pass" {
+				passRuns++
+			}
 		}
 	}
 	pipeStore.mu.RUnlock()
@@ -235,7 +253,6 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 	}
 	pipeStore.mu.RUnlock()
 
-
 	// Load data that từ DB
 	conmonScore := 94
 	fedrampPct, cmmcPct, nistPct := 91.67, 86.67, 75.0
@@ -247,14 +264,32 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 		if p4SQLDB.QueryRow("SELECT summary FROM p4_pipeline_runs ORDER BY started_at DESC LIMIT 1").Scan(&summaryJSON) == nil {
 			var raw map[string]interface{}
 			if json.Unmarshal(summaryJSON, &raw) == nil {
-				if v, ok := raw["pass"].(float64); ok { controlsPass = int(v) }
-				if v, ok := raw["fail"].(float64); ok { controlsFail = int(v) }
-				if v, ok := raw["total"].(float64); ok { controlsTotal = int(v) }
+				if v, ok := raw["pass"].(float64); ok {
+					controlsPass = int(v)
+				}
+				if v, ok := raw["fail"].(float64); ok {
+					controlsFail = int(v)
+				}
+				if v, ok := raw["total"].(float64); ok {
+					controlsTotal = int(v)
+				}
 				driftEvents = controlsFail
 				if fw, ok := raw["frameworks"].(map[string]interface{}); ok {
-					if f, ok := fw["FedRAMP"].(map[string]interface{}); ok { if v, ok := f["percent"].(float64); ok { fedrampPct = v } }
-					if f, ok := fw["CMMC"].(map[string]interface{}); ok { if v, ok := f["percent"].(float64); ok { cmmcPct = v } }
-					if f, ok := fw["NIST"].(map[string]interface{}); ok { if v, ok := f["percent"].(float64); ok { nistPct = v } }
+					if f, ok := fw["FedRAMP"].(map[string]interface{}); ok {
+						if v, ok := f["percent"].(float64); ok {
+							fedrampPct = v
+						}
+					}
+					if f, ok := fw["CMMC"].(map[string]interface{}); ok {
+						if v, ok := f["percent"].(float64); ok {
+							cmmcPct = v
+						}
+					}
+					if f, ok := fw["NIST"].(map[string]interface{}); ok {
+						if v, ok := f["percent"].(float64); ok {
+							nistPct = v
+						}
+					}
 				}
 			}
 		}
@@ -275,7 +310,6 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 		"generated_at":   now.Format(time.RFC3339),
 		"generated_by":   "VSP Automated ConMon Engine",
 		"classification": "UNCLASSIFIED // FOR OFFICIAL USE ONLY",
-
 
 		"executive_summary": map[string]interface{}{
 			"p4_readiness":     p4Score,
@@ -313,12 +347,12 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 			"critical_cves":       criticalOpen,
 		},
 		"poam_summary": map[string]interface{}{
-			"total_open":          openPOAM,
-			"total_closed":        closedPOAM,
-			"critical_open":       criticalOpen,
-			"new_this_period":     3,
-			"closed_this_period":  0,
-			"overdue":             0,
+			"total_open":         openPOAM,
+			"total_closed":       closedPOAM,
+			"critical_open":      criticalOpen,
+			"new_this_period":    3,
+			"closed_this_period": 0,
+			"overdue":            0,
 		},
 		"incidents": map[string]interface{}{
 			"total":      0,
@@ -328,10 +362,10 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 			"sla_met":    true,
 		},
 		"rasp_summary": map[string]interface{}{
-			"attacks_blocked":   attacksBlocked,
-			"attacks_alerted":   12,
-			"top_attack_types":  []string{"SQL Injection", "SSRF", "Path Traversal", "XSS"},
-			"services_covered":  5,
+			"attacks_blocked":  attacksBlocked,
+			"attacks_alerted":  12,
+			"top_attack_types": []string{"SQL Injection", "SSRF", "Path Traversal", "XSS"},
+			"services_covered": 5,
 		},
 		"next_actions": []string{
 			"Schedule Q4 2025 annual 3PAO assessment (POAM-007)",
@@ -339,9 +373,9 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 			"Complete remaining 6% security awareness training",
 			"Update SSP for recent architecture changes",
 		},
-		"assessor":           "Coalfire (FedRAMP 3PAO)",
-		"isso":               "VSP ISSO",
-		"next_report_due":    now.AddDate(0, 1, 0).Format("2006-01-02"),
+		"assessor":        "Coalfire (FedRAMP 3PAO)",
+		"isso":            "VSP ISSO",
+		"next_report_due": now.AddDate(0, 1, 0).Format("2006-01-02"),
 	}
 
 	log.Printf("[P4] ConMon report generated — period: %s, P4: %d%%", period, p4Score)

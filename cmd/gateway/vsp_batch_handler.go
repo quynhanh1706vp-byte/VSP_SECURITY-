@@ -13,10 +13,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/vsp/platform/internal/api/handler"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/pipeline"
 	"github.com/vsp/platform/internal/store"
-	"github.com/vsp/platform/internal/api/handler"
 )
 
 // ── Structs ───────────────────────────────────────────────────────────────────
@@ -93,34 +93,60 @@ func newBatchHandler(db *store.DB, runsH *handler.Runs) *batchHandler {
 
 func (h *batchHandler) Submit(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
-	if !ok { jsonErr(w, "unauthorized", http.StatusUnauthorized); return }
+	if !ok {
+		jsonErr(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req batchScanRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonErr(w, "invalid request: "+err.Error(), http.StatusBadRequest); return
+		jsonErr(w, "invalid request: "+err.Error(), http.StatusBadRequest)
+		return
 	}
-	if len(req.Items) == 0 { jsonErr(w, "items: min 1 required", http.StatusBadRequest); return }
-	if len(req.Items) > 20 { jsonErr(w, "items: max 20 per batch", http.StatusBadRequest); return }
+	if len(req.Items) == 0 {
+		jsonErr(w, "items: min 1 required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Items) > 20 {
+		jsonErr(w, "items: max 20 per batch", http.StatusBadRequest)
+		return
+	}
 
 	parallel := req.Parallel
-	if parallel <= 0 { parallel = 3 }
-	if parallel > 5  { parallel = 5 }
+	if parallel <= 0 {
+		parallel = 3
+	}
+	if parallel > 5 {
+		parallel = 5
+	}
 
 	batchID := "BATCH_" + uuid.New().String()[:8]
 
 	jobs := make([]batchJobStatus, len(req.Items))
 	for i, item := range req.Items {
-		mode    := item.Mode;    if mode    == "" { mode    = "FULL" }
-		profile := item.Profile; if profile == "" { profile = "FAST" }
-		label   := item.Label;   if label   == "" { label   = fmt.Sprintf("Job %d — %s", i+1, mode) }
+		mode := item.Mode
+		if mode == "" {
+			mode = "FULL"
+		}
+		profile := item.Profile
+		if profile == "" {
+			profile = "FAST"
+		}
+		label := item.Label
+		if label == "" {
+			label = fmt.Sprintf("Job %d — %s", i+1, mode)
+		}
 		if item.Src == "" {
-			jsonErr(w, fmt.Sprintf("item[%d].src is required", i), http.StatusBadRequest); return
+			jsonErr(w, fmt.Sprintf("item[%d].src is required", i), http.StatusBadRequest)
+			return
 		}
 		if strings.ContainsAny(item.Src, ";&|`$<>{}\\") {
-			jsonErr(w, fmt.Sprintf("item[%d].src: contains illegal characters", i), http.StatusBadRequest); return
+			jsonErr(w, fmt.Sprintf("item[%d].src: contains illegal characters", i), http.StatusBadRequest)
+			return
 		}
 		if len(item.Src) > 500 {
-			jsonErr(w, fmt.Sprintf("item[%d].src: too long (max 500)", i), http.StatusBadRequest); return
+			jsonErr(w, fmt.Sprintf("item[%d].src: too long (max 500)", i), http.StatusBadRequest)
+			return
 		}
 		jobs[i] = batchJobStatus{
 			Index: i, Mode: mode, Profile: profile,
@@ -129,7 +155,9 @@ func (h *batchHandler) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	label := req.BatchLabel
-	if label == "" { label = fmt.Sprintf("Batch %s · %d jobs", batchID[6:], len(jobs)) }
+	if label == "" {
+		label = fmt.Sprintf("Batch %s · %d jobs", batchID[6:], len(jobs))
+	}
 
 	batch := &batchRecord{
 		BatchID: batchID, TenantID: claims.TenantID, Label: label,
@@ -146,7 +174,8 @@ func (h *batchHandler) Submit(w http.ResponseWriter, r *http.Request) {
 		batchID, claims.TenantID, label, len(jobs), parallel, req.FailFast,
 	)
 	if err != nil {
-		jsonErr(w, "db error: "+err.Error(), http.StatusInternalServerError); return
+		jsonErr(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	for _, job := range jobs {
@@ -199,7 +228,10 @@ func (h *batchHandler) runBatch(ctx context.Context, batchID string) {
 
 	for i := range batch.Jobs {
 		h.mu.RLock()
-		if batch.Status == "CANCELLED" { h.mu.RUnlock(); break }
+		if batch.Status == "CANCELLED" {
+			h.mu.RUnlock()
+			break
+		}
 		h.mu.RUnlock()
 
 		if batch.FailFast && cancelled {
@@ -242,15 +274,27 @@ func (h *batchHandler) runBatch(ctx context.Context, batchID string) {
 			job.RID = rid
 
 			if err != nil {
-				job.Status = "FAILED"; job.Gate = "—"; job.Error = err.Error()
+				job.Status = "FAILED"
+				job.Gate = "—"
+				job.Error = err.Error()
 				batch.Failed++
-				if failFast { cancelled = true }
+				if failFast {
+					cancelled = true
+				}
 			} else {
-				job.Status = "DONE"; job.Gate = gate; job.Findings = findings
+				job.Status = "DONE"
+				job.Gate = gate
+				job.Findings = findings
 				switch gate {
-				case "PASS": batch.Passed++
-				case "WARN": batch.Warned++
-				case "FAIL": batch.Failed++; if failFast { cancelled = true }
+				case "PASS":
+					batch.Passed++
+				case "WARN":
+					batch.Warned++
+				case "FAIL":
+					batch.Failed++
+					if failFast {
+						cancelled = true
+					}
 				}
 			}
 			batch.Done++
@@ -266,7 +310,9 @@ func (h *batchHandler) runBatch(ctx context.Context, batchID string) {
 
 			// Update job row
 			errStr := ""
-			if err != nil { errStr = err.Error() }
+			if err != nil {
+				errStr = err.Error()
+			}
 			h.pool.Exec(ctx, `
 				UPDATE batch_jobs SET
 				  rid=$1, status=$2, gate=$3, findings=$4, error=$5, done_at=$6
@@ -322,7 +368,9 @@ func (h *batchHandler) dispatchScan(ctx context.Context, tenantID, mode, profile
 			}
 		}
 		run, dbErr := h.db.GetRunByRID(ctx, tenantID, rid)
-		if dbErr != nil || run == nil { continue }
+		if dbErr != nil || run == nil {
+			continue
+		}
 		switch run.Status {
 		case "DONE":
 			return rid, run.Gate, run.TotalFindings, nil
@@ -340,7 +388,10 @@ func (h *batchHandler) dispatchScan(ctx context.Context, tenantID, mode, profile
 func (h *batchHandler) Status(w http.ResponseWriter, r *http.Request) {
 	batchID := chi.URLParam(r, "batch_id")
 	claims, ok := auth.FromContext(r.Context())
-	if !ok { jsonErr(w, "unauthorized", http.StatusUnauthorized); return }
+	if !ok {
+		jsonErr(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	// Try cache first (hot path during polling)
 	h.mu.RLock()
@@ -352,7 +403,9 @@ func (h *batchHandler) Status(w http.ResponseWriter, r *http.Request) {
 		if h.rdb != nil {
 			if rb, _ := h.rdb.Get(r.Context(), batchID); rb != nil && rb.TenantID == claims.TenantID {
 				batch = rb
-				h.mu.Lock(); h.cache[batchID] = rb; h.mu.Unlock()
+				h.mu.Lock()
+				h.cache[batchID] = rb
+				h.mu.Unlock()
 				inCache = true
 			}
 		}
@@ -360,16 +413,20 @@ func (h *batchHandler) Status(w http.ResponseWriter, r *http.Request) {
 			// Fallback: Load from DB
 			loaded, err := h.loadFromDB(r.Context(), claims.TenantID, batchID)
 			if err != nil || loaded == nil {
-				jsonErr(w, "batch not found: "+batchID, http.StatusNotFound); return
+				jsonErr(w, "batch not found: "+batchID, http.StatusNotFound)
+				return
 			}
 			batch = loaded
 		}
 	} else if batch.TenantID != claims.TenantID {
-		jsonErr(w, "batch not found: "+batchID, http.StatusNotFound); return
+		jsonErr(w, "batch not found: "+batchID, http.StatusNotFound)
+		return
 	}
 
 	pct := 0
-	if batch.Total > 0 { pct = batch.Done * 100 / batch.Total }
+	if batch.Total > 0 {
+		pct = batch.Done * 100 / batch.Total
+	}
 	jsonOK(w, map[string]any{"batch": batch, "progress": pct})
 }
 
@@ -389,7 +446,9 @@ func (h *batchHandler) loadFromDB(ctx context.Context, tenantID, batchID string)
 		&b.Parallel, &b.FailFast,
 		&b.CreatedAt, &b.StartedAt, &b.DoneAt,
 	)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 
 	// Load jobs
 	rows, err := h.pool.Query(ctx, `
@@ -397,7 +456,9 @@ func (h *batchHandler) loadFromDB(ctx context.Context, tenantID, batchID string)
 		       status, gate, findings, error, started_at, done_at
 		FROM batch_jobs WHERE batch_id=$1 AND tenant_id=$2
 		ORDER BY idx`, batchID, tenantID)
-	if err != nil { return &b, nil }
+	if err != nil {
+		return &b, nil
+	}
 	defer rows.Close()
 
 	for rows.Next() {
@@ -423,7 +484,10 @@ func (h *batchHandler) loadFromDB(ctx context.Context, tenantID, batchID string)
 func (h *batchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	batchID := chi.URLParam(r, "batch_id")
 	claims, ok := auth.FromContext(r.Context())
-	if !ok { jsonErr(w, "unauthorized", http.StatusUnauthorized); return }
+	if !ok {
+		jsonErr(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	// Try cache first
 	h.mu.Lock()
@@ -443,13 +507,19 @@ func (h *batchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 				`SELECT status, tenant_id FROM batch_runs WHERE batch_id=$1`, batchID,
 			).Scan(&status, &tenantID)
 			if err != nil {
-				h.mu.Unlock(); jsonErr(w, "batch not found", http.StatusNotFound); return
+				h.mu.Unlock()
+				jsonErr(w, "batch not found", http.StatusNotFound)
+				return
 			}
 			if tenantID != claims.TenantID {
-				h.mu.Unlock(); jsonErr(w, "batch not found", http.StatusNotFound); return
+				h.mu.Unlock()
+				jsonErr(w, "batch not found", http.StatusNotFound)
+				return
 			}
 			if status == "DONE" || status == "FAILED" {
-				h.mu.Unlock(); jsonErr(w, "batch already finished: "+status, http.StatusBadRequest); return
+				h.mu.Unlock()
+				jsonErr(w, "batch already finished: "+status, http.StatusBadRequest)
+				return
 			}
 			// Cancel via DB directly — no in-memory record to update
 			h.mu.Unlock()
@@ -463,10 +533,14 @@ func (h *batchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if batch.TenantID != claims.TenantID {
-		h.mu.Unlock(); jsonErr(w, "batch not found", http.StatusNotFound); return
+		h.mu.Unlock()
+		jsonErr(w, "batch not found", http.StatusNotFound)
+		return
 	}
 	if batch.Status == "DONE" || batch.Status == "FAILED" {
-		h.mu.Unlock(); jsonErr(w, "batch already finished: "+batch.Status, http.StatusBadRequest); return
+		h.mu.Unlock()
+		jsonErr(w, "batch already finished: "+batch.Status, http.StatusBadRequest)
+		return
 	}
 	batch.Status = "CANCELLED"
 	h.mu.Unlock()
@@ -483,7 +557,10 @@ func (h *batchHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 
 func (h *batchHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
-	if !ok { jsonErr(w, "unauthorized", http.StatusUnauthorized); return }
+	if !ok {
+		jsonErr(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	rows, err := h.pool.Query(r.Context(), `
 		SELECT batch_id, label, status, total, done, passed, warned, failed,
@@ -494,7 +571,10 @@ func (h *batchHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 		LIMIT 100`,
 		claims.TenantID,
 	)
-	if err != nil { jsonErr(w, "db error: "+err.Error(), http.StatusInternalServerError); return }
+	if err != nil {
+		jsonErr(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 
 	list := make([]map[string]any, 0)
@@ -512,10 +592,14 @@ func (h *batchHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 			&total, &done, &passed, &warned, &failed,
 			&parallel, &failFast,
 			&createdAt, &startedAt, &doneAt,
-		); err != nil { continue }
+		); err != nil {
+			continue
+		}
 
 		pct := 0
-		if total > 0 { pct = done * 100 / total }
+		if total > 0 {
+			pct = done * 100 / total
+		}
 
 		list = append(list, map[string]any{
 			"batch_id":   batchID,

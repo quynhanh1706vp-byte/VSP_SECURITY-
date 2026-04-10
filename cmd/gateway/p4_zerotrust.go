@@ -78,11 +78,11 @@ type APIPolicy struct {
 }
 
 type SBOMSummary struct {
-	Total      int      `json:"total"`
-	Critical   int      `json:"critical"`
-	High       int      `json:"high"`
+	Total      int       `json:"total"`
+	Critical   int       `json:"critical"`
+	High       int       `json:"high"`
 	LastScan   time.Time `json:"last_scan"`
-	Frameworks []string `json:"frameworks"`
+	Frameworks []string  `json:"frameworks"`
 }
 
 type ZeroTrustAppState struct {
@@ -102,19 +102,29 @@ type ZeroTrustAppState struct {
 var ztState = &ZeroTrustAppState{}
 
 func minInt(a, b int) int {
-	if a < b { return a }
+	if a < b {
+		return a
+	}
 	return b
 }
 
 func pillarStatus(score int) string {
-	if score >= 85 { return "green" }
-	if score >= 60 { return "amber" }
+	if score >= 85 {
+		return "green"
+	}
+	if score >= 60 {
+		return "amber"
+	}
 	return "red"
 }
 
 func pillarMaturity(score int) string {
-	if score >= 90 { return "Optimal" }
-	if score >= 70 { return "Advanced" }
+	if score >= 90 {
+		return "Optimal"
+	}
+	if score >= 70 {
+		return "Advanced"
+	}
 	return "Traditional"
 }
 
@@ -256,17 +266,30 @@ func recalcScoresLocked() {
 	allP4 := true
 	for _, p := range ztState.Pillars {
 		capT, capM := 0, 0
-		for _, c := range p.Capabilities { capT += c.Score; capM += c.MaxScore }
-		if capM > 0 { p.Score = capT * 100 / capM }
+		for _, c := range p.Capabilities {
+			capT += c.Score
+			capM += c.MaxScore
+		}
+		if capM > 0 {
+			p.Score = capT * 100 / capM
+		}
 		p.Status = pillarStatus(p.Score)
 		p.MaturityLevel = pillarMaturity(p.Score)
 		total += p.Score
 		count++
-		if p.Score < 85 { allP4 = false }
+		if p.Score < 85 {
+			allP4 = false
+		}
 	}
-	if count > 0 { ztState.OverallScore = total / count }
+	if count > 0 {
+		ztState.OverallScore = total / count
+	}
 	ztState.P4Achieved = allP4
-	if allP4 { ztState.P4Readiness = 100 } else { ztState.P4Readiness = ztState.OverallScore }
+	if allP4 {
+		ztState.P4Readiness = 100
+	} else {
+		ztState.P4Readiness = ztState.OverallScore
+	}
 	ztState.LastUpdated = time.Now()
 }
 
@@ -288,7 +311,10 @@ func handleZTMicroSeg(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Vary", "Origin")
 	if r.Method == http.MethodPost {
 		var rule MicroSegRule
-		if err := json.NewDecoder(r.Body).Decode(&rule); err != nil { http.Error(w, `{"error":"invalid request body"}`, 400); return }
+		if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, 400)
+			return
+		}
 		ztState.mu.Lock()
 		rule.ID = fmt.Sprintf("SEG-%03d", len(ztState.SegRules)+1)
 		rule.CreatedAt = time.Now()
@@ -297,7 +323,9 @@ func handleZTMicroSeg(w http.ResponseWriter, r *http.Request) {
 			for i := range p.Capabilities {
 				if p.Capabilities[i].ID == "A-1" {
 					p.Capabilities[i].Score = minInt(p.Capabilities[i].MaxScore, p.Capabilities[i].Score+1)
-					if p.Capabilities[i].Score >= p.Capabilities[i].MaxScore { p.Capabilities[i].Status = "implemented" }
+					if p.Capabilities[i].Score >= p.Capabilities[i].MaxScore {
+						p.Capabilities[i].Status = "implemented"
+					}
 				}
 			}
 		}
@@ -308,7 +336,9 @@ func handleZTMicroSeg(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": id})
 		return
 	}
-	ztState.mu.RLock(); rules := ztState.SegRules; ztState.mu.RUnlock()
+	ztState.mu.RLock()
+	rules := ztState.SegRules
+	ztState.mu.RUnlock()
 	json.NewEncoder(w).Encode(rules)
 }
 
@@ -341,7 +371,8 @@ func handleZTRASP(w http.ResponseWriter, r *http.Request) {
 func handleZTRASPCoverage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Vary", "Origin")
-	ztState.mu.RLock(); defer ztState.mu.RUnlock()
+	ztState.mu.RLock()
+	defer ztState.mu.RUnlock()
 	json.NewEncoder(w).Encode(ztState.RASPCoverage)
 }
 
@@ -350,7 +381,10 @@ func handleZTAPIPolicy(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Vary", "Origin")
 	if r.Method == http.MethodPost {
 		var pol APIPolicy
-		if err := json.NewDecoder(r.Body).Decode(&pol); err != nil { http.Error(w, `{"error":"invalid request body"}`, 400); return }
+		if err := json.NewDecoder(r.Body).Decode(&pol); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, 400)
+			return
+		}
 		ztState.mu.Lock()
 		pol.ID = fmt.Sprintf("POL-%03d", len(ztState.APIPolicies)+1)
 		pol.LastAudited = time.Now()
@@ -360,13 +394,16 @@ func handleZTAPIPolicy(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": pol.ID})
 		return
 	}
-	ztState.mu.RLock(); policies := ztState.APIPolicies; ztState.mu.RUnlock()
+	ztState.mu.RLock()
+	policies := ztState.APIPolicies
+	ztState.mu.RUnlock()
 	json.NewEncoder(w).Encode(policies)
 }
 
 func handleZTSBOM(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Vary", "Origin")
-	ztState.mu.RLock(); defer ztState.mu.RUnlock()
+	ztState.mu.RLock()
+	defer ztState.mu.RUnlock()
 	json.NewEncoder(w).Encode(ztState.SBOM)
 }

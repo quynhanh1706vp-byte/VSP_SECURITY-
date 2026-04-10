@@ -13,7 +13,9 @@ import (
 )
 
 func getEnvOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" { return v }
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return def
 }
 
@@ -47,14 +49,14 @@ func main() {
 	fmt.Fprintln(os.Stderr, "WARNING: seeding development users with weak passwords — never run in production!")
 
 	// Users to seed — passwords from env or defaults (dev only)
-	adminPass   := getEnvOrDefault("SEED_ADMIN_PASS",   "admin123")
+	adminPass := getEnvOrDefault("SEED_ADMIN_PASS", "admin123")
 	analystPass := getEnvOrDefault("SEED_ANALYST_PASS", "analyst123")
-	devPass     := getEnvOrDefault("SEED_DEV_PASS",     "dev123")
+	devPass := getEnvOrDefault("SEED_DEV_PASS", "dev123")
 	auditorPass := getEnvOrDefault("SEED_AUDITOR_PASS", "auditor123")
 	seeds := []struct{ email, password, role string }{
-		{"admin@vsp.local",   adminPass,   "admin"},
+		{"admin@vsp.local", adminPass, "admin"},
 		{"analyst@vsp.local", analystPass, "analyst"},
-		{"dev@vsp.local",     devPass,     "dev"},
+		{"dev@vsp.local", devPass, "dev"},
 		{"auditor@vsp.local", auditorPass, "auditor"},
 	}
 

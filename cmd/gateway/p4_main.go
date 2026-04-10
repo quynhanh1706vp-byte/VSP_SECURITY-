@@ -13,7 +13,9 @@ import (
 
 func p4GetEnvAPIKey() string {
 	for _, key := range []string{"P4_API_KEY", "VSP_P4_API_KEY", "INTERNAL_API_KEY"} {
-		if v := os.Getenv(key); v != "" { return v }
+		if v := os.Getenv(key); v != "" {
+			return v
+		}
 	}
 	return ""
 }
@@ -26,19 +28,25 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
-		w.Header().Set("Access-Control-Allow-Methods","GET,POST,OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers","Content-Type,Authorization,X-API-Key")
-		if r.Method==http.MethodOptions{w.WriteHeader(204);return}
-		bearer:=strings.TrimPrefix(r.Header.Get("Authorization"),"Bearer ")
-		if bearer==""{bearer=r.URL.Query().Get("token")}
-		apiKey:=r.Header.Get("X-API-Key")
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization,X-API-Key")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(204)
+			return
+		}
+		bearer := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if bearer == "" {
+			bearer = r.URL.Query().Get("token")
+		}
+		apiKey := r.Header.Get("X-API-Key")
 		// No Referer-based bypass — Referer headers can be spoofed by clients
 		// Only accept: valid Bearer JWT or configured API key from env
 		validAPIKey := p4GetEnvAPIKey()
 		isValidAPIKey := apiKey != "" && validAPIKey != "" && apiKey == validAPIKey
-		if bearer==""&&!isValidAPIKey{
-			w.Header().Set("Content-Type","application/json"); w.WriteHeader(401)
-			json.NewEncoder(w).Encode(map[string]string{"error":"authentication required"})
+		if bearer == "" && !isValidAPIKey {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(401)
+			json.NewEncoder(w).Encode(map[string]string{"error": "authentication required"})
 			return
 		}
 		// Validate JWT signature nếu có bearer token
@@ -46,53 +54,57 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			// Parse và validate JWT
 			parts := strings.Split(bearer, ".")
 			if len(parts) != 3 {
-				w.Header().Set("Content-Type","application/json")
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error":"invalid token format"})
+				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token format"})
 				return
 			}
 			// Decode payload
 			payload := parts[1]
 			// Add padding if needed
-			for len(payload)%4 != 0 { payload += "=" }
+			for len(payload)%4 != 0 {
+				payload += "="
+			}
 			decoded, err := base64.StdEncoding.DecodeString(payload)
 			if err != nil {
 				// Try URL encoding
 				decoded, err = base64.RawURLEncoding.DecodeString(parts[1])
 			}
 			if err != nil {
-				w.Header().Set("Content-Type","application/json")
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error":"invalid token encoding"})
+				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token encoding"})
 				return
 			}
 			var claims map[string]interface{}
 			if err := json.Unmarshal(decoded, &claims); err != nil {
-				w.Header().Set("Content-Type","application/json")
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error":"invalid token claims"})
+				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token claims"})
 				return
 			}
 			// Check expiry
 			if exp, ok := claims["exp"].(float64); ok {
 				if time.Now().Unix() > int64(exp) {
-					w.Header().Set("Content-Type","application/json")
+					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(401)
-					json.NewEncoder(w).Encode(map[string]string{"error":"token expired"})
+					json.NewEncoder(w).Encode(map[string]string{"error": "token expired"})
 					return
 				}
 			}
 			// Must have sub or email claim
 			if claims["sub"] == nil && claims["email"] == nil {
-				w.Header().Set("Content-Type","application/json")
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error":"invalid token claims"})
+				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token claims"})
 				return
 			}
 		}
 		reqID := r.Header.Get("X-Request-ID")
-		if reqID == "" { reqID = fmt.Sprintf("p4-%d", time.Now().UnixNano()) }
-		r.Header.Set("X-P4-Auth-Time",time.Now().Format(time.RFC3339))
+		if reqID == "" {
+			reqID = fmt.Sprintf("p4-%d", time.Now().UnixNano())
+		}
+		r.Header.Set("X-P4-Auth-Time", time.Now().Format(time.RFC3339))
 		// Write audit log
 		if p4SQLDB != nil {
 			auditActor := bearer
@@ -111,20 +123,24 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				log.Printf("[P4-AUDIT] DB write failed: %v", auditErr)
 			}
 		}
-		next.ServeHTTP(w,r)
+		next.ServeHTTP(w, r)
 	}
 }
-func p4Health(w http.ResponseWriter,r *http.Request){
-	w.Header().Set("Content-Type","application/json"); w.Header().Set("Access-Control-Allow-Origin","*")
-	fmt.Fprintf(w,`{"status":"ok","module":"VSP-P4","version":"2.0.0","p4_achieved":true}`)
+func p4Health(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	fmt.Fprintf(w, `{"status":"ok","module":"VSP-P4","version":"2.0.0","p4_achieved":true}`)
 }
-func init(){
+func init() {
 	initZeroTrustState()
-	pkg:=seedDefaultATOPackage(); rmfStore.mu.Lock(); rmfStore.packages["VSP-DOD-2025-001"]=pkg; rmfStore.mu.Unlock()
+	pkg := seedDefaultATOPackage()
+	rmfStore.mu.Lock()
+	rmfStore.packages["VSP-DOD-2025-001"] = pkg
+	rmfStore.mu.Unlock()
 	seedPipelineStore()
-	log.Printf("[P4] Initialized — P4 Readiness: %d%%",ztState.P4Readiness)
+	log.Printf("[P4] Initialized — P4 Readiness: %d%%", ztState.P4Readiness)
 }
-func RegisterP4Routes(mux *http.ServeMux){
+func RegisterP4Routes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/p4/health", p4SecurityHeaders(p4Health))
 	mux.HandleFunc("/api/p4/rmf", p4SecurityHeaders(p4AuthMiddleware(handleRMFGet)))
 	mux.HandleFunc("/api/p4/rmf/task", p4SecurityHeaders(p4AuthMiddleware(handleRMFTaskUpdate)))

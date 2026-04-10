@@ -37,7 +37,9 @@ func p4SecurityHeaders(next http.HandlerFunc) http.HandlerFunc {
 		if strings.HasPrefix(r.URL.Path, "/api/p4/") {
 			// Note: X-Auth-User is client-controlled — for audit only, not security decisions
 			authUser := r.Header.Get("X-Auth-User") + "(client-header)"
-			if authUser == "(client-header)" { authUser = "anonymous" }
+			if authUser == "(client-header)" {
+				authUser = "anonymous"
+			}
 			log.Printf("[P4-AUDIT] %s %s by %s from %s req=%s",
 				r.Method, r.URL.Path, authUser, r.RemoteAddr, reqID)
 			// Write to audit DB — capture vars before goroutine
