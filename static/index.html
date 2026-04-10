@@ -2876,9 +2876,12 @@ async function govLoginSubmit() {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
+    var csrfToken = document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');});
+    csrfToken = csrfToken ? csrfToken.split('=')[1] : '';
     var r = await fetch('/api/v1/auth/login', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json', 'X-CSRF-Token': csrfToken},
       body: JSON.stringify({email, password})
     });
 
@@ -2888,7 +2891,7 @@ async function govLoginSubmit() {
     }
 
     var data = await r.json();
-    window.TOKEN = data.token;
+    // CWE-522: raw JWT NOT stored in JS — httpOnly cookie used
     // httpOnly cookie is set by server (cannot be accessed via JS — XSS safe)
     // localStorage kept for Authorization: Bearer header in API fetch calls
     // If migrating to full cookie-only, remove this line and update all fetch() calls
