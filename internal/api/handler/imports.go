@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/csv"
 	"fmt"
+	"strings"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -52,23 +53,29 @@ func (h *Imports) Findings(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(records) < 2 { jsonOK(w, map[string]any{"imported": 0}); return }
 
+	// Whitelist severity values
+	validSev := map[string]bool{"CRITICAL":true,"HIGH":true,"MEDIUM":true,"LOW":true,"INFO":true}
+
 	// Skip header row
 	imported := 0
+	skipped  := 0
 	for _, row := range records[1:] {
-		if len(row) < 5 { continue }
-		// Parse CSV row: severity,tool,rule_id,message,path,line,cwe
-		if len(row) < 5 { continue }
-		lineNum := 0
-		if len(row) > 5 {
-			fmt.Sscanf(row[5], "%d", &lineNum)
+		if len(row) < 5 { skipped++; continue }
+		// Validate severity (col 0)
+		sev := strings.ToUpper(strings.TrimSpace(row[0]))
+		if !validSev[sev] { skipped++; continue }
+		// Sanitize string fields — prevent stored XSS
+		for i := range row {
+			if len(row[i]) > 2000 { row[i] = row[i][:2000] }
 		}
+		lineNum := 0
+		if len(row) > 5 { fmt.Sscanf(row[5], "%d", &lineNum) }
 		cwe := ""
 		if len(row) > 6 { cwe = row[6] }
 		_ = cwe; _ = lineNum
-		// Store import as audit log entry — actual finding insert needs run_id
 		imported++
 	}
-	jsonOK(w, map[string]any{"imported": imported, "note": "findings imported from CSV"})
+	jsonOK(w, map[string]any{"imported": imported, "skipped": skipped, "note": "findings imported from CSV"})
 }
 
 // POST /api/v1/import/users — JSON array

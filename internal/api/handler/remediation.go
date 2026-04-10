@@ -62,6 +62,13 @@ func (h *Remediation) Upsert(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Status == "" { req.Status = "open" }
 	if req.Priority == "" { req.Priority = "P3" }
+	// Validate TicketURL — chặn SSRF + chỉ cho phép http/https
+	if req.TicketURL != "" {
+		if err := validateScanURL(req.TicketURL); err != nil {
+			jsonError(w, "invalid ticket_url: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	rem, err := h.DB.UpsertRemediation(r.Context(), store.Remediation{
 		FindingID: fid,
 		TenantID:  claims.TenantID,
