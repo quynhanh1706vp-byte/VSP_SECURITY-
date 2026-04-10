@@ -9081,7 +9081,7 @@ async function loadEvidenceLocker() {
           +'<td style="padding:5px 6px">'
           +(isFrozen
             ? '<span style="font-size:9px;color:var(--green)">✓ Signed</span>'
-            : '<button class="btn btn-ghost" style="font-size:9px;padding:1px 6px" onclick="freezeEvidence(''+id+'')">Freeze</button>')
+            : '<button class="btn btn-ghost" style="font-size:9px;padding:1px 6px" onclick="freezeEvidence(this.dataset.id)" data-id="'+id+'">Freeze</button>')
           +'</td></tr>';
       }).join('');
     }
