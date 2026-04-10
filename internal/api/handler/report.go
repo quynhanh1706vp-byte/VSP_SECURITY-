@@ -15,8 +15,10 @@ type Report struct{ DB *store.DB }
 
 var reportTmpl = template.Must(template.New("report").Funcs(template.FuncMap{
 	"sevColor": func(s string) string {
-		m := map[string]string{"CRITICAL":"#dc2626","HIGH":"#ea580c","MEDIUM":"#d97706","LOW":"#65a30d","INFO":"#6b7280"}
-		if c, ok := m[s]; ok { return c }
+		m := map[string]string{"CRITICAL": "#dc2626", "HIGH": "#ea580c", "MEDIUM": "#d97706", "LOW": "#65a30d", "INFO": "#6b7280"}
+		if c, ok := m[s]; ok {
+			return c
+		}
 		return "#6b7280"
 	},
 	"fmtTime": func(t time.Time) string { return t.Format("2006-01-02 15:04:05") },
@@ -87,19 +89,30 @@ func (h *Report) HTML(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
 	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
-	if err != nil || run == nil { jsonError(w, "run not found", http.StatusNotFound); return }
+	if err != nil || run == nil {
+		jsonError(w, "run not found", http.StatusNotFound)
+		return
+	}
 
 	findings, _, _ := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{RunID: run.ID, Limit: 1000})
 	var rf []store.Finding
-	for _, f := range findings { if f.RunID == run.ID { rf = append(rf, f) } }
+	for _, f := range findings {
+		if f.RunID == run.ID {
+			rf = append(rf, f)
+		}
+	}
 
 	data := reportData{Run: run, Findings: rf}
 	for _, f := range rf {
 		switch f.Severity {
-		case "CRITICAL": data.Summary.Critical++
-		case "HIGH":     data.Summary.High++
-		case "MEDIUM":   data.Summary.Medium++
-		case "LOW":      data.Summary.Low++
+		case "CRITICAL":
+			data.Summary.Critical++
+		case "HIGH":
+			data.Summary.High++
+		case "MEDIUM":
+			data.Summary.Medium++
+		case "LOW":
+			data.Summary.Low++
 		}
 	}
 

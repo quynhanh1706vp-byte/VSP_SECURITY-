@@ -27,19 +27,22 @@ func TestHash_ChangesWithFields(t *testing.T) {
 	h1 := Hash(base)
 
 	// Change action
-	e2 := base; e2.Action = "LOGOUT"
+	e2 := base
+	e2.Action = "LOGOUT"
 	if Hash(e2) == h1 {
 		t.Error("hash should change when Action changes")
 	}
 
 	// Change seq
-	e3 := base; e3.Seq = 2
+	e3 := base
+	e3.Seq = 2
 	if Hash(e3) == h1 {
 		t.Error("hash should change when Seq changes")
 	}
 
 	// Change prev_hash (chain integrity)
-	e4 := base; e4.PrevHash = "abc123"
+	e4 := base
+	e4.PrevHash = "abc123"
 	if Hash(e4) == h1 {
 		t.Error("hash should change when PrevHash changes")
 	}
@@ -62,7 +65,8 @@ func TestHash_ChainIntegrity(t *testing.T) {
 	}
 
 	// Tampering detection: change e2, h3 will mismatch
-	e2tampered := e2; e2tampered.Action = "ADMIN_DELETE"
+	e2tampered := e2
+	e2tampered.Action = "ADMIN_DELETE"
 	h2tampered := Hash(e2tampered)
 	if h2tampered == h2 {
 		t.Error("tampered entry should produce different hash")

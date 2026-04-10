@@ -2,10 +2,10 @@ package handler
 
 import (
 	"encoding/csv"
-	"fmt"
-	"strings"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/vsp/platform/internal/auth"
@@ -19,15 +19,19 @@ func (h *Imports) Policies(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	var rules []store.PolicyRule
 	if err := json.NewDecoder(r.Body).Decode(&rules); err != nil {
-		jsonError(w, "invalid JSON", http.StatusBadRequest); return
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
 	}
 	if len(rules) > 50 {
-		jsonError(w, "too many rules: max 50 per import", http.StatusBadRequest); return
+		jsonError(w, "too many rules: max 50 per import", http.StatusBadRequest)
+		return
 	}
 	var imported int
 	for _, rule := range rules {
 		rule.TenantID = claims.TenantID
-		if _, err := h.DB.CreatePolicyRule(r.Context(), rule); err == nil { imported++ }
+		if _, err := h.DB.CreatePolicyRule(r.Context(), rule); err == nil {
+			imported++
+		}
 	}
 	jsonOK(w, map[string]any{"imported": imported, "total": len(rules)})
 }
@@ -36,7 +40,10 @@ func (h *Imports) Policies(w http.ResponseWriter, r *http.Request) {
 func (h *Imports) Findings(w http.ResponseWriter, r *http.Request) {
 	r.ParseMultipartForm(10 << 20)
 	file, _, err := r.FormFile("file")
-	if err != nil { jsonError(w, "file required", http.StatusBadRequest); return }
+	if err != nil {
+		jsonError(w, "file required", http.StatusBadRequest)
+		return
+	}
 	defer file.Close()
 
 	cr := csv.NewReader(file)
@@ -44,35 +51,53 @@ func (h *Imports) Findings(w http.ResponseWriter, r *http.Request) {
 	var records [][]string
 	for {
 		row, err := cr.Read()
-		if err != nil { break }
+		if err != nil {
+			break
+		}
 		records = append(records, row)
 		if len(records) > 10001 { // max 10000 data rows + header
 			jsonError(w, "CSV too large: max 10000 rows", http.StatusBadRequest)
 			return
 		}
 	}
-	if len(records) < 2 { jsonOK(w, map[string]any{"imported": 0}); return }
+	if len(records) < 2 {
+		jsonOK(w, map[string]any{"imported": 0})
+		return
+	}
 
 	// Whitelist severity values
-	validSev := map[string]bool{"CRITICAL":true,"HIGH":true,"MEDIUM":true,"LOW":true,"INFO":true}
+	validSev := map[string]bool{"CRITICAL": true, "HIGH": true, "MEDIUM": true, "LOW": true, "INFO": true}
 
 	// Skip header row
 	imported := 0
-	skipped  := 0
+	skipped := 0
 	for _, row := range records[1:] {
-		if len(row) < 5 { skipped++; continue }
+		if len(row) < 5 {
+			skipped++
+			continue
+		}
 		// Validate severity (col 0)
 		sev := strings.ToUpper(strings.TrimSpace(row[0]))
-		if !validSev[sev] { skipped++; continue }
+		if !validSev[sev] {
+			skipped++
+			continue
+		}
 		// Sanitize string fields — prevent stored XSS
 		for i := range row {
-			if len(row[i]) > 2000 { row[i] = row[i][:2000] }
+			if len(row[i]) > 2000 {
+				row[i] = row[i][:2000]
+			}
 		}
 		lineNum := 0
-		if len(row) > 5 { fmt.Sscanf(row[5], "%d", &lineNum) }
+		if len(row) > 5 {
+			fmt.Sscanf(row[5], "%d", &lineNum)
+		}
 		cwe := ""
-		if len(row) > 6 { cwe = row[6] }
-		_ = cwe; _ = lineNum
+		if len(row) > 6 {
+			cwe = row[6]
+		}
+		_ = cwe
+		_ = lineNum
 		imported++
 	}
 	jsonOK(w, map[string]any{"imported": imported, "skipped": skipped, "note": "findings imported from CSV"})
@@ -86,15 +111,18 @@ func (h *Imports) Users(w http.ResponseWriter, r *http.Request) {
 		Name  string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&users); err != nil {
-		jsonError(w, "invalid JSON", http.StatusBadRequest); return
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
 	}
 	if len(users) > 100 {
-		jsonError(w, "too many users: max 100 per import", http.StatusBadRequest); return
+		jsonError(w, "too many users: max 100 per import", http.StatusBadRequest)
+		return
 	}
-	validRoles := map[string]bool{"admin":true,"analyst":true,"dev":true,"auditor":true}
+	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
 	for _, u := range users {
 		if u.Role != "" && !validRoles[u.Role] {
-			jsonError(w, "invalid role: "+u.Role, http.StatusBadRequest); return
+			jsonError(w, "invalid role: "+u.Role, http.StatusBadRequest)
+			return
 		}
 	}
 	jsonOK(w, map[string]any{

@@ -32,7 +32,7 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 		"--source", opts.Src,
 		"--report-format", "json",
 		"--report-path", "/dev/stdout",
-		"--no-git",   // scan files directly, not git history
+		"--no-git", // scan files directly, not git history
 		"--exit-code", "0",
 	}
 	if extra, ok := opts.ExtraArgs["gitleaks"]; ok {
@@ -55,14 +55,14 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 // ── Parser ────────────────────────────────────────────────────────────────────
 
 type gitleaksLeak struct {
-	Description string `json:"Description"`
-	StartLine   int    `json:"StartLine"`
-	File        string `json:"File"`
-	RuleID      string `json:"RuleID"`
+	Description string   `json:"Description"`
+	StartLine   int      `json:"StartLine"`
+	File        string   `json:"File"`
+	RuleID      string   `json:"RuleID"`
 	Tags        []string `json:"Tags"`
-	Match       string `json:"Match"`  // masked by gitleaks
-	Commit      string `json:"Commit"`
-	Author      string `json:"Author"`
+	Match       string   `json:"Match"` // masked by gitleaks
+	Commit      string   `json:"Commit"`
+	Author      string   `json:"Author"`
 }
 
 func parse(data []byte) ([]scanner.Finding, error) {

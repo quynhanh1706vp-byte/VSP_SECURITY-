@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
-	"net/http"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -22,11 +22,11 @@ type InternalScan struct {
 }
 
 type ScanCompletePayload struct {
-	RID        string           `json:"rid"`
-	TenantID   string           `json:"tenant_id"`
-	Findings   []store.Finding  `json:"findings"`
+	RID        string            `json:"rid"`
+	TenantID   string            `json:"tenant_id"`
+	Findings   []store.Finding   `json:"findings"`
 	ToolErrors map[string]string `json:"tool_errors"`
-	DurationMs int64            `json:"duration_ms"`
+	DurationMs int64             `json:"duration_ms"`
 }
 
 func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +84,9 @@ func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
 	hasSecrets := false
 	for _, f := range payload.Findings {
 		sev[f.Severity]++
-		if f.Tool == "gitleaks" || f.Tool == "secretcheck" { hasSecrets = true }
+		if f.Tool == "gitleaks" || f.Tool == "secretcheck" {
+			hasSecrets = true
+		}
 	}
 	s := scanner.Summary{
 		Critical:   sev["CRITICAL"],

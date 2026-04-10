@@ -1,9 +1,9 @@
 package codeql
 
 import (
+	"context"
 	"os"
 	"path/filepath"
-	"context"
 	"testing"
 
 	"github.com/vsp/platform/internal/scanner"

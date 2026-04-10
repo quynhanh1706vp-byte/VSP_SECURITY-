@@ -92,19 +92,23 @@ func (h *Report) ExecutivePDF(w http.ResponseWriter, r *http.Request) {
 // ── Executive data model ─────────────────────────────────────────────────────
 
 type execData struct {
-	Run            *store.Run
-	GeneratedAt    string
-	RiskScore      int
-	RiskLevel      string
-	RiskColor      string
-	Summary        execSummary
-	TopFindings    []store.Finding
-	ToolBreakdown  []toolStat
+	Run             *store.Run
+	GeneratedAt     string
+	RiskScore       int
+	RiskLevel       string
+	RiskColor       string
+	Summary         execSummary
+	TopFindings     []store.Finding
+	ToolBreakdown   []toolStat
 	Recommendations []string
 }
 
 type execSummary struct{ Critical, High, Medium, Low, Total int }
-type toolStat    struct{ Tool string; Count int; Pct int }
+type toolStat struct {
+	Tool  string
+	Count int
+	Pct   int
+}
 
 func buildExecData(run *store.Run, findings []store.Finding) execData {
 	d := execData{
@@ -115,10 +119,14 @@ func buildExecData(run *store.Run, findings []store.Finding) execData {
 	toolMap := map[string]int{}
 	for _, f := range findings {
 		switch f.Severity {
-		case "CRITICAL": d.Summary.Critical++
-		case "HIGH":     d.Summary.High++
-		case "MEDIUM":   d.Summary.Medium++
-		case "LOW":      d.Summary.Low++
+		case "CRITICAL":
+			d.Summary.Critical++
+		case "HIGH":
+			d.Summary.High++
+		case "MEDIUM":
+			d.Summary.Medium++
+		case "LOW":
+			d.Summary.Low++
 		}
 		toolMap[f.Tool]++
 	}
@@ -127,26 +135,36 @@ func buildExecData(run *store.Run, findings []store.Finding) execData {
 	// Risk score 0-100 (lower = safer)
 	score := d.Summary.Critical*25 + d.Summary.High*10 +
 		d.Summary.Medium*3 + d.Summary.Low*1
-	if score > 100 { score = 100 }
+	if score > 100 {
+		score = 100
+	}
 	d.RiskScore = score
 	switch {
-	case score >= 75: d.RiskLevel, d.RiskColor = "CRITICAL", "#dc2626"
-	case score >= 50: d.RiskLevel, d.RiskColor = "HIGH",     "#ea580c"
-	case score >= 25: d.RiskLevel, d.RiskColor = "MEDIUM",   "#d97706"
-	default:          d.RiskLevel, d.RiskColor = "LOW",      "#16a34a"
+	case score >= 75:
+		d.RiskLevel, d.RiskColor = "CRITICAL", "#dc2626"
+	case score >= 50:
+		d.RiskLevel, d.RiskColor = "HIGH", "#ea580c"
+	case score >= 25:
+		d.RiskLevel, d.RiskColor = "MEDIUM", "#d97706"
+	default:
+		d.RiskLevel, d.RiskColor = "LOW", "#16a34a"
 	}
 
 	// Top 10 critical/high findings
 	for _, f := range findings {
 		if f.Severity == "CRITICAL" || f.Severity == "HIGH" {
 			d.TopFindings = append(d.TopFindings, f)
-			if len(d.TopFindings) >= 10 { break }
+			if len(d.TopFindings) >= 10 {
+				break
+			}
 		}
 	}
 
 	// Tool breakdown
 	total := len(findings)
-	if total == 0 { total = 1 }
+	if total == 0 {
+		total = 1
+	}
 	for tool, cnt := range toolMap {
 		d.ToolBreakdown = append(d.ToolBreakdown, toolStat{
 			Tool:  tool,
@@ -198,7 +216,9 @@ var execTmpl = template.Must(template.New("exec").Funcs(template.FuncMap{
 			"CRITICAL": "#dc2626", "HIGH": "#ea580c",
 			"MEDIUM": "#d97706", "LOW": "#16a34a",
 		}
-		if c, ok := m[s]; ok { return c }
+		if c, ok := m[s]; ok {
+			return c
+		}
 		return "#6b7280"
 	},
 	"barWidth": func(pct int) string { return fmt.Sprintf("%d%%", pct) },

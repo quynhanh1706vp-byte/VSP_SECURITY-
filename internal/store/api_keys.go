@@ -54,7 +54,9 @@ func (db *DB) ListAPIKeys(ctx context.Context, tenantID string) ([]APIKey, error
 		if err != nil {
 			return nil, err
 		}
-		if k == nil { continue }
+		if k == nil {
+			continue
+		}
 		keys = append(keys, *k)
 	}
 	return keys, nil

@@ -21,13 +21,13 @@ var DefaultPolicy = LicensePolicy{
 }
 
 type Component struct {
-	Name          string  `json:"name"`
-	Version       string  `json:"version"`
-	License       string  `json:"license"`
-	Type          string  `json:"type"`
-	PolicyStatus  string  `json:"policy_status"`
-	RiskLevel     string  `json:"risk_level"`
-	NTIACompliant bool    `json:"ntia_compliant"`
+	Name          string `json:"name"`
+	Version       string `json:"version"`
+	License       string `json:"license"`
+	Type          string `json:"type"`
+	PolicyStatus  string `json:"policy_status"`
+	RiskLevel     string `json:"risk_level"`
+	NTIACompliant bool   `json:"ntia_compliant"`
 }
 
 type ScanResult struct {
@@ -60,12 +60,18 @@ func (s *Scanner) Scan(projectPath string) (*ScanResult, error) {
 		components[i].PolicyStatus = s.checkPolicy(components[i].License)
 		components[i].RiskLevel = policyToRisk(components[i].PolicyStatus)
 		components[i].NTIACompliant = components[i].License != "" && components[i].License != "UNKNOWN"
-		if components[i].NTIACompliant { ntia++ }
+		if components[i].NTIACompliant {
+			ntia++
+		}
 		switch components[i].PolicyStatus {
-		case "allowed":    result.Allowed++
-		case "restricted": result.Restricted++
-		case "forbidden":  result.Forbidden++
-		default:           result.Unknown++
+		case "allowed":
+			result.Allowed++
+		case "restricted":
+			result.Restricted++
+		case "forbidden":
+			result.Forbidden++
+		default:
+			result.Unknown++
 		}
 	}
 	if result.Total > 0 {
@@ -76,19 +82,31 @@ func (s *Scanner) Scan(projectPath string) (*ScanResult, error) {
 
 func (s *Scanner) scanGoModules(projectPath string) ([]Component, error) {
 	f, err := os.Open(filepath.Join(projectPath, "go.mod"))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer f.Close()
 	var comps []Component
 	sc := bufio.NewScanner(f)
 	inReq := false
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
-		if line == "require (" { inReq = true; continue }
-		if line == ")" { inReq = false; continue }
-		if !inReq && !strings.HasPrefix(line, "require ") { continue }
+		if line == "require (" {
+			inReq = true
+			continue
+		}
+		if line == ")" {
+			inReq = false
+			continue
+		}
+		if !inReq && !strings.HasPrefix(line, "require ") {
+			continue
+		}
 		line = strings.TrimPrefix(line, "require ")
 		parts := strings.Fields(line)
-		if len(parts) < 2 || strings.HasPrefix(parts[0], "//") { continue }
+		if len(parts) < 2 || strings.HasPrefix(parts[0], "//") {
+			continue
+		}
 		ver := strings.TrimSuffix(parts[1], "// indirect")
 		comps = append(comps, Component{
 			Name: parts[0], Version: strings.TrimSpace(ver),
@@ -100,12 +118,16 @@ func (s *Scanner) scanGoModules(projectPath string) ([]Component, error) {
 
 func (s *Scanner) scanNPM(projectPath string) ([]Component, error) {
 	f, err := os.Open(filepath.Join(projectPath, "package.json"))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer f.Close()
 	var pkg struct {
 		Dependencies map[string]string `json:"dependencies"`
 	}
-	if err := json.NewDecoder(f).Decode(&pkg); err != nil { return nil, err }
+	if err := json.NewDecoder(f).Decode(&pkg); err != nil {
+		return nil, err
+	}
 	var comps []Component
 	for name, ver := range pkg.Dependencies {
 		comps = append(comps, Component{Name: name, Version: ver, License: "UNKNOWN", Type: "npm"})
@@ -114,26 +136,38 @@ func (s *Scanner) scanNPM(projectPath string) ([]Component, error) {
 }
 
 func (s *Scanner) checkPolicy(license string) string {
-	if license == "" || license == "UNKNOWN" { return "unknown" }
+	if license == "" || license == "UNKNOWN" {
+		return "unknown"
+	}
 	up := strings.ToUpper(license)
 	for _, f := range s.policy.Forbidden {
-		if strings.Contains(up, strings.ToUpper(f)) { return "forbidden" }
+		if strings.Contains(up, strings.ToUpper(f)) {
+			return "forbidden"
+		}
 	}
 	for _, r := range s.policy.Restricted {
-		if strings.Contains(up, strings.ToUpper(r)) { return "restricted" }
+		if strings.Contains(up, strings.ToUpper(r)) {
+			return "restricted"
+		}
 	}
 	for _, a := range s.policy.Allowed {
-		if strings.Contains(up, strings.ToUpper(a)) { return "allowed" }
+		if strings.Contains(up, strings.ToUpper(a)) {
+			return "allowed"
+		}
 	}
 	return "unknown"
 }
 
 func policyToRisk(status string) string {
 	switch status {
-	case "forbidden":  return "CRITICAL"
-	case "restricted": return "MEDIUM"
-	case "allowed":    return "LOW"
-	default:           return "INFO"
+	case "forbidden":
+		return "CRITICAL"
+	case "restricted":
+		return "MEDIUM"
+	case "allowed":
+		return "LOW"
+	default:
+		return "INFO"
 	}
 }
 
@@ -150,7 +184,9 @@ func guessGoLicense(module string) string {
 		"github.com/prometheus/client": "Apache-2.0",
 	}
 	for prefix, lic := range known {
-		if strings.HasPrefix(module, prefix) { return lic }
+		if strings.HasPrefix(module, prefix) {
+			return lic
+		}
 	}
 	return "UNKNOWN"
 }

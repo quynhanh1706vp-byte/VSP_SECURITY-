@@ -13,7 +13,7 @@ import (
 
 type Runner struct{ checker *Checker }
 
-func NewRunner() *Runner { return &Runner{checker: NewChecker()} }
+func NewRunner() *Runner       { return &Runner{checker: NewChecker()} }
 func (r *Runner) Name() string { return "secretcheck" }
 
 func (r *Runner) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Finding, error) {
@@ -75,7 +75,9 @@ func extractSecrets(src string) ([]rawSecret, error) {
 		}
 		if err := func() error { //nolint:gosec // G122: path from WalkDir, symlinks followed intentionally
 			f, err := os.Open(path)
-			if err != nil { return nil }
+			if err != nil {
+				return nil
+			}
 			defer f.Close() // safe: closed per-iteration via closure
 			sc := bufio.NewScanner(f)
 			lineNum := 0
@@ -85,7 +87,9 @@ func extractSecrets(src string) ([]rawSecret, error) {
 				for _, prefix := range secretPrefixes {
 					if idx := strings.Index(line, prefix); idx != -1 {
 						end := idx + 60
-						if end > len(line) { end = len(line) }
+						if end > len(line) {
+							end = len(line)
+						}
 						results = append(results, rawSecret{
 							value: strings.Fields(line[idx:end])[0],
 							file:  path,

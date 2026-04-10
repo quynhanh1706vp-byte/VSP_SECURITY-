@@ -129,12 +129,20 @@ func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.TenantID = claims.TenantID
-	if req.Name == ""        { req.Name = "default" }
-	if req.RepoPattern == "" { req.RepoPattern = "*" }
-	if req.FailOn == ""      { req.FailOn = "FAIL" }
-	if req.MaxHigh == 0      { req.MaxHigh = -1 }
+	if req.Name == "" {
+		req.Name = "default"
+	}
+	if req.RepoPattern == "" {
+		req.RepoPattern = "*"
+	}
+	if req.FailOn == "" {
+		req.FailOn = "FAIL"
+	}
+	if req.MaxHigh == 0 {
+		req.MaxHigh = -1
+	}
 	req.BlockCritical = true
-	req.BlockSecrets  = true
+	req.BlockSecrets = true
 
 	rule, err := h.DB.CreatePolicyRule(r.Context(), req)
 	if err != nil {
@@ -170,13 +178,17 @@ func runSummary(run *store.Run) scanner.Summary {
 	}
 	toInt := func(v any) int {
 		switch n := v.(type) {
-		case int:    return n
-		case float64: return int(n)
-		default:     return 0
+		case int:
+			return n
+		case float64:
+			return int(n)
+		default:
+			return 0
 		}
 	}
 	toBool := func(v any) bool {
-		b, ok := v.(bool); return ok && b
+		b, ok := v.(bool)
+		return ok && b
 	}
 	return scanner.Summary{
 		Critical:   toInt(m["CRITICAL"]),

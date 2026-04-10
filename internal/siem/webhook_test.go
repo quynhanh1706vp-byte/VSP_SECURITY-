@@ -56,8 +56,8 @@ func TestValidateWebhookURL_Localhost_Blocked(t *testing.T) {
 
 func TestDeliver_SeverityFilter(t *testing.T) {
 	cases := []struct {
-		minSev  string
-		event   siem.Event
+		minSev   string
+		event    siem.Event
 		wantFire bool
 	}{
 		{"CRITICAL", makeEvent(0, 1, 0), false},

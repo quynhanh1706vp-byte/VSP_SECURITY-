@@ -57,12 +57,16 @@ func (h *SIEM) Create(w http.ResponseWriter, r *http.Request) {
 		"generic": true, "slack": true, "splunk_hec": true,
 		"sentinel": true, "datadog": true, "cef": true,
 	}
-	if req.Type == "" { req.Type = "generic" }
+	if req.Type == "" {
+		req.Type = "generic"
+	}
 	if !validTypes[req.Type] {
 		jsonError(w, "invalid type", http.StatusBadRequest)
 		return
 	}
-	if req.MinSev == "" { req.MinSev = "HIGH" }
+	if req.MinSev == "" {
+		req.MinSev = "HIGH"
+	}
 
 	hook, err := h.DB.CreateSIEMWebhook(r.Context(), store.SIEMWebhook{
 		TenantID:   claims.TenantID,

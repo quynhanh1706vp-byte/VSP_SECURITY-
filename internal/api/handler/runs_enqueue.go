@@ -3,8 +3,8 @@ package handler
 import (
 	"context"
 	"github.com/hibiken/asynq"
-	"github.com/vsp/platform/internal/pipeline"
 	"github.com/rs/zerolog/log"
+	"github.com/vsp/platform/internal/pipeline"
 )
 
 // SetAsynqClient wires an asynq client into the Runs handler so that
@@ -44,7 +44,9 @@ func (h *Runs) EnqueueDirect(rid, tenantID string, mode pipeline.Mode, profile p
 		"NETWORK": 1,  // sslscan
 		"FULL":    14, // all tools
 	}[string(mode)]
-	if toolsTotal == 0 { toolsTotal = 3 }
+	if toolsTotal == 0 {
+		toolsTotal = 3
+	}
 	h.DB.CreateRun(context.Background(), rid, tenantID, string(mode), string(profile), src, url, toolsTotal) //nolint:errcheck
 	h.enqueueOrLog(rid, tenantID, mode, profile, src, url)
 }

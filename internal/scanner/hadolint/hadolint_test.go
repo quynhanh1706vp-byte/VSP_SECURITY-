@@ -3,8 +3,8 @@ package hadolint
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -3,11 +3,11 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"strconv"
-	"time"
 	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/log"
+	"strconv"
+	"time"
 )
 
 // ── Types ─────────────────────────────────────────────────────
@@ -52,14 +52,14 @@ type Playbook struct {
 }
 
 type PlaybookRun struct {
-	ID          string     `json:"id"`
-	PlaybookID  string     `json:"playbook_id"`
-	PlaybookName string    `json:"pb"`
-	TenantID    string     `json:"tenant_id"`
-	Status      string     `json:"status"`
-	Trigger     string     `json:"trigger"`
-	StartedAt   time.Time  `json:"ts"`
-	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	ID           string     `json:"id"`
+	PlaybookID   string     `json:"playbook_id"`
+	PlaybookName string     `json:"pb"`
+	TenantID     string     `json:"tenant_id"`
+	Status       string     `json:"status"`
+	Trigger      string     `json:"trigger"`
+	StartedAt    time.Time  `json:"ts"`
+	FinishedAt   *time.Time `json:"finished_at,omitempty"`
 }
 
 type LogSource struct {
@@ -152,13 +152,21 @@ func (db *DB) ListIncidents(ctx context.Context, tenantID, status, sev string, l
 	      LEFT   JOIN correlation_rules r ON r.id = i.rule_id
 	      WHERE  i.tenant_id = $1`
 	args := []any{tenantID}
-	if status != "" { args = append(args, status); q += " AND i.status=$" + itoa(len(args)) }
-	if sev != ""    { args = append(args, sev);    q += " AND i.severity=$" + itoa(len(args)) }
+	if status != "" {
+		args = append(args, status)
+		q += " AND i.status=$" + itoa(len(args))
+	}
+	if sev != "" {
+		args = append(args, sev)
+		q += " AND i.severity=$" + itoa(len(args))
+	}
 	args = append(args, limit)
 	q += " ORDER BY i.created_at DESC LIMIT $" + itoa(len(args))
 
 	rows, err := db.pool.Query(ctx, q, args...)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var out []Incident
 	for rows.Next() {
@@ -183,7 +191,6 @@ func (db *DB) CreateIncident(ctx context.Context, inc Incident) (string, error) 
 	return id, err
 }
 
-
 func (db *DB) UpdateIncidentStatus(ctx context.Context, tenantID, id, status string) error {
 	_, err := db.pool.Exec(ctx,
 		`UPDATE incidents SET status=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3`,
@@ -203,7 +210,9 @@ func (db *DB) GetIncident(ctx context.Context, tenantID, id string) (*Incident, 
 		WHERE  i.id=$1 AND i.tenant_id=$2`, id, tenantID,
 	).Scan(&inc.ID, &inc.Title, &inc.Severity, &inc.Status,
 		&inc.SourceRefs, &inc.CreatedAt, &inc.RuleName)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &inc, nil
 }
 
@@ -214,7 +223,9 @@ func (db *DB) ListPlaybooks(ctx context.Context, tenantID string) ([]Playbook, e
 		SELECT id, name, description, trigger_event, sev_filter,
 		       steps, enabled, run_count, success_count, created_at
 		FROM   playbooks WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200`, tenantID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var out []Playbook
 	for rows.Next() {
@@ -266,7 +277,9 @@ func (db *DB) CreatePlaybookRun(ctx context.Context, playbookID, tenantID, trigg
 
 func (db *DB) CompletePlaybookRun(ctx context.Context, runID string, success bool) {
 	status := "success"
-	if !success { status = "failed" }
+	if !success {
+		status = "failed"
+	}
 	db.pool.Exec(ctx, //nolint:errcheck
 		`UPDATE playbook_runs SET status=$1, finished_at=NOW(),
 		        duration_s=EXTRACT(EPOCH FROM NOW()-started_at)::int
@@ -285,7 +298,9 @@ func (db *DB) ListPlaybookRuns(ctx context.Context, tenantID string, limit int) 
 		FROM   playbook_runs r JOIN playbooks p ON p.id=r.playbook_id
 		WHERE  r.tenant_id=$1 ORDER BY r.started_at DESC LIMIT $2`,
 		tenantID, limit)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var out []PlaybookRun
 	for rows.Next() {
@@ -306,12 +321,16 @@ func (db *DB) FindEnabledPlaybooks(ctx context.Context, tenantID, trigger, sev s
 		WHERE  tenant_id=$1 AND enabled=true AND trigger_event=$2
 	  AND  (sev_filter='any' OR sev_filter=$3) LIMIT 20`,
 		tenantID, trigger, sev)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var out []Playbook
 	for rows.Next() {
 		var p Playbook
-		if err := rows.Scan(&p.ID, &p.Name); err != nil { log.Warn().Err(err).Caller().Msg("ignored error") }
+		if err := rows.Scan(&p.ID, &p.Name); err != nil {
+			log.Warn().Err(err).Caller().Msg("ignored error")
+		}
 		out = append(out, p)
 	}
 	return out, nil
@@ -324,7 +343,9 @@ func (db *DB) ListLogSources(ctx context.Context, tenantID string) ([]LogSource,
 		SELECT id, name, host, protocol, port, format,
 		       tags, enabled, eps, parse_rate, status, last_seen, created_at
 		FROM   log_sources WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200`, tenantID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var out []LogSource
 	for rows.Next() {
@@ -341,7 +362,9 @@ func (db *DB) ListLogSources(ctx context.Context, tenantID string) ([]LogSource,
 }
 
 func (db *DB) CreateLogSource(ctx context.Context, s LogSource) (string, error) {
-	if s.Tags == nil { s.Tags = []string{} }
+	if s.Tags == nil {
+		s.Tags = []string{}
+	}
 	var id string
 	err := db.pool.QueryRow(ctx, `
 		INSERT INTO log_sources (tenant_id, name, host, protocol, port, format, tags)
@@ -381,11 +404,16 @@ func (db *DB) ListIOCs(ctx context.Context, iocType string, limit int) ([]IOC, e
 	q := `SELECT id, type, value, severity, feed, description, matched, created_at
 	      FROM iocs WHERE (expires_at > NOW() OR expires_at IS NULL)`
 	args := []any{}
-	if iocType != "" { args = append(args, iocType); q += " AND type=$1" }
+	if iocType != "" {
+		args = append(args, iocType)
+		q += " AND type=$1"
+	}
 	args = append(args, limit)
 	q += " ORDER BY matched DESC, severity DESC LIMIT $" + itoa(len(args))
 	rows, err := db.pool.Query(ctx, q, args...)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var out []IOC
 	for rows.Next() {
@@ -424,7 +452,6 @@ func (db *DB) FindingCWECount(ctx context.Context, cwe string) int {
 	return cnt
 }
 
-
 func (db *DB) UpdateCorrelationRule(ctx context.Context, tenantID, id string, sources []string, windowMin int, severity, condExpr string) error {
 	_, err := db.pool.Exec(ctx, `
 		UPDATE correlation_rules
@@ -437,17 +464,17 @@ func (db *DB) UpdateCorrelationRule(ctx context.Context, tenantID, id string, so
 func (db *DB) SeedDefaultCorrelationRules(ctx context.Context, tenantID string) error {
 	type rule struct {
 		name, severity, condExpr string
-		sources []string
-		windowMin int
+		sources                  []string
+		windowMin                int
 	}
 	rules := []rule{
-		{"SSH brute force", "HIGH", "count>=5 AND message~Failed password AND process=sshd", []string{"sshd","auth"}, 5},
+		{"SSH brute force", "HIGH", "count>=5 AND message~Failed password AND process=sshd", []string{"sshd", "auth"}, 5},
 		{"Critical severity spike", "CRITICAL", "count>=10 AND severity=CRITICAL", []string{"*"}, 10},
-		{"Auth failure flood", "HIGH", "count>=20 AND message~authentication failure", []string{"auth","authpriv"}, 15},
+		{"Auth failure flood", "HIGH", "count>=20 AND message~authentication failure", []string{"auth", "authpriv"}, 15},
 		{"Kernel errors", "MEDIUM", "count>=5 AND facility=kern AND severity>=HIGH", []string{"kern"}, 10},
 		{"Port scan detection", "HIGH", "count>=50 AND message~Connection refused", []string{"*"}, 5},
-		{"Sudo abuse", "HIGH", "count>=3 AND message~sudo AND message~COMMAND", []string{"auth","authpriv"}, 30},
-		{"Service crash loop", "HIGH", "count>=5 AND message~segfault", []string{"kern","daemon"}, 15},
+		{"Sudo abuse", "HIGH", "count>=3 AND message~sudo AND message~COMMAND", []string{"auth", "authpriv"}, 30},
+		{"Service crash loop", "HIGH", "count>=5 AND message~segfault", []string{"kern", "daemon"}, 15},
 	}
 	for _, r := range rules {
 		_, err := db.pool.Exec(ctx, `
@@ -456,7 +483,9 @@ func (db *DB) SeedDefaultCorrelationRules(ctx context.Context, tenantID string) 
 			VALUES ($1,$2,$3,$4,$5,$6,true)
 			ON CONFLICT DO NOTHING`,
 			tenantID, r.name, r.sources, r.windowMin, r.severity, r.condExpr)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -468,7 +497,9 @@ func itoa(n int) string {
 }
 
 func nullStr(s *string) any {
-	if s == nil || *s == "" { return nil }
+	if s == nil || *s == "" {
+		return nil
+	}
 	return *s
 }
 
@@ -494,7 +525,9 @@ func (db *DB) ListSIEMWebhooks(ctx context.Context, tenantID string) ([]SIEMWebh
 		       COALESCE(secret_hash,''), min_sev, active,
 		       last_fired, fire_count, created_at
 		FROM   siem_webhooks WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 100`, tenantID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var out []SIEMWebhook
 	for rows.Next() {

@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"context"
-	"time"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/vsp/platform/internal/audit"
@@ -20,7 +20,7 @@ type Users struct {
 // GET /api/v1/admin/users
 func (u *Users) List(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	limit  := queryInt(r, "limit", 50)
+	limit := queryInt(r, "limit", 50)
 	offset := queryInt(r, "offset", 0)
 
 	users, total, err := u.DB.ListUsers(r.Context(), claims.TenantID, limit, offset)
@@ -55,7 +55,9 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	// Whitelist roles — không cho phép role tùy ý
 	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
-	if req.Role == "" { req.Role = "analyst" }
+	if req.Role == "" {
+		req.Role = "analyst"
+	}
 	if !validRoles[req.Role] {
 		jsonError(w, "invalid role: must be admin|analyst|dev|auditor", http.StatusBadRequest)
 		return
@@ -84,7 +86,7 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 		prevHash, _ := u.DB.GetLastAuditHash(ctx, claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "USER_CREATED", Resource: "/admin/users/" + user.ID, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
-		u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "USER_CREATED", Resource: "/admin/users/"+ user.ID, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
+		u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "USER_CREATED", Resource: "/admin/users/" + user.ID, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 	}()
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, user)
@@ -104,14 +106,18 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 		prevHash, _ := u.DB.GetLastAuditHash(ctx, claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "USER_DELETED", Resource: "/admin/users/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
-		u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "USER_DELETED", Resource: "/admin/users/"+ id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
+		u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "USER_DELETED", Resource: "/admin/users/" + id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 	}()
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func queryInt(r *http.Request, key string, def int) int {
 	v := r.URL.Query().Get(key)
-	if v == "" { return def }
-	if n, ok := validatePositiveInt(v, 100000); ok { return n }
+	if v == "" {
+		return def
+	}
+	if n, ok := validatePositiveInt(v, 100000); ok {
+		return n
+	}
 	return def
 }

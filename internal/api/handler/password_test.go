@@ -10,8 +10,8 @@ import (
 
 func TestChangePasswordValidation(t *testing.T) {
 	tests := []struct {
-		name    string
-		body    map[string]string
+		name       string
+		body       map[string]string
 		wantStatus int
 	}{
 		{

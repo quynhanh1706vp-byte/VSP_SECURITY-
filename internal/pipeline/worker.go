@@ -11,7 +11,7 @@ import (
 	"github.com/vsp/platform/internal/audit"
 	"github.com/vsp/platform/internal/gate"
 	"github.com/vsp/platform/internal/scanner"
-"github.com/vsp/platform/internal/store"
+	"github.com/vsp/platform/internal/store"
 )
 
 const TaskTypeScan = "scan:run"
@@ -30,8 +30,8 @@ func NewScanTask(payload JobPayload) (*asynq.Task, error) {
 
 // ScanHandler is the asynq task handler that runs the actual scan.
 type ScanHandler struct {
-	DB       *store.DB
-	Exec     *Executor
+	DB   *store.DB
+	Exec *Executor
 }
 
 func NewScanHandler(db *store.DB) *ScanHandler {
@@ -206,16 +206,22 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	if string(eval.Decision) == "FAIL" {
 		go func() {
 			sev := "HIGH"
-			if s.Critical > 0 { sev = "CRITICAL" }
+			if s.Critical > 0 {
+				sev = "CRITICAL"
+			}
 			pbs, err := h.DB.FindEnabledPlaybooks(context.Background(), payload.TenantID, "gate_fail", sev) //#nosec G118 -- async goroutine, request ctx already done
-			if err != nil { return }
+			if err != nil {
+				return
+			}
 			for _, pb := range pbs {
 				ctxJSON, _ := json.Marshal(map[string]any{
-					"trigger":"gate_fail","gate":string(eval.Decision),
-					"severity":sev,"run_id":payload.RID,"findings":len(result.Findings),
+					"trigger": "gate_fail", "gate": string(eval.Decision),
+					"severity": sev, "run_id": payload.RID, "findings": len(result.Findings),
 				})
 				runID, err := h.DB.CreatePlaybookRun(context.Background(), pb.ID, payload.TenantID, "gate_fail", ctxJSON)
-				if err != nil { continue }
+				if err != nil {
+					continue
+				}
 				log.Info().Str("playbook", pb.Name).Str("run_id", runID).Msg("soar: auto-triggered")
 			}
 		}()
@@ -236,7 +242,9 @@ func EnqueueScan(client *asynq.Client, payload JobPayload) error {
 
 // ScannerSummaryFromStore converts store.FindingSummary to scanner.Summary.
 func ScannerSummaryFromStore(s *store.FindingSummary) scanner.Summary {
-	if s == nil { return scanner.Summary{} }
+	if s == nil {
+		return scanner.Summary{}
+	}
 	return scanner.Summary{
 		Critical: s.Critical, High: s.High,
 		Medium: s.Medium, Low: s.Low, Info: s.Info,
@@ -252,9 +260,13 @@ func SetBroadcast(fn func([]byte)) { broadcastSSE = fn }
 
 func severityToPriority(sev string) string {
 	switch sev {
-	case "CRITICAL": return "P1"
-	case "HIGH":     return "P2"
-	case "MEDIUM":   return "P3"
-	default:         return "P4"
+	case "CRITICAL":
+		return "P1"
+	case "HIGH":
+		return "P2"
+	case "MEDIUM":
+		return "P3"
+	default:
+		return "P4"
 	}
 }

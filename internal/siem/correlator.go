@@ -66,8 +66,8 @@ func runCorrelationPass(ctx context.Context, db store.CorrelatorStore, broadcast
 
 	type ruleRow struct {
 		id, tenantID, name, severity, condExpr string
-		sources                                 []string
-		windowMin                               int
+		sources                                []string
+		windowMin                              int
 	}
 	var rules []ruleRow
 	for rows.Next() {
@@ -302,7 +302,7 @@ func sanitizeJSONKey(k string) string {
 	var b strings.Builder
 	for _, c := range k {
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-			(c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.'  {
+			(c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' {
 			b.WriteRune(c)
 		}
 	}

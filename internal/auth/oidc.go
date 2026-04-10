@@ -20,12 +20,12 @@ type OIDCConfig struct {
 	ClientSecret string `yaml:"client_secret"`
 	RedirectURL  string `yaml:"redirect_url"`
 	// OIDC discovery or manual endpoints
-	AuthURL      string `yaml:"auth_url"`
-	TokenURL     string `yaml:"token_url"`
-	UserInfoURL  string `yaml:"userinfo_url"`
-	Scopes       []string `yaml:"scopes"`
+	AuthURL     string   `yaml:"auth_url"`
+	TokenURL    string   `yaml:"token_url"`
+	UserInfoURL string   `yaml:"userinfo_url"`
+	Scopes      []string `yaml:"scopes"`
 	// Role mapping
-	DefaultRole  string `yaml:"default_role"` // analyst / admin
+	DefaultRole  string   `yaml:"default_role"`  // analyst / admin
 	AdminDomains []string `yaml:"admin_domains"` // e.g. ["company.com"]
 }
 
@@ -72,7 +72,9 @@ type OIDCHandler struct {
 // GenerateState creates a random state token for CSRF protection.
 func GenerateState() (string, error) {
 	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil { return "", err }
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
@@ -100,22 +102,33 @@ func (h *OIDCHandler) ExchangeCode(ctx context.Context, code string) (accessToke
 	var req *http.Request
 	req, err = http.NewRequestWithContext(ctx, "POST", h.Config.TokenURL,
 		strings.NewReader(data.Encode()))
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil { return }
-	if resp == nil { return }
+	if err != nil {
+		return
+	}
+	if resp == nil {
+		return
+	}
 	defer resp.Body.Close()
 
 	var tok struct {
 		AccessToken string `json:"access_token"`
 		Error       string `json:"error"`
 	}
-	if err = json.NewDecoder(resp.Body).Decode(&tok); err != nil { return }
-	if tok.Error != "" { err = fmt.Errorf("oauth2: %s", tok.Error); return }
+	if err = json.NewDecoder(resp.Body).Decode(&tok); err != nil {
+		return
+	}
+	if tok.Error != "" {
+		err = fmt.Errorf("oauth2: %s", tok.Error)
+		return
+	}
 	accessToken = tok.AccessToken
 	return
 }
@@ -130,21 +143,33 @@ type UserInfo struct {
 
 func (h *OIDCHandler) FetchUserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", h.Config.UserInfoURL, nil)
-	if err != nil { return nil, err }
-	req.Header.Set("Authorization", "Bearer " + accessToken)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil { return nil, err }
-	if resp == nil { return nil, fmt.Errorf("oidc: empty response") }
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("oidc: empty response")
+	}
 	defer resp.Body.Close()
 
 	var info UserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil { return nil, err }
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return nil, err
+	}
 	// GitHub uses login as name
-	if info.Name == "" && info.Login != "" { info.Name = info.Login }
-	if info.Sub == "" { info.Sub = info.Email }
+	if info.Name == "" && info.Login != "" {
+		info.Name = info.Login
+	}
+	if info.Sub == "" {
+		info.Sub = info.Email
+	}
 	return &info, nil
 }
 
@@ -154,9 +179,13 @@ func (h *OIDCHandler) DetermineRole(email string) string {
 	if len(parts) == 2 {
 		domain := parts[1]
 		for _, d := range h.Config.AdminDomains {
-			if d == domain { return "admin" }
+			if d == domain {
+				return "admin"
+			}
 		}
 	}
-	if h.Config.DefaultRole != "" { return h.Config.DefaultRole }
+	if h.Config.DefaultRole != "" {
+		return h.Config.DefaultRole
+	}
 	return "analyst"
 }

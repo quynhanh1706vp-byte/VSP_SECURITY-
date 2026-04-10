@@ -57,8 +57,12 @@ func (db *DB) CreatePolicyRule(ctx context.Context, r PolicyRule) (*PolicyRule, 
 	err := row.Scan(&out.ID, &out.TenantID, &out.Name, &out.RepoPattern,
 		&out.FailOn, &out.MinScore, &out.MaxHigh, &out.BlockSecrets,
 		&out.BlockCritical, &out.Active, &out.CreatedAt)
-	if err == pgx.ErrNoRows { return nil, nil }
-	if err != nil { return nil, fmt.Errorf("create policy: %w", err) }
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("create policy: %w", err)
+	}
 	return &out, nil
 }
 

@@ -46,7 +46,9 @@ func buildSystemPrompt(tenantID string) string {
 		}
 		return '_'
 	}, tenantID)
-	if len(safe) > 50 { safe = safe[:50] }
+	if len(safe) > 50 {
+		safe = safe[:50]
+	}
 	tenantID = safe
 	return fmt.Sprintf(`Bạn là VSP AI Security Advisor — trợ lý bảo mật thông minh của nền tảng VSP SOC (Security Operations Center).
 
@@ -118,7 +120,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			// Base64 decode payload (no validation here — just extract tenantID)
 			// Real validation happens in auth middleware upstream
 			if decoded, err := base64.RawURLEncoding.DecodeString(parts[1]); err == nil {
-				var claims struct{ TID string `json:"tid"` }
+				var claims struct {
+					TID string `json:"tid"`
+				}
 				if err := json.Unmarshal(decoded, &claims); err == nil && claims.TID != "" {
 					tenantID = claims.TID
 				}

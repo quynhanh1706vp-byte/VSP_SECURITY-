@@ -3,7 +3,7 @@ package handler
 import "testing"
 
 func TestValidateScanURL(t *testing.T) {
-	cases := []struct{
+	cases := []struct {
 		url     string
 		wantErr bool
 		desc    string

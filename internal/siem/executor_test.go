@@ -55,8 +55,8 @@ func TestExpandVars_WithGate(t *testing.T) {
 func TestParseDuration_Valid(t *testing.T) {
 	cases := map[string]time.Duration{
 		"duration: 30s": 30 * time.Second,
-		"duration: 5m": 5 * time.Minute,
-		"duration: 1h": time.Hour,
+		"duration: 5m":  5 * time.Minute,
+		"duration: 1h":  time.Hour,
 	}
 	for config, want := range cases {
 		got := parseDuration(config)

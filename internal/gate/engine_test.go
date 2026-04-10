@@ -35,8 +35,8 @@ func TestEvaluate_SecretsBlock(t *testing.T) {
 
 func TestEvaluate_HighWarn(t *testing.T) {
 	rule := gate.DefaultRule()
-	rule.MaxHigh = -1  // unlimited — should only warn on HIGH
-	rule.MinScore = 0  // disable score threshold to isolate MaxHigh behavior
+	rule.MaxHigh = -1 // unlimited — should only warn on HIGH
+	rule.MinScore = 0 // disable score threshold to isolate MaxHigh behavior
 	s := scanner.Summary{High: 5}
 	r := gate.Evaluate(rule, s)
 	assert.Equal(t, gate.DecisionWarn, r.Decision)
@@ -56,7 +56,7 @@ func TestEvaluate_MaxHighWarnMode(t *testing.T) {
 	rule := gate.DefaultRule()
 	rule.MaxHigh = 2
 	rule.FailOn = "WARN"
-	rule.MinScore = 0  // disable score threshold to isolate FailOn=WARN behavior
+	rule.MinScore = 0 // disable score threshold to isolate FailOn=WARN behavior
 	s := scanner.Summary{High: 5}
 	r := gate.Evaluate(rule, s)
 	assert.Equal(t, gate.DecisionWarn, r.Decision)
@@ -93,9 +93,9 @@ func TestPosture(t *testing.T) {
 
 func TestScore(t *testing.T) {
 	assert.Equal(t, 100, gate.Score(scanner.Summary{}))
-	assert.Equal(t, 92,  gate.Score(scanner.Summary{High: 1}))          // 100-8
-	assert.Equal(t, 85,  gate.Score(scanner.Summary{Critical: 1}))      // 100-15
-	assert.Equal(t, 70,  gate.Score(scanner.Summary{Critical: 10}))     // 100-30 (capped)
-	assert.Equal(t, 75,  gate.Score(scanner.Summary{HasSecrets: true})) // 100-25
-	assert.Equal(t, 60,  gate.Score(scanner.Summary{HasSecrets: true, Critical: 1})) // 100-25-15
+	assert.Equal(t, 92, gate.Score(scanner.Summary{High: 1}))                       // 100-8
+	assert.Equal(t, 85, gate.Score(scanner.Summary{Critical: 1}))                   // 100-15
+	assert.Equal(t, 70, gate.Score(scanner.Summary{Critical: 10}))                  // 100-30 (capped)
+	assert.Equal(t, 75, gate.Score(scanner.Summary{HasSecrets: true}))              // 100-25
+	assert.Equal(t, 60, gate.Score(scanner.Summary{HasSecrets: true, Critical: 1})) // 100-25-15
 }

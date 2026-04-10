@@ -2,10 +2,10 @@ package handler
 
 import (
 	"encoding/json"
-	"time"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
@@ -60,7 +60,7 @@ func (u *Users) CreateTenant(w http.ResponseWriter, r *http.Request) {
 
 	// Audit log
 	prevHash, _ := u.DB.GetLastAuditHash(r.Context(), claims.TenantID)
-	u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "TENANT_CREATED", Resource: "/admin/tenants/"+id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
+	u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "TENANT_CREATED", Resource: "/admin/tenants/" + id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{"id": id, "slug": req.Slug, "name": req.Name, "plan": req.Plan})
@@ -83,11 +83,11 @@ func (u *Users) ListAllTenants(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type TenantRow struct {
-		ID        string `json:"id"`
-		Slug      string `json:"slug"`
-		Name      string `json:"name"`
-		Plan      string `json:"plan"`
-		Active    bool   `json:"active"`
+		ID        string    `json:"id"`
+		Slug      string    `json:"slug"`
+		Name      string    `json:"name"`
+		Plan      string    `json:"plan"`
+		Active    bool      `json:"active"`
 		CreatedAt time.Time `json:"created_at"`
 	}
 	var tenants []TenantRow

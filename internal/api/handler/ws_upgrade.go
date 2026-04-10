@@ -114,7 +114,7 @@ func wsWriteText(conn net.Conn, msg string) error {
 		frame = make([]byte, 4+n)
 		frame[0] = 0x81
 		frame[1] = 126
-		frame[2] = byte(n >> 8) //#nosec G115 -- n <= 65535 after truncation
+		frame[2] = byte(n >> 8)   //#nosec G115 -- n <= 65535 after truncation
 		frame[3] = byte(n & 0xFF) //#nosec G115 -- n <= 65535
 		copy(frame[4:], b)
 	}

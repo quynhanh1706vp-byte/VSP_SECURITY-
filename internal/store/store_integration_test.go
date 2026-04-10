@@ -131,8 +131,12 @@ func TestInsertAudit_HashChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InsertAudit 1: %v", err)
 	}
-	if seq1 == 0 { t.Error("want seq > 0") }
-	if hash1 == "" { t.Error("want hash") }
+	if seq1 == 0 {
+		t.Error("want seq > 0")
+	}
+	if hash1 == "" {
+		t.Error("want hash")
+	}
 
 	// Entry thứ 2 — prevHash = hash1
 	seq2, hash2, err := db.InsertAudit(ctx, store.AuditWriteParams{
@@ -142,8 +146,12 @@ func TestInsertAudit_HashChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InsertAudit 2: %v", err)
 	}
-	if seq2 <= seq1 { t.Errorf("want seq2 > seq1, got %d <= %d", seq2, seq1) }
-	if hash2 == hash1 { t.Error("want different hashes") }
+	if seq2 <= seq1 {
+		t.Errorf("want seq2 > seq1, got %d <= %d", seq2, seq1)
+	}
+	if hash2 == hash1 {
+		t.Error("want different hashes")
+	}
 
 	// GetLastAuditHash trả về hash mới nhất
 	last, err := db.GetLastAuditHash(ctx, tid)
@@ -236,7 +244,9 @@ func TestUpsertRemediation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpsertRemediation: %v", err)
 	}
-	if r.ID == "" { t.Error("want ID") }
+	if r.ID == "" {
+		t.Error("want ID")
+	}
 
 	// Upsert lần 2 — đổi status
 	r2, err := db.UpsertRemediation(ctx, store.Remediation{
@@ -267,8 +277,12 @@ func TestIsPasswordReused(t *testing.T) {
 
 	// Lần đầu chưa có history
 	reused, err := db.IsPasswordReused(ctx, user.ID, "newpassword")
-	if err != nil { t.Fatalf("IsPasswordReused: %v", err) }
-	if reused { t.Error("want not reused on empty history") }
+	if err != nil {
+		t.Fatalf("IsPasswordReused: %v", err)
+	}
+	if reused {
+		t.Error("want not reused on empty history")
+	}
 }
 
 // ── API Keys ──────────────────────────────────────────────────────────────────
@@ -282,14 +296,22 @@ func TestAPIKey_CreateAndTouch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAPIKey: %v", err)
 	}
-	if key.ID == "" { t.Error("want ID") }
+	if key.ID == "" {
+		t.Error("want ID")
+	}
 
 	if err := db.TouchAPIKey(ctx, key.ID); err != nil {
 		t.Fatalf("TouchAPIKey: %v", err)
 	}
 
 	keys, err := db.ListAPIKeys(ctx, tid)
-	if err != nil { t.Fatalf("ListAPIKeys: %v", err) }
-	if len(keys) != 1 { t.Fatalf("want 1 key, got %d", len(keys)) }
-	if keys[0].UseCount != 1 { t.Errorf("want use_count=1, got %d", keys[0].UseCount) }
+	if err != nil {
+		t.Fatalf("ListAPIKeys: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("want 1 key, got %d", len(keys))
+	}
+	if keys[0].UseCount != 1 {
+		t.Errorf("want use_count=1, got %d", keys[0].UseCount)
+	}
 }

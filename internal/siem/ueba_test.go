@@ -15,13 +15,13 @@ func TestNewUEBAEngine(t *testing.T) {
 }
 
 func TestAnomalyTypes_Constants(t *testing.T) {
-	assert.Equal(t, AnomalyType("score_spike"),      AnomalyScoreSpike)
-	assert.Equal(t, AnomalyType("findings_surge"),   AnomalyFindingsSurge)
+	assert.Equal(t, AnomalyType("score_spike"), AnomalyScoreSpike)
+	assert.Equal(t, AnomalyType("findings_surge"), AnomalyFindingsSurge)
 	assert.Equal(t, AnomalyType("gate_fail_streak"), AnomalyGateFailStreak)
-	assert.Equal(t, AnomalyType("scan_frequency"),   AnomalyScanFrequency)
+	assert.Equal(t, AnomalyType("scan_frequency"), AnomalyScanFrequency)
 	assert.Equal(t, AnomalyType("new_critical_tool"), AnomalyNewCritical)
-	assert.Equal(t, AnomalyType("off_hours_scan"),   AnomalyOffHoursScan)
-	assert.Equal(t, AnomalyType("sla_breach"),       AnomalySLABreach)
+	assert.Equal(t, AnomalyType("off_hours_scan"), AnomalyOffHoursScan)
+	assert.Equal(t, AnomalyType("sla_breach"), AnomalySLABreach)
 }
 
 func TestAnomalyNewCriticalTool_SameAsNewCritical(t *testing.T) {

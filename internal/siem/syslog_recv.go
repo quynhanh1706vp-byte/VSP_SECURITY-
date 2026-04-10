@@ -44,10 +44,10 @@ type SyslogReceiver struct {
 }
 
 type ReceiverStats struct {
-	Received   int64
-	Parsed     int64
-	Errors     int64
-	LastEvent  time.Time
+	Received  int64
+	Parsed    int64
+	Errors    int64
+	LastEvent time.Time
 }
 
 func NewSyslogReceiver(udpAddr, tcpAddr string, db *store.DB, tenantID string) *SyslogReceiver {
@@ -105,9 +105,13 @@ func (r *SyslogReceiver) Stats() ReceiverStats {
 
 func (r *SyslogReceiver) listenUDP(ctx context.Context) error {
 	addr, err := net.ResolveUDPAddr("udp", r.udpAddr)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	conn, err := net.ListenUDP("udp", addr)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer conn.Close()
 
 	go func() { <-ctx.Done(); conn.Close() }()
@@ -116,17 +120,26 @@ func (r *SyslogReceiver) listenUDP(ctx context.Context) error {
 	for {
 		n, src, err := conn.ReadFromUDP(buf)
 		if err != nil {
-			if ctx.Err() != nil { return nil }
+			if ctx.Err() != nil {
+				return nil
+			}
 			continue
 		}
 		raw := string(buf[:n])
-		r.mu.Lock(); r.stats.Received++; r.mu.Unlock()
+		r.mu.Lock()
+		r.stats.Received++
+		r.mu.Unlock()
 		ev, err := ParseSyslog(raw, src.IP.String())
 		if err != nil {
-			r.mu.Lock(); r.stats.Errors++; r.mu.Unlock()
+			r.mu.Lock()
+			r.stats.Errors++
+			r.mu.Unlock()
 			continue
 		}
-		r.mu.Lock(); r.stats.Parsed++; r.stats.LastEvent = time.Now(); r.mu.Unlock()
+		r.mu.Lock()
+		r.stats.Parsed++
+		r.stats.LastEvent = time.Now()
+		r.mu.Unlock()
 		select {
 		case r.buf <- ev:
 		default: // drop if buffer full
@@ -138,14 +151,18 @@ func (r *SyslogReceiver) listenUDP(ctx context.Context) error {
 
 func (r *SyslogReceiver) listenTCP(ctx context.Context) error {
 	ln, err := net.Listen("tcp", r.tcpAddr)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer ln.Close()
 	go func() { <-ctx.Done(); ln.Close() }()
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			if ctx.Err() != nil { return nil }
+			if ctx.Err() != nil {
+				return nil
+			}
 			continue
 		}
 		go r.handleTCPConn(ctx, conn)
@@ -160,14 +177,23 @@ func (r *SyslogReceiver) handleTCPConn(ctx context.Context, conn net.Conn) {
 	sc.Buffer(make([]byte, 65536), 65536)
 	for sc.Scan() {
 		raw := sc.Text()
-		if raw == "" { continue }
-		r.mu.Lock(); r.stats.Received++; r.mu.Unlock()
-		ev, err := ParseSyslog(raw, srcIP)
-		if err != nil {
-			r.mu.Lock(); r.stats.Errors++; r.mu.Unlock()
+		if raw == "" {
 			continue
 		}
-		r.mu.Lock(); r.stats.Parsed++; r.stats.LastEvent = time.Now(); r.mu.Unlock()
+		r.mu.Lock()
+		r.stats.Received++
+		r.mu.Unlock()
+		ev, err := ParseSyslog(raw, srcIP)
+		if err != nil {
+			r.mu.Lock()
+			r.stats.Errors++
+			r.mu.Unlock()
+			continue
+		}
+		r.mu.Lock()
+		r.stats.Parsed++
+		r.stats.LastEvent = time.Now()
+		r.mu.Unlock()
 		select {
 		case r.buf <- ev:
 		default:
@@ -182,7 +208,9 @@ func (r *SyslogReceiver) processEvents(ctx context.Context) {
 	defer ticker.Stop()
 	var batch []ParsedEvent
 	flush := func() {
-		if len(batch) == 0 { return }
+		if len(batch) == 0 {
+			return
+		}
 		r.writeBatch(ctx, batch)
 		batch = batch[:0]
 	}
@@ -190,7 +218,9 @@ func (r *SyslogReceiver) processEvents(ctx context.Context) {
 		select {
 		case ev := <-r.buf:
 			batch = append(batch, ev)
-			if len(batch) >= 500 { flush() }
+			if len(batch) >= 500 {
+				flush()
+			}
 		case <-ticker.C:
 			flush()
 		case <-ctx.Done():
@@ -201,7 +231,9 @@ func (r *SyslogReceiver) processEvents(ctx context.Context) {
 }
 
 func (r *SyslogReceiver) writeBatch(ctx context.Context, events []ParsedEvent) {
-	if len(events) == 0 { return }
+	if len(events) == 0 {
+		return
+	}
 	// Write to log_events table (create if not exists inline)
 	r.db.Pool().Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS log_events (
@@ -244,7 +276,7 @@ var (
 	// RFC5424: <PRI>1 TIMESTAMP HOST APP PROCID MSGID STRUCTURED-DATA MSG
 	re5424 = regexp.MustCompile(`^<(\d+)>1\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\S+\s+(?:\[[^\]]*\]\s*)?(\S.*)$`)
 	// CEF: CEF:0|vendor|product|version|sigid|name|severity|ext
-	reCEF  = regexp.MustCompile(`^CEF:(\d+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|(\d+)\|(.*)$`)
+	reCEF = regexp.MustCompile(`^CEF:(\d+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|(\d+)\|(.*)$`)
 )
 
 // ParseSyslog auto-detects format and returns a normalized ParsedEvent.
@@ -264,8 +296,12 @@ func ParseSyslog(raw, srcIP string) (ParsedEvent, error) {
 		sev, _ := strconv.Atoi(m[7])
 		ev.Severity = cefSeverity(sev)
 		ev.Fields = parseCEFExtension(m[8])
-		if h, ok := ev.Fields["dhost"]; ok { ev.Host = h }
-		if h, ok := ev.Fields["src"];   ok { ev.SourceIP = h }
+		if h, ok := ev.Fields["dhost"]; ok {
+			ev.Host = h
+		}
+		if h, ok := ev.Fields["src"]; ok {
+			ev.SourceIP = h
+		}
 		return ev, nil
 	}
 
@@ -275,9 +311,9 @@ func ParseSyslog(raw, srcIP string) (ParsedEvent, error) {
 		pri, _ := strconv.Atoi(m[1])
 		ev.Facility, ev.Severity = decodePRI(pri)
 		ev.Timestamp, _ = time.Parse(time.RFC3339, m[2])
-		ev.Host    = m[3]
+		ev.Host = m[3]
 		ev.Process = m[4]
-		ev.PID, _  = strconv.Atoi(m[5])
+		ev.PID, _ = strconv.Atoi(m[5])
 		ev.Message = m[6]
 		return ev, nil
 	}
@@ -291,16 +327,16 @@ func ParseSyslog(raw, srcIP string) (ParsedEvent, error) {
 		if err == nil {
 			ev.Timestamp = t.AddDate(time.Now().Year(), 0, 0)
 		}
-		ev.Host    = m[3]
+		ev.Host = m[3]
 		ev.Process = strings.TrimSuffix(m[4], ":")
-		ev.PID, _  = strconv.Atoi(m[5])
+		ev.PID, _ = strconv.Atoi(m[5])
 		ev.Message = m[6]
 		return ev, nil
 	}
 
 	// Fallback: raw line
-	ev.Format   = "raw"
-	ev.Message  = raw
+	ev.Format = "raw"
+	ev.Message = raw
 	ev.Severity = "INFO"
 	return ev, nil
 }
@@ -308,19 +344,31 @@ func ParseSyslog(raw, srcIP string) (ParsedEvent, error) {
 func decodePRI(pri int) (facility, severity string) {
 	fac := pri >> 3
 	sev := pri & 0x7
-	facilities := []string{"kern","user","mail","daemon","auth","syslog","lpr","news","uucp","cron","authpriv","ftp","ntp","audit","alert","clock","local0","local1","local2","local3","local4","local5","local6","local7"}
-	severities := []string{"CRITICAL","CRITICAL","CRITICAL","ERROR","WARNING","INFO","INFO","DEBUG"}
-	if fac < len(facilities) { facility = facilities[fac] } else { facility = "unknown" }
-	if sev < len(severities) { severity = severities[sev] } else { severity = "INFO" }
+	facilities := []string{"kern", "user", "mail", "daemon", "auth", "syslog", "lpr", "news", "uucp", "cron", "authpriv", "ftp", "ntp", "audit", "alert", "clock", "local0", "local1", "local2", "local3", "local4", "local5", "local6", "local7"}
+	severities := []string{"CRITICAL", "CRITICAL", "CRITICAL", "ERROR", "WARNING", "INFO", "INFO", "DEBUG"}
+	if fac < len(facilities) {
+		facility = facilities[fac]
+	} else {
+		facility = "unknown"
+	}
+	if sev < len(severities) {
+		severity = severities[sev]
+	} else {
+		severity = "INFO"
+	}
 	return
 }
 
 func cefSeverity(n int) string {
 	switch {
-	case n >= 9: return "CRITICAL"
-	case n >= 7: return "HIGH"
-	case n >= 4: return "MEDIUM"
-	default:     return "LOW"
+	case n >= 9:
+		return "CRITICAL"
+	case n >= 7:
+		return "HIGH"
+	case n >= 4:
+		return "MEDIUM"
+	default:
+		return "LOW"
 	}
 }
 
@@ -329,7 +377,9 @@ func parseCEFExtension(ext string) map[string]string {
 	parts := strings.Split(ext, " ")
 	for _, p := range parts {
 		kv := strings.SplitN(p, "=", 2)
-		if len(kv) == 2 { out[kv[0]] = kv[1] }
+		if len(kv) == 2 {
+			out[kv[0]] = kv[1]
+		}
 	}
 	return out
 }

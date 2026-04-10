@@ -4,8 +4,8 @@ package netcap
 
 import (
 	"bytes"
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net"
@@ -46,8 +46,8 @@ type ARPEntry struct {
 
 // MACFloodTracker tracks unique MACs per time window.
 type MACFloodTracker struct {
-	macs    map[string]time.Time
-	mu      sync.Mutex
+	macs      map[string]time.Time
+	mu        sync.Mutex
 	lastAlert time.Time
 }
 
@@ -61,13 +61,13 @@ type Engine struct {
 	running atomic.Bool
 
 	// L2
-	ethFrames  []*EthernetFrame
-	arpTable   map[string]*ARPEntry // key: IP
-	macFlood   *MACFloodTracker
+	ethFrames []*EthernetFrame
+	arpTable  map[string]*ARPEntry // key: IP
+	macFlood  *MACFloodTracker
 
 	// L3/L4
-	flows    []*Flow
-	flowIdx  map[string]*Flow
+	flows   []*Flow
+	flowIdx map[string]*Flow
 
 	// L7
 	anomalies []*Anomaly
@@ -97,7 +97,6 @@ type Engine struct {
 
 	// Cancel running capture
 	cancelCapture func()
-
 }
 
 type scanWindow struct {
@@ -153,7 +152,9 @@ func (e *Engine) Start(cfg CaptureConfig) error {
 
 	// Open pcap handle — this needs CAP_NET_RAW
 	snapLen := cfg.SnapLen
-	if snapLen <= 0 || snapLen > 65535 { snapLen = 1500 } // clamp to safe range
+	if snapLen <= 0 || snapLen > 65535 {
+		snapLen = 1500
+	} // clamp to safe range
 	handle, err := pcap.OpenLive(cfg.Interface, int32(snapLen), cfg.Promiscuous, pcap.BlockForever)
 	if err != nil {
 		return fmt.Errorf("pcap.OpenLive: %w (needs CAP_NET_RAW)", err)
@@ -224,7 +225,9 @@ func (e *Engine) IsRunning() bool { return e.running.Load() }
 func (e *Engine) pruneFlows() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if len(e.flowIdx) < 5000 { return }
+	if len(e.flowIdx) < 5000 {
+		return
+	}
 	cutoff := time.Now().Add(-5 * time.Minute)
 	for k, f := range e.flowIdx {
 		if f.UpdatedAt.Before(cutoff) {
@@ -237,7 +240,9 @@ func (e *Engine) pruneFlows() {
 func (e *Engine) pruneARPTable() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if len(e.arpTable) < 1000 { return }
+	if len(e.arpTable) < 1000 {
+		return
+	}
 	cutoff := time.Now().Add(-10 * time.Minute)
 	for k, entry := range e.arpTable {
 		if entry.LastSeen.Before(cutoff) {
@@ -250,7 +255,9 @@ func (e *Engine) pruneARPTable() {
 func (e *Engine) pruneScanTrack() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if len(e.scanTrack) < 1000 { return }
+	if len(e.scanTrack) < 1000 {
+		return
+	}
 	cutoff := time.Now().Add(-2 * time.Minute)
 	for k, sw := range e.scanTrack {
 		if sw.firstAt.Before(cutoff) {
@@ -509,8 +516,8 @@ func (e *Engine) detectRogueDHCP(ts time.Time, srcIP, srcMAC string) {
 			Layer:    "L2",
 			Type:     "Rogue DHCP Server",
 			SrcIP:    srcIP,
-				SrcGeo:   GeoLookup(context.Background(), srcIP).CountryCode,
-				SrcASN:   GeoLookup(context.Background(), srcIP).ASN,
+			SrcGeo:   GeoLookup(context.Background(), srcIP).CountryCode,
+			SrcASN:   GeoLookup(context.Background(), srcIP).ASN,
 			Detail:   fmt.Sprintf("DHCP server response from unexpected host %s (MAC: %s)", srcIP, srcMAC),
 			MITRE:    "T1557",
 			Proto:    "DHCP",
@@ -602,12 +609,24 @@ func (e *Engine) updateFlow(ts time.Time, srcIP, dstIP string, srcPort, dstPort 
 }
 
 func (e *Engine) updateTCPFlagCounters(tcp *layers.TCP) {
-	if tcp.SYN { atomic.AddInt64(&e.tcpFlags.SYN, 1) }
-	if tcp.ACK { atomic.AddInt64(&e.tcpFlags.ACK, 1) }
-	if tcp.PSH { atomic.AddInt64(&e.tcpFlags.PSH, 1) }
-	if tcp.RST { atomic.AddInt64(&e.tcpFlags.RST, 1) }
-	if tcp.FIN { atomic.AddInt64(&e.tcpFlags.FIN, 1) }
-	if tcp.URG { atomic.AddInt64(&e.tcpFlags.URG, 1) }
+	if tcp.SYN {
+		atomic.AddInt64(&e.tcpFlags.SYN, 1)
+	}
+	if tcp.ACK {
+		atomic.AddInt64(&e.tcpFlags.ACK, 1)
+	}
+	if tcp.PSH {
+		atomic.AddInt64(&e.tcpFlags.PSH, 1)
+	}
+	if tcp.RST {
+		atomic.AddInt64(&e.tcpFlags.RST, 1)
+	}
+	if tcp.FIN {
+		atomic.AddInt64(&e.tcpFlags.FIN, 1)
+	}
+	if tcp.URG {
+		atomic.AddInt64(&e.tcpFlags.URG, 1)
+	}
 }
 
 func (e *Engine) detectPortScan(ts time.Time, srcIP, dstIP string, dstPort int) {
@@ -690,7 +709,6 @@ func (e *Engine) processDNS(ts time.Time, srcIP, dstIP string, dns *layers.DNS) 
 			flag = "suspicious"
 		}
 
-
 		dq := &DNSQuery{
 			Timestamp: ts,
 			SrcIP:     srcIP,
@@ -772,14 +790,6 @@ func (e *Engine) processTLS(ts time.Time, srcIP, dstIP string, dstPort int, payl
 // ---
 // TCP stream reassembly for HTTP / PostgreSQL / gRPC
 // ---
-
-
-
-
-
-
-
-
 
 // ---
 // HTTP parser
@@ -992,7 +1002,6 @@ func (e *Engine) parseGRPC(ts time.Time, srcIP, dstIP string, data []byte) {
 // Reassembly flusher
 // ---
 
-
 // ---
 // Stats ticker
 // ---
@@ -1129,9 +1138,13 @@ func (e *Engine) GetAnomalies(limit int) []*Anomaly {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	n := len(e.anomalies)
-	if limit > n { limit = n }
+	if limit > n {
+		limit = n
+	}
 	out := make([]*Anomaly, limit)
-	for i := 0; i < limit; i++ { out[i] = e.anomalies[n-1-i] }
+	for i := 0; i < limit; i++ {
+		out[i] = e.anomalies[n-1-i]
+	}
 	return out
 }
 
@@ -1150,9 +1163,13 @@ func (e *Engine) GetDNSQueries(limit int) []*DNSQuery {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	n := len(e.dnsQ)
-	if limit > n { limit = n }
+	if limit > n {
+		limit = n
+	}
 	out := make([]*DNSQuery, limit)
-	for i := 0; i < limit; i++ { out[i] = e.dnsQ[n-1-i] }
+	for i := 0; i < limit; i++ {
+		out[i] = e.dnsQ[n-1-i]
+	}
 	return out
 }
 
@@ -1160,9 +1177,13 @@ func (e *Engine) GetHTTPRequests(limit int) []*HTTPRequest {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	n := len(e.httpReqs)
-	if limit > n { limit = n }
+	if limit > n {
+		limit = n
+	}
 	out := make([]*HTTPRequest, limit)
-	for i := 0; i < limit; i++ { out[i] = e.httpReqs[n-1-i] }
+	for i := 0; i < limit; i++ {
+		out[i] = e.httpReqs[n-1-i]
+	}
 	return out
 }
 
@@ -1170,9 +1191,13 @@ func (e *Engine) GetTLSSessions(limit int) []*TLSSession {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	n := len(e.tlsSess)
-	if limit > n { limit = n }
+	if limit > n {
+		limit = n
+	}
 	out := make([]*TLSSession, limit)
-	for i := 0; i < limit; i++ { out[i] = e.tlsSess[n-1-i] }
+	for i := 0; i < limit; i++ {
+		out[i] = e.tlsSess[n-1-i]
+	}
 	return out
 }
 
@@ -1180,9 +1205,13 @@ func (e *Engine) GetSQLEvents(limit int) []*SQLEvent {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	n := len(e.sqlEvts)
-	if limit > n { limit = n }
+	if limit > n {
+		limit = n
+	}
 	out := make([]*SQLEvent, limit)
-	for i := 0; i < limit; i++ { out[i] = e.sqlEvts[n-1-i] }
+	for i := 0; i < limit; i++ {
+		out[i] = e.sqlEvts[n-1-i]
+	}
 	return out
 }
 
@@ -1190,9 +1219,13 @@ func (e *Engine) GetGRPCEvents(limit int) []*GRPCEvent {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	n := len(e.grpcEvts)
-	if limit > n { limit = n }
+	if limit > n {
+		limit = n
+	}
 	out := make([]*GRPCEvent, limit)
-	for i := 0; i < limit; i++ { out[i] = e.grpcEvts[n-1-i] }
+	for i := 0; i < limit; i++ {
+		out[i] = e.grpcEvts[n-1-i]
+	}
 	return out
 }
 
@@ -1200,9 +1233,13 @@ func (e *Engine) GetEthernetFrames(limit int) []*EthernetFrame {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	n := len(e.ethFrames)
-	if limit > n { limit = n }
+	if limit > n {
+		limit = n
+	}
 	out := make([]*EthernetFrame, limit)
-	for i := 0; i < limit; i++ { out[i] = e.ethFrames[n-1-i] }
+	for i := 0; i < limit; i++ {
+		out[i] = e.ethFrames[n-1-i]
+	}
 	return out
 }
 
@@ -1218,9 +1255,13 @@ func (e *Engine) GetARPTable() []*ARPEntry {
 
 func (e *Engine) GetInterfaces() ([]string, error) {
 	ifaces, err := net.Interfaces()
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	names := make([]string, 0, len(ifaces))
-	for _, iface := range ifaces { names = append(names, iface.Name) }
+	for _, iface := range ifaces {
+		names = append(names, iface.Name)
+	}
 	return names, nil
 }
 
@@ -1231,7 +1272,9 @@ func (e *Engine) GetProtoBreakdown() []ProtoBreakdown {
 	var total int64
 	for _, f := range e.flows {
 		l7 := f.L7Proto
-		if l7 == "" { l7 = string(f.Proto) }
+		if l7 == "" {
+			l7 = string(f.Proto)
+		}
 		counts[l7] += f.Bytes
 		total += f.Bytes
 	}
@@ -1243,9 +1286,13 @@ func (e *Engine) GetProtoBreakdown() []ProtoBreakdown {
 	result := make([]ProtoBreakdown, 0, len(counts))
 	for name, bytes := range counts {
 		pct := 0.0
-		if total > 0 { pct = float64(bytes) / float64(total) * 100 }
+		if total > 0 {
+			pct = float64(bytes) / float64(total) * 100
+		}
 		c := colors[name]
-		if c == "" { c = "#5a6278" }
+		if c == "" {
+			c = "#5a6278"
+		}
 		result = append(result, ProtoBreakdown{Name: name, Bytes: bytes, Pct: pct, Color: c})
 	}
 	return result
@@ -1281,12 +1328,24 @@ func (e *Engine) StartTsharkDecoder(_ interface{}, _ string) {}
 
 func tcpFlagsStr(tcp *layers.TCP) string {
 	var flags []string
-	if tcp.SYN { flags = append(flags, "SYN") }
-	if tcp.ACK { flags = append(flags, "ACK") }
-	if tcp.PSH { flags = append(flags, "PSH") }
-	if tcp.RST { flags = append(flags, "RST") }
-	if tcp.FIN { flags = append(flags, "FIN") }
-	if tcp.URG { flags = append(flags, "URG") }
+	if tcp.SYN {
+		flags = append(flags, "SYN")
+	}
+	if tcp.ACK {
+		flags = append(flags, "ACK")
+	}
+	if tcp.PSH {
+		flags = append(flags, "PSH")
+	}
+	if tcp.RST {
+		flags = append(flags, "RST")
+	}
+	if tcp.FIN {
+		flags = append(flags, "FIN")
+	}
+	if tcp.URG {
+		flags = append(flags, "URG")
+	}
 	return strings.Join(flags, "/")
 }
 
@@ -1297,13 +1356,17 @@ func isHTTP(data []byte) bool {
 		[]byte("HTTP/1."), []byte("HTTP/2"),
 	}
 	for _, m := range methods {
-		if bytes.HasPrefix(data, m) { return true }
+		if bytes.HasPrefix(data, m) {
+			return true
+		}
 	}
 	return false
 }
 
 func isPGSQL(data []byte) bool {
-	if len(data) < 5 { return false }
+	if len(data) < 5 {
+		return false
+	}
 	msgType := data[0]
 	return (msgType == 'Q' || msgType == 'P' || msgType == 'B') &&
 		data[1] == 0 // high byte of length is typically 0
@@ -1317,10 +1380,14 @@ func isGRPC(data []byte) bool {
 func tlsVersionFromBytes(b1, b2 byte) string {
 	ver := uint16(b1)<<8 | uint16(b2)
 	switch ver {
-	case 0x0301: return "TLSv1.0"
-	case 0x0302: return "TLSv1.1"
-	case 0x0303: return "TLSv1.2"
-	case 0x0304: return "TLSv1.3"
+	case 0x0301:
+		return "TLSv1.0"
+	case 0x0302:
+		return "TLSv1.1"
+	case 0x0303:
+		return "TLSv1.2"
+	case 0x0304:
+		return "TLSv1.3"
 	}
 	return fmt.Sprintf("0x%04x", ver)
 }
@@ -1328,23 +1395,33 @@ func tlsVersionFromBytes(b1, b2 byte) string {
 func extractSNI(data []byte) string {
 	// Find SNI extension (type 0x0000) in ClientHello extensions
 	// Simplified: search for SNI extension bytes
-	if len(data) < 44 { return "" }
+	if len(data) < 44 {
+		return ""
+	}
 
 	// Skip: record header(5) + handshake header(4) + version(2) + random(32) + session_id_len(1)
 	offset := 5 + 4 + 2 + 32
-	if offset >= len(data) { return "" }
+	if offset >= len(data) {
+		return ""
+	}
 	sidLen := int(data[offset])
 	offset += 1 + sidLen
 
-	if offset+2 >= len(data) { return "" }
+	if offset+2 >= len(data) {
+		return ""
+	}
 	csLen := int(data[offset])<<8 | int(data[offset+1])
 	offset += 2 + csLen
 
-	if offset >= len(data) { return "" }
+	if offset >= len(data) {
+		return ""
+	}
 	compLen := int(data[offset])
 	offset += 1 + compLen
 
-	if offset+2 >= len(data) { return "" }
+	if offset+2 >= len(data) {
+		return ""
+	}
 	extLen := int(data[offset])<<8 | int(data[offset+1])
 	offset += 2
 	end := offset + extLen
@@ -1372,16 +1449,22 @@ func computeJA3(data []byte) string {
 	// Simplified JA3: extract TLS version + cipher suites for fingerprint
 	// Real JA3 = MD5(SSLVersion,Ciphers,Extensions,EllipticCurves,EllipticCurvePointFormats)
 	// This is a simplified version for detection purposes
-	if len(data) < 44 { return "" }
+	if len(data) < 44 {
+		return ""
+	}
 
 	ver := fmt.Sprintf("%d", uint16(data[1])<<8|uint16(data[2]))
 
 	offset := 5 + 4 + 2 + 32
-	if offset >= len(data) { return ver }
+	if offset >= len(data) {
+		return ver
+	}
 	sidLen := int(data[offset])
 	offset += 1 + sidLen
 
-	if offset+2 >= len(data) { return ver }
+	if offset+2 >= len(data) {
+		return ver
+	}
 	csLen := int(data[offset])<<8 | int(data[offset+1])
 	offset += 2
 
@@ -1397,9 +1480,13 @@ func computeJA3(data []byte) string {
 }
 
 func shannonEntropy(s string) float64 {
-	if len(s) == 0 { return 0 }
+	if len(s) == 0 {
+		return 0
+	}
 	freq := make(map[rune]int)
-	for _, c := range s { freq[c]++ }
+	for _, c := range s {
+		freq[c]++
+	}
 	n := float64(len(s))
 	var h float64
 	for _, c := range freq {
@@ -1410,20 +1497,30 @@ func shannonEntropy(s string) float64 {
 }
 
 func geoCC(ip string) string {
-	if isPrivateIP(ip) { return "—" }
+	if isPrivateIP(ip) {
+		return "—"
+	}
 	parts := strings.Split(ip, ".")
-	if len(parts) < 1 { return "??" }
+	if len(parts) < 1 {
+		return "??"
+	}
 	first, _ := strconv.Atoi(parts[0])
 	switch {
-	case first >= 178 && first <= 185: return "RU"
-	case first >= 45 && first <= 46:   return "NL"
-	case first >= 1 && first <= 9:     return "US"
-	default: return "??"
+	case first >= 178 && first <= 185:
+		return "RU"
+	case first >= 45 && first <= 46:
+		return "NL"
+	case first >= 1 && first <= 9:
+		return "US"
+	default:
+		return "??"
 	}
 }
 
 func geoASN(ip string) string {
-	if isPrivateIP(ip) { return "—" }
+	if isPrivateIP(ip) {
+		return "—"
+	}
 	return "AS????"
 }
 
@@ -1432,24 +1529,37 @@ func isPrivateIP(ip string) bool {
 		"172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
 		"172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
 		"192.168.", "127.", "::1", "fc", "fd"} {
-		if strings.HasPrefix(ip, p) { return true }
+		if strings.HasPrefix(ip, p) {
+			return true
+		}
 	}
 	return false
 }
 
 func l7ProtoByPort(dstPort, srcPort int) string {
 	switch {
-	case dstPort == 80 || srcPort == 80 || dstPort == 8080 || srcPort == 8080: return "HTTP"
-	case dstPort == 443 || srcPort == 443 || dstPort == 8443 || srcPort == 8443: return "HTTPS/TLS"
-	case dstPort == 53 || srcPort == 53: return "DNS"
-	case dstPort == 22 || srcPort == 22: return "SSH"
-	case dstPort == 5432 || srcPort == 5432: return "PostgreSQL"
-	case dstPort == 3306 || srcPort == 3306: return "MySQL"
-	case dstPort == 6379 || srcPort == 6379: return "Redis"
-	case dstPort == 50051 || srcPort == 50051: return "gRPC"
-	case dstPort == 9200 || srcPort == 9200: return "Elasticsearch"
-	case dstPort == 27017 || srcPort == 27017: return "MongoDB"
-	default: return ""
+	case dstPort == 80 || srcPort == 80 || dstPort == 8080 || srcPort == 8080:
+		return "HTTP"
+	case dstPort == 443 || srcPort == 443 || dstPort == 8443 || srcPort == 8443:
+		return "HTTPS/TLS"
+	case dstPort == 53 || srcPort == 53:
+		return "DNS"
+	case dstPort == 22 || srcPort == 22:
+		return "SSH"
+	case dstPort == 5432 || srcPort == 5432:
+		return "PostgreSQL"
+	case dstPort == 3306 || srcPort == 3306:
+		return "MySQL"
+	case dstPort == 6379 || srcPort == 6379:
+		return "Redis"
+	case dstPort == 50051 || srcPort == 50051:
+		return "gRPC"
+	case dstPort == 9200 || srcPort == 9200:
+		return "Elasticsearch"
+	case dstPort == 27017 || srcPort == 27017:
+		return "MongoDB"
+	default:
+		return ""
 	}
 }
 
@@ -1457,14 +1567,22 @@ func detectHTTPFlag(uri, ua, method string) string {
 	uaL := strings.ToLower(ua)
 	uriL := strings.ToLower(uri)
 	for _, sc := range []string{"sqlmap", "nikto", "nmap", "masscan", "dirbuster", "gobuster", "nuclei", "burp", "zgrab"} {
-		if strings.Contains(uaL, sc) { return "scanner-ua" }
+		if strings.Contains(uaL, sc) {
+			return "scanner-ua"
+		}
 	}
-	if strings.Contains(uriL, "../") || strings.Contains(uriL, "..%2f") { return "path-traversal" }
+	if strings.Contains(uriL, "../") || strings.Contains(uriL, "..%2f") {
+		return "path-traversal"
+	}
 	for _, p := range []string{"' or ", "1=1", "union select", "drop table", ";--"} {
-		if strings.Contains(uriL, p) { return "sqli-uri" }
+		if strings.Contains(uriL, p) {
+			return "sqli-uri"
+		}
 	}
 	for _, cms := range []string{"/wp-admin", "/.git/", "/.env", "/phpmyadmin"} {
-		if strings.Contains(uriL, cms) { return "probe" }
+		if strings.Contains(uriL, cms) {
+			return "probe"
+		}
 	}
 	return ""
 }
@@ -1472,7 +1590,9 @@ func detectHTTPFlag(uri, ua, method string) string {
 func detectHTTPBodyFlag(body string) string {
 	bodyL := strings.ToLower(body)
 	for _, p := range []string{"' or '1'='1", "or 1=1", "union select", "drop table"} {
-		if strings.Contains(bodyL, p) { return "sqli-body" }
+		if strings.Contains(bodyL, p) {
+			return "sqli-body"
+		}
 	}
 	return ""
 }
@@ -1482,41 +1602,53 @@ func httpFlagMITRE(flag string) string {
 		"sqli-uri": "T1190", "sqli-body": "T1190",
 		"path-traversal": "T1083", "probe": "T1595", "scanner-ua": "T1595",
 	}
-	if v, ok := m[flag]; ok { return v }
+	if v, ok := m[flag]; ok {
+		return v
+	}
 	return "T1190"
 }
 
 func detectSQLInjection(sql string) string {
 	lower := strings.ToLower(sql)
 	for _, p := range []string{"or '1'='1", "or 1=1", "union select", "drop table", "delete from"} {
-		if strings.Contains(lower, p) { return "critical" }
+		if strings.Contains(lower, p) {
+			return "critical"
+		}
 	}
 	for _, p := range []string{"select * from secrets", "information_schema", "pg_shadow"} {
-		if strings.Contains(lower, p) { return "high" }
+		if strings.Contains(lower, p) {
+			return "high"
+		}
 	}
 	return "ok"
 }
 
 func isKnownBadDomain(d string) bool {
 	for _, b := range []string{".onion", "evil-c2", "malware", "c2.", "botnet"} {
-		if strings.Contains(strings.ToLower(d), b) { return true }
+		if strings.Contains(strings.ToLower(d), b) {
+			return true
+		}
 	}
 	return false
 }
 
 func retxPct(retx, total int64) float64 {
-	if total == 0 { return 0 }
+	if total == 0 {
+		return 0
+	}
 	return float64(retx) / float64(total) * 100
 }
 
 func truncate(s string, n int) string {
-	if len(s) <= n { return s }
+	if len(s) <= n {
+		return s
+	}
 	return s[:n] + "..."
 }
 
 func knownBadJA3() map[string]string {
 	return map[string]string{
-		"769,47-53-5-10-49161-49162": "Metasploit/Cobalt Strike",
+		"769,47-53-5-10-49161-49162":       "Metasploit/Cobalt Strike",
 		"e7d705a3286e19ea42f587b344ee6865": "Dridex",
 	}
 }

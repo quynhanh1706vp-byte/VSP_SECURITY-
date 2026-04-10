@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"context"
 	"strings"
 	"time"
 
@@ -25,18 +25,23 @@ func (h *SBOM) Generate(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
 	format := r.URL.Query().Get("format") // cyclonedx | spdx | json
-	if format == "" { format = "cyclonedx" }
+	if format == "" {
+		format = "cyclonedx"
+	}
 
 	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
 	if err != nil || run == nil {
-		jsonError(w, "run not found", http.StatusNotFound); return
+		jsonError(w, "run not found", http.StatusNotFound)
+		return
 	}
 
 	findings, _, _ := h.DB.ListFindings(r.Context(), claims.TenantID,
 		store.FindingFilter{Limit: 2000})
 	var rf []store.Finding
 	for _, f := range findings {
-		if f.RunID == run.ID { rf = append(rf, f) }
+		if f.RunID == run.ID {
+			rf = append(rf, f)
+		}
 	}
 
 	bom := buildCycloneDX(run, rf)
@@ -74,11 +79,14 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 
 	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
 	if err != nil || run == nil {
-		jsonError(w, "run not found", http.StatusNotFound); return
+		jsonError(w, "run not found", http.StatusNotFound)
+		return
 	}
 
 	target := run.Src
-	if target == "" { target = run.TargetURL }
+	if target == "" {
+		target = run.TargetURL
+	}
 	// Nếu target là directory Go source → dùng gomod: prefix
 	if target != "" {
 		// Check nếu là Go project (có go.mod)
@@ -87,16 +95,19 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if target == "" {
-		jsonError(w, "no src/url for this run", http.StatusBadRequest); return
+		jsonError(w, "no src/url for this run", http.StatusBadRequest)
+		return
 	}
 	// Validate target — chặn metacharacters
 	for _, c := range []string{";", "&", "|", "`", "$", "<", ">", "{", "}", "\\"} {
 		if strings.Contains(target, c) {
-			jsonError(w, "invalid target", http.StatusBadRequest); return
+			jsonError(w, "invalid target", http.StatusBadRequest)
+			return
 		}
 	}
 	if len(target) > 500 {
-		jsonError(w, "target too long", http.StatusBadRequest); return
+		jsonError(w, "target too long", http.StatusBadRequest)
+		return
 	}
 
 	// grype sbom output — timeout 60s + ulimit memory
@@ -104,7 +115,10 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	// Grype write to temp file — stdout suppressed by default
 	tmpOut, tmpErr := os.CreateTemp("", "grype-*.json")
-	if tmpErr != nil { jsonError(w, "temp file error", http.StatusInternalServerError); return }
+	if tmpErr != nil {
+		jsonError(w, "temp file error", http.StatusInternalServerError)
+		return
+	}
 	defer os.Remove(tmpOut.Name())
 	tmpOut.Close()
 
@@ -126,7 +140,9 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 	out, _ := os.ReadFile(tmpOut.Name())
 	if len(out) < 10 {
 		errMsg := "grype produced no output"
-		if err != nil { errMsg = "grype failed: " + err.Error() }
+		if err != nil {
+			errMsg = "grype failed: " + err.Error()
+		}
 		jsonError(w, errMsg, http.StatusInternalServerError)
 		return
 	}
@@ -138,18 +154,18 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 }
 
 type cycloneDX struct {
-	BOMFormat   string        `json:"bomFormat"`
-	SpecVersion string        `json:"specVersion"`
-	Version     int           `json:"version"`
-	Metadata    cdxMetadata   `json:"metadata"`
-	Components  []cdxComponent `json:"components"`
-	Vulnerabilities []cdxVuln `json:"vulnerabilities"`
+	BOMFormat       string         `json:"bomFormat"`
+	SpecVersion     string         `json:"specVersion"`
+	Version         int            `json:"version"`
+	Metadata        cdxMetadata    `json:"metadata"`
+	Components      []cdxComponent `json:"components"`
+	Vulnerabilities []cdxVuln      `json:"vulnerabilities"`
 }
 
 type cdxMetadata struct {
-	Timestamp string         `json:"timestamp"`
-	Tools     []cdxTool      `json:"tools"`
-	Component *cdxComponent  `json:"component,omitempty"`
+	Timestamp string        `json:"timestamp"`
+	Tools     []cdxTool     `json:"tools"`
+	Component *cdxComponent `json:"component,omitempty"`
 }
 
 type cdxTool struct {
@@ -166,16 +182,24 @@ type cdxComponent struct {
 }
 
 type cdxVuln struct {
-	ID          string     `json:"id"`
-	Source      cdxSource  `json:"source"`
-	Ratings     []cdxRating `json:"ratings"`
-	Description string     `json:"description"`
+	ID          string       `json:"id"`
+	Source      cdxSource    `json:"source"`
+	Ratings     []cdxRating  `json:"ratings"`
+	Description string       `json:"description"`
 	Affects     []cdxAffects `json:"affects"`
 }
 
-type cdxSource  struct { Name string `json:"name"`; URL string `json:"url"` }
-type cdxRating  struct { Severity string `json:"severity"`; Method string `json:"method"` }
-type cdxAffects struct { Ref string `json:"ref"` }
+type cdxSource struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+type cdxRating struct {
+	Severity string `json:"severity"`
+	Method   string `json:"method"`
+}
+type cdxAffects struct {
+	Ref string `json:"ref"`
+}
 
 func buildCycloneDX(run *store.Run, findings []store.Finding) cycloneDX {
 	bom := cycloneDX{
@@ -197,7 +221,9 @@ func buildCycloneDX(run *store.Run, findings []store.Finding) cycloneDX {
 	seenComp := map[string]bool{}
 	for _, f := range findings {
 		key := f.Tool + ":" + f.Path
-		if f.Path == "" || seenComp[key] { continue }
+		if f.Path == "" || seenComp[key] {
+			continue
+		}
 		seenComp[key] = true
 		compType := "library"
 		if strings.HasSuffix(f.Path, ".go") || strings.HasSuffix(f.Path, ".py") {
@@ -216,17 +242,19 @@ func buildCycloneDX(run *store.Run, findings []store.Finding) cycloneDX {
 	// Build vulnerabilities từ unique rule IDs
 	seen := map[string]bool{}
 	for _, f := range findings {
-		if f.RuleID == "" || seen[f.RuleID] { continue }
+		if f.RuleID == "" || seen[f.RuleID] {
+			continue
+		}
 		seen[f.RuleID] = true
 		sev := map[string]string{
-			"CRITICAL":"critical","HIGH":"high","MEDIUM":"medium","LOW":"low","INFO":"info",
+			"CRITICAL": "critical", "HIGH": "high", "MEDIUM": "medium", "LOW": "low", "INFO": "info",
 		}[string(f.Severity)]
 		bom.Vulnerabilities = append(bom.Vulnerabilities, cdxVuln{
-			ID: f.RuleID,
-			Source: cdxSource{Name: f.Tool, URL: "https://cwe.mitre.org/data/definitions/" + f.CWE},
-			Ratings: []cdxRating{{Severity: sev, Method: "other"}},
+			ID:          f.RuleID,
+			Source:      cdxSource{Name: f.Tool, URL: "https://cwe.mitre.org/data/definitions/" + f.CWE},
+			Ratings:     []cdxRating{{Severity: sev, Method: "other"}},
 			Description: f.Message,
-			Affects: []cdxAffects{{Ref: "target"}},
+			Affects:     []cdxAffects{{Ref: "target"}},
 		})
 	}
 	return bom

@@ -2,19 +2,19 @@ package handler
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"strings"
-	"net/http"
 	"time"
 )
 
 // OpenAPI 3.0 spec — generated from handler definitions
 type openAPISpec struct {
-	OpenAPI string            `json:"openapi"`
-	Info    map[string]any    `json:"info"`
-	Servers []map[string]any  `json:"servers"`
-	Paths   map[string]any    `json:"paths"`
-	Components map[string]any `json:"components"`
+	OpenAPI    string           `json:"openapi"`
+	Info       map[string]any   `json:"info"`
+	Servers    []map[string]any `json:"servers"`
+	Paths      map[string]any   `json:"paths"`
+	Components map[string]any   `json:"components"`
 }
 
 var cachedSpec []byte
@@ -87,7 +87,9 @@ window.onload = function() {
 
 func buildSpec(r *http.Request) openAPISpec {
 	scheme := "http"
-	if r.TLS != nil { scheme = "https" }
+	if r.TLS != nil {
+		scheme = "https"
+	}
 	return openAPISpec{
 		OpenAPI: "3.0.3",
 		Info: map[string]any{
@@ -132,8 +134,8 @@ func buildSpec(r *http.Request) openAPISpec {
 			},
 			"/api/v1/vsp/run": map[string]any{
 				"post": map[string]any{
-					"tags":    []string{"Scan"},
-					"summary": "Trigger a security scan",
+					"tags":     []string{"Scan"},
+					"summary":  "Trigger a security scan",
 					"security": []map[string]any{{"bearerAuth": []string{}}},
 					"requestBody": map[string]any{
 						"required": true,
@@ -142,8 +144,8 @@ func buildSpec(r *http.Request) openAPISpec {
 								"schema": map[string]any{
 									"type": "object",
 									"properties": map[string]any{
-										"mode":    map[string]any{"type": "string", "enum": []string{"SAST","SCA","SECRETS","IAC","DAST","FULL"}},
-										"profile": map[string]any{"type": "string", "enum": []string{"FAST","EXT","AGGR","PREMIUM","FULL","FULL_SOC"}},
+										"mode":    map[string]any{"type": "string", "enum": []string{"SAST", "SCA", "SECRETS", "IAC", "DAST", "FULL"}},
+										"profile": map[string]any{"type": "string", "enum": []string{"FAST", "EXT", "AGGR", "PREMIUM", "FULL", "FULL_SOC"}},
 										"src":     map[string]string{"type": "string"},
 										"url":     map[string]string{"type": "string"},
 									},
@@ -156,34 +158,34 @@ func buildSpec(r *http.Request) openAPISpec {
 			},
 			"/api/v1/vsp/run/{rid}": map[string]any{
 				"get": map[string]any{
-					"tags":    []string{"Scan"},
-					"summary": "Get scan run status",
-					"security": []map[string]any{{"bearerAuth": []string{}}},
+					"tags":       []string{"Scan"},
+					"summary":    "Get scan run status",
+					"security":   []map[string]any{{"bearerAuth": []string{}}},
 					"parameters": []map[string]any{{"name": "rid", "in": "path", "required": true, "schema": map[string]string{"type": "string"}}},
-					"responses": map[string]any{"200": map[string]any{"description": "Run object"}},
+					"responses":  map[string]any{"200": map[string]any{"description": "Run object"}},
 				},
 			},
 			"/api/v1/vsp/findings": map[string]any{
 				"get": map[string]any{
-					"tags":    []string{"Findings"},
-					"summary": "List findings",
+					"tags":     []string{"Findings"},
+					"summary":  "List findings",
 					"security": []map[string]any{{"bearerAuth": []string{}}},
 					"parameters": []map[string]any{
-						{"name": "severity", "in": "query", "schema": map[string]any{"type": "string", "enum": []string{"CRITICAL","HIGH","MEDIUM","LOW","INFO"}}},
-						{"name": "tool",     "in": "query", "schema": map[string]string{"type": "string"}},
-						{"name": "limit",    "in": "query", "schema": map[string]string{"type": "integer"}},
-						{"name": "offset",   "in": "query", "schema": map[string]string{"type": "integer"}},
+						{"name": "severity", "in": "query", "schema": map[string]any{"type": "string", "enum": []string{"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}}},
+						{"name": "tool", "in": "query", "schema": map[string]string{"type": "string"}},
+						{"name": "limit", "in": "query", "schema": map[string]string{"type": "integer"}},
+						{"name": "offset", "in": "query", "schema": map[string]string{"type": "integer"}},
 					},
 					"responses": map[string]any{"200": map[string]any{"description": "Findings list"}},
 				},
 			},
 			"/api/v1/vsp/findings/summary": map[string]any{
 				"get": map[string]any{
-					"tags":    []string{"Findings"},
-					"summary": "Findings severity summary (latest run by default)",
+					"tags":     []string{"Findings"},
+					"summary":  "Findings severity summary (latest run by default)",
 					"security": []map[string]any{{"bearerAuth": []string{}}},
 					"parameters": []map[string]any{
-						{"name": "scope",  "in": "query", "schema": map[string]any{"type": "string", "enum": []string{"latest","all"}}},
+						{"name": "scope", "in": "query", "schema": map[string]any{"type": "string", "enum": []string{"latest", "all"}}},
 						{"name": "run_id", "in": "query", "schema": map[string]string{"type": "string"}},
 					},
 					"responses": map[string]any{"200": map[string]any{"description": "Summary counts"}},

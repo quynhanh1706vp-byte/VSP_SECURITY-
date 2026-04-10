@@ -107,7 +107,9 @@ func (c *Client) Middleware(name string, ttl time.Duration) func(next http.Handl
 			// CRITICAL: include tenant_id to prevent cross-tenant cache leak
 			tenantID := ""
 			if tid := r.Context().Value("tenant_id"); tid != nil {
-				if s, ok := tid.(string); ok { tenantID = s }
+				if s, ok := tid.(string); ok {
+					tenantID = s
+				}
 			}
 			key := "vsp:api:" + name + ":" + tenantID + ":" + r.URL.RawQuery
 

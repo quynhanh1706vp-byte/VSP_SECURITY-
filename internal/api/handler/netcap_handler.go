@@ -60,9 +60,9 @@ func (h *NetCapHandler) Start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]interface{}{
-		"status":    "capturing",
-		"interface": cfg.Interface,
-		"filter":    cfg.BPFFilter,
+		"status":     "capturing",
+		"interface":  cfg.Interface,
+		"filter":     cfg.BPFFilter,
 		"started_at": time.Now(),
 	})
 }
@@ -325,7 +325,6 @@ func sendSSE(w http.ResponseWriter, f http.Flusher, event string, data interface
 	f.Flush()
 }
 
-
 func pickDefaultInterface(ifaces []string) string {
 	preferred := []string{"eth0", "ens3", "ens4", "enp0s3", "wlp59s0"}
 	for _, p := range preferred {
@@ -346,5 +345,3 @@ func pickDefaultInterface(ifaces []string) string {
 	}
 	return "any"
 }
-
-

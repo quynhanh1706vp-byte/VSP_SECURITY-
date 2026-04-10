@@ -75,7 +75,9 @@ func (db *DB) ListUsers(ctx context.Context, tenantID string, limit, offset int)
 		if err != nil {
 			return nil, 0, err
 		}
-		if u == nil { continue }
+		if u == nil {
+			continue
+		}
 		users = append(users, *u)
 	}
 
@@ -94,7 +96,6 @@ func (db *DB) UpdateLastLogin(ctx context.Context, id string) error {
 	_, err := db.pool.Exec(ctx, `UPDATE users SET last_login = NOW() WHERE id = $1`, id)
 	return err
 }
-
 
 // ── MFA methods ───────────────────────────────────────────────────────────────
 
@@ -125,7 +126,9 @@ func (db *DB) RecordFailedLogin(ctx context.Context, userID string) (int, error)
 	err := db.pool.QueryRow(ctx,
 		`UPDATE users SET failed_logins = failed_logins + 1
 		 WHERE id = $1 RETURNING failed_logins`, userID).Scan(&count)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	// Lockout sau 5 lần fail: 15 phút
 	if count >= 5 {
 		db.pool.Exec(ctx,

@@ -40,10 +40,14 @@ func ValidateWebhookURL(rawURL string) error {
 	}
 	// Resolve DNS và check IP
 	ips, err := net.LookupHost(host)
-	if err != nil { return nil } // nếu không resolve được thì skip check này
+	if err != nil {
+		return nil
+	} // nếu không resolve được thì skip check này
 	for _, ip := range ips {
 		parsed := net.ParseIP(ip)
-		if parsed == nil { continue }
+		if parsed == nil {
+			continue
+		}
 		if parsed.IsLoopback() || parsed.IsPrivate() || parsed.IsLinkLocalUnicast() {
 			return fmt.Errorf("URL resolves to private IP %s — blocked", ip)
 		}
@@ -65,18 +69,18 @@ const (
 
 // Event is the internal representation sent to all webhooks.
 type Event struct {
-	RID        string    `json:"rid"`
-	TenantID   string    `json:"tenant_id"`
-	Gate       string    `json:"gate"`
-	Posture    string    `json:"posture"`
-	Score      int       `json:"score"`
-	Findings   int       `json:"total_findings"`
-	Critical   int       `json:"critical"`
-	High       int       `json:"high"`
-	Medium     int       `json:"medium"`
-	Low        int       `json:"low"`
-	Timestamp  time.Time `json:"timestamp"`
-	Src        string    `json:"src"`
+	RID       string    `json:"rid"`
+	TenantID  string    `json:"tenant_id"`
+	Gate      string    `json:"gate"`
+	Posture   string    `json:"posture"`
+	Score     int       `json:"score"`
+	Findings  int       `json:"total_findings"`
+	Critical  int       `json:"critical"`
+	High      int       `json:"high"`
+	Medium    int       `json:"medium"`
+	Low       int       `json:"low"`
+	Timestamp time.Time `json:"timestamp"`
+	Src       string    `json:"src"`
 }
 
 // Deliver sends event to all active webhooks for a tenant.
@@ -170,18 +174,18 @@ func buildPayload(t WebhookType, hook store.SIEMWebhook, e Event) ([]byte, error
 				"color": color,
 				"title": fmt.Sprintf("VSP Scan: %s — %s", e.Gate, e.RID),
 				"fields": []map[string]any{
-					{"title": "Gate",     "value": e.Gate,               "short": true},
-					{"title": "Posture",  "value": e.Posture,            "short": true},
-					{"title": "Score",    "value": e.Score,              "short": true},
-					{"title": "Critical", "value": e.Critical,           "short": true},
-					{"title": "High",     "value": e.High,               "short": true},
-					{"title": "Source",   "value": e.Src,                "short": false},
+					{"title": "Gate", "value": e.Gate, "short": true},
+					{"title": "Posture", "value": e.Posture, "short": true},
+					{"title": "Score", "value": e.Score, "short": true},
+					{"title": "Critical", "value": e.Critical, "short": true},
+					{"title": "High", "value": e.High, "short": true},
+					{"title": "Source", "value": e.Src, "short": false},
 				},
 				"footer": "VSP Security Platform",
 				"ts":     e.Timestamp.Unix(),
 			}},
 		})
-	 case TypeSplunk:
+	case TypeSplunk:
 		return json.Marshal(map[string]any{
 			"time":       e.Timestamp.Unix(),
 			"sourcetype": "vsp:scan",
@@ -189,10 +193,10 @@ func buildPayload(t WebhookType, hook store.SIEMWebhook, e Event) ([]byte, error
 		})
 	case TypeDatadog:
 		return json.Marshal(map[string]any{
-			"title": "VSP Scan Complete: " + e.Gate,
-			"text":  fmt.Sprintf("RID: %s\nFindings: %d (C:%d H:%d M:%d L:%d)", e.RID, e.Findings, e.Critical, e.High, e.Medium, e.Low),
+			"title":      "VSP Scan Complete: " + e.Gate,
+			"text":       fmt.Sprintf("RID: %s\nFindings: %d (C:%d H:%d M:%d L:%d)", e.RID, e.Findings, e.Critical, e.High, e.Medium, e.Low),
 			"alert_type": map[string]string{"PASS": "success", "WARN": "warning", "FAIL": "error"}[e.Gate],
-			"tags": []string{"source:vsp", "gate:" + e.Gate},
+			"tags":       []string{"source:vsp", "gate:" + e.Gate},
 		})
 	default: // generic
 		return json.Marshal(e)

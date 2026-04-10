@@ -11,6 +11,7 @@ import (
 )
 
 var sseJWTSecret string
+
 func SetJWTSecret(s string) { sseJWTSecret = s }
 
 // WSHub broadcasts scan events to all connected dashboard clients.
@@ -56,9 +57,9 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return
 	}
-	w.Header().Set("Content-Type",  "text/event-stream")
+	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection",    "keep-alive")
+	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	ch := make(chan []byte, 8)
@@ -67,7 +68,9 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Send initial ping
 	w.Write([]byte("data: {\"type\":\"connected\"}\n\n")) //nolint
-	if f, ok := w.(http.Flusher); ok { f.Flush() }
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 
 	ticker := time.NewTicker(25 * time.Second)
 	defer ticker.Stop()
@@ -80,10 +83,14 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 			// keepalive ping
 			w.Write([]byte(": ping\n\n")) //nolint
-			if f, ok := w.(http.Flusher); ok { f.Flush() }
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
 		case msg := <-ch:
 			w.Write(append([]byte("data: "), append(msg, '\n', '\n')...)) //nolint
-			if f, ok := w.(http.Flusher); ok { f.Flush() }
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
 		}
 	}
 }

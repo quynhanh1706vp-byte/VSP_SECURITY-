@@ -132,7 +132,7 @@ func (a *AlertEmail) SendIncidentAlert(inc IncidentAlert) error {
 // WatchIncidents polls for new critical incidents and sends alerts.
 func WatchIncidents(ctx context.Context, db *store.DB) {
 	alerter := NewAlerter()
-	ticker  := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	// Track by created_at — UUID comparison unreliable
 	lastSeen := time.Now()
@@ -153,7 +153,9 @@ func WatchIncidents(ctx context.Context, db *store.DB) {
 				  AND  i.created_at > $1
 				ORDER  BY i.created_at ASC
 				LIMIT  10`, since)
-			if err != nil { continue }
+			if err != nil {
+				continue
+			}
 			for rows.Next() {
 				var inc IncidentAlert
 				var createdAt time.Time

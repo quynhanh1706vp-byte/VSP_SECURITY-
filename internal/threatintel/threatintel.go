@@ -81,10 +81,10 @@ func (c *Cache) evict() {
 // ── Client ─────────────────────────────────────────────────────────────────
 
 type Client struct {
-	http    *http.Client
-	cache   *Cache
-	kevSet  map[string]bool // KEV CVE IDs
-	kevMu   sync.RWMutex
+	http   *http.Client
+	cache  *Cache
+	kevSet map[string]bool // KEV CVE IDs
+	kevMu  sync.RWMutex
 }
 
 func NewClient() *Client {
@@ -173,7 +173,7 @@ func (c *Client) EnrichBatch(ctx context.Context, cveIDs []string) map[string]*C
 func (c *Client) fetchNVD(ctx context.Context, cveID string, enr *CVEEnrichment) error {
 	//nolint:gosec // G704: base URL is hardcoded constant, cveID validated as alphanumeric
 	url := "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=" + cveID //#nosec G704 -- base URL hardcoded
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil) //nolint:gosec
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)               //nolint:gosec
 	req.Header.Set("User-Agent", "VSP-Security-Platform/1.0")
 
 	resp, err := c.http.Do(req)
@@ -185,8 +185,8 @@ func (c *Client) fetchNVD(ctx context.Context, cveID string, enr *CVEEnrichment)
 	var nvd struct {
 		Vulnerabilities []struct {
 			CVE struct {
-				ID          string `json:"id"`
-				Published   string `json:"published"`
+				ID           string `json:"id"`
+				Published    string `json:"published"`
 				LastModified string `json:"lastModified"`
 				Descriptions []struct {
 					Lang  string `json:"lang"`
@@ -244,7 +244,9 @@ func (c *Client) fetchNVD(ctx context.Context, cveID string, enr *CVEEnrichment)
 
 	// References (first 5)
 	for i, r := range cve.References {
-		if i >= 5 { break }
+		if i >= 5 {
+			break
+		}
 		enr.References = append(enr.References, r.URL)
 	}
 
@@ -255,7 +257,8 @@ func (c *Client) fetchNVD(ctx context.Context, cveID string, enr *CVEEnrichment)
 		"2006-01-02T15:04:05Z", "2006-01-02T15:04:05",
 	} {
 		if t, err := time.Parse(layout, cve.Published); err == nil {
-			enr.Published = t; break
+			enr.Published = t
+			break
 		}
 	}
 	for _, layout := range []string{
@@ -263,7 +266,8 @@ func (c *Client) fetchNVD(ctx context.Context, cveID string, enr *CVEEnrichment)
 		"2006-01-02T15:04:05Z", "2006-01-02T15:04:05",
 	} {
 		if t, err := time.Parse(layout, cve.LastModified); err == nil {
-			enr.Modified = t; break
+			enr.Modified = t
+			break
 		}
 	}
 
@@ -274,7 +278,7 @@ func (c *Client) fetchNVD(ctx context.Context, cveID string, enr *CVEEnrichment)
 
 func (c *Client) fetchEPSS(ctx context.Context, cveID string, enr *CVEEnrichment) error {
 	//nolint:gosec // G704: base URL is hardcoded constant
-	url := "https://api.first.org/data/v1/epss?cve=" + cveID //#nosec G704 -- base URL hardcoded
+	url := "https://api.first.org/data/v1/epss?cve=" + cveID   //#nosec G704 -- base URL hardcoded
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil) //nolint:gosec
 
 	resp, err := c.http.Do(req)
@@ -367,13 +371,19 @@ func adjustSeverity(enr *CVEEnrichment) string {
 
 	// Escalate if EPSS > 0.7 (high exploit probability)
 	if enr.EPSS >= 0.7 {
-		if base == "MEDIUM" { return "HIGH" }
-		if base == "HIGH"   { return "CRITICAL" }
+		if base == "MEDIUM" {
+			return "HIGH"
+		}
+		if base == "HIGH" {
+			return "CRITICAL"
+		}
 	}
 
 	// Escalate if EPSS > 0.5 and CVSS >= 7
 	if enr.EPSS >= 0.5 && enr.CVSS >= 7.0 {
-		if base == "HIGH" { return "CRITICAL" }
+		if base == "HIGH" {
+			return "CRITICAL"
+		}
 	}
 
 	return base
@@ -394,16 +404,23 @@ func computeRiskScore(enr *CVEEnrichment) float64 {
 		score += 20
 	}
 
-	if score > 100 { score = 100 }
+	if score > 100 {
+		score = 100
+	}
 	return score
 }
 
 func cvssToSev(cvss float64) string {
 	switch {
-	case cvss >= 9.0: return "CRITICAL"
-	case cvss >= 7.0: return "HIGH"
-	case cvss >= 4.0: return "MEDIUM"
-	case cvss > 0:    return "LOW"
-	default:          return "UNKNOWN" // no CVSS data
+	case cvss >= 9.0:
+		return "CRITICAL"
+	case cvss >= 7.0:
+		return "HIGH"
+	case cvss >= 4.0:
+		return "MEDIUM"
+	case cvss > 0:
+		return "LOW"
+	default:
+		return "UNKNOWN" // no CVSS data
 	}
 }

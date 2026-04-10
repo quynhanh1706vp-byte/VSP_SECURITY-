@@ -37,8 +37,8 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Plan      string `json:"plan"`
-		Interval  string `json:"interval"` // monthly | yearly
+		Plan       string `json:"plan"`
+		Interval   string `json:"interval"` // monthly | yearly
 		SuccessURL string `json:"success_url"`
 		CancelURL  string `json:"cancel_url"`
 	}
@@ -154,8 +154,12 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		&status.StripeCustomerID,
 	)
 	// Default values if DB scan fails (tenant not yet in billing)
-	if status.Plan == "" { status.Plan = "starter" }
-	if status.SubscriptionStatus == "" { status.SubscriptionStatus = "active" }
+	if status.Plan == "" {
+		status.Plan = "starter"
+	}
+	if status.SubscriptionStatus == "" {
+		status.SubscriptionStatus = "active"
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(status)
@@ -197,7 +201,9 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		plan := sub.Metadata["plan"]
-		if plan == "" { plan = "starter" }
+		if plan == "" {
+			plan = "starter"
+		}
 		periodEnd := time.Unix(sub.CurrentPeriodEnd, 0)
 		h.DB.Exec(r.Context(),
 			`UPDATE tenants SET

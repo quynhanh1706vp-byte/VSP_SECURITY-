@@ -51,10 +51,12 @@ func (h *Assets) List(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			i++
-			a.Type        = protoToType(proto)
+			a.Type = protoToType(proto)
 			a.Environment = "prod"
-			a.RiskScore   = 0
-			if a.Tags == nil { a.Tags = []string{} }
+			a.RiskScore = 0
+			if a.Tags == nil {
+				a.Tags = []string{}
+			}
 			assets = append(assets, a)
 		}
 	}
@@ -81,18 +83,20 @@ func (h *Assets) List(w http.ResponseWriter, r *http.Request) {
 			var tool string
 			rows2.Scan(&tool, &a.TotalFinds, &a.CritCount, &a.HighCount, &a.LastScan) //nolint:errcheck
 			i++
-			a.ID          = "scanner-" + tool
-			a.Name        = tool + " scanner"
-			a.Type        = "scanner"
-			a.IP          = "internal"
+			a.ID = "scanner-" + tool
+			a.Name = tool + " scanner"
+			a.Type = "scanner"
+			a.IP = "internal"
 			a.Environment = "prod"
-			a.Tags        = []string{"scanner", tool}
-			a.RiskScore   = calcRisk(a.CritCount, a.HighCount, a.TotalFinds)
+			a.Tags = []string{"scanner", tool}
+			a.RiskScore = calcRisk(a.CritCount, a.HighCount, a.TotalFinds)
 			assets = append(assets, a)
 		}
 	}
 
-	if assets == nil { assets = []Asset{} }
+	if assets == nil {
+		assets = []Asset{}
+	}
 	jsonOK(w, map[string]any{"assets": assets, "total": len(assets)})
 }
 
@@ -168,7 +172,9 @@ func (h *Assets) Findings(w http.ResponseWriter, r *http.Request) {
 		rows.Scan(&f.ID, &f.Severity, &f.Tool, &f.RuleID, &f.Message, &f.Path, &f.Line, &f.CWE) //nolint:errcheck
 		out = append(out, f)
 	}
-	if out == nil { out = []F{} }
+	if out == nil {
+		out = []F{}
+	}
 	jsonOK(w, map[string]any{"findings": out, "total": len(out)})
 }
 
@@ -190,14 +196,18 @@ func (h *Assets) Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "name required", http.StatusBadRequest)
 		return
 	}
-	if req.Tags == nil { req.Tags = []string{} }
+	if req.Tags == nil {
+		req.Tags = []string{}
+	}
 	var id string
 	// Validate
 	if req.Name == "" || len(req.Name) > 200 {
-		jsonError(w, "name: required, max 200 chars", http.StatusBadRequest); return
+		jsonError(w, "name: required, max 200 chars", http.StatusBadRequest)
+		return
 	}
 	if req.IP != "" && len(req.IP) > 45 {
-		jsonError(w, "ip: max 45 chars", http.StatusBadRequest); return
+		jsonError(w, "ip: max 45 chars", http.StatusBadRequest)
+		return
 	}
 	err := h.DB.Pool().QueryRow(r.Context(), `
 		INSERT INTO log_sources
@@ -216,17 +226,25 @@ func (h *Assets) Create(w http.ResponseWriter, r *http.Request) {
 
 func protoToType(proto string) string {
 	switch proto {
-	case "syslog-udp", "syslog-tcp", "syslog-tls": return "server"
-	case "agent": return "host"
-	case "s3":    return "cloud"
-	case "kafka": return "queue"
-	case "asset", "cmdb": return "asset"
-	default:      return "host"
+	case "syslog-udp", "syslog-tcp", "syslog-tls":
+		return "server"
+	case "agent":
+		return "host"
+	case "s3":
+		return "cloud"
+	case "kafka":
+		return "queue"
+	case "asset", "cmdb":
+		return "asset"
+	default:
+		return "host"
 	}
 }
 
 func calcRisk(crit, high, total int) int {
 	score := crit*40 + high*10 + total/10
-	if score > 100 { score = 100 }
+	if score > 100 {
+		score = 100
+	}
 	return score
 }

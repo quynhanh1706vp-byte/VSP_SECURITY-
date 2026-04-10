@@ -18,8 +18,12 @@ func (h *Findings) List(w http.ResponseWriter, r *http.Request) {
 
 	// Cap limit tối đa 2000, search tối đa 200 chars
 	limit := queryInt(r, "limit", 50)
-	if limit > 2000 { limit = 2000 }
-	if limit < 1   { limit = 1   }
+	if limit > 2000 {
+		limit = 2000
+	}
+	if limit < 1 {
+		limit = 1
+	}
 
 	search := sanitizeString(q.Get("q"), 200)
 

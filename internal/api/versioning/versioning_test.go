@@ -8,15 +8,15 @@ import (
 
 func TestExtractVersion(t *testing.T) {
 	cases := []struct {
-		path    string
-		want    string
+		path string
+		want string
 	}{
 		{"/api/v1/findings", "v1"},
 		{"/api/v2/findings", "v2"},
 		{"/api/v1/auth/login", "v1"},
-		{"/health", "v1"},           // fallback to current
+		{"/health", "v1"}, // fallback to current
 		{"/", "v1"},
-		{"/api/v3/test", "v1"},      // unknown version → fallback
+		{"/api/v3/test", "v1"}, // unknown version → fallback
 	}
 
 	for _, c := range cases {

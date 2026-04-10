@@ -7,7 +7,9 @@ func EnrichFinding(tool, ruleID, severity, message string) (cwe string, cvss flo
 	switch tool {
 	case "kics", "checkov":
 		cwe, cvss = enrichIaC(message, severity)
-		if cvss == 0 { cvss = cvssDefault[severity] }
+		if cvss == 0 {
+			cvss = cvssDefault[severity]
+		}
 	case "gitleaks", "trufflehog":
 		cwe = enrichSecrets(ruleID, message)
 		cvss = cvssDefault[severity]
@@ -47,21 +49,31 @@ func enrichIaC(message, severity string) (string, float64) {
 	case strings.Contains(msg, "mfa"):
 		return "CWE-308", 7.0
 	default:
-		if severity == "CRITICAL" || severity == "HIGH" { return "CWE-284", 0 }
-		if severity == "MEDIUM" { return "CWE-16", 0 }
+		if severity == "CRITICAL" || severity == "HIGH" {
+			return "CWE-284", 0
+		}
+		if severity == "MEDIUM" {
+			return "CWE-16", 0
+		}
 		return "CWE-1188", 0
 	}
 }
 
 func enrichSecrets(ruleID, message string) string {
-	if strings.Contains(strings.ToLower(ruleID), "private-key") { return "CWE-321" }
-	if strings.Contains(strings.ToLower(message), "private key") { return "CWE-321" }
+	if strings.Contains(strings.ToLower(ruleID), "private-key") {
+		return "CWE-321"
+	}
+	if strings.Contains(strings.ToLower(message), "private key") {
+		return "CWE-321"
+	}
 	return "CWE-798"
 }
 
 func enrichBandit(ruleID string) string {
-	m := map[string]string{"B102":"CWE-78","B105":"CWE-259","B301":"CWE-502","B303":"CWE-327","B311":"CWE-338","B321":"CWE-319","B501":"CWE-295","B601":"CWE-78","B608":"CWE-89","B701":"CWE-94"}
-	if cwe, ok := m[strings.ToUpper(ruleID)]; ok { return cwe }
+	m := map[string]string{"B102": "CWE-78", "B105": "CWE-259", "B301": "CWE-502", "B303": "CWE-327", "B311": "CWE-338", "B321": "CWE-319", "B501": "CWE-295", "B601": "CWE-78", "B608": "CWE-89", "B701": "CWE-94"}
+	if cwe, ok := m[strings.ToUpper(ruleID)]; ok {
+		return cwe
+	}
 	return "CWE-676"
 }
 

@@ -10,40 +10,40 @@ import (
 
 // AssessmentResult is a minimal OSCAL AR structure.
 type AssessmentResult struct {
-	UUID       string          `json:"uuid"`
-	Metadata   ARMetadata      `json:"metadata"`
-	Results    []ARResult      `json:"results"`
-	Generated  time.Time       `json:"generated"`
+	UUID      string     `json:"uuid"`
+	Metadata  ARMetadata `json:"metadata"`
+	Results   []ARResult `json:"results"`
+	Generated time.Time  `json:"generated"`
 }
 
 type ARMetadata struct {
-	Title       string    `json:"title"`
+	Title        string    `json:"title"`
 	LastModified time.Time `json:"last-modified"`
-	Version     string    `json:"version"`
-	OSCALVersion string   `json:"oscal-version"`
+	Version      string    `json:"version"`
+	OSCALVersion string    `json:"oscal-version"`
 }
 
 type ARResult struct {
-	UUID        string        `json:"uuid"`
-	Title       string        `json:"title"`
-	Start       time.Time     `json:"start"`
-	End         *time.Time    `json:"end,omitempty"`
-	Findings    []ARFinding   `json:"findings"`
+	UUID         string          `json:"uuid"`
+	Title        string          `json:"title"`
+	Start        time.Time       `json:"start"`
+	End          *time.Time      `json:"end,omitempty"`
+	Findings     []ARFinding     `json:"findings"`
 	Observations []ARObservation `json:"observations"`
-	Risks       []ARRisk      `json:"risks"`
+	Risks        []ARRisk        `json:"risks"`
 }
 
 type ARFinding struct {
-	UUID        string `json:"uuid"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
+	UUID        string   `json:"uuid"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
 	Target      ARTarget `json:"target"`
 	RelatedObs  []string `json:"related-observations"`
 }
 
 type ARTarget struct {
-	Type   string `json:"type"`
-	ID     string `json:"target-id"`
+	Type   string   `json:"type"`
+	ID     string   `json:"target-id"`
 	Status ARStatus `json:"status"`
 }
 
@@ -93,17 +93,19 @@ func BuildAR(tenantID string, runs []store.Run, findings []store.Finding) *Asses
 
 		// Add observation for the run
 		result.Observations = append(result.Observations, ARObservation{
-			UUID:        fmt.Sprintf("obs-%s", run.ID),
-			Title:       "Automated Security Scan",
-			Methods:     []string{"AUTOMATED"},
-			Collected:   run.CreatedAt,
+			UUID:      fmt.Sprintf("obs-%s", run.ID),
+			Title:     "Automated Security Scan",
+			Methods:   []string{"AUTOMATED"},
+			Collected: run.CreatedAt,
 			Description: fmt.Sprintf("Mode: %s, Profile: %s, Gate: %s, Posture: %s, Findings: %d",
 				run.Mode, run.Profile, run.Gate, run.Posture, run.TotalFindings),
 		})
 
 		// Add findings for this run
 		for _, f := range findings {
-			if f.RunID != run.ID { continue }
+			if f.RunID != run.ID {
+				continue
+			}
 			state := "not-satisfied"
 			if f.Severity == "LOW" || f.Severity == "INFO" {
 				state = "not-applicable"
@@ -114,8 +116,8 @@ func BuildAR(tenantID string, runs []store.Run, findings []store.Finding) *Asses
 				Title:       fmt.Sprintf("[%s] %s", f.Severity, f.RuleID),
 				Description: f.Message,
 				Target: ARTarget{
-					Type: "statement-id",
-					ID:   f.Path,
+					Type:   "statement-id",
+					ID:     f.Path,
 					Status: ARStatus{State: state, Reason: f.CWE},
 				},
 				RelatedObs: []string{obsID},
@@ -138,10 +140,10 @@ func BuildAR(tenantID string, runs []store.Run, findings []store.Finding) *Asses
 
 // BuildPOAM generates an OSCAL Plan of Action & Milestones.
 type POAM struct {
-	UUID      string        `json:"uuid"`
-	Metadata  ARMetadata    `json:"metadata"`
-	Items     []POAMItem    `json:"poam-items"`
-	Generated time.Time     `json:"generated"`
+	UUID      string     `json:"uuid"`
+	Metadata  ARMetadata `json:"metadata"`
+	Items     []POAMItem `json:"poam-items"`
+	Generated time.Time  `json:"generated"`
 }
 
 type POAMItem struct {
@@ -169,7 +171,9 @@ func BuildPOAM(tenantID string, findings []store.Finding) *POAM {
 	}
 
 	for _, f := range findings {
-		if f.Severity == "INFO" || f.Severity == "TRACE" { continue }
+		if f.Severity == "INFO" || f.Severity == "TRACE" {
+			continue
+		}
 		due := now.AddDate(0, 0, dueDays(f.Severity))
 		poam.Items = append(poam.Items, POAMItem{
 			UUID:        fmt.Sprintf("poam-item-%s", f.ID),
@@ -187,10 +191,14 @@ func BuildPOAM(tenantID string, findings []store.Finding) *POAM {
 
 func dueDays(sev string) int {
 	switch sev {
-	case "CRITICAL": return 3
-	case "HIGH":     return 14
-	case "MEDIUM":   return 30
-	default:         return 90
+	case "CRITICAL":
+		return 3
+	case "HIGH":
+		return 14
+	case "MEDIUM":
+		return 30
+	default:
+		return 90
 	}
 }
 

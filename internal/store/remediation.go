@@ -20,18 +20,18 @@ const (
 )
 
 type Remediation struct {
-	ID          string            `json:"id"`
-	FindingID   string            `json:"finding_id"`
-	TenantID    string            `json:"tenant_id"`
-	Status      RemediationStatus `json:"status"`
-	Assignee    string            `json:"assignee"`
-	Priority    string            `json:"priority"` // P1/P2/P3/P4
-	DueDate     *time.Time        `json:"due_date,omitempty"`
-	Notes       string            `json:"notes"`
-	TicketURL   string            `json:"ticket_url"`
-	ResolvedAt  *time.Time        `json:"resolved_at,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	ID         string            `json:"id"`
+	FindingID  string            `json:"finding_id"`
+	TenantID   string            `json:"tenant_id"`
+	Status     RemediationStatus `json:"status"`
+	Assignee   string            `json:"assignee"`
+	Priority   string            `json:"priority"` // P1/P2/P3/P4
+	DueDate    *time.Time        `json:"due_date,omitempty"`
+	Notes      string            `json:"notes"`
+	TicketURL  string            `json:"ticket_url"`
+	ResolvedAt *time.Time        `json:"resolved_at,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
 type RemediationComment struct {
@@ -41,7 +41,6 @@ type RemediationComment struct {
 	Body          string    `json:"body"`
 	CreatedAt     time.Time `json:"created_at"`
 }
-
 
 func (db *DB) GetRemediation(ctx context.Context, tenantID, findingID string) (*Remediation, error) {
 	row := db.pool.QueryRow(ctx,
@@ -53,7 +52,9 @@ func (db *DB) GetRemediation(ctx context.Context, tenantID, findingID string) (*
 	err := row.Scan(&r.ID, &r.FindingID, &r.TenantID, &r.Status,
 		&r.Assignee, &r.Priority, &r.DueDate, &r.Notes,
 		&r.TicketURL, &r.ResolvedAt, &r.CreatedAt, &r.UpdatedAt)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &r, nil
 }
 
@@ -78,7 +79,9 @@ func (db *DB) UpsertRemediation(ctx context.Context, r Remediation) (*Remediatio
 	err := row.Scan(&out.ID, &out.FindingID, &out.TenantID, &out.Status,
 		&out.Assignee, &out.Priority, &out.DueDate, &out.Notes,
 		&out.TicketURL, &out.ResolvedAt, &out.CreatedAt, &out.UpdatedAt)
-	if err != nil { return nil, fmt.Errorf("upsert remediation: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("upsert remediation: %w", err)
+	}
 	return &out, nil
 }
 
@@ -94,7 +97,9 @@ func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]
 		        notes,ticket_url,resolved_at,created_at,updated_at
 		 FROM remediations WHERE `+where+` ORDER BY updated_at DESC LIMIT 200`,
 		args...)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var list []Remediation
 	for rows.Next() {
@@ -108,15 +113,21 @@ func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]
 }
 
 func (db *DB) AddComment(ctx context.Context, remID, author, body string) (*RemediationComment, error) {
-	if len(body) > 10000 { body = body[:10000] } // cap comment length
-	if len(author) > 200 { author = author[:200] }
+	if len(body) > 10000 {
+		body = body[:10000]
+	} // cap comment length
+	if len(author) > 200 {
+		author = author[:200]
+	}
 	row := db.pool.QueryRow(ctx,
 		`INSERT INTO remediation_comments (remediation_id,author,body)
 		 VALUES ($1,$2,$3) RETURNING id,remediation_id,author,body,created_at`,
 		remID, author, body)
 	var c RemediationComment
 	err := row.Scan(&c.ID, &c.RemediationID, &c.Author, &c.Body, &c.CreatedAt)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &c, nil
 }
 
@@ -125,7 +136,9 @@ func (db *DB) ListComments(ctx context.Context, remID string) ([]RemediationComm
 		`SELECT id,remediation_id,author,body,created_at
 		 FROM remediation_comments WHERE remediation_id=$1 ORDER BY created_at ASC LIMIT 500`,
 		remID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var list []RemediationComment
 	for rows.Next() {
@@ -140,11 +153,14 @@ func (db *DB) RemediationStats(ctx context.Context, tenantID string) (map[string
 	rows, err := db.pool.Query(ctx,
 		`SELECT status, COUNT(*) FROM remediations WHERE tenant_id=$1 GROUP BY status`,
 		tenantID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
-	stats := map[string]int{"open":0,"in_progress":0,"resolved":0,"accepted":0,"false_positive":0,"suppressed":0}
+	stats := map[string]int{"open": 0, "in_progress": 0, "resolved": 0, "accepted": 0, "false_positive": 0, "suppressed": 0}
 	for rows.Next() {
-		var s string; var n int
+		var s string
+		var n int
 		rows.Scan(&s, &n) //nolint
 		stats[s] = n
 	}

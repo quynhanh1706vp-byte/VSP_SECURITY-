@@ -3,9 +3,9 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/hibiken/asynq"
 	"github.com/vsp/platform/internal/pipeline"
@@ -19,7 +19,7 @@ import (
 
 type Runs struct {
 	DB    *store.DB
-	asynq  *asynq.Client
+	asynq *asynq.Client
 }
 
 // POST /api/v1/vsp/run
@@ -36,8 +36,12 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if req.Mode == "" { req.Mode = "SAST" }
-	if req.Profile == "" { req.Profile = "FAST" }
+	if req.Mode == "" {
+		req.Mode = "SAST"
+	}
+	if req.Profile == "" {
+		req.Profile = "FAST"
+	}
 	if req.Src == "" && req.URL == "" {
 		jsonError(w, "src or url required", http.StatusBadRequest)
 		return
@@ -81,7 +85,9 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		"NETWORK": 1,  // sslscan
 		"FULL":    14, // all: sast(3)+sca(3)+secrets(2)+iac(2)+dast(3)+network(1)
 	}[req.Mode]
-	if toolsTotal == 0 { toolsTotal = 3 }
+	if toolsTotal == 0 {
+		toolsTotal = 3
+	}
 
 	run, err := h.DB.CreateRun(r.Context(),
 		rid, claims.TenantID, req.Mode, req.Profile,
@@ -109,9 +115,6 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		uid := claims.UserID
 		h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: claims.TenantID, UserID: &uid, Action: "SCAN_TRIGGER", Resource: run.RID, IP: r.RemoteAddr, PrevHash: prevHash})
 	}()
-
-
-
 
 	w.WriteHeader(http.StatusAccepted)
 	jsonOK(w, map[string]any{
@@ -156,7 +159,7 @@ func (h *Runs) Get(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/vsp/runs
 func (h *Runs) List(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	limit  := queryInt(r, "limit", 20)
+	limit := queryInt(r, "limit", 20)
 	offset := queryInt(r, "offset", 0)
 
 	runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, limit, offset)
@@ -164,7 +167,9 @@ func (h *Runs) List(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	if runs == nil { runs = []store.Run{} }
+	if runs == nil {
+		runs = []store.Run{}
+	}
 	jsonOK(w, map[string]any{
 		"runs":   runs,
 		"limit":  limit,
@@ -196,7 +201,9 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 	rows := make([]indexRow, 0, len(runs))
 	for _, run := range runs {
 		summ := run.Summary
-		if summ == nil { summ = json.RawMessage("{}") }
+		if summ == nil {
+			summ = json.RawMessage("{}")
+		}
 		rows = append(rows, indexRow{
 			RID:        run.RID,
 			Status:     run.Status,
@@ -223,4 +230,3 @@ func (h *Runs) Cancel(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]string{"rid": rid, "status": "CANCELLED"})
 }
-

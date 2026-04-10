@@ -15,7 +15,7 @@ import (
 
 type Adapter struct{}
 
-func New() *Adapter      { return &Adapter{} }
+func New() *Adapter             { return &Adapter{} }
 func (a *Adapter) Name() string { return "hadolint" }
 
 // Run scans Dockerfiles in opts.Src using hadolint.
@@ -28,7 +28,9 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 	// Find all Dockerfiles under src
 	var dockerfiles []string
 	err := filepath.WalkDir(opts.Src, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() { return nil }
+		if err != nil || d.IsDir() {
+			return nil
+		}
 		name := strings.ToLower(d.Name())
 		if name == "dockerfile" || strings.HasPrefix(name, "dockerfile.") {
 			dockerfiles = append(dockerfiles, path)
@@ -67,8 +69,8 @@ func scanDockerfile(ctx context.Context, path string) ([]scanner.Finding, error)
 type hadolintResult struct {
 	Line    int    `json:"line"`
 	Column  int    `json:"column"`
-	Level   string `json:"level"`   // error | warning | info | style
-	Code    string `json:"code"`    // DL3002, SC2086, etc.
+	Level   string `json:"level"` // error | warning | info | style
+	Code    string `json:"code"`  // DL3002, SC2086, etc.
 	Message string `json:"message"`
 	File    string `json:"file"`
 }
@@ -90,9 +92,13 @@ func parseJSON(data []byte, defaultFile string) ([]scanner.Finding, error) {
 	var findings []scanner.Finding
 	for _, r := range results {
 		sev := levelToSeverity(r.Level)
-		if sev == scanner.SevInfo || sev == scanner.SevTrace { continue } // skip style
+		if sev == scanner.SevInfo || sev == scanner.SevTrace {
+			continue
+		} // skip style
 		file := r.File
-		if file == "" { file = defaultFile }
+		if file == "" {
+			file = defaultFile
+		}
 		findings = append(findings, scanner.Finding{
 			Tool:      "hadolint",
 			Severity:  sev,
@@ -135,6 +141,8 @@ func codeToRef(code string) string {
 		"DL3025": "CIS-DI-0001", // use JSON for CMD/ENTRYPOINT
 		"DL4006": "CIS-DI-0001", // set SHELL option -o pipefail
 	}
-	if ref, ok := refs[code]; ok { return ref }
+	if ref, ok := refs[code]; ok {
+		return ref
+	}
 	return "CIS-Docker-Benchmark"
 }

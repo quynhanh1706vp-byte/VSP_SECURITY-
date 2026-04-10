@@ -21,7 +21,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestListSchedules_Empty(t *testing.T) {
-	e := New(nil, func(a,b,c,d,f,g string) {})
+	e := New(nil, func(a, b, c, d, f, g string) {})
 	scheds := e.ListSchedules(context.Background())
 	// nil hoặc empty slice đều OK
 	if len(scheds) != 0 {
@@ -53,13 +53,13 @@ func TestTriggerNow(t *testing.T) {
 
 func TestStop_BeforeStart(t *testing.T) {
 	// Should not panic
-	e := New(nil, func(a,b,c,d,f,g string) {})
+	e := New(nil, func(a, b, c, d, f, g string) {})
 	e.Stop()
 }
 
 func TestNextRun_Daily(t *testing.T) {
 	from := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
-	
+
 	// Daily schedule should return next day same time
 	next := nextRun("@daily", from)
 	if next.IsZero() {

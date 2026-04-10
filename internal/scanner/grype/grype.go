@@ -54,16 +54,16 @@ type grypeOutput struct {
 }
 
 type grypeMatch struct {
-	Vulnerability grypeVuln    `json:"vulnerability"`
+	Vulnerability grypeVuln     `json:"vulnerability"`
 	Artifact      grypeArtifact `json:"artifact"`
 }
 
 type grypeVuln struct {
-	ID          string    `json:"id"`
-	Severity    string    `json:"severity"`
-	Description string    `json:"description"`
-	Fix         grypeFix  `json:"fix"`
-	URLs        []string  `json:"urls"`
+	ID          string   `json:"id"`
+	Severity    string   `json:"severity"`
+	Description string   `json:"description"`
+	Fix         grypeFix `json:"fix"`
+	URLs        []string `json:"urls"`
 }
 
 type grypeFix struct {

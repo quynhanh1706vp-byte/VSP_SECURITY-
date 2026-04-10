@@ -57,8 +57,12 @@ func (e *Engine) tick(ctx context.Context) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for i, s := range e.schedules {
-		if !s.Enabled { continue }
-		if now.Before(s.NextRunAt) { continue }
+		if !s.Enabled {
+			continue
+		}
+		if now.Before(s.NextRunAt) {
+			continue
+		}
 		log.Info().Str("schedule", s.Name).Str("mode", s.Mode).Msg("scheduler: firing")
 		rid := fmt.Sprintf("RID_SCHED_%s_%d", now.Format("20060102_150405"), i)
 		e.enqueue(rid, s.TenantID, s.Mode, s.Profile, s.Src, s.URL)
@@ -78,9 +82,13 @@ func (e *Engine) checkDrift(ctx context.Context, s store.StoreSchedule, rid stri
 	case <-time.After(5 * time.Minute):
 	}
 	runs, err := e.db.ListRuns(ctx, s.TenantID, 2, 0)
-	if err != nil || len(runs) < 2 { return }
+	if err != nil || len(runs) < 2 {
+		return
+	}
 	postureScore := map[string]int{"A": 100, "B": 85, "C": 70, "D": 55, "F": 20}
-	if runs[1].Posture == runs[0].Posture { return }
+	if runs[1].Posture == runs[0].Posture {
+		return
+	}
 	delta := postureScore[runs[0].Posture] - postureScore[runs[1].Posture]
 	log.Warn().Int("delta", delta).Msg("scheduler: drift detected")
 	e.db.SaveStoreDriftEvent(ctx, store.StoreDriftEvent{ //nolint:errcheck
@@ -123,17 +131,33 @@ func (e *Engine) TriggerNow(_ context.Context, s store.StoreSchedule) {
 func nextRun(expr string, from time.Time) time.Time {
 	var parts [5]string
 	fmt.Sscanf(expr, "%s %s %s %s %s", &parts[0], &parts[1], &parts[2], &parts[3], &parts[4])
-	if parts[0] == "*/30" { return from.Add(30 * time.Minute) }
-	if parts[0] == "*/15" { return from.Add(15 * time.Minute) }
-	if parts[0] == "*/5"  { return from.Add(5 * time.Minute) }
-	if parts[0] == "*"    { return from.Add(time.Minute) }
+	if parts[0] == "*/30" {
+		return from.Add(30 * time.Minute)
+	}
+	if parts[0] == "*/15" {
+		return from.Add(15 * time.Minute)
+	}
+	if parts[0] == "*/5" {
+		return from.Add(5 * time.Minute)
+	}
+	if parts[0] == "*" {
+		return from.Add(time.Minute)
+	}
 	var min, hour int
 	fmt.Sscanf(parts[0], "%d", &min)
-	if parts[1] == "*/6"  { return from.Add(6 * time.Hour) }
-	if parts[1] == "*/12" { return from.Add(12 * time.Hour) }
-	if parts[1] == "*"    { return from.Add(time.Hour) }
+	if parts[1] == "*/6" {
+		return from.Add(6 * time.Hour)
+	}
+	if parts[1] == "*/12" {
+		return from.Add(12 * time.Hour)
+	}
+	if parts[1] == "*" {
+		return from.Add(time.Hour)
+	}
 	fmt.Sscanf(parts[1], "%d", &hour)
 	next := time.Date(from.Year(), from.Month(), from.Day(), hour, min, 0, 0, from.Location())
-	if !next.After(from) { next = next.Add(24 * time.Hour) }
+	if !next.After(from) {
+		next = next.Add(24 * time.Hour)
+	}
 	return next
 }

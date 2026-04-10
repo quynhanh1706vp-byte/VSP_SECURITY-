@@ -1,10 +1,10 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"context"
 	"net/http"
 	"time"
 
@@ -35,9 +35,9 @@ func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 
 	var req struct {
-		Label     string `json:"label"`
-		Role      string `json:"role"`
-		ExpiryDays int   `json:"expiry_days"`
+		Label      string `json:"label"`
+		Role       string `json:"role"`
+		ExpiryDays int    `json:"expiry_days"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -49,16 +49,28 @@ func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	// Whitelist roles
 	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
-	if req.Label == "" { jsonError(w, "label required", http.StatusBadRequest); return }
-	if len(req.Label) > 100 { jsonError(w, "label: max 100 chars", http.StatusBadRequest); return }
-	if req.Role == "" { req.Role = "analyst" }
+	if req.Label == "" {
+		jsonError(w, "label required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Label) > 100 {
+		jsonError(w, "label: max 100 chars", http.StatusBadRequest)
+		return
+	}
+	if req.Role == "" {
+		req.Role = "analyst"
+	}
 	if !validRoles[req.Role] {
 		jsonError(w, "invalid role: must be admin|analyst|dev|auditor", http.StatusBadRequest)
 		return
 	}
 	// ExpiryDays: max 365
-	if req.ExpiryDays == 0 { req.ExpiryDays = 90 }
-	if req.ExpiryDays > 365 { req.ExpiryDays = 365 }
+	if req.ExpiryDays == 0 {
+		req.ExpiryDays = 90
+	}
+	if req.ExpiryDays > 365 {
+		req.ExpiryDays = 365
+	}
 
 	// Generate: 32-byte random → hex → prefix(8) + full(64)
 	buf := make([]byte, 32)
@@ -67,7 +79,7 @@ func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fullKey := "vspk_" + hex.EncodeToString(buf) // shown once
-	prefix  := fullKey[:12]
+	prefix := fullKey[:12]
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(fullKey), bcrypt.DefaultCost)
 	expiry := time.Now().AddDate(0, 0, req.ExpiryDays)
@@ -110,7 +122,7 @@ func (h *APIKeys) Delete(w http.ResponseWriter, r *http.Request) {
 		prevHash, _ := h.DB.GetLastAuditHash(ctx, claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
-		h.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/"+ id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
+		h.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 	}()
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -8,10 +8,10 @@ type ProfileConfig struct {
 }
 
 var Profiles = map[Profile]ProfileConfig{
-	ProfileFast:    {TimeoutSec: 120,  Description: "Fast — core tools, 2min"},
-	ProfileExt:     {TimeoutSec: 300,  Description: "Extended — all tools, 5min"},
-	ProfileAggr:    {TimeoutSec: 600,  Description: "Aggressive — fail on any HIGH"},
-	ProfilePremium: {TimeoutSec: 900,  Description: "Premium — deep scan 15min"},
+	ProfileFast:    {TimeoutSec: 120, Description: "Fast — core tools, 2min"},
+	ProfileExt:     {TimeoutSec: 300, Description: "Extended — all tools, 5min"},
+	ProfileAggr:    {TimeoutSec: 600, Description: "Aggressive — fail on any HIGH"},
+	ProfilePremium: {TimeoutSec: 900, Description: "Premium — deep scan 15min"},
 	ProfileFull:    {TimeoutSec: 1200, Description: "Full — all tools 20min"},
 	ProfileFullSOC: {TimeoutSec: 1800, Description: "Full SOC — max depth"},
 }
@@ -72,12 +72,18 @@ func TimeoutForProfile(profile Profile) int {
 
 func ToolNamesForMode(mode Mode) []string {
 	switch mode {
-	case ModeSAST:    return []string{"bandit", "semgrep", "codeql"}
-	case ModeSCA:     return []string{"trivy", "grype", "license"}
-	case ModeSecrets: return []string{"gitleaks", "secretcheck"}
-	case ModeIAC:     return []string{"kics", "checkov", "hadolint"}
-	case ModeDAST:    return []string{"nikto", "nuclei", "sslscan"}
-	case ModeNetwork: return []string{"netcap", "sslscan"}
+	case ModeSAST:
+		return []string{"bandit", "semgrep", "codeql"}
+	case ModeSCA:
+		return []string{"trivy", "grype", "license"}
+	case ModeSecrets:
+		return []string{"gitleaks", "secretcheck"}
+	case ModeIAC:
+		return []string{"kics", "checkov", "hadolint"}
+	case ModeDAST:
+		return []string{"nikto", "nuclei", "sslscan"}
+	case ModeNetwork:
+		return []string{"netcap", "sslscan"}
 	case ModeFull:
 		return []string{
 			"kics", "checkov", "hadolint",

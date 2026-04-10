@@ -32,15 +32,15 @@ func validateScanURL(rawURL string) error {
 	// Block private/internal ranges — SSRF protection
 	blocked := []string{
 		"localhost", "127.", "0.0.0.0", "::1",
-		"169.254.",                                          // link-local
-		"10.",                                               // RFC1918
-		"192.168.",                                          // RFC1918
-		"172.16.", "172.17.", "172.18.", "172.19.",         // RFC1918
+		"169.254.",                                 // link-local
+		"10.",                                      // RFC1918
+		"192.168.",                                 // RFC1918
+		"172.16.", "172.17.", "172.18.", "172.19.", // RFC1918
 		"172.20.", "172.21.", "172.22.", "172.23.",
 		"172.24.", "172.25.", "172.26.", "172.27.",
 		"172.28.", "172.29.", "172.30.", "172.31.",
-		"metadata.google", "metadata.aws",                  // cloud metadata
-		"100.64.", "100.65.", "100.66.", "100.67.",         // CGNAT
+		"metadata.google", "metadata.aws", // cloud metadata
+		"100.64.", "100.65.", "100.66.", "100.67.", // CGNAT
 	}
 	for _, b := range blocked {
 		if strings.HasPrefix(host, b) || host == strings.TrimSuffix(b, ".") {

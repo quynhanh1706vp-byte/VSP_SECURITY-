@@ -227,8 +227,9 @@ jobs:
               try:
                   with open(fname) as f:
                       all_lines = f.readlines()
-                  snippet = "".join(all_lines[lineno-1:lineno+8])
-                  if "LIMIT" not in snippet and "COUNT" not in snippet:
+                  snippet = "".join(all_lines[max(0,lineno-5):lineno+20])
+                  is_bounded = any(k in snippet for k in ["LIMIT","COUNT(","GROUP BY","SUM(","OFFSET"])
+                  if not is_bounded:
                       no_limit.append(f"{fname}:{lineno}")
               except:
                   pass

@@ -10,7 +10,7 @@ import (
 
 type Adapter struct{}
 
-func New() *Adapter      { return &Adapter{} }
+func New() *Adapter             { return &Adapter{} }
 func (a *Adapter) Name() string { return "nikto" }
 
 func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Finding, error) {

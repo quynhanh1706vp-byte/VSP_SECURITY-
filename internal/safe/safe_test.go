@@ -13,18 +13,18 @@ func TestGo_RunsFunction(t *testing.T) {
 	Go(func() {
 		defer wg.Done()
 	})
-	
+
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
-		case <-done:
-		// OK
-		case <-time.After(time.Second):
-			t.Error("goroutine did not complete in time")
+	case <-done:
+	// OK
+	case <-time.After(time.Second):
+		t.Error("goroutine did not complete in time")
 	}
 }
 
@@ -40,7 +40,7 @@ func TestGo_RecoversPanic(t *testing.T) {
 func TestGoCtx_RunsWithContext(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
-	
+
 	ctx := context.Background()
 	GoCtx(ctx, func(c context.Context) {
 		defer wg.Done()
@@ -48,13 +48,13 @@ func TestGoCtx_RunsWithContext(t *testing.T) {
 			panic("context is nil")
 		}
 	})
-	
+
 	done := make(chan struct{})
 	go func() { wg.Wait(); close(done) }()
 	select {
-		case <-done:
-		case <-time.After(time.Second):
-			t.Error("goroutine did not complete")
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("goroutine did not complete")
 	}
 }
 

@@ -28,22 +28,22 @@ func NewSemanticAnalyzer() *SemanticAnalyzer {
 }
 
 type SemanticResult struct {
-	FindingID      string   `json:"finding_id"`
-	IsFalsePositive bool    `json:"is_false_positive"`
-	Confidence     float64  `json:"confidence"`      // 0-1
-	RealSeverity   string   `json:"real_severity"`   // adjusted severity
-	Explanation    string   `json:"explanation"`
-	ExploitScenario string  `json:"exploit_scenario"`
+	FindingID        string   `json:"finding_id"`
+	IsFalsePositive  bool     `json:"is_false_positive"`
+	Confidence       float64  `json:"confidence"`    // 0-1
+	RealSeverity     string   `json:"real_severity"` // adjusted severity
+	Explanation      string   `json:"explanation"`
+	ExploitScenario  string   `json:"exploit_scenario"`
 	RemediationSteps []string `json:"remediation_steps"`
-	References     []string `json:"references"`
-	Priority       int      `json:"priority"`        // 1-10
+	References       []string `json:"references"`
+	Priority         int      `json:"priority"` // 1-10
 }
 
 type BatchSemanticResult struct {
-	Results   []SemanticResult `json:"results"`
-	Processed int              `json:"processed"`
-	FalsePositives int         `json:"false_positives"`
-	Escalated int              `json:"escalated"`
+	Results        []SemanticResult `json:"results"`
+	Processed      int              `json:"processed"`
+	FalsePositives int              `json:"false_positives"`
+	Escalated      int              `json:"escalated"`
 }
 
 // AnalyzeFinding phân tích 1 finding với Claude
@@ -53,7 +53,7 @@ func (a *SemanticAnalyzer) AnalyzeFinding(ctx context.Context, f store.Finding) 
 	}
 
 	prompt := buildAnalysisPrompt(f)
-	
+
 	reply, err := a.callClaude(ctx, prompt)
 	if err != nil {
 		return nil, err

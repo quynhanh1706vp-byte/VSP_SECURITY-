@@ -43,7 +43,9 @@ func (h *UEBA) ListAnomalies(w http.ResponseWriter, r *http.Request) {
 		rows.Scan(&a.ID, &a.Title, &a.Severity, &a.Status, &a.SourceRefs, &a.DetectedAt) //nolint:errcheck
 		out = append(out, a)
 	}
-	if out == nil { out = []Anomaly{} }
+	if out == nil {
+		out = []Anomaly{}
+	}
 	jsonOK(w, map[string]any{"anomalies": out, "total": len(out)})
 }
 
@@ -59,14 +61,18 @@ func (h *UEBA) Analyze(w http.ResponseWriter, r *http.Request) {
 	// Persist significant anomalies as incidents
 	saved := 0
 	for _, a := range anomalies {
-		if a.Score < 30 { continue }
+		if a.Score < 30 {
+			continue
+		}
 		srcJSON, _ := json.Marshal(map[string]any{
 			"type": a.Type, "score": a.Score,
 			"entity": a.Entity, "baseline": a.Baseline,
 			"current": a.Current, "deviation_pct": a.Deviation,
 		})
 		title := a.Message
-		if len(title) > 200 { title = title[:200] }
+		if len(title) > 200 {
+			title = title[:200]
+		}
 		h.DB.Pool().Exec(r.Context(), `
 			INSERT INTO incidents
 				(tenant_id, title, severity, status, source_refs)
@@ -75,9 +81,9 @@ func (h *UEBA) Analyze(w http.ResponseWriter, r *http.Request) {
 		saved++
 	}
 	jsonOK(w, map[string]any{
-		"anomalies": anomalies,
-		"total":     len(anomalies),
-		"saved":     saved,
+		"anomalies":   anomalies,
+		"total":       len(anomalies),
+		"saved":       saved,
 		"analyzed_at": time.Now(),
 	})
 }
@@ -143,6 +149,8 @@ func (h *UEBA) Timeline(w http.ResponseWriter, r *http.Request) {
 		rows.Scan(&p.Day, &p.Score, &p.Findings, &p.Scans, &p.Passes) //nolint:errcheck
 		pts = append(pts, p)
 	}
-	if pts == nil { pts = []Point{} }
+	if pts == nil {
+		pts = []Point{}
+	}
 	jsonOK(w, map[string]any{"timeline": pts, "total": len(pts)})
 }

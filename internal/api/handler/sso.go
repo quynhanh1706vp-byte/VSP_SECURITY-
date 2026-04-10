@@ -11,10 +11,10 @@ import (
 )
 
 type SSO struct {
-	Handler    *auth.OIDCHandler
-	AuthH      *Auth
-	mu         sync.Mutex
-	states     map[string]time.Time // state → expiry
+	Handler *auth.OIDCHandler
+	AuthH   *Auth
+	mu      sync.Mutex
+	states  map[string]time.Time // state → expiry
 }
 
 func NewSSO(cfg auth.OIDCConfig, authH *Auth, db *store.DB) *SSO {
@@ -36,18 +36,28 @@ func NewSSO(cfg auth.OIDCConfig, authH *Auth, db *store.DB) *SSO {
 			h.mu.Unlock()
 		}
 	}()
-	if !cfg.Enabled { return h }
+	if !cfg.Enabled {
+		return h
+	}
 	// Merge preset
 	if preset, ok := auth.ProviderPresets[cfg.ProviderName]; ok {
-		if cfg.AuthURL == "" { cfg.AuthURL = preset.AuthURL }
-		if cfg.TokenURL == "" { cfg.TokenURL = preset.TokenURL }
-		if cfg.UserInfoURL == "" { cfg.UserInfoURL = preset.UserInfoURL }
-		if len(cfg.Scopes) == 0 { cfg.Scopes = preset.Scopes }
+		if cfg.AuthURL == "" {
+			cfg.AuthURL = preset.AuthURL
+		}
+		if cfg.TokenURL == "" {
+			cfg.TokenURL = preset.TokenURL
+		}
+		if cfg.UserInfoURL == "" {
+			cfg.UserInfoURL = preset.UserInfoURL
+		}
+		if len(cfg.Scopes) == 0 {
+			cfg.Scopes = preset.Scopes
+		}
 	}
 	h.Handler = &auth.OIDCHandler{
 		Config:    cfg,
 		JWTSecret: authH.JWTSecret,
-		JWTTTL:   authH.JWTTTL,
+		JWTTTL:    authH.JWTTTL,
 	}
 	return h
 }
@@ -80,7 +90,7 @@ func (h *SSO) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state := r.URL.Query().Get("state")
-	code  := r.URL.Query().Get("code")
+	code := r.URL.Query().Get("code")
 
 	// Validate state
 	h.mu.Lock()

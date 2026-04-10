@@ -31,13 +31,13 @@ type loginRequest struct {
 }
 
 type loginResponse struct {
-	Token       string    `json:"token"`
-	UserID      string    `json:"user_id"`
-	Email       string    `json:"email"`
-	Role        string    `json:"role"`
-	TenantID    string    `json:"tenant_id"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	MFAEnabled  bool      `json:"mfa_enabled"`
+	Token      string    `json:"token"`
+	UserID     string    `json:"user_id"`
+	Email      string    `json:"email"`
+	Role       string    `json:"role"`
+	TenantID   string    `json:"tenant_id"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	MFAEnabled bool      `json:"mfa_enabled"`
 }
 
 type mfaRequiredResponse struct {
@@ -159,13 +159,13 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		Expires:  time.Now().Add(ttl),
 		MaxAge:   int(ttl.Seconds()),
-		HttpOnly: true,          // JS cannot read — XSS cannot steal
-		Secure:   secure,        // HTTPS only in prod
+		HttpOnly: true,                    // JS cannot read — XSS cannot steal
+		Secure:   secure,                  // HTTPS only in prod
 		SameSite: http.SameSiteStrictMode, // CSRF protection
 	})
 
 	jsonOK(w, loginResponse{
-		Token:      token,   // kept for API clients / CI-CD
+		Token:      token, // kept for API clients / CI-CD
 		UserID:     user.ID,
 		Email:      user.Email,
 		Role:       user.Role,
@@ -235,6 +235,8 @@ func (a *Auth) writeAudit(r *http.Request, tenantID string, userID *string, acti
 }
 
 func derefStr(s *string) string {
-	if s == nil { return "" }
+	if s == nil {
+		return ""
+	}
 	return *s
 }

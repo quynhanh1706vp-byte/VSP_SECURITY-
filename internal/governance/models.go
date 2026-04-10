@@ -3,6 +3,7 @@ package governance
 import "time"
 
 type RiskLevel string
+
 const (
 	RiskCritical RiskLevel = "CRITICAL"
 	RiskHigh     RiskLevel = "HIGH"
@@ -35,32 +36,32 @@ type ControlOwner struct {
 }
 
 type Evidence struct {
-	ID          string     `json:"id"`
-	TenantID    string     `json:"tenant_id"`
-	Title       string     `json:"title"`
-	Type        string     `json:"type"` // scan|screenshot|policy|attestation
-	RunID       string     `json:"run_id,omitempty"`
-	Path        string     `json:"path"`
-	Hash        string     `json:"hash"`
-	Frozen      bool       `json:"frozen"`
-	FrozenAt    *time.Time `json:"frozen_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID        string     `json:"id"`
+	TenantID  string     `json:"tenant_id"`
+	Title     string     `json:"title"`
+	Type      string     `json:"type"` // scan|screenshot|policy|attestation
+	RunID     string     `json:"run_id,omitempty"`
+	Path      string     `json:"path"`
+	Hash      string     `json:"hash"`
+	Frozen    bool       `json:"frozen"`
+	FrozenAt  *time.Time `json:"frozen_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 type TraceabilityRow struct {
-	FindingID   string `json:"finding_id"`
-	Severity    string `json:"severity"`
-	RuleID      string `json:"rule_id"`
-	Control     string `json:"control"`
-	Framework   string `json:"framework"`
-	EvidenceID  string `json:"evidence_id"`
-	Status      string `json:"status"`
+	FindingID  string `json:"finding_id"`
+	Severity   string `json:"severity"`
+	RuleID     string `json:"rule_id"`
+	Control    string `json:"control"`
+	Framework  string `json:"framework"`
+	EvidenceID string `json:"evidence_id"`
+	Status     string `json:"status"`
 }
 
 type FrameworkScore struct {
-	Framework string           `json:"framework"`
-	Score     int              `json:"score"`
-	Domains   []DomainScore    `json:"domains"`
+	Framework string        `json:"framework"`
+	Score     int           `json:"score"`
+	Domains   []DomainScore `json:"domains"`
 }
 
 type DomainScore struct {
@@ -79,9 +80,9 @@ type RoadmapItem struct {
 }
 
 type ZeroTrustPillar struct {
-	Pillar   string `json:"pillar"`
-	Score    int    `json:"score"`
-	Level    string `json:"level"` // Traditional|Advanced|Optimal
-	Findings int    `json:"open_findings"`
+	Pillar   string   `json:"pillar"`
+	Score    int      `json:"score"`
+	Level    string   `json:"level"` // Traditional|Advanced|Optimal
+	Findings int      `json:"open_findings"`
 	Controls []string `json:"key_controls"`
 }

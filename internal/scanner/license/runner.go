@@ -9,7 +9,7 @@ import (
 
 type Runner struct{ s *Scanner }
 
-func NewRunner() *Runner { return &Runner{s: NewScanner(DefaultPolicy)} }
+func NewRunner() *Runner       { return &Runner{s: NewScanner(DefaultPolicy)} }
 func (r *Runner) Name() string { return "license" }
 
 func (r *Runner) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Finding, error) {

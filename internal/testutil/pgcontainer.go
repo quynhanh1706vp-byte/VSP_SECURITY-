@@ -7,10 +7,10 @@ import (
 	"database/sql"
 	"testing"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	tc "github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/store"
 )

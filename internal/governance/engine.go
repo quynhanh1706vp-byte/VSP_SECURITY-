@@ -62,29 +62,29 @@ func BuildFrameworkScorecard(findings []store.Finding) []FrameworkScore {
 	frameworks := map[string]*FrameworkScore{
 		"NIST SP 800-53": {Framework: "NIST SP 800-53", Score: 100,
 			Domains: []DomainScore{
-				{Name: "Access Control (AC)",       Score: 100, Items: 10},
-				{Name: "System Integrity (SI)",      Score: 100, Items: 8},
+				{Name: "Access Control (AC)", Score: 100, Items: 10},
+				{Name: "System Integrity (SI)", Score: 100, Items: 8},
 				{Name: "Identification & Auth (IA)", Score: 100, Items: 6},
-				{Name: "Audit & Accountability (AU)",Score: 100, Items: 5},
-				{Name: "Config Management (CM)",     Score: 100, Items: 7},
+				{Name: "Audit & Accountability (AU)", Score: 100, Items: 5},
+				{Name: "Config Management (CM)", Score: 100, Items: 7},
 			},
 		},
 		"ISO 27001": {Framework: "ISO 27001", Score: 100,
 			Domains: []DomainScore{
-				{Name: "A.9 Access Control",          Score: 100, Items: 8},
-				{Name: "A.12 Operations Security",    Score: 100, Items: 10},
-				{Name: "A.14 System Development",     Score: 100, Items: 9},
-				{Name: "A.16 Incident Management",    Score: 100, Items: 4},
-				{Name: "A.18 Compliance",             Score: 100, Items: 6},
+				{Name: "A.9 Access Control", Score: 100, Items: 8},
+				{Name: "A.12 Operations Security", Score: 100, Items: 10},
+				{Name: "A.14 System Development", Score: 100, Items: 9},
+				{Name: "A.16 Incident Management", Score: 100, Items: 4},
+				{Name: "A.18 Compliance", Score: 100, Items: 6},
 			},
 		},
 		"SOC 2 Type II": {Framework: "SOC 2 Type II", Score: 100,
 			Domains: []DomainScore{
-				{Name: "CC6 Logical Access",          Score: 100, Items: 7},
-				{Name: "CC7 System Operations",       Score: 100, Items: 8},
-				{Name: "CC8 Change Management",       Score: 100, Items: 5},
-				{Name: "A1 Availability",             Score: 100, Items: 4},
-				{Name: "PI1 Processing Integrity",    Score: 100, Items: 6},
+				{Name: "CC6 Logical Access", Score: 100, Items: 7},
+				{Name: "CC7 System Operations", Score: 100, Items: 8},
+				{Name: "CC8 Change Management", Score: 100, Items: 5},
+				{Name: "A1 Availability", Score: 100, Items: 4},
+				{Name: "PI1 Processing Integrity", Score: 100, Items: 6},
 			},
 		},
 	}
@@ -95,12 +95,14 @@ func BuildFrameworkScorecard(findings []store.Finding) []FrameworkScore {
 		sevCount[f.Severity]++
 	}
 	// Capped penalty: each bucket has diminishing impact
-	penaltyTotal := capInt2(sevCount["CRITICAL"],3)*15 +
-		capInt2(sevCount["HIGH"],5)*6 +
-		capInt2(sevCount["MEDIUM"],10)*2 +
-		capInt2(sevCount["LOW"],10)*1
+	penaltyTotal := capInt2(sevCount["CRITICAL"], 3)*15 +
+		capInt2(sevCount["HIGH"], 5)*6 +
+		capInt2(sevCount["MEDIUM"], 10)*2 +
+		capInt2(sevCount["LOW"], 10)*1
 	// Max penalty = 45+30+20+10 = 105 → cap at 60 so min score = 40
-	if penaltyTotal > 60 { penaltyTotal = 60 }
+	if penaltyTotal > 60 {
+		penaltyTotal = 60
+	}
 
 	for _, fw := range frameworks {
 		fw.Score = max0(100 - penaltyTotal)
@@ -122,30 +124,34 @@ func BuildFrameworkScorecard(findings []store.Finding) []FrameworkScore {
 func BuildZeroTrust(findings []store.Finding) []ZeroTrustPillar {
 	// Count findings by tool to derive pillar scores
 	toolFindings := map[string]int{}
-	sevFindings  := map[string]int{}
+	sevFindings := map[string]int{}
 	for _, f := range findings {
 		toolFindings[f.Tool]++
 		sevFindings[f.Severity]++
 	}
 
 	// Penalty per pillar based on relevant tools/findings
-	appPenalty  := capInt2(toolFindings["bandit"]+toolFindings["semgrep"]+toolFindings["codeql"], 20)*4 +
+	appPenalty := capInt2(toolFindings["bandit"]+toolFindings["semgrep"]+toolFindings["codeql"], 20)*4 +
 		capInt2(sevFindings["CRITICAL"], 3)*15 + capInt2(sevFindings["HIGH"], 10)*5
 	dataPenalty := capInt2(toolFindings["gitleaks"], 5) * 10
-	netPenalty  := capInt2(toolFindings["nikto"]+toolFindings["nuclei"], 5) * 8
+	netPenalty := capInt2(toolFindings["nikto"]+toolFindings["nuclei"], 5) * 8
 
 	zeroTrustLevel := func(score int) string {
-		if score >= 80 { return "Advanced" }
-		if score >= 60 { return "Initial" }
+		if score >= 80 {
+			return "Advanced"
+		}
+		if score >= 60 {
+			return "Initial"
+		}
 		return "Traditional"
 	}
 
-	appScore  := max0(100 - appPenalty)
+	appScore := max0(100 - appPenalty)
 	dataScore := max0(100 - dataPenalty)
-	netScore  := max0(100 - netPenalty)
+	netScore := max0(100 - netPenalty)
 
 	pillars := []ZeroTrustPillar{
-		{Pillar: "User",   Score: 95, Level: "Advanced",
+		{Pillar: "User", Score: 95, Level: "Advanced",
 			Findings: 0,
 			Controls: []string{"MFA", "RBAC", "Session management"}},
 		{Pillar: "Device", Score: 80, Level: "Advanced",
@@ -171,7 +177,9 @@ func BuildZeroTrust(findings []store.Finding) []ZeroTrustPillar {
 }
 
 func capInt2(v, max int) int {
-	if v > max { return max }
+	if v > max {
+		return max
+	}
 	return v
 }
 
@@ -215,10 +223,14 @@ func BuildRACI() []map[string]string {
 
 func severityToRisk(sev string) RiskLevel {
 	switch sev {
-	case "CRITICAL": return RiskCritical
-	case "HIGH":     return RiskHigh
-	case "MEDIUM":   return RiskMedium
-	default:         return RiskLow
+	case "CRITICAL":
+		return RiskCritical
+	case "HIGH":
+		return RiskHigh
+	case "MEDIUM":
+		return RiskMedium
+	default:
+		return RiskLow
 	}
 }
 
@@ -228,7 +240,9 @@ func dueDateBySev(sev string) time.Time {
 }
 
 func riskStatus(sev string) string {
-	if sev == "LOW" { return "monitor" }
+	if sev == "LOW" {
+		return "monitor"
+	}
 	return "open"
 }
 
@@ -237,10 +251,10 @@ func cweToControl(cwe string) (control, framework string) {
 		"CWE-78":  {"SI-10", "NIST SP 800-53"},
 		"CWE-79":  {"SI-10", "NIST SP 800-53"},
 		"CWE-89":  {"SI-10", "NIST SP 800-53"},
-		"CWE-259": {"IA-5",  "NIST SP 800-53"},
+		"CWE-259": {"IA-5", "NIST SP 800-53"},
 		"CWE-327": {"SC-13", "NIST SP 800-53"},
 		"CWE-502": {"SI-10", "NIST SP 800-53"},
-		"CWE-798": {"IA-5",  "NIST SP 800-53"},
+		"CWE-798": {"IA-5", "NIST SP 800-53"},
 	}
 	if v, ok := m[cwe]; ok {
 		return v[0], v[1]
@@ -249,6 +263,8 @@ func cweToControl(cwe string) (control, framework string) {
 }
 
 func max0(n int) int {
-	if n < 0 { return 0 }
+	if n < 0 {
+		return 0
+	}
 	return n
 }

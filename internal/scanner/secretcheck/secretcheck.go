@@ -78,7 +78,10 @@ func (c *Checker) checkGitHub(ctx context.Context, token string, r *SecretValidi
 	req.Header.Set("Authorization", "token "+token)
 	req.Header.Set("User-Agent", "VSP/1.0")
 	resp, err := c.http.Do(req)
-	if err != nil { r.Error = err.Error(); return }
+	if err != nil {
+		r.Error = err.Error()
+		return
+	}
 	defer resp.Body.Close()
 	r.StatusCode = resp.StatusCode
 	r.Endpoint = "https://api.github.com/user"
@@ -89,7 +92,10 @@ func (c *Checker) checkStripe(ctx context.Context, key string, r *SecretValidity
 	req, _ := http.NewRequestWithContext(ctx, "GET", "https://api.stripe.com/v1/charges?limit=1", nil)
 	req.SetBasicAuth(key, "")
 	resp, err := c.http.Do(req)
-	if err != nil { r.Error = err.Error(); return }
+	if err != nil {
+		r.Error = err.Error()
+		return
+	}
 	defer resp.Body.Close()
 	r.StatusCode = resp.StatusCode
 	r.Endpoint = "https://api.stripe.com/v1/charges"
@@ -100,7 +106,10 @@ func (c *Checker) checkSlack(ctx context.Context, token string, r *SecretValidit
 	req, _ := http.NewRequestWithContext(ctx, "GET", "https://slack.com/api/auth.test", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := c.http.Do(req)
-	if err != nil { r.Error = err.Error(); return }
+	if err != nil {
+		r.Error = err.Error()
+		return
+	}
 	defer resp.Body.Close()
 	r.StatusCode = resp.StatusCode
 	r.Endpoint = "https://slack.com/api/auth.test"
@@ -111,7 +120,10 @@ func (c *Checker) checkAWS(ctx context.Context, key string, r *SecretValidity) {
 	req, _ := http.NewRequestWithContext(ctx, "GET",
 		"https://sts.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15", nil)
 	resp, err := c.http.Do(req)
-	if err != nil { r.Error = err.Error(); return }
+	if err != nil {
+		r.Error = err.Error()
+		return
+	}
 	defer resp.Body.Close()
 	r.StatusCode = resp.StatusCode
 	r.Endpoint = "https://sts.amazonaws.com"

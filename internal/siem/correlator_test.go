@@ -46,7 +46,7 @@ func TestExtractThreshold(t *testing.T) {
 	}{
 		{"count>=10", 10},
 		{"count>=5", 5},
-		{"count>9", 10},   // count>9 → n+1=10
+		{"count>9", 10},          // count>9 → n+1=10
 		{"no threshold here", 1}, // default
 	}
 	for _, c := range cases {
@@ -61,10 +61,10 @@ func TestSanitizeField(t *testing.T) {
 	cases := map[string]string{
 		"severity":  "severity",
 		"source_ip": "source_ip",
-		"SEVERITY":  "severity",  // lowercase
+		"SEVERITY":  "severity", // lowercase
 		"host":      "host",
 		"process":   "process",
-		"unknown":   "message",   // default fallback
+		"unknown":   "message", // default fallback
 	}
 	for input, want := range cases {
 		got := sanitizeField(input)

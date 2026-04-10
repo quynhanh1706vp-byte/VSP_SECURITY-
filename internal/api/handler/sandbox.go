@@ -12,8 +12,8 @@ import (
 )
 
 type Sandbox struct {
-	DB    *store.DB
-	mu    sync.RWMutex
+	DB     *store.DB
+	mu     sync.RWMutex
 	events []sandboxEvent
 }
 
@@ -32,9 +32,13 @@ func (h *Sandbox) List(w http.ResponseWriter, r *http.Request) {
 	defer h.mu.RUnlock()
 	var my []sandboxEvent
 	for _, e := range h.events {
-		if e.TenantID == claims.TenantID { my = append(my, e) }
+		if e.TenantID == claims.TenantID {
+			my = append(my, e)
+		}
 	}
-	if my == nil { my = []sandboxEvent{} }
+	if my == nil {
+		my = []sandboxEvent{}
+	}
 	jsonOK(w, map[string]any{"events": my, "total": len(my)})
 }
 
@@ -52,15 +56,15 @@ func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
 		req.Severity = "HIGH"
 	}
 	event := siem.Event{
-		RID:      "RID_SANDBOX_" + time.Now().Format("20060102_150405"),
-		TenantID: claims.TenantID,
-		Gate:     req.Gate,
-		Posture:  "B",
-		Score:    75,
-		Findings: 3,
-		High:     3,
+		RID:       "RID_SANDBOX_" + time.Now().Format("20060102_150405"),
+		TenantID:  claims.TenantID,
+		Gate:      req.Gate,
+		Posture:   "B",
+		Score:     75,
+		Findings:  3,
+		High:      3,
 		Timestamp: time.Now(),
-		Src:      "sandbox",
+		Src:       "sandbox",
 	}
 	go siem.Deliver(r.Context(), h.DB, event)
 
@@ -91,7 +95,9 @@ func (h *Sandbox) Clear(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	keep := h.events[:0]
 	for _, e := range h.events {
-		if e.TenantID != claims.TenantID { keep = append(keep, e) }
+		if e.TenantID != claims.TenantID {
+			keep = append(keep, e)
+		}
 	}
 	h.events = keep
 	h.mu.Unlock()

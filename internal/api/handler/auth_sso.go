@@ -19,9 +19,9 @@ func (h *Auth) IssueToken(ctx context.Context, email, name, role string) (string
 	if users, _, err := h.DB.ListUsers(ctx, tenantID, 100, 0); err == nil {
 		for _, u := range users {
 			if u.Email == email {
-				userID  = u.ID
+				userID = u.ID
 				tenantID = u.TenantID
-				role    = u.Role
+				role = u.Role
 				break
 			}
 		}
@@ -38,6 +38,8 @@ func (h *Auth) IssueToken(ctx context.Context, email, name, role string) (string
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := tok.SignedString([]byte(h.JWTSecret))
-	if err != nil { return "", fmt.Errorf("sign token: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("sign token: %w", err)
+	}
 	return signed, nil
 }

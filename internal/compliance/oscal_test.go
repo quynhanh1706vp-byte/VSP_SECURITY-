@@ -13,10 +13,10 @@ func makeRuns(n int) []store.Run {
 	now := time.Now()
 	for i := range runs {
 		runs[i] = store.Run{
-			ID:     "run-" + string(rune('0'+i)),
-			RID:    "RID-001",
-			Status: "DONE",
-			Gate:   "PASS",
+			ID:        "run-" + string(rune('0'+i)),
+			RID:       "RID-001",
+			Status:    "DONE",
+			Gate:      "PASS",
 			CreatedAt: now,
 		}
 	}
@@ -27,12 +27,12 @@ func makeFindings(severities ...string) []store.Finding {
 	f := make([]store.Finding, len(severities))
 	for i, sev := range severities {
 		f[i] = store.Finding{
-			ID: "f" + string(rune('0'+i)),
+			ID:       "f" + string(rune('0'+i)),
 			Severity: sev,
-			Tool: "trivy",
-			RuleID: "CVE-2024-000" + string(rune('0'+i)),
-			Message: "test",
-			CWE: "CWE-79",
+			Tool:     "trivy",
+			RuleID:   "CVE-2024-000" + string(rune('0'+i)),
+			Message:  "test",
+			CWE:      "CWE-79",
 		}
 	}
 	return f

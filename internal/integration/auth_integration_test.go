@@ -23,7 +23,8 @@ import (
 
 const testJWTSecret = "integration-test-secret-32bytes!"
 
-func setupRouter(db interface{ /* store.DB */ }) *chi.Mux {
+func setupRouter(db interface { /* store.DB */
+}) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
 	r.Use(chimw.Recoverer)

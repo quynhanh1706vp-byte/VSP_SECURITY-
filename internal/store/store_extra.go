@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ── Password change ───────────────────────────────────────────────────────
@@ -50,7 +50,9 @@ func (db *DB) IsPasswordReused(ctx context.Context, userID, newPassword string) 
 	defer rows.Close()
 	for rows.Next() {
 		var hash string
-		if err := rows.Scan(&hash); err != nil { log.Warn().Err(err).Caller().Msg("ignored error") }
+		if err := rows.Scan(&hash); err != nil {
+			log.Warn().Err(err).Caller().Msg("ignored error")
+		}
 		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(newPassword)); err == nil {
 			return true, nil
 		}

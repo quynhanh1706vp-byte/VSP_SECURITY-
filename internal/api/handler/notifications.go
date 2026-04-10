@@ -23,32 +23,32 @@ func (h *Audit) Notifications(w http.ResponseWriter, r *http.Request) {
 		Title     string    `json:"title"`
 		Body      string    `json:"body"`
 		Icon      string    `json:"icon"`
-		Level     string    `json:"level"`   // info | warn | critical
+		Level     string    `json:"level"` // info | warn | critical
 		Read      bool      `json:"read"`
 		CreatedAt time.Time `json:"created_at"`
 	}
 
 	iconMap := map[string]string{
-		"login":            "🔑",
-		"logout":           "🔒",
-		"scan.triggered":   "▷",
-		"scan.done":        "✓",
-		"scan.failed":      "✗",
-		"gate.fail":        "⚠",
-		"gate.pass":        "✓",
-		"user.created":     "👤",
-		"user.deleted":     "🗑",
-		"policy.created":   "📋",
-		"policy.deleted":   "📋",
-		"apikey.created":   "🔑",
-		"apikey.deleted":   "🔑",
-		"webhook.fired":    "📡",
+		"login":               "🔑",
+		"logout":              "🔒",
+		"scan.triggered":      "▷",
+		"scan.done":           "✓",
+		"scan.failed":         "✗",
+		"gate.fail":           "⚠",
+		"gate.pass":           "✓",
+		"user.created":        "👤",
+		"user.deleted":        "🗑",
+		"policy.created":      "📋",
+		"policy.deleted":      "📋",
+		"apikey.created":      "🔑",
+		"apikey.deleted":      "🔑",
+		"webhook.fired":       "📡",
 		"remediation.updated": "🔧",
 	}
 	levelMap := map[string]string{
-		"scan.failed":  "critical",
-		"gate.fail":    "warn",
-		"user.deleted": "warn",
+		"scan.failed":    "critical",
+		"gate.fail":      "warn",
+		"user.deleted":   "warn",
 		"apikey.deleted": "warn",
 	}
 

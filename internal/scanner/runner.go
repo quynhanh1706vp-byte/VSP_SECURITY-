@@ -96,17 +96,17 @@ func CategoryOf(tool string) SourceCategory {
 }
 
 type Finding struct {
-	Tool      string            `json:"tool"`
-	Severity  Severity          `json:"severity"`
-	RuleID    string            `json:"rule_id"`
-	Message   string            `json:"message"`
-	Path      string            `json:"path"`       // file path or package name
-	Line      int               `json:"line"`       // 0 = not applicable
-	CWE       string            `json:"cwe"`        // e.g. "CWE-79", "CVE-2024-1234", "GHSA-xxxx"
-	CVSS      float64           `json:"cvss"`       // CVSS v3.1 base score 0.0-10.0; 0 = unknown
-	FixSignal string            `json:"fix_signal"` // upgrade hint or remediation note
-	Raw       map[string]any    `json:"raw"`        // original tool output for audit
-	Category  SourceCategory    `json:"category"`   // DAST|SAST|SCA|SECRETS|IAC|NETWORK
+	Tool      string         `json:"tool"`
+	Severity  Severity       `json:"severity"`
+	RuleID    string         `json:"rule_id"`
+	Message   string         `json:"message"`
+	Path      string         `json:"path"`       // file path or package name
+	Line      int            `json:"line"`       // 0 = not applicable
+	CWE       string         `json:"cwe"`        // e.g. "CWE-79", "CVE-2024-1234", "GHSA-xxxx"
+	CVSS      float64        `json:"cvss"`       // CVSS v3.1 base score 0.0-10.0; 0 = unknown
+	FixSignal string         `json:"fix_signal"` // upgrade hint or remediation note
+	Raw       map[string]any `json:"raw"`        // original tool output for audit
+	Category  SourceCategory `json:"category"`   // DAST|SAST|SCA|SECRETS|IAC|NETWORK
 }
 
 // ── RunOpts ───────────────────────────────────────────────────────────────────
@@ -140,7 +140,6 @@ func (o RunOpts) timeout() time.Duration {
 
 // ── Runner interface ──────────────────────────────────────────────────────────
 
-
 // TimeoutOrDefault returns timeout duration, defaulting to 300s.
 func (o RunOpts) TimeoutOrDefault() time.Duration {
 	if o.TimeoutSec > 0 {
@@ -151,9 +150,9 @@ func (o RunOpts) TimeoutOrDefault() time.Duration {
 
 // Runner is implemented by each tool adapter (bandit, semgrep, grype, …).
 // Each adapter is responsible for:
-//   1. Invoking the tool binary via exec.Command
-//   2. Parsing stdout (JSON / SARIF / XML)
-//   3. Returning []Finding normalised to canonical fields
+//  1. Invoking the tool binary via exec.Command
+//  2. Parsing stdout (JSON / SARIF / XML)
+//  3. Returning []Finding normalised to canonical fields
 //
 // Adapters MUST respect ctx cancellation and the timeout in RunOpts.
 type Runner interface {
@@ -218,17 +217,17 @@ func RunAll(ctx context.Context, runners []Runner, opts RunOpts) ([]Finding, []R
 
 // Summarise counts findings by severity from a slice.
 type Summary struct {
-	Critical       int
-	High           int
-	Medium         int
-	Low            int
-	Info           int
-	Trace          int
-	HasSecrets     bool // true if any gitleaks/secretcheck finding present
-	DASTConfirmed  int  // findings from DAST tools (runtime-confirmed exploitable)
-	DASTRan        bool // true if at least one DAST tool was included in this scan
-	WeightedHigh   int  // weighted HIGH count for scoring: DAST×1.5, SCA×1.2, IAC×0.8
-	WeightedCrit   int  // weighted CRITICAL count
+	Critical      int
+	High          int
+	Medium        int
+	Low           int
+	Info          int
+	Trace         int
+	HasSecrets    bool // true if any gitleaks/secretcheck finding present
+	DASTConfirmed int  // findings from DAST tools (runtime-confirmed exploitable)
+	DASTRan       bool // true if at least one DAST tool was included in this scan
+	WeightedHigh  int  // weighted HIGH count for scoring: DAST×1.5, SCA×1.2, IAC×0.8
+	WeightedCrit  int  // weighted CRITICAL count
 }
 
 func Summarise(findings []Finding) Summary {
@@ -274,12 +273,18 @@ func Summarise(findings []Finding) Summary {
 // DAST=15 (1.5x), Network=13 (1.3x), SCA=12 (1.2x), SAST=10 (1.0x), IAC=8 (0.8x)
 func sourceWeight(c SourceCategory) int {
 	switch c {
-	case SourceDAST:    return 15
-	case SourceNetwork: return 13
-	case SourceSCA:     return 12
-	case SourceSecrets: return 10
-	case SourceIAC:     return 8
-	default:            return 10 // SAST baseline
+	case SourceDAST:
+		return 15
+	case SourceNetwork:
+		return 13
+	case SourceSCA:
+		return 12
+	case SourceSecrets:
+		return 10
+	case SourceIAC:
+		return 8
+	default:
+		return 10 // SAST baseline
 	}
 }
 

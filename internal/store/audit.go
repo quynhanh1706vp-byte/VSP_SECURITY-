@@ -1,6 +1,5 @@
 package store
 
-
 import (
 	"context"
 	"encoding/json"
@@ -22,7 +21,6 @@ type AuditEntry struct {
 	PrevHash  string          `json:"prev_hash"`
 	CreatedAt time.Time       `json:"created_at"`
 }
-
 
 func (db *DB) InsertAudit(ctx context.Context, p AuditWriteParams) (int64, string, error) {
 	var seq int64

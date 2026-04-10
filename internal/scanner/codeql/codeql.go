@@ -12,22 +12,31 @@ import (
 )
 
 type Adapter struct{}
-func New() *Adapter { return &Adapter{} }
+
+func New() *Adapter             { return &Adapter{} }
 func (a *Adapter) Name() string { return "codeql" }
 
 func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Finding, error) {
-	if opts.Src == "" { return nil, fmt.Errorf("codeql: Src required") }
+	if opts.Src == "" {
+		return nil, fmt.Errorf("codeql: Src required")
+	}
 
 	// Detect language from source files
 	lang := detectLang(opts.Src)
-	if lang == "" { return nil, nil } // no supported files found
+	if lang == "" {
+		return nil, nil
+	} // no supported files found
 
 	dbDir, err := os.MkdirTemp("", "codeql_db_*")
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer os.RemoveAll(dbDir)
 
 	resDir, err := os.MkdirTemp("", "codeql_res_*")
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer os.RemoveAll(resDir)
 
 	// Create database
@@ -37,7 +46,9 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 		"--overwrite",
 		dbDir,
 	)
-	if err != nil { return nil, fmt.Errorf("codeql: database create: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("codeql: database create: %w", err)
+	}
 
 	resFile := filepath.Join(resDir, "results.sarif")
 	// Analyze
@@ -47,10 +58,14 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 		"--output="+resFile,
 		"--sarif-add-snippets",
 	)
-	if err != nil { return nil, fmt.Errorf("codeql: analyze: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("codeql: analyze: %w", err)
+	}
 
 	data, err := os.ReadFile(resFile)
-	if err != nil { return nil, nil }
+	if err != nil {
+		return nil, nil
+	}
 	return parseSARIF(data, lang)
 }
 
@@ -58,21 +73,33 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 func detectLang(src string) string {
 	counts := map[string]int{}
 	filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d == nil { return nil }
-		if d.IsDir() { return nil }
+		if err != nil || d == nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
 		switch strings.ToLower(filepath.Ext(p)) {
-		case ".py":          counts["python"]++
-		case ".go":          counts["go"]++
-		case ".js", ".ts":   counts["javascript"]++
-		case ".java":        counts["java"]++
-		case ".cs":          counts["csharp"]++
-		case ".cpp", ".cc":  counts["cpp"]++
+		case ".py":
+			counts["python"]++
+		case ".go":
+			counts["go"]++
+		case ".js", ".ts":
+			counts["javascript"]++
+		case ".java":
+			counts["java"]++
+		case ".cs":
+			counts["csharp"]++
+		case ".cpp", ".cc":
+			counts["cpp"]++
 		}
 		return nil
 	})
 	best, max := "", 0
 	for lang, n := range counts {
-		if n > max { best, max = lang, n }
+		if n > max {
+			best, max = lang, n
+		}
 	}
 	return best
 }
@@ -86,20 +113,29 @@ type sarifRun struct {
 type sarifResult struct {
 	RuleID  string `json:"ruleId"`
 	Level   string `json:"level"`
-	Message struct{ Text string `json:"text"` } `json:"message"`
+	Message struct {
+		Text string `json:"text"`
+	} `json:"message"`
 	Locations []struct {
 		PhysicalLocation struct {
-			ArtifactLocation struct{ URI string `json:"uri"` } `json:"artifactLocation"`
-			Region struct{ StartLine int `json:"startLine"` } `json:"region"`
+			ArtifactLocation struct {
+				URI string `json:"uri"`
+			} `json:"artifactLocation"`
+			Region struct {
+				StartLine int `json:"startLine"`
+			} `json:"region"`
 		} `json:"physicalLocation"`
 	} `json:"locations"`
 }
 
 func levelToSev(level string) string {
 	switch level {
-	case "error":   return "HIGH"
-	case "warning": return "MEDIUM"
-	default:        return "INFO"
+	case "error":
+		return "HIGH"
+	case "warning":
+		return "MEDIUM"
+	default:
+		return "INFO"
 	}
 }
 

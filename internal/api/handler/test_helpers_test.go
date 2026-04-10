@@ -14,4 +14,3 @@ func fakeRun(summaryJSON []byte) *store.Run {
 		Summary: json.RawMessage(summaryJSON),
 	}
 }
-

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/vsp/platform/internal/scheduler"
 	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/scheduler"
 	"github.com/vsp/platform/internal/store"
 )
 
@@ -19,7 +19,9 @@ type Scheduler struct {
 // GET /api/v1/schedules
 func (h *Scheduler) List(w http.ResponseWriter, r *http.Request) {
 	scheds := h.Engine.ListSchedules(r.Context())
-	if scheds == nil { scheds = []store.StoreSchedule{} }
+	if scheds == nil {
+		scheds = []store.StoreSchedule{}
+	}
 	jsonOK(w, map[string]any{"schedules": scheds, "total": len(scheds)})
 }
 
@@ -36,12 +38,21 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 		Enabled bool   `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid body", http.StatusBadRequest); return
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
 	}
-	if req.Name == "" { req.Name = req.Mode + " scheduled scan" }
-	if req.Mode == "" { req.Mode = "SAST" }
-	if req.Profile == "" { req.Profile = "FAST" }
-	if req.Cron == "" { req.Cron = "0 2 * * *" }
+	if req.Name == "" {
+		req.Name = req.Mode + " scheduled scan"
+	}
+	if req.Mode == "" {
+		req.Mode = "SAST"
+	}
+	if req.Profile == "" {
+		req.Profile = "FAST"
+	}
+	if req.Cron == "" {
+		req.Cron = "0 2 * * *"
+	}
 	// Validate cron: chỉ cho phép standard 5-field cron, chặn injection
 	cronParts := strings.Fields(req.Cron)
 	if len(cronParts) != 5 {
@@ -76,7 +87,10 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 		CronExpr: req.Cron,
 		Enabled:  req.Enabled,
 	})
-	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
+	if err != nil {
+		jsonError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, s)
 }
@@ -94,8 +108,13 @@ func (h *Scheduler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *Scheduler) DriftEvents(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	events, err := h.DB.ListStoreDriftEvents(r.Context(), claims.TenantID, 50)
-	if err != nil { jsonError(w, "db error", http.StatusInternalServerError); return }
-	if events == nil { events = []store.StoreDriftEvent{} }
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if events == nil {
+		events = []store.StoreDriftEvent{}
+	}
 	jsonOK(w, map[string]any{"events": events, "total": len(events)})
 }
 
@@ -128,17 +147,20 @@ func (h *Scheduler) Update(w http.ResponseWriter, r *http.Request) {
 		Cron    string `json:"cron"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid body", http.StatusBadRequest); return
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
 	}
 	if req.Cron != "" {
 		parts := strings.Fields(req.Cron)
 		if len(parts) != 5 {
-			jsonError(w, "invalid cron: must be 5 fields", http.StatusBadRequest); return
+			jsonError(w, "invalid cron: must be 5 fields", http.StatusBadRequest)
+			return
 		}
 	}
 	if err := h.DB.UpdateSchedule(r.Context(), claims.TenantID, id,
 		req.Name, req.Mode, req.Profile, req.Src, req.URL, req.Cron); err != nil {
-		jsonError(w, "update failed", http.StatusInternalServerError); return
+		jsonError(w, "update failed", http.StatusInternalServerError)
+		return
 	}
 	jsonOK(w, map[string]string{"id": id, "status": "updated"})
 }

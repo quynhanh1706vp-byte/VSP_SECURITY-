@@ -69,10 +69,10 @@ type semgrepPos struct {
 }
 
 type semgrepExtra struct {
-	Severity string            `json:"severity"`
-	Message  string            `json:"message"`
-	Metadata semgrepMetadata   `json:"metadata"`
-	Fix      string            `json:"fix"`
+	Severity string          `json:"severity"`
+	Message  string          `json:"message"`
+	Metadata semgrepMetadata `json:"metadata"`
+	Fix      string          `json:"fix"`
 }
 
 type semgrepMetadata struct {

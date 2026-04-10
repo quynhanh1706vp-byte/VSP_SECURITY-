@@ -17,8 +17,8 @@ type Audit struct {
 // GET /api/v1/audit/log
 func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	limit        := queryInt(r, "limit", 50)
-	offset       := queryInt(r, "offset", 0)
+	limit := queryInt(r, "limit", 50)
+	offset := queryInt(r, "offset", 0)
 	actionFilter := r.URL.Query().Get("action")
 
 	entries, total, err := h.DB.ListAuditPaged(r.Context(),

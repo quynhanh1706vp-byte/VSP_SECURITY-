@@ -2,8 +2,8 @@ package handler
 
 import (
 	"context"
-	"time"
 	"net/http"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/audit"
@@ -20,7 +20,7 @@ func logAudit(r *http.Request, db *store.DB, action, resource string) {
 	}
 	// Capture values before goroutine — r may be gone by the time goroutine runs
 	tenantID := claims.TenantID
-	userID   := claims.UserID
+	userID := claims.UserID
 	remoteIP := r.RemoteAddr
 	go func() { //#nosec G118 -- intentional: audit goroutine outlives request
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) //nolint:gosec // G118: intentional — request ctx cancelled after response

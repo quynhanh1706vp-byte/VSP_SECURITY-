@@ -8,14 +8,14 @@ import (
 
 // SARIF 2.1.0 structures
 type SARIFDoc struct {
-	Schema  string    `json:"$schema"`
-	Version string    `json:"version"`
+	Schema  string     `json:"$schema"`
+	Version string     `json:"version"`
 	Runs    []SARIFRun `json:"runs"`
 }
 
 type SARIFRun struct {
-	Tool    SARIFTool      `json:"tool"`
-	Results []SARIFResult  `json:"results"`
+	Tool    SARIFTool     `json:"tool"`
+	Results []SARIFResult `json:"results"`
 }
 
 type SARIFTool struct {
@@ -29,17 +29,17 @@ type SARIFDriver struct {
 }
 
 type SARIFRule struct {
-	ID               string          `json:"id"`
-	Name             string          `json:"name"`
-	ShortDescription SARIFMessage    `json:"shortDescription"`
-	Properties       map[string]any  `json:"properties,omitempty"`
+	ID               string         `json:"id"`
+	Name             string         `json:"name"`
+	ShortDescription SARIFMessage   `json:"shortDescription"`
+	Properties       map[string]any `json:"properties,omitempty"`
 }
 
 type SARIFResult struct {
-	RuleID    string           `json:"ruleId"`
-	Level     string           `json:"level"`
-	Message   SARIFMessage     `json:"message"`
-	Locations []SARIFLocation  `json:"locations"`
+	RuleID    string          `json:"ruleId"`
+	Level     string          `json:"level"`
+	Message   SARIFMessage    `json:"message"`
+	Locations []SARIFLocation `json:"locations"`
 }
 
 type SARIFMessage struct {
@@ -65,9 +65,12 @@ type SARIFRegion struct {
 
 func severityToLevel(sev string) string {
 	switch sev {
-	case "CRITICAL", "HIGH": return "error"
-	case "MEDIUM":           return "warning"
-	default:                 return "note"
+	case "CRITICAL", "HIGH":
+		return "error"
+	case "MEDIUM":
+		return "warning"
+	default:
+		return "note"
 	}
 }
 
@@ -90,16 +93,16 @@ func BuildSARIF(run store.Run, findings []store.Finding) *SARIFDoc {
 		for _, f := range toolFindings {
 			if !ruleSet[f.RuleID] && f.RuleID != "" {
 				rules = append(rules, SARIFRule{
-					ID:   f.RuleID,
-					Name: f.RuleID,
+					ID:               f.RuleID,
+					Name:             f.RuleID,
 					ShortDescription: SARIFMessage{Text: f.Message},
-					Properties: map[string]any{"cwe": f.CWE, "fix": f.FixSignal},
+					Properties:       map[string]any{"cwe": f.CWE, "fix": f.FixSignal},
 				})
 				ruleSet[f.RuleID] = true
 			}
 			results = append(results, SARIFResult{
-				RuleID: f.RuleID,
-				Level:  severityToLevel(f.Severity),
+				RuleID:  f.RuleID,
+				Level:   severityToLevel(f.Severity),
 				Message: SARIFMessage{Text: f.Message},
 				Locations: []SARIFLocation{{
 					PhysicalLocation: SARIFPhysical{

@@ -4,21 +4,21 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/vsp/platform/internal/store"
 	"github.com/vsp/platform/internal/scanner"
+	"github.com/vsp/platform/internal/store"
 )
 
 func makeFindings(n int, severity string) []store.Finding {
 	findings := make([]store.Finding, n)
 	for i := range findings {
 		findings[i] = store.Finding{
-			ID:     "finding-" + string(rune('0'+i)),
-			RunID:  "r1", // must match run.ID in BuildSARIF
-			Tool:   "trivy",
+			ID:       "finding-" + string(rune('0'+i)),
+			RunID:    "r1", // must match run.ID in BuildSARIF
+			Tool:     "trivy",
 			Severity: severity,
-			RuleID: "CVE-2024-001",
-			Message: "Test vulnerability",
-			Path:   "go.mod",
+			RuleID:   "CVE-2024-001",
+			Message:  "Test vulnerability",
+			Path:     "go.mod",
 		}
 	}
 	return findings

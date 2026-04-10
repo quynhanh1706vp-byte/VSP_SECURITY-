@@ -16,8 +16,13 @@ func (h *Remediation) List(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	status := r.URL.Query().Get("status")
 	list, err := h.DB.ListRemediations(r.Context(), claims.TenantID, status)
-	if err != nil { jsonError(w, "db error", http.StatusInternalServerError); return }
-	if list == nil { list = []store.Remediation{} }
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if list == nil {
+		list = []store.Remediation{}
+	}
 	jsonOK(w, map[string]any{"remediations": list, "total": len(list)})
 }
 
@@ -25,7 +30,10 @@ func (h *Remediation) List(w http.ResponseWriter, r *http.Request) {
 func (h *Remediation) Stats(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	stats, err := h.DB.RemediationStats(r.Context(), claims.TenantID)
-	if err != nil { jsonError(w, "db error", http.StatusInternalServerError); return }
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, stats)
 }
 
@@ -33,7 +41,10 @@ func (h *Remediation) Stats(w http.ResponseWriter, r *http.Request) {
 func (h *Remediation) Get(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	fid := chi.URLParam(r, "finding_id")
-	if !validateUUID(fid) { jsonError(w, "invalid finding_id", http.StatusBadRequest); return }
+	if !validateUUID(fid) {
+		jsonError(w, "invalid finding_id", http.StatusBadRequest)
+		return
+	}
 	rem, err := h.DB.GetRemediation(r.Context(), claims.TenantID, fid)
 	if err != nil {
 		jsonOK(w, map[string]any{"status": "open", "finding_id": fid})
@@ -41,7 +52,9 @@ func (h *Remediation) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	// Also load comments
 	comments, _ := h.DB.ListComments(r.Context(), rem.ID)
-	if comments == nil { comments = []store.RemediationComment{} }
+	if comments == nil {
+		comments = []store.RemediationComment{}
+	}
 	jsonOK(w, map[string]any{"remediation": rem, "comments": comments})
 }
 
@@ -58,10 +71,15 @@ func (h *Remediation) Upsert(w http.ResponseWriter, r *http.Request) {
 		TicketURL string `json:"ticket_url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid body", http.StatusBadRequest); return
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
 	}
-	if req.Status == "" { req.Status = "open" }
-	if req.Priority == "" { req.Priority = "P3" }
+	if req.Status == "" {
+		req.Status = "open"
+	}
+	if req.Priority == "" {
+		req.Priority = "P3"
+	}
 	// Validate TicketURL — chặn SSRF + chỉ cho phép http/https
 	if req.TicketURL != "" {
 		if err := validateScanURL(req.TicketURL); err != nil {
@@ -78,7 +96,10 @@ func (h *Remediation) Upsert(w http.ResponseWriter, r *http.Request) {
 		Notes:     req.Notes,
 		TicketURL: req.TicketURL,
 	})
-	if err != nil { jsonError(w, "internal server error", http.StatusInternalServerError); return }
+	if err != nil {
+		jsonError(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, rem)
 }
 
@@ -90,10 +111,14 @@ func (h *Remediation) AddComment(w http.ResponseWriter, r *http.Request) {
 		Body string `json:"body"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Body == "" {
-		jsonError(w, "body required", http.StatusBadRequest); return
+		jsonError(w, "body required", http.StatusBadRequest)
+		return
 	}
 	c, err := h.DB.AddComment(r.Context(), remID, claims.UserID, req.Body)
-	if err != nil { jsonError(w, "comment failed", http.StatusInternalServerError); return }
+	if err != nil {
+		jsonError(w, "comment failed", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, c)
 }

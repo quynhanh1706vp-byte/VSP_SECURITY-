@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"regexp"
 	"path/filepath"
+	"regexp"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/vsp/platform/internal/auth"
@@ -59,7 +59,9 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 	// Try wkhtmltopdf first, then weasyprint, then fallback to HTML
 	// Sanitize rid — chặn path traversal
 	ridSafe := regexp.MustCompile(`[^a-zA-Z0-9_\-]`).ReplaceAllString(rid, "")
-	if ridSafe == "" { ridSafe = "unknown" }
+	if ridSafe == "" {
+		ridSafe = "unknown"
+	}
 	rid = ridSafe
 	pdfPath := filepath.Join(os.TempDir(), "vsp-report-"+rid+".pdf")
 	defer os.Remove(pdfPath)
@@ -120,10 +122,14 @@ func buildReportData(run *store.Run, rf []store.Finding) reportData {
 	data := reportData{Run: run, Findings: rf}
 	for _, f := range rf {
 		switch f.Severity {
-		case "CRITICAL": data.Summary.Critical++
-		case "HIGH":     data.Summary.High++
-		case "MEDIUM":   data.Summary.Medium++
-		case "LOW":      data.Summary.Low++
+		case "CRITICAL":
+			data.Summary.Critical++
+		case "HIGH":
+			data.Summary.High++
+		case "MEDIUM":
+			data.Summary.Medium++
+		case "LOW":
+			data.Summary.Low++
 		}
 	}
 	return data
@@ -131,7 +137,9 @@ func buildReportData(run *store.Run, rf []store.Finding) reportData {
 
 // isValidRID ensures rid contains only safe characters (alphanumeric + hyphen + underscore)
 func isValidRID(rid string) bool {
-	if len(rid) == 0 || len(rid) > 128 { return false }
+	if len(rid) == 0 || len(rid) > 128 {
+		return false
+	}
 	for _, c := range rid {
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
 			(c >= '0' && c <= '9') || c == '-' || c == '_') {

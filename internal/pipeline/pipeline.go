@@ -8,19 +8,19 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/scanner"
 	"github.com/vsp/platform/internal/scanner/bandit"
+	"github.com/vsp/platform/internal/scanner/checkov"
 	"github.com/vsp/platform/internal/scanner/codeql"
 	"github.com/vsp/platform/internal/scanner/gitleaks"
 	"github.com/vsp/platform/internal/scanner/grype"
-	"github.com/vsp/platform/internal/scanner/checkov"
 	"github.com/vsp/platform/internal/scanner/hadolint"
 	"github.com/vsp/platform/internal/scanner/kics"
+	"github.com/vsp/platform/internal/scanner/license"
 	"github.com/vsp/platform/internal/scanner/nikto"
 	"github.com/vsp/platform/internal/scanner/nuclei"
-	"github.com/vsp/platform/internal/scanner/semgrep"
-	"github.com/vsp/platform/internal/scanner/trivy"
-	"github.com/vsp/platform/internal/scanner/sslscan"
-	"github.com/vsp/platform/internal/scanner/license"
 	"github.com/vsp/platform/internal/scanner/secretcheck"
+	"github.com/vsp/platform/internal/scanner/semgrep"
+	"github.com/vsp/platform/internal/scanner/sslscan"
+	"github.com/vsp/platform/internal/scanner/trivy"
 )
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -65,18 +65,18 @@ const (
 // Run is the canonical representation of one scan job.
 // Stored in DB table `runs` and used as the job payload.
 type Run struct {
-	ID        string    `json:"id"`         // UUID
-	RID       string    `json:"rid"`        // human-readable: RID_VSPGO_RUN_YYYYMMDD_HHMMSS_xxxxxxxx
-	TenantID  string    `json:"tenant_id"`
-	Mode      Mode      `json:"mode"`
-	Profile   Profile   `json:"profile"`
-	Src       string    `json:"src"`
-	TargetURL string    `json:"target_url"`
-	Status    Status    `json:"status"`
-	ToolsDone int       `json:"tools_done"`
-	ToolsTotal int      `json:"tools_total"`
-	CreatedAt time.Time `json:"created_at"`
-	StartedAt *time.Time `json:"started_at"`
+	ID         string     `json:"id"`  // UUID
+	RID        string     `json:"rid"` // human-readable: RID_VSPGO_RUN_YYYYMMDD_HHMMSS_xxxxxxxx
+	TenantID   string     `json:"tenant_id"`
+	Mode       Mode       `json:"mode"`
+	Profile    Profile    `json:"profile"`
+	Src        string     `json:"src"`
+	TargetURL  string     `json:"target_url"`
+	Status     Status     `json:"status"`
+	ToolsDone  int        `json:"tools_done"`
+	ToolsTotal int        `json:"tools_total"`
+	CreatedAt  time.Time  `json:"created_at"`
+	StartedAt  *time.Time `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at"`
 }
 
@@ -84,13 +84,13 @@ type Run struct {
 
 // JobPayload is serialised into the asynq task and consumed by the worker.
 type JobPayload struct {
-	RunID     string            `json:"run_id"`
-	RID       string            `json:"rid"`
-	TenantID  string            `json:"tenant_id"`
-	Mode      Mode              `json:"mode"`
-	Profile   Profile           `json:"profile"`
-	Src       string            `json:"src"`
-	TargetURL string            `json:"target_url"`
+	RunID      string              `json:"run_id"`
+	RID        string              `json:"rid"`
+	TenantID   string              `json:"tenant_id"`
+	Mode       Mode                `json:"mode"`
+	Profile    Profile             `json:"profile"`
+	Src        string              `json:"src"`
+	TargetURL  string              `json:"target_url"`
 	ExtraArgs  map[string][]string `json:"extra_args,omitempty"`
 	TimeoutSec int                 `json:"timeout_sec,omitempty"`
 }
@@ -183,9 +183,9 @@ func (e *Executor) Execute(ctx context.Context, payload JobPayload) (*ExecuteRes
 	}
 
 	opts := scanner.RunOpts{
-		Src:       payload.Src,
-		URL:       payload.TargetURL,
-			Mode:       string(payload.Mode),
+		Src:        payload.Src,
+		URL:        payload.TargetURL,
+		Mode:       string(payload.Mode),
 		ExtraArgs:  payload.ExtraArgs,
 		TimeoutSec: payload.TimeoutSec,
 	}

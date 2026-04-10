@@ -26,21 +26,21 @@ type StepResult struct {
 
 // RunCtx is the runtime context passed to every step.
 type RunCtx struct {
-	TenantID string
-	RunID    string
-	Trigger  string
-	Severity string
+	TenantID  string
+	RunID     string
+	Trigger   string
+	Severity  string
 	FindingID string
-	Score    int
-	Gate     string
+	Score     int
+	Gate      string
 	// Integrations config (loaded from DB/config)
-	SlackWebhookURL  string
-	JiraURL          string
-	JiraToken        string
-	JiraProject      string
-	GitHubToken      string
-	GitHubRepo       string
-	PagerDutyKey     string
+	SlackWebhookURL string
+	JiraURL         string
+	JiraToken       string
+	JiraProject     string
+	GitHubToken     string
+	GitHubRepo      string
+	PagerDutyKey    string
 }
 
 // ExecutePlaybook runs all steps of a playbook and records results.
@@ -51,7 +51,7 @@ func ExecutePlaybook(ctx context.Context, db *store.DB, runID string, steps []ma
 	for i, step := range steps {
 		stepType := step["Type"]
 		stepName := step["Name"]
-		config   := step["Config"]
+		config := step["Config"]
 
 		log.Info().
 			Str("run_id", runID).
@@ -152,16 +152,18 @@ func execNotify(ctx context.Context, rc RunCtx, config string) (string, error) {
 		}
 		msg = expandVars(msg, rc)
 		ping := ""
-		if p, ok := cfg["ping"]; ok { ping = p + " " }
+		if p, ok := cfg["ping"]; ok {
+			ping = p + " "
+		}
 
 		payload, _ := json.Marshal(map[string]any{
 			"text": ping + msg,
 			"attachments": []map[string]any{{
-				"color": map[string]string{"PASS":"#36a64f","WARN":"#ffcc00","FAIL":"#ff0000"}[rc.Gate],
+				"color": map[string]string{"PASS": "#36a64f", "WARN": "#ffcc00", "FAIL": "#ff0000"}[rc.Gate],
 				"fields": []map[string]any{
-					{"title":"Severity","value":rc.Severity,"short":true},
-					{"title":"Gate",    "value":rc.Gate,    "short":true},
-					{"title":"Run ID",  "value":rc.RunID,   "short":false},
+					{"title": "Severity", "value": rc.Severity, "short": true},
+					{"title": "Gate", "value": rc.Gate, "short": true},
+					{"title": "Run ID", "value": rc.RunID, "short": false},
 				},
 			}},
 		})
@@ -186,36 +188,50 @@ func execJiraTicket(ctx context.Context, rc RunCtx, config string) (string, erro
 		return "SKIP — Jira not configured (set JIRA_URL + JIRA_TOKEN)", nil
 	}
 	project := cfg["project"]
-	if project == "" { project = rc.JiraProject }
-	if project == "" { project = "VSP-SECURITY" }
+	if project == "" {
+		project = rc.JiraProject
+	}
+	if project == "" {
+		project = "VSP-SECURITY"
+	}
 	priority := cfg["priority"]
-	if priority == "" { priority = "P1" }
+	if priority == "" {
+		priority = "P1"
+	}
 
 	payload, _ := json.Marshal(map[string]any{
 		"fields": map[string]any{
-			"project":     map[string]string{"key": project},
-			"summary":     fmt.Sprintf("[VSP] Gate %s — %s — %s", rc.Gate, rc.Severity, rc.RunID),
+			"project": map[string]string{"key": project},
+			"summary": fmt.Sprintf("[VSP] Gate %s — %s — %s", rc.Gate, rc.Severity, rc.RunID),
 			"description": fmt.Sprintf("Automated ticket from VSP SOAR.\n\nRun ID: %s\nGate: %s\nSeverity: %s\nFinding: %s",
 				rc.RunID, rc.Gate, rc.Severity, rc.FindingID),
 			"issuetype": map[string]string{"name": "Bug"},
-			"priority":  map[string]string{"name": map[string]string{"P0":"Critical","P1":"High","P2":"Medium","P3":"Low"}[priority]},
+			"priority":  map[string]string{"name": map[string]string{"P0": "Critical", "P1": "High", "P2": "Medium", "P3": "Low"}[priority]},
 		},
 	})
 	resp, err := httpPostWithResp(ctx,
 		rc.JiraURL+"/rest/api/3/issue",
 		"Bearer "+rc.JiraToken, payload)
-	if err != nil { return "", fmt.Errorf("jira: %w", err) }
-	var jresp struct{ Key string `json:"key"` }
+	if err != nil {
+		return "", fmt.Errorf("jira: %w", err)
+	}
+	var jresp struct {
+		Key string `json:"key"`
+	}
 	json.Unmarshal(resp, &jresp) //nolint:errcheck
 	key := jresp.Key
-	if key == "" { key = project + "-???"}
+	if key == "" {
+		key = project + "-???"
+	}
 	return fmt.Sprintf("CREATED — %s in %s (priority: %s)", key, project, priority), nil
 }
 
 func execBlockCI(ctx context.Context, rc RunCtx, config string) (string, error) {
 	cfg := parseConfig(config)
 	provider := cfg["provider"]
-	if provider == "" { provider = "github" }
+	if provider == "" {
+		provider = "github"
+	}
 
 	if provider == "github" {
 		if rc.GitHubToken == "" || rc.GitHubRepo == "" {
@@ -223,9 +239,13 @@ func execBlockCI(ctx context.Context, rc RunCtx, config string) (string, error) 
 		}
 		// GitHub commit status API
 		statusCtx := cfg["context"]
-		if statusCtx == "" { statusCtx = "vsp/gate" }
+		if statusCtx == "" {
+			statusCtx = "vsp/gate"
+		}
 		desc := cfg["description"]
-		if desc == "" { desc = fmt.Sprintf("VSP Gate %s — %s", rc.Gate, rc.RunID) }
+		if desc == "" {
+			desc = fmt.Sprintf("VSP Gate %s — %s", rc.Gate, rc.RunID)
+		}
 
 		payload, _ := json.Marshal(map[string]string{
 			"state":       "failure",
@@ -236,7 +256,9 @@ func execBlockCI(ctx context.Context, rc RunCtx, config string) (string, error) 
 		// Note: requires commit SHA — HEAD is not valid for GitHub Statuses API
 		// In production: resolve HEAD SHA via /repos/{owner}/{repo}/commits/HEAD first
 		sha := cfg["sha"]
-		if sha == "" { sha = "HEAD" } // fallback — will fail without real SHA
+		if sha == "" {
+			sha = "HEAD"
+		} // fallback — will fail without real SHA
 		url := fmt.Sprintf("https://api.github.com/repos/%s/statuses/%s", rc.GitHubRepo, sha)
 		if err := httpPost(ctx, url, "token "+rc.GitHubToken, payload); err != nil {
 			// Don't fail — CI block is best-effort
@@ -252,13 +274,17 @@ func execBlockCI(ctx context.Context, rc RunCtx, config string) (string, error) 
 func execWebhook(ctx context.Context, rc RunCtx, config string) (string, error) {
 	cfg := parseConfig(config)
 	url := cfg["url"]
-	if url == "" { return "", fmt.Errorf("webhook: url required in config") }
+	if url == "" {
+		return "", fmt.Errorf("webhook: url required in config")
+	}
 	// SSRF protection — reuse webhook validation
 	if err := ValidateWebhookURL(url); err != nil {
 		return "", fmt.Errorf("webhook: %w", err)
 	}
 	method := cfg["method"]
-	if method == "" { method = "POST" }
+	if method == "" {
+		method = "POST"
+	}
 	payload, _ := json.Marshal(map[string]any{
 		"run_id":   rc.RunID,
 		"trigger":  rc.Trigger,
@@ -286,11 +312,17 @@ func execEnrich(ctx context.Context, rc RunCtx, config string) (string, error) {
 func execRemediate(ctx context.Context, db *store.DB, rc RunCtx, config string) (string, error) {
 	cfg := parseConfig(config)
 	assignee := cfg["assignee"]
-	if assignee == "" { assignee = "security-oncall" }
+	if assignee == "" {
+		assignee = "security-oncall"
+	}
 	status := cfg["status"]
-	if status == "" { status = "in_progress" }
+	if status == "" {
+		status = "in_progress"
+	}
 	priority := cfg["priority"]
-	if priority == "" { priority = "P1" }
+	if priority == "" {
+		priority = "P1"
+	}
 
 	// Auto-assign all open findings from this run
 	tag, err := db.Pool().Exec(ctx, `
@@ -320,14 +352,20 @@ func httpPost(ctx context.Context, url, token string, body []byte) error {
 
 func httpPostWithResp(ctx context.Context, url, token string, body []byte) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "VSP-SOAR/1.0")
-	if token != "" { req.Header.Set("Authorization", token) }
+	if token != "" {
+		req.Header.Set("Authorization", token)
+	}
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
@@ -346,7 +384,9 @@ func parseConfig(config string) map[string]string {
 		if len(kv) == 2 {
 			k := strings.TrimSpace(kv[0])
 			v := strings.Trim(strings.TrimSpace(kv[1]), `"'`)
-			if k != "" { out[k] = v }
+			if k != "" {
+				out[k] = v
+			}
 		}
 	}
 	return out
@@ -354,11 +394,11 @@ func parseConfig(config string) map[string]string {
 
 func expandVars(s string, rc RunCtx) string {
 	r := strings.NewReplacer(
-		"{{run_id}}",    rc.RunID,
-		"{{severity}}",  rc.Severity,
-		"{{gate}}",      rc.Gate,
+		"{{run_id}}", rc.RunID,
+		"{{severity}}", rc.Severity,
+		"{{gate}}", rc.Gate,
 		"{{finding_id}}", rc.FindingID,
-		"{{trigger}}",   rc.Trigger,
+		"{{trigger}}", rc.Trigger,
 	)
 	return r.Replace(s)
 }
@@ -367,7 +407,9 @@ func parseDuration(config string) time.Duration {
 	cfg := parseConfig(config)
 	if d, ok := cfg["duration"]; ok {
 		dur, err := time.ParseDuration(d)
-		if err == nil { return dur }
+		if err == nil {
+			return dur
+		}
 	}
 	return 5 * time.Second
 }

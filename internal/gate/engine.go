@@ -34,8 +34,8 @@ type PolicyRule struct {
 func DefaultRule() PolicyRule {
 	return PolicyRule{
 		FailOn:        "FAIL",
-		MinScore:      70,  // NIST SP 800-53 baseline — score < 70 = FAIL
-		MaxHigh:       10,  // >10 HIGH findings = FAIL (was unlimited)
+		MinScore:      70, // NIST SP 800-53 baseline — score < 70 = FAIL
+		MaxHigh:       10, // >10 HIGH findings = FAIL (was unlimited)
 		BlockSecrets:  true,
 		BlockCritical: true,
 	}
@@ -47,7 +47,7 @@ func DefaultRule() PolicyRule {
 type EvalResult struct {
 	Decision Decision
 	Reason   string
-	Score    int // 0-100
+	Score    int    // 0-100
 	Posture  string // A | B | C | D | F
 }
 
@@ -137,12 +137,14 @@ func Score(s scanner.Summary) int {
 	}
 
 	// Penalty: each bucket capped so score never reaches 0 from single bucket
-	critPenalty    := capInt(critCount, 2) * 15 // max 30pts (cap 2 for SAST; DAST raises effective count via weighted)
-	highPenalty    := capInt(highCount, 5) * 8  // max 40pts
-	medPenalty     := capInt(s.Medium, 10) * 2  // max 20pts
-	lowPenalty     := capInt(s.Low, 10)    * 1  // max 10pts
+	critPenalty := capInt(critCount, 2) * 15 // max 30pts (cap 2 for SAST; DAST raises effective count via weighted)
+	highPenalty := capInt(highCount, 5) * 8  // max 40pts
+	medPenalty := capInt(s.Medium, 10) * 2   // max 20pts
+	lowPenalty := capInt(s.Low, 10) * 1      // max 10pts
 	secretsPenalty := 0
-	if s.HasSecrets { secretsPenalty = 25 } // live secrets always -25pts
+	if s.HasSecrets {
+		secretsPenalty = 25
+	} // live secrets always -25pts
 
 	// DAST bonus: applied only when DASTRan=true and no DAST-confirmed issues
 	dastBonus := 0
@@ -151,13 +153,19 @@ func Score(s scanner.Summary) int {
 	}
 
 	score := 100 - critPenalty - highPenalty - medPenalty - lowPenalty - secretsPenalty + dastBonus
-	if score < 0 { return 0 }
-	if score > 100 { return 100 }
+	if score < 0 {
+		return 0
+	}
+	if score > 100 {
+		return 100
+	}
 	return score
 }
 
 func capInt(v, max int) int {
-	if v > max { return max }
+	if v > max {
+		return max
+	}
 	return v
 }
 

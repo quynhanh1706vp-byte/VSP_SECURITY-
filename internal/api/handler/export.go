@@ -21,7 +21,10 @@ type Export struct {
 func (h *Export) SARIF(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
-	if !validateRID(rid) { jsonError(w, "invalid rid", http.StatusBadRequest); return }
+	if !validateRID(rid) {
+		jsonError(w, "invalid rid", http.StatusBadRequest)
+		return
+	}
 
 	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
 	if err != nil || run == nil {
@@ -84,16 +87,18 @@ func (h *Export) JSON(w http.ResponseWriter, r *http.Request) {
 
 	runFindings, total, _ := h.DB.ListFindings(r.Context(), claims.TenantID,
 		store.FindingFilter{RunID: run.ID, Limit: 10000})
-	if runFindings == nil { runFindings = []store.Finding{} }
+	if runFindings == nil {
+		runFindings = []store.Finding{}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=vsp-%s.json", rid))
 
 	json.NewEncoder(w).Encode(map[string]any{
-		"run":      run,
-		"findings": runFindings,
-		"total":    total,
+		"run":         run,
+		"findings":    runFindings,
+		"total":       total,
 		"exported_at": time.Now(),
 	})
 }

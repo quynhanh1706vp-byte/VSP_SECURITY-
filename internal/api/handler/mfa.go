@@ -33,9 +33,9 @@ func (h *MFA) Setup(w http.ResponseWriter, r *http.Request) {
 
 	uri := auth.TOTPProvisioningURI(secret, claims.Email, "VSP Security Platform")
 	jsonOK(w, map[string]any{
-		"secret":          secret,
+		"secret":           secret,
 		"provisioning_uri": uri,
-		"message":         "Scan QR code with authenticator app, then call /mfa/verify to confirm",
+		"message":          "Scan QR code with authenticator app, then call /mfa/verify to confirm",
 	})
 }
 

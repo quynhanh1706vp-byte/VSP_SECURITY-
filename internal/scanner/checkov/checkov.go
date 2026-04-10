@@ -9,16 +9,25 @@ import (
 )
 
 type Adapter struct{}
-func New() *Adapter { return &Adapter{} }
+
+func New() *Adapter             { return &Adapter{} }
 func (a *Adapter) Name() string { return "checkov" }
 
 func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Finding, error) {
-	if opts.Src == "" { return nil, fmt.Errorf("checkov: Src required") }
+	if opts.Src == "" {
+		return nil, fmt.Errorf("checkov: Src required")
+	}
 	args := []string{"-d", opts.Src, "-o", "json", "--quiet", "--compact"}
-	if extra, ok := opts.ExtraArgs["checkov"]; ok { args = append(args, extra...) }
+	if extra, ok := opts.ExtraArgs["checkov"]; ok {
+		args = append(args, extra...)
+	}
 	res, err := scanner.Run(ctx, "checkov", args...)
-	if err != nil { return nil, err }
-	if len(res.Stdout) == 0 { return nil, nil }
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Stdout) == 0 {
+		return nil, nil
+	}
 	return parse(res.Stdout)
 }
 
@@ -76,7 +85,9 @@ func parse(data []byte) ([]scanner.Finding, error) {
 	for _, out := range outputs {
 		for _, c := range out.Results.FailedChecks {
 			line := 0
-			if len(c.Line) > 0 { line = c.Line[0] }
+			if len(c.Line) > 0 {
+				line = c.Line[0]
+			}
 			findings = append(findings, scanner.Finding{
 				Tool:      "checkov",
 				Severity:  checkovSeverity(c.CheckID, c.Severity),

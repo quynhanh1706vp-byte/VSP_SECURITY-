@@ -36,7 +36,9 @@ func (h *Governance) getFindings(r *http.Request, tenantID string) []store.Findi
 
 func (h *Governance) getLatestPosture(r *http.Request, tenantID string) string {
 	run, _ := h.DB.GetLatestRun(r.Context(), tenantID)
-	if run == nil || run.Posture == "" { return "F" }
+	if run == nil || run.Posture == "" {
+		return "F"
+	}
 	return run.Posture
 }
 
@@ -45,7 +47,9 @@ func (h *Governance) RiskRegister(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	findings := h.getFindings(r, claims.TenantID)
 	items := governance.BuildRiskRegister(claims.TenantID, findings)
-	if items == nil { items = []governance.RiskItem{} }
+	if items == nil {
+		items = []governance.RiskItem{}
+	}
 	jsonOK(w, map[string]any{"risks": items, "total": len(items)})
 }
 
@@ -54,7 +58,9 @@ func (h *Governance) Traceability(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	findings := h.getFindings(r, claims.TenantID)
 	rows := governance.BuildTraceability(findings)
-	if rows == nil { rows = []governance.TraceabilityRow{} }
+	if rows == nil {
+		rows = []governance.TraceabilityRow{}
+	}
 	jsonOK(w, map[string]any{"rows": rows, "total": len(rows)})
 }
 
@@ -78,14 +84,14 @@ func (h *Governance) Ownership(w http.ResponseWriter, r *http.Request) {
 
 	// Base control owners — enrich status từ findings thật
 	base := []governance.ControlOwner{
-		{Control: "AC-2",  Framework: "NIST", Owner: "identity-team",   Team: "Platform",  Status: "implemented"},
-		{Control: "AC-17", Framework: "NIST", Owner: "network-team",    Team: "Infra",     Status: "implemented"},
-		{Control: "SI-10", Framework: "NIST", Owner: "appsec-team",     Team: "Security",  Status: "partial"},
-		{Control: "IA-5",  Framework: "NIST", Owner: "identity-team",   Team: "Platform",  Status: "implemented"},
-		{Control: "SC-13", Framework: "NIST", Owner: "crypto-team",     Team: "Security",  Status: "implemented"},
-		{Control: "AU-2",  Framework: "NIST", Owner: "soc-team",        Team: "SOC",       Status: "implemented"},
-		{Control: "CM-8",  Framework: "NIST", Owner: "devops-team",     Team: "DevOps",    Status: "partial"},
-		{Control: "SA-11", Framework: "NIST", Owner: "appsec-team",     Team: "Security",  Status: "implemented"},
+		{Control: "AC-2", Framework: "NIST", Owner: "identity-team", Team: "Platform", Status: "implemented"},
+		{Control: "AC-17", Framework: "NIST", Owner: "network-team", Team: "Infra", Status: "implemented"},
+		{Control: "SI-10", Framework: "NIST", Owner: "appsec-team", Team: "Security", Status: "partial"},
+		{Control: "IA-5", Framework: "NIST", Owner: "identity-team", Team: "Platform", Status: "implemented"},
+		{Control: "SC-13", Framework: "NIST", Owner: "crypto-team", Team: "Security", Status: "implemented"},
+		{Control: "AU-2", Framework: "NIST", Owner: "soc-team", Team: "SOC", Status: "implemented"},
+		{Control: "CM-8", Framework: "NIST", Owner: "devops-team", Team: "DevOps", Status: "partial"},
+		{Control: "SA-11", Framework: "NIST", Owner: "appsec-team", Team: "Security", Status: "implemented"},
 	}
 
 	// Enrich: set id + tenant_id, mark "at_risk" nếu có findings open
@@ -117,7 +123,9 @@ func (h *Governance) Evidence(w http.ResponseWriter, r *http.Request) {
 	runs, _ := h.DB.ListRuns(r.Context(), claims.TenantID, 20, 0)
 	evidence := make([]governance.Evidence, 0, len(runs))
 	for _, run := range runs {
-		if run.Status != "DONE" { continue }
+		if run.Status != "DONE" {
+			continue
+		}
 		evidence = append(evidence, governance.Evidence{
 			ID:        "ev-" + run.ID,
 			TenantID:  run.TenantID,
@@ -158,8 +166,8 @@ func (h *Governance) FrameworkScorecard(w http.ResponseWriter, r *http.Request) 
 func (h *Governance) Roadmap(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	findings := h.getFindings(r, claims.TenantID)
-	posture  := h.getLatestPosture(r, claims.TenantID)
-	items    := governance.BuildSecurityRoadmap(findings, posture)
+	posture := h.getLatestPosture(r, claims.TenantID)
+	items := governance.BuildSecurityRoadmap(findings, posture)
 	jsonOK(w, map[string]any{"roadmap": items, "posture": posture})
 }
 
@@ -167,7 +175,7 @@ func (h *Governance) Roadmap(w http.ResponseWriter, r *http.Request) {
 func (h *Governance) ZeroTrust(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	findings := h.getFindings(r, claims.TenantID)
-	pillars  := governance.BuildZeroTrust(findings)
+	pillars := governance.BuildZeroTrust(findings)
 	jsonOK(w, map[string]any{"pillars": pillars, "framework": "DoD Zero Trust Strategy 2022"})
 }
 
@@ -179,7 +187,9 @@ func (h *Governance) Detection(w http.ResponseWriter, r *http.Request) {
 	// Build detection use cases from real findings
 	toolMap := map[string]string{}
 	for _, f := range findings {
-		if f.Tool != "" { toolMap[f.Tool] = f.Severity }
+		if f.Tool != "" {
+			toolMap[f.Tool] = f.Severity
+		}
 	}
 	type UseCase struct {
 		ID       string `json:"id"`
@@ -190,20 +200,24 @@ func (h *Governance) Detection(w http.ResponseWriter, r *http.Request) {
 		Count    int    `json:"count"`
 	}
 	baseUC := []UseCase{
-		{"UC-001","Secrets detection","gitleaks","CRITICAL","active",0},
-		{"UC-002","Code injection","bandit","HIGH","active",0},
-		{"UC-003","IaC misconfig","kics","HIGH","active",0},
-		{"UC-004","Container CVEs","trivy","HIGH","active",0},
-		{"UC-005","Dependency CVEs","grype","MEDIUM","active",0},
-		{"UC-006","DAST findings","nuclei","HIGH","active",0},
-		{"UC-007","License compliance","license","MEDIUM","active",0},
-		{"UC-008","Live secret validation","secretcheck","CRITICAL","active",0},
+		{"UC-001", "Secrets detection", "gitleaks", "CRITICAL", "active", 0},
+		{"UC-002", "Code injection", "bandit", "HIGH", "active", 0},
+		{"UC-003", "IaC misconfig", "kics", "HIGH", "active", 0},
+		{"UC-004", "Container CVEs", "trivy", "HIGH", "active", 0},
+		{"UC-005", "Dependency CVEs", "grype", "MEDIUM", "active", 0},
+		{"UC-006", "DAST findings", "nuclei", "HIGH", "active", 0},
+		{"UC-007", "License compliance", "license", "MEDIUM", "active", 0},
+		{"UC-008", "Live secret validation", "secretcheck", "CRITICAL", "active", 0},
 	}
 	toolCount := map[string]int{}
-	for _, f := range findings { toolCount[f.Tool]++ }
+	for _, f := range findings {
+		toolCount[f.Tool]++
+	}
 	for i, uc := range baseUC {
 		baseUC[i].Count = toolCount[uc.Tool]
-		if toolCount[uc.Tool] == 0 { baseUC[i].Status = "no_data" }
+		if toolCount[uc.Tool] == 0 {
+			baseUC[i].Status = "no_data"
+		}
 	}
 	jsonOK(w, map[string]any{"use_cases": baseUC, "total": len(baseUC)})
 }
@@ -214,9 +228,16 @@ func (h *Governance) Incidents(w http.ResponseWriter, r *http.Request) {
 	findings := h.getFindings(r, claims.TenantID)
 	incidents := make([]map[string]any, 0)
 	for _, f := range findings {
-		if f.Severity != "CRITICAL" && f.Severity != "HIGH" { continue }
+		if f.Severity != "CRITICAL" && f.Severity != "HIGH" {
+			continue
+		}
 		incidents = append(incidents, map[string]any{
-			"id":       "INC-" + func() string { if len(f.ID) >= 8 { return f.ID[:8] }; return f.ID }(),
+			"id": "INC-" + func() string {
+				if len(f.ID) >= 8 {
+					return f.ID[:8]
+				}
+				return f.ID
+			}(),
 			"title":    f.RuleID + ": " + f.Message[:min(50, len(f.Message))],
 			"severity": f.Severity,
 			"tool":     f.Tool,
@@ -225,7 +246,9 @@ func (h *Governance) Incidents(w http.ResponseWriter, r *http.Request) {
 			"path":     f.Path,
 		})
 	}
-	if incidents == nil { incidents = []map[string]any{} }
+	if incidents == nil {
+		incidents = []map[string]any{}
+	}
 	jsonOK(w, map[string]any{"incidents": incidents, "total": len(incidents)})
 }
 
@@ -252,7 +275,9 @@ func (h *Governance) ReleaseGovernance(w http.ResponseWriter, r *http.Request) {
 	runs, _ := h.DB.ListRuns(r.Context(), claims.TenantID, 20, 0)
 	gates := make([]map[string]any, 0, len(runs))
 	for _, run := range runs {
-		if run.Status != "DONE" { continue }
+		if run.Status != "DONE" {
+			continue
+		}
 		gates = append(gates, map[string]any{
 			"rid":      run.RID,
 			"gate":     run.Gate,
@@ -271,6 +296,8 @@ func timeNowStr() string {
 }
 
 func min(a, b int) int {
-	if a < b { return a }
+	if a < b {
+		return a
+	}
 	return b
 }

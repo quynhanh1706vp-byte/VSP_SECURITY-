@@ -80,7 +80,7 @@ func Verify(ctx context.Context, store Store, tenantID string) VerifyResult {
 				OK:          false,
 				Checked:     i,
 				BrokenAtSeq: e.Seq,
-				Err: fmt.Errorf("prev_hash mismatch at seq %d", e.Seq),
+				Err:         fmt.Errorf("prev_hash mismatch at seq %d", e.Seq),
 			}
 		}
 	}

@@ -33,13 +33,13 @@ func FingerprintGroup(findings []store.Finding) map[string][]store.Finding {
 // ưu tiên finding mới nhất, giữ metadata về số lần xuất hiện
 type DeduplicatedFinding struct {
 	store.Finding
-	Fingerprint   string `json:"fingerprint"`
-	OccurrenceCount int  `json:"occurrence_count"`
-	FirstSeen     string `json:"first_seen"`
-	LastSeen      string `json:"last_seen"`
-	AcrossRuns    int    `json:"across_runs"`
-	IsPersistent  bool   `json:"is_persistent"` // true nếu xuất hiện >= 3 runs
-	IsRegression  bool   `json:"is_regression"`  // true nếu biến mất rồi xuất hiện lại
+	Fingerprint     string `json:"fingerprint"`
+	OccurrenceCount int    `json:"occurrence_count"`
+	FirstSeen       string `json:"first_seen"`
+	LastSeen        string `json:"last_seen"`
+	AcrossRuns      int    `json:"across_runs"`
+	IsPersistent    bool   `json:"is_persistent"` // true nếu xuất hiện >= 3 runs
+	IsRegression    bool   `json:"is_regression"` // true nếu biến mất rồi xuất hiện lại
 }
 
 func Deduplicate(findings []store.Finding) []DeduplicatedFinding {

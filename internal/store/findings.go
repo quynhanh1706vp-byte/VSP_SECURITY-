@@ -34,35 +34,44 @@ type FindingFilter struct {
 	Offset   int
 }
 
-
 func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter) ([]Finding, int64, error) {
-	if f.Limit == 0  { f.Limit = 50   }
-	if f.Limit > 2000 { f.Limit = 2000 } // hard cap tại store layer
+	if f.Limit == 0 {
+		f.Limit = 50
+	}
+	if f.Limit > 2000 {
+		f.Limit = 2000
+	} // hard cap tại store layer
 
 	where := []string{"tenant_id = $1"}
-	args  := []any{tenantID}
+	args := []any{tenantID}
 	i := 2
 
 	if f.RunID != "" {
 		where = append(where, fmt.Sprintf("run_id = $%d", i))
-		args = append(args, f.RunID); i++
+		args = append(args, f.RunID)
+		i++
 	}
 	if f.Severity != "" {
 		where = append(where, fmt.Sprintf("severity = $%d", i))
-		args = append(args, strings.ToUpper(f.Severity)); i++
+		args = append(args, strings.ToUpper(f.Severity))
+		i++
 	}
 	if f.Tool != "" {
 		where = append(where, fmt.Sprintf("tool = $%d", i))
-		args = append(args, f.Tool); i++
+		args = append(args, f.Tool)
+		i++
 	}
 	if f.Search != "" {
 		// Defense in depth: cap search length tại store layer
 		s := f.Search
-		if len(s) > 200 { s = s[:200] }
+		if len(s) > 200 {
+			s = s[:200]
+		}
 		// Use GIN index via to_tsvector for performance on large datasets
 		// Fallback to ILIKE for exact substring matching (covered by idx_findings_search)
 		where = append(where, fmt.Sprintf("(message ILIKE $%d OR rule_id ILIKE $%d OR path ILIKE $%d)", i, i, i))
-		args = append(args, "%"+s+"%"); i++
+		args = append(args, "%"+s+"%")
+		i++
 	}
 
 	whereSQL := strings.Join(where, " AND ")
@@ -101,13 +110,27 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 			&lineNum, &cwe, &cvss, &fixSignal, &fn.CreatedAt); err != nil {
 			return nil, 0, err
 		}
-		if ruleID    != nil { fn.RuleID    = *ruleID }
-		if message   != nil { fn.Message   = *message }
-		if fpath     != nil { fn.Path      = *fpath }
-		if cwe       != nil { fn.CWE       = *cwe }
-		if cvss      != nil { fn.CVSS      = *cvss }
-		if fixSignal != nil { fn.FixSignal  = *fixSignal }
-		if lineNum   != nil { fn.LineNum   = *lineNum }
+		if ruleID != nil {
+			fn.RuleID = *ruleID
+		}
+		if message != nil {
+			fn.Message = *message
+		}
+		if fpath != nil {
+			fn.Path = *fpath
+		}
+		if cwe != nil {
+			fn.CWE = *cwe
+		}
+		if cvss != nil {
+			fn.CVSS = *cvss
+		}
+		if fixSignal != nil {
+			fn.FixSignal = *fixSignal
+		}
+		if lineNum != nil {
+			fn.LineNum = *lineNum
+		}
 		result = append(result, fn)
 	}
 	return result, total, nil
@@ -134,14 +157,20 @@ func (db *DB) FindingsSummary(ctx context.Context, tenantID, runID string) (*Fin
 	defer rows.Close()
 	s := &FindingSummary{}
 	for rows.Next() {
-		var sev string; var cnt int
+		var sev string
+		var cnt int
 		rows.Scan(&sev, &cnt)
 		switch sev {
-		case "CRITICAL": s.Critical = cnt
-		case "HIGH":     s.High = cnt
-		case "MEDIUM":   s.Medium = cnt
-		case "LOW":      s.Low = cnt
-		default:         s.Info += cnt
+		case "CRITICAL":
+			s.Critical = cnt
+		case "HIGH":
+			s.High = cnt
+		case "MEDIUM":
+			s.Medium = cnt
+		case "LOW":
+			s.Low = cnt
+		default:
+			s.Info += cnt
 		}
 		s.Total += cnt
 	}
