@@ -121,3 +121,12 @@ func scanRun(row scanner) (*Run, error) {
 	if r.Summary == nil { r.Summary   = json.RawMessage("{}") }
 	return &r, nil
 }
+
+// UpdateRunGateReason stores the gate decision reason for audit trail.
+func (db *DB) UpdateRunGateReason(ctx context.Context, tenantID, rid, reason string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE runs SET gate_reason=$1 WHERE tenant_id=$2 AND rid=$3`,
+		reason, tenantID, rid)
+	return err
+}
+

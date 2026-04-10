@@ -782,7 +782,7 @@
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>Run ID</th><th>Mode</th><th>Profile</th><th>Status</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Score</th><th>Created</th></tr></thead>
+            <thead><tr><th>Run ID</th><th>Mode</th><th>Profile</th><th>Status</th><th>Gate</th><th>Gate Reason</th><th>Findings</th><th>Tools</th><th>Score</th><th>By</th><th>Created</th></tr></thead>
             <tbody id="runs-table">
               <tr><td class="mono" style="font-size:10px">RID_SCHED_20260329_194714_0</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">104</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 19:47</td></tr>
               <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_171611</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-orange fw7">49</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 17:16</td></tr>
@@ -2329,9 +2329,14 @@ function loadCMMC() {
 async function triggerScan() {
   const mode    = document.getElementById('scanMode').value;
   const profile = document.getElementById('scanProfile').value;
-  const src     = document.getElementById('scanSrc').value;
+  const src     = document.getElementById('scanSrc').value.trim();
   const msg     = document.getElementById('scanMsg');
   if (!src) { msg.style.color='var(--red)'; msg.textContent='⚠ Source path is required'; return; }
+  // Security: validate path format — must be absolute path or git URL
+  const validPath = /^(\/[^ <>|;&`]+|https?:\/\/|git@|ssh:\/\/)/.test(src);
+  const hasTraversal = src.includes('../') || src.includes('..\\');
+  if (!validPath) { msg.style.color='var(--red)'; msg.textContent='⚠ Must be absolute path (/...) or Git URL (https://...)'; return; }
+  if (hasTraversal) { msg.style.color='var(--red)'; msg.textContent='⚠ Path traversal detected — use absolute path'; return; }
   msg.style.color='var(--t3)'; msg.textContent='⏳ Triggering scan…';
   try {
     if (TOKEN) {
@@ -3556,6 +3561,7 @@ async function loadRuns() {
       const scoreColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)';
       const findColor = r.total > 0 ? (r.summary?.CRITICAL > 0 ? 'c-red' : r.summary?.HIGH > 0 ? 'c-orange' : 'c-amber') : 'c-green';
 
+      const triggeredBy = r.triggered_by || 'scheduler';
       return `<tr style="cursor:pointer" onclick="viewRunLog('${r.rid}')">
         <td class="mono" style="font-size:10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.rid}">${r.rid}</td>
         <td><span class="pill" style="${mStyle}">${r.mode}</span></td>

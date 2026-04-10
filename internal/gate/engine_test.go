@@ -35,7 +35,8 @@ func TestEvaluate_SecretsBlock(t *testing.T) {
 
 func TestEvaluate_HighWarn(t *testing.T) {
 	rule := gate.DefaultRule()
-	rule.MaxHigh = -1 // unlimited — should only warn
+	rule.MaxHigh = -1  // unlimited — should only warn on HIGH
+	rule.MinScore = 0  // disable score threshold to isolate MaxHigh behavior
 	s := scanner.Summary{High: 5}
 	r := gate.Evaluate(rule, s)
 	assert.Equal(t, gate.DecisionWarn, r.Decision)
@@ -55,6 +56,7 @@ func TestEvaluate_MaxHighWarnMode(t *testing.T) {
 	rule := gate.DefaultRule()
 	rule.MaxHigh = 2
 	rule.FailOn = "WARN"
+	rule.MinScore = 0  // disable score threshold to isolate FailOn=WARN behavior
 	s := scanner.Summary{High: 5}
 	r := gate.Evaluate(rule, s)
 	assert.Equal(t, gate.DecisionWarn, r.Decision)
