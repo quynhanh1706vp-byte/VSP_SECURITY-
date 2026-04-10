@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -39,7 +38,7 @@ func (h *SIEM) Create(w http.ResponseWriter, r *http.Request) {
 		Secret string `json:"secret"`
 		MinSev string `json:"min_sev"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}

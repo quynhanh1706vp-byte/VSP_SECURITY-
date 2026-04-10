@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -110,7 +109,10 @@ func (h *Remediation) AddComment(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Body string `json:"body"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Body == "" {
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Body == "" {
 		jsonError(w, "body required", http.StatusBadRequest)
 		return
 	}

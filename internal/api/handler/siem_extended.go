@@ -49,7 +49,7 @@ func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
 		Condition string   `json:"condition"`
 		Enabled   bool     `json:"enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -137,7 +137,7 @@ func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
 		RuleID     string          `json:"rule_id"`
 		SourceRefs json.RawMessage `json:"source_refs"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -176,7 +176,7 @@ func (h *Correlation) ResolveIncident(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Status string `json:"status"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	decodeJSON(w, r, &req)
 	if req.Status == "" {
 		req.Status = "resolved"
 	}
@@ -229,7 +229,7 @@ func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
 		Steps       json.RawMessage `json:"steps"`
 		Enabled     bool            `json:"enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -287,7 +287,7 @@ func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var ctxRaw json.RawMessage
-	json.NewDecoder(r.Body).Decode(&ctxRaw) //nolint:errcheck
+	decodeJSON(w, r, &ctxRaw) //nolint:errcheck
 	if ctxRaw == nil {
 		ctxRaw = json.RawMessage(`{"trigger":"manual"}`)
 	}
@@ -360,7 +360,7 @@ func (h *SOAR) Trigger(w http.ResponseWriter, r *http.Request) {
 		RunID    string `json:"run_id"`
 		Findings int    `json:"findings"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -420,7 +420,7 @@ func (h *LogSources) List(w http.ResponseWriter, r *http.Request) {
 func (h *LogSources) Create(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	var req store.LogSource
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -609,7 +609,7 @@ func (h *ThreatIntel) EnrichBatch(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		CVEs []string `json:"cves"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -696,7 +696,7 @@ func (h *ThreatIntel) SemanticAnalyze(w http.ResponseWriter, r *http.Request) {
 		MaxItems   int      `json:"max_items"`   // default 5
 		Severity   string   `json:"severity"`    // filter: CRITICAL/HIGH/etc
 	}
-	json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+	decodeJSON(w, r, &req) //nolint:errcheck
 	if req.MaxItems == 0 {
 		req.MaxItems = 5
 	}
@@ -746,7 +746,10 @@ func (h *ThreatIntel) CheckSecret(w http.ResponseWriter, r *http.Request) {
 		Value string `json:"value"`
 		Type  string `json:"type"` // optional, auto-detect if empty
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Value == "" {
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Value == "" {
 		jsonError(w, "value required", http.StatusBadRequest)
 		return
 	}

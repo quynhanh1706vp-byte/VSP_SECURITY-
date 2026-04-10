@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -45,7 +44,7 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 		Role     string `json:"role"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}

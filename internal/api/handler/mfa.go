@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/vsp/platform/internal/auth"
@@ -88,7 +87,7 @@ func (h *MFA) Disable(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code string `json:"code"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	decodeJSON(w, r, &req)
 
 	user, err := h.DB.GetUserByID(r.Context(), claims.TenantID, claims.UserID)
 	if err != nil || user == nil {

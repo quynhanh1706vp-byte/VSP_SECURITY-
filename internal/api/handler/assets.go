@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -188,7 +187,7 @@ func (h *Assets) Create(w http.ResponseWriter, r *http.Request) {
 		Env  string   `json:"env"`
 		Tags []string `json:"tags"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}

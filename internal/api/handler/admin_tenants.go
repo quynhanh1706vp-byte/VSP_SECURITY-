@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"regexp"
 	"strings"
@@ -26,7 +25,7 @@ func (u *Users) CreateTenant(w http.ResponseWriter, r *http.Request) {
 		Name string `json:"name"`
 		Plan string `json:"plan"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}

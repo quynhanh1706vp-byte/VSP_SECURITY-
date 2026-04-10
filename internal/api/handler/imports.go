@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -18,7 +17,7 @@ type Imports struct{ DB *store.DB }
 func (h *Imports) Policies(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	var rules []store.PolicyRule
-	if err := json.NewDecoder(r.Body).Decode(&rules); err != nil {
+	if !decodeJSON(w, r, &rules) {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -110,7 +109,7 @@ func (h *Imports) Users(w http.ResponseWriter, r *http.Request) {
 		Role  string `json:"role"`
 		Name  string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&users); err != nil {
+	if !decodeJSON(w, r, &users) {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}

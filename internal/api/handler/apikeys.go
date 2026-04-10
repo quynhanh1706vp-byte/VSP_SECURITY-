@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -39,7 +38,7 @@ func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
 		Role       string `json:"role"`
 		ExpiryDays int    `json:"expiry_days"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}

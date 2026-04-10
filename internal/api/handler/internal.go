@@ -65,7 +65,7 @@ func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload ScanCompletePayload
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if !decodeJSON(w, r, &payload) {
 		jsonError(w, "invalid payload", http.StatusBadRequest)
 		return
 	}

@@ -395,7 +395,7 @@ func main() {
 		netCapH.Stream(w, r)
 	})
 	r.Get("/api/p4/conmon/report", p4AuthMiddleware(handleConMonReport))
-	r.With(auth.TokenFromQuery(jwtSecret, keyStore)).Get("/api/v1/ws", handler.WSUpgradeHandler)
+	r.With(authMw).Get("/api/v1/ws", handler.WSUpgradeHandler) // cookie-based auth
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
 		r.Use(vspMW.NewUserRateLimiter(600, time.Minute)) // per-user: 600 req/min

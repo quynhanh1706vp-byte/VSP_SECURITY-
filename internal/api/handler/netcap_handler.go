@@ -48,7 +48,7 @@ func (h *NetCapHandler) Interfaces(w http.ResponseWriter, r *http.Request) {
 
 func (h *NetCapHandler) Start(w http.ResponseWriter, r *http.Request) {
 	var cfg netcap.CaptureConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+	if !decodeJSON(w, r, &cfg) {
 		// Defaults if no body
 		cfg.Interface = "any"
 		cfg.SnapLen = 1500

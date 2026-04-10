@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -50,7 +49,7 @@ func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
 		Gate      string `json:"gate"`
 		Severity  string `json:"severity"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		req.EventType = "test"
 		req.Gate = "WARN"
 		req.Severity = "HIGH"
