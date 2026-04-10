@@ -49,3 +49,4 @@ config.yaml.bak
 # Redis dump
 dump.rdb
 *.rdb
+.auth_patch_backup_*
