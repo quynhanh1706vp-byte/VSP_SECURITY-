@@ -279,7 +279,8 @@ func main() {
 	r.Get("/api/docs", handler.SwaggerUI)
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
-	r.Get("/api/v1/auth/check", authH.Check) // public — FE session validation
+	// /auth/check: dùng authMw để validate cookie/token, trả 401 nếu invalid
+	// Đặt sau authMw declaration — xem dưới
 	r.With(vspMW.StrictLimiter(20, time.Minute)).Post("/api/v1/auth/logout", authH.Logout)
 	r.With(vspMW.StrictLimiter(30, time.Minute)).Post("/api/v1/auth/refresh", authH.Refresh)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/mfa/setup", mfaH.Setup)
