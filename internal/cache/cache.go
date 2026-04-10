@@ -3,9 +3,11 @@ package cache
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -18,12 +20,20 @@ type Client struct {
 }
 
 // New tạo cache client. Nếu Redis không available, trả về no-op client.
+// Hỗ trợ TLS: nếu addr bắt đầu bằng "rediss://" hoặc REDIS_TLS=true thì dùng TLS.
 func New(addr, password string) *Client {
-	rdb := redis.NewClient(&redis.Options{
+	opts := &redis.Options{
 		Addr:     addr,
 		Password: password,
 		DB:       1, // DB 1 để tách khỏi asynq (DB 0)
-	})
+	}
+	// TLS support: rediss:// scheme hoặc addr chứa :6380 (TLS port)
+	if strings.HasPrefix(addr, "rediss://") || strings.Contains(addr, ":6380") {
+		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		// Strip scheme nếu có
+		opts.Addr = strings.TrimPrefix(addr, "rediss://")
+	}
+	rdb := redis.NewClient(opts)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if err := rdb.Ping(ctx).Err(); err != nil {

@@ -21,7 +21,7 @@ func TestChangePasswordValidation(t *testing.T) {
 		},
 		{
 			name:       "password too short — no auth returns 401",
-			body:       map[string]string{"current_password": "old", "new_password": "short"},
+			body:       map[string]string{"current_password": "old", "new_password": "shortpasswd"},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{

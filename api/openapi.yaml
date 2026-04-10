@@ -440,7 +440,7 @@ components:
       required: [email, password]
       properties:
         email: { type: string, format: email }
-        password: { type: string, minLength: 8 }
+        password: { type: string, minLength: 12 }
         mfa_code: { type: string, pattern: "^[0-9]{6}$" }
 
     LoginResponse:
@@ -646,7 +646,7 @@ paths:
               required: [current_password, new_password]
               properties:
                 current_password: { type: string }
-                new_password: { type: string, minLength: 8 }
+                new_password: { type: string, minLength: 12 }
                 mfa_code: { type: string }
       responses:
         "200": { description: Password changed }
@@ -841,7 +841,7 @@ paths:
               required: [email, password, role]
               properties:
                 email: { type: string }
-                password: { type: string, minLength: 8 }
+                password: { type: string, minLength: 12 }
                 role: { type: string, enum: [admin, analyst, dev, auditor] }
       responses:
         "201": { description: User created }
