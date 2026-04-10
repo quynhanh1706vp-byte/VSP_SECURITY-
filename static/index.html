@@ -2777,7 +2777,11 @@ window.TOKEN = ''; /* cookie-based auth — no localStorage */
 
 // ── ensureToken: returns true if TOKEN available, else tries localStorage ──
 async function ensureToken() {
+  // Already verified this session
   if (window.TOKEN === '✓') return true;
+  // Only probe once — avoid repeated 401 logs
+  if (window._tokenChecked) return false;
+  window._tokenChecked = true;
   try {
     var r = await fetch('/api/v1/auth/check', {credentials: 'same-origin'});
     if (r.ok) { window.TOKEN = '✓'; return true; }
