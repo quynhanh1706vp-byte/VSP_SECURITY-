@@ -1,5 +1,6 @@
 # Binaries
-gateway
+/gateway
+/vsp-gateway
 scanner
 soc-shell
 seed
@@ -36,7 +37,6 @@ static/vsp_features_patch.js
 start.sh
 .env
 .env
-vsp-gateway
 *.py
 *.sh
 !setup_vsp.sh
