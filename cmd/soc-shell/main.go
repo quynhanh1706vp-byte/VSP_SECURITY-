@@ -19,6 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"io"
+	"encoding/json"
 )
 
 
@@ -156,7 +157,8 @@ mux.HandleFunc("/p4", func(w http.ResponseWriter, r *http.Request) {
 			data, err := os.ReadFile("./static/panels/p4_compliance.html")
 			if err == nil {
 				html := string(data)
-				inject := "<script>window.TOKEN=" + fmt.Sprintf("%q", token) + ";</script>"
+				tokenJSON, _ := json.Marshal(token)
+			inject := "<script>window.TOKEN=" + string(tokenJSON) + ";</script>"
 				html = strings.Replace(html, "<head>", "<head>"+inject, 1)
 				w.Write([]byte(html)) //nolint:errcheck
 				return
