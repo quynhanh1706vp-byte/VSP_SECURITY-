@@ -5742,7 +5742,7 @@ async function sbomDownload(rid) {
   await ensureToken();
   showToast('Generating SBOM…','info');
   try {
-    var resp = await fetch('/api/v1/sbom/'+rid, {
+    var resp = await fetch('/api/p4/zt/sbom'+rid, {
       headers: {}
     });
     if (!resp.ok) throw new Error('HTTP '+resp.status);
@@ -5761,7 +5761,7 @@ async function sbomDetail(rid) {
   await ensureToken();
   showToast('Loading SBOM…','info');
   try {
-    var resp = await fetch('/api/v1/sbom/'+rid, {
+    var resp = await fetch('/api/p4/zt/sbom'+rid, {
       headers: {}
     });
     if (!resp.ok) throw new Error('HTTP '+resp.status);
