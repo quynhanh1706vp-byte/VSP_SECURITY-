@@ -1604,7 +1604,8 @@ function owaspBadge(cwe) {
 function getCSRFToken() {
   var match = document.cookie.split(';').map(function(c){return c.trim();})
     .find(function(c){return c.startsWith('vsp_csrf=');});
-  return match ? match.split('=')[1] : '';
+  var token = match ? match.split('=').slice(1).join('=') : '';
+  return token.replace(/[^\x20-\x7E]/g,''); // ISO-8859-1 safe
 }
 
 function esc(s) {
@@ -1630,7 +1631,10 @@ async function api(method, path, body, noAuth) {
     throw new Error('not_authenticated');
   }
   // FIX 3: OWASP ASVS V4.2.2 — Double Submit Cookie CSRF protection
-  var csrfToken = document.cookie.split(';').map(function(c){return c.trim();}).reduce(function(v,c){return c.startsWith('vsp_csrf=')?c.split('=')[1]:v;},'');
+  // encodeURIComponent not needed — getCSRFToken() returns ASCII-safe base64url
+  var _csrfRaw = document.cookie.split(';').map(function(c){return c.trim();}).reduce(function(v,c){return c.startsWith('vsp_csrf=')?decodeURIComponent(c.split('=').slice(1).join('=')):v;},'');
+  // Sanitize: HTTP headers only accept ISO-8859-1 — strip non-ASCII chars
+  var csrfToken = _csrfRaw.replace(/[^\x20-\x7E]/g, '');
   const opts = { method, credentials: 'same-origin', headers: {'Content-Type':'application/json', 'X-CSRF-Token': csrfToken} };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(API + path, opts);
@@ -2876,8 +2880,8 @@ async function govLoginSubmit() {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
-    var csrfToken = document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');});
-    csrfToken = csrfToken ? csrfToken.split('=')[1] : '';
+    var csrfToken = (document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('=');
+    csrfToken = csrfToken.replace(/[^\x20-\x7E]/g,''); // ISO-8859-1 safe for HTTP header
     var r = await fetch('/api/v1/auth/login', {
       method: 'POST',
       credentials: 'same-origin',
