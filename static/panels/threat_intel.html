@@ -234,7 +234,7 @@ async function openIOCDetail(id){
   if(TOKEN&&ioc){
     try{
       // Get matched findings via hunt
-      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(ioc.val||'')+'&hours=72&limit=5', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
+      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(ioc.val||'')+'&hours=72&limit=5', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({}));
       if(hunted.events&&hunted.events.length){
         ioc._log_hits=hunted.events.length;
         ioc.findings=(hunted.events||[]).slice(0,3).map(function(e){return e.message;});
@@ -262,7 +262,7 @@ async function openCVEDetail(id){
   if(!c&&TOKEN){
     // Try fetch from top-cves API
     try{
-      var d=await fetch(API+'/api/v1/vulns/top-cves', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({cves:[]}));
+      var d=await fetch(API+'/api/v1/vulns/top-cves', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({cves:[]}));
       var found=(d.cves||[]).find(function(x){return x.cve===id;});
       if(found) c={id:found.cve,severity:found.severity,cvss:found.cvss||'N/A',epss:found.epss||'N/A',kev:false,desc:found.cve+' — '+found.severity+' vulnerability',component:found.tools,fix:'Update affected component',ttp:'T1190',refs:[]};
     }catch(e){}
@@ -271,7 +271,7 @@ async function openCVEDetail(id){
   // Fetch related findings count
   if(TOKEN){
     try{
-      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(id)+'&hours=168&limit=10', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
+      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(id)+'&hours=168&limit=10', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({}));
       if(hunted.count) c._log_hits=hunted.count;
     }catch(e){}
   }
@@ -300,11 +300,11 @@ function syncFeeds(){
   var b=document.getElementById('sync-badge');
   b.textContent='⏳ Syncing…';b.className='pill pill-amber';
   setTimeout(function(){b.textContent='✓ synced just now';b.className='pill pill-green';},2000);
-  if(TOKEN)fetch(API+'/api/v1/ti/feeds/sync',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+  if(TOKEN)fetch(API+'/api/v1/ti/feeds/sync',{method:'POST',credentials:'same-origin'}).catch(function(){});
 }
 function loadFromAPI(){
   if(!TOKEN)return;
-  var h={Authorization:'Bearer '+TOKEN};
+  var h = {};
   Promise.all([
     fetch(API+'/api/v1/ti/iocs?limit=20', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
     fetch(API+'/api/v1/ti/feeds', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),

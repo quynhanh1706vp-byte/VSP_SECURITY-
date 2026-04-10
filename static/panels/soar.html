@@ -463,7 +463,7 @@ function togglePB(id){
   var pb=PLAYBOOKS.find(function(p){return p.id===id;});
   if(pb){pb.enabled=!pb.enabled;}
   renderList();renderDetail();
-  if(TOKEN) fetch(API+'/api/v1/soar/playbooks/'+id+'/toggle',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+  if(TOKEN) fetch(API+'/api/v1/soar/playbooks/'+id+'/toggle',{method:'POST',credentials:'same-origin'}).catch(function(){});
 }
 
 // ── Run modal ──────────────────────────────────────────────
@@ -551,8 +551,8 @@ async function execPlaybook(){
   RUN_HISTORY.unshift(newRun);
   btn.disabled=false;btn.textContent='▶ Execute';isRunning=false;
   renderList();loadRunHistory();
-  if(TOKEN) fetch(API+'/api/v1/soar/playbooks/'+pb.id+'/run',{
-    method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+  if(TOKEN) fetch(API+'/api/v1/soar/playbooks/'+pb.id+'/run', {credentials:"same-origin", 
+    method:'POST',headers:{'Content-Type':'application/json'},
     body:document.getElementById('run-ctx').value}).catch(function(){});
 }
 
@@ -581,7 +581,7 @@ function loadRunHistory(){
       +'<span class="run-dur">'+r.dur+'</span>'
       +'</div>';
   }).join('');
-  if(TOKEN) fetch(API+'/api/v1/soar/runs?limit=20', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}})
+  if(TOKEN) fetch(API+'/api/v1/soar/runs?limit=20', {credentials:'same-origin'})
     .then(function(r){return r.json();}).then(function(d){
       if(d.runs&&d.runs.length){
         d.runs.forEach(function(r){
@@ -652,8 +652,8 @@ function createPB(){
   PLAYBOOKS.unshift(newPB);
   closeModal('new-pb-modal');
   renderList();selectPB(newPB.id);
-  if(TOKEN) fetch(API+'/api/v1/soar/playbooks',{method:'POST',
-    headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+  if(TOKEN) fetch(API+'/api/v1/soar/playbooks', {credentials:"same-origin", method:'POST',
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:newPB.name,description:newPB.desc,trigger:newPB.trigger,sev_filter:newPB.sev,enabled:true})}).catch(function(){});
 }
 

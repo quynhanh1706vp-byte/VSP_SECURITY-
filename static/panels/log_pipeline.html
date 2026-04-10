@@ -225,7 +225,7 @@ function openSourceDetail(id){
     +'<div class="detail-card"><div class="detail-lbl">Total events</div><div class="detail-val">'+s.events.toLocaleString()+'</div></div>'
     +(s.status==='err'?'<div style="background:var(--red2);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px 11px;font-size:11px;color:var(--red);margin-top:8px">&#9888; Source offline: last heartbeat '+s.lastEvent+' ago. Auto-reconnect in progress.</div>':'');
   document.getElementById('smod-test-btn').onclick=function(){
-    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id+'/test',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json();}).then(function(d){alert('Test result: '+(d.ok?'✓ connected':'✗ failed'));}).catch(function(){alert('Test: ✓ simulated OK');});
+    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id+'/test',{method:'POST',credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){alert('Test result: '+(d.ok?'✓ connected':'✗ failed'));}).catch(function(){alert('Test: ✓ simulated OK');});
     else alert('Test: ✓ simulated OK (no token)');
   };
   document.getElementById('source-modal').classList.add('open');
@@ -314,7 +314,7 @@ function addSource(){
   var newSrc={id:'s'+Date.now(),name:name,proto:_selectedType,format:'json-raw',addr:addr,eps:0,lastEvent:'never',parseRate:0,status:'ok',events:0};
   SOURCES.push(newSrc);
   closeModal('add-source-modal');renderSources();
-  if(TOKEN)fetch(API+'/api/v1/logs/sources',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({name:name,protocol:_selectedType,address:addr})}).catch(function(){});
+  if(TOKEN)fetch(API+'/api/v1/logs/sources', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,protocol:_selectedType,address:addr})}).catch(function(){});
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function togglePause(){
@@ -343,7 +343,7 @@ setInterval(function(){
 },1000);
 async function loadSources(){
   if(!TOKEN)return;
-  var h={Authorization:'Bearer '+TOKEN};
+  var h = {};
   try{
     var [sr,st]=await Promise.all([
       fetch(API+'/api/v1/logs/sources', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),

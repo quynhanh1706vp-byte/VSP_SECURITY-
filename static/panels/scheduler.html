@@ -394,7 +394,7 @@ function toggleSched(idx) {
   if (TOKEN) {
     fetch(API + '/api/v1/schedules/' + s.id + '/toggle', {
       method: 'PATCH',
-      headers: { Authorization: 'Bearer ' + TOKEN }
+      credentials:'same-origin'
     }).catch(function(){});
   }
 }
@@ -421,7 +421,7 @@ function runNow(idx) {
     if (TOKEN) {
       fetch(API + '/api/v1/schedules/' + s.id + '/run', {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + TOKEN }
+        credentials:'same-origin'
       }).then(function(r){ return r.json(); })
         .then(function(d){
           if (d && d.rid) { newRun.rid = d.rid; renderRecentRuns(); }
@@ -530,18 +530,18 @@ function saveSchedule() {
     var s = SCHEDULES.find(function(x){ return x.id === _editId; });
     if (s) Object.assign(s, payload);
     showToast('Schedule updated', 'success');
-    if (TOKEN) fetch(API + '/api/v1/schedules/' + _editId, {
+    if (TOKEN) fetch(API + '/api/v1/schedules/' + _editId, {credentials:"same-origin", 
       method: 'PATCH',
-      headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     }).catch(function(){});
   } else {
     var newS = Object.assign({ id: 'sc' + Date.now(), next_run: '—', last_run: 'never', last_status: '—', last_gate: '—' }, payload);
     SCHEDULES.unshift(newS);
     showToast('Schedule created', 'success');
-    if (TOKEN) fetch(API + '/api/v1/schedules', {
+    if (TOKEN) fetch(API + '/api/v1/schedules', {credentials:"same-origin", 
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     }).catch(function(){});
   }
@@ -559,7 +559,7 @@ function deleteSchedule(idx) {
   showToast('Schedule deleted', 'success');
   if (TOKEN) fetch(API + '/api/v1/schedules/' + id, {
     method: 'DELETE',
-    headers: { Authorization: 'Bearer ' + TOKEN }
+    credentials:'same-origin'
   }).catch(function(){});
 }
 
@@ -583,7 +583,7 @@ document.addEventListener('keydown', function(e) {
 async function loadSchedules() {
   if (!TOKEN) { renderSchedules(); return; }
   try {
-    var r = await fetch(API + '/api/v1/schedules', {credentials:'same-origin', headers: { Authorization: 'Bearer ' + TOKEN } });
+    var r = await fetch(API + '/api/v1/schedules', {credentials:'same-origin' });
     if (r.ok) {
       var d = await r.json();
       if (d.schedules && d.schedules.length) {
@@ -611,7 +611,7 @@ async function loadSchedules() {
 async function loadRecentRuns() {
   if (!TOKEN) { renderRecentRuns(); return; }
   try {
-    var r = await fetch(API + '/api/v1/vsp/runs?limit=20', {credentials:'same-origin', headers: { Authorization: 'Bearer ' + TOKEN } });
+    var r = await fetch(API + '/api/v1/vsp/runs?limit=20', {credentials:'same-origin' });
     if (r.ok) {
       var d = await r.json();
       if (d.runs && d.runs.length) {

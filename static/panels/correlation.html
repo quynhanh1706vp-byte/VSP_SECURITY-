@@ -397,7 +397,7 @@ function toggleRule(id){
   var r=RULES.find(function(x){return x.id===id;});
   if(r){
     r.enabled=!r.enabled;
-    if(TOKEN) fetch(API+'/api/v1/correlation/rules/'+id+'/toggle',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+    if(TOKEN) fetch(API+'/api/v1/correlation/rules/'+id+'/toggle',{method:'POST',credentials:'same-origin'}).catch(function(){});
     renderRules();
   }
 }
@@ -439,7 +439,7 @@ async function openIncidentDetail(id){
   // Fetch fresh data from API
   if(TOKEN){
     try{
-      var fresh=await fetch(API+'/api/v1/correlation/incidents/'+id, {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
+      var fresh=await fetch(API+'/api/v1/correlation/incidents/'+id, {credentials:'same-origin'}).then(r=>r.json());
       if(fresh&&fresh.id) inc=Object.assign(inc||{},fresh);
     }catch(e){}
     // Fetch related log events
@@ -447,7 +447,7 @@ async function openIncidentDetail(id){
       var refs=inc&&inc.source_refs?inc.source_refs:{};
       var q=refs.matched_hosts&&refs.matched_hosts[0]?refs.matched_hosts[0]:'';
       if(q){
-        var evts=await fetch(API+'/api/v1/logs/hunt?source_ip='+encodeURIComponent(q)+'&hours=2&limit=5', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
+        var evts=await fetch(API+'/api/v1/logs/hunt?source_ip='+encodeURIComponent(q)+'&hours=2&limit=5', {credentials:'same-origin'}).then(r=>r.json());
         if(evts&&evts.events&&evts.events.length){
           inc._related_events=evts.events;
         }
@@ -540,7 +540,7 @@ async function openIncidentDetail(id){
     inc.status='resolved';
     closeModal('inc-modal');
     renderIncidents();
-    if(TOKEN) fetch(API+'/api/v1/correlation/incidents/'+inc.id+'/resolve',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+    if(TOKEN) fetch(API+'/api/v1/correlation/incidents/'+inc.id+'/resolve',{method:'POST',credentials:'same-origin'}).catch(function(){});
   };
   document.getElementById('imod-soar-btn').onclick=function(){
     closeModal('inc-modal');
@@ -574,8 +574,8 @@ function saveRule(){
   RULES.unshift(newRule);
   closeModal('rule-modal');
   renderRules();
-  if(TOKEN) fetch(API+'/api/v1/correlation/rules',{
-    method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+  if(TOKEN) fetch(API+'/api/v1/correlation/rules', {credentials:"same-origin", 
+    method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:name,sources:sources,window_min:win,severity:sev,condition:cond,enabled:true})}).catch(function(){});
 }
 
@@ -623,7 +623,7 @@ function renderSpark(){
 var _apiLoaded=false;
 function loadFromAPI(){
   if(!TOKEN) return;
-  var h={Authorization:'Bearer '+TOKEN};
+  var h = {};
   Promise.all([
     fetch(API+'/api/v1/correlation/rules', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
     fetch(API+'/api/v1/correlation/incidents', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),

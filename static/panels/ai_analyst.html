@@ -285,7 +285,7 @@ if (window.parent !== window) {
 // ── Load all VSP data ──────────────────────────────────────
 async function loadAllData() {
   setStatus('loading', 'Loading data…');
-  var h = { Authorization: 'Bearer ' + TOKEN };
+  var h = {};
   try {
     var results = await Promise.all([
       fetch(API_BASE + '/api/v1/vsp/run/latest', {credentials:'same-origin', headers: h }).then(function(r){ return r.json(); }).catch(function(){ return {}; }),
@@ -420,7 +420,7 @@ async function send() {
 
   try {
     // Try streaming via gateway first
-    var response = await fetch(API_BASE + '/api/v1/ai/chat', {
+    var response = await fetch(API_BASE + '/api/v1/ai/chat', {credentials:"same-origin", 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'},
@@ -620,7 +620,7 @@ var _h=[];
 var _busy=false;
 
 function tok(){var t=localStorage.getItem('vsp_token')||'';try{if(!t)t=window.parent.TOKEN||'';}catch(e){}return t;}
-function hdr(){return {Authorization:'Bearer '+tok()};}
+function hdr(){return {()};}
 
 function fetchD(){
   return Promise.all([

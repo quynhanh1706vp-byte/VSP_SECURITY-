@@ -395,7 +395,7 @@ async function loadAll() {
   if (!TOKEN) { renderSampleData(); return; }
 
   var days = document.getElementById('days-sel').value;
-  var h = { Authorization: 'Bearer ' + TOKEN };
+  var h = {};
   try {
     var res = await Promise.all([
       fetch(API + '/api/v1/vulns/trend?days=' + days, {credentials:'same-origin', headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { trend:[] }; }),

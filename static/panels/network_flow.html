@@ -106,7 +106,7 @@ var TOKEN='',API='',_showSusOnly=false,_selectedNode=null;
 async function loadNetworkFlow(){
   if(!TOKEN)return;
   try{
-    var d=await fetch(API+'/api/v1/logs/network-flow', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
+    var d=await fetch(API+'/api/v1/logs/network-flow', {credentials:'same-origin'}).then(r=>r.json());
     if(d.flows_per_min!==undefined)
       document.getElementById('k-flows').textContent=(d.flows_per_min||0).toLocaleString();
     if(d.suspicious!==undefined)

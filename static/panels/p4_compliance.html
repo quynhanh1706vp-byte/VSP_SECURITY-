@@ -859,7 +859,7 @@ function getP4Token() {
 async function api(path) {
   try {
     const token = getP4Token();
-    const headers = token ? {Authorization: 'Bearer ' + token} : {};
+    const headers = token ? {} : {};
     const r = await fetch(API + path, {headers});
     return await r.json();
   } catch(e) {
@@ -871,8 +871,8 @@ async function post(path, body) {
   try {
     const token = getP4Token();
     const h = {'Content-Type':'application/json'};
-    if (token) h['Authorization'] = 'Bearer ' + token;
-    const r = await fetch(API + path, { method:'POST', headers:h, body:JSON.stringify(body) });
+    
+    const r = await fetch(API + path, {credentials:"same-origin",  method:'POST', headers:h, body:JSON.stringify(body) });
     return await r.json();
   } catch(e) { return null; }
 }

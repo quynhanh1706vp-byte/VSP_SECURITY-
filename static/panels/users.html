@@ -334,7 +334,7 @@ function saveUser(){
   } else {
     USERS.push(Object.assign({id:'u'+Date.now(),last_login:'never',status:'active',mfa:false},payload));
     AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Created user '+email+' with role '+_selectedRole,ts:'just now',level:'warn'});
-    if(TOKEN)fetch(API+'/api/v1/admin/users',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(){});
+    if(TOKEN)fetch(API+'/api/v1/admin/users', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(){});
   }
   closeModal('user-modal');
   updateKPIs();renderUsers();
@@ -345,7 +345,7 @@ function deleteUser(idx){
   if(!confirm('Delete user '+u.email+'?'))return;
   AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Deleted user '+u.email,ts:'just now',level:'warn'});
   USERS.splice(idx,1);
-  if(TOKEN)fetch(API+'/api/v1/admin/users/'+u.id,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+  if(TOKEN)fetch(API+'/api/v1/admin/users/'+u.id,{method:'DELETE',credentials:'same-origin'}).catch(function(){});
   updateKPIs();renderUsers();
 }
 
@@ -377,7 +377,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 
 async function loadUsers(){
   if(!TOKEN)return;
-  var h={Authorization:'Bearer '+TOKEN};
+  var h = {};
   try{
     var r=await fetch(API+'/api/v1/admin/users', {credentials:'same-origin', headers:h});
     if(r.ok){
