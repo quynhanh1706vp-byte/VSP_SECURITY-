@@ -9,8 +9,8 @@ require (
 	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.6.0
 	github.com/hibiken/asynq v0.26.0
-	github.com/jackc/pgx/v5 v5.9.1
-	github.com/pressly/goose/v3 v3.27.0
+	github.com/jackc/pgx/v5 v5.7.4
+	github.com/pressly/goose/v3 v3.24.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/rs/zerolog v1.35.0
