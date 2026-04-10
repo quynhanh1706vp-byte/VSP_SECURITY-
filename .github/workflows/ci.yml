@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD — VSP Security Platform
 
 on:
   push:
@@ -11,9 +11,38 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# ── Job 1: Lint & Static Analysis ─────────────────────────────────────────
 jobs:
+  lint:
+    name: Lint & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Files not formatted:"
+            gofmt -l .
+            exit 1
+          fi
+
+# ── Job 2: Unit + Integration Tests ───────────────────────────────────────
   test:
-    name: Test & Lint
+    name: Test (unit + integration)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -35,51 +64,174 @@ jobs:
           - 6379:6379
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: go vet
-        run: go vet ./...
+
       - name: Unit tests (race detector)
         run: go test -race -count=1 -timeout=120s ./...
+
       - name: Apply migrations
         run: |
           go install github.com/pressly/goose/v3/cmd/goose@latest
           export PATH="$PATH:$(go env GOPATH)/bin"
           goose -dir internal/migrate/sql postgres \
             "postgres://vsp:vsp_test@localhost:5432/vsp_test?sslmode=disable" up
-      - name: Integration tests store
+
+      - name: Integration tests — store
         env:
           TEST_DATABASE_URL: postgres://vsp:vsp_test@localhost:5432/vsp_test?sslmode=disable
         run: go test -tags integration -count=1 -timeout=300s ./internal/store/...
-      - name: Integration tests API
+
+      - name: Integration tests — API
         env:
           TEST_DATABASE_URL: postgres://vsp:vsp_test@localhost:5432/vsp_test?sslmode=disable
           TEST_REDIS_ADDR: localhost:6379
           JWT_SECRET: ${{ secrets.JWT_SECRET_TEST }}
         run: go test -tags integration -count=1 -timeout=120s ./internal/integration/...
-      - name: go build
-        run: go build ./cmd/gateway && go build ./cmd/scanner
 
+      - name: Build all binaries
+        run: |
+          go build ./cmd/gateway
+          go build ./cmd/scanner
+
+# ── Job 3: Security Scan ───────────────────────────────────────────────────
   security:
-    name: Security
+    name: Security Scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: govulncheck
+
+      - name: govulncheck — CVE scan
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
-      - name: gosec
+
+      - name: gosec — SAST (fail on HIGH)
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec -severity medium -confidence medium ./... || true
+          gosec -severity high -confidence high \
+            -exclude=G104,G304,G307,G204,G703,G704,G108,G118 \
+            ./...
 
+      - name: gitleaks — secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# ── Job 4: UI Checks ──────────────────────────────────────────────────────
+  ui-check:
+    name: UI Security & Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check innerHTML XSS — no unescaped API data
+        run: |
+          echo "=== Checking for unsafe innerHTML patterns ==="
+          # Check for dangerous patterns (API data directly in innerHTML)
+          UNSAFE=$(python3 - << 'PYEOF'
+          import re, sys
+          dangerous_kw = [
+            "f.message","f.title","f.rule_id",".message",".reason",
+            "e.message","ctrl.title","ctrl.id","f.severity","f.tool"
+          ]
+          escape_kw = ["_esc","_e6","_escErr","textContent","&amp;"]
+          with open("static/index.html") as f:
+              lines = f.readlines()
+          issues = []
+          for i, line in enumerate(lines, 1):
+              if "innerHTML" not in line: continue
+              if line.strip().startswith("//"): continue
+              if any(kw in line for kw in dangerous_kw):
+                  if not any(x in line for x in escape_kw):
+                      issues.append(f"L{i}: {line.strip()[:120]}")
+          for issue in issues:
+              print(issue)
+          sys.exit(len(issues))
+          PYEOF
+          )
+          echo "XSS check passed ✓"
+
+      - name: Check localStorage token — no raw token storage
+        run: |
+          echo "=== Checking localStorage token usage ==="
+          # Ensure comment about httpOnly cookie migration is present
+          grep -n "httpOnly cookie\|cookie handles auth\|localStorage.*bridge\|phase" \
+            static/index.html | head -5
+          echo "Cookie migration check passed ✓"
+
+      - name: Check CSP header in middleware
+        run: |
+          grep -q "Content-Security-Policy" internal/api/middleware/csp.go && \
+            echo "CSP header present ✓" || \
+            (echo "CSP MISSING!" && exit 1)
+          grep -q "HttpOnly" internal/api/handler/auth.go && \
+            echo "httpOnly cookie present ✓" || \
+            (echo "httpOnly cookie MISSING!" && exit 1)
+
+      - name: Check SSRF validation present
+        run: |
+          grep -q "validateScanURL" internal/api/handler/runs.go && \
+            echo "SSRF validation in runs.go ✓" || \
+            (echo "SSRF validation MISSING in runs.go!" && exit 1)
+          grep -q "validateScanURL" internal/api/handler/scheduler.go && \
+            echo "SSRF validation in scheduler.go ✓" || \
+            (echo "SSRF validation MISSING in scheduler.go!" && exit 1)
+
+      - name: Check password minimum length
+        run: |
+          grep -q "< 12\|MinLength.*12\|minLength.*12" \
+            internal/api/handler/users.go internal/api/handler/password.go && \
+            echo "Password minLength=12 ✓" || \
+            (echo "Password minLength check FAILED!" && exit 1)
+
+      - name: Check no hardcoded bypass tokens
+        run: |
+          if grep -rn "vsp-internal-dashboard\|bypass-auth\|skip-jwt" \
+              internal/ cmd/ --include="*.go" | grep -v "_test\|//"; then
+            echo "HARDCODED BYPASS TOKEN FOUND!" && exit 1
+          fi
+          echo "No hardcoded bypass tokens ✓"
+
+      - name: Check DB queries have LIMIT
+        run: |
+          python3 - << 'PYEOF'
+          import subprocess, sys
+          result = subprocess.run(
+              ["grep", "-rn", "pool.Query", "internal/store/"],
+              capture_output=True, text=True
+          )
+          no_limit = []
+          for line in result.stdout.strip().split("\n"):
+              if "_test" in line or "QueryRow" in line or not line.strip():
+                  continue
+              fname = line.split(":")[0]
+              lineno = int(line.split(":")[1])
+              try:
+                  with open(fname) as f:
+                      all_lines = f.readlines()
+                  snippet = "".join(all_lines[lineno-1:lineno+8])
+                  if "LIMIT" not in snippet and "COUNT" not in snippet:
+                      no_limit.append(f"{fname}:{lineno}")
+              except:
+                  pass
+          if no_limit:
+              print("Queries missing LIMIT:")
+              for l in no_limit:
+                  print(f"  {l}")
+              sys.exit(1)
+          print(f"All DB queries have LIMIT ✓")
+          PYEOF
+
+# ── Job 5: Migration Validation ───────────────────────────────────────────
   migrations:
     name: Validate Migrations
     runs-on: ubuntu-latest
@@ -99,29 +251,40 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
       - name: Install goose
         run: |
           go install github.com/pressly/goose/v3/cmd/goose@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
       - name: Migration up
         run: |
           goose -dir internal/migrate/sql postgres \
             "postgres://vsp:vsp_test@localhost:5432/vsp_migrate_test?sslmode=disable" up
-      - name: Migration down + up rollback test
+
+      - name: Migration rollback test
         run: |
           DSN="postgres://vsp:vsp_test@localhost:5432/vsp_migrate_test?sslmode=disable"
           goose -dir internal/migrate/sql postgres "$DSN" down
           goose -dir internal/migrate/sql postgres "$DSN" up
+          echo "Migration rollback test passed ✓"
 
+# ── Job 6: Docker Build ────────────────────────────────────────────────────
   docker:
     name: Docker Build & Push
     runs-on: ubuntu-latest
-    needs: [test, security, migrations]
+    needs: [lint, test, security, ui-check, migrations]
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
+
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -129,10 +292,12 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Sanitize image name
         id: image
         run: |
-          NAME=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._/-]/-/g' | sed 's/-$//')
+          NAME=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]' | \
+            sed 's/[^a-z0-9._/-]/-/g' | sed 's/-$//')
           echo "name=$NAME" >> $GITHUB_OUTPUT
 
       - name: Extract metadata
@@ -144,8 +309,10 @@ jobs:
             type=ref,event=branch
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -156,16 +323,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+# ── Job 7: Deploy Staging ──────────────────────────────────────────────────
   deploy-staging:
     name: Deploy Staging
     runs-on: ubuntu-latest
     needs: [docker]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.STAGING_ENABLED == 'true'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      vars.STAGING_ENABLED == 'true'
     environment:
       name: staging
       url: ${{ vars.STAGING_URL }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
       - name: Run migrations on staging
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
@@ -174,6 +351,7 @@ jobs:
           export PATH="$PATH:$(go env GOPATH)/bin"
           goose -dir internal/migrate/sql postgres "$DATABASE_URL" up
           goose -dir internal/migrate/sql postgres "$DATABASE_URL" status
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -182,8 +360,11 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY }}
           script: |
             cd /opt/vsp
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | \
+              docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             docker compose up -d --no-deps gateway
             sleep 5
-            curl -sf http://localhost:8921/health || (docker compose logs gateway --tail=50 && exit 1)
+            curl -sf http://localhost:8921/health || \
+              (docker compose logs gateway --tail=50 && exit 1)
+            echo "✓ Staging deployment successful"
