@@ -232,9 +232,13 @@ body::after {
 // P4 auth: lấy short-lived JWT từ session cookie → dùng Bearer cho /api/p4/
 (async function initP4Auth() {
   try {
+    var csrfVal = (document.cookie.split(';').map(function(c){return c.trim();})
+      .find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('=');
+    csrfVal = csrfVal.replace(/[^\x20-\x7E]/g,'');
     var r = await fetch('/api/v1/auth/api-token', {
       method: 'POST',
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json','X-CSRF-Token': csrfVal}
     });
     if (r.ok) {
       var d = await r.json();
