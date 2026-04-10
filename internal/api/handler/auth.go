@@ -240,3 +240,15 @@ func derefStr(s *string) string {
 	}
 	return *s
 }
+
+// ── GET /api/v1/auth/check ────────────────────────────────────────────────────
+// Returns 200 if session is valid (cookie or Bearer), 401 if not.
+// Used by frontend to skip login overlay when session exists.
+func (a *Auth) Check(w http.ResponseWriter, r *http.Request) {
+	_, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"authenticated":false}`, http.StatusUnauthorized)
+		return
+	}
+	jsonOK(w, map[string]bool{"authenticated": true})
+}

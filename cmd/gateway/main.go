@@ -279,12 +279,13 @@ func main() {
 	r.Get("/api/docs", handler.SwaggerUI)
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
+	r.Get("/api/v1/auth/check", authH.Check)   // session validation (cookie-based)
 	r.Post("/api/v1/billing/webhook", billingH.Webhook)
 
 	authMw := auth.Middleware(jwtSecret, keyStore)
 
-	// SSE/WS — auth qua query param ?token= hoặc Authorization header
-	r.With(auth.TokenFromQuery(jwtSecret, keyStore)).Get("/api/v1/events", handler.SSEHandler)
+	// SSE — cookie-based auth (no ?token= in URL — prevents log leakage)
+	r.With(authMw).Get("/api/v1/events", handler.SSEHandler)
 
 	// Serve P4 static panel directly (bypasses Python proxy)
 	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
