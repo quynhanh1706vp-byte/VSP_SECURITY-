@@ -1680,6 +1680,14 @@ const PANEL_META = {
 };
 
 function showPanel(name, btn) {
+  // Lazy-load iframe panels (data-src → src)
+  var _panel = document.getElementById('panel-' + name);
+  if (_panel) {
+    var _iframe = _panel.querySelector('iframe[data-src]');
+    if (_iframe && (!_iframe.src || _iframe.src === window.location.href || _iframe.src === 'about:blank' || _iframe.src === '')) {
+      _iframe.src = _iframe.getAttribute('data-src');
+    }
+  }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);
