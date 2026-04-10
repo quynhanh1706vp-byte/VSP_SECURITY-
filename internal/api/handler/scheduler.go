@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -37,7 +36,7 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 		Cron    string `json:"cron"`
 		Enabled bool   `json:"enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -146,7 +145,7 @@ func (h *Scheduler) Update(w http.ResponseWriter, r *http.Request) {
 		URL     string `json:"url"`
 		Cron    string `json:"cron"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}

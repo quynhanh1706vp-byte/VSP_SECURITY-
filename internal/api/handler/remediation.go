@@ -70,7 +70,7 @@ func (h *Remediation) Upsert(w http.ResponseWriter, r *http.Request) {
 		Notes     string `json:"notes"`
 		TicketURL string `json:"ticket_url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}

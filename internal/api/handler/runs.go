@@ -32,7 +32,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		Src     string `json:"src"`
 		URL     string `json:"url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}

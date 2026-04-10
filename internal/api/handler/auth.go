@@ -47,7 +47,7 @@ type mfaRequiredResponse struct {
 
 func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}

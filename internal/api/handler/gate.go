@@ -62,7 +62,7 @@ func (h *Gate) Evaluate(w http.ResponseWriter, r *http.Request) {
 		CommitSHA string `json:"commit_sha"`
 		RID       string `json:"rid"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -124,7 +124,7 @@ func (h *Gate) ListRules(w http.ResponseWriter, r *http.Request) {
 func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	var req store.PolicyRule
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
