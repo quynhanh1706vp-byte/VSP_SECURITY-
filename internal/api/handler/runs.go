@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"net/url"
 	"strings"
 	"fmt"
 	"net/http"
