@@ -8515,5 +8515,28 @@ document.addEventListener('DOMContentLoaded', function() {
   if (profEl) { profEl.addEventListener('change', () => updateProfileHint(profEl.value)); }
 });
 </script>
+
+<script>
+// FIX ISO-8859-1: Patch fetch để tự động sanitize X-CSRF-Token header
+// HTTP/1.1 headers chỉ chấp nhận ISO-8859-1 (RFC 7230)
+(function() {
+  var _origFetch2 = window.fetch;
+  window.fetch = function(url, opts) {
+    if (opts && opts.headers) {
+      var h = opts.headers;
+      if (h['X-CSRF-Token']) {
+        // Sanitize: chỉ giữ ký tự printable ASCII (0x20-0x7E)
+        h['X-CSRF-Token'] = String(h['X-CSRF-Token']).replace(/[^ -~]/g, '');
+      }
+      // Nếu CSRF token rỗng sau sanitize, xóa header đi
+      if (h['X-CSRF-Token'] === '') {
+        delete h['X-CSRF-Token'];
+      }
+    }
+    return _origFetch2.apply(this, arguments);
+  };
+  console.log('[VSP] CSRF header sanitizer active');
+})();
+</script>
 </body>
 </html>
