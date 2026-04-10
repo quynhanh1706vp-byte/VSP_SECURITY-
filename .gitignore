@@ -45,3 +45,7 @@ vsp_*.xlsx
 coverage.out
 coverage.html
 config.yaml.bak
+
+# Redis dump
+dump.rdb
+*.rdb
