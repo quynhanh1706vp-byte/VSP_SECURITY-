@@ -150,8 +150,22 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	// Write audit log (best-effort)
 	go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_OK", "/auth/login")
 
+	// Set httpOnly cookie for browser clients (OWASP A07 — prevents XSS token theft)
+	// API clients / CI-CD still get token in response body for Authorization: Bearer usage
+	secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+	http.SetCookie(w, &http.Cookie{
+		Name:     "vsp_token",
+		Value:    token,
+		Path:     "/",
+		Expires:  time.Now().Add(ttl),
+		MaxAge:   int(ttl.Seconds()),
+		HttpOnly: true,          // JS cannot read — XSS cannot steal
+		Secure:   secure,        // HTTPS only in prod
+		SameSite: http.SameSiteStrictMode, // CSRF protection
+	})
+
 	jsonOK(w, loginResponse{
-		Token:      token,
+		Token:      token,   // kept for API clients / CI-CD
 		UserID:     user.ID,
 		Email:      user.Email,
 		Role:       user.Role,
@@ -169,6 +183,16 @@ func (a *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		go a.writeAudit(r.Clone(context.Background()), claims.TenantID, &claims.UserID, "LOGOUT", "/auth/logout")
 	}
+	// Clear httpOnly cookie on logout
+	http.SetCookie(w, &http.Cookie{
+		Name:     "vsp_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+		SameSite: http.SameSiteStrictMode,
+	})
 	jsonOK(w, map[string]string{"message": "logged out"})
 }
 
