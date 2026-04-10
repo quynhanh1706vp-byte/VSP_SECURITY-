@@ -12,9 +12,28 @@ import (
 )
 
 func p4GetEnvAPIKey() string {
+	// Try env vars first
 	for _, key := range []string{"P4_API_KEY", "VSP_P4_API_KEY", "INTERNAL_API_KEY"} {
 		if v := os.Getenv(key); v != "" {
 			return v
+		}
+	}
+	// Fallback: read from config file directly
+	try := []string{"config/config.yaml", "./config/config.yaml", "../config/config.yaml"}
+	for _, p := range try {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "p4_api_key:") {
+				v := strings.TrimSpace(strings.TrimPrefix(line, "p4_api_key:"))
+				v = strings.Trim(v, "\"'")
+				if v != "" {
+					return v
+				}
+			}
 		}
 	}
 	return ""

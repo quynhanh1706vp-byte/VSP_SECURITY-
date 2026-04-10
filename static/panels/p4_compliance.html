@@ -246,9 +246,7 @@ body::after {
   }
 })();
 function p4Hdr() {
-  var h = {'Content-Type': 'application/json'};
-  if (window._p4Token) h['Authorization'] = 'Bearer ' + window._p4Token;
-  return h;
+  return {'Content-Type': 'application/json', 'X-API-Key': window._p4ApiKey||''};
 }
 </script>
 <script>
