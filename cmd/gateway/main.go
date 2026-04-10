@@ -38,7 +38,7 @@ import (
 	"github.com/vsp/platform/internal/telemetry"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
-)
+	"crypto/tls")
 
 var startTime = time.Now()
 
@@ -133,10 +133,17 @@ func main() {
 		redisPass = viper.GetString("redis.password")
 	}
 	log.Info().Str("redis", redisAddr).Msg("connecting asynq client")
-	asynqClient := asynq.NewClient(asynq.RedisClientOpt{
-		Addr:     redisAddr,
+	// TLS support: set REDIS_TLS=true hoặc dùng rediss:// scheme
+	redisTLS := os.Getenv("REDIS_TLS") == "true" || strings.HasPrefix(redisAddr, "rediss://")
+	asynqOpt := asynq.RedisClientOpt{
+		Addr:     strings.TrimPrefix(redisAddr, "rediss://"),
 		Password: redisPass,
-	})
+	}
+	if redisTLS {
+		asynqOpt.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		log.Info().Msg("redis: TLS enabled")
+	}
+	asynqClient := asynq.NewClient(asynqOpt)
 	defer asynqClient.Close()
 	// ── Redis API cache ──────────────────────────────────────────────────────
 	ca := cache.New(redisAddr, redisPass)

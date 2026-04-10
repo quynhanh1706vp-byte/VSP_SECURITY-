@@ -61,8 +61,8 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Password strength check
-	if len(req.Password) < 8 {
-		jsonError(w, "password must be at least 8 characters", http.StatusBadRequest)
+	if len(req.Password) < 12 {
+		jsonError(w, "password must be at least 12 characters", http.StatusBadRequest)
 		return
 	}
 

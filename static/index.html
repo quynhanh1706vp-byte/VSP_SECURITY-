@@ -465,7 +465,7 @@
           </div>
           <div class="chpw-field">
             <label class="chpw-label">New password</label>
-            <input class="chpw-input" type="password" id="chpw-new" placeholder="min 8 characters">
+            <input class="chpw-input" type="password" id="chpw-new" placeholder="min 12 characters">
           </div>
           <div class="chpw-field">
             <label class="chpw-label">Confirm new password</label>
@@ -6517,8 +6517,8 @@ function _openInviteModal() {
       +'<div style="margin-bottom:12px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Email <span style=\"color:var(--red)\">*</span></label>'
       +'<input id="invite-email" class="filter-input" style="width:100%" placeholder="user@example.com" type="email"></div>'
       +'<div style="margin-bottom:12px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Password <span style=\"color:var(--red)\">*</span></label>'
-      +'<input id="invite-password" type="password" class="filter-input" style="width:100%" placeholder="min 8 characters">'
-      +'<div style=\"font-size:9px;color:var(--t3);margin-top:3px\">Required · min 8 characters</div></div>'
+      +'<input id="invite-password" type="password" class="filter-input" style="width:100%" placeholder="min 12 characters">'
+      +'<div style=\"font-size:9px;color:var(--t3);margin-top:3px\">Required · min 12 characters</div></div>'
       +'<div style="margin-bottom:16px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Role</label>'
       +'<select id="invite-role" class="filter-select" style="width:100%">'
       +'<option value="analyst">Analyst</option>'
@@ -6540,7 +6540,7 @@ async function _createUser() {
   if (!email) { showToast('Email is required','error'); return; }
   if (!email.includes('@')) { showToast('Invalid email format','error'); return; }
   if (!password) { showToast('Password is required','error'); return; }
-  if (password.length < 8) { showToast('Password must be at least 8 characters','error'); return; }
+  if (password.length < 12) { showToast('Password must be at least 12 characters','error'); return; }
   window.TOKEN = null; await ensureToken();
   try {
     var r = await fetch('/api/v1/admin/users', {
@@ -7291,7 +7291,7 @@ async function profileSubmitPassword() {
   errEl.textContent = '';
 
   if (!current) { errEl.textContent = 'Current password required.'; return; }
-  if (newpw.length < 8) { errEl.textContent = 'New password must be at least 8 characters.'; return; }
+  if (newpw.length < 12) { errEl.textContent = 'New password must be at least 12 characters.'; return; }
   if (newpw !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
 
   // Re-auth with current password to get a fresh token, then update
