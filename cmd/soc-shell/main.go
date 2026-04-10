@@ -51,20 +51,9 @@ func securityMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 
-		// CSRF cookie — set on GET if missing
-		if r.Method == http.MethodGet {
-			if _, err := r.Cookie("vsp_csrf"); err != nil {
-				csrfB := make([]byte, 32)
-				rand.Read(csrfB) //nolint:errcheck
-				http.SetCookie(w, &http.Cookie{
-					Name:     "vsp_csrf",
-					Value:    base64.URLEncoding.EncodeToString(csrfB),
-					Path:     "/",
-					SameSite: http.SameSiteStrictMode,
-					HttpOnly: false,
-				})
-			}
-		}
+		// CSRF cookie là trách nhiệm của gateway (port 8921)
+		// soc-shell KHÔNG set vsp_csrf — tránh duplicate/conflict
+		// Browser sẽ nhận cookie từ response gateway qua proxy
 
 		// Store nonce in context for downstream handlers
 		ctx := context.WithValue(r.Context(), struct{ key string }{"nonce"}, nonce)
