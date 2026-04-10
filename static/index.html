@@ -2793,7 +2793,9 @@ async function ensureToken() {
   var _handling401 = false;
   window.fetch = async function() {
     var res = await _origFetch.apply(this, arguments);
-    if (res.status === 401 && !_handling401) {
+    // Skip 401 handler for auth/check — it's a session probe, not an API call
+    var reqUrl = (arguments[0] || '').toString();
+    if (res.status === 401 && !_handling401 && !reqUrl.includes('/auth/check')) {
       _handling401 = true;
       // Server từ chối token → clear và redirect về login
       window.TOKEN = '';
