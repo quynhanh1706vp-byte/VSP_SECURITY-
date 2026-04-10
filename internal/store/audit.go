@@ -91,7 +91,7 @@ func (db *DB) ListAuditPaged(ctx context.Context, tenantID, actionFilter string,
 func (db *DB) ListAuditByTenant(ctx context.Context, tenantID string) ([]AuditEntry, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT seq, tenant_id, user_id, action, resource, ip, hash, prev_hash, created_at
-		 FROM audit_log WHERE tenant_id=$1 ORDER BY seq ASC`,
+		 FROM audit_log WHERE tenant_id=$1 ORDER BY seq ASC LIMIT 10000`,
 		tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("list audit by tenant: %w", err)

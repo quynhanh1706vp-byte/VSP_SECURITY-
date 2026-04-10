@@ -137,10 +137,10 @@ func main() {
 mux.HandleFunc("/api/p4/", func(w http.ResponseWriter, r *http.Request) {
     target := "http://127.0.0.1:8921" + r.URL.RequestURI()
     req, err := http.NewRequest(r.Method, target, r.Body)
-    if err != nil { http.Error(w, err.Error(), 502); return }
+    if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
     for k, vv := range r.Header { for _, v := range vv { req.Header.Add(k, v) } }
     resp, err := http.DefaultClient.Do(req)
-    if err != nil { http.Error(w, err.Error(), 502); return }
+    if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
     defer resp.Body.Close()
     for k, vv := range resp.Header { for _, v := range vv { w.Header().Add(k, v) } }
     w.WriteHeader(resp.StatusCode)

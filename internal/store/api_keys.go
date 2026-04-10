@@ -41,7 +41,7 @@ func (db *DB) GetAPIKeyByPrefix(ctx context.Context, tenantID, prefix string) (*
 func (db *DB) ListAPIKeys(ctx context.Context, tenantID string) ([]APIKey, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, tenant_id, label, prefix, hash, role, expires_at, last_used, use_count, created_at
-		 FROM api_keys WHERE tenant_id = $1 ORDER BY created_at DESC`,
+		 FROM api_keys WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 200`,
 		tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("list api keys: %w", err)

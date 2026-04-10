@@ -43,13 +43,13 @@ func (db *DB) ListStoreSchedules(ctx context.Context, tenantID ...string) ([]Sto
 		rows, err = db.pool.Query(ctx,
 			`SELECT id,tenant_id,name,mode,profile,src,url,cron_expr,
 			        enabled,last_run_at,next_run_at,created_at
-			 FROM scan_schedules WHERE tenant_id=$1 ORDER BY created_at DESC`,
+			 FROM scan_schedules WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 500`,
 			tenantID[0])
 	} else {
 		rows, err = db.pool.Query(ctx,
 			`SELECT id,tenant_id,name,mode,profile,src,url,cron_expr,
 			        enabled,last_run_at,next_run_at,created_at
-			 FROM scan_schedules ORDER BY created_at DESC`)
+			 FROM scan_schedules ORDER BY created_at DESC LIMIT 500`)
 	}
 	if err != nil { return nil, err }
 	defer rows.Close()
