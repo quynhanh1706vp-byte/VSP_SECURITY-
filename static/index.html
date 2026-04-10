@@ -1,4 +1,721 @@
- DoD widgets ──────────────────────────────────────────── -->
+
+    <!-- ── OSCAL Assessment Results Viewer ───────────────────────── -->
+    <div class="mb14">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">OSCAL Assessment Results</div>
+          <div style="display:flex;gap:6px">
+            <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px" id="oscal-version-badge">OSCAL —</span>
+            <span class="pill" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);font-size:9px" id="oscal-status-badge">Loading...</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0" id="oscal-kpis">
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--green);font-family:var(--mono)" id="oscal-satisfactory">—</div>
+            <div style="font-size:10px;color:var(--t3)">Satisfactory</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--red);font-family:var(--mono)" id="oscal-not-satisfactory">—</div>
+            <div style="font-size:10px;color:var(--t3)">Not satisfactory</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="oscal-other">—</div>
+            <div style="font-size:10px;color:var(--t3)">Other findings</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="oscal-controls">—</div>
+            <div style="font-size:10px;color:var(--t3)">Controls assessed</div>
+          </div>
+        </div>
+        <div style="max-height:300px;overflow-y:auto" id="oscal-findings-table">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--b1)">
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Control</th>
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Status</th>
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Finding</th>
+              </tr>
+            </thead>
+            <tbody id="oscal-findings-tbody">
+              <tr><td colspan="3" style="padding:12px;text-align:center;color:var(--t3)">Loading OSCAL data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:9px;color:var(--t3);margin-top:8px" id="oscal-last-modified">NIST OSCAL 1.1.2 · FedRAMP AR · Last modified: —</div>
+      </div>
+    </div><!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSP Security Platform v2.0</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+
+<!-- ══════════════════════════════════════════════
+     HTML STRUCTURE
+══════════════════════════════════════════════ -->
+
+<div id="toast-container"></div>
+
+<!-- QUICK SEARCH OVERLAY -->
+<div id="qs-overlay" onclick="if(event.target===this)closeQS()">
+  <div id="qs-box">
+    <input id="qs-input" placeholder="Search panels, findings, runs… (↑↓ Enter Esc)" autocomplete="off">
+    <div id="qs-results"></div>
+    <div id="qs-hint-bar">
+      <span class="qs-hint-key"><kbd>↑↓</kbd> navigate</span>
+      <span class="qs-hint-key"><kbd>Enter</kbd> select</span>
+      <span class="qs-hint-key"><kbd>Esc</kbd> close</span>
+      <span class="qs-hint-key" style="margin-left:auto"><kbd>/</kbd> to open anywhere</span>
+    </div>
+  </div>
+</div>
+
+<!-- REMEDIATION EDIT MODAL -->
+<div class="modal-overlay" id="rem-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="rem-modal-title">Update finding</div>
+        <div id="rem-modal-finding" style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:3px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      </div>
+      <button class="modal-close" onclick="closeRemModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="g2 mb14">
+        <div class="form-group mb8">
+          <label class="form-label">Status</label>
+          <select id="rem-status" class="form-ctrl">
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="resolved">Resolved</option>
+            <option value="accepted">Risk accepted</option>
+            <option value="false_positive">False positive</option>
+            <option value="suppressed">Suppressed</option>
+          </select>
+        </div>
+        <div class="form-group mb8">
+          <label class="form-label">Priority</label>
+          <select id="rem-priority" class="form-ctrl">
+            <option value="P1">P1 — Critical</option>
+            <option value="P2">P2 — High</option>
+            <option value="P3">P3 — Medium</option>
+            <option value="P4">P4 — Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group mb8">
+        <label class="form-label">Assignee</label>
+        <input id="rem-assignee" class="form-ctrl" placeholder="email or name">
+      </div>
+      <div class="form-group mb8">
+        <label class="form-label">Ticket URL</label>
+        <input id="rem-ticket" class="form-ctrl" placeholder="https://jira.example.com/VSP-001">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea id="rem-notes" class="form-ctrl" rows="3" style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeRemModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRemediation()">Save changes →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCAN TRIGGER MODAL -->
+<div class="modal-overlay" id="scan-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Trigger new scan</div>
+      <button class="modal-close" onclick="document.getElementById('scan-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="g2 mb14">
+        <div class="form-group mb8">
+          <label class="form-label">Mode</label>
+          <select id="scanMode" class="form-ctrl" onchange="updateModeHint(this.value)">
+            <option value="SAST">SAST — Static code analysis</option>
+            <option value="SCA">SCA — Software composition</option>
+            <option value="SECRETS">SECRETS — Secret &amp; credential leak</option>
+            <option value="IAC">IAC — Infrastructure as Code</option>
+            <option value="DAST">DAST — Dynamic app testing</option>
+            <option value="NETWORK">NETWORK — Deep L2-L7 packet analysis</option>
+            <option value="FULL">FULL — All tools combined</option>
+          </select>
+          <div id="mode-hint" style="font-size:10px;color:var(--cyan);margin-top:4px;font-family:var(--font-mono)"></div>
+        </div>
+        <div class="form-group mb8">
+          <label class="form-label">Profile</label>
+          <select id="scanProfile" class="form-ctrl" onchange="updateProfileHint(this.value)">
+            <option value="FAST">FAST — Core tools · 2 min/tool</option>
+            <option value="EXT">EXT — Extended · 5 min/tool</option>
+            <option value="AGGR">AGGR — Aggressive · 10 min/tool</option>
+            <option value="PREMIUM">PREMIUM — Deep scan · 15 min/tool</option>
+            <option value="FULL">FULL — All tools · 20 min/tool</option>
+            <option value="FULL_SOC">FULL_SOC — SOC max depth · 30 min/tool</option>
+          </select>
+          <div id="profile-hint" style="font-size:10px;color:var(--amber);margin-top:4px;font-family:var(--font-mono)"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Source path <span style="color:var(--red)">*</span></label>
+        <input id="scanSrc" class="form-ctrl" placeholder="/home/user/project or https://github.com/...">
+        <div style="font-size:9px;color:var(--t3);margin-top:3px">Local path or Git URL · required</div>
+      </div>
+      <div id="scanMsg" style="margin-top:10px;font-size:11px;font-family:var(--font-mono)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('scan-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="triggerScan()">Execute scan →</button>
+    </div>
+  </div>
+</div>
+
+<!-- GOV PATCH: Classification Banner -->
+<div class="classif-banner unclass" id="classif-banner-top">
+  <span class="classif-banner-label">UNCLASSIFIED // FOR OFFICIAL USE ONLY</span>
+  <span class="classif-banner-ts" id="banner-ts"></span>
+</div>
+<div class="app">
+
+<!-- GOV PATCH v1.1: Login Overlay with DoD Warning Notice -->
+<div id="gov-login-overlay">
+  <!-- Classification bars -->
+  <div class="login-classif-bar">UNCLASSIFIED // FOR OFFICIAL USE ONLY</div>
+  <div class="login-classif-bar-bot">UNCLASSIFIED // FOUO — Authorized Users Only</div>
+
+  <div class="login-wrap">
+
+    <!-- DoD Warning & Consent Banner -->
+    <div class="login-warning-box">
+      <div class="login-warning-title">U.S. Government Warning &amp; Consent Notice</div>
+      <div class="login-warning-text">
+        You are accessing a <strong>U.S. Government information system</strong>, which includes (1) this computer, (2) this computer network, (3) all computers connected to this network, and (4) all devices and storage media attached to this network or to a computer on this network. This information system is provided for <strong>U.S. Government-authorized use only</strong>.<br><br>
+        Unauthorized or improper use of this system may result in <strong>disciplinary action</strong>, as well as civil and criminal penalties. By using this system, you consent to monitoring, interception, recording, reading, copying, or capturing by authorized personnel. <strong>There is no right of privacy in this system.</strong><br><br>
+        Evidence of unauthorized use collected during monitoring may be used for administrative, criminal, or other adverse action.
+      </div>
+    </div>
+
+    <!-- Login Card -->
+    <div class="login-card">
+      <div class="login-logo-row">
+        <div class="login-logo-icon">VSP</div>
+        <div class="login-logo-text">
+          <div class="login-logo-title">VSP Security Platform</div>
+          <div class="login-logo-sub">VULNERABILITY SCANNING PLATFORM · v0.10.0</div>
+        </div>
+      </div>
+
+      <div class="login-field">
+        <label class="login-label" for="login-email">Email / User ID</label>
+        <input class="login-input" id="login-email" type="email"
+               placeholder="user@agency.gov" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label class="login-label" for="login-pass">Password</label>
+        <input class="login-input" id="login-pass" type="password"
+               placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <!-- Consent -->
+      <div class="login-consent">
+        <input type="checkbox" id="login-consent-cb">
+        <label for="login-consent-cb">
+          I have read, understand, and consent to the <strong>U.S. Government Warning &amp; Consent Notice</strong> above. I am an authorized user of this system.
+        </label>
+      </div>
+
+      <div class="login-error" id="login-error"></div>
+
+      <div class="login-btn-row">
+        <button class="login-btn-primary" id="login-submit-btn" onclick="govLoginSubmit()">
+          <span id="login-btn-text">AUTHENTICATE →</span>
+          <div class="login-spinner" id="login-spinner"></div>
+        </button>
+        <button class="login-btn-cac" onclick="showToast('CAC/PIV — configure OIDC/SSO in Settings','info')" title="CAC/PIV Smart Card (requires OIDC/SSO)">
+          🪪 CAC/PIV
+        </button>
+      </div>
+
+      <div class="login-footer-row" style="margin-top:16px">
+        <div class="login-footer-badges">
+          <span class="login-footer-badge fr">FedRAMP</span>
+          <span class="login-footer-badge cm">CMMC L2</span>
+        </div>
+        <span class="login-ver">CONTROLLED UNCLASSIFIED INFORMATION</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- END GOV PATCH v1.1 Login Overlay -->
+
+
+<!-- ══════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════ -->
+<nav class="sidebar">
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-main">
+      <div class="logo-icon">VSP</div>
+      <div class="logo-text-wrap">
+        <div class="logo-title">Security</div>
+        <div class="logo-sub">Platform v2.0 · Enterprise</div>
+      </div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div> SSE live</div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-section">
+      <div class="nav-section-label">Operations</div>
+      <button class="nav-item active" onclick="showPanel('dashboard',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></span> Dashboard</button>
+      <button class="nav-item" onclick="showPanel('scanlog',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M2 8h8M2 12h10"/><circle cx="13" cy="12" r="2.5"/><path d="M15 14l1.5 1.5"/></svg></span> Scan log</button>
+      <button class="nav-item" onclick="showPanel('runs',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,2 13,8 3,14" fill="none"/></svg></span> Runs</button>
+      <button class="nav-item" onclick="showPanel('findings',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5"/><circle cx="8" cy="11.5" r="0.5" fill="currentColor"/></svg></span> Findings <span class="nav-badge" id="badge-findings">104</span></button>
+      <button class="nav-item" onclick="showPanel('remediation',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5A6.5 6.5 0 1 0 14.5 8"/><polyline points="10,1 13,2.5 11.5,5.5"/></svg></span> Remediation</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Security</div>
+      <button class="nav-item" onclick="showPanel('policy',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/></svg></span> Policy</button>
+      <button class="nav-item" onclick="showPanel('audit',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M6 5h4M6 8h4M6 11h2"/></svg></span> Audit</button>
+      <button class="nav-item" onclick="showPanel('soc',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/></svg></span> SOC</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Compliance</div>
+      <button class="nav-item" onclick="showPanel('governance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1l7 4v1H1V5L8 1z"/><rect x="2" y="6" width="2" height="7"/><rect x="7" y="6" width="2" height="7"/><rect x="12" y="6" width="2" height="7"/><path d="M1 13h14"/></svg></span> Governance</button>
+      <button class="nav-item" onclick="showPanel('compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/><path d="M5 8l2 2 4-4"/></svg></span> FedRAMP</button>
+          <button class="nav-item" onclick="window.location.href='/p4'  /* cookie handles auth */"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/></svg></span> P4 Compliance</button>
+      <button class="nav-item" onclick="showPanel('sbom',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 3V2M8 3V2M11 3V2M4 7h2M4 10h2M8 7h4M8 10h3"/></svg></span> SBOM</button>
+      <button class="nav-item" onclick="showPanel('sla',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4 8,8 11,10"/></svg></span> SLA</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Reports</div>
+      <button class="nav-item" onclick="showPanel('analytics',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,12 5,7 8,9 12,4 15,6"/><path d="M1 14h14"/></svg></span> Analytics</button>
+      <button class="nav-item" onclick="showPanel('executive',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1l1.8 3.6L14 5.3l-3 2.9.7 4.1L8 10.4l-3.7 1.9.7-4.1-3-2.9 4.2-.7z"/></svg></span> Executive</button>
+      <button class="nav-item" onclick="showPanel('export',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1v9M4.5 6.5L8 10l3.5-3.5"/><path d="M3 11v2.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V11"/></svg></span> Export</button>
+      <button class="nav-item" onclick="showPanel('users',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="3"/><path d="M1 14c0-3 2-5 5-5s5 2 5 5"/><path d="M11 3a3 3 0 010 4M15 14c0-2.5-1.5-4-3.5-4.5"/></svg></span> Users</button>
+    
+    <div class="nav-section">
+      <div class="nav-section-label" style="display:flex;align-items:center;justify-content:space-between">
+          SIEM
+          <button onclick="window._downloadSIEMReport&&window._downloadSIEMReport()"
+            style="font-size:9px;padding:2px 6px;border-radius:3px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--t3);cursor:pointer"
+            title="Export SIEM PDF report">&#8595; PDF</button>
+          <button onclick="window._downloadSIEMExcel&&window._downloadSIEMExcel()"
+            style="font-size:9px;padding:2px 6px;border-radius:3px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--t3);cursor:pointer;margin-left:3px"
+            title="Export SIEM Excel">&#8595; XLS</button>
+        </div>
+      <button class="nav-item" onclick="showPanel('ai_analyst',this)" style="background:linear-gradient(135deg,rgba(79,209,197,.08),rgba(159,122,234,.08));border-color:rgba(79,209,197,.2)">
+        <span class="nav-icon" style="color:#4fd1c5">&#9672;</span>
+        <span style="background:linear-gradient(135deg,#4fd1c5,#9f7aea);-webkit-background-clip:text;-webkit-text-fill-color:transparent">AI Analyst</span>
+        <span style="font-size:9px;background:rgba(79,209,197,.15);color:#4fd1c5;padding:1px 5px;border-radius:3px;margin-left:auto;font-family:var(--font-mono)">NEW</span>
+      </button>
+      <button class="nav-item" onclick="showPanel('scheduler',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="11" rx="2"/><path d="M1 7h14M5 1v4M11 1v4"/></svg></span>
+        Scheduler
+      </button>
+      <button class="nav-item" onclick="showPanel('correlation',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><path d="M8 6v2M8 8L3 10M8 8l5 2"/></svg></span>
+        Correlation
+        <span class="nav-badge" id="badge-incidents">0</span>
+      </button>
+      <button class="nav-item" onclick="showPanel('soar',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,2 13,8 3,14"/></svg></span>
+        SOAR
+      </button>
+      <button class="nav-item" onclick="showPanel('logsources',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M2 8h8M2 12h10"/></svg></span>
+        Log ingestion
+      </button>
+      <button class="nav-item" onclick="showPanel('ueba',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/></svg></span>
+        UEBA
+      </button>
+      <button class="nav-item" onclick="showPanel('assets',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 3V2M8 3V2M11 3V2M4 7h2M4 10h2M8 7h4M8 10h3"/></svg></span>
+        Assets
+      </button>
+      <button class="nav-item" onclick="showPanel('netflow',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8h14M8 1l4 7-4 7"/><circle cx="4" cy="8" r="1.5"/><circle cx="12" cy="8" r="1.5"/></svg></span>
+        Network flow
+      </button>
+      <button class="nav-item" onclick="showPanel('threathunt',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="4.5"/><path d="M10 10l4 4"/><path d="M6 4v4M4 6h4"/></svg></span> Threat Hunt
+      </button>
+      <button class="nav-item" onclick="showPanel('vulnmgmt',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/><circle cx="8" cy="8" r="2"/></svg></span> Vuln Mgmt
+      </button>
+      <button class="nav-item" onclick="showPanel('threatintel',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/><path d="M5.5 7l2 2L11 5.5"/></svg></span>
+        Threat intel
+      </button>
+    </div>
+    </div>
+</nav>
+
+  <!-- Bottom -->
+  <div class="sidebar-bottom">
+    <div class="gate-status" id="gate-widget">
+      <span class="gate-icon">✗</span>
+      <span class="gate-label">GATE FAIL</span>
+      <span class="gate-detail" id="d-gate-score">score: —</span>
+    </div>
+    <div class="user-row">
+      <div class="user-avatar">A</div>
+      <div class="user-info">
+        <div class="user-email">admin@vsp.local</div>
+        <div class="user-role">admin · default tenant</div>
+      </div>
+    </div>
+    <div class="qs-hint" onclick="openQS()">
+      <span class="qs-key">/</span>
+      <span class="qs-label">Quick search</span>
+      <span class="qs-key" style="margin-left:auto">⌘K</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════════ -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-breadcrumb" id="page-sub">VSP / Operations / Dashboard</div>
+    </div>
+    <div class="topbar-center">
+      <div class="ticker">
+        <div class="ticker-dot"></div>
+        <span class="ticker-lbl">LATEST:</span>
+        <span class="ticker-content" id="ticker-content">Loading...</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <!-- SSE status -->
+      <div class="sse-status">
+        <div class="sse-dot sse-live" id="sse-dot"></div>
+        <span id="sse-label">SSE live</span>
+      </div>
+      <!-- Session timer -->
+      <div class="session-timer" id="session-timer" title="Session expires">
+        <span class="session-timer-icon">⏱</span>
+        <span id="session-countdown">28:47</span>
+      </div>
+      <!-- Org selector -->
+      <div class="topbar-gov-bar">
+        <span style="color:var(--t4)">ORG</span>
+        <span class="gov-org" onclick="showToast('Tenant switcher — use sidebar','info')" id="gov-org-label">DEFAULT</span>
+      </div>
+      <!-- Notification -->
+      <!-- GOV PATCH v1.3: Notification Center -->
+      <div class="notif-wrapper" id="notif-wrapper">
+        <button class="notif-btn" onclick="toggleNotifPanel(event)" id="notif-bell-btn">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1a5 5 0 015 5v3l1.5 2H1.5L3 9V6a5 5 0 015-5z"/><path d="M6.5 13.5a1.5 1.5 0 003 0"/></svg>
+          <span class="notif-count" id="notif-count-badge">1</span>
+        </button>
+        <div class="notif-dropdown" id="notif-dropdown">
+          <div class="notif-header">
+            <span class="notif-header-title">Notifications</span>
+            <button class="notif-mark-all" onclick="notifMarkAll()">Mark all read</button>
+          </div>
+          <div class="notif-list" id="notif-list">
+            <!-- populated by JS -->
+          </div>
+          <div class="notif-footer">
+            <button class="notif-footer-btn" onclick="showPanel('audit',null);toggleNotifPanel()">
+              View full audit log →
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- User pill -->
+      <!-- GOV PATCH v1.4: Profile Dropdown -->
+      <div class="profile-wrapper" id="profile-wrapper">
+        <div class="topbar-user-pill" onclick="toggleProfilePanel(event)" id="profile-pill-btn" style="cursor:pointer">
+          <div class="topbar-user-avatar" id="topbar-avatar">A</div>
+          <span id="topbar-username">admin</span>
+          <span class="user-clearance" id="topbar-clearance">UNCLASS</span>
+        </div>
+        <div class="profile-dropdown" id="profile-dropdown">
+          <!-- User card -->
+          <div class="profile-user-card">
+            <div class="profile-avatar-lg" id="profile-avatar-lg">A</div>
+            <div class="profile-user-info">
+              <div class="profile-user-email" id="profile-email">admin@vsp.local</div>
+              <div class="profile-user-meta">
+                <span id="profile-role">admin</span>
+                <span>·</span>
+                <span id="profile-tenant">default</span>
+                <span class="profile-clearance-badge">UNCLASS</span>
+              </div>
+            </div>
+          </div>
+          <!-- Menu -->
+          <div class="profile-menu">
+            <!-- Theme toggle -->
+            <div class="profile-theme-row">
+              <span>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13"/></svg>
+                Theme
+              </span>
+              <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="profileToggleTheme()" title="Toggle dark/light">
+                <div class="theme-toggle-knob" id="theme-knob"></div>
+              </button>
+            </div>
+            <div class="profile-menu-sep"></div>
+            <button class="profile-menu-item" onclick="profileChangePassword()">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 016 0v2"/><circle cx="8" cy="11" r="1" fill="currentColor"/></svg>
+              Change password
+            </button>
+            <button class="profile-menu-item" onclick="showPanel('audit',null);toggleProfilePanel()">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M6 5h4M6 8h4M6 11h2"/></svg>
+              My audit trail
+            </button>
+            <button class="profile-menu-item" onclick="profileCopyToken()">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M5 11H3a1.5 1.5 0 01-1.5-1.5v-7A1.5 1.5 0 013 1h7A1.5 1.5 0 0111.5 3v2"/></svg>
+              Copy API token
+            </button>
+            <div class="profile-menu-sep"></div>
+            <button class="profile-menu-item danger" onclick="profileLogout()">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 2H3a1.5 1.5 0 00-1.5 1.5v9A1.5 1.5 0 003 14h3"/><path d="M10.5 11L14 8l-3.5-3M14 8H6"/></svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Change Password Modal -->
+      <div class="chpw-modal-overlay" id="chpw-modal">
+        <div class="chpw-modal">
+          <div class="chpw-title">
+            Change password
+            <button class="chpw-close" onclick="document.getElementById('chpw-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="chpw-field">
+            <label class="chpw-label">Current password</label>
+            <input class="chpw-input" type="password" id="chpw-current" placeholder="••••••••">
+          </div>
+          <div class="chpw-field">
+            <label class="chpw-label">New password</label>
+            <input class="chpw-input" type="password" id="chpw-new" placeholder="min 12 characters">
+          </div>
+          <div class="chpw-field">
+            <label class="chpw-label">Confirm new password</label>
+            <input class="chpw-input" type="password" id="chpw-confirm" placeholder="••••••••">
+          </div>
+          <div class="chpw-error" id="chpw-error"></div>
+          <div class="chpw-actions">
+            <button class="btn btn-ghost" onclick="document.getElementById('chpw-modal').classList.remove('open')">Cancel</button>
+            <button class="btn btn-primary" onclick="profileSubmitPassword()">Update password</button>
+          </div>
+        </div>
+      </div>
+      <!-- Actions -->
+      <button class="btn btn-ghost" onclick="loadCurrentPanel()">↻</button>
+      <button class="btn btn-primary" onclick="document.getElementById('scan-modal').classList.add('open')">+ Scan</button>
+    </div>
+  </header>
+
+  <!-- CONTENT -->
+  <div class="content" id="content">
+
+    <!-- ════════════════════════════════════
+         DASHBOARD PANEL
+    ════════════════════════════════════ -->
+    <div id="panel-dashboard" class="panel active">
+
+      <!-- Spark KPIs -->
+      <div class="g4 mb14">
+        <div class="spark-card">
+          <div class="spark-label">Security Score</div>
+          <div class="spark-value c-red" id="d-score">—</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-score" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Total Runs</div>
+          <div class="spark-value c-cyan" id="d-runs-count">—</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-runs" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Gate Pass Rate</div>
+          <div class="spark-value c-amber" id="d-pass-rate">—</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-pass" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Open Remediations</div>
+          <div class="spark-value c-purple" id="d-rem">—</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-rem" height="40"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Extra KPIs -->
+      <div class="g4 mb14">
+        <div class="kpi kpi-crit" style="cursor:pointer" title="View critical findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='CRITICAL';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Critical →</div><div class="kpi-value c-red" id="d-critical">—</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-high" style="cursor:pointer" title="View high findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='HIGH';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">High →</div><div class="kpi-value c-orange" id="d-high">—</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-med" style="cursor:pointer" title="View medium findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='MEDIUM';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Medium →</div><div class="kpi-value c-amber" id="d-medium">—</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-low" style="cursor:pointer" title="View low findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='LOW';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Low →</div><div class="kpi-value c-green" id="d-low">—</div><div class="kpi-sub">findings</div></div>
+      </div>
+
+
+      <!-- SIEM KPI row -->
+      <div class="kpi-row mb14" style="grid-template-columns:repeat(4,1fr);gap:10px;display:grid;margin-bottom:14px">
+        <div class="kpi" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px" onclick="showPanel('correlation',null)">
+          <div class="kpi-label" style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Incidents →</div>
+          <div class="kpi-value c-red" id="siem-incidents" style="font-size:20px;font-weight:700;font-family:var(--font-mono)">—</div>
+          <div class="kpi-sub" style="font-size:10px;color:var(--t3);margin-top:2px">active incidents</div>
+          <canvas id="spark-incidents" width="80" height="20" style="margin-top:4px;opacity:.6"></canvas>
+        </div>
+        <div class="kpi" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px" onclick="showPanel('soar',null)">
+          <div class="kpi-label" style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Playbook runs →</div>
+          <div class="kpi-value c-cyan" id="siem-runs" style="font-size:20px;font-weight:700;font-family:var(--font-mono)">—</div>
+          <div class="kpi-sub" style="font-size:10px;color:var(--t3);margin-top:2px">today</div>
+          <canvas id="spark-runs" width="80" height="20" style="margin-top:4px;opacity:.6"></canvas>
+        </div>
+        <div class="kpi" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px" onclick="showPanel('logsources',null)">
+          <div class="kpi-label" style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Log sources →</div>
+          <div class="kpi-value c-green" id="siem-sources" style="font-size:20px;font-weight:700;font-family:var(--font-mono)">—</div>
+          <div class="kpi-sub" style="font-size:10px;color:var(--t3);margin-top:2px">active</div>
+          <canvas id="spark-sources" width="80" height="20" style="margin-top:4px;opacity:.6"></canvas>
+        </div>
+        <div class="kpi" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px" onclick="showPanel('ueba',null)">
+          <div class="kpi-label" style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Anomalies →</div>
+          <div class="kpi-value c-amber" id="siem-anomalies" style="font-size:20px;font-weight:700;font-family:var(--font-mono)">—</div>
+          <div class="kpi-sub" style="font-size:10px;color:var(--t3);margin-top:2px">detected</div>
+          <canvas id="spark-anomalies" width="80" height="20" style="margin-top:4px;opacity:.6"></canvas>
+        </div>
+      </div>
+      <!-- Charts row -->
+      <div class="g2 mb14">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Security posture</div><div class="card-sub" id="posture-run-lbl">latest run</div></div>
+          </div>
+          <div class="card-body">
+            <div class="score-section">
+              <div class="score-ring-wrap">
+                <canvas id="score-ring" width="90" height="90"></canvas>
+                <div class="score-overlay">
+                  <div class="score-num c-red" id="d-score2">—</div>
+                  <div class="score-lbl">/100</div>
+                  <div id="d-score-cap" style="font-size:9px;color:var(--t3);margin-top:2px;display:none" title="Penalty capped per bucket">cap active</div>
+                </div>
+              </div>
+              <div style="flex:1">
+                <div class="exec-stat"><span class="exec-stat-lbl">Grade</span><span class="exec-stat-val c-red" id="d-grade">—</span></div>
+                <div class="exec-stat"><span class="exec-stat-lbl">Gate</span><span><span class="pill pill-fail" id="d-gate">—</span></span></div>
+                <div class="exec-stat"><span class="exec-stat-lbl">SLA breaches</span><span class="exec-stat-val c-green" id="d-breaches">0</span></div>
+                <div class="exec-stat"><span class="exec-stat-lbl">Total findings</span><span class="exec-stat-val" id="d-total">—</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Findings by severity</div>
+            <div class="card-sub" id="chart-run-lbl">latest run</div>
+          </div>
+          <div class="card-body" style="height:160px;position:relative">
+            <canvas id="chartSeverity"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top findings + Gate trend -->
+
+      <!-- ── DoD RMF / ATO / POAM / KEV row ───────────────────────────── -->
+      <div class="g4 mb14" id="dod-widgets-row">
+
+        <!-- ATO Countdown -->
+        <div class="card" style="border-left:3px solid var(--green)">
+          <div class="card-head">
+            <div class="card-title">ATO Status</div>
+            <span class="pill" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);font-size:9px" id="ato-status-pill">AUTHORIZED</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin:8px 0 2px">
+            <div style="font-size:28px;font-weight:700;color:var(--green);font-family:var(--mono)" id="ato-days">—</div>
+            <div style="font-size:11px;color:var(--t2)">days remaining</div>
+          </div>
+          <div style="font-size:10px;color:var(--t3)" id="ato-expiry">Expires: —</div>
+          <div style="margin-top:8px;height:4px;background:var(--bg3);border-radius:2px">
+            <div id="ato-bar" style="height:4px;border-radius:2px;background:var(--green);width:80%;transition:width .5s"></div>
+          </div>
+          <div style="font-size:9px;color:var(--t3);margin-top:4px">RMF Step 5 · DoD 8510.01</div>
+        </div>
+
+        <!-- POAM Summary -->
+        <div class="card" style="border-left:3px solid var(--amber)">
+          <div class="card-head">
+            <div class="card-title">POA&amp;M</div>
+            <span class="pill" style="background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2);font-size:9px">CA-5</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+            <div style="text-align:center">
+              <div style="font-size:22px;font-weight:700;color:var(--red);font-family:var(--mono)" id="poam-open">—</div>
+              <div style="font-size:10px;color:var(--t3)">Open items</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:22px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="poam-overdue">—</div>
+              <div style="font-size:10px;color:var(--t3)">Overdue</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:10px;color:var(--t3)">From open remediation items</div>
+          <div style="font-size:9px;color:var(--t3);margin-top:4px">NIST CA-5 · FedRAMP POA&amp;M</div>
+        </div>
+
+        <!-- ConMon Status -->
+        <div class="card" style="border-left:3px solid var(--cyan)">
+          <div class="card-head">
+            <div class="card-title">ConMon</div>
+            <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px">CA-7</span>
+          </div>
+          <div style="margin-top:8px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:11px;color:var(--t2)">Last scan</span>
+              <span style="font-size:11px;font-weight:600;color:var(--green)" id="conmon-last-scan">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:11px;color:var(--t2)">Scan frequency</span>
+              <span style="font-size:11px;font-weight:600;color:var(--t1)" id="conmon-freq">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span style="font-size:11px;color:var(--t2)">30-day runs</span>
+              <span style="font-size:11px;font-weight:600;color:var(--cyan)" id="conmon-30d">—</span>
+            </div>
+          </div>
+          <div style="font-size:9px;color:var(--t3);margin-top:6px">FedRAMP ConMon · SI-4 · AU-6</div>
+        </div>
+
+        <!-- CISA KEV Alert -->
+        <div class="card" style="border-left:3px solid var(--red)">
+          <div class="card-head">
+            <div class="card-title">CISA KEV</div>
+            <span class="pill" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);font-size:9px">RA-5</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin:8px 0 2px">
+            <div style="font-size:28px;font-weight:700;color:var(--red);font-family:var(--mono)" id="kev-matches">—</div>
+            <div style="font-size:11px;color:var(--t2)">KEV matches</div>
+          </div>
+          <div style="font-size:10px;color:var(--t3)" id="kev-status">Checking findings vs CISA KEV...</div>
+          <div style="margin-top:6px" id="kev-list"></div>
+          <div style="font-size:9px;color:var(--t3);margin-top:4px">CISA Known Exploited Vulns · SI-5</div>
+        </div>
+
+      </div>
+      <!-- ── End DoD widgets ──────────────────────────────────────────── -->
       <div class="g2 mb14">
         <div class="card">
           <div class="card-head">
@@ -633,41 +1350,6 @@
               <span class="pill" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);font-size:9px" id="oscal-status-badge">Loading...</span>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0" id="oscal-kpis">
-            <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
-              <div style="font-size:20px;font-weight:700;color:var(--green);font-family:var(--mono)" id="oscal-satisfactory">—</div>
-              <div style="font-size:10px;color:var(--t3)">Satisfactory</div>
-            </div>
-            <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
-              <div style="font-size:20px;font-weight:700;color:var(--red);font-family:var(--mono)" id="oscal-not-satisfactory">—</div>
-              <div style="font-size:10px;color:var(--t3)">Not satisfactory</div>
-            </div>
-            <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
-              <div style="font-size:20px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="oscal-other">—</div>
-              <div style="font-size:10px;color:var(--t3)">Other findings</div>
-            </div>
-            <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
-              <div style="font-size:20px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="oscal-controls">—</div>
-              <div style="font-size:10px;color:var(--t3)">Controls assessed</div>
-            </div>
-          </div>
-          <div style="max-height:300px;overflow-y:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:11px">
-              <thead>
-                <tr style="border-bottom:1px solid var(--b1)">
-                  <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Control</th>
-                  <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Status</th>
-                  <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Finding</th>
-                </tr>
-              </thead>
-              <tbody id="oscal-findings-tbody">
-                <tr><td colspan="3" style="padding:12px;text-align:center;color:var(--t3)">Loading OSCAL data...</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div style="font-size:9px;color:var(--t3);margin-top:8px" id="oscal-last-modified">NIST OSCAL 1.1.2 · FedRAMP AR · Last modified: —</div>
-        </div>
-      </div>
 
       <div class="g3 mb14">
         <div class="card" style="text-align:center">
