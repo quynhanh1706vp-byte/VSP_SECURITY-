@@ -9312,16 +9312,9 @@ function addPOAMItem() {
 
 function exportPOAM() {
   // Generate CSV
-  var csv = 'POA&M ID,Control,Weakness,Severity,Due Date,Status,Milestone
-';
-  _poamItems.forEach(function(p){
-    csv += [p.id,p.control,'"'+p.weakness+'"',p.severity,p.due,p.status,'"'+p.milestone+'"'].join(',')+'
-';
+  var csv = 'POA&M ID,Control,Weakness,Severity,Due Date,Status,Milestone\n'\1\n\2'"'+p.weakness+'"',p.severity,p.due,p.status,'"'+p.milestone+'"'].join(',')+'\1\n\2';
   });
-  var blob = new Blob([csv], {type:'text/csv'});
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'poam_'+new Date().toISOString().split('T')[0]+'.csv';
+  var blob = new Blob([csv], {type:'text/csv'\1\n\2'a'\1\n\2'poam_'+new Date().toISOString().split('T')[0]+'.csv';
   a.click();
   showToast('POA&M exported as CSV','success');
 }
