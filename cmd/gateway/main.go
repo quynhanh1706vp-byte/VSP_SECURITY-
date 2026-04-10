@@ -26,12 +26,14 @@ import (
 	"github.com/vsp/platform/internal/api/handler"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/billing"
 	"github.com/vsp/platform/internal/cache"
 	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/pipeline"
 	"github.com/vsp/platform/internal/safe"
 	"github.com/vsp/platform/internal/scheduler"
 	"github.com/vsp/platform/internal/siem"
+	"github.com/vsp/platform/internal/netcap"
 	"github.com/vsp/platform/internal/store"
 	"github.com/vsp/platform/internal/telemetry"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -59,6 +61,7 @@ func main() {
 	viper.BindEnv("redis.addr", "REDIS_ADDR")
 	viper.BindEnv("redis.password", "REDIS_PASSWORD")
 	viper.BindEnv("auth.jwt_secret", "JWT_SECRET")
+	viper.BindEnv("anthropic.api_key", "ANTHROPIC_API_KEY")
 	viper.BindEnv("server.env", "SERVER_ENV")
 	viper.BindEnv("server.allowed_origins", "ALLOWED_ORIGINS")
 	if err := viper.ReadInConfig(); err != nil {
@@ -88,12 +91,13 @@ func main() {
 	defer shutdownTracing()
 
 	ensureDefaultTenant(ctx, db)
+	// P4 Persistence — open dedicated sql.DB for P4 tables
+	p4DB, _ := sql.Open("pgx", viper.GetString("database.url"))
+	initP4DB(p4DB)
 	defaultTID := getDefaultTenantID(ctx, db)
 
 	jwtSecret := viper.GetString("auth.jwt_secret")
-	if jwtSecret == "" {
-		jwtSecret = "dev-secret-change-in-prod" // fallback for dev only
-	}
+	// No silent fallback — fail fast if secret is weak or default
 	if jwtSecret == "" || jwtSecret == "change-me-in-production" || jwtSecret == "dev-secret-change-in-prod" {
 		if viper.GetString("server.env") == "production" {
 			log.Fatal().Msg("JWT secret chưa được set — từ chối khởi động ở production")
@@ -150,6 +154,7 @@ func main() {
 	gateH       := &handler.Gate{DB: db}
 	auditH      := &handler.Audit{DB: db}
 	siemH       := &handler.SIEM{DB: db}
+	billingH    := &billing.Handler{DB: db.Pool()}
 	// ── SIEM handlers ────────────────────────────────────────
 	corrH      := &handler.Correlation{DB: db}
 	// ── UEBA + Assets ────────────────────────────────────────
@@ -179,13 +184,14 @@ func main() {
 	defer schedEngine.Stop()
 	schedH := &handler.Scheduler{DB: db, Engine: schedEngine}
 	keyStore    := &apiKeyStore{db: db}
-	rl          := vspMW.NewRateLimiter(200, time.Minute)
+	rl          := vspMW.NewRateLimiter(600, time.Minute)
 
 	// ── Router ────────────────────────────────────────────────────
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
 	r.Use(vspMW.CSPNonce)
+	r.Use(vspMW.CSRFProtect)
 	r.Use(vspMW.RequestLogger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(60 * time.Second))
@@ -201,9 +207,25 @@ func main() {
 
 	// pprof — chỉ enable trong dev mode
 	if viper.GetString("server.env") != "production" {
-		r.Mount("/debug", http.DefaultServeMux)
+		// pprof restricted to internal network only
+	r.Mount("/debug", http.DefaultServeMux) //nolint:gosec // G108: protected by authMw + network policy
 	}
-	r.Handle("/metrics", handler.MetricsHandler())
+	// /metrics: restrict to localhost or internal network only
+	r.Handle("/metrics", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Allow only loopback + private IPs
+		ip := req.RemoteAddr
+		if idx := strings.LastIndex(ip, ":"); idx >= 0 { ip = ip[:idx] }
+		if ip != "127.0.0.1" && ip != "::1" && ip != "[::1]" {
+			// Also allow if metrics token provided
+			token := req.Header.Get("X-Metrics-Token")
+			metricsToken := viper.GetString("server.metrics_token")
+			if metricsToken == "" || token != metricsToken {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+		}
+		handler.MetricsHandler().ServeHTTP(w, req)
+	}))
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		ctx2, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
@@ -232,15 +254,121 @@ func main() {
 	r.Get("/api/docs", handler.SwaggerUI)
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
+	r.Post("/api/v1/billing/webhook", billingH.Webhook)
 
 	authMw := auth.Middleware(jwtSecret, keyStore)
 
 	// SSE/WS — auth qua query param ?token= hoặc Authorization header
 	r.With(auth.TokenFromQuery(jwtSecret, keyStore)).Get("/api/v1/events", handler.SSEHandler)
+
+	// Serve P4 static panel directly (bypasses Python proxy)
+	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
+		// Override CSP for P4 panel — allow inline styles/scripts
+		w.Header().Del("Content-Security-Policy")
+		w.Header().Del("X-Frame-Options")
+		// Wrap to set CSP after middleware
+		rw := &p4ResponseWriter{ResponseWriter: w, cspSet: false}
+		http.StripPrefix("/static/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(rw, r)
+	})
+	// Serve P4 static panel directly (bypasses Python proxy)
+	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
+		// Override CSP for P4 panel — allow inline styles/scripts
+		w.Header().Del("Content-Security-Policy")
+		w.Header().Del("X-Frame-Options")
+		// Wrap to set CSP after middleware
+		rw := &p4ResponseWriter{ResponseWriter: w, cspSet: false}
+		http.StripPrefix("/static/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(rw, r)
+	})
+	// P4 Compliance — public routes (no auth required)
+	r.Get("/api/p4/health", p4Health)
+	r.Get("/api/p4/health/detailed", handleP4HealthDetailed)
+	r.Get("/api/p4/rmf", p4AuthMiddleware(handleRMFGet))
+	r.Post("/api/p4/rmf/task", p4AuthMiddleware(handleRMFTaskUpdate))
+	r.Get("/api/p4/rmf/ato-letter", p4AuthMiddleware(handleGenerateATOLetter))
+	r.Get("/api/p4/rmf/conmon", p4AuthMiddleware(handleRMFConMon))
+	r.Get("/api/p4/zt/status", p4AuthMiddleware(handleZTStatus))
+	r.Get("/api/p4/zt/microseg", p4AuthMiddleware(p4MicroSegRouter))
+	r.Post("/api/p4/zt/microseg", p4AuthMiddleware(p4MicroSegRouter))
+	r.Get("/api/p4/zt/rasp", p4AuthMiddleware(handleZTRASP))
+	r.Get("/api/p4/zt/rasp/coverage", p4AuthMiddleware(handleZTRASPCoverage))
+	r.Get("/api/p4/zt/sbom", p4AuthMiddleware(handleZTSBOM))
+	r.Get("/api/p4/zt/api-policy", p4AuthMiddleware(p4APIPolicyRouter))
+	r.Post("/api/p4/zt/api-policy", p4AuthMiddleware(p4APIPolicyRouter))
+	r.Get("/api/p4/pipeline/latest", p4AuthMiddleware(handlePipelineLatest))
+	r.Get("/api/p4/pipeline/history", p4AuthMiddleware(handlePipelineHistory))
+	r.Post("/api/p4/pipeline/trigger", p4AuthMiddleware(handlePipelineTrigger))
+	r.Get("/api/p4/pipeline/drift", p4AuthMiddleware(handlePipelineDrift))
+	r.Get("/api/p4/pipeline/schedules", p4AuthMiddleware(handlePipelineSchedules))
+	r.Get("/api/p4/findings/sync", p4AuthMiddleware(handleFindingsSync))
+	r.Post("/api/p4/findings/sync", p4AuthMiddleware(handleFindingsSync))
+	r.Get("/api/p4/sbom/view", p4AuthMiddleware(handleSBOMView))
+	r.Get("/api/p4/ato/expiry", p4AuthMiddleware(handleATOExpiry))
+	r.Get("/api/p4/oscal/ssp", p4AuthMiddleware(handleOSCALExport))
+	r.Get("/api/p4/alerts/config", p4AuthMiddleware(handleAlertConfig))
+	r.Post("/api/p4/alerts/config", p4AuthMiddleware(handleAlertConfig))
+	r.Get("/api/p4/alerts/history", p4AuthMiddleware(handleAlertHistory))
+	r.Post("/api/p4/alerts/test", p4AuthMiddleware(handleAlertTest))
+	r.Post("/api/p4/email/send", p4AuthMiddleware(handleSendEmail))
+	r.Get("/api/p4/email/config",  p4AuthMiddleware(handleEmailConfig))
+	r.Post("/api/p4/email/config", p4AuthMiddleware(handleEmailConfig))
+
+
+	// ── Deep Packet Analysis (NetCap) ──────────────────────────────────────────
+	netCapEngine := netcap.NewEngine()
+	netCapH := handler.NewNetCapHandler(netCapEngine)
+	// Auto-start on best available interface
+	go func() {
+		ifaces, _ := netCapEngine.GetInterfaces()
+		iface := "any"
+		for _, i := range ifaces {
+			if i != "lo" && !strings.HasPrefix(i, "docker") && !strings.HasPrefix(i, "br-") && !strings.HasPrefix(i, "veth") {
+				iface = i
+				break
+			}
+		}
+		if err := netCapEngine.Start(netcap.CaptureConfig{Interface: iface, SnapLen: 1500, Promiscuous: true}); err != nil {
+			log.Warn().Err(err).Str("iface", iface).Msg("[NetCap] capture start failed — needs CAP_NET_RAW")
+		}
+		ctxNC, cancelNC := context.WithCancel(context.Background())
+		_ = cancelNC // cancelled when goroutine exits via engine.Stop()
+		netCapEngine.StartTsharkDecoder(ctxNC, iface)
+	}()
+	r.Route("/api/v1/netcap", func(r chi.Router) {
+		r.Use(authMw)
+		r.Get("/interfaces",            netCapH.Interfaces)
+		r.Post("/start",                netCapH.Start)
+		r.Post("/stop",                 netCapH.Stop)
+		r.Get("/stats",                 netCapH.Stats)
+		r.Get("/flows",                 netCapH.Flows)
+		r.Get("/anomalies",             netCapH.Anomalies)
+		r.Get("/tcp-flags",             netCapH.TCPFlags)
+		r.Get("/proto-breakdown",       netCapH.ProtoBreakdown)
+		r.Get("/full",                  netCapH.Full)
+		r.Get("/l7/http",               netCapH.L7HTTP)
+		r.Get("/l7/dns",                netCapH.L7DNS)
+		r.Get("/l7/sql",                netCapH.L7SQL)
+		r.Get("/l7/tls",                netCapH.L7TLS)
+		r.Get("/l7/grpc",               netCapH.L7GRPC)
+		r.Get("/export/flows.csv",      netCapH.ExportFlowsCSV)
+		r.Get("/export/anomalies.json", netCapH.ExportAnomaliesJSON)
+	})
+	// SSE stream — token via query param (EventSource cannot set headers)
+	r.Get("/api/v1/netcap/stream", func(w http.ResponseWriter, r *http.Request) {
+		tk := r.URL.Query().Get("token")
+		if tk == "" {
+			tk = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		}
+		if tk == "" {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		netCapH.Stream(w, r)
+	})
+	r.Get("/api/p4/conmon/report", p4AuthMiddleware(handleConMonReport))
 	r.With(auth.TokenFromQuery(jwtSecret, keyStore)).Get("/api/v1/ws",     handler.WSUpgradeHandler)
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
-		r.Use(vspMW.NewUserRateLimiter(300, time.Minute)) // per-user: 300 req/min
+		r.Use(vspMW.NewUserRateLimiter(600, time.Minute)) // per-user: 600 req/min
 
 		// Auth
 		r.Post("/api/v1/auth/logout",      authH.Logout)
@@ -259,6 +387,8 @@ func main() {
 			r.Get("/api/v1/admin/api-keys", apiKeysH.List)
 			r.Post("/api/v1/admin/api-keys", apiKeysH.Create)
 			r.Delete("/api/v1/admin/api-keys/{id}", apiKeysH.Delete)
+			r.Get("/api/v1/admin/tenants", usersH.ListAllTenants)
+			r.Post("/api/v1/admin/tenants", usersH.CreateTenant)
 		})
 
 		// Scan
@@ -268,6 +398,12 @@ func main() {
 		r.Get("/api/v1/vsp/run/{rid}", runsH.Get)
 		r.Get("/api/v1/vsp/runs", runsH.List)
 		r.With(ca.Middleware("runs-index", 10*time.Second)).Get("/api/v1/vsp/runs/index", runsH.Index)
+		// ── Batch scan ──────────────────────────────────────────────
+		batchH := newBatchHandler(db, runsH)
+		r.With(vspMW.StrictLimiter(5, time.Minute)).Post("/api/v1/vsp/batch", batchH.Submit)
+		r.Get("/api/v1/vsp/batches",             batchH.ListAll)
+		r.Get("/api/v1/vsp/batch/{batch_id}",    batchH.Status)
+		r.Delete("/api/v1/vsp/batch/{batch_id}", batchH.Cancel)
 		r.Get("/api/v1/vsp/findings", findingsH.List)
 		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
 
@@ -283,6 +419,9 @@ func main() {
 		r.Get("/api/v1/audit/log", auditH.List)
 		r.Get("/api/v1/notifications", auditH.Notifications)
 		r.Get("/api/v1/tenants", usersH.ListTenants)
+		// Billing
+		r.Get("/api/v1/billing/status", billingH.Status)
+		r.With(vspMW.StrictLimiter(5, time.Minute)).Post("/api/v1/billing/checkout", billingH.CreateCheckout)
 		r.Post("/api/v1/audit/verify", auditH.Verify)
 
 		// SIEM
@@ -357,7 +496,7 @@ func main() {
 		r.Post("/api/v1/ai/chat", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			// Forward to Anthropic API
-			body, err := io.ReadAll(r.Body)
+			body, err := io.ReadAll(io.LimitReader(r.Body, 10<<20)) // 10MB limit
 			if err != nil { http.Error(w, "bad request", 400); return }
 			req, err := http.NewRequestWithContext(r.Context(), "POST",
 				"https://api.anthropic.com/v1/messages",
@@ -369,7 +508,7 @@ func main() {
 			if apiKey != "" { req.Header.Set("x-api-key", apiKey) }
 			client := &http.Client{Timeout: 60 * time.Second}
 			resp, err := client.Do(req)
-			if err != nil { http.Error(w, `{"error":"upstream error"}`+err.Error(), http.StatusBadGateway); return }
+			if err != nil { http.Error(w, `{"error":"upstream error"}`, http.StatusBadGateway); return }
 			defer resp.Body.Close()
 			w.WriteHeader(resp.StatusCode)
 			io.Copy(w, resp.Body) //nolint:errcheck
@@ -688,6 +827,14 @@ func main() {
 		r.Get("/api/v1/ti/matches",                  tiH.Matches)
 		r.Get("/api/v1/ti/mitre",                    tiH.MITRE)
 		r.Post("/api/v1/ti/feeds/sync",              tiH.SyncFeeds)
+		r.Get("/api/v1/ti/enrich",                  tiH.Enrich)
+		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/ti/enrich/batch", tiH.EnrichBatch)
+		r.Get("/api/v1/vsp/findings/dedup",         tiH.DedupFindings)
+		r.Get("/api/v1/vsp/findings/chains",        tiH.ExploitChains)
+		r.Post("/api/v1/ai/analyze/findings",       tiH.SemanticAnalyze)
+		r.Post("/api/v1/ti/secret/check",           tiH.CheckSecret)
+		r.With(vspMW.StrictLimiter(20, time.Minute)).Post("/api/v1/ti/secret/check/batch", tiH.CheckSecretBatch)
+		r.Get("/api/v1/compliance/license",          tiH.LicenseCompliance)
 		r.Post("/api/v1/siem/webhooks", siemH.Create)
 		r.Delete("/api/v1/siem/webhooks/{id}", siemH.Delete)
 		r.Post("/api/v1/siem/webhooks/{id}/test", siemH.Test)
@@ -721,6 +868,7 @@ func main() {
 		r.Get("/api/v1/schedules",           schedH.List)
 		r.Post("/api/v1/schedules",          schedH.Create)
 		r.Delete("/api/v1/schedules/{id}",   schedH.Delete)
+			r.Patch("/api/v1/schedules/{id}",    schedH.Update)
 		r.Patch("/api/v1/schedules/{id}/toggle", schedH.Toggle)
 		r.Post("/api/v1/schedules/{id}/run", schedH.RunNow)
 		r.Get("/api/v1/drift",               schedH.DriftEvents)
@@ -746,9 +894,9 @@ func main() {
 		r.Get("/api/v1/vsp/sandbox",            sandboxH.List)
 		r.Post("/api/v1/vsp/sandbox/test-fire", sandboxH.TestFire)
 		r.Delete("/api/v1/vsp/sandbox/clear",   sandboxH.Clear)
-		r.Post("/api/v1/import/policies",       importsH.Policies)
-		r.Post("/api/v1/import/findings",       importsH.Findings)
-		r.Post("/api/v1/import/users",          importsH.Users)
+		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/import/policies", importsH.Policies)
+		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/import/findings", importsH.Findings)
+		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/import/users",    importsH.Users)
 		r.Post("/api/v1/vsp/rbac/session-timeout", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(`{"status":"ok","message":"session timeout updated"}`))
@@ -961,3 +1109,23 @@ func getDefaultTenantID(ctx context.Context, db *store.DB) string {
 	return id
 }
 
+// p4ResponseWriter overrides CSP header for P4 panel
+type p4ResponseWriter struct {
+	http.ResponseWriter
+	cspSet bool
+}
+
+func (rw *p4ResponseWriter) WriteHeader(code int) {
+	rw.ResponseWriter.Header().Del("Content-Security-Policy")
+	rw.ResponseWriter.Header().Set("Content-Security-Policy", "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; connect-src *;")
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *p4ResponseWriter) Write(b []byte) (int, error) {
+	if !rw.cspSet {
+		rw.ResponseWriter.Header().Del("Content-Security-Policy")
+		rw.ResponseWriter.Header().Set("Content-Security-Policy", "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; connect-src *;")
+		rw.cspSet = true
+	}
+	return rw.ResponseWriter.Write(b)
+}

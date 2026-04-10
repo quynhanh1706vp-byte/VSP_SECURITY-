@@ -81,8 +81,13 @@ func ExecutePlaybook(ctx context.Context, db *store.DB, runID string, steps []ma
 			result.Output, err = execRemediate(ctx, db, rc, config)
 		case "wait":
 			dur := parseDuration(config)
-			time.Sleep(dur)
-			result.Output = fmt.Sprintf("waited %s", dur)
+			select {
+			case <-ctx.Done():
+				result.Output = "cancelled"
+				err = ctx.Err()
+			case <-time.After(dur):
+				result.Output = fmt.Sprintf("waited %s", dur)
+			}
 		default:
 			result.Output = fmt.Sprintf("unknown step type: %s", stepType)
 		}
@@ -228,7 +233,11 @@ func execBlockCI(ctx context.Context, rc RunCtx, config string) (string, error) 
 			"context":     statusCtx,
 		})
 		// POST to latest commit SHA — simplified (in real impl: get SHA first)
-		url := fmt.Sprintf("https://api.github.com/repos/%s/statuses/HEAD", rc.GitHubRepo)
+		// Note: requires commit SHA — HEAD is not valid for GitHub Statuses API
+		// In production: resolve HEAD SHA via /repos/{owner}/{repo}/commits/HEAD first
+		sha := cfg["sha"]
+		if sha == "" { sha = "HEAD" } // fallback — will fail without real SHA
+		url := fmt.Sprintf("https://api.github.com/repos/%s/statuses/%s", rc.GitHubRepo, sha)
 		if err := httpPost(ctx, url, "token "+rc.GitHubToken, payload); err != nil {
 			// Don't fail — CI block is best-effort
 			log.Warn().Err(err).Msg("soar: github status update failed (non-fatal)")
@@ -244,6 +253,10 @@ func execWebhook(ctx context.Context, rc RunCtx, config string) (string, error) 
 	cfg := parseConfig(config)
 	url := cfg["url"]
 	if url == "" { return "", fmt.Errorf("webhook: url required in config") }
+	// SSRF protection — reuse webhook validation
+	if err := ValidateWebhookURL(url); err != nil {
+		return "", fmt.Errorf("webhook: %w", err)
+	}
 	method := cfg["method"]
 	if method == "" { method = "POST" }
 	payload, _ := json.Marshal(map[string]any{

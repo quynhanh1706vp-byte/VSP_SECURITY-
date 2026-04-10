@@ -54,3 +54,16 @@ func sanitizeString(s string, maxLen int) string {
 	}
 	return s
 }
+
+
+// validateRID returns true if s looks like a valid Run ID (alphanumeric + _ -).
+func validateRID(s string) bool {
+	if len(s) == 0 || len(s) > 100 { return false }
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') || c == '_' || c == '-') {
+			return false
+		}
+	}
+	return true
+}

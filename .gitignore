@@ -45,3 +45,4 @@ vsp_*.xlsx
 .fuse_hidden*
 coverage.out
 coverage.html
+config.yaml.bak

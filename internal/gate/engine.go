@@ -124,16 +124,34 @@ func Evaluate(rule PolicyRule, s scanner.Summary) EvalResult {
 // Score computes a 0-100 security score from a summary.
 // Industry-standard weighted scoring with diminishing penalties.
 func Score(s scanner.Summary) int {
-	// Penalty: each bucket capped so score never reaches 0 from single bucket
-	critPenalty := capInt(s.Critical, 2) * 15 // max 30pts (2+ critical = very bad)
-	highPenalty := capInt(s.High, 5)     * 8  // max 40pts
-	medPenalty  := capInt(s.Medium, 10)  * 2  // max 20pts
-	lowPenalty  := capInt(s.Low, 10)     * 1  // max 10pts
-
-	score := 100 - critPenalty - highPenalty - medPenalty - lowPenalty
-	if score < 0 {
-		return 0
+	// Use weighted counts when available (DAST×1.5, SCA×1.2, IAC×0.8, SAST×1.0)
+	// WeightedCrit/High are ×10 integers — divide to get float-equivalent penalty
+	critCount := s.Critical
+	highCount := s.High
+	if s.WeightedCrit > 0 {
+		critCount = (s.WeightedCrit + 5) / 10 // round weighted to effective count
 	}
+	if s.WeightedHigh > 0 {
+		highCount = (s.WeightedHigh + 5) / 10
+	}
+
+	// Penalty: each bucket capped so score never reaches 0 from single bucket
+	critPenalty    := capInt(critCount, 2) * 15 // max 30pts (cap 2 for SAST; DAST raises effective count via weighted)
+	highPenalty    := capInt(highCount, 5) * 8  // max 40pts
+	medPenalty     := capInt(s.Medium, 10) * 2  // max 20pts
+	lowPenalty     := capInt(s.Low, 10)    * 1  // max 10pts
+	secretsPenalty := 0
+	if s.HasSecrets { secretsPenalty = 25 } // live secrets always -25pts
+
+	// DAST bonus: applied only when DASTRan=true and no DAST-confirmed issues
+	dastBonus := 0
+	if s.DASTRan && s.DASTConfirmed == 0 {
+		dastBonus = 3 // DAST ran clean → small confidence boost
+	}
+
+	score := 100 - critPenalty - highPenalty - medPenalty - lowPenalty - secretsPenalty + dastBonus
+	if score < 0 { return 0 }
+	if score > 100 { return 100 }
 	return score
 }
 

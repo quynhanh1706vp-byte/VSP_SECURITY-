@@ -72,6 +72,10 @@ func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
 		Payload:   event,
 		FiredAt:   time.Now(),
 	})
+	// Cap total events to prevent memory leak
+	if len(h.events) > 1000 {
+		h.events = h.events[len(h.events)-500:] // keep last 500
+	}
 	h.mu.Unlock()
 
 	jsonOK(w, map[string]any{

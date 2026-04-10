@@ -7,13 +7,21 @@ import (
 	"github.com/vsp/platform/internal/store"
 )
 
-// BuildRiskRegister derives risk items from findings.
+// BuildRiskRegister derives risk items from findings, deduped by rule_id+severity.
 func BuildRiskRegister(tenantID string, findings []store.Finding) []RiskItem {
-	items := make([]RiskItem, 0, len(findings))
+	// Dedup by rule_id+severity — one risk per unique rule, highest severity wins
+	type key struct{ RuleID, Severity string }
+	seen := make(map[key]bool)
+	items := make([]RiskItem, 0)
 	for _, f := range findings {
 		if f.Severity == "INFO" || f.Severity == "TRACE" {
 			continue
 		}
+		k := key{f.RuleID, f.Severity}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
 		items = append(items, RiskItem{
 			ID:          "risk-" + f.ID,
 			TenantID:    tenantID,

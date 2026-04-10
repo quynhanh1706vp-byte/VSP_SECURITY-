@@ -7,8 +7,11 @@ RETURNING *;
 SELECT * FROM runs WHERE rid = $1 AND tenant_id = $2 LIMIT 1;
 
 -- name: GetLatestRun :one
+-- Note: Go implementation filters status='DONE' AND total_findings > 0
+-- This raw SQL is for reference only — use store.DB.GetLatestRun() instead
 SELECT * FROM runs
 WHERE tenant_id = $1
+  AND status = 'DONE'
 ORDER BY created_at DESC
 LIMIT 1;
 

@@ -34,11 +34,16 @@ func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
 	// Static secret: X-Internal-Secret: <secret>
 	// Time-based: X-Internal-Secret: <hmac-sha256(secret + timestamp_minute)>
 	secret := os.Getenv("INTERNAL_SECRET")
-	if secret == "" { secret = "dev-internal-secret" }
+	if secret == "" {
+		// Fail closed in production — no fallback secret
+		http.Error(w, `{"error":"INTERNAL_SECRET not configured"}`, http.StatusForbidden)
+		log.Error().Msg("INTERNAL_SECRET env not set — internal endpoint disabled")
+		return
+	}
 
 	provided := r.Header.Get("X-Internal-Secret")
-	// Check 1: static secret match
-	staticOK := provided == secret
+	// Check 1: constant-time comparison — prevents timing attacks
+	staticOK := hmac.Equal([]byte(provided), []byte(secret))
 	// Check 2: time-based HMAC (valid for current + prev minute)
 	hmacOK := false
 	if !staticOK {
@@ -48,7 +53,7 @@ func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
 			mac.Reset()
 			mac.Write([]byte(fmt.Sprintf("%d", minute)))
 			expected := fmt.Sprintf("%x", mac.Sum(nil))
-			if provided == expected {
+			if hmac.Equal([]byte(provided), []byte(expected)) {
 				hmacOK = true
 				break
 			}
@@ -79,7 +84,7 @@ func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
 	hasSecrets := false
 	for _, f := range payload.Findings {
 		sev[f.Severity]++
-		if f.Tool == "gitleaks" { hasSecrets = true }
+		if f.Tool == "gitleaks" || f.Tool == "secretcheck" { hasSecrets = true }
 	}
 	s := scanner.Summary{
 		Critical:   sev["CRITICAL"],
@@ -95,12 +100,14 @@ func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
 	result := gate.Evaluate(rule, s)
 
 	// 4. Build summary JSON
-	summaryJSON, _ := json.Marshal(map[string]int{
-		"CRITICAL": s.Critical,
-		"HIGH":     s.High,
-		"MEDIUM":   s.Medium,
-		"LOW":      s.Low,
-		"INFO":     s.Info,
+	summaryJSON, _ := json.Marshal(map[string]any{
+		"CRITICAL":    s.Critical,
+		"HIGH":        s.High,
+		"MEDIUM":      s.Medium,
+		"LOW":         s.Low,
+		"INFO":        s.Info,
+		"SCORE":       result.Score,
+		"HAS_SECRETS": s.HasSecrets,
 	})
 
 	// 5. Update run record

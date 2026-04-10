@@ -108,6 +108,8 @@ func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]
 }
 
 func (db *DB) AddComment(ctx context.Context, remID, author, body string) (*RemediationComment, error) {
+	if len(body) > 10000 { body = body[:10000] } // cap comment length
+	if len(author) > 200 { author = author[:200] }
 	row := db.pool.QueryRow(ctx,
 		`INSERT INTO remediation_comments (remediation_id,author,body)
 		 VALUES ($1,$2,$3) RETURNING id,remediation_id,author,body,created_at`,

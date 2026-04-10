@@ -57,8 +57,17 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve tenant — use default for now; extend with X-Tenant-Slug header later
+	// Resolve tenant — X-Tenant-Slug header takes priority, fallback to default
 	tenantID := a.DefaultTID
+	if slug := strings.TrimSpace(r.Header.Get("X-Tenant-Slug")); slug != "" {
+		var tid string
+		a.DB.Pool().QueryRow(r.Context(),
+			`SELECT id FROM tenants WHERE slug=$1 AND active=true LIMIT 1`, slug,
+		).Scan(&tid) //nolint:errcheck
+		if tid != "" {
+			tenantID = tid
+		}
+	}
 
 	// Lookup user
 	user, err := a.DB.GetUserByEmail(r.Context(), tenantID, req.Email)
@@ -82,7 +91,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PwHash), []byte(req.Password)); err != nil {
-		log.Warn().Str("email", req.Email).Msg("login: wrong password")
+		log.Warn().Msg("login: wrong password") // email not logged to prevent user enumeration
 		// Record failed login + possible lockout
 		count, _ := a.DB.RecordFailedLogin(r.Context(), user.ID)
 		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_FAILED", "/auth/login")

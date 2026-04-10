@@ -333,8 +333,8 @@ func (e *UEBAEngine) checkSLABreach(ctx context.Context) *Anomaly {
 	return nil
 }
 
-// AnomalyNewCriticalTool — extra constant needed
-const AnomalyNewCriticalTool AnomalyType = "new_critical_tool"
+// AnomalyNewCriticalTool = AnomalyNewCritical (same value, kept for code using this name)
+const AnomalyNewCriticalTool AnomalyType = AnomalyNewCritical
 
 // RunUEBA is the entry point for the UEBA background worker.
 // Call this on a schedule (e.g. every 15 minutes).
@@ -360,18 +360,24 @@ func RunUEBA(ctx context.Context, db *store.DB) {
 			if a.Score < 30 { continue } // Only create incidents for significant anomalies
 			// Dedup: skip if same title already open in last 6h
 			var existing int
+			// Truncate title to 200 chars for efficient index lookup
+			title := a.Message
+			if len(title) > 200 { title = title[:200] }
 			db.Pool().QueryRow(ctx, `
 				SELECT COUNT(*) FROM incidents
 				WHERE tenant_id=$1 AND title=$2
 				  AND status='open'
-				  AND created_at > NOW() - INTERVAL '6 hours'`,
-				tenantID, a.Message).Scan(&existing) //nolint:errcheck
+				  AND created_at > NOW() - INTERVAL '24 hours'`,
+				tenantID, title).Scan(&existing) //nolint:errcheck
 			if existing > 0 { continue }
+			// Truncate title consistently
+			if len(title) == 0 { title = a.Message }
+			if len(title) > 200 { title = title[:200] }
 			db.Pool().Exec(ctx, `
 				INSERT INTO incidents
 					(tenant_id, title, severity, status, source_refs)
 				VALUES ($1,$2,$3,'open',$4)`,
-				tenantID, a.Message, a.Severity,
+				tenantID, title, a.Severity,
 				fmt.Sprintf(`{"type":"%s","score":%.1f,"entity":"%s"}`, a.Type, a.Score, a.Entity),
 			) //nolint:errcheck
 		}

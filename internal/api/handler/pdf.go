@@ -18,6 +18,11 @@ import (
 func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
+	// Sanitize rid to prevent path traversal (G703)
+	if !isValidRID(rid) {
+		jsonError(w, "invalid run id", http.StatusBadRequest)
+		return
+	}
 
 	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
 	if err != nil || run == nil {
@@ -75,7 +80,7 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 		if _, err := exec.LookPath(converter[0]); err != nil {
 			continue
 		}
-		cmd := exec.CommandContext(r.Context(), converter[0], converter[1:]...)
+		cmd := exec.CommandContext(r.Context(), converter[0], converter[1:]...) //#nosec G702 -- converter from hardcoded list
 		pdfErr = cmd.Run()
 		if pdfErr == nil {
 			break
@@ -92,7 +97,7 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pdfBytes, err := os.ReadFile(pdfPath)
+	pdfBytes, err := os.ReadFile(pdfPath) //nolint:gosec // G703: pdfPath uses rid validated by isValidRID()
 	if err != nil {
 		jsonError(w, "pdf read error", http.StatusInternalServerError)
 		return
@@ -122,4 +127,16 @@ func buildReportData(run *store.Run, rf []store.Finding) reportData {
 		}
 	}
 	return data
+}
+
+// isValidRID ensures rid contains only safe characters (alphanumeric + hyphen + underscore)
+func isValidRID(rid string) bool {
+	if len(rid) == 0 || len(rid) > 128 { return false }
+	for _, c := range rid {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
 }

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSP — Billing & Plans</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b0c0f;--bg2:#111318;--t1:#f0f2f8;--t2:#8a90a2;--t3:#484e61;--cyan:#00e5ff;--green:#00ffa3;--amber:#ffb800;--border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.1)}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t1);min-height:100vh}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between;background:rgba(11,12,15,.9);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.logo{font-family:'Syne',sans-serif;font-size:17px;font-weight:800}
+.hero{padding:120px 40px 60px;text-align:center;max-width:700px;margin:0 auto}
+.eyebrow{font-family:'DM Mono',monospace;font-size:11px;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px}
+h1{font-family:'Syne',sans-serif;font-size:48px;font-weight:800;letter-spacing:-.04em;margin-bottom:14px}
+.sub{font-size:16px;color:var(--t2);line-height:1.7;font-weight:300}
+.toggle{display:flex;align-items:center;gap:12px;justify-content:center;margin:32px 0}
+.toggle-lbl{font-size:13px;color:var(--t2)}
+.sw{width:44px;height:24px;background:var(--border2);border-radius:12px;cursor:pointer;position:relative;transition:background .2s}
+.sw.on{background:var(--cyan)}
+.sw::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s}
+.sw.on::after{left:23px}
+.save{background:rgba(0,255,163,.15);border:1px solid rgba(0,255,163,.3);color:var(--green);font-size:11px;font-weight:600;font-family:'DM Mono',monospace;padding:3px 8px;border-radius:20px}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:1100px;margin:0 auto;padding:0 40px 80px}
+.plan{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;position:relative}
+.plan.featured{border-color:rgba(0,229,255,.3);background:linear-gradient(135deg,rgba(0,229,255,.05) 0%,var(--bg2) 60%)}
+.ptag{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--cyan);color:#0b0c0f;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;letter-spacing:.08em;padding:3px 12px;border-radius:100px}
+.pname{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.pprice{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;letter-spacing:-.03em}
+.pperiod{font-size:13px;color:var(--t3);margin-bottom:6px}
+.passets{font-size:12px;color:var(--t2);margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.pfeatures{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+.pfeatures li{font-size:13px;color:var(--t2);display:flex;gap:8px}
+.pfeatures li::before{content:'—';color:var(--cyan);font-family:'DM Mono',monospace;flex-shrink:0}
+.pfeatures li.off{opacity:.35}
+.pfeatures li.off::before{color:var(--t3)}
+.btn{width:100%;padding:11px;border-radius:8px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;transition:all .2s}
+.bf{background:var(--cyan);color:#0b0c0f}.bf:hover{opacity:.9}
+.bo{background:transparent;border:1px solid var(--border2);color:var(--t1)}.bo:hover{background:rgba(255,255,255,.04)}
+.faq-sec{max-width:800px;margin:0 auto;padding:60px 40px}
+.faq-sec h2{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;letter-spacing:-.03em;margin-bottom:28px}
+.faq-item{border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden}
+.faq-q{padding:16px 20px;font-size:14px;font-weight:500;cursor:pointer;display:flex;justify-content:space-between}
+.faq-q:hover{background:rgba(255,255,255,.02)}
+.faq-a{display:none;padding:0 20px 16px;font-size:13px;color:var(--t2);line-height:1.7}
+.faq-item.open .faq-a{display:block}
+.faq-item.open .faq-q{color:var(--cyan)}
+.cta{text-align:center;padding:80px 40px;border-top:1px solid var(--border)}
+.cta h2{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;letter-spacing:-.04em;margin-bottom:12px}
+.cta p{font-size:15px;color:var(--t2);margin-bottom:32px;font-weight:300}
+.cta-btns{display:flex;gap:12px;justify-content:center}
+.cp{background:var(--cyan);color:#0b0c0f;border:none;padding:13px 28px;border-radius:8px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+.cg{background:transparent;color:var(--t1);border:1px solid var(--border2);padding:13px 28px;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--bg2);border:1px solid var(--border2);color:var(--t1);padding:12px 20px;border-radius:10px;font-size:13px;transform:translateY(80px);transition:transform .3s;z-index:999}
+.toast.show{transform:translateY(0)}
+footer{padding:28px 40px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;color:var(--t3)}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">VSP</div>
+  <div style="display:flex;gap:20px;font-size:13px">
+    <a href="/landing" style="color:var(--t2);text-decoration:none">Home</a>
+    <a href="/p4" style="color:var(--t2);text-decoration:none">Dashboard</a>
+    <a href="/docs" style="color:var(--t2);text-decoration:none">Docs</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="eyebrow">Pricing</div>
+  <h1>Simple, transparent<br>pricing.</h1>
+  <p class="sub">All plans include P4 compliance dashboard, automated scanning, and ISSO support. No hidden fees.</p>
+  <div class="toggle">
+    <span class="toggle-lbl">Monthly</span>
+    <div class="sw" id="sw" onclick="toggleBilling()"></div>
+    <span class="toggle-lbl">Annual <span class="save">Save 20%</span></span>
+  </div>
+</div>
+
+<div class="plans">
+  <div class="plan">
+    <div class="pname">Starter</div>
+    <div class="pprice" id="p-starter">$8,500<span style="font-size:18px;font-weight:400;color:var(--t3)">/mo</span></div>
+    <div class="pperiod">Up to 50 assets · 1 ATO system</div>
+    <div class="passets">billed monthly</div>
+    <ul class="pfeatures">
+      <li>P4 Compliance Dashboard</li>
+      <li>Automated vulnerability scanning</li>
+      <li>RMF workflow Steps 1–6</li>
+      <li>POA&M auto-sync</li>
+      <li>FedRAMP + CMMC reporting</li>
+      <li>OSCAL SSP export</li>
+      <li>Email support (48h SLA)</li>
+      <li class="off">AI Compliance Advisor</li>
+      <li class="off">RASP runtime protection</li>
+      <li class="off">Multi-tenant management</li>
+    </ul>
+    <button class="btn bo" onclick="selectPlan('starter')">Get started</button>
+  </div>
+
+  <div class="plan featured">
+    <div class="ptag">MOST POPULAR</div>
+    <div class="pname">Professional</div>
+    <div class="pprice" id="p-pro">$22,000<span style="font-size:18px;font-weight:400;color:var(--t3)">/mo</span></div>
+    <div class="pperiod">Up to 200 assets · 3 ATO systems</div>
+    <div class="passets">billed monthly</div>
+    <ul class="pfeatures">
+      <li>Everything in Starter</li>
+      <li>AI Compliance Advisor (Claude)</li>
+      <li>RASP runtime protection</li>
+      <li>SBOM + supply chain tracking</li>
+      <li>ConMon automated reports</li>
+      <li>3PAO coordination support</li>
+      <li>Slack + webhook alerts</li>
+      <li>Priority support (4h SLA)</li>
+      <li>vspcli DevSecOps tool</li>
+      <li class="off">Air-gap / on-premise</li>
+    </ul>
+    <button class="btn bf" onclick="selectPlan('professional')">Start free trial →</button>
+  </div>
+
+  <div class="plan">
+    <div class="pname">Enterprise</div>
+    <div class="pprice">Custom</div>
+    <div class="pperiod">Unlimited assets · Unlimited systems</div>
+    <div class="passets">Air-gap · IL4/IL5 · On-premise</div>
+    <ul class="pfeatures">
+      <li>Everything in Professional</li>
+      <li>On-premise / air-gapped deploy</li>
+      <li>Multi-tenant (per-program ATO)</li>
+      <li>Dedicated ISSO on-call</li>
+      <li>Custom integrations + API</li>
+      <li>IL4 / IL5 ready</li>
+      <li>SLA 99.95% uptime</li>
+      <li>24/7 phone support</li>
+      <li>Annual 3PAO coordination</li>
+      <li>White-label option</li>
+    </ul>
+    <button class="btn bo" onclick="contactSales()">Contact sales</button>
+  </div>
+</div>
+
+<div class="faq-sec">
+  <h2>Frequently asked questions.</h2>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">What's included in the free trial? <span>+</span></div>
+    <div class="faq-a">30-day full Professional plan access — AI Advisor, RASP, SBOM, all compliance features. No credit card required. Data carries over when you subscribe.</div>
+  </div>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">How long does it take to achieve P4? <span>+</span></div>
+    <div class="faq-a">Most organizations achieve P4 in 4–6 months. VSP's AI Advisor reduces remediation time by 60%. Timeline depends on starting posture and asset count.</div>
+  </div>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">Do you support air-gapped environments? <span>+</span></div>
+    <div class="faq-a">Yes — Enterprise plan includes on-premise deployment for air-gapped environments. Tested at IL4/IL5. Contact sales for a tailored deployment plan.</div>
+  </div>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">What payment methods are accepted? <span>+</span></div>
+    <div class="faq-a">Credit card, ACH, government purchase orders (POs), and agency credit cards. Net-30 invoicing available for Enterprise. All major card networks accepted via Stripe.</div>
+  </div>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">Can I migrate from Tenable or Qualys? <span>+</span></div>
+    <div class="faq-a">Yes — VSP includes a migration assistant for existing scan data, POA&M spreadsheets, and SSP documents. Most migrations complete in under 2 weeks.</div>
+  </div>
+</div>
+
+<div class="cta">
+  <h2>Start your P4 journey.</h2>
+  <p>30-day free trial. No credit card. Your data stays yours.</p>
+  <div class="cta-btns">
+    <button class="cp" onclick="window.location.href='/onboarding'">Start free trial →</button>
+    <button class="cg" onclick="contactSales()">Talk to sales</button>
+  </div>
+</div>
+
+<footer>
+  <div style="font-family:'Syne',sans-serif;font-weight:800">VSP</div>
+  <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.04em">UNCLASSIFIED // FOR OFFICIAL USE ONLY</div>
+  <div>security@vsp.mil</div>
+</footer>
+
+<div class="toast" id="toast"></div>
+<script>
+let annual=false;
+function toggleBilling(){
+  annual=!annual;
+  document.getElementById('sw').classList.toggle('on',annual);
+  document.getElementById('p-starter').innerHTML=(annual?'$6,800':'$8,500')+'<span style="font-size:18px;font-weight:400;color:var(--t3)">/mo</span>';
+  document.getElementById('p-pro').innerHTML=(annual?'$17,600':'$22,000')+'<span style="font-size:18px;font-weight:400;color:var(--t3)">/mo</span>';
+}
+function selectPlan(p){showToast('Redirecting to '+p+' checkout...');setTimeout(()=>window.location.href='/onboarding',1500);}
+function contactSales(){showToast('Sales team will contact you within 24h ✓');}
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+</script>
+</body>
+</html>

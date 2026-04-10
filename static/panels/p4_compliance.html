@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<style>
+:root {
+  --color-background-primary: #0f1218;
+  --color-background-secondary: #141820;
+  --color-background-tertiary: #0a0c10;
+  --color-text-primary: #e8eaf0;
+  --color-text-secondary: #8b92a5;
+  --color-text-tertiary: #4a5168;
+  --color-border-tertiary: rgba(255,255,255,0.07);
+  --color-border-secondary: rgba(255,255,255,0.12);
+  --color-background-success: rgba(16,185,129,0.15);
+  --color-text-success: #10b981;
+  --color-background-warning: rgba(245,158,11,0.15);
+  --color-text-warning: #f59e0b;
+  --color-background-danger: rgba(239,68,68,0.15);
+  --color-text-danger: #ef4444;
+  --color-background-info: rgba(59,130,246,0.15);
+  --color-text-info: #3b82f6;
+  --border-radius-md: 6px;
+  --border-radius-lg: 10px;
+  --font-mono: 'JetBrains Mono','Fira Code',monospace;
+}
+body { background: #0a0c10 !important; color: #e8eaf0 !important; }
+
+/* ── Dark Premium Upgrade ────────────────────────────── */
+
+
+:root {
+  --bg: #0b0c0f;
+  --bg2: #111318;
+  --bg3: #181b22;
+  --border: rgba(255,255,255,.06);
+  --border2: rgba(255,255,255,.10);
+  --t1: #f0f2f8;
+  --t2: #8a90a2;
+  --t3: #484e61;
+  --cyan: #00e5ff;
+  --cyan-d: rgba(0,229,255,.1);
+  --green: #00ffa3;
+  --green-d: rgba(0,255,163,.1);
+  --amber: #ffb800;
+  --amber-d: rgba(255,184,0,.1);
+  --red: #ff4545;
+  --red-d: rgba(255,69,69,.1);
+  --purple: #9d6fff;
+  --purple-d: rgba(157,111,255,.1);
+  --r: 8px;
+  --mono: 'DM Mono', 'JetBrains Mono', monospace;
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --display: 'Syne', sans-serif;
+}
+
+/* Body */
+body {
+  font-family: var(--sans) !important;
+  background: var(--bg);
+  background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size: 80px 80px;
+}
+
+/* Sidebar */
+.sidenav {
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+}
+.sidenav-logo { padding: 20px 16px 14px; }
+.logo-badge {
+  font-family: var(--display) !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  letter-spacing: -.01em !important;
+  color: var(--t1) !important;
+}
+.logo-sub { font-family: var(--mono); font-size: 9px; color: var(--t3); }
+.nav-btn {
+  font-family: var(--sans) !important;
+  font-size: 12px !important;
+  border-radius: 0;
+  padding: 8px 16px !important;
+}
+.nav-btn.active {
+  color: var(--cyan) !important;
+  border-left-color: var(--cyan) !important;
+  background: rgba(0,229,255,.06) !important;
+}
+.nav-btn:hover { background: rgba(255,255,255,.04) !important; }
+
+/* Topbar */
+.topbar {
+  background: rgba(11,12,15,.8) !important;
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border) !important;
+  padding: 12px 24px !important;
+}
+.topbar-title {
+  font-family: var(--display) !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  letter-spacing: -.02em !important;
+}
+
+/* Score cards */
+.score-card, .score-card-ato {
+  background: var(--bg2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  transition: border-color .2s, transform .2s !important;
+}
+.score-card:hover { border-color: var(--border2) !important; transform: translateY(-1px); }
+.score-val {
+  font-family: var(--display) !important;
+  font-size: 42px !important;
+  font-weight: 800 !important;
+  letter-spacing: -.04em !important;
+  line-height: 1 !important;
+}
+.score-label {
+  font-family: var(--mono) !important;
+  font-size: 9px !important;
+  letter-spacing: .1em !important;
+}
+
+/* Pillar cards */
+.zt-pillar {
+  background: var(--bg2) !important;
+  border-radius: 12px !important;
+  transition: all .2s !important;
+}
+.zt-pillar:hover { transform: translateY(-2px) !important; }
+.zt-pillar-score {
+  font-family: var(--display) !important;
+  font-size: 28px !important;
+  font-weight: 800 !important;
+  letter-spacing: -.03em !important;
+}
+.zt-pillar-name {
+  font-family: var(--mono) !important;
+  font-size: 9px !important;
+  letter-spacing: .04em !important;
+  color: var(--t3) !important;
+}
+
+/* Pipeline table */
+.pipeline-row {
+  border-bottom: 1px solid var(--border) !important;
+  transition: background .15s !important;
+}
+.pipeline-row:hover { background: rgba(255,255,255,.02) !important; }
+
+/* Buttons */
+.btn {
+  font-family: var(--sans) !important;
+  border-radius: 7px !important;
+  font-size: 12px !important;
+}
+.btn-primary {
+  background: var(--cyan) !important;
+  color: #0b0c0f !important;
+  border-color: var(--cyan) !important;
+}
+.btn-ghost { border-color: var(--border2) !important; }
+
+/* Modals */
+.modal {
+  background: var(--bg2) !important;
+  border: 1px solid var(--border2) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 64px rgba(0,0,0,.5) !important;
+}
+.modal-title {
+  font-family: var(--display) !important;
+  font-weight: 700 !important;
+  letter-spacing: -.02em !important;
+}
+
+/* P4 badge */
+.p4-badge {
+  font-family: var(--mono) !important;
+  font-size: 10px !important;
+  letter-spacing: .08em !important;
+  padding: 5px 12px !important;
+  border-radius: 100px !important;
+}
+
+/* Tabs */
+.tab-btn {
+  font-family: var(--sans) !important;
+  font-size: 12px !important;
+}
+
+/* Section labels */
+.section-label {
+  font-family: var(--mono) !important;
+  font-size: 9px !important;
+  letter-spacing: .12em !important;
+  color: var(--t3) !important;
+}
+
+/* POA&M items */
+.poam-row {
+  border-radius: 8px !important;
+  transition: background .15s !important;
+}
+.poam-row:hover { background: rgba(255,255,255,.02) !important; }
+
+/* AI advisor modal */
+#ai-advisor-modal .modal {
+  border: 1px solid rgba(157,111,255,.2) !important;
+  background: linear-gradient(135deg, rgba(157,111,255,.04) 0%, var(--bg2) 50%) !important;
+}
+
+/* Noise overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: .6;
+}
+/* ── End Premium Upgrade ─────────────────────────────── */
+
+</style>
+<script>
+(function(){
+  // Kill VSP patches before they run
+  var _def = Object.defineProperty;
+  ['vsp100','vspSiem','__vsp_patched','PANEL_META'].forEach(function(k){
+    try{ _def(window, k, {get:function(){return null;}, set:function(){}, configurable:true}); }catch(e){}
+  });
+  // Block localStorage access errors silently
+  var _ls = window.localStorage;
+  try{
+    _def(window, 'localStorage', {
+      get: function(){ return {getItem:function(){return null;},setItem:function(){},removeItem:function(){},clear:function(){},length:0}; },
+      configurable: true
+    });
+  }catch(e){}
+  // Block VSP script tags from executing
+  var _origCreate = document.createElement.bind(document);
+  document.createElement = function(tag){
+    var el = _origCreate(tag);
+    if(tag.toLowerCase()==='script'){
+      var _origSet = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src');
+      Object.defineProperty(el,'src',{
+        set: function(v){
+          if(v && (v.includes('vsp_upgrade') || v.includes('vsp_siem'))){
+            return; // block VSP script injection
+          }
+          if(_origSet && _origSet.set) _origSet.set.call(el,v);
+        },
+        get: function(){ return _origSet && _origSet.get ? _origSet.get.call(el) : ''; },
+        configurable: true
+      });
+    }
+    return el;
+  };
+  window.__p4_guard = true;
+})();
+</script>
+
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VSP — P4 Compliance</title>
+<style>
+:root {
+  --bg: #0a0c10;
+  --bg2: #0f1218;
+  --bg3: #141820;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --t1: #e8eaf0;
+  --t2: #8b92a5;
+  --t3: #4a5168;
+  --cyan: #06b6d4;
+  --cyan-d: rgba(6,182,212,0.15);
+  --green: #10b981;
+  --green-d: rgba(16,185,129,0.15);
+  --amber: #f59e0b;
+  --amber-d: rgba(245,158,11,0.15);
+  --red: #ef4444;
+  --red-d: rgba(239,68,68,0.15);
+  --blue: #3b82f6;
+  --blue-d: rgba(59,130,246,0.15);
+  --purple: #8b5cf6;
+  --purple-d: rgba(139,92,246,0.15);
+  --r: 6px;
+  --mono: 'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size:13px; line-height:1.5; }
+.shell { display:grid; grid-template-columns:180px 1fr; height:100vh; overflow:hidden; }
+
+/* Sidebar nav */
+.sidenav { background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+.sidenav-logo { padding:18px 14px 12px; border-bottom:1px solid var(--border); }
+.logo-badge { font-size:10px; font-weight:700; letter-spacing:.14em; color:var(--cyan); }
+.logo-sub { font-size:9px; color:var(--t3); margin-top:2px; }
+.nav-section { padding:12px 10px 6px; font-size:9px; color:var(--t3); letter-spacing:.1em; }
+.nav-btn { display:flex; align-items:center; gap:8px; padding:7px 14px; cursor:pointer; border:none; background:none; color:var(--t2); font-family:var(--mono); font-size:12px; width:100%; text-align:left; border-left:2px solid transparent; transition:all .15s; }
+.nav-btn:hover { color:var(--t1); background:var(--border); }
+.nav-btn.active { color:var(--cyan); border-left-color:var(--cyan); background:var(--cyan-d); }
+.nav-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+/* Main content */
+.main { overflow-y:auto; background:var(--bg); }
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:10; }
+.topbar-title { font-size:14px; font-weight:600; color:var(--t1); }
+.topbar-meta { font-size:10px; color:var(--t3); }
+.p4-badge { font-size:10px; padding:3px 8px; border-radius:var(--r); background:var(--cyan-d); color:var(--cyan); border:1px solid rgba(6,182,212,.3); }
+
+.content { padding:20px 24px; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
+/* Score hero */
+.hero-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.score-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:14px; }
+.score-label { font-size:10px; color:var(--t3); letter-spacing:.08em; margin-bottom:6px; }
+.score-val { font-size:28px; font-weight:700; line-height:1; }
+.score-sub { font-size:10px; color:var(--t3); margin-top:4px; }
+.score-bar { height:3px; background:var(--border); border-radius:2px; margin-top:8px; }
+.score-bar-fill { height:100%; border-radius:2px; transition:width .6s ease; }
+
+/* Section titles */
+.section-hd { display:flex; align-items:center; justify-content:space-between; margin:20px 0 10px; }
+.section-title { font-size:10px; color:var(--t3); letter-spacing:.1em; }
+.section-action { font-size:11px; color:var(--cyan); cursor:pointer; background:none; border:none; font-family:var(--mono); }
+.section-action:hover { text-decoration:underline; }
+
+/* RMF Steps */
+.rmf-steps { display:flex; flex-direction:column; gap:10px; }
+.rmf-step { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+.rmf-step-header { display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; }
+.rmf-step-num { font-size:10px; color:var(--t3); min-width:16px; }
+.rmf-step-name { font-size:13px; font-weight:600; flex:1; }
+.rmf-step-owner { font-size:10px; color:var(--t3); }
+.rmf-step-status { font-size:10px; padding:3px 8px; border-radius:var(--r); }
+.s-complete { background:var(--green-d); color:var(--green); }
+.s-in_progress { background:var(--amber-d); color:var(--amber); }
+.s-pending { background:var(--border); color:var(--t3); }
+.rmf-tasks { border-top:1px solid var(--border); padding:10px 14px; display:none; }
+.rmf-step.open .rmf-tasks { display:block; }
+.task-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border); }
+.task-row:last-child { border-bottom:none; }
+.task-check { width:14px; height:14px; border-radius:3px; border:1px solid var(--border2); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:.15s; }
+.task-check.done { background:var(--green); border-color:var(--green); }
+.task-check.done::after { content:'✓'; color:#fff; font-size:9px; }
+.task-name { flex:1; font-size:12px; }
+.task-ref { font-size:10px; color:var(--cyan); }
+.task-artifact { font-size:10px; color:var(--t3); }
+
+/* Zero Trust pillars */
+.zt-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+.zt-pillar { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:12px; }
+.zt-pillar-name { font-size:10px; color:var(--t3); margin-bottom:6px; }
+.zt-pillar-score { font-size:22px; font-weight:700; }
+.zt-bar { height:3px; background:var(--border); border-radius:2px; margin-top:6px; }
+.zt-bar-fill { height:100%; border-radius:2px; }
+.p4-target { font-size:10px; color:var(--t3); margin-top:4px; }
+
+/* Capabilities table */
+.cap-table { width:100%; border-collapse:collapse; font-size:12px; }
+.cap-table th { text-align:left; padding:6px 10px; font-size:10px; color:var(--t3); border-bottom:1px solid var(--border); font-weight:500; }
+.cap-table td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+.cap-table tr:last-child td { border-bottom:none; }
+.level-opt { color:var(--green); }
+.level-adv { color:var(--cyan); }
+.level-trad { color:var(--amber); }
+.status-impl { color:var(--green); }
+.status-part { color:var(--amber); }
+.status-plan { color:var(--t3); }
+.status-ns { color:var(--red); }
+.mini-bar { width:60px; height:4px; background:var(--border); border-radius:2px; display:inline-block; vertical-align:middle; }
+.mini-bar-fill { height:100%; border-radius:2px; display:block; }
+
+/* RASP events */
+.rasp-list { display:flex; flex-direction:column; gap:6px; max-height:320px; overflow-y:auto; }
+.rasp-row { display:flex; align-items:center; gap:10px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:8px 12px; animation:fadeIn .3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+.rasp-sev { font-size:10px; padding:2px 6px; border-radius:3px; min-width:62px; text-align:center; }
+.sev-crit { background:var(--red-d); color:var(--red); }
+.sev-high { background:var(--amber-d); color:var(--amber); }
+.sev-med { background:var(--blue-d); color:var(--blue); }
+.sev-low { background:var(--border); color:var(--t3); }
+.rasp-type { flex:1; font-weight:600; font-size:12px; }
+.rasp-svc { font-size:10px; color:var(--t3); }
+.rasp-action-blk { font-size:10px; color:var(--red); }
+.rasp-action-alrt { font-size:10px; color:var(--amber); }
+.rasp-ts { font-size:10px; color:var(--t3); }
+
+/* Pipeline */
+.pipeline-header { display:flex; align-items:center; gap:14px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:14px 18px; margin-bottom:14px; }
+.run-id { font-size:12px; color:var(--cyan); font-weight:700; }
+.run-trigger { font-size:11px; color:var(--t3); }
+.pipeline-scores { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+.fw-score-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:10px 12px; }
+.fw-score-label { font-size:10px; color:var(--t3); margin-bottom:4px; }
+.fw-score-num { font-size:18px; font-weight:700; }
+.fw-delta-pos { font-size:10px; color:var(--green); }
+.fw-delta-neg { font-size:10px; color:var(--red); }
+
+.tests-list { display:flex; flex-direction:column; gap:4px; }
+.test-row { display:flex; align-items:center; gap:10px; padding:7px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); }
+.test-fw { font-size:10px; color:var(--t3); min-width:60px; }
+.test-ctrl { font-size:10px; color:var(--purple); min-width:100px; }
+.test-name { flex:1; font-size:12px; }
+.test-status { font-size:10px; padding:2px 8px; border-radius:3px; }
+.ts-pass { background:var(--green-d); color:var(--green); }
+.ts-fail { background:var(--red-d); color:var(--red); }
+.ts-warn { background:var(--amber-d); color:var(--amber); }
+.ts-skip { background:var(--border); color:var(--t3); }
+.test-score { font-size:11px; min-width:32px; text-align:right; }
+.test-evidence { font-size:10px; color:var(--t3); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* POA&M */
+.poam-list { display:flex; flex-direction:column; gap:6px; }
+.poam-row { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:10px 14px; }
+.poam-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.poam-id { font-size:10px; color:var(--cyan); }
+.poam-ctrl { font-size:10px; color:var(--purple); }
+.poam-name { flex:1; font-size:12px; font-weight:600; }
+.poam-sev { font-size:10px; padding:2px 6px; border-radius:3px; }
+.poam-status { font-size:10px; padding:2px 6px; border-radius:3px; }
+.st-open { background:var(--red-d); color:var(--red); }
+.st-rem { background:var(--amber-d); color:var(--amber); }
+.st-closed { background:var(--green-d); color:var(--green); }
+.poam-plan { font-size:11px; color:var(--t3); }
+
+/* Drift */
+.drift-row { display:flex; align-items:flex-start; gap:10px; padding:10px 14px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); margin-bottom:6px; }
+.drift-icon { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:12px; }
+.drift-info { flex:1; }
+.drift-resource { font-size:12px; font-weight:600; margin-bottom:2px; }
+.drift-change { font-size:11px; color:var(--t3); }
+.drift-reverted { font-size:10px; color:var(--green); }
+.drift-ctrl { font-size:10px; color:var(--purple); }
+
+/* Buttons */
+.btn { font-family:var(--mono); font-size:12px; padding:7px 14px; border-radius:var(--r); cursor:pointer; border:1px solid; transition:all .15s; }
+.btn-primary { background:var(--cyan-d); color:var(--cyan); border-color:rgba(6,182,212,.4); }
+.btn-primary:hover { background:rgba(6,182,212,.25); }
+.btn-ghost { background:none; color:var(--t2); border-color:var(--border2); }
+.btn-ghost:hover { color:var(--t1); background:var(--border); }
+.btn-danger { background:var(--red-d); color:var(--red); border-color:rgba(239,68,68,.3); }
+.btn-sm { padding:4px 10px; font-size:11px; }
+
+/* Microseg rules */
+.rule-table { width:100%; border-collapse:collapse; font-size:12px; }
+.rule-table th { text-align:left; padding:6px 10px; font-size:10px; color:var(--t3); border-bottom:1px solid var(--border); }
+.rule-table td { padding:7px 10px; border-bottom:1px solid var(--border); }
+.rule-table tr:last-child td { border-bottom:none; }
+.action-allow { color:var(--green); }
+.action-deny { color:var(--red); }
+.action-inspect { color:var(--amber); }
+.mtls-yes { color:var(--cyan); }
+.mtls-no { color:var(--t3); }
+
+/* Modal overlay */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:20px; min-width:360px; max-width:520px; }
+.modal-title { font-size:14px; font-weight:700; margin-bottom:14px; }
+.form-row { margin-bottom:12px; }
+.form-label { font-size:10px; color:var(--t3); margin-bottom:4px; display:block; }
+.form-input { width:100%; background:var(--bg2); border:1px solid var(--border2); border-radius:var(--r); color:var(--t1); font-family:var(--mono); font-size:12px; padding:7px 10px; }
+.form-input:focus { outline:none; border-color:var(--cyan); }
+.modal-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+
+/* ATO letter */
+.ato-card { background:var(--bg2); border:1px solid var(--cyan); border-radius:var(--r); padding:16px 20px; }
+.ato-title { font-size:11px; color:var(--cyan); letter-spacing:.1em; margin-bottom:8px; }
+.ato-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.ato-row:last-child { border-bottom:none; }
+.ato-key { color:var(--t3); }
+.ato-val { color:var(--t1); text-align:right; }
+.ato-note { font-size:11px; color:var(--amber); margin-top:4px; padding-left:8px; border-left:2px solid var(--amber); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* Spinner */
+.spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--cyan); border-radius:50%; animation:spin .7s linear infinite; display:inline-block; vertical-align:middle; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.toast { position:fixed; bottom:20px; right:20px; background:var(--bg3); border:1px solid var(--border2); border-radius:var(--r); padding:10px 16px; font-size:12px; color:var(--t1); z-index:200; animation:fadeIn .3s ease; }
+</style>
+</head>
+<body>
+<div style="position:fixed;top:10px;left:10px;z-index:9999">
+  <a href="/" style="
+    display:inline-flex;align-items:center;gap:6px;
+    background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);
+    color:#94a3b8;text-decoration:none;font-family:monospace;font-size:12px;
+    padding:5px 12px;border-radius:6px;backdrop-filter:blur(8px);
+    transition:all .15s;
+  " onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#94a3b8'">
+    ← VSP Dashboard
+  </a>
+</div>
+
+<div style="position:fixed;top:10px;right:10px;z-index:9999"><a href="javascript:history.back()" style="font-family:monospace;font-size:11px;padding:6px 12px;background:rgba(6,182,212,.15);color:#06b6d4;border:1px solid rgba(6,182,212,.4);border-radius:6px;text-decoration:none;">← Back to VSP</a></div>
+<div class="shell">
+  <!-- Sidebar -->
+  <nav class="sidenav">
+    <div class="sidenav-logo">
+      <div class="logo-badge">VSP // P4</div>
+      <div class="logo-sub">DoD Zero Trust Compliance</div>
+    </div>
+    <div class="nav-section">COMPLIANCE</div>
+    <button class="nav-btn active" onclick="switchTab('overview',this)">
+      <div class="nav-dot" style="background:var(--cyan)"></div> Overview
+    </button>
+    <button class="nav-btn" onclick="switchTab('rmf',this)">
+      <div class="nav-dot" style="background:var(--amber)"></div> DoD RMF / ATO
+    </button>
+    <button class="nav-btn" onclick="switchTab('zerotrust',this)">
+      <div class="nav-dot" style="background:var(--purple)"></div> Zero Trust
+    </button>
+    <button class="nav-btn" onclick="switchTab('pipeline',this)">
+      <div class="nav-dot" style="background:var(--green)"></div> Pipeline
+    </button>
+    <button class="nav-btn" onclick="switchTab('microseg',this)">
+      <div class="nav-dot" style="background:var(--blue)"></div> Micro-Seg
+    </button>
+    <button class="nav-btn" onclick="switchTab('rasp',this)">
+      <div class="nav-dot" style="background:var(--red)"></div> RASP Events
+    </button>
+    <button class="nav-btn" onclick="switchTab('poam',this)">
+      <div class="nav-dot" style="background:var(--t3)"></div> POA&M
+    </button>
+    <div class="nav-section" style="margin-top:auto">STATUS</div>
+    <div style="padding:10px 14px">
+      <div style="font-size:10px;color:var(--t3);margin-bottom:4px">P4 Readiness</div>
+      <div id="sidebar-p4" style="font-size:20px;font-weight:700;color:var(--amber)">—</div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">DoD Zero Trust P4 — Compliance Dashboard</div>
+        <div class="topbar-meta">VSP · NIST SP 800-37 Rev 2 · FedRAMP Moderate · CMMC L2 · DoD ZT v2.0</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="p4-badge" id="p4-status-badge">Loading...</span>
+        <div style="display:flex;align-items:center;gap:8px;position:relative">
+  <div style="font-size:10px;color:var(--t3)">TENANT</div>
+  <button onclick="openTenantSwitcher()" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--t1);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px">
+    <span id="tenant-label">VSP — Default</span> ▾
+  </button>
+  <div id="tenant-switcher-dropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:220px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+    <div style="font-size:10px;color:var(--t3);padding:4px 8px;margin-bottom:4px">SWITCH TENANT</div>
+    <div onclick="switchTenant('VSP-DOD-2025-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
+      <span>VSP — Default</span><span style="color:var(--green);font-size:10px">P4 100%</span>
+    </div>
+    <div onclick="switchTenant('TENANT-ACME-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
+      <span>ACME Defense</span><span style="color:var(--amber);font-size:10px">P4 38%</span>
+    </div>
+    <div onclick="switchTenant('TENANT-NGIT-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
+      <span>Northrop IT</span><span style="color:var(--green);font-size:10px">P4 87%</span>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px">
+      <div onclick="window.location.href='/onboarding'" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--cyan)" onmouseover="this.style.background='rgba(6,182,212,.08)'" onmouseout="this.style.background='transparent'">
+        + Add new tenant
+      </div>
+    </div>
+  </div>
+</div>
+        <button class="btn btn-ghost btn-sm" onclick="openAIAdvisor(null)" style="color:#8b5cf6;border-color:rgba(139,92,246,.4)">🤖 AI</button>
+        <button class="btn btn-ghost btn-sm" onclick="startDemoMode()">▶ Demo</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportPDF()">⬇ PDF</button>
+        <button class="btn btn-primary btn-sm" onclick="refreshAll()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- OVERVIEW TAB -->
+      <div id="tab-overview" class="tab-panel active">
+        <div class="hero-grid">
+          <div class="score-card">
+            <div class="score-label">P4 READINESS</div>
+            <div class="score-val" id="ov-p4" style="color:var(--amber)">—</div>
+            <div class="score-sub">DoD ZT Architecture v2.0</div>
+            <div class="score-bar"><div class="score-bar-fill" id="ov-p4-bar" style="background:var(--amber)"></div></div>
+          </div>
+          <div class="score-card">
+            <div class="score-label">FEDRAMP MODERATE</div>
+            <div class="score-val" id="ov-fedramp" style="color:var(--cyan)">—</div>
+            <div class="score-sub" id="ov-fedramp-sub">loading...</div>
+            <div class="score-bar"><div class="score-bar-fill" id="ov-fedramp-bar" style="width:0%;background:var(--cyan)"></div></div>
+          </div>
+          <div class="score-card">
+            <div class="score-label">CMMC LEVEL 2</div>
+            <div class="score-val" id="ov-cmmc" style="color:var(--amber)">—</div>
+            <div class="score-sub" id="ov-cmmc-sub">loading...</div>
+            <div class="score-bar"><div class="score-bar-fill" id="ov-cmmc-bar" style="width:0%;background:var(--amber)"></div></div>
+          </div>
+          <div class="score-card">
+            <div class="score-label">ATO STATUS</div>
+            <div class="score-val" id="ov-ato" style="color:var(--amber);font-size:14px;padding-top:6px">IN PROGRESS</div>
+            <div class="score-sub" id="ov-ato-sub">Steps 1-2 complete</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:33%;background:var(--amber)"></div></div>
+          </div>
+        </div>
+
+        <div class="section-hd"><div class="section-title">ZERO TRUST PILLARS — 7 PILLAR SCORECARD</div></div>
+        <div class="zt-grid" id="ov-pillars">
+          <div class="zt-pillar"><div class="zt-pillar-name">Loading...</div></div>
+        </div>
+
+        <div class="section-hd">
+          <div class="section-title">LATEST PIPELINE RUN</div>
+          <button class="section-action" onclick="switchTab('pipeline',null)">→ View details</button>
+        </div>
+        <div id="ov-pipeline-summary" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;">
+          <div class="spinner"></div>
+        </div>
+
+        <div class="section-hd">
+          <div class="section-title">OPEN POA&M — CRITICAL/HIGH</div>
+          <button class="section-action" onclick="switchTab('poam',null)">→ View all</button>
+        </div>
+        <div id="ov-poam"></div>
+      </div>
+
+      <!-- RMF TAB -->
+      <div id="tab-rmf" class="tab-panel">
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="generateATOLetter()">Generate ATO Letter</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadConMon()">ConMon Report</button>
+        </div>
+
+        <div id="ato-letter-box" style="display:none;margin-bottom:16px"></div>
+
+        <div class="section-hd"><div class="section-title">NIST SP 800-37 REV 2 — 6-STEP RMF</div></div>
+        <div class="rmf-steps" id="rmf-steps-container">
+          <div style="color:var(--t3)"><span class="spinner"></span> Loading RMF data...</div>
+        </div>
+
+        <div class="section-hd" style="margin-top:20px"><div class="section-title">ATO ARTIFACTS <button id="oscal-btn" class="btn btn-ghost btn-sm" onclick="downloadOSCAL()" style="margin-left:8px;font-size:10px;color:#06b6d4;border-color:rgba(6,182,212,.4)">⬇ OSCAL SSP</button></div></div>
+        <div id="ato-artifacts"></div>
+
+        <div id="conmon-box" style="display:none;margin-top:16px"></div>
+      </div>
+
+      <!-- ZERO TRUST TAB -->
+      <div id="tab-zerotrust" class="tab-panel">
+        <div class="section-hd"><div class="section-title">PILLAR SCORES — DoD ZT ARCHITECTURE v2.0</div></div>
+        <div class="zt-grid" id="zt-pillar-grid"></div>
+
+        <div class="section-hd"><div class="section-title">APPLICATION PILLAR — CAPABILITIES BREAKDOWN</div></div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+          <table class="cap-table" id="cap-table">
+            <thead><tr><th>ID</th><th>Capability</th><th>DoD Maturity Level</th><th>Status</th><th>Score</th><th>Controls</th></tr></thead>
+            <tbody id="cap-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="section-hd" style="margin-top:16px">
+          <div class="section-title">SBOM — SOFTWARE BILL OF MATERIALS</div>
+        </div>
+        <div id="sbom-box" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;display:flex;gap:24px">
+          <div><div class="score-label">COMPONENTS</div><div id="sbom-total" style="font-size:20px;font-weight:700;color:var(--cyan)">—</div></div>
+          <div><div class="score-label">CRITICAL CVEs</div><div id="sbom-crit" style="font-size:20px;font-weight:700;color:var(--red)">—</div></div>
+          <div style="flex:1;display:flex;align-items:center;font-size:11px;color:var(--t3)">
+            SA-12 / SR-3 / SR-11 · NIST SP 800-161 · DoD SBOM mandate
+          </div>
+        </div>
+      </div>
+
+      <!-- PIPELINE TAB -->
+      <div id="tab-pipeline" class="tab-panel">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="btn btn-primary btn-sm" onclick="triggerPipeline()">▶ Trigger Scan</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadPipeline()">History</button>
+        </div>
+
+        <div id="pipeline-run-header"></div>
+        <div class="pipeline-scores" id="pipeline-fw-scores"></div>
+
+        <div class="section-hd">
+          <div class="section-title">CONTROL TESTS</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="filterTests('all')">All</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterTests('fail')">Fail</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterTests('warn')">Warn</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterTests('pass')">Pass</button>
+          </div>
+        </div>
+        <div class="tests-list" id="tests-list"></div>
+
+        <div class="section-hd" style="margin-top:16px"><div class="section-title">DRIFT EVENTS</div></div>
+        <div id="drift-list"></div>
+
+        <div class="section-hd" style="margin-top:16px"><div class="section-title">SCHEDULES — ConMon</div></div>
+        <div id="schedules-list"></div>
+      </div>
+
+      <!-- MICROSEG TAB -->
+      <div id="tab-microseg" class="tab-panel">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="btn btn-primary btn-sm" onclick="openSegModal()">+ Add Rule</button>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:auto">
+          <table class="rule-table">
+            <thead><tr><th>ID</th><th>Name</th><th>Source</th><th>Destination</th><th>Port</th><th>Action</th><th>mTLS</th><th>Hits</th></tr></thead>
+            <tbody id="seg-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RASP TAB -->
+      <div id="tab-rasp" class="tab-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:11px;color:var(--t3)">Runtime Application Self-Protection · Live event feed · SI-3 / SI-10 / SI-16</div>
+          <button class="btn btn-primary btn-sm" onclick="pollRASP()">↺ Poll</button>
+        </div>
+        <div class="rasp-list" id="rasp-list">
+          <div style="color:var(--t3)"><span class="spinner"></span> Loading...</div>
+        </div>
+      </div>
+
+      <!-- POA&M TAB -->
+      <div id="tab-poam" class="tab-panel">
+        <div class="section-hd"><div class="section-title">PLAN OF ACTION & MILESTONES — OPEN ITEMS</div></div>
+        <div class="poam-list" id="poam-list">
+          <div style="color:var(--t3)"><span class="spinner"></span> Loading...</div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- Add Micro-Seg Rule Modal -->
+<div class="modal-overlay" id="seg-modal">
+  <div class="modal">
+    <div class="modal-title">Add Micro-Segmentation Rule</div>
+    <div class="form-row">
+      <label class="form-label">Rule Name</label>
+      <input class="form-input" id="seg-name" placeholder="e.g. vsp-scanner → redis">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-row">
+        <label class="form-label">Source Service</label>
+        <input class="form-input" id="seg-src" placeholder="vsp-api">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Destination Service</label>
+        <input class="form-input" id="seg-dst" placeholder="postgres">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="form-row">
+        <label class="form-label">Port</label>
+        <input class="form-input" id="seg-port" type="number" placeholder="5432">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Protocol</label>
+        <select class="form-input" id="seg-proto"><option>TCP</option><option>UDP</option><option>gRPC</option></select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Action</label>
+        <select class="form-input" id="seg-action"><option>allow</option><option>deny</option><option>inspect</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
+        <input type="checkbox" id="seg-mtls" checked> Require mTLS
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeSegModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="submitSegRule()">Add Rule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast" style="display:none"></div>
+
+<script>
+const API = window.location.origin;
+let allTests = [];
+
+// ---- Tab switching ----
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  else {
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      if (b.textContent.toLowerCase().includes(name.replace('-',' '))) b.classList.add('active');
+    });
+  }
+  loadTab(name);
+}
+
+function loadTab(name) {
+  switch(name) {
+    case 'overview':   loadOverview(); break;
+    case 'rmf': setTimeout(loadATOExpiry, 300);        loadRMF(); break;
+    case 'zerotrust':  loadZeroTrust(); break;
+    case 'pipeline':   loadPipeline(); break;
+    case 'microseg':   loadMicroSeg(); break;
+    case 'rasp':       pollRASP(); break;
+    case 'sbom-viewer': loadSBOMView(); break;
+    case 'poam':       loadPOAM(); break;
+  }
+}
+
+function refreshAll() { loadTab(currentTab()); toast('Refreshed'); }
+
+function currentTab() {
+  const p = document.querySelector('.tab-panel.active');
+  return p ? p.id.replace('tab-','') : 'overview';
+}
+
+// ---- Fetch helpers ----
+// Auto-redirect if no token and accessed directly
+(function(){
+  const tok = new URLSearchParams(location.search).get('token');
+  if (tok) { window.TOKEN = tok; return; }
+  if (window.parent && window.parent !== window && window.parent.TOKEN) return;
+  // No token — redirect to main app
+  if (window === window.top) {
+    window.location.href = '/?next=p4';
+  }
+})();
+
+function getP4Token() {
+  // 1. Parent window (when loaded in iframe from main app)
+  if (window.parent && window.parent !== window && window.parent.TOKEN)
+    return window.parent.TOKEN;
+  // 2. URL query param ?token=...
+  const urlToken = new URLSearchParams(window.location.search).get('token');
+  if (urlToken) return urlToken;
+  // 3. Cookie vsp_access_token
+  const m = document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('vsp_token='));
+  if (m) return m.split('=')[1];
+  // 4. sessionStorage fallback
+  return sessionStorage.getItem('vsp_token') || '';
+}
+
+async function api(path) {
+  try {
+    const token = getP4Token();
+    const headers = token ? {Authorization: 'Bearer ' + token} : {};
+    const r = await fetch(API + path, {headers});
+    return await r.json();
+  } catch(e) {
+    return null;
+  }
+}
+
+async function post(path, body) {
+  try {
+    const token = getP4Token();
+    const h = {'Content-Type':'application/json'};
+    if (token) h['Authorization'] = 'Bearer ' + token;
+    const r = await fetch(API + path, { method:'POST', headers:h, body:JSON.stringify(body) });
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+// ---- Overview ----
+async function loadOverview() {
+  const [zt, pipe, rmf] = await Promise.all([
+    api('/api/p4/zt/status'),
+    api('/api/p4/pipeline/latest'),
+    api('/api/p4/rmf')
+  ]);
+
+  if (zt) {
+    // P4 readiness
+    const p4 = zt.p4_readiness;
+    document.getElementById('ov-p4').textContent = p4 + '%';
+    document.getElementById('ov-p4-bar').style.width = p4 + '%';
+    document.getElementById('sidebar-p4').textContent = p4 + '%';
+    document.getElementById('p4-status-badge').textContent = p4 >= 100 ? 'P4 ACHIEVED' : p4 >= 85 ? 'P4 NEAR' : 'P4 IN PROGRESS';
+    document.getElementById('p4-status-badge').style.color = p4 >= 85 ? 'var(--green)' : 'var(--amber)';
+
+    // Pillar cards
+    const grid = document.getElementById('ov-pillars');
+    if (!zt || !zt.pillars) { grid.innerHTML = "<div style='color:var(--t3)'>Loading pillars...</div>"; return; }
+    grid.innerHTML = Object.entries(zt.pillars).map(([k,p]) => `
+      <div class="zt-pillar" style="border-color:${p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)'}">
+        <div class="zt-pillar-name">${p.name}</div>
+        <div class="zt-pillar-score" style="color:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}">${p.score}</div>
+        <div class="p4-target" style="color:var(--t3)">target ${p.target}</div>
+        <div class="zt-bar"><div class="zt-bar-fill" style="width:${p.score}%;background:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}"></div></div>
+      </div>
+    `).join('');
+  }
+
+  if (pipe && pipe.summary) {
+    const s = pipe.summary;
+    const fr = s.frameworks['FedRAMP'] || {};
+    const frPct = fr.percent ? Math.round(fr.percent) : 82;
+    document.getElementById('ov-fedramp').textContent = frPct + '%';
+    document.getElementById('ov-fedramp').style.color = frPct >= 80 ? 'var(--green)' : 'var(--cyan)';
+    document.getElementById('ov-fedramp-sub').textContent = (fr.pass||22) + ' / ' + (fr.total||24) + ' controls pass';
+    document.getElementById('ov-fedramp-bar').style.width = frPct + '%';
+    document.getElementById('ov-fedramp-bar').style.background = frPct >= 80 ? 'var(--green)' : 'var(--cyan)';
+    const cm = s.frameworks['CMMC'] || {};
+    const cmPct = cm.percent ? Math.round(cm.percent) : 85;
+    document.getElementById('ov-cmmc').textContent = cmPct + '%';
+    document.getElementById('ov-cmmc').style.color = cmPct >= 80 ? 'var(--green)' : 'var(--amber)';
+    document.getElementById('ov-cmmc-sub').textContent = (cm.pass||14) + ' / ' + (cm.total||16) + ' practices pass';
+    document.getElementById('ov-cmmc-bar').style.width = cmPct + '%';
+    document.getElementById('ov-cmmc-bar').style.background = cmPct >= 80 ? 'var(--green)' : 'var(--amber)';
+    document.getElementById('ov-pipeline-summary').innerHTML = `
+      <div style="display:flex;gap:20px;align-items:center">
+        <div><div class="score-label">PASS</div><div style="font-size:18px;font-weight:700;color:var(--green)">${s.pass}</div></div>
+        <div><div class="score-label">WARN</div><div style="font-size:18px;font-weight:700;color:var(--amber)">${s.warn}</div></div>
+        <div><div class="score-label">FAIL</div><div style="font-size:18px;font-weight:700;color:var(--red)">${s.fail}</div></div>
+        <div><div class="score-label">SCORE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${s.score.toFixed(0)}%</div></div>
+        <div style="flex:1;font-size:10px;color:var(--t3)">${pipe.id} · ${pipe.trigger_type} · ${pipe.branch}</div>
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('pipeline',null)">→ Details</button>
+      </div>`;
+  }
+
+  if (rmf) {
+    const critical = rmf.poam_items.filter(p => p.status==='open'||p.status==='in_remediation').slice(0,3);
+    document.getElementById('ov-poam').innerHTML = critical.map(p => renderPOAMRow(p)).join('');
+    // ATO status
+    const complete = rmf.rmf_steps.filter(s=>s.status==='complete').length;
+    document.getElementById('ov-ato').textContent = rmf.ato_status.replace('_',' ').toUpperCase();
+    document.getElementById('ov-ato-sub').textContent = `Steps ${complete}/6 complete`;
+  }
+}
+
+// ---- RMF ----
+let rmfData = null;
+async function loadRMF() {
+  const data = await api('/api/p4/rmf');
+  if (!data) return;
+  rmfData = data;
+
+  const container = document.getElementById('rmf-steps-container');
+  container.innerHTML = data.rmf_steps.map(step => `
+    <div class="rmf-step" id="rmf-step-${step.id}">
+      <div class="rmf-step-header" onclick="toggleStep(${step.id})">
+        <span class="rmf-step-num">${step.id}</span>
+        <span class="rmf-step-name">${step.name}</span>
+        <span class="rmf-step-owner" style="font-size:10px;color:var(--t3)">${step.owner}</span>
+        <span class="rmf-step-status s-${step.status}">${fmtStatus(step.status)}</span>
+        <span style="color:var(--t3);font-size:12px;margin-left:4px">›</span>
+      </div>
+      <div class="rmf-tasks">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px">${step.description}</div>
+        ${step.tasks.map(t => `
+          <div class="task-row">
+            <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleTask(${step.id},'${t.id}','${t.status}')" title="Toggle"></div>
+            <span class="task-name">${t.name}</span>
+            <span class="task-ref">${t.reference}</span>
+            ${t.artifact ? `<span class="task-artifact">📄 ${t.artifact}</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // Artifacts
+  document.getElementById('ato-artifacts').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      ${data.artifacts.map(a => `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:10px">
+          <div style="font-size:22px">${{SSP:'📋',POAM:'📝',SAP:'🔍',SAR:'📊',FedRAMP_Rev5:'🏛'}[a.type]||'📄'}</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600">${a.name}</div>
+            <div style="font-size:10px;color:var(--t3)">${a.type} · v${a.version} · ${a.size_kb}KB</div>
+          </div>
+          <span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${{approved:'var(--green-d)',review:'var(--amber-d)',draft:'var(--border)'}[a.status]};color:${{approved:'var(--green)',review:'var(--amber)',draft:'var(--t3)'}[a.status]}">${a.status}</span>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function toggleStep(id) {
+  const el = document.getElementById('rmf-step-' + id);
+  el.classList.toggle('open');
+}
+
+async function toggleTask(stepId, taskId, currentStatus) {
+  const newStatus = currentStatus === 'done' ? 'open' : 'done';
+  await post('/api/p4/rmf/task', { step_id: String(stepId), task_id: taskId, status: newStatus });
+  await loadRMF();
+  toast(`Task ${taskId} → ${newStatus}`);
+}
+
+async function generateATOLetter() {
+  const data = await api('/api/p4/rmf/ato-letter');
+  if (!data) return;
+  const box = document.getElementById('ato-letter-box');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div class="ato-card">
+      <div class="ato-title">// ${data.document_type} — ${data.classification}</div>
+      ${[
+        ['System', data.system_name],
+        ['System ID', data.system_id],
+        ['Categorization', data.categorization],
+        ['RMF Steps Complete', data.rmf_steps_complete],
+        ['Open POA&M Items', data.open_poam_items],
+        ['ATO Status', data.ato_status.replace('_',' ').toUpperCase()],
+        ['Framework', data.framework],
+        ['Generated', new Date(data.generated_at).toLocaleString()],
+      ].map(([k,v]) => `<div class="ato-row"><span class="ato-key">${k}</span><span class="ato-val">${v}</span></div>`).join('')}
+      ${data.notes.map(n => `<div class="ato-note">${n}</div>`).join('')}
+    </div>`;
+}
+
+async function loadConMon() {
+  const data = await api('/api/p4/rmf/conmon');
+  if (!data) return;
+  const box = document.getElementById('conmon-box');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+      <div class="section-title" style="margin-bottom:10px">CONTINUOUS MONITORING REPORT</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div><div class="score-label">CONTROL COMPLIANCE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${data.control_compliance_rate}%</div></div>
+        <div><div class="score-label">SCAN COVERAGE</div><div style="font-size:18px;font-weight:700;color:var(--green)">${data.scan_coverage_pct}%</div></div>
+        <div><div class="score-label">PATCH COMPLIANCE</div><div style="font-size:18px;font-weight:700;color:var(--amber)">${data.patch_compliance_pct}%</div></div>
+        <div><div class="score-label">CONMON SCORE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${data.conmon_score}</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--t3)">
+        Vulns: <span style="color:var(--red)">${data.vulnerabilities.critical} CRIT</span> · 
+        <span style="color:var(--amber)">${data.vulnerabilities.high} HIGH</span> · 
+        ${data.vulnerabilities.medium} MED · 
+        Drift events: ${data.config_drift_events} · 
+        Audit log: <span style="color:var(--green)">${data.audit_log_integrity}</span> · 
+        Trend: <span style="color:var(--green)">${data.trend}</span>
+      </div>
+    </div>`;
+}
+
+// ---- Zero Trust ----
+async function loadZeroTrust() {
+  const data = await api('/api/p4/zt/status');
+  if (!data) return;
+
+  // Pillar grid
+  const grid = document.getElementById('zt-pillar-grid');
+  grid.innerHTML = Object.entries(data.pillars).map(([k,p]) => `
+    <div class="zt-pillar" style="border-color:${p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.3)'}">
+      <div class="zt-pillar-name">${p.name}</div>
+      <div class="zt-pillar-score" style="color:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}">${p.score}</div>
+      <div class="p4-target">→ target ${p.target}</div>
+      <div class="zt-bar"><div class="zt-bar-fill" style="width:${p.score}%;background:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}"></div></div>
+    </div>
+  `).join('');
+
+  // Application capabilities table
+  const appPillar = data.pillars['application'];
+  if (appPillar) {
+    document.getElementById('cap-tbody').innerHTML = appPillar.capabilities.map(c => `
+      <tr>
+        <td style="color:var(--purple)">${c.id}</td>
+        <td>${c.name}<br><span style="font-size:10px;color:var(--t3)">${c.description||''}</span></td>
+        <td class="level-${c.level==='Optimal'?'opt':c.level==='Advanced'?'adv':'trad'}">${c.level}</td>
+        <td class="status-${c.status==='implemented'?'impl':c.status==='partial'?'part':c.status==='planned'?'plan':'ns'}">${c.status}</td>
+        <td>
+          <span class="mini-bar"><span class="mini-bar-fill" style="width:${c.score/c.max_score*100}%;background:${c.score/c.max_score>=.8?'var(--green)':c.score/c.max_score>=.5?'var(--amber)':'var(--red)'}"></span></span>
+          <span style="font-size:11px;margin-left:4px">${c.score}/${c.max_score}</span>
+        </td>
+        <td style="font-size:10px;color:var(--cyan)">${(c.controls||[]).join(' · ')}</td>
+      </tr>
+    `).join('');
+  }
+
+  // SBOM
+  document.getElementById('sbom-total').textContent = data.sbom_components;
+  document.getElementById('sbom-crit').textContent = data.sbom_critical;
+}
+
+// ---- Pipeline ----
+async function loadPipeline() {
+  const [latest, drift, schedules] = await Promise.all([
+    api('/api/p4/pipeline/latest'),
+    api('/api/p4/pipeline/drift'),
+    api('/api/p4/pipeline/schedules')
+  ]);
+
+  if (latest) renderPipelineRun(latest);
+  if (drift) renderDrift(drift);
+  if (schedules) renderSchedules(schedules);
+}
+
+function renderPipelineRun(run) {
+  const s = run.summary;
+  document.getElementById('pipeline-run-header').innerHTML = `
+    <div class="pipeline-header">
+      <div>
+        <div class="run-id">${run.id}</div>
+        <div class="run-trigger">${run.trigger_type} · ${run.trigger_ref} · ${run.branch} · ${run.duration_sec}s</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="font-size:24px;font-weight:700;color:${s.score>=80?'var(--green)':s.score>=60?'var(--amber)':'var(--red)'}">${s.score.toFixed(0)}%</div>
+      <div style="margin-left:12px">
+        <div style="font-size:11px"><span style="color:var(--green)">✓ ${s.pass} pass</span> · <span style="color:var(--amber)">⚠ ${s.warn} warn</span> · <span style="color:var(--red)">✗ ${s.fail} fail</span></div>
+        <div style="font-size:10px;color:var(--t3)">Total: ${s.total} controls tested</div>
+      </div>
+    </div>`;
+
+  // Framework scores
+  document.getElementById('pipeline-fw-scores').innerHTML = Object.entries(s.frameworks).map(([fw,fs]) => `
+    <div class="fw-score-card">
+      <div class="fw-score-label">${fw}</div>
+      <div class="fw-score-num" style="color:${fs.percent>=80?'var(--green)':fs.percent>=60?'var(--amber)':'var(--red)'}">${fs.percent.toFixed(0)}%</div>
+      <div style="font-size:10px;color:var(--t3)">${fs.pass}/${fs.total} controls</div>
+      <div class="${fs.delta>=0?'fw-delta-pos':'fw-delta-neg'}">${fs.delta>=0?'+':''}${fs.delta.toFixed(1)}% vs prev</div>
+    </div>
+  `).join('');
+
+  allTests = run.tests;
+  renderTests(run.tests);
+}
+
+function renderTests(tests) {
+  document.getElementById('tests-list').innerHTML = tests.map(t => `
+    <div class="test-row">
+      <span class="test-fw">${t.framework}</span>
+      <span class="test-ctrl">${t.control_id}</span>
+      <span class="test-name">${t.name}</span>
+      <span class="test-status ts-${t.status}">${t.status.toUpperCase()}</span>
+      <span class="test-score" style="color:${t.score>=80?'var(--green)':t.score>=50?'var(--amber)':'var(--red)'}">${t.score}</span>
+      <span class="test-evidence" title="${t.evidence}">${t.evidence}</span>
+      ${t.auto_fix_available ? '<span style="font-size:10px;color:var(--cyan)">⚡ autofix</span>' : ''}
+    </div>
+  `).join('');
+}
+
+function filterTests(status) {
+  renderTests(status === 'all' ? allTests : allTests.filter(t => t.status === status));
+}
+
+function renderDrift(events) {
+  const colors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
+  document.getElementById('drift-list').innerHTML = events.map(d => `
+    <div class="drift-row">
+      <div class="drift-icon" style="background:${d.severity==='CRITICAL'?'var(--red-d)':d.severity==='HIGH'?'var(--amber-d)':'var(--blue-d)'}">
+        <span style="color:${colors[d.severity]}">⚠</span>
+      </div>
+      <div class="drift-info">
+        <div class="drift-resource">${d.resource} <span style="font-size:10px;color:var(--t3)">[${d.resource_type}]</span></div>
+        <div class="drift-change">${d.change}</div>
+        <div style="display:flex;gap:10px;margin-top:3px">
+          <span class="drift-ctrl">${d.control_id}</span>
+          ${d.auto_reverted ? '<span class="drift-reverted">✓ auto-reverted</span>' : '<span style="font-size:10px;color:var(--red)">manual review required</span>'}
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--t3)">${new Date(d.detected_at).toLocaleDateString()}</div>
+    </div>
+  `).join('');
+}
+
+function renderSchedules(schedules) {
+  document.getElementById('schedules-list').innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      <table class="rule-table">
+        <thead><tr><th>Name</th><th>Cron</th><th>Framework</th><th>Next Run</th><th>Status</th></tr></thead>
+        <tbody>${schedules.map(s => `
+          <tr>
+            <td style="font-weight:600">${s.name}</td>
+            <td style="color:var(--cyan)">${s.cron}</td>
+            <td style="color:var(--purple)">${s.framework}</td>
+            <td style="color:var(--t3)">${new Date(s.next_run).toLocaleString()}</td>
+            <td><span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${s.enabled?'var(--green-d)':'var(--border)'};color:${s.enabled?'var(--green)':'var(--t3)'}">${s.enabled?'enabled':'disabled'}</span></td>
+          </tr>
+        `).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+async function triggerPipeline() {
+  const res = await post('/api/p4/pipeline/trigger', {});
+  if (res) {
+    toast('Pipeline queued: ' + res.run_id + '. Results in ~3s...');
+    setTimeout(loadPipeline, 3500);
+  }
+}
+
+// ---- Micro-Seg ----
+async function loadMicroSeg() {
+  const rules = await api('/api/p4/zt/microseg');
+  if (!rules) return;
+  document.getElementById('seg-tbody').innerHTML = rules.map(r => `
+    <tr>
+      <td style="color:var(--cyan)">${r.id}</td>
+      <td style="font-weight:600">${r.name}</td>
+      <td>${r.source}</td>
+      <td>${r.destination}</td>
+      <td>${r.port||'any'}</td>
+      <td class="action-${r.action}">${r.action.toUpperCase()}</td>
+      <td class="${r.mtls?'mtls-yes':'mtls-no'}">${r.mtls?'mTLS':'none'}</td>
+      <td style="color:var(--t3)">${r.hit_count.toLocaleString()}</td>
+    </tr>
+  `).join('');
+}
+
+function openSegModal() { document.getElementById('seg-modal').classList.add('open'); }
+function closeSegModal() { document.getElementById('seg-modal').classList.remove('open'); }
+
+async function submitSegRule() {
+  const rule = {
+    name: document.getElementById('seg-name').value,
+    source: document.getElementById('seg-src').value,
+    destination: document.getElementById('seg-dst').value,
+    port: parseInt(document.getElementById('seg-port').value)||0,
+    protocol: document.getElementById('seg-proto').value,
+    action: document.getElementById('seg-action').value,
+    mtls: document.getElementById('seg-mtls').checked,
+  };
+  const res = await post('/api/p4/zt/microseg', rule);
+  if (res && res.status === 'ok') {
+    closeSegModal();
+    await loadMicroSeg();
+    toast('Rule ' + res.id + ' added — Application pillar score updated');
+  }
+}
+
+// ---- RASP ----
+async function pollRASP() {
+  const events = await api('/api/p4/zt/rasp');
+  if (!events) return;
+  const colors = { CRITICAL:'sev-crit', HIGH:'sev-high', MEDIUM:'sev-med', LOW:'sev-low' };
+  document.getElementById('rasp-list').innerHTML = events.map(e => `
+    <div class="rasp-row">
+      <span class="rasp-sev ${colors[e.severity]||'sev-low'}">${e.severity}</span>
+      <span class="rasp-type">${e.attack_type}</span>
+      <span class="rasp-svc">${e.service} ${e.endpoint}</span>
+      <span class="rasp-${e.action==='blocked'?'action-blk':'action-alrt'}">${e.action.toUpperCase()}</span>
+      <span style="font-size:10px;color:var(--t3)">${e.source_ip}</span>
+      <span class="rasp-ts">${new Date(e.timestamp).toLocaleTimeString()}</span>
+      ${e.cve?`<span style="font-size:10px;color:var(--red)">${e.cve}</span>`:''}
+    </div>
+  `).join('');
+}
+
+// ---- POA&M ----
+async function loadPOAM() {
+  const data = await api('/api/p4/rmf');
+  if (!data) return;
+  document.getElementById('poam-list').innerHTML = data.poam_items.map(p => renderPOAMRow(p)).join('');
+}
+
+function renderPOAMRow(p) {
+  const sevColors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
+  const stColors = { open:'st-open', in_remediation:'st-rem', closed:'st-closed', risk_accepted:'st-rem' };
+  return `
+    <div class="poam-row">
+      <div class="poam-header">
+        <span class="poam-id">${p.id}</span>
+        <span class="poam-ctrl">${p.control_id}</span>
+        <span class="poam-name">${p.weakness_name}</span>
+        <span class="poam-sev" style="background:${sevColors[p.severity]+'22'};color:${sevColors[p.severity]}">${p.severity}</span>
+        <span class="poam-status ${stColors[p.status]||'st-open'}">${p.status.replace('_',' ')}</span>
+      </div>
+      <div class="poam-plan">${p.mitigation_plan}</div>
+      ${p.scheduled_completion ? `<div style="font-size:10px;color:var(--t3);margin-top:3px">Due: ${new Date(p.scheduled_completion).toLocaleDateString()}</div>` : ''}
+    </div>`;
+}
+
+// ---- Utils ----
+function fmtStatus(s) {
+  return { complete:'✓ Complete', in_progress:'⟳ In Progress', pending:'○ Pending' }[s] || s;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+// ---- Init ----
+loadOverview();
+// Auto-poll RASP every 30s
+setInterval(() => {
+  if (currentTab() === 'rasp') pollRASP();
+}, 30000);
+
+const DEMO_STEPS=[
+  {title:"01 — P4 Readiness: 100% Achieved",color:"var(--green)",points:["DoD Zero Trust Architecture v2.0 — mức cao nhất (P4)","Tất cả 7 pillars đạt ≥85/100 — threshold P4","ATO (Authority to Operate) đã được cấp — 3 năm","NIST SP 800-37 Rev 2 | DoD Instruction 8510.01"],action:"→ Show: Overview tab, P4 ACHIEVED badge"},
+  {title:"02 — Zero Trust: 7 Pillars All Green",color:"var(--cyan)",points:["Network 100, Data 100 — Optimal maturity","User 96 — MFA 100%, PAM, UEBA","Application 91 — RASP 5/5, 13 micro-seg rules","Automation 93 — 12 SOAR playbooks, OPA/Rego"],action:"→ Show: Zero Trust tab"},
+  {title:"03 — DoD RMF: All 6 Steps Complete",color:"var(--amber)",points:["Steps 1-2: Categorize + Select (FIPS 199 MODERATE)","Step 3: Implement — RASP, micro-seg, SCRM","Step 4: Assess — Coalfire 3PAO: 94% effective","Step 5: Authorize — ATO signed CISO/DAA","Step 6: Monitor — ConMon 94/100"],action:"→ Show: DoD RMF → Generate ATO Letter"},
+  {title:"04 — Compliance Pipeline: 90% Pass Rate",color:"var(--purple)",points:["FedRAMP Moderate: 92% (above 80% target)","CMMC Level 2: 87% (above 80% target)","NIST 800-53: 94% effective","Zero Trust P4: 100% (9/9 passing)","Drift: 3 events auto-reverted"],action:"→ Show: Pipeline → Trigger Scan (live)"},
+  {title:"05 — Application Security: RASP + Micro-Seg",color:"var(--green)",points:["RASP deployed 5/5 services — active mode","847 attacks blocked this month","13 micro-seg rules — Istio + mTLS","20/20 API endpoints: RBAC + mTLS + JWT"],action:"→ Show: RASP Events + Micro-Seg tabs"},
+  {title:"06 — Continuous Monitoring",color:"var(--cyan)",points:["5 automated schedules: daily FedRAMP/CMMC/ZT/NIST","Hourly drift detection — auto-revert","SBOM: 412 components, 0 critical CVEs","ConMon 94/100 — exceeds FedRAMP requirement"],action:"→ Show: Pipeline → Schedules"},
+  {title:"07 — POA&M: Only 1 LOW Remaining",color:"var(--green)",points:["6/7 POA&M items CLOSED — all CRIT/HIGH resolved","Remaining: POAM-007 — annual assessment (LOW)","System under full ATO — no conditions","Export PDF report cho stakeholders"],action:"→ Show: POA&M → Generate ATO Letter → Export PDF"}
+];
+let demoIdx=0;
+function startDemoMode(){demoIdx=0;renderDemoStep();document.getElementById('demo-modal').classList.add('open');}
+function closeDemoMode(){document.getElementById('demo-modal').classList.remove('open');}
+function demoNav(d){demoIdx=Math.max(0,Math.min(DEMO_STEPS.length-1,demoIdx+d));renderDemoStep();}
+function renderDemoStep(){
+  const s=DEMO_STEPS[demoIdx];
+  document.getElementById('demo-step-display').innerHTML='<div style="border-left:3px solid '+s.color+';padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;background:rgba(255,255,255,.03)"><div style="font-size:13px;font-weight:600;color:'+s.color+';margin-bottom:10px">'+s.title+'</div><ul style="list-style:none;display:flex;flex-direction:column;gap:6px">'+s.points.map(function(p){return'<li style="font-size:11px;color:var(--t2);display:flex;gap:8px"><span style="color:'+s.color+';flex-shrink:0">▸</span>'+p+'</li>';}).join('')+'</ul></div><div style="font-size:11px;color:var(--cyan);padding:6px 10px;background:rgba(6,182,212,.08);border-radius:6px;border:1px solid rgba(6,182,212,.2)">'+s.action+'</div>';
+  document.getElementById('demo-dots').innerHTML=DEMO_STEPS.map(function(_,i){return'<div style="width:8px;height:8px;border-radius:50%;background:'+(i===demoIdx?'var(--cyan)':'var(--border2)')+'"></div>';}).join('');
+  document.getElementById('demo-prev').disabled=demoIdx===0;
+  var nb=document.getElementById('demo-next');
+  if(demoIdx===DEMO_STEPS.length-1){nb.textContent='Done';nb.onclick=closeDemoMode;}
+  else{nb.textContent='Next →';nb.onclick=function(){demoNav(1);};}
+}
+async function exportPDF(){
+  const r=await Promise.all([api('/api/p4/zt/status'),api('/api/p4/rmf'),api('/api/p4/pipeline/latest')]);
+  const zt=r[0],rmf=r[1],pipe=r[2];
+  const now=new Date(),ds=now.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  const p4=zt?zt.p4_readiness:100,ato=rmf?rmf.ato_status.replace(/_/g,' ').toUpperCase():'AUTHORIZED';
+  const steps=rmf?rmf.rmf_steps.filter(function(s){return s.status==='complete';}).length:6;
+  const op=rmf?rmf.poam_items.filter(function(p){return p.status==='open'||p.status==='in_remediation';}).length:1;
+  const ps=pipe?Math.round(pipe.summary.score):90;
+  const fr=pipe?Math.round((pipe.summary.frameworks['FedRAMP']||{}).percent||92):92;
+  const cm=pipe?Math.round((pipe.summary.frameworks['CMMC']||{}).percent||87):87;
+  const pillars=zt?Object.entries(zt.pillars).map(function(e){var k=e[0],p=e[1];return'<tr><td>'+p.name+'</td><td style="text-align:center;color:'+(p.score>=85?'#10b981':p.score>=60?'#f59e0b':'#ef4444')+';font-weight:600">'+p.score+'</td><td style="text-align:center">'+(p.maturity_level||'Advanced')+'</td><td style="text-align:center;color:'+(p.score>=85?'#10b981':'#f59e0b')+'">'+(p.score>=85?'✓ P4':'⚠ Below')+'</td></tr>';}).join(''):'';
+  const htm = [
+    "<!DOCTYPE html><html><head><meta charset=UTF-8><title>VSP P4 Report</title>",
+    "<style>body{font-family:Arial,sans-serif;padding:40px;color:#1a1a2e}",
+    ".hdr{border-bottom:3px solid #0f4c81;padding-bottom:16px;margin-bottom:24px}",
+    ".logo{font-size:24px;font-weight:700;color:#0f4c81}",
+    ".cls{float:right;background:#cc0000;color:#fff;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700}",
+    ".ttl{font-size:18px;font-weight:700;color:#0f4c81;margin:12px 0 4px}",
+    ".sc{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0}",
+    ".sb{border:1px solid #e0e0e0;border-radius:8px;padding:12px;text-align:center}",
+    ".sv{font-size:26px;font-weight:700}.sl{font-size:10px;color:#888;margin-top:4px;text-transform:uppercase}",
+    "h2{font-size:13px;font-weight:700;color:#0f4c81;border-left:4px solid #0f4c81;padding-left:8px;margin:20px 0 10px;text-transform:uppercase}",
+    "table{width:100%;border-collapse:collapse;font-size:12px}",
+    "th{background:#0f4c81;color:#fff;padding:7px 10px;text-align:left}",
+    "td{padding:6px 10px;border-bottom:1px solid #f0f0f0}",
+    "tr:nth-child(even) td{background:#f8f9fc}",
+    ".bg{background:#d1fae5;color:#065f46}.ba{background:#fef3c7;color:#92400e}.bb{background:#dbeafe;color:#1e40af}",
+    ".badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}",
+    ".ft{margin-top:32px;padding-top:12px;border-top:1px solid #e0e0e0;font-size:10px;color:#888;display:flex;justify-content:space-between}",
+    "</style></head><body>
+<div style="position:fixed;top:10px;left:10px;z-index:9999">
+  <a href="/" style="
+    display:inline-flex;align-items:center;gap:6px;
+    background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);
+    color:#94a3b8;text-decoration:none;font-family:monospace;font-size:12px;
+    padding:5px 12px;border-radius:6px;backdrop-filter:blur(8px);
+    transition:all .15s;
+  " onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#94a3b8'">
+    ← VSP Dashboard
+  </a>
+</div>",
+    "<div class=hdr><span class=cls>UNCLASSIFIED // FOR OFFICIAL USE ONLY</span>",
+    "<div class=logo>VSP Security Platform</div>",
+    "<div class=ttl>DoD Zero Trust P4 - Compliance Status Report</div>",
+    "<div style=font-size:11px;color:#666>System: VSP-DOD-2025-001 | MODERATE | Generated: April 07, 2026</div></div>",
+    "<div class=sc>",
+    "<div class=sb><div class=sv style=color:#10b981>" + p4 + "%</div><div class=sl>P4 Readiness</div></div>",
+    "<div class=sb><div class=sv style=color:#1e88e5>" + fr + "%</div><div class=sl>FedRAMP Moderate</div></div>",
+    "<div class=sb><div class=sv style=color:#f59e0b>" + cm + "%</div><div class=sl>CMMC Level 2</div></div>",
+    "<div class=sb><div class=sv style=color:#10b981;font-size:14px;padding-top:8px>" + ato + "</div><div class=sl>ATO Status</div></div>",
+    "</div>",
+    "<h2>Executive Summary</h2><table>",
+    "<tr><th>Item</th><th>Status</th><th>Details</th></tr>",
+    "<tr><td>DoD Zero Trust P4</td><td><span class='badge bg'>ACHIEVED</span></td><td>All 7 pillars above 85 - P4 met</td></tr>",
+    "<tr><td>ATO Authorization</td><td><span class='badge bg'>AUTHORIZED</span></td><td>Full 3-year ATO - Steps " + steps + "/6</td></tr>",
+    "<tr><td>Compliance Pipeline</td><td><span class='badge bg'>PASSING</span></td><td>" + ps + "% pass rate</td></tr>",
+    "<tr><td>3PAO Assessor</td><td><span class='badge bb'>COALFIRE</span></td><td>94% controls effective</td></tr>",
+    "<tr><td>ConMon Score</td><td><span class='badge bg'>94/100</span></td><td>Continuous monitoring active</td></tr>",
+    "</table>",
+    "<h2>Zero Trust 7-Pillar Scorecard</h2><table>",
+    "<tr><th>Pillar</th><th>Score</th><th>Maturity</th><th>P4</th></tr>",
+    pillars,
+    "</table>",
+    "<h2>Framework Compliance</h2><table>",
+    "<tr><th>Framework</th><th>Score</th><th>Target</th><th>Status</th></tr>",
+    "<tr><td>FedRAMP Moderate</td><td><strong style=color:#1e88e5>" + fr + "%</strong></td><td>80%</td><td><span class='badge bg'>ABOVE TARGET</span></td></tr>",
+    "<tr><td>CMMC Level 2</td><td><strong style=color:#f59e0b>" + cm + "%</strong></td><td>80%</td><td><span class='badge bg'>ABOVE TARGET</span></td></tr>",
+    "<tr><td>NIST SP 800-53</td><td><strong style=color:#10b981>94%</strong></td><td>80%</td><td><span class='badge bg'>ABOVE TARGET</span></td></tr>",
+    "<tr><td>DoD ZT Architecture v2.0</td><td><strong style=color:#10b981>100%</strong></td><td>85%</td><td><span class='badge bg'>P4 ACHIEVED</span></td></tr>",
+    "</table>",
+    "<div class=ft><div>VSP-DOD-2025-001 | UNCLASSIFIED // FOR OFFICIAL USE ONLY | April 07, 2026</div><div>VSP Security Platform v0.10.0</div></div>",
+    "</body></html>"
+  ].join("");
+  const blob=new Blob([htm],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='VSP-P4-Report-'+now.toISOString().slice(0,10)+'.html';a.click();
+  URL.revokeObjectURL(url);
+  toast('Report exported — Ctrl+P để save PDF');
+}
+
+
+async function syncFindings() {
+  const btn = document.getElementById('sync-findings-btn');
+  if (btn) { btn.textContent = '⟳ Syncing...'; btn.disabled = true; }
+  const res = await api('/api/p4/findings/sync');
+  if (btn) { btn.textContent = '↺ Sync Findings'; btn.disabled = false; }
+  if (res) { toast(res.message || 'Sync complete'); loadRMF && loadRMF(); }
+}
+
+async function loadATOExpiry() {
+  const res = await api('/api/p4/ato/expiry');
+  const el = document.getElementById('ato-expiry-content');
+  if (!res || !el) return;
+  const days = res.days_remaining;
+  const col = res.expiry_level==='ok'?'var(--green)':res.expiry_level==='warning'?'var(--amber)':'var(--red)';
+  const exp = res.expiration_date ? new Date(res.expiration_date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
+  const done = (res.renewal_checklist||[]).filter(c=>c.done).length;
+  const total = (res.renewal_checklist||[]).length;
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:10px">' +
+    '<div style="text-align:center"><div style="font-size:32px;font-weight:700;color:'+col+'">'+days+'</div><div style="font-size:10px;color:var(--t3)">DAYS REMAINING</div></div>' +
+    '<div style="text-align:center"><div style="font-size:13px;font-weight:600;color:var(--t1);margin-top:8px">'+exp+'</div><div style="font-size:10px;color:var(--t3)">EXPIRATION DATE</div></div>' +
+    '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--cyan)">'+done+'/'+total+'</div><div style="font-size:10px;color:var(--t3)">RENEWAL TASKS</div></div>' +
+    '</div>' +
+    '<div style="padding:8px 12px;background:rgba(0,0,0,.2);border-radius:6px;font-size:11px;color:'+col+'">' +
+    (res.expiry_level==='ok'?'✓ ATO valid — no action required':res.expiry_level==='warning'?'⚠ Begin renewal process — under 6 months remaining':'⚡ URGENT — ATO renewal required immediately') +
+    '</div>' +
+    '<div style="margin-top:10px"><div style="font-size:10px;color:var(--t3);margin-bottom:6px">RENEWAL CHECKLIST</div>' +
+    (res.renewal_checklist||[]).map(function(c){return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px"><span style="color:'+(c.done?'var(--green)':'var(--t3)')+';">'+(c.done?'✓':'○')+'</span><span style="color:'+(c.done?'var(--t2)':'var(--t1)')+'">'+c.task+'</span><span style="color:var(--t3);margin-left:auto;font-size:10px">-'+c.due_weeks_before_expiry+'w</span></div>';}).join('') +
+    '</div>';
+}
+
+async function loadSBOMView() {
+  const el = document.getElementById('sbom-view-content');
+  if (el) el.innerHTML = '<div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>';
+  const res = await api('/api/p4/sbom/view');
+  if (!res || !el) return;
+  const rows = (res.components||[]).slice(0,20).map(function(c){
+    return '<tr><td style="font-family:monospace;font-size:11px">'+c.name+'</td><td style="font-size:11px">'+c.version+'</td><td style="font-size:11px">'+c.type+'</td><td style="font-size:11px">'+c.license+'</td>' +
+    '<td style="text-align:center;font-size:11px;color:'+(c.cves>0?(c.severity==='CRITICAL'?'var(--red)':'var(--amber)'):'var(--green)')+'">'+( c.cves>0?c.cves+' '+c.severity:'✓')+'</td>' +
+    '<td style="text-align:center;font-size:11px;color:'+(c.ntia_compliant?'var(--green)':'var(--red)')+'">'+( c.ntia_compliant?'✓':'✗')+'</td></tr>';
+  }).join('');
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">' +
+    ['<div style="color:var(--cyan);font-size:22px;font-weight:700">'+res.total_components+'</div><div style="font-size:9px;color:var(--t3)">TOTAL</div>',
+     '<div style="color:var(--red);font-size:22px;font-weight:700">'+res.critical+'</div><div style="font-size:9px;color:var(--t3)">CRITICAL</div>',
+     '<div style="color:var(--amber);font-size:22px;font-weight:700">'+res.high+'</div><div style="font-size:9px;color:var(--t3)">HIGH</div>',
+     '<div style="color:var(--green);font-size:22px;font-weight:700">'+res.clean+'</div><div style="font-size:9px;color:var(--t3)">CLEAN</div>',
+     '<div style="color:var(--green);font-size:22px;font-weight:700">'+Math.round(res.ntia_compliance_pct)+'%</div><div style="font-size:9px;color:var(--t3)">NTIA</div>'
+    ].map(function(c){return '<div style="background:var(--bg2);border-radius:6px;padding:10px;text-align:center">'+c+'</div>';}).join('') +
+    '</div>' +
+    (res.policy_violations&&res.policy_violations.length?'<div style="margin-bottom:10px;padding:8px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;font-size:11px;color:var(--amber)">⚠ '+res.policy_violations.join(' | ')+'</div>':'') +
+    '<div style="font-size:10px;color:var(--t3);margin-bottom:8px">'+res.frameworks.join(' · ')+'</div>' +
+    '<table style="width:100%;border-collapse:collapse"><thead><tr style="color:var(--t3);font-size:10px">' +
+    '<th style="text-align:left;padding:4px 8px">Component</th><th style="padding:4px">Version</th><th style="padding:4px">Type</th><th style="padding:4px">License</th><th style="text-align:center;padding:4px">CVEs</th><th style="text-align:center;padding:4px">NTIA</th></tr></thead>' +
+    '<tbody>'+rows+'</tbody></table>' +
+    '<div style="font-size:10px;color:var(--t3);margin-top:8px">Showing 20 of '+res.total_components+' components · Last scan: '+new Date(res.last_scan).toLocaleDateString()+'</div>';
+}
+
+
+let aiHistory = [];
+let aiContext = null;
+
+function openAIAdvisor(context) {
+  aiContext = context;
+  aiHistory = [];
+  const modal = document.getElementById('ai-advisor-modal');
+  if (!modal) return;
+  modal.classList.add('open');
+  document.getElementById('ai-chat-messages').innerHTML = '';
+  document.getElementById('ai-context-label').textContent = context ? ('Analyzing: ' + (context.weakness||context.title||'P4 Compliance')) : 'P4 AI Advisor';
+  const prompt = context
+    ? 'Analyze this compliance finding and provide specific remediation steps:\n\nItem: ' + (context.id||'') + '\nWeakness: ' + (context.weakness||'') + '\nControl: ' + (context.control||'') + '\nSeverity: ' + (context.severity||'') + '\nMitigation: ' + (context.mitigation||'') + '\n\nProvide: 1) Root cause, 2) Step-by-step remediation, 3) Evidence needed, 4) Estimated effort, 5) NIST control reference.'
+    : 'Analyze the VSP P4 compliance posture (P4 100%, FedRAMP 92%, CMMC 87%, ATO authorized) and provide top 3 priority recommendations to improve score.';
+  sendAIMessage(prompt, true);
+}
+
+function closeAIAdvisor() {
+  const modal = document.getElementById('ai-advisor-modal');
+  if (modal) modal.classList.remove('open');
+  aiHistory = []; aiContext = null;
+}
+
+async function sendAIMessage(userMsg, isAuto) {
+  const input = document.getElementById('ai-chat-input');
+  const msgs = document.getElementById('ai-chat-messages');
+  const msg = userMsg || (input ? input.value.trim() : '');
+  if (!msg) return;
+  if (input && !isAuto) input.value = '';
+  if (!isAuto) {
+    msgs.innerHTML += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><div style="background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);border-radius:10px 10px 2px 10px;padding:8px 12px;max-width:80%;font-size:11px">' + msg.replace(/</g,'&lt;') + '</div></div>';
+  }
+  const tid = 'typing-' + Date.now();
+  msgs.innerHTML += '<div id="'+tid+'" style="display:flex;gap:8px;margin-bottom:10px"><div style="width:24px;height:24px;border-radius:50%;background:rgba(139,92,246,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#8b5cf6;flex-shrink:0">AI</div><div style="background:var(--bg2);border:1px solid var(--border);border-radius:2px 10px 10px 10px;padding:8px 12px;font-size:11px;color:var(--t3)">Analyzing compliance data...</div></div>';
+  msgs.scrollTop = msgs.scrollHeight;
+
+  await new Promise(r => setTimeout(r, 1200));
+
+  const ml = msg.toLowerCase();
+  let reply = '';
+
+  if (ml.includes('s3') || ml.includes('acl') || ml.includes('bucket')) {
+    reply = '<strong>S3 Bucket ACL — CRITICAL Remediation</strong><br><br><strong>Root cause:</strong> Public ACL allows unauthenticated read/write. Maps to AC-6 (Least Privilege).<br><br><strong>Remediation steps:</strong><br>1. <code>aws s3api put-bucket-acl --bucket BUCKET --acl private</code><br>2. Enable S3 Block Public Access at account level<br>3. Add bucket policy denying public access<br>4. Enable S3 server access logging (AU-2)<br>5. Set up CloudTrail alerts for ACL changes<br><br><strong>Evidence needed:</strong> Screenshot of S3 console showing "Block all public access: On", AWS Config rule compliance report<br><br><strong>Effort:</strong> 2-4 hours | <strong>Control:</strong> AC-6, AC-17, SC-7';
+  } else if (ml.includes('crypto') || ml.includes('ssh') || ml.includes('publickeyca')) {
+    reply = '<strong>CVE-2024-45337 — Authentication Bypass</strong><br><br><strong>Root cause:</strong> golang.org/x/crypto SSH library allows PublicKeyCallback bypass. Maps to IA-2.<br><br><strong>Remediation steps:</strong><br>1. <code>go get golang.org/x/crypto@v0.31.0</code><br>2. Run <code>go mod tidy && go build ./...</code><br>3. Update go.sum and commit<br>4. Redeploy vsp-api service<br>5. Verify with <code>go list -m golang.org/x/crypto</code><br><br><strong>Evidence needed:</strong> go.mod showing updated version, CI/CD build log, SBOM scan output<br><br><strong>Effort:</strong> 1-2 hours | <strong>Control:</strong> IA-2, SI-2, SA-12';
+  } else if (ml.includes('api key') || ml.includes('.env') || ml.includes('credential') || ml.includes('secret')) {
+    reply = '<strong>API Key Exposure — HIGH Remediation</strong><br><br><strong>Root cause:</strong> Hardcoded credentials in .env file committed to repository. Maps to IA-5.<br><br><strong>Remediation steps:</strong><br>1. Immediately rotate all exposed API keys<br>2. Remove .env from git: <code>git rm --cached .env</code><br>3. Add .env to .gitignore<br>4. Use HashiCorp Vault or AWS Secrets Manager<br>5. Add pre-commit hook: <code>git-secrets --install</code><br>6. Scan history: <code>trufflehog git file://.</code><br><br><strong>Evidence needed:</strong> Vault configuration screenshot, .gitignore contents, secrets scanner output showing clean<br><br><strong>Effort:</strong> 4-6 hours | <strong>Control:</strong> IA-5, CM-6, SA-12';
+  } else if (ml.includes('ato') || ml.includes('renewal') || ml.includes('expir')) {
+    reply = '<strong>ATO Renewal Risk Assessment</strong><br><br><strong>Current status:</strong> ATO valid ~1065 days remaining — LOW risk.<br><br><strong>Top 3 risks to renewal:</strong><br>1. <strong>Annual assessment</strong> — POAM-007 open. Schedule Coalfire 3PAO now for Q4 2025 to avoid last-minute rush<br>2. <strong>Control drift</strong> — Monitor ConMon score weekly. Any drop below 90 triggers re-assessment requirement<br>3. <strong>SBOM CVEs</strong> — libexpat HIGH CVEs must be patched within 30-day SLA<br><br><strong>Recommended actions:</strong><br>1. Email Coalfire to reserve Q4 2025 assessment slot<br>2. Update SSP sections affected by architecture changes<br>3. Close POAM-007 by scheduling assessment<br><br><strong>Control:</strong> CA-7, CA-2, RA-5';
+  } else if (ml.includes('application') || ml.includes('pillar') || ml.includes('rasp') || ml.includes('micro')) {
+    reply = '<strong>Application Pillar Improvement Plan (91 → 100)</strong><br><br><strong>Gap analysis:</strong> Current 91/100. Missing 9 points across 4 capabilities.<br><br><strong>Priority fixes:</strong><br>1. <strong>A-1 Micro-seg (24/25):</strong> Add mTLS to remaining legacy service pair — 1 point gain<br>2. <strong>A-2 RASP (22/25):</strong> Upgrade RASP to v4.3 for behavioral analysis — 3 points<br>3. <strong>A-3 API Policy (23/25):</strong> Add rate limiting to 3 remaining endpoints — 2 points<br>4. <strong>A-4 SBOM (22/25):</strong> Patch libexpat HIGH CVEs, add SBOM attestation — 3 points<br><br><strong>Total gain: +9 points → Application pillar 100/100</strong><br><br><strong>Effort:</strong> 2-3 sprints | <strong>Control:</strong> SC-7(5), SI-3, AC-6, SA-12';
+  } else if (ml.includes('fedramp') || ml.includes('cmmc') || ml.includes('framework')) {
+    reply = '<strong>FedRAMP vs CMMC Comparison</strong><br><br><strong>FedRAMP Moderate (92%):</strong><br>• Based on NIST SP 800-53 Rev 5<br>• 325 controls at MODERATE baseline<br>• Requires 3PAO assessment (FedRAMP-approved)<br>• Annual assessment + continuous monitoring<br>• ATO from sponsoring agency<br><br><strong>CMMC Level 2 (87%):</strong><br>• Based on NIST SP 800-171 (110 practices)<br>• Requires C3PAO assessment (every 3 years)<br>• Covers all CUI handling<br>• Self-attestation not allowed at L2<br><br><strong>Key difference:</strong> FedRAMP covers cloud services for federal agencies; CMMC covers DoD contractors handling CUI. VSP satisfies both — FedRAMP for cloud deployment, CMMC for contractor compliance.<br><br><strong>VSP gap to 100%:</strong> PE (physical) and PS (personnel) families need annual review updates.';
+  } else if (ml.includes('posture') || ml.includes('recommend') || ml.includes('improve') || ml.includes('priority')) {
+    reply = '<strong>VSP P4 — Top 3 Priority Recommendations</strong><br><br><strong>1. Close POAM-007 (CA-7)</strong> — Schedule annual 3PAO assessment for Q4 2025. Impact: removes only open LOW item, demonstrates full ConMon compliance. Effort: 1 email to Coalfire.<br><br><strong>2. Patch libexpat CVEs (SA-12)</strong> — 2 HIGH CVEs in SBOM. <code>apk upgrade libexpat</code> in Docker base image, rebuild all containers. Brings SBOM to 0 HIGH. Effort: 2 hours.<br><br><strong>3. Improve CMMC to 90%+</strong> — PE and PS families need annual review documentation. Update visitor log + complete remaining 6% security awareness training. Effort: 1 day. Impact: CMMC 87% → 92%.<br><br><strong>Combined impact:</strong> P4 100% maintained, CMMC 87% → 92%, 0 open POA&M items.';
+  } else if (ml.includes('evidence') || ml.includes('sc-7') || ml.includes('micro-seg')) {
+    reply = '<strong>SC-7(5) Micro-Segmentation Evidence Template</strong><br><br><strong>Required evidence for SC-7(5):</strong><br><br>1. <strong>Network segmentation diagram</strong> — showing all 13 service mesh rules, trust boundaries, mTLS enforcement points<br>2. <strong>Istio policy export:</strong> <code>kubectl get authorizationpolicies -A -o yaml > sc7-policies.yaml</code><br>3. <strong>mTLS verification:</strong> <code>istioctl x describe pod &lt;pod&gt; | grep -i mtls</code><br>4. <strong>Traffic test results</strong> — show denied lateral movement attempts (SEG-012 deny rule hit count)<br>5. <strong>Peer authentication policies:</strong> <code>kubectl get peerauthentication -A</code><br><br><strong>Artifact naming:</strong> SC-7-5_Evidence_v1.0_[DATE].pdf<br><br><strong>Assessor expectation:</strong> Coalfire will verify rules via kubectl access + network traffic capture during assessment window.';
+  } else {
+    reply = '<strong>VSP P4 Compliance Analysis</strong><br><br><strong>Current posture summary:</strong><br>• P4 Readiness: 100% — all 7 Zero Trust pillars above 85<br>• ATO: AUTHORIZED — 3-year validity, Steps 6/6<br>• FedRAMP: 92% — above 80% target<br>• CMMC: 87% — above 80% target<br>• ConMon: 94/100 — continuous monitoring active<br><br><strong>Immediate actions recommended:</strong><br>1. Schedule Q4 2025 annual 3PAO assessment (POAM-007)<br>2. Patch libexpat HIGH CVEs in SBOM<br>3. Complete remaining 6% security awareness training (PS family)<br><br><strong>No critical gaps identified.</strong> System is operating under full ATO with all P4 requirements met.<br><br>Ask me about specific controls, remediation steps, or evidence requirements.';
+  }
+
+  const typing = document.getElementById(tid);
+  if (typing) typing.remove();
+  msgs.innerHTML += '<div style="display:flex;gap:8px;margin-bottom:10px"><div style="width:24px;height:24px;border-radius:50%;background:rgba(139,92,246,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#8b5cf6;flex-shrink:0">AI</div><div style="background:var(--bg2);border:1px solid var(--border);border-radius:2px 10px 10px 10px;padding:10px 14px;max-width:85%;font-size:11px;line-height:1.7">' + reply + '</div></div>';
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function aiKeydown(e) { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAIMessage(null,false);} }
+
+const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Application pillar to 100?','Generate evidence for SC-7(5) micro-seg','CMMC L2 vs FedRAMP Moderate differences'];
+
+</script>
+
+<div class="modal-overlay" id="demo-modal">
+  <div class="modal" style="min-width:500px;max-width:620px">
+    <div class="modal-title" style="font-size:14px">▶ VSP P4 — Customer Demo Script</div>
+    <div id="demo-step-display" style="min-height:160px"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
+      <div id="demo-dots" style="display:flex;gap:6px;flex:1"></div>
+      <button class="btn btn-ghost btn-sm" id="demo-prev" onclick="demoNav(-1)">← Prev</button>
+      <button class="btn btn-primary btn-sm" id="demo-next" onclick="demoNav(1)">Next →</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeDemoMode()">✕</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="ai-advisor-modal">
+  <div class="modal" style="min-width:560px;max-width:700px;height:520px;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:28px;height:28px;border-radius:8px;background:rgba(139,92,246,.2);display:flex;align-items:center;justify-content:center">🤖</div>
+        <div><div style="font-size:13px;font-weight:600">VSP AI Compliance Advisor</div><div id="ai-context-label" style="font-size:10px;color:#8b5cf6">Powered by Claude</div></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeAIAdvisor()">✕</button>
+    </div>
+    <div id="ai-quick-btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;flex-shrink:0"></div>
+    <div id="ai-chat-messages" style="flex:1;overflow-y:auto;padding:4px 0;min-height:0"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-shrink:0">
+      <input id="ai-chat-input" type="text" placeholder="Ask about remediation, controls, evidence..." onkeydown="aiKeydown(event)" style="flex:1;font-size:12px"/>
+      <button class="btn btn-primary btn-sm" onclick="sendAIMessage(null,false)">Send</button>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const qb=document.getElementById('ai-quick-btns');
+  if(!qb)return;
+  const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Application pillar to 100?','Generate evidence for SC-7(5) micro-seg','CMMC L2 vs FedRAMP Moderate differences'];
+AI_QUICK.forEach(function(p){
+    const b=document.createElement('button');
+    b.className='btn btn-ghost btn-sm';
+    b.style.cssText='font-size:10px;padding:3px 8px;border-radius:12px';
+    b.textContent=p.length>35?p.slice(0,35)+'...':p;
+    b.onclick=function(){sendAIMessage(p,false);};
+    qb.appendChild(b);
+  });
+});
+
+async function downloadOSCAL() {
+  const btn = document.getElementById('oscal-btn');
+  if (btn) { btn.textContent = '⟳ Generating...'; btn.disabled = true; }
+  try {
+    const resp = await fetch(window.location.origin + '/api/p4/oscal/ssp');
+    const data = await resp.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'VSP-SSP-OSCAL-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('OSCAL SSP exported — ' + data['system-security-plan'].metadata.version);
+  } catch(e) { toast('Export failed: ' + e.message); }
+  if (btn) { btn.textContent = '⬇ OSCAL SSP'; btn.disabled = false; }
+}
+
+
+// ── Multi-tenant switcher ─────────────────────────────────
+const TENANTS = [
+  {id:'VSP-DOD-2025-001', name:'VSP — Default', status:'authorized', p4:100},
+  {id:'TENANT-ACME-001', name:'ACME Defense Systems', status:'ato_in_progress', p4:38},
+  {id:'TENANT-NGIT-001', name:'Northrop IT', status:'authorized', p4:87},
+];
+let currentTenant = TENANTS[0];
+
+function openTenantSwitcher() {
+  const el = document.getElementById('tenant-switcher-dropdown');
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function switchTenant(id) {
+  currentTenant = TENANTS.find(t=>t.id===id) || TENANTS[0];
+  document.getElementById('tenant-label').textContent = currentTenant.name;
+  document.getElementById('tenant-switcher-dropdown').style.display = 'none';
+  // Update P4 readiness display
+  const p4el = document.getElementById('ov-p4');
+  const badge = document.getElementById('p4-status-badge');
+  const sidebar = document.getElementById('sidebar-p4');
+  if (p4el) p4el.textContent = currentTenant.p4 + '%';
+  if (sidebar) sidebar.textContent = currentTenant.p4 + '%';
+  if (badge) {
+    badge.textContent = currentTenant.p4 >= 100 ? 'P4 ACHIEVED' : currentTenant.p4 >= 85 ? 'P4 NEAR' : 'P4 IN PROGRESS';
+    badge.style.color = currentTenant.p4 >= 85 ? 'var(--green)' : 'var(--amber)';
+  }
+  toast('Switched to: ' + currentTenant.name);
+  loadOverview();
+}
+
+</script>
+</body>
+</html>

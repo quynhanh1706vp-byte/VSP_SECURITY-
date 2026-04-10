@@ -1,0 +1,165 @@
+{
+  "summary": {
+    "be_routes": 219,
+    "fe_calls": 86,
+    "missing_in_backend": 16,
+    "be_uncalled_by_fe": 95
+  },
+  "missing_in_backend": {
+    "/api/query": [
+      "docs.html"
+    ],
+    "/api/v1/auth/token": [
+      "network_deep.html",
+      "network_deep.html"
+    ],
+    "/api/v1/compliance/oscal": [
+      "index.html"
+    ],
+    "/api/v1/events": [
+      "vsp_features_patch.js",
+      "vsp_upgrade_v070.js",
+      "index.html",
+      "vsp_features_patch.js"
+    ],
+    "/api/v1/export": [
+      "index.html"
+    ],
+    "/api/v1/health": [
+      "network_deep.html",
+      "network_deep.html"
+    ],
+    "/api/v1/metrics": [
+      "network_deep.html",
+      "network_deep.html"
+    ],
+    "/api/v1/remediation/finding": [
+      "index.html"
+    ],
+    "/api/v1/sbom": [
+      "index.html"
+    ],
+    "/api/v1/upload": [
+      "network_deep.html",
+      "network_deep.html"
+    ],
+    "/api/v1/users": [
+      "network_deep.html",
+      "network_deep.html"
+    ],
+    "/api/v1/users/../../etc/passwd": [
+      "network_deep.html",
+      "network_deep.html"
+    ],
+    "/api/v1/vsp/batch": [
+      "vsp_batch_patch_v27.js",
+      "vsp_batch_patch_v27.js"
+    ],
+    "/api/v1/vsp/executive_report_pdf": [
+      "index.html"
+    ],
+    "/api/v1/vsp/findings/summary": [
+      "index.html"
+    ],
+    "/api/v1/vsp/runs/index": [
+      "index.html"
+    ]
+  },
+  "be_uncalled_by_fe": [
+    "ANY /api/",
+    "ANY /api/p4/pipeline/history",
+    "ANY /api/p4/zt/api-policy",
+    "ANY /api/p4/zt/rasp/coverage",
+    "ANY /api/p4/zt/sbom",
+    "DELETE /api/v1/admin/api-keys/{id}",
+    "DELETE /api/v1/admin/users/{id}",
+    "DELETE /api/v1/auth/mfa",
+    "DELETE /api/v1/correlation/rules/{id}",
+    "DELETE /api/v1/logs/sources/{id}",
+    "DELETE /api/v1/policy/rules/{id}",
+    "DELETE /api/v1/schedules/{id}",
+    "DELETE /api/v1/siem/webhooks/{id}",
+    "DELETE /api/v1/vsp/batch/{batch_id}",
+    "DELETE /api/v1/vsp/sandbox/clear",
+    "GET /api/docs",
+    "GET /api/docs/openapi.json",
+    "GET /api/p4/alerts/config",
+    "GET /api/p4/email/config",
+    "GET /api/p4/health/detailed",
+    "GET /api/p4/pipeline/history",
+    "GET /api/p4/zt/api-policy",
+    "GET /api/p4/zt/rasp/coverage",
+    "GET /api/p4/zt/sbom",
+    "GET /api/v1/admin/api-keys",
+    "GET /api/v1/admin/tenants",
+    "GET /api/v1/assets/{id}/findings",
+    "GET /api/v1/billing/status",
+    "GET /api/v1/compliance/license",
+    "GET /api/v1/correlation/incidents/{id}",
+    "GET /api/v1/drift",
+    "GET /api/v1/export/csv/{rid}",
+    "GET /api/v1/export/json/{rid}",
+    "GET /api/v1/export/sarif/{rid}",
+    "GET /api/v1/governance/effectiveness",
+    "GET /api/v1/governance/evidence",
+    "GET /api/v1/governance/ownership",
+    "GET /api/v1/governance/rule-overrides",
+    "GET /api/v1/logs/hunt",
+    "GET /api/v1/netcap/stream",
+    "GET /api/v1/remediation/finding/{finding_id}",
+    "GET /api/v1/sbom/{rid}",
+    "GET /api/v1/sbom/{rid}/grype",
+    "GET /api/v1/siem/webhooks",
+    "GET /api/v1/soc/detection",
+    "GET /api/v1/soc/incidents",
+    "GET /api/v1/soc/release-governance",
+    "GET /api/v1/soc/roadmap",
+    "GET /api/v1/soc/supply-chain",
+    "GET /api/v1/tenants",
+    "GET /api/v1/ti/enrich",
+    "GET /api/v1/ti/mitre",
+    "GET /api/v1/vsp/batch/{batch_id}",
+    "GET /api/v1/vsp/batches",
+    "GET /api/v1/vsp/executive_report_html/{rid}",
+    "GET /api/v1/vsp/executive_report_pdf/{rid}",
+    "GET /api/v1/vsp/findings/chains",
+    "GET /api/v1/vsp/findings/dedup",
+    "GET /api/v1/vsp/run/{rid}",
+    "GET /api/v1/vsp/run_report_html/{rid}",
+    "GET /api/v1/vsp/run_report_pdf/{rid}",
+    "GET /api/v1/vsp/sandbox",
+    "GET /api/v1/vulns/trend",
+    "PATCH /api/v1/correlation/incidents/{id}/status",
+    "PATCH /api/v1/schedules/{id}",
+    "PATCH /api/v1/schedules/{id}/toggle",
+    "POST /api/p4/alerts/config",
+    "POST /api/p4/email/config",
+    "POST /api/p4/email/send",
+    "POST /api/p4/zt/api-policy",
+    "POST /api/v1/admin/api-keys",
+    "POST /api/v1/admin/tenants",
+    "POST /api/v1/ai/analyze/findings",
+    "POST /api/v1/audit/verify",
+    "POST /api/v1/auth/logout",
+    "POST /api/v1/auth/mfa/setup",
+    "POST /api/v1/auth/mfa/verify",
+    "POST /api/v1/auth/password/change",
+    "POST /api/v1/auth/refresh",
+    "POST /api/v1/billing/webhook",
+    "POST /api/v1/correlation/incidents/{id}/resolve",
+    "POST /api/v1/correlation/rules/{id}/toggle",
+    "POST /api/v1/governance/evidence/{id}/freeze",
+    "POST /api/v1/logs/sources/{id}/test",
+    "POST /api/v1/remediation/finding/{finding_id}",
+    "POST /api/v1/remediation/{rem_id}/comments",
+    "POST /api/v1/schedules/{id}/run",
+    "POST /api/v1/siem/webhooks",
+    "POST /api/v1/siem/webhooks/{id}/test",
+    "POST /api/v1/soar/playbooks/{id}/run",
+    "POST /api/v1/soar/playbooks/{id}/toggle",
+    "POST /api/v1/ti/secret/check",
+    "POST /api/v1/vsp/rbac/session-timeout",
+    "POST /api/v1/vsp/run/{rid}/cancel",
+    "POST /api/v1/vsp/sandbox/test-fire"
+  ]
+}

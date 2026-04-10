@@ -250,3 +250,9 @@ func TokenFromQuery(jwtSecret string, keyStore APIKeyStore) func(http.Handler) h
 		})
 	}
 }
+
+// InjectForTest injects Claims into context for use in unit tests.
+// Do NOT use in production code.
+func InjectForTest(ctx context.Context, c Claims) context.Context {
+	return injectClaims(ctx, c)
+}

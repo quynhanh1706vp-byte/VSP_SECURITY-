@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"context"
 	"net/http"
 	"time"
 
@@ -48,6 +49,8 @@ func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	// Whitelist roles
 	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
+	if req.Label == "" { jsonError(w, "label required", http.StatusBadRequest); return }
+	if len(req.Label) > 100 { jsonError(w, "label: max 100 chars", http.StatusBadRequest); return }
 	if req.Role == "" { req.Role = "analyst" }
 	if !validRoles[req.Role] {
 		jsonError(w, "invalid role: must be admin|analyst|dev|auditor", http.StatusBadRequest)
@@ -102,7 +105,9 @@ func (h *APIKeys) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go func() {
-		prevHash, _ := h.DB.GetLastAuditHash(r.Context(), claims.TenantID)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) //nolint:gosec // G118: intentional
+		defer cancel()
+		prevHash, _ := h.DB.GetLastAuditHash(ctx, claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
 		h.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/"+ id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck

@@ -24,6 +24,12 @@ func WSUpgradeHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
 			return
 		}
+		// Validate token length — real JWT validation happens in middleware
+		// WS upgrades bypass middleware, so basic sanity check here
+		if len(rawToken) < 50 || !strings.Contains(rawToken, ".") {
+			http.Error(w, `{"error":"invalid token format"}`, http.StatusUnauthorized)
+			return
+		}
 		wsServe(w, r)
 		return
 	}
@@ -94,18 +100,22 @@ func wsAcceptKey(key string) string {
 
 func wsWriteText(conn net.Conn, msg string) error {
 	b := []byte(msg)
+	if len(b) > 65535 {
+		b = b[:65535] // truncate — WebSocket 2-byte extended payload max
+	}
 	var frame []byte
-	if len(b) <= 125 {
-		frame = make([]byte, 2+len(b))
+	n := len(b)
+	if n <= 125 {
+		frame = make([]byte, 2+n)
 		frame[0] = 0x81
-		frame[1] = byte(len(b))
+		frame[1] = byte(n) //#nosec G115 -- n <= 125 after bounds check
 		copy(frame[2:], b)
 	} else {
-		frame = make([]byte, 4+len(b))
+		frame = make([]byte, 4+n)
 		frame[0] = 0x81
 		frame[1] = 126
-		frame[2] = byte(len(b) >> 8)
-		frame[3] = byte(len(b))
+		frame[2] = byte(n >> 8) //#nosec G115 -- n <= 65535 after truncation
+		frame[3] = byte(n & 0xFF) //#nosec G115 -- n <= 65535
 		copy(frame[4:], b)
 	}
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second)) //nolint

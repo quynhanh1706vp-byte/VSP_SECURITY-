@@ -84,7 +84,7 @@ func (h *Assets) List(w http.ResponseWriter, r *http.Request) {
 			a.ID          = "scanner-" + tool
 			a.Name        = tool + " scanner"
 			a.Type        = "scanner"
-			a.IP          = "127.0.0.1"
+			a.IP          = "internal"
 			a.Environment = "prod"
 			a.Tags        = []string{"scanner", tool}
 			a.RiskScore   = calcRisk(a.CritCount, a.HighCount, a.TotalFinds)
@@ -192,6 +192,13 @@ func (h *Assets) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Tags == nil { req.Tags = []string{} }
 	var id string
+	// Validate
+	if req.Name == "" || len(req.Name) > 200 {
+		jsonError(w, "name: required, max 200 chars", http.StatusBadRequest); return
+	}
+	if req.IP != "" && len(req.IP) > 45 {
+		jsonError(w, "ip: max 45 chars", http.StatusBadRequest); return
+	}
 	err := h.DB.Pool().QueryRow(r.Context(), `
 		INSERT INTO log_sources
 			(tenant_id, name, host, protocol, format, tags, status)

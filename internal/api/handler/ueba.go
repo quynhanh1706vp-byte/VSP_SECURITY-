@@ -65,11 +65,13 @@ func (h *UEBA) Analyze(w http.ResponseWriter, r *http.Request) {
 			"entity": a.Entity, "baseline": a.Baseline,
 			"current": a.Current, "deviation_pct": a.Deviation,
 		})
+		title := a.Message
+		if len(title) > 200 { title = title[:200] }
 		h.DB.Pool().Exec(r.Context(), `
 			INSERT INTO incidents
 				(tenant_id, title, severity, status, source_refs)
 			VALUES ($1,$2,$3,'open',$4)`,
-			claims.TenantID, a.Message, a.Severity, srcJSON) //nolint:errcheck
+			claims.TenantID, title, a.Severity, srcJSON) //nolint:errcheck
 		saved++
 	}
 	jsonOK(w, map[string]any{

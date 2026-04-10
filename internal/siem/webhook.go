@@ -95,7 +95,7 @@ func Deliver(ctx context.Context, db store.WebhookStore, event Event) {
 		if !SeverityMeetsMin(event, hook.MinSev) {
 			continue
 		}
-		go deliverOne(ctx, db, hook, event)
+		go deliverOne(ctx, db, hook, event) //#nosec G118 -- ctx is passed as argument, not context.Background
 	}
 }
 
@@ -113,7 +113,11 @@ func deliverOne(ctx context.Context, db store.WebhookStore, hook store.SIEMWebho
 			backoff := time.Duration(attempt*attempt) * time.Second
 			log.Warn().Err(err).Int("attempt", attempt).
 				Str("hook", hook.Label).Msgf("siem: retry in %s", backoff)
-			time.Sleep(backoff)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(backoff):
+			}
 			continue
 		}
 		log.Info().Str("hook", hook.Label).Str("rid", event.RID).Msg("siem: delivered")

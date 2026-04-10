@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSP — DoD Zero Trust P4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0b0c0f;
+  --ink2: #13151a;
+  --ink3: #1c1f27;
+  --glass: rgba(255,255,255,.04);
+  --glass2: rgba(255,255,255,.07);
+  --edge: rgba(255,255,255,.07);
+  --edge2: rgba(255,255,255,.12);
+  --t1: #f0f2f8;
+  --t2: #8a90a2;
+  --t3: #484e61;
+  --acid: #00e5ff;
+  --acid2: #00ffa3;
+  --warn: #ffb800;
+  --danger: #ff4545;
+  --purple: #9d6fff;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--ink);
+  color: var(--t1);
+  overflow-x: hidden;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── Noise texture overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1000;
+  opacity: .5;
+}
+
+/* ── Grid background ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 80px 80px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Nav ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 900;
+  padding: 0 48px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(11,12,15,.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--edge);
+}
+.nav-logo {
+  font-family: 'Syne', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--t1);
+  letter-spacing: -.01em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-logo-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 8px var(--acid);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+.nav-links a {
+  font-size: 13px;
+  color: var(--t2);
+  text-decoration: none;
+  transition: color .2s;
+  letter-spacing: .01em;
+}
+.nav-links a:hover { color: var(--t1); }
+.nav-cta {
+  background: var(--t1);
+  color: var(--ink);
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: opacity .2s;
+  letter-spacing: .01em;
+}
+.nav-cta:hover { opacity: .85; }
+
+/* ── Hero ── */
+.hero {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 48px 80px;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* Radial glow */
+.hero-glow {
+  position: absolute;
+  width: 800px; height: 800px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,229,255,.06) 0%, transparent 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.hero-glow2 {
+  position: absolute;
+  width: 500px; height: 300px;
+  background: radial-gradient(ellipse, rgba(0,255,163,.04) 0%, transparent 70%);
+  bottom: 20%; right: 10%;
+  pointer-events: none;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--glass);
+  border: 1px solid var(--edge2);
+  border-radius: 100px;
+  padding: 6px 14px 6px 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--acid);
+  letter-spacing: .08em;
+  margin-bottom: 28px;
+  animation: fadeUp .6s ease both;
+}
+.hero-eyebrow-icon {
+  width: 18px; height: 18px;
+  background: rgba(0,229,255,.15);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+}
+
+.hero h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(48px, 7vw, 84px);
+  font-weight: 800;
+  line-height: 1.0;
+  letter-spacing: -.04em;
+  margin-bottom: 24px;
+  animation: fadeUp .6s .1s ease both;
+}
+.hero h1 em {
+  font-style: normal;
+  background: linear-gradient(135deg, var(--acid) 0%, var(--acid2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: 17px;
+  color: var(--t2);
+  max-width: 500px;
+  margin: 0 auto 40px;
+  line-height: 1.7;
+  font-weight: 300;
+  animation: fadeUp .6s .2s ease both;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 56px;
+  animation: fadeUp .6s .3s ease both;
+}
+.btn-hero-primary {
+  background: var(--acid);
+  color: var(--ink);
+  border: none;
+  padding: 13px 28px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: .01em;
+}
+.btn-hero-primary:hover { opacity: .9; transform: translateY(-1px); }
+.btn-hero-ghost {
+  background: var(--glass);
+  color: var(--t1);
+  border: 1px solid var(--edge2);
+  padding: 13px 28px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+}
+.btn-hero-ghost:hover { background: var(--glass2); transform: translateY(-1px); }
+
+.hero-chips {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  animation: fadeUp .6s .4s ease both;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .04em;
+  border: 1px solid;
+}
+.chip-green { border-color: rgba(0,255,163,.3); color: var(--acid2); background: rgba(0,255,163,.06); }
+.chip-cyan  { border-color: rgba(0,229,255,.3); color: var(--acid);  background: rgba(0,229,255,.06); }
+.chip-warn  { border-color: rgba(255,184,0,.3);  color: var(--warn);  background: rgba(255,184,0,.06); }
+.chip-purple{ border-color: rgba(157,111,255,.3);color: var(--purple);background: rgba(157,111,255,.06); }
+.chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Stats ticker ── */
+.stats-ticker {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+  background: var(--glass);
+  padding: 0;
+  overflow: hidden;
+}
+.ticker-inner {
+  display: flex;
+  animation: ticker 20s linear infinite;
+  width: max-content;
+}
+.ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 40px;
+  white-space: nowrap;
+  border-right: 1px solid var(--edge);
+}
+.ticker-num { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+.ticker-lbl { font-size: 11px; color: var(--t3); text-transform: uppercase; letter-spacing: .1em; }
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ── Sections ── */
+.section {
+  position: relative;
+  z-index: 1;
+  padding: 100px 48px;
+  max-width: 1140px;
+  margin: 0 auto;
+}
+.section-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--acid);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.section-title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -.03em;
+  margin-bottom: 14px;
+}
+.section-sub {
+  font-size: 16px;
+  color: var(--t2);
+  max-width: 480px;
+  line-height: 1.7;
+  font-weight: 300;
+}
+
+/* ── Feature bento ── */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 12px;
+  margin-top: 52px;
+}
+.bento-card {
+  background: var(--ink2);
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  padding: 24px;
+  transition: border-color .3s, background .3s;
+  position: relative;
+  overflow: hidden;
+}
+.bento-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, rgba(0,229,255,.04), transparent 60%);
+  opacity: 0;
+  transition: opacity .3s;
+}
+.bento-card:hover { border-color: var(--edge2); background: var(--ink3); }
+.bento-card:hover::before { opacity: 1; }
+.b-wide { grid-column: span 8; }
+.b-narrow { grid-column: span 4; }
+.b-half { grid-column: span 6; }
+.b-third { grid-column: span 4; }
+.bento-icon {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  background: var(--glass);
+  border: 1px solid var(--edge);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+.bento-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -.01em;
+}
+.bento-desc { font-size: 13px; color: var(--t2); line-height: 1.6; }
+.bento-metric {
+  font-family: 'Syne', sans-serif;
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: 16px;
+  letter-spacing: -.04em;
+}
+.bento-metric-label { font-size: 12px; color: var(--t3); margin-top: 4px; font-family: 'DM Mono', monospace; letter-spacing: .06em; }
+
+/* ── Pillars ── */
+.pillar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-top: 48px;
+}
+.pillar-card {
+  background: var(--ink2);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  padding: 16px 10px;
+  text-align: center;
+  transition: all .2s;
+}
+.pillar-card:hover {
+  border-color: rgba(0,255,163,.3);
+  background: var(--ink3);
+  transform: translateY(-2px);
+}
+.pillar-score {
+  font-family: 'Syne', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--acid2);
+}
+.pillar-label {
+  font-size: 10px;
+  color: var(--t3);
+  margin-top: 6px;
+  line-height: 1.3;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: .03em;
+}
+.pillar-bar {
+  height: 3px;
+  background: rgba(255,255,255,.06);
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.pillar-fill { height: 100%; background: var(--acid2); border-radius: 2px; }
+
+/* ── Comparison ── */
+.comp-table {
+  margin-top: 48px;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.comp-header-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  background: var(--ink2);
+  border-bottom: 1px solid var(--edge);
+}
+.comp-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+  transition: background .15s;
+}
+.comp-row:last-child { border-bottom: none; }
+.comp-row:hover { background: var(--glass); }
+.comp-cell {
+  padding: 13px 18px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.comp-cell:first-child { justify-content: flex-start; color: var(--t2); }
+.comp-hd {
+  padding: 12px 18px;
+  font-size: 11px;
+  color: var(--t3);
+  font-family: 'DM Mono', monospace;
+  letter-spacing: .06em;
+  display: flex; align-items: center; justify-content: center;
+}
+.comp-hd:first-child { justify-content: flex-start; }
+.comp-hd.vsp-hd { color: var(--acid); }
+.check { color: var(--acid2); font-weight: 700; font-size: 15px; }
+.cross { color: var(--t3); font-size: 15px; }
+.partial { font-size: 11px; color: var(--warn); font-family: 'DM Mono', monospace; }
+
+/* ── Timeline ── */
+.timeline {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  margin-top: 48px;
+  position: relative;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--edge2) 20%, var(--edge2) 80%, transparent);
+}
+.tl-step { padding-top: 44px; padding-right: 16px; position: relative; }
+.tl-dot {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid;
+  background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+}
+.tl-dot::after {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.tl-month { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--t3); letter-spacing: .08em; margin-bottom: 8px; text-transform: uppercase; }
+.tl-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.tl-desc { font-size: 12px; color: var(--t2); line-height: 1.5; }
+
+/* ── Pricing ── */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 48px;
+}
+.price-card {
+  background: var(--ink2);
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  padding: 28px;
+  position: relative;
+  transition: border-color .3s;
+}
+.price-card.featured {
+  border-color: rgba(0,229,255,.3);
+  background: linear-gradient(135deg, rgba(0,229,255,.04) 0%, var(--ink2) 60%);
+}
+.featured-tag {
+  position: absolute;
+  top: -10px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--acid);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: .08em;
+  padding: 3px 12px;
+  border-radius: 100px;
+}
+.price-tier { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--t3); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 10px; }
+.price-amount { font-family: 'Syne', sans-serif; font-size: 40px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 4px; }
+.price-period { font-size: 13px; color: var(--t3); margin-bottom: 18px; }
+.price-desc { font-size: 13px; color: var(--t2); line-height: 1.6; margin-bottom: 20px; border-bottom: 1px solid var(--edge); padding-bottom: 18px; }
+.price-features { list-style: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: 22px; }
+.price-features li { font-size: 13px; color: var(--t2); display: flex; gap: 8px; align-items: flex-start; }
+.price-features li::before { content: '—'; color: var(--acid2); flex-shrink: 0; font-family: 'DM Mono', monospace; }
+.price-btn {
+  width: 100%;
+  padding: 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  border: none;
+  transition: all .2s;
+}
+.price-btn-filled { background: var(--acid); color: var(--ink); }
+.price-btn-filled:hover { opacity: .9; }
+.price-btn-outline { background: transparent; border: 1px solid var(--edge2); color: var(--t1); }
+.price-btn-outline:hover { background: var(--glass); }
+
+/* ── CTA block ── */
+.cta-block {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 100px 48px;
+  text-align: center;
+  border-top: 1px solid var(--edge);
+  overflow: hidden;
+}
+.cta-glow {
+  position: absolute;
+  width: 600px; height: 400px;
+  background: radial-gradient(ellipse, rgba(0,229,255,.07) 0%, transparent 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.cta-block h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(36px, 5vw, 60px);
+  font-weight: 800;
+  letter-spacing: -.04em;
+  margin-bottom: 14px;
+  position: relative;
+}
+.cta-block p { font-size: 16px; color: var(--t2); margin-bottom: 36px; font-weight: 300; position: relative; }
+.cta-actions { display: flex; gap: 12px; justify-content: center; position: relative; }
+
+/* ── Footer ── */
+footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--edge);
+  padding: 32px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.footer-logo { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; color: var(--t2); }
+.footer-center { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--t3); letter-spacing: .06em; text-align: center; }
+.footer-right { font-size: 12px; color: var(--t3); }
+
+/* ── Scroll reveal ── */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--ink2); border: 1px solid var(--edge2);
+  color: var(--t1); padding: 12px 20px;
+  border-radius: 10px; font-size: 13px;
+  transform: translateY(80px); transition: transform .3s;
+  z-index: 9999; box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+.toast.show { transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-dot"></div>
+    VSP
+  </div>
+  <div class="nav-links">
+    <a href="#features">Platform</a>
+    <a href="#compliance">Compliance</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/docs">Docs</a>
+  </div>
+  <button class="nav-cta" onclick="showToast('Demo request sent — we\'ll contact you within 24h ✓')">Request Demo</button>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-glow2"></div>
+
+  <div class="hero-eyebrow">
+    <div class="hero-eyebrow-icon">⚡</div>
+    INDUSTRY FIRST — DOD ZERO TRUST P4 ACHIEVED
+  </div>
+
+  <h1>
+    The compliance<br>
+    platform built for<br>
+    <em>DoD contracts.</em>
+  </h1>
+
+  <p class="hero-sub">
+    Automated P4 readiness, ATO management, and continuous monitoring — so your team focuses on security, not paperwork.
+  </p>
+
+  <div class="hero-actions">
+    <button class="btn-hero-primary" onclick="window.location.href='/onboarding'">Start free trial →</button>
+    <button class="btn-hero-ghost" onclick="window.location.href='/p4'">View live dashboard</button>
+  </div>
+
+  <div class="hero-chips">
+    <span class="chip chip-green"><span class="chip-dot"></span>P4 ACHIEVED</span>
+    <span class="chip chip-cyan"><span class="chip-dot"></span>ATO AUTHORIZED</span>
+    <span class="chip chip-cyan"><span class="chip-dot"></span>FedRAMP Moderate 92%</span>
+    <span class="chip chip-warn"><span class="chip-dot"></span>CMMC Level 2 87%</span>
+    <span class="chip chip-purple"><span class="chip-dot"></span>Coalfire 3PAO</span>
+  </div>
+</section>
+
+<!-- Stats ticker -->
+<div class="stats-ticker">
+  <div class="ticker-inner">
+    <!-- Repeat twice for seamless loop -->
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid2)">100%</div><div class="ticker-lbl">P4 Readiness</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid)">92%</div><div class="ticker-lbl">FedRAMP Moderate</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--warn)">87%</div><div class="ticker-lbl">CMMC Level 2</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid2)">6/6</div><div class="ticker-lbl">RMF Steps Complete</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid)">94</div><div class="ticker-lbl">ConMon Score</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--warn)">847</div><div class="ticker-lbl">Attacks Blocked / Mo</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid2)">412</div><div class="ticker-lbl">SBOM Components</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--purple)">0</div><div class="ticker-lbl">Critical CVEs Open</div></div>
+    <!-- Duplicate -->
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid2)">100%</div><div class="ticker-lbl">P4 Readiness</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid)">92%</div><div class="ticker-lbl">FedRAMP Moderate</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--warn)">87%</div><div class="ticker-lbl">CMMC Level 2</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid2)">6/6</div><div class="ticker-lbl">RMF Steps Complete</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid)">94</div><div class="ticker-lbl">ConMon Score</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--warn)">847</div><div class="ticker-lbl">Attacks Blocked / Mo</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--acid2)">412</div><div class="ticker-lbl">SBOM Components</div></div>
+    <div class="ticker-item"><div class="ticker-num" style="color:var(--purple)">0</div><div class="ticker-lbl">Critical CVEs Open</div></div>
+  </div>
+</div>
+
+<!-- Features Bento -->
+<div class="section" id="features">
+  <div class="reveal">
+    <div class="section-eyebrow">Platform</div>
+    <div class="section-title">Everything DoD<br>compliance demands.</div>
+    <p class="section-sub">One platform automates the entire lifecycle from vulnerability scan to ATO authorization.</p>
+  </div>
+
+  <div class="bento reveal">
+    <div class="bento-card b-wide">
+      <div class="bento-icon">🎯</div>
+      <div class="bento-title">Automated RMF Workflow</div>
+      <div class="bento-desc">All 6 NIST SP 800-37 Rev 2 steps tracked end-to-end. SSP, SAR, POA&M generated in OSCAL 1.1.2 format. Authorization package ready to submit on day one.</div>
+      <div class="bento-metric" style="color:var(--acid2)">6/6</div>
+      <div class="bento-metric-label">RMF STEPS COMPLETE</div>
+    </div>
+    <div class="bento-card b-narrow">
+      <div class="bento-icon">🤖</div>
+      <div class="bento-title">AI Compliance Advisor</div>
+      <div class="bento-desc">Claude-powered remediation suggestions for every failing control. Evidence templates, effort estimates, NIST references — instantly.</div>
+      <div class="bento-metric" style="color:var(--purple)">60%</div>
+      <div class="bento-metric-label">FASTER REMEDIATION</div>
+    </div>
+    <div class="bento-card b-third">
+      <div class="bento-icon">🔗</div>
+      <div class="bento-title">Findings → POA&M</div>
+      <div class="bento-desc">Scan findings automatically become mapped POA&M items with deadlines.</div>
+    </div>
+    <div class="bento-card b-third">
+      <div class="bento-icon">🛡️</div>
+      <div class="bento-title">RASP Protection</div>
+      <div class="bento-desc">Runtime protection on all services. SQLi, SSRF, RCE blocked in real-time.</div>
+      <div style="margin-top:14px;font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:var(--danger)">847</div>
+      <div class="bento-metric-label">ATTACKS BLOCKED / MO</div>
+    </div>
+    <div class="bento-card b-third">
+      <div class="bento-icon">📦</div>
+      <div class="bento-title">SBOM Tracking</div>
+      <div class="bento-desc">CycloneDX 1.4 on every build. NTIA compliant. 0 critical CVEs.</div>
+      <div style="margin-top:14px;font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:var(--acid)">412</div>
+      <div class="bento-metric-label">COMPONENTS TRACKED</div>
+    </div>
+    <div class="bento-card b-half">
+      <div class="bento-icon">📊</div>
+      <div class="bento-title">Compliance Pipeline</div>
+      <div class="bento-desc">47 automated control tests across FedRAMP, CMMC, NIST, Zero Trust. Hourly drift detection with auto-revert. Daily ConMon reports generated automatically.</div>
+    </div>
+    <div class="bento-card b-half">
+      <div class="bento-icon">💾</div>
+      <div class="bento-title">OSCAL Export</div>
+      <div class="bento-desc">Machine-readable System Security Plan in NIST OSCAL 1.1.2 JSON — required for FedRAMP submission and DoD automated assessment tools. Download on demand.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Zero Trust Pillars -->
+<div style="position:relative;z-index:1;background:var(--ink2);border-top:1px solid var(--edge);border-bottom:1px solid var(--edge);padding:80px 48px" id="compliance">
+  <div style="max-width:1140px;margin:0 auto">
+    <div class="reveal">
+      <div class="section-eyebrow">Zero Trust</div>
+      <div class="section-title">All 7 pillars.<br>Every one green.</div>
+      <p class="section-sub">VSP achieves P4 maturity across all DoD Zero Trust Architecture v2.0 pillars — the highest level achievable under DoD ZTA v2.0.</p>
+    </div>
+    <div class="pillar-grid reveal">
+      <div class="pillar-card"><div class="pillar-score">91</div><div class="pillar-label">Application &<br>Workloads</div><div class="pillar-bar"><div class="pillar-fill" style="width:91%"></div></div></div>
+      <div class="pillar-card"><div class="pillar-score">93</div><div class="pillar-label">Automation &<br>Orchestration</div><div class="pillar-bar"><div class="pillar-fill" style="width:93%"></div></div></div>
+      <div class="pillar-card"><div class="pillar-score">100</div><div class="pillar-label">Data</div><div class="pillar-bar"><div class="pillar-fill" style="width:100%"></div></div></div>
+      <div class="pillar-card"><div class="pillar-score">88</div><div class="pillar-label">Device</div><div class="pillar-bar"><div class="pillar-fill" style="width:88%"></div></div></div>
+      <div class="pillar-card"><div class="pillar-score">100</div><div class="pillar-label">Network</div><div class="pillar-bar"><div class="pillar-fill" style="width:100%"></div></div></div>
+      <div class="pillar-card"><div class="pillar-score">96</div><div class="pillar-label">User</div><div class="pillar-bar"><div class="pillar-fill" style="width:96%"></div></div></div>
+      <div class="pillar-card"><div class="pillar-score">95</div><div class="pillar-label">Visibility &<br>Analytics</div><div class="pillar-bar"><div class="pillar-fill" style="width:95%"></div></div></div>
+    </div>
+
+    <!-- Comparison -->
+    <div class="reveal" style="margin-top:64px">
+      <div class="section-eyebrow">Differentiation</div>
+      <div class="section-title" style="font-size:32px;margin-bottom:0">VSP vs. the field.</div>
+    </div>
+    <div class="comp-table reveal">
+      <div class="comp-header-row">
+        <div class="comp-hd">Capability</div>
+        <div class="comp-hd vsp-hd">VSP</div>
+        <div class="comp-hd">Tenable.sc</div>
+        <div class="comp-hd">Qualys</div>
+        <div class="comp-hd">Rapid7</div>
+      </div>
+      <div class="comp-row"><div class="comp-cell">DoD Zero Trust P4</div><div class="comp-cell"><span class="check">P4 ✓</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="cross">—</span></div></div>
+      <div class="comp-row"><div class="comp-cell">Full ATO (FedRAMP + DoD)</div><div class="comp-cell"><span class="check">✓</span></div><div class="comp-cell"><span class="partial">FedRAMP only</span></div><div class="comp-cell"><span class="partial">FedRAMP only</span></div><div class="comp-cell"><span class="partial">FedRAMP only</span></div></div>
+      <div class="comp-row"><div class="comp-cell">RASP Runtime Protection</div><div class="comp-cell"><span class="check">✓</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="cross">—</span></div></div>
+      <div class="comp-row"><div class="comp-cell">Findings → POA&M Auto-Sync</div><div class="comp-cell"><span class="check">✓ Real-time</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="partial">Manual</span></div><div class="comp-cell"><span class="partial">Manual</span></div></div>
+      <div class="comp-row"><div class="comp-cell">AI Compliance Advisor</div><div class="comp-cell"><span class="check">✓ Claude</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="cross">—</span></div></div>
+      <div class="comp-row"><div class="comp-cell">OSCAL Machine-Readable Export</div><div class="comp-cell"><span class="check">✓ v1.1.2</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="cross">—</span></div><div class="comp-cell"><span class="cross">—</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Timeline -->
+<div class="section">
+  <div class="reveal">
+    <div class="section-eyebrow">Implementation</div>
+    <div class="section-title">P4 in 6 months.<br>Guaranteed.</div>
+    <p class="section-sub">Structured deployment with dedicated support at every RMF step.</p>
+  </div>
+  <div class="timeline reveal">
+    <div class="tl-step">
+      <div class="tl-dot" style="color:var(--acid);border-color:var(--acid)"></div>
+      <div class="tl-month">Month 1</div>
+      <div class="tl-title">Deploy & Categorize</div>
+      <div class="tl-desc">VSP installed, FIPS 199 categorization, initial scan baseline</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-dot" style="color:var(--acid);border-color:var(--acid)"></div>
+      <div class="tl-month">Month 2</div>
+      <div class="tl-title">Select & Implement</div>
+      <div class="tl-desc">Control baseline, RASP deployed, micro-seg rules, SBOM automation</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-dot" style="color:var(--warn);border-color:var(--warn)"></div>
+      <div class="tl-month">Month 3–4</div>
+      <div class="tl-title">3PAO Assessment</div>
+      <div class="tl-desc">Coalfire SAP + SAR, penetration test, POA&M remediation</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-dot" style="color:var(--acid2);border-color:var(--acid2)"></div>
+      <div class="tl-month">Month 5–6</div>
+      <div class="tl-title">ATO + P4</div>
+      <div class="tl-desc">Authorization package, ATO issued, ConMon active, P4 certified</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-dot" style="color:var(--purple);border-color:var(--purple)"></div>
+      <div class="tl-month">Ongoing</div>
+      <div class="tl-title">ConMon</div>
+      <div class="tl-desc">Daily automated scans, auto-remediation, annual 3PAO renewal</div>
+    </div>
+  </div>
+</div>
+
+<!-- Pricing -->
+<div style="position:relative;z-index:1;background:var(--ink2);border-top:1px solid var(--edge);padding:80px 48px" id="pricing">
+  <div style="max-width:1140px;margin:0 auto">
+    <div class="reveal">
+      <div class="section-eyebrow">Pricing</div>
+      <div class="section-title">Transparent.<br>No surprises.</div>
+      <p class="section-sub">All plans include P4 dashboard, automated scanning, and dedicated compliance support.</p>
+    </div>
+    <div class="pricing-grid reveal">
+      <div class="price-card">
+        <div class="price-tier">Starter</div>
+        <div class="price-amount">$8,500<span style="font-size:18px;font-weight:400;color:var(--t3)">/mo</span></div>
+        <div class="price-period">Up to 50 assets · 1 system</div>
+        <div class="price-desc">For small DoD contractors starting their compliance journey.</div>
+        <ul class="price-features">
+          <li>P4 Compliance Dashboard</li>
+          <li>Automated vulnerability scanning</li>
+          <li>RMF workflow (Steps 1–6)</li>
+          <li>POA&M auto-sync</li>
+          <li>FedRAMP + CMMC reporting</li>
+          <li>Email support</li>
+        </ul>
+        <button class="price-btn price-btn-outline" onclick="showToast('Redirecting to onboarding...')">Get started</button>
+      </div>
+      <div class="price-card featured">
+        <div class="featured-tag">MOST POPULAR</div>
+        <div class="price-tier">Professional</div>
+        <div class="price-amount">$22,000<span style="font-size:18px;font-weight:400;color:var(--t3)">/mo</span></div>
+        <div class="price-period">Up to 200 assets · 3 systems</div>
+        <div class="price-desc">For organizations managing active DoD contracts and ATO requirements.</div>
+        <ul class="price-features">
+          <li>Everything in Starter</li>
+          <li>AI Compliance Advisor (Claude)</li>
+          <li>RASP runtime protection</li>
+          <li>SBOM + supply chain tracking</li>
+          <li>OSCAL machine-readable export</li>
+          <li>3PAO coordination support</li>
+          <li>Slack + priority support</li>
+        </ul>
+        <button class="price-btn price-btn-filled" onclick="window.location.href='/onboarding'">Start free trial →</button>
+      </div>
+      <div class="price-card">
+        <div class="price-tier">Enterprise</div>
+        <div class="price-amount">Custom</div>
+        <div class="price-period">Unlimited assets · Air-gap ready</div>
+        <div class="price-desc">For large DoD programs needing on-premise deployment.</div>
+        <ul class="price-features">
+          <li>Everything in Professional</li>
+          <li>On-premise / air-gapped</li>
+          <li>Multi-tenant (per-program ATO)</li>
+          <li>Dedicated ISSO support</li>
+          <li>Custom integrations</li>
+          <li>24/7 phone + SLA 99.9%</li>
+        </ul>
+        <button class="price-btn price-btn-outline" onclick="showToast('Sales team will contact you within 24h')">Contact sales</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-block">
+  <div class="cta-glow"></div>
+  <h2>Ready for P4?</h2>
+  <p>30-minute live demo. Your data. Walk away with a gap analysis.</p>
+  <div class="cta-actions">
+    <button class="btn-hero-primary" onclick="window.location.href='/onboarding'">Start free trial →</button>
+    <button class="btn-hero-ghost" onclick="window.location.href='/p4'">View live demo</button>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:24px;flex-wrap:wrap">
+    <span class="chip chip-green"><span class="chip-dot"></span>FedRAMP Moderate</span>
+    <span class="chip chip-warn"><span class="chip-dot"></span>CMMC Level 2</span>
+    <span class="chip chip-green"><span class="chip-dot"></span>DoD ZT P4</span>
+    <span class="chip chip-purple"><span class="chip-dot"></span>ATO Authorized</span>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-logo">VSP</div>
+  <div class="footer-center">
+    UNCLASSIFIED // FOR OFFICIAL USE ONLY<br>
+    VSP-DOD-2025-001 · Coalfire 3PAO · © 2026
+  </div>
+  <div class="footer-right">security@vsp.mil</div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Scroll reveal
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Smooth scroll
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href'))?.scrollIntoView({behavior:'smooth'});
+  });
+});
+
+// Nav bg on scroll
+window.addEventListener('scroll', () => {
+  document.querySelector('nav').style.background =
+    window.scrollY > 40 ? 'rgba(11,12,15,.95)' : 'rgba(11,12,15,.7)';
+});
+</script>
+</body>
+</html>

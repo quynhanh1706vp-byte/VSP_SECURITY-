@@ -75,6 +75,7 @@ func (db *DB) ListUsers(ctx context.Context, tenantID string, limit, offset int)
 		if err != nil {
 			return nil, 0, err
 		}
+		if u == nil { continue }
 		users = append(users, *u)
 	}
 

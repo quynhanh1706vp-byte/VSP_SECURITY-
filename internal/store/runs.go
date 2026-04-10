@@ -57,6 +57,8 @@ func (db *DB) GetLatestRun(ctx context.Context, tenantID string) (*Run, error) {
 }
 
 func (db *DB) ListRuns(ctx context.Context, tenantID string, limit, offset int) ([]Run, error) {
+	if limit <= 0  { limit = 20   }
+	if limit > 500 { limit = 500  } // hard cap
 	rows, err := db.pool.Query(ctx,
 		`SELECT `+runCols+` FROM runs WHERE tenant_id=$1
 		 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
@@ -71,6 +73,7 @@ func (db *DB) ListRuns(ctx context.Context, tenantID string, limit, offset int) 
 		if err != nil {
 			return nil, err
 		}
+		if r == nil { continue }
 		runs = append(runs, *r)
 	}
 	return runs, nil
@@ -98,11 +101,11 @@ func (db *DB) UpdateRunResult(ctx context.Context, tenantID, rid, gate, posture 
 
 func scanRun(row scanner) (*Run, error) {
 	var r Run
-	// gate, posture may be NULL in DB
-	var gate, posture *string
+	// NULL-safe scanning for optional fields
+	var gate, posture, src, targetURL *string
 	err := row.Scan(
 		&r.ID, &r.RID, &r.TenantID, &r.Mode, &r.Profile,
-		&r.Src, &r.TargetURL, &r.Status, &gate, &posture,
+		&src, &targetURL, &r.Status, &gate, &posture,
 		&r.ToolsDone, &r.ToolsTotal, &r.TotalFindings,
 		&r.Summary, &r.StartedAt, &r.FinishedAt, &r.CreatedAt)
 	if err == pgx.ErrNoRows {
@@ -111,8 +114,10 @@ func scanRun(row scanner) (*Run, error) {
 	if err != nil {
 		return nil, fmt.Errorf("scan run: %w", err)
 	}
-	if gate != nil    { r.Gate = *gate }
-	if posture != nil { r.Posture = *posture }
-	if r.Summary == nil { r.Summary = json.RawMessage("{}") }
+	if gate      != nil { r.Gate      = *gate }
+	if posture   != nil { r.Posture   = *posture }
+	if src       != nil { r.Src       = *src }
+	if targetURL != nil { r.TargetURL = *targetURL }
+	if r.Summary == nil { r.Summary   = json.RawMessage("{}") }
 	return &r, nil
 }

@@ -19,6 +19,7 @@ type Finding struct {
 	Path      string          `json:"path"`
 	LineNum   int             `json:"line"`
 	CWE       string          `json:"cwe"`
+	CVSS      float64         `json:"cvss"`
 	FixSignal string          `json:"fix_signal"`
 	Raw       json.RawMessage `json:"raw,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
@@ -58,6 +59,8 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 		// Defense in depth: cap search length tại store layer
 		s := f.Search
 		if len(s) > 200 { s = s[:200] }
+		// Use GIN index via to_tsvector for performance on large datasets
+		// Fallback to ILIKE for exact substring matching (covered by idx_findings_search)
 		where = append(where, fmt.Sprintf("(message ILIKE $%d OR rule_id ILIKE $%d OR path ILIKE $%d)", i, i, i))
 		args = append(args, "%"+s+"%"); i++
 	}
@@ -71,7 +74,7 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 	args = append(args, f.Limit, f.Offset)
 	rows, err := db.pool.Query(ctx,
 		fmt.Sprintf(`SELECT id, run_id, tenant_id, tool, severity, rule_id,
-		             message, path, line_num, cwe, fix_signal, created_at
+		             message, path, line_num, cwe, cvss, fix_signal, created_at
 		             FROM findings WHERE %s
 		             ORDER BY
 		               CASE severity
@@ -90,11 +93,21 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 	var result []Finding
 	for rows.Next() {
 		var fn Finding
+		var ruleID, message, fpath, cwe, fixSignal *string
+		var cvss *float64
+		var lineNum *int
 		if err := rows.Scan(&fn.ID, &fn.RunID, &fn.TenantID, &fn.Tool,
-			&fn.Severity, &fn.RuleID, &fn.Message, &fn.Path,
-			&fn.LineNum, &fn.CWE, &fn.FixSignal, &fn.CreatedAt); err != nil {
+			&fn.Severity, &ruleID, &message, &fpath,
+			&lineNum, &cwe, &cvss, &fixSignal, &fn.CreatedAt); err != nil {
 			return nil, 0, err
 		}
+		if ruleID    != nil { fn.RuleID    = *ruleID }
+		if message   != nil { fn.Message   = *message }
+		if fpath     != nil { fn.Path      = *fpath }
+		if cwe       != nil { fn.CWE       = *cwe }
+		if cvss      != nil { fn.CVSS      = *cvss }
+		if fixSignal != nil { fn.FixSignal  = *fixSignal }
+		if lineNum   != nil { fn.LineNum   = *lineNum }
 		result = append(result, fn)
 	}
 	return result, total, nil
