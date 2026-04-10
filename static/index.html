@@ -8806,20 +8806,6 @@ setInterval(loadDoDWidgets, 300000);
 
 
 <script>
-(function(){
-  var _spDoD = window.showPanel;
-  window.showPanel = function(name, btn) {
-    _spDoD(name, btn);
-    if (name==='soc') { setTimeout(loadZTMaturity,300); setTimeout(loadATTACK,400); }
-    if (name==='compliance') setTimeout(loadOSCALViewer,300);
-    if (name==='governance') {
-      setTimeout(loadEvidenceLocker,300);
-      if(typeof loadPOAMEditor==='function') setTimeout(loadPOAMEditor,400);
-    }
-    if (name==='threatintel' && typeof loadKEVFeed==='function') setTimeout(loadKEVFeed,300);
-  };
-})();
-</script>
 <script>
 async function loadCDMWidgets() {
   if (!window.TOKEN) return;
@@ -8872,7 +8858,6 @@ window.showPanel = function(name, btn) {
   if (name === 'governance') setTimeout(loadEvidenceLocker, 300);
 };
 </script>
-
 <script>
 function renderPOAMTable() {
   var statusFilter = (document.getElementById('poam-filter-status')||{}).value||'';
@@ -8936,6 +8921,86 @@ function exportPOAM() {
   showToast('POA&M exported','success');
 }
 </script>
+<script>
+function renderPOAMTable() {
+  var statusFilter = (document.getElementById('poam-filter-status')||{}).value||'';
+  var severityFilter = (document.getElementById('poam-filter-severity')||{}).value||'';
+  var search = ((document.getElementById('poam-search')||{}).value||'').toLowerCase();
+
+  var filtered = _poamItems.filter(function(p) {
+    if (statusFilter && p.status !== statusFilter) return false;
+    if (severityFilter && p.severity !== severityFilter) return false;
+    if (search && !(p.weakness.toLowerCase().includes(search) || p.id.toLowerCase().includes(search) || p.control.toLowerCase().includes(search))) return false;
+    return true;
+  });
+
+  // Update summary
+  var total = _poamItems.length;
+  var open = _poamItems.filter(function(p){return p.status==='open';}).length;
+  var inprog = _poamItems.filter(function(p){return p.status==='in-progress';}).length;
+  var done = _poamItems.filter(function(p){return p.status==='completed';}).length;
+  var overdue = _poamItems.filter(function(p){return p.overdue;}).length;
+
+  ['poam-count-total','poam-count-open','poam-count-inprog','poam-count-done','poam-count-overdue'].forEach(function(id, i){
+    var el = document.getElementById(id); if(el) el.textContent = [total,open,inprog,done,overdue][i];
+  });
+
+  var tbody = document.getElementById('poam-tbody');
+  if (!tbody) return;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:12px;text-align:center;color:var(--t3)">No POA&M items match filter</td></tr>';
+    return;
+  }
+
+  var sevColors = {critical:'var(--red)',high:'var(--orange,#f97316)',medium:'var(--amber)',low:'var(--green)'};
+  var statColors = {open:'var(--red)','in-progress':'var(--cyan)',completed:'var(--green)','risk-accepted':'var(--amber)'};
+
+  tbody.innerHTML = filtered.map(function(p) {
+    var isOverdue = p.overdue;
+    var rowBg = isOverdue ? 'background:rgba(239,68,68,0.03)' : '';
+    return '<tr style="border-bottom:1px solid var(--b1);'+rowBg+'">'
+      +'<td style="padding:5px 6px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+p.id+'</td>'
+      +'<td style="padding:5px 6px;font-size:10px;color:var(--t1)">'+p.control+'</td>'
+      +'<td style="padding:5px 6px;font-size:10px;color:var(--t2)" title="'+p.weakness+'">'+p.weakness.slice(0,50)+(p.weakness.length>50?'…':'')+'</td>'
+      +'<td style="padding:5px 6px"><span style="font-size:9px;color:'+(sevColors[p.severity]||'var(--t2)')+'">'+p.severity.toUpperCase()+'</span></td>'
+      +'<td style="padding:5px 6px;font-size:10px;color:'+(isOverdue?'var(--red)':'var(--t2)')+'">'+p.due+(isOverdue?' ⚠':'')+'</td>'
+      +'<td style="padding:5px 6px"><span style="font-size:9px;color:'+(statColors[p.status]||'var(--t2)')+'">'+p.status+'</span></td>'
+      +'<td style="padding:5px 6px;font-size:10px;color:var(--t3)">'+p.milestone.slice(0,40)+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function exportPOAM() {
+  var header = 'ID,Control,Weakness,Severity,Due Date,Status,Milestone';
+  var rows = (_poamItems||[]).map(function(p){
+    return [p.id,p.control,'"'+(p.weakness||'').replace(/"/g,'""')+'"',p.severity,p.due,p.status,p.milestone].join(',');
+  });
+  var blob = new Blob([[header].concat(rows).join('\n')], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'poam_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+  showToast('POA&M exported','success');
+}
+</script>
+(function(){
+  var _spDoD = window.showPanel;
+  window.showPanel = function(name, btn) {
+    _spDoD(name, btn);
+    if (name==='soc') { setTimeout(loadZTMaturity,300); setTimeout(loadATTACK,400); }
+    if (name==='compliance') setTimeout(loadOSCALViewer,300);
+    if (name==='governance') {
+      setTimeout(loadEvidenceLocker,300);
+      if(typeof loadPOAMEditor==='function') setTimeout(loadPOAMEditor,400);
+    }
+    if (name==='threatintel' && typeof loadKEVFeed==='function') setTimeout(loadKEVFeed,300);
+  };
+})();
+</script>
+
+
+
 </body>
 </html>
     <!-- ── OSCAL Assessment Results Viewer ───────────────────────── -->
@@ -9000,68 +9065,6 @@ async function freezeEvidence(id) {
 }
 
 </script>
-<script>
-function renderPOAMTable() {
-  var statusFilter = (document.getElementById('poam-filter-status')||{}).value||'';
-  var severityFilter = (document.getElementById('poam-filter-severity')||{}).value||'';
-  var search = ((document.getElementById('poam-search')||{}).value||'').toLowerCase();
 
-  var filtered = _poamItems.filter(function(p) {
-    if (statusFilter && p.status !== statusFilter) return false;
-    if (severityFilter && p.severity !== severityFilter) return false;
-    if (search && !(p.weakness.toLowerCase().includes(search) || p.id.toLowerCase().includes(search) || p.control.toLowerCase().includes(search))) return false;
-    return true;
-  });
-
-  // Update summary
-  var total = _poamItems.length;
-  var open = _poamItems.filter(function(p){return p.status==='open';}).length;
-  var inprog = _poamItems.filter(function(p){return p.status==='in-progress';}).length;
-  var done = _poamItems.filter(function(p){return p.status==='completed';}).length;
-  var overdue = _poamItems.filter(function(p){return p.overdue;}).length;
-
-  ['poam-count-total','poam-count-open','poam-count-inprog','poam-count-done','poam-count-overdue'].forEach(function(id, i){
-    var el = document.getElementById(id); if(el) el.textContent = [total,open,inprog,done,overdue][i];
-  });
-
-  var tbody = document.getElementById('poam-tbody');
-  if (!tbody) return;
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="padding:12px;text-align:center;color:var(--t3)">No POA&M items match filter</td></tr>';
-    return;
-  }
-
-  var sevColors = {critical:'var(--red)',high:'var(--orange,#f97316)',medium:'var(--amber)',low:'var(--green)'};
-  var statColors = {open:'var(--red)','in-progress':'var(--cyan)',completed:'var(--green)','risk-accepted':'var(--amber)'};
-
-  tbody.innerHTML = filtered.map(function(p) {
-    var isOverdue = p.overdue;
-    var rowBg = isOverdue ? 'background:rgba(239,68,68,0.03)' : '';
-    return '<tr style="border-bottom:1px solid var(--b1);'+rowBg+'">'
-      +'<td style="padding:5px 6px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+p.id+'</td>'
-      +'<td style="padding:5px 6px;font-size:10px;color:var(--t1)">'+p.control+'</td>'
-      +'<td style="padding:5px 6px;font-size:10px;color:var(--t2)" title="'+p.weakness+'">'+p.weakness.slice(0,50)+(p.weakness.length>50?'…':'')+'</td>'
-      +'<td style="padding:5px 6px"><span style="font-size:9px;color:'+(sevColors[p.severity]||'var(--t2)')+'">'+p.severity.toUpperCase()+'</span></td>'
-      +'<td style="padding:5px 6px;font-size:10px;color:'+(isOverdue?'var(--red)':'var(--t2)')+'">'+p.due+(isOverdue?' ⚠':'')+'</td>'
-      +'<td style="padding:5px 6px"><span style="font-size:9px;color:'+(statColors[p.status]||'var(--t2)')+'">'+p.status+'</span></td>'
-      +'<td style="padding:5px 6px;font-size:10px;color:var(--t3)">'+p.milestone.slice(0,40)+'</td>'
-      +'</tr>';
-  }).join('');
-}
-
-function exportPOAM() {
-  var header = 'ID,Control,Weakness,Severity,Due Date,Status,Milestone';
-  var rows = (_poamItems||[]).map(function(p){
-    return [p.id,p.control,'"'+(p.weakness||'').replace(/"/g,'""')+'"',p.severity,p.due,p.status,p.milestone].join(',');
-  });
-  var blob = new Blob([[header].concat(rows).join('\n')], {type:'text/csv'});
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'poam_'+new Date().toISOString().split('T')[0]+'.csv';
-  a.click();
-  showToast('POA&M exported','success');
-}
-</script>
 </body>
 </html>
