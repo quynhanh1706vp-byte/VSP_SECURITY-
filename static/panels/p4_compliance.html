@@ -227,6 +227,30 @@ body::after {
 /* ── End Premium Upgrade ─────────────────────────────── */
 
 </style>
+
+<script>
+// P4 auth: lấy short-lived JWT từ session cookie → dùng Bearer cho /api/p4/
+(async function initP4Auth() {
+  try {
+    var r = await fetch('/api/v1/auth/api-token', {
+      method: 'POST',
+      credentials: 'same-origin'
+    });
+    if (r.ok) {
+      var d = await r.json();
+      window._p4Token = d.token;
+      console.log('[P4] auth token obtained');
+    }
+  } catch(e) {
+    console.warn('[P4] auth token failed:', e.message);
+  }
+})();
+function p4Hdr() {
+  var h = {'Content-Type': 'application/json'};
+  if (window._p4Token) h['Authorization'] = 'Bearer ' + window._p4Token;
+  return h;
+}
+</script>
 <script>
 (function(){
   // Kill VSP patches before they run
