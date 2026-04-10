@@ -58,6 +58,14 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	// req.Enabled preserved from request (default true for new schedules handled by DB)
 
+	// Validate scan URL — SSRF protection
+	if req.URL != "" {
+		if err := validateScanURL(req.URL); err != nil {
+			jsonError(w, "invalid url: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	s, err := h.Engine.AddSchedule(r.Context(), store.StoreSchedule{
 		TenantID: claims.TenantID,
 		Name:     req.Name,

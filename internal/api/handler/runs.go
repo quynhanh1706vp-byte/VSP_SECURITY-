@@ -54,15 +54,14 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Validate URL — chỉ cho phép http/https, chặn internal
+	// Validate URL — chặn SSRF: không cho phép internal/private hosts
 	if req.URL != "" {
-		u, err := url.ParseRequestURI(req.URL)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-			jsonError(w, "invalid url: must be http/https", http.StatusBadRequest)
-			return
-		}
 		if len(req.URL) > 500 {
 			jsonError(w, "url too long", http.StatusBadRequest)
+			return
+		}
+		if err := validateScanURL(req.URL); err != nil {
+			jsonError(w, "invalid url: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
