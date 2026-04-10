@@ -108,7 +108,7 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 	defer os.Remove(tmpOut.Name())
 	tmpOut.Close()
 
-	cmd := exec.CommandContext(ctx2, //nolint:gosec // G702: target validated above (metachar + length check)
+	cmd := exec.CommandContext(ctx2, //#nosec G702 -- target validated: metachar check + length limit applied above
 		"grype", target,
 		"-o", "cyclonedx-json",
 		"--file", tmpOut.Name())
