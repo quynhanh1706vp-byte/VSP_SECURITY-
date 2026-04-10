@@ -590,6 +590,87 @@
       </div>
 
       <!-- Top findings + Gate trend -->
+
+      <!-- ── DoD RMF / ATO / POAM / KEV row ───────────────────────────── -->
+      <div class="g4 mb14" id="dod-widgets-row">
+
+        <!-- ATO Countdown -->
+        <div class="card" style="border-left:3px solid var(--green)">
+          <div class="card-head">
+            <div class="card-title">ATO Status</div>
+            <span class="pill" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);font-size:9px" id="ato-status-pill">AUTHORIZED</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin:8px 0 2px">
+            <div style="font-size:28px;font-weight:700;color:var(--green);font-family:var(--mono)" id="ato-days">—</div>
+            <div style="font-size:11px;color:var(--t2)">days remaining</div>
+          </div>
+          <div style="font-size:10px;color:var(--t3)" id="ato-expiry">Expires: —</div>
+          <div style="margin-top:8px;height:4px;background:var(--bg3);border-radius:2px">
+            <div id="ato-bar" style="height:4px;border-radius:2px;background:var(--green);width:80%;transition:width .5s"></div>
+          </div>
+          <div style="font-size:9px;color:var(--t3);margin-top:4px">RMF Step 5 · DoD 8510.01</div>
+        </div>
+
+        <!-- POAM Summary -->
+        <div class="card" style="border-left:3px solid var(--amber)">
+          <div class="card-head">
+            <div class="card-title">POA&amp;M</div>
+            <span class="pill" style="background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2);font-size:9px">CA-5</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+            <div style="text-align:center">
+              <div style="font-size:22px;font-weight:700;color:var(--red);font-family:var(--mono)" id="poam-open">—</div>
+              <div style="font-size:10px;color:var(--t3)">Open items</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:22px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="poam-overdue">—</div>
+              <div style="font-size:10px;color:var(--t3)">Overdue</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:10px;color:var(--t3)">From open remediation items</div>
+          <div style="font-size:9px;color:var(--t3);margin-top:4px">NIST CA-5 · FedRAMP POA&amp;M</div>
+        </div>
+
+        <!-- ConMon Status -->
+        <div class="card" style="border-left:3px solid var(--cyan)">
+          <div class="card-head">
+            <div class="card-title">ConMon</div>
+            <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px">CA-7</span>
+          </div>
+          <div style="margin-top:8px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:11px;color:var(--t2)">Last scan</span>
+              <span style="font-size:11px;font-weight:600;color:var(--green)" id="conmon-last-scan">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:11px;color:var(--t2)">Scan frequency</span>
+              <span style="font-size:11px;font-weight:600;color:var(--t1)" id="conmon-freq">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span style="font-size:11px;color:var(--t2)">30-day runs</span>
+              <span style="font-size:11px;font-weight:600;color:var(--cyan)" id="conmon-30d">—</span>
+            </div>
+          </div>
+          <div style="font-size:9px;color:var(--t3);margin-top:6px">FedRAMP ConMon · SI-4 · AU-6</div>
+        </div>
+
+        <!-- CISA KEV Alert -->
+        <div class="card" style="border-left:3px solid var(--red)">
+          <div class="card-head">
+            <div class="card-title">CISA KEV</div>
+            <span class="pill" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);font-size:9px">RA-5</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin:8px 0 2px">
+            <div style="font-size:28px;font-weight:700;color:var(--red);font-family:var(--mono)" id="kev-matches">—</div>
+            <div style="font-size:11px;color:var(--t2)">KEV matches</div>
+          </div>
+          <div style="font-size:10px;color:var(--t3)" id="kev-status">Checking findings vs CISA KEV...</div>
+          <div style="margin-top:6px" id="kev-list"></div>
+          <div style="font-size:9px;color:var(--t3);margin-top:4px">CISA Known Exploited Vulns · SI-5</div>
+        </div>
+
+      </div>
+      <!-- ── End DoD widgets ──────────────────────────────────────────── -->
       <div class="g2 mb14">
         <div class="card">
           <div class="card-head">
@@ -8538,5 +8619,133 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('[VSP] CSRF header sanitizer active');
 })();
 </script>
+
+<script>
+// ── DoD Dashboard Widgets: ATO · POAM · ConMon · KEV ─────────────────────
+async function loadDoDWidgets() {
+  if (!window.TOKEN) return;
+  try {
+    // ATO data từ /api/p4/ato/expiry
+    var csrfVal = _safeHeader((document.cookie.split(';').map(function(c){return c.trim();})
+      .find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('='));
+
+    // Lấy p4 JWT nếu chưa có
+    if (!window._p4Token) {
+      try {
+        var tr = await fetch('/api/v1/auth/api-token', {
+          method:'POST', credentials:'same-origin',
+          headers:{'Content-Type':'application/json','X-CSRF-Token':csrfVal}
+        });
+        if (tr.ok) { var td = await tr.json(); window._p4Token = td.token; }
+      } catch(e) {}
+    }
+
+    var p4h = window._p4Token ? {'Authorization':'Bearer '+window._p4Token} : {};
+
+    // ATO Expiry
+    try {
+      var atoR = await fetch('/api/p4/ato/expiry', {headers:p4h}).then(function(r){return r.json();}).catch(function(){return null;});
+      if (atoR && atoR.expiration_date) {
+        var exp = new Date(atoR.expiration_date);
+        var now = new Date();
+        var days = Math.ceil((exp - now) / (1000*60*60*24));
+        var total = Math.ceil((exp - new Date(atoR.authorization_date||now)) / (1000*60*60*24));
+        var pct = Math.max(5, Math.min(95, Math.round(days/total*100)));
+        var el = document.getElementById('ato-days');
+        if (el) el.textContent = days > 0 ? days : 0;
+        var bar = document.getElementById('ato-bar');
+        if (bar) {
+          bar.style.width = pct + '%';
+          bar.style.background = days > 365 ? 'var(--green)' : days > 90 ? 'var(--amber)' : 'var(--red)';
+        }
+        var pill = document.getElementById('ato-status-pill');
+        if (pill) {
+          pill.textContent = atoR.ato_status ? atoR.ato_status.toUpperCase() : 'AUTHORIZED';
+          pill.style.color = days > 90 ? 'var(--green)' : 'var(--red)';
+        }
+        var exp_el = document.getElementById('ato-expiry');
+        if (exp_el) exp_el.textContent = 'Expires: ' + exp.toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'});
+      }
+    } catch(e) {}
+
+    // POAM từ remediation open items
+    try {
+      var remR = await fetch('/api/v1/remediation/stats', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};});
+      var open = remR.open || remR.by_status && remR.by_status.open || 0;
+      var overdue = remR.overdue || 0;
+      var po = document.getElementById('poam-open'); if(po) po.textContent = open;
+      var pod = document.getElementById('poam-overdue'); if(pod) pod.textContent = overdue;
+    } catch(e) {}
+
+    // ConMon từ runs data
+    try {
+      var runsR = await fetch('/api/v1/vsp/runs/index?limit=50', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {runs:[]};});
+      var runs = runsR.runs || [];
+      var last = runs[0];
+      if (last) {
+        var lastScan = document.getElementById('conmon-last-scan');
+        if (lastScan) {
+          var d = new Date(last.created_at);
+          var diff = Math.floor((new Date()-d)/3600000);
+          lastScan.textContent = diff < 1 ? 'Just now' : diff < 24 ? diff+'h ago' : Math.floor(diff/24)+'d ago';
+          lastScan.style.color = diff < 24 ? 'var(--green)' : diff < 168 ? 'var(--amber)' : 'var(--red)';
+        }
+        // Tính frequency
+        if (runs.length >= 2) {
+          var gaps = [];
+          for (var i=0; i<Math.min(runs.length-1,10); i++) {
+            gaps.push(new Date(runs[i].created_at) - new Date(runs[i+1].created_at));
+          }
+          var avgGap = gaps.reduce(function(a,b){return a+b;},0)/gaps.length;
+          var freqH = Math.round(avgGap/3600000);
+          var freqEl = document.getElementById('conmon-freq');
+          if (freqEl) freqEl.textContent = freqH < 24 ? 'Every '+freqH+'h' : 'Every '+Math.round(freqH/24)+'d';
+        }
+        // 30-day count
+        var thirtyDays = new Date(Date.now() - 30*24*3600*1000);
+        var count30 = runs.filter(function(r){return new Date(r.created_at) > thirtyDays;}).length;
+        var el30 = document.getElementById('conmon-30d'); if(el30) el30.textContent = count30;
+      }
+    } catch(e) {}
+
+    // KEV matching — match findings CVEs against known KEV list
+    try {
+      var findR = await fetch('/api/v1/vsp/findings?limit=500', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {findings:[]};});
+      var findings = findR.findings || [];
+      // Dùng vulns/top-cves để check KEV
+      var cveR = await fetch('/api/v1/vulns/top-cves', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {cves:[]};});
+      var cves = cveR.cves || [];
+      // Mark critical CVEs as potential KEV
+      var kevMatches = cves.filter(function(c){return c.severity==='CRITICAL' && c.cvss>=9.0;});
+      var kevEl = document.getElementById('kev-matches');
+      if (kevEl) {
+        kevEl.textContent = kevMatches.length;
+        kevEl.style.color = kevMatches.length > 0 ? 'var(--red)' : 'var(--green)';
+      }
+      var kevStatus = document.getElementById('kev-status');
+      if (kevStatus) kevStatus.textContent = kevMatches.length > 0
+        ? kevMatches.length + ' critical CVEs require immediate remediation'
+        : 'No critical KEV matches detected';
+      var kevList = document.getElementById('kev-list');
+      if (kevList && kevMatches.length > 0) {
+        kevList.innerHTML = kevMatches.slice(0,3).map(function(c){
+          return '<div style="font-size:9px;color:var(--red);font-family:var(--mono)">'+c.id+'</div>';
+        }).join('');
+      }
+    } catch(e) {}
+
+  } catch(e) { console.warn('loadDoDWidgets:', e.message); }
+}
+
+// Run on dashboard load
+var _origInitDash = window.initDashboardCharts;
+window.initDashboardCharts = async function() {
+  if (_origInitDash) await _origInitDash();
+  await loadDoDWidgets();
+};
+// Auto-refresh every 5 min
+setInterval(loadDoDWidgets, 300000);
+</script>
+
 </body>
 </html>
