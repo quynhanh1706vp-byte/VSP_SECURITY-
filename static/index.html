@@ -2152,7 +2152,9 @@ async function runEval() {
     if (TOKEN) {
       const r = await api('POST', '/policy/evaluate', {repo:'current'});
       const color = r.decision==='PASS'?'var(--green)':r.decision==='WARN'?'var(--amber)':'var(--red)';
-      el.innerHTML = `<span style="color:${color};font-size:16px;font-weight:700">${r.decision}</span> · score: <b>${r.score}</b> · posture: <b>${r.posture}</b> · <span style="color:var(--t3)">${r.reason}</span>`;
+      // Security: escape r.reason (API string) before innerHTML
+      const _esc2155 = s => String(s||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+      el.innerHTML = `<span style="color:${color};font-size:16px;font-weight:700">${_esc2155(r.decision)}</span> · score: <b>${Number(r.score)||0}</b> · posture: <b>${_esc2155(r.posture)}</b> · <span style="color:var(--t3)">${_esc2155(r.reason)}</span>`;
     } else {
       el.innerHTML = `<span style="color:var(--red);font-size:16px;font-weight:700">FAIL</span> · score: <b>—</b> · posture: <b>—</b> · <span style="color:var(--t3)">Critical findings detected (Block Critical rule triggered)</span>`;
     }
@@ -2192,7 +2194,9 @@ function _ensureCompModal() {
 
 function _showCompDetail(ctrl) {
   _ensureCompModal();
-  document.getElementById('cdm-title').innerHTML = (ctrl.id + ' — ' + (ctrl.control||ctrl.practice||ctrl.title||'')) + ' <span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--t3)">read-only</span>';
+  // Security: escape ctrl fields from DB before innerHTML
+  const _esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+  document.getElementById('cdm-title').innerHTML = (_esc(ctrl.id) + ' — ' + _esc(ctrl.control||ctrl.practice||ctrl.title||'')) + ' <span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--t3)">read-only</span>';
   document.getElementById('cdm-id').textContent = (ctrl.family||ctrl.domain||'—') + ' · ' + (ctrl.framework||'');
   var statusColor = ctrl.status==='assessed' ? 'var(--green)' : 'var(--t3)';
   var statusPill  = ctrl.status==='assessed' ? 'pill-pass' : 'pill-queue';
@@ -2333,7 +2337,7 @@ async function triggerScan() {
   const msg     = document.getElementById('scanMsg');
   if (!src) { msg.style.color='var(--red)'; msg.textContent='⚠ Source path is required'; return; }
   // Security: validate path format — must be absolute path or git URL
-  const validPath = /^(\/[^ <>|;&`]+|https?:\/\/|git@|ssh:\/\/)/.test(src);
+  const validPath = /^(\/[^<>|;&`]+|https?:\/\/|git@|ssh:\/\/)/.test(src);
   const hasTraversal = src.includes('../') || src.includes('..\\');
   if (!validPath) { msg.style.color='var(--red)'; msg.textContent='⚠ Must be absolute path (/...) or Git URL (https://...)'; return; }
   if (hasTraversal) { msg.style.color='var(--red)'; msg.textContent='⚠ Path traversal detected — use absolute path'; return; }
@@ -4707,7 +4711,9 @@ window.runEval = async function() {
       +' &middot; posture: <b>'+(d.posture||'?')+'</b>'
       +' &middot; <span style="color:var(--t3)">'+(d.reason||'')+'</span>';
   } catch(e) {
-    el.innerHTML = '<span style="color:var(--red)">Error: '+e.message+'</span>';
+    // Security: escape error message (defense-in-depth)
+    const _escErr = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    el.innerHTML = '<span style="color:var(--red)">Error: '+_escErr(e.message)+'</span>';
   }
 };
 
@@ -4912,7 +4918,9 @@ window.verifyAudit = async function() {
       +' &mdash; '+runs.length+' audit entries verified'
       +' &middot; last verified: '+new Date().toLocaleTimeString('vi-VN');
   } catch(e) {
-    el.innerHTML = '<span style="color:var(--amber)">&#9888; Verify error: '+e.message+'</span>';
+    // Security: escape error message (defense-in-depth)
+    const _escErr2 = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    el.innerHTML = '<span style="color:var(--amber)">&#9888; Verify error: '+_escErr2(e.message)+'</span>';
   }
 };
 
@@ -6097,7 +6105,9 @@ function showFindingDetail(idx) {
   }
   var sevClass = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
   var sevColor = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--amber)',LOW:'var(--green)'};
-  document.getElementById('fdm-title').innerHTML = '<span class="sev '+(sevClass[f.severity]||'')+'">'+f.severity+'</span> · '+f.tool;
+  // Security: escape API strings — severity/tool should be enum values but escape anyway
+  const _e6 = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  document.getElementById('fdm-title').innerHTML = '<span class="sev '+_e6(sevClass[f.severity]||'')+'">'+_e6(f.severity)+'</span> · '+_e6(f.tool);
   document.getElementById('fdm-id').textContent = f.id;
   document.getElementById('fdm-body').innerHTML =
     '<div class="g3 mb14">'
