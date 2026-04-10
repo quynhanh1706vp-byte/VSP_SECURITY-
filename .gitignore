@@ -1,9 +1,9 @@
 # Binaries
 /gateway
 /vsp-gateway
-scanner
-soc-shell
-seed
+/scanner
+/soc-shell
+/seed
 
 # CodeQL
 .codeql-db/
@@ -36,8 +36,7 @@ static/vsp_features_patch.js
 *.test
 start.sh
 .env
-.env
-*.py
+/*.py
 *.sh
 !setup_vsp.sh
 vsp_*.pdf
