@@ -213,7 +213,7 @@ func (db *DB) ListPlaybooks(ctx context.Context, tenantID string) ([]Playbook, e
 	rows, err := db.pool.Query(ctx, `
 		SELECT id, name, description, trigger_event, sev_filter,
 		       steps, enabled, run_count, success_count, created_at
-		FROM   playbooks WHERE tenant_id=$1 ORDER BY created_at DESC`, tenantID)
+		FROM   playbooks WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200`, tenantID)
 	if err != nil { return nil, err }
 	defer rows.Close()
 	var out []Playbook
@@ -304,7 +304,7 @@ func (db *DB) FindEnabledPlaybooks(ctx context.Context, tenantID, trigger, sev s
 	rows, err := db.pool.Query(ctx, `
 		SELECT id, name FROM playbooks
 		WHERE  tenant_id=$1 AND enabled=true AND trigger_event=$2
-		  AND  (sev_filter='any' OR sev_filter=$3)`,
+	  AND  (sev_filter='any' OR sev_filter=$3) LIMIT 20`,
 		tenantID, trigger, sev)
 	if err != nil { return nil, err }
 	defer rows.Close()
@@ -323,7 +323,7 @@ func (db *DB) ListLogSources(ctx context.Context, tenantID string) ([]LogSource,
 	rows, err := db.pool.Query(ctx, `
 		SELECT id, name, host, protocol, port, format,
 		       tags, enabled, eps, parse_rate, status, last_seen, created_at
-		FROM   log_sources WHERE tenant_id=$1 ORDER BY created_at DESC`, tenantID)
+		FROM   log_sources WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200`, tenantID)
 	if err != nil { return nil, err }
 	defer rows.Close()
 	var out []LogSource
@@ -493,7 +493,7 @@ func (db *DB) ListSIEMWebhooks(ctx context.Context, tenantID string) ([]SIEMWebh
 		SELECT id, tenant_id, label, type, url,
 		       COALESCE(secret_hash,''), min_sev, active,
 		       last_fired, fire_count, created_at
-		FROM   siem_webhooks WHERE tenant_id=$1 ORDER BY created_at DESC`, tenantID)
+		FROM   siem_webhooks WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 100`, tenantID)
 	if err != nil { return nil, err }
 	defer rows.Close()
 	var out []SIEMWebhook
@@ -568,7 +568,7 @@ func (db *DB) ListAllEnabledRules(ctx context.Context) (pgx.Rows, error) {
 		SELECT id, tenant_id, name, sources, window_min, severity, condition_expr
 		FROM   correlation_rules
 		WHERE  enabled = true
-		ORDER  BY tenant_id, created_at`)
+		ORDER  BY tenant_id, created_at LIMIT 500`)
 }
 
 func (db *DB) CountEventsInWindow(ctx context.Context, tenantID string, since time.Time, extraWhere string, args []any) (int, []string, error) {
