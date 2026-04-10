@@ -8820,5 +8820,122 @@ setInterval(loadDoDWidgets, 300000);
   };
 })();
 </script>
+<script>
+async function loadCDMWidgets() {
+  if (!window.TOKEN) return;
+  try {
+    var assets = await fetch('/api/v1/assets/summary',{credentials:'same-origin'})
+      .then(function(r){return r.json();}).catch(function(){return {};});
+
+    var total = assets.total || assets.count || 0;
+    var byType = assets.by_type || {};
+    var vuln = assets.vulnerable || assets.with_findings || 0;
+    var compliant = total - vuln;
+
+    var ct = document.getElementById('cdm-total'); if(ct) ct.textContent = total;
+    var cc = document.getElementById('cdm-compliant'); if(cc) cc.textContent = compliant;
+    var cv = document.getElementById('cdm-vuln'); if(cv) cv.textContent = vuln;
+    var cu = document.getElementById('cdm-unmanaged'); if(cu) cu.textContent = assets.unmanaged||0;
+
+    // RMF Steps
+    var rmfList = document.getElementById('rmf-steps-list');
+    if (rmfList) {
+      var steps = [
+        {n:1, label:'Categorize', done:true},
+        {n:2, label:'Select controls', done:true},
+        {n:3, label:'Implement', done:true},
+        {n:4, label:'Assess', done:true},
+        {n:5, label:'Authorize', done:true},
+        {n:6, label:'Monitor', done:false}
+      ];
+      rmfList.innerHTML = steps.map(function(s){
+        return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+          +'<div style="width:18px;height:18px;border-radius:50%;background:'+(s.done?'var(--green)':'var(--bg3)')+';border:1px solid '+(s.done?'var(--green)':'var(--b1)')+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+(s.done?'#fff':'var(--t3)')+'">'+s.n+'</div>'
+          +'<span style="font-size:11px;color:'+(s.done?'var(--t1)':'var(--t3)')+'">'+s.label+'</span>'
+          +(s.done ? '<span style="font-size:9px;color:var(--green);margin-left:auto">✓</span>' : '<span style="font-size:9px;color:var(--amber);margin-left:auto">Active</span>')
+          +'</div>';
+      }).join('');
+    }
+  } catch(e) { console.warn('loadCDMWidgets:', e.message); }
+}
+
+// Hook vào showPanel và initDashboardCharts
+var _origInitDash2 = window.initDashboardCharts;
+window.initDashboardCharts = async function() {
+  if (_origInitDash2) await _origInitDash2();
+  await loadCDMWidgets();
+};
+
+var _sp_feat45 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp_feat45(name, btn);
+  if (name === 'governance') setTimeout(loadEvidenceLocker, 300);
+};
+</script>
+
+</body>
+</html>
+    <!-- ── OSCAL Assessment Results Viewer ───────────────────────── -->
+    <div class="mb14">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">OSCAL Assessment Results</div>
+          <div style="display:flex;gap:6px">
+            <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px" id="oscal-version-badge">OSCAL —</span>
+            <span class="pill" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);font-size:9px" id="oscal-status-badge">Loading...</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0" id="oscal-kpis">
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--green);font-family:var(--mono)" id="oscal-satisfactory">—</div>
+            <div style="font-size:10px;color:var(--t3)">Satisfactory</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--red);font-family:var(--mono)" id="oscal-not-satisfactory">—</div>
+            <div style="font-size:10px;color:var(--t3)">Not satisfactory</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="oscal-other">—</div>
+            <div style="font-size:10px;color:var(--t3)">Other findings</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="oscal-controls">—</div>
+            <div style="font-size:10px;color:var(--t3)">Controls assessed</div>
+          </div>
+        </div>
+        <div style="max-height:300px;overflow-y:auto" id="oscal-findings-table">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--b1)">
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Control</th>
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Status</th>
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Finding</th>
+              </tr>
+            </thead>
+            <tbody id="oscal-findings-tbody">
+              <tr><td colspan="3" style="padding:12px;text-align:center;color:var(--t3)">Loading OSCAL data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:9px;color:var(--t3);margin-top:8px" id="oscal-last-modified">NIST OSCAL 1.1.2 · FedRAMP AR · Last modified: —</div>
+      </div>
+    </div>
+
+var _poamItems = [];
+
+async function freezeEvidence(id) {
+  try {
+    var csrfVal = _safeHeader((document.cookie.split(';').map(function(c){return c.trim();})
+      .find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('='));
+    await fetch('/api/v1/governance/evidence/'+encodeURIComponent(id)+'/freeze',{
+      method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':csrfVal}
+    });
+    showToast('Evidence frozen: '+id.slice(0,20),'success');
+    loadEvidenceLocker();
+  } catch(e) { showToast('Freeze failed','error'); }
+}
+
+</script>
 </body>
 </html>
