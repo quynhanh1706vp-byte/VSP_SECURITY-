@@ -123,7 +123,7 @@ func (db *DB) AddComment(ctx context.Context, remID, author, body string) (*Reme
 func (db *DB) ListComments(ctx context.Context, remID string) ([]RemediationComment, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id,remediation_id,author,body,created_at
-		 FROM remediation_comments WHERE remediation_id=$1 ORDER BY created_at ASC`,
+		 FROM remediation_comments WHERE remediation_id=$1 ORDER BY created_at ASC LIMIT 500`,
 		remID)
 	if err != nil { return nil, err }
 	defer rows.Close()

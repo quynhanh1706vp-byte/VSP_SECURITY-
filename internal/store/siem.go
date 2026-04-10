@@ -98,7 +98,7 @@ func (db *DB) ListCorrelationRules(ctx context.Context, tenantID string) ([]Corr
 		       condition_expr, enabled, hits, created_at
 		FROM   correlation_rules
 		WHERE  tenant_id = $1
-		ORDER  BY created_at DESC`, tenantID)
+		ORDER  BY created_at DESC LIMIT 500`, tenantID)
 	if err != nil {
 		return nil, err
 	}

@@ -57,9 +57,16 @@ func main() {
 	viper.SetDefault("redis.addr", "localhost:6379")
 	viper.SetDefault("telemetry.otlp_endpoint", "")
 	// Docker env var mappings — sau SetDefault để override
-	viper.BindEnv("database.url", "DATABASE_URL")
-	viper.BindEnv("redis.addr", "REDIS_ADDR")
-	viper.BindEnv("redis.password", "REDIS_PASSWORD")
+	// BindEnv errors are non-fatal — viper falls back to SetDefault values
+	if err := viper.BindEnv("database.url", "DATABASE_URL"); err != nil {
+		log.Warn().Err(err).Msg("viper: BindEnv database.url failed")
+	}
+	if err := viper.BindEnv("redis.addr", "REDIS_ADDR"); err != nil {
+		log.Warn().Err(err).Msg("viper: BindEnv redis.addr failed")
+	}
+	if err := viper.BindEnv("redis.password", "REDIS_PASSWORD"); err != nil {
+		log.Warn().Err(err).Msg("viper: BindEnv redis.password failed")
+	}
 	viper.BindEnv("auth.jwt_secret", "JWT_SECRET")
 	viper.BindEnv("anthropic.api_key", "ANTHROPIC_API_KEY")
 	viper.BindEnv("server.env", "SERVER_ENV")

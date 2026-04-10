@@ -27,7 +27,7 @@ func (db *DB) ListPolicyRules(ctx context.Context, tenantID string) ([]PolicyRul
 		`SELECT id, tenant_id, name, repo_pattern, fail_on, min_score,
 		        max_high, block_secrets, block_critical, active, created_at
 		 FROM policy_rules WHERE tenant_id=$1 AND active=true
-		 ORDER BY created_at DESC`,
+		 ORDER BY created_at DESC LIMIT 100`,
 		tenantID)
 	if err != nil {
 		return nil, err
