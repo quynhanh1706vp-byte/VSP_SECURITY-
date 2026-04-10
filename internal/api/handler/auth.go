@@ -103,6 +103,14 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enforce MFA for admin role — admin MUST have MFA enabled
+	if user.Role == "admin" && (!user.MFAEnabled || !user.MFAVerified) {
+		log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured")
+		jsonError(w, "admin accounts require MFA — please set up TOTP before logging in",
+			http.StatusForbidden)
+		return
+	}
+
 	// Verify MFA if enabled
 	if user.MFAEnabled && user.MFAVerified {
 		if req.MFACode == "" {
