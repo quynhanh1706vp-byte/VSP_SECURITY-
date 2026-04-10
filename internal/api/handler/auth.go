@@ -252,4 +252,3 @@ func (a *Auth) Check(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]bool{"authenticated": true})
 }
-

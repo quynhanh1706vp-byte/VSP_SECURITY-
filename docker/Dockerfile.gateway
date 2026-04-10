@@ -1,15 +1,23 @@
 FROM golang:1.25-alpine AS builder
+RUN apk add --no-cache git ca-certificates tzdata libpcap-dev
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o gateway ./cmd/gateway/
+RUN CGO_ENABLED=0 GOOS=linux \
+    go build -ldflags="-s -w" -trimpath \
+    -o gateway ./cmd/gateway/
 
-FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -g 65534 -S nonroot && \
+    adduser  -u 65534 -S nonroot -G nonroot
 WORKDIR /app
 COPY --from=builder /app/gateway .
 COPY config/config.yaml ./config/
 COPY static/ ./static/
+USER nonroot:nonroot
 EXPOSE 8921
-CMD ["./gateway"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:8921/health || exit 1
+ENTRYPOINT ["./gateway"]
