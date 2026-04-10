@@ -279,8 +279,6 @@ func main() {
 	r.Get("/api/docs", handler.SwaggerUI)
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
-	// /auth/check: dùng authMw để validate cookie/token, trả 401 nếu invalid
-	// Đặt sau authMw declaration — xem dưới
 	r.With(vspMW.StrictLimiter(20, time.Minute)).Post("/api/v1/auth/logout", authH.Logout)
 	r.With(vspMW.StrictLimiter(30, time.Minute)).Post("/api/v1/auth/refresh", authH.Refresh)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/mfa/setup", mfaH.Setup)
@@ -289,6 +287,7 @@ func main() {
 	r.Post("/api/v1/billing/webhook", billingH.Webhook)
 
 	authMw := auth.Middleware(jwtSecret, keyStore)
+	r.With(authMw).Get("/api/v1/auth/check", authH.Check) // session check — validates cookie
 
 	// SSE — cookie-based auth (no ?token= in URL — prevents log leakage)
 	r.With(authMw).Get("/api/v1/events", handler.SSEHandler)
