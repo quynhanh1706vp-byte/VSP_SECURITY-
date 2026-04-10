@@ -171,6 +171,32 @@ func main() {
 	// Serve static files, fallback to index.html for SPA
 	fs := http.FileServer(http.Dir("./static"))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// CSRF token relay: lấy vsp_csrf từ gateway rồi set cho browser
+		// OWASP ASVS V4.2.2 — cả browser và gateway phải dùng cùng token
+		if r.Method == http.MethodGet {
+			if _, err := r.Cookie("vsp_csrf"); err != nil {
+				// Fetch CSRF token từ gateway (sync)
+				gwURL := fmt.Sprintf("http://%s:%d/health", gatewayHost, gatewayPort)
+				if gresp, gerr := http.DefaultClient.Get(gwURL); gerr == nil {
+					for _, c := range gresp.Cookies() {
+						if c.Name == "vsp_csrf" {
+							// Relay gateway's CSRF cookie to browser
+							http.SetCookie(w, &http.Cookie{
+								Name:     "vsp_csrf",
+								Value:    c.Value,
+								Path:     "/",
+								SameSite: http.SameSiteStrictMode,
+								HttpOnly: false,
+							})
+							// Also forward cookie to all subsequent proxy requests
+							r.AddCookie(&http.Cookie{Name: "vsp_csrf", Value: c.Value})
+							break
+						}
+					}
+					gresp.Body.Close() //nolint:errcheck
+				}
+			}
+		}
 		if r.URL.Path != "/" {
 			_, err := os.Stat("./static" + r.URL.Path) //#nosec G703 -- path sanitized by http.FileServer
 			if os.IsNotExist(err) {
