@@ -67,7 +67,7 @@ func (h *Report) ExecutivePDF(w http.ResponseWriter, r *http.Request) {
 		if _, err := exec.LookPath(conv[0]); err != nil {
 			continue
 		}
-		if pdfErr = exec.CommandContext(r.Context(), conv[0], conv[1:]...).Run(); pdfErr == nil { //nolint:gosec // G702: conv from hardcoded list
+		if pdfErr = exec.CommandContext(r.Context(), conv[0], conv[1:]...).Run(); pdfErr == nil { //#nosec G702 -- conv[0] from hardcoded allowlist only
 			break
 		}
 	}
