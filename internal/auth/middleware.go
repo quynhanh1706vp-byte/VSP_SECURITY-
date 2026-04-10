@@ -74,13 +74,26 @@ func Middleware(jwtSecret string, keyStore APIKeyStore) func(http.Handler) http.
 				claims, ok = c, true
 			}
 
-			// 2. Try Bearer JWT (browser/UI path)
+			// 2. Try Bearer JWT header (API clients / CI-CD path)
 			if !ok {
 				bearer := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 				if bearer != "" {
 					c, err := parseJWT(bearer, jwtSecret)
 					if err != nil {
 						log.Warn().Str("ip", r.RemoteAddr).Err(err).Msg("invalid jwt")
+						http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+						return
+					}
+					claims, ok = c, true
+				}
+			}
+
+			// 3. Try httpOnly cookie (browser path — OWASP A07)
+			if !ok {
+				if cookie, err := r.Cookie("vsp_token"); err == nil && cookie.Value != "" {
+					c, err := parseJWT(cookie.Value, jwtSecret)
+					if err != nil {
+						log.Warn().Str("ip", r.RemoteAddr).Err(err).Msg("invalid cookie jwt")
 						http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 						return
 					}
