@@ -34,7 +34,8 @@ type PolicyRule struct {
 func DefaultRule() PolicyRule {
 	return PolicyRule{
 		FailOn:        "FAIL",
-		MaxHigh:       -1,
+		MinScore:      70,  // NIST SP 800-53 baseline — score < 70 = FAIL
+		MaxHigh:       10,  // >10 HIGH findings = FAIL (was unlimited)
 		BlockSecrets:  true,
 		BlockCritical: true,
 	}

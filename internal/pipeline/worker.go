@@ -157,6 +157,8 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	h.DB.UpdateRunResult(dbCtx, payload.TenantID, payload.RID,
 		string(eval.Decision), eval.Posture,
 		len(result.Findings), summaryJSON)
+	// Store gate reason for audit trail
+	h.DB.UpdateRunGateReason(dbCtx, payload.TenantID, payload.RID, eval.Reason)
 	// Audit: log scan completion (synchronous - context.Background avoids cancellation)
 	{
 		auditCtx := context.Background()

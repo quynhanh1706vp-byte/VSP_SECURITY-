@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strings"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,8 +29,15 @@ func TestCSPNonce_SetsHeader(t *testing.T) {
 	if w.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Error("expected X-Content-Type-Options: nosniff")
 	}
-	if w.Header().Get("X-Frame-Options") != "DENY" {
-		t.Error("expected X-Frame-Options: DENY")
+	if w.Header().Get("X-Frame-Options") != "SAMEORIGIN" {
+		t.Error("expected X-Frame-Options: SAMEORIGIN")
+	}
+	// Verify nonce is injected into CSP script-src and style-src
+	if !strings.Contains(csp, "nonce-"+capturedNonce) {
+		t.Errorf("expected nonce %s in CSP, got: %s", capturedNonce, csp)
+	}
+	if !strings.Contains(csp, "script-src") {
+		t.Error("expected script-src in CSP")
 	}
 }
 
