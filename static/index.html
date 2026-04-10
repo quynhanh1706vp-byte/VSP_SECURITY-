@@ -1111,6 +1111,57 @@
          SOC PANEL
     ════════════════════════════════════ -->
     <div id="panel-soc" class="panel">
+    <!-- ── Zero Trust Maturity Dashboard ─────────────────────────── -->
+    <div class="g4 mb14" id="zt-maturity-row">
+      <div class="card" style="grid-column:span 2">
+        <div class="card-head">
+          <div class="card-title">Zero Trust Maturity — CISA ZT Model</div>
+          <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px" id="zt-overall-badge">Score: —</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px" id="zt-pillars-grid">
+          <!-- Populated by JS -->
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Identity</div>
+            <div style="font-size:18px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="zt-identity">—</div>
+            <div style="height:3px;background:var(--bg2);border-radius:2px;margin-top:4px"><div id="zt-identity-bar" style="height:3px;border-radius:2px;background:var(--cyan);width:0%"></div></div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Devices</div>
+            <div style="font-size:18px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="zt-devices">—</div>
+            <div style="height:3px;background:var(--bg2);border-radius:2px;margin-top:4px"><div id="zt-devices-bar" style="height:3px;border-radius:2px;background:var(--cyan);width:0%"></div></div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Networks</div>
+            <div style="font-size:18px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="zt-networks">—</div>
+            <div style="height:3px;background:var(--bg2);border-radius:2px;margin-top:4px"><div id="zt-networks-bar" style="height:3px;border-radius:2px;background:var(--cyan);width:0%"></div></div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Apps</div>
+            <div style="font-size:18px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="zt-apps">—</div>
+            <div style="height:3px;background:var(--bg2);border-radius:2px;margin-top:4px"><div id="zt-apps-bar" style="height:3px;border-radius:2px;background:var(--cyan);width:0%"></div></div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Data</div>
+            <div style="font-size:18px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="zt-data">—</div>
+            <div style="height:3px;background:var(--bg2);border-radius:2px;margin-top:4px"><div id="zt-data-bar" style="height:3px;border-radius:2px;background:var(--cyan);width:0%"></div></div>
+          </div>
+        </div>
+        <div style="font-size:9px;color:var(--t3);margin-top:8px">CISA Zero Trust Maturity Model v2.0 · DoD ZTA Strategy · EO 14028</div>
+      </div>
+
+      <!-- MITRE ATT&CK Summary -->
+      <div class="card" style="grid-column:span 2">
+        <div class="card-head">
+          <div class="card-title">MITRE ATT&amp;CK Coverage</div>
+          <span class="pill" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);font-size:9px">SI-3 · IR-4</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px" id="attack-tactics-grid">
+          <!-- Populated by JS -->
+        </div>
+        <div style="font-size:9px;color:var(--t3);margin-top:8px">Based on active incidents · MITRE ATT&amp;CK Enterprise v14</div>
+      </div>
+    </div>
+
       <div class="card mb14">
         <div class="card-head"><div class="card-title">Zero Trust — 7 pillar scores</div></div>
         <div class="pillars" id="zt-pillars">
@@ -8747,5 +8798,217 @@ window.initDashboardCharts = async function() {
 setInterval(loadDoDWidgets, 300000);
 </script>
 
+
+<script>
+// ── Feature 2: ZT Maturity + ATT&CK ─────────────────────────────
+async function loadZTMaturity() {
+  if (!window.TOKEN) return;
+  try {
+    if (!window._p4Token) {
+      var csrfVal = _safeHeader((document.cookie.split(';').map(function(c){return c.trim();})
+        .find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('='));
+      var tr = await fetch('/api/v1/auth/api-token',{method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':'application/json','X-CSRF-Token':csrfVal}});
+      if(tr.ok){var td=await tr.json();window._p4Token=td.token;}
+    }
+    var p4h = window._p4Token ? {'Authorization':'Bearer '+window._p4Token} : {};
+    var zt = await fetch('/api/p4/zt/status',{headers:p4h}).then(function(r){return r.json();}).catch(function(){return null;});
+    if (!zt || !zt.pillars) return;
+
+    // Overall score badge
+    var badge = document.getElementById('zt-overall-badge');
+    if (badge) {
+      badge.textContent = 'Score: '+zt.overall_score+'/100';
+      badge.style.color = zt.overall_score>=80?'var(--green)':zt.overall_score>=60?'var(--amber)':'var(--red)';
+    }
+
+    // Map pillars
+    var pillarMap = {
+      'identity':   ['zt-identity','zt-identity-bar'],
+      'devices':    ['zt-devices','zt-devices-bar'],
+      'networks':   ['zt-networks','zt-networks-bar'],
+      'application':['zt-apps','zt-apps-bar'],
+      'data':       ['zt-data','zt-data-bar']
+    };
+    Object.keys(pillarMap).forEach(function(key) {
+      var p = zt.pillars[key];
+      if (!p) return;
+      var ids = pillarMap[key];
+      var scoreEl = document.getElementById(ids[0]);
+      var barEl = document.getElementById(ids[1]);
+      var sc = p.score || 0;
+      var color = sc>=80?'var(--green)':sc>=60?'var(--amber)':'var(--red)';
+      if (scoreEl) { scoreEl.textContent = sc; scoreEl.style.color = color; }
+      if (barEl) { barEl.style.width = sc+'%'; barEl.style.background = color; }
+    });
+  } catch(e) { console.warn('loadZTMaturity:', e.message); }
+}
+
+async function loadATTACK() {
+  if (!window.TOKEN) return;
+  try {
+    var inc = await fetch('/api/v1/correlation/incidents?limit=100',{credentials:'same-origin'})
+      .then(function(r){return r.json();}).catch(function(){return {incidents:[]};});
+    var incidents = inc.incidents || [];
+
+    // Map incidents to ATT&CK tactics
+    var tacticCounts = {
+      'Initial Access': 0, 'Execution': 0, 'Persistence': 0,
+      'Privilege Escalation': 0, 'Defense Evasion': 0, 'Credential Access': 0,
+      'Discovery': 0, 'Lateral Movement': 0
+    };
+
+    incidents.forEach(function(i) {
+      var title = (i.title||'').toLowerCase();
+      if (title.includes('access') || title.includes('login') || title.includes('auth')) tacticCounts['Initial Access']++;
+      if (title.includes('exec') || title.includes('script') || title.includes('command')) tacticCounts['Execution']++;
+      if (title.includes('persist') || title.includes('startup') || title.includes('scheduled')) tacticCounts['Persistence']++;
+      if (title.includes('privilege') || title.includes('escalat') || title.includes('sudo')) tacticCounts['Privilege Escalation']++;
+      if (title.includes('evas') || title.includes('bypass') || title.includes('disable')) tacticCounts['Defense Evasion']++;
+      if (title.includes('credential') || title.includes('password') || title.includes('hash')) tacticCounts['Credential Access']++;
+      if (title.includes('scan') || title.includes('enum') || title.includes('discover')) tacticCounts['Discovery']++;
+      if (title.includes('lateral') || title.includes('move') || title.includes('pivot')) tacticCounts['Lateral Movement']++;
+    });
+
+    var grid = document.getElementById('attack-tactics-grid');
+    if (!grid) return;
+    var maxCount = Math.max(1, Math.max.apply(null, Object.values(tacticCounts)));
+    grid.innerHTML = Object.keys(tacticCounts).map(function(tactic) {
+      var count = tacticCounts[tactic];
+      var pct = Math.round(count/maxCount*100);
+      var color = count===0?'var(--t3)':count>=3?'var(--red)':'var(--amber)';
+      return '<div style="padding:6px;background:var(--bg3);border-radius:4px;border-left:2px solid '+color+'">'
+        +'<div style="font-size:9px;color:var(--t3);margin-bottom:3px">'+tactic+'</div>'
+        +'<div style="font-size:16px;font-weight:700;color:'+color+';font-family:var(--mono)">'+count+'</div>'
+        +'<div style="height:2px;background:var(--bg2);border-radius:1px;margin-top:3px">'
+        +'<div style="height:2px;border-radius:1px;background:'+color+';width:'+pct+'%"></div></div>'
+        +'</div>';
+    }).join('');
+  } catch(e) { console.warn('loadATTACK:', e.message); }
+}
+
+// ── Feature 3: OSCAL Viewer ──────────────────────────────────────
+async function loadOSCALViewer() {
+  if (!window.TOKEN) return;
+  try {
+    var ar = await fetch('/api/v1/compliance/oscal/ar',{credentials:'same-origin'})
+      .then(function(r){return r.json();}).catch(function(){return null;});
+    if (!ar) return;
+
+    // Version badge
+    var vBadge = document.getElementById('oscal-version-badge');
+    if (vBadge) vBadge.textContent = 'OSCAL '+(ar['oscal-version']||'1.1.2');
+
+    // Last modified
+    var lm = document.getElementById('oscal-last-modified');
+    if (lm && ar.metadata) {
+      var d = new Date(ar.metadata['last-modified']);
+      lm.textContent = 'NIST OSCAL '+(ar['oscal-version']||'1.1.2')+' · FedRAMP AR · Last modified: '+d.toLocaleDateString();
+    }
+
+    // Count findings
+    var allFindings = [];
+    (ar.results||[]).forEach(function(result) {
+      (result.findings||[]).forEach(function(f) { allFindings.push(f); });
+    });
+
+    var satisfactory = allFindings.filter(function(f){
+      return f.target && f.target.status && f.target.status.state === 'satisfactory';
+    }).length;
+    var notSatisfactory = allFindings.filter(function(f){
+      return f.target && f.target.status && f.target.status.state === 'not-satisfactory';
+    }).length;
+    var other = allFindings.length - satisfactory - notSatisfactory;
+    var controls = new Set(allFindings.map(function(f){return f.target&&f.target['target-id']||'';})).size;
+
+    var s = document.getElementById('oscal-satisfactory'); if(s) s.textContent = satisfactory;
+    var ns = document.getElementById('oscal-not-satisfactory'); if(ns) ns.textContent = notSatisfactory;
+    var o = document.getElementById('oscal-other'); if(o) o.textContent = other;
+    var c = document.getElementById('oscal-controls'); if(c) c.textContent = controls;
+
+    // Status badge
+    var sBadge = document.getElementById('oscal-status-badge');
+    if (sBadge) {
+      sBadge.textContent = notSatisfactory === 0 ? 'All controls satisfactory' : notSatisfactory+' controls need attention';
+      sBadge.style.color = notSatisfactory===0 ? 'var(--green)' : 'var(--amber)';
+    }
+
+    // Table
+    var tbody = document.getElementById('oscal-findings-tbody');
+    if (tbody && allFindings.length > 0) {
+      tbody.innerHTML = allFindings.slice(0,20).map(function(f) {
+        var state = f.target&&f.target.status&&f.target.status.state||'unknown';
+        var color = state==='satisfactory'?'var(--green)':state==='not-satisfactory'?'var(--red)':'var(--amber)';
+        var ctrl = f.target&&f.target['target-id']||'—';
+        var desc = (f.description||'').slice(0,80)+(f.description&&f.description.length>80?'…':'');
+        return '<tr style="border-bottom:1px solid var(--b1)">'
+          +'<td style="padding:5px 6px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+ctrl+'</td>'
+          +'<td style="padding:5px 6px"><span style="font-size:9px;color:'+color+'">'+state+'</span></td>'
+          +'<td style="padding:5px 6px;color:var(--t2);font-size:10px">'+desc+'</td>'
+          +'</tr>';
+      }).join('');
+    }
+  } catch(e) { console.warn('loadOSCALViewer:', e.message); }
+}
+
+// Hook vào showPanel
+var _sp_feat23 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp_feat23(name, btn);
+  if (name === 'soc') {
+    setTimeout(loadZTMaturity, 300);
+    setTimeout(loadATTACK, 400);
+  }
+  if (name === 'fedramp') {
+    setTimeout(loadOSCALViewer, 300);
+  }
+};
+</script>
+
 </body>
 </html>
+    <!-- ── OSCAL Assessment Results Viewer ───────────────────────── -->
+    <div class="mb14">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">OSCAL Assessment Results</div>
+          <div style="display:flex;gap:6px">
+            <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px" id="oscal-version-badge">OSCAL —</span>
+            <span class="pill" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);font-size:9px" id="oscal-status-badge">Loading...</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0" id="oscal-kpis">
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--green);font-family:var(--mono)" id="oscal-satisfactory">—</div>
+            <div style="font-size:10px;color:var(--t3)">Satisfactory</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--red);font-family:var(--mono)" id="oscal-not-satisfactory">—</div>
+            <div style="font-size:10px;color:var(--t3)">Not satisfactory</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="oscal-other">—</div>
+            <div style="font-size:10px;color:var(--t3)">Other findings</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px">
+            <div style="font-size:20px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="oscal-controls">—</div>
+            <div style="font-size:10px;color:var(--t3)">Controls assessed</div>
+          </div>
+        </div>
+        <div style="max-height:300px;overflow-y:auto" id="oscal-findings-table">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--b1)">
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Control</th>
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Status</th>
+                <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Finding</th>
+              </tr>
+            </thead>
+            <tbody id="oscal-findings-tbody">
+              <tr><td colspan="3" style="padding:12px;text-align:center;color:var(--t3)">Loading OSCAL data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:9px;color:var(--t3);margin-top:8px" id="oscal-last-modified">NIST OSCAL 1.1.2 · FedRAMP AR · Last modified: —</div>
+      </div>
+    </div>
