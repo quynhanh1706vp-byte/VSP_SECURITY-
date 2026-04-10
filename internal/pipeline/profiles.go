@@ -32,7 +32,7 @@ func RunnersForProfile(mode Mode, profile Profile) []scanner.Runner {
 
 func TimeoutForProfile(profile Profile) int {
 	if cfg, ok := Profiles[profile]; ok {
-		return cfg.TimeoutSec / 3
+		return cfg.TimeoutSec
 	}
 	return 120
 }

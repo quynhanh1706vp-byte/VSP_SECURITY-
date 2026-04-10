@@ -13,29 +13,15 @@ database:
   min_conns: 2
 
 auth:
-  jwt_secret: "57639b491307d4989ef41e1b381599c3024cab37d4f6538f9dd0538c6defd953"  # generated — move to env JWT_SECRET in production
-  jwt_ttl: 24h
-  api_key_ttl: 90d
-
-scanner:
-  concurrency: 4
-  default_timeout_sec: 300
-
-log:
-  level: info
-  format: json
-
-redis:
-  addr: localhost:6379
-  password: "VspRedis2026!"
+  jwt_secret: "${JWT_SECRET}"  # set via env: export JWT_SECRET=<your-secret>VspRedis2026!"
 integrations:
-  slack_webhook: "https://hooks.slack.com/services/xxx"
+  slack_webhook: "${{ SLACK_WEBHOOK }}"  # set via env
   jira_url: "https://your-org.atlassian.net"
-  jira_token: "xxx"
+  jira_token: "${{ JIRA_TOKEN }}"  # set via env
   jira_project: "VSP-SECURITY"
-  github_token: "ghp_xxx"
+  github_token: "${{ GITHUB_TOKEN }}"  # set via env
   github_repo: "your-org/your-repo"
-  pagerduty_key: "xxx"
+  pagerduty_key: "${{ PAGERDUTY_KEY }}"  # set via env
 
 smtp:
   host: "smtp.gmail.com"
@@ -47,4 +33,4 @@ smtp:
   enabled: false
 
 anthropic:
-  api_key: ""
+  api_key: "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"

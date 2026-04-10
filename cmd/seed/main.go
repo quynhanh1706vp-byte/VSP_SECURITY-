@@ -12,6 +12,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func getEnvOrDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" { return v }
+	return def
+}
+
 func main() {
 	viper.SetDefault("database.url", "postgres://vsp:vsp@localhost:5432/vsp_go")
 	viper.AutomaticEnv()
@@ -34,12 +39,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Users to seed
+	// Safety guard — refuse to run in production
+	if env := os.Getenv("VSP_ENV"); env == "production" || env == "prod" {
+		fmt.Fprintln(os.Stderr, "ERROR: seed refused in production environment (VSP_ENV=production)")
+		os.Exit(1)
+	}
+	fmt.Fprintln(os.Stderr, "WARNING: seeding development users with weak passwords — never run in production!")
+
+	// Users to seed — passwords from env or defaults (dev only)
+	adminPass   := getEnvOrDefault("SEED_ADMIN_PASS",   "admin123")
+	analystPass := getEnvOrDefault("SEED_ANALYST_PASS", "analyst123")
+	devPass     := getEnvOrDefault("SEED_DEV_PASS",     "dev123")
+	auditorPass := getEnvOrDefault("SEED_AUDITOR_PASS", "auditor123")
 	seeds := []struct{ email, password, role string }{
-		{"admin@vsp.local",   "admin123",   "admin"},
-		{"analyst@vsp.local", "analyst123", "analyst"},
-		{"dev@vsp.local",     "dev123",     "dev"},
-		{"auditor@vsp.local", "auditor123", "auditor"},
+		{"admin@vsp.local",   adminPass,   "admin"},
+		{"analyst@vsp.local", analystPass, "analyst"},
+		{"dev@vsp.local",     devPass,     "dev"},
+		{"auditor@vsp.local", auditorPass, "auditor"},
 	}
 
 	for _, s := range seeds {

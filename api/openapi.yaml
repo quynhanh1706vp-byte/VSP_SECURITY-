@@ -20,6 +20,404 @@ servers:
 security:
   - BearerAuth: []
 
+  /api/v1/vsp/run/latest:
+    get:
+      summary: Get latest scan run
+      tags: [Runs]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Latest run object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+
+  /api/v1/vsp/run/{rid}:
+    get:
+      summary: Get run by RID
+      tags: [Runs]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: rid
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Run object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+
+  /api/v1/vsp/runs/index:
+    get:
+      summary: List runs with summary (index view)
+      tags: [Runs]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, default: 100}
+      responses:
+        '200':
+          description: Run list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runs: {type: array, items: {$ref: '#/components/schemas/Run'}}
+                  total: {type: integer}
+
+  /api/v1/vsp/findings:
+    get:
+      summary: List findings with filters
+      tags: [Findings]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: run_id
+          in: query
+          schema: {type: string}
+        - name: severity
+          in: query
+          schema: {type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW, INFO]}
+        - name: tool
+          in: query
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, default: 50, maximum: 2000}
+        - name: offset
+          in: query
+          schema: {type: integer, default: 0}
+      responses:
+        '200':
+          description: Paginated findings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  findings:
+                    type: array
+                    items: {$ref: '#/components/schemas/Finding'}
+                  total: {type: integer}
+                  limit: {type: integer}
+                  offset: {type: integer}
+
+  /api/v1/vsp/findings/summary:
+    get:
+      summary: Findings summary counts for latest run
+      tags: [Findings]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: run_id
+          in: query
+          schema: {type: string}
+          description: Optional run UUID. Defaults to latest run.
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  critical: {type: integer}
+                  high: {type: integer}
+                  medium: {type: integer}
+                  low: {type: integer}
+                  info: {type: integer}
+                  total: {type: integer}
+
+  /api/v1/vsp/gate/latest:
+    get:
+      summary: Latest gate decision
+      tags: [Gate]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Gate result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gate: {type: string, enum: [PASS, WARN, FAIL]}
+                  score: {type: integer}
+                  posture: {type: string}
+                  rid: {type: string}
+                  status: {type: string}
+
+  /api/v1/vsp/metrics_slos:
+    get:
+      summary: SLO metrics summary
+      tags: [Metrics]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: SLO metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pass_rate_pct: {type: number}
+                  avg_scan_duration_sec: {type: number}
+                  slo_pass_rate_met: {type: boolean}
+                  slo_scan_time_met: {type: boolean}
+
+  /api/v1/vsp/posture/latest:
+    get:
+      summary: Latest security posture
+      tags: [Gate]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Posture
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  grade: {type: string}
+                  score: {type: integer}
+                  critical: {type: integer}
+                  high: {type: integer}
+                  rid: {type: string}
+
+  /api/v1/vsp/sla_tracker:
+    get:
+      summary: SLA remediation deadlines tracker
+      tags: [Remediation]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: SLA items
+
+  /api/v1/remediation:
+    get:
+      summary: List remediation records
+      tags: [Remediation]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, enum: [open, in_progress, resolved]}
+        - name: limit
+          in: query
+          schema: {type: integer, default: 50}
+      responses:
+        '200':
+          description: Remediation list
+
+  /api/v1/remediation/stats:
+    get:
+      summary: Remediation statistics
+      tags: [Remediation]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Stats
+
+  /api/v1/remediation/finding/{finding_id}:
+    post:
+      summary: Create or update remediation for a finding
+      tags: [Remediation]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: finding_id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string}
+                priority: {type: string}
+                assignee: {type: string}
+                ticket_url: {type: string}
+                notes: {type: string}
+      responses:
+        '200':
+          description: Updated remediation
+
+  /api/v1/audit/log:
+    get:
+      summary: Audit log entries
+      tags: [Audit]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, default: 100}
+        - name: action
+          in: query
+          schema: {type: string}
+      responses:
+        '200':
+          description: Audit log
+
+  /api/v1/policy/rules:
+    get:
+      summary: List policy rules
+      tags: [Policy]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Policy rules
+    post:
+      summary: Create policy rule
+      tags: [Policy]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyRule'
+      responses:
+        '201':
+          description: Created
+
+  /api/v1/policy/evaluate:
+    post:
+      summary: Evaluate current findings against policy
+      tags: [Policy]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Evaluation result
+
+  /api/v1/sbom/{rid}:
+    get:
+      summary: Get SBOM for a run (CycloneDX JSON)
+      tags: [SBOM]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: rid
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: CycloneDX SBOM
+
+  /api/v1/compliance/fedramp:
+    get:
+      summary: FedRAMP Moderate control coverage
+      tags: [Compliance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: FedRAMP scorecard
+
+  /api/v1/compliance/cmmc:
+    get:
+      summary: CMMC Level 2 domain coverage
+      tags: [Compliance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: CMMC scorecard
+
+  /api/v1/governance/raci:
+    get:
+      summary: RACI matrix
+      tags: [Governance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: RACI data
+
+  /api/v1/governance/risk-register:
+    get:
+      summary: Risk register derived from findings
+      tags: [Governance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Risk register items
+
+  /api/v1/governance/traceability:
+    get:
+      summary: Findings to control traceability matrix
+      tags: [Governance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Traceability rows
+
+  /api/v1/soc/zero-trust:
+    get:
+      summary: Zero Trust 7 pillars scorecard
+      tags: [SOC]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Zero Trust pillars
+
+  /api/v1/soc/framework-scorecard:
+    get:
+      summary: NIST/ISO/SOC2 framework scorecard
+      tags: [SOC]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Framework scores
+
+  /api/v1/soar/runs:
+    get:
+      summary: List SOAR playbook runs
+      tags: [SOAR]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Playbook runs
+
+  /api/v1/notifications:
+    get:
+      summary: User notifications
+      tags: [Notifications]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Notifications
+
+  /api/v1/logs/stats:
+    get:
+      summary: Log pipeline statistics
+      tags: [SIEM]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Log stats
+
+  /api/v1/vsp/executive_report_pdf/{rid}:
+    get:
+      summary: Generate executive PDF report
+      tags: [Reports]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: rid
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: PDF binary
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
 components:
   securitySchemes:
     BearerAuth:
@@ -84,7 +482,7 @@ components:
         id: { type: string, format: uuid }
         rid: { type: string }
         tenant_id: { type: string, format: uuid }
-        mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, FULL] }
+        mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, NETWORK, FULL] }
         profile: { type: string, enum: [FAST, STANDARD, DEEP] }
         status: { type: string, enum: [QUEUED, RUNNING, DONE, FAILED, CANCELLED] }
         gate: { type: string, enum: [PASS, WARN, FAIL] }
@@ -104,6 +502,61 @@ components:
         line_num: { type: integer }
         cwe: { type: string }
         fix_signal: { type: string }
+
+
+    Run:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        rid: {type: string}
+        tenant_id: {type: string}
+        mode: {type: string, enum: [SAST, SCA, IAC, SECRETS, DAST, FULL]}
+        profile: {type: string, enum: [FAST, STANDARD, THOROUGH]}
+        src: {type: string}
+        status: {type: string, enum: [QUEUED, RUNNING, DONE, FAILED]}
+        gate: {type: string, enum: [PASS, WARN, FAIL]}
+        posture: {type: string, enum: [A, B, C, D, F]}
+        total_findings: {type: integer}
+        tools_done: {type: integer}
+        tools_total: {type: integer}
+        summary:
+          type: object
+          properties:
+            SCORE: {type: integer}
+            CRITICAL: {type: integer}
+            HIGH: {type: integer}
+            MEDIUM: {type: integer}
+            LOW: {type: integer}
+        created_at: {type: string, format: date-time}
+        started_at: {type: string, format: date-time}
+        finished_at: {type: string, format: date-time}
+
+    Finding:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        run_id: {type: string, format: uuid}
+        tenant_id: {type: string}
+        tool: {type: string}
+        severity: {type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW, INFO]}
+        rule_id: {type: string}
+        message: {type: string}
+        path: {type: string}
+        line: {type: integer}
+        cwe: {type: string, example: CWE-732}
+        cvss: {type: number, format: float, minimum: 0, maximum: 10}
+        fix_signal: {type: string}
+        created_at: {type: string, format: date-time}
+
+    PolicyRule:
+      type: object
+      properties:
+        name: {type: string}
+        fail_on: {type: string, enum: [FAIL, WARN, never]}
+        min_score: {type: integer, minimum: 0, maximum: 100}
+        max_high: {type: integer}
+        block_secrets: {type: boolean}
+        block_critical: {type: boolean}
 
     User:
       type: object
@@ -239,11 +692,73 @@ paths:
             schema:
               type: object
               properties:
-                mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, FULL] }
+                mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, NETWORK, FULL] }
                 profile: { type: string, enum: [FAST, STANDARD, DEEP] }
                 src: { type: string, description: "Path or URL to scan" }
       responses:
         "200": { description: Scan queued }
+
+  
+  /api/v1/vsp/batch:
+    post:
+      summary: Submit batch of scan jobs
+      tags: [Scans]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                batch_label: { type: string }
+                parallel: { type: integer, minimum: 1, maximum: 5, default: 3 }
+                fail_fast: { type: boolean, default: false }
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [mode, src]
+                    properties:
+                      mode: { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, NETWORK, FULL] }
+                      profile: { type: string, enum: [FAST, STANDARD, DEEP], default: FAST }
+                      src: { type: string }
+                      label: { type: string }
+      responses:
+        "200": { description: Batch queued }
+        "400": { description: Validation error }
+
+  /api/v1/vsp/batches:
+    get:
+      summary: List batch runs
+      tags: [Scans]
+      responses:
+        "200": { description: List of batches }
+
+  /api/v1/vsp/batch/{batch_id}:
+    get:
+      summary: Get batch status
+      tags: [Scans]
+      parameters:
+        - in: path
+          name: batch_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Batch status with progress }
+        "404": { description: Not found }
+    delete:
+      summary: Cancel batch
+      tags: [Scans]
+      parameters:
+        - in: path
+          name: batch_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Cancelled }
 
   /api/v1/vsp/runs:
     get:
@@ -368,6 +883,324 @@ paths:
       responses:
         "200": { description: Webhook created }
 
+
+  /api/v1/vsp/run/{rid}:
+    get:
+      summary: Get scan run by RID
+      tags: [Scans]
+      parameters:
+        - in: path
+          name: rid
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Run object }
+        "404": { description: Not found }
+
+  /api/v1/vsp/run/latest:
+    get:
+      summary: Get latest scan run
+      tags: [Scans]
+      responses:
+        "200": { description: Latest run }
+        "404": { description: No runs found }
+
+  /api/v1/vsp/runs/index:
+    get:
+      summary: Lightweight runs index for polling
+      tags: [Scans]
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+      responses:
+        "200": { description: Runs index }
+
+  /api/v1/vsp/findings/summary:
+    get:
+      summary: Findings severity summary
+      tags: [Findings]
+      parameters:
+        - in: query
+          name: run_id
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  CRITICAL: { type: integer }
+                  HIGH: { type: integer }
+                  MEDIUM: { type: integer }
+                  LOW: { type: integer }
+                  total: { type: integer }
+
+  /api/v1/vsp/posture/latest:
+    get:
+      summary: Latest security posture score
+      tags: [Scans]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  score: { type: integer }
+                  gate: { type: string, enum: [PASS, WARN, FAIL] }
+                  posture: { type: string, enum: [A, B, C, D, F] }
+
+  /api/v1/schedules:
+    get:
+      summary: List scan schedules
+      tags: [Scheduler]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schedules:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        mode: { type: string, enum: [SAST, SCA, SECRETS, IAC, DAST, FULL, NETWORK] }
+                        profile: { type: string, enum: [FAST, EXT, AGGR, PREMIUM, FULL, FULL_SOC] }
+                        cron: { type: string, description: "5-field cron expression" }
+                        enabled: { type: boolean }
+                        next_run_at: { type: string, format: date-time }
+                        last_run_at: { type: string, format: date-time }
+    post:
+      summary: Create scan schedule
+      tags: [Scheduler]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, mode, cron]
+              properties:
+                name: { type: string }
+                mode: { type: string, enum: [SAST, SCA, SECRETS, IAC, DAST, FULL, NETWORK] }
+                profile: { type: string, enum: [FAST, EXT, AGGR, PREMIUM, FULL, FULL_SOC], default: FAST }
+                cron: { type: string, example: "0 2 * * *" }
+                src: { type: string }
+                enabled: { type: boolean, default: true }
+      responses:
+        "201": { description: Schedule created }
+        "400": { description: Invalid cron or mode }
+
+  /api/v1/schedules/{id}:
+    patch:
+      summary: Update schedule
+      tags: [Scheduler]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Updated }
+    delete:
+      summary: Delete schedule
+      tags: [Scheduler]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+
+  /api/v1/schedules/{id}/toggle:
+    patch:
+      summary: Toggle schedule enabled/disabled
+      tags: [Scheduler]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  enabled: { type: boolean }
+
+  /api/v1/remediation/finding/{finding_id}:
+    get:
+      summary: Get remediation for a finding
+      tags: [Remediation]
+      parameters:
+        - in: path
+          name: finding_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Remediation object }
+    post:
+      summary: Create or update remediation
+      tags: [Remediation]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [open, in_progress, resolved, accepted, false_positive] }
+                priority: { type: string, enum: [P1, P2, P3, P4] }
+                assignee: { type: string }
+                ticket_url: { type: string }
+                notes: { type: string }
+      responses:
+        "200": { description: Remediation saved }
+
+  /api/v1/compliance/fedramp:
+    get:
+      summary: FedRAMP Moderate compliance status
+      tags: [Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  coverage_pct: { type: number }
+                  controls_assessed: { type: integer }
+                  controls_total: { type: integer }
+
+  /api/v1/compliance/cmmc:
+    get:
+      summary: CMMC Level 2 compliance status
+      tags: [Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  coverage_pct: { type: number }
+
+  /api/v1/ai/analyze:
+    post:
+      summary: AI security analysis (Claude)
+      tags: [AI]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                model: { type: string, default: claude-sonnet-4-20250514 }
+                max_tokens: { type: integer, default: 1000 }
+                system: { type: string }
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role: { type: string, enum: [user, assistant] }
+                      content: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string }
+                        text: { type: string }
+
+  /api/v1/export/sarif/{rid}:
+    get:
+      summary: Export findings as SARIF
+      tags: [Export]
+      parameters:
+        - in: path
+          name: rid
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, description: "SARIF 2.1.0 format" }
+
+  /api/v1/export/csv/{rid}:
+    get:
+      summary: Export findings as CSV
+      tags: [Export]
+      parameters:
+        - in: path
+          name: rid
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /api/v1/vsp/batch:
+    post:
+      summary: Submit batch scan
+      tags: [Scans]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      src: { type: string }
+                      mode: { type: string }
+                      profile: { type: string }
+      responses:
+        "202": { description: Batch queued }
+
+  /api/v1/drift:
+    get:
+      summary: List drift detection events
+      tags: [Scheduler]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        prev_posture: { type: string }
+                        new_posture: { type: string }
+                        delta: { type: integer }
+                        detected_at: { type: string, format: date-time }
+
 tags:
   - name: System
     description: Health, metrics
@@ -381,3 +1214,13 @@ tags:
     description: User management (admin only)
   - name: SIEM
     description: Security incidents, webhooks, correlation
+  - name: Scheduler
+    description: Scan schedules and drift detection
+  - name: Remediation
+    description: Finding remediation tracking
+  - name: Compliance
+    description: FedRAMP, CMMC, OSCAL compliance
+  - name: AI
+    description: AI-powered security analysis
+  - name: Export
+    description: Export findings in various formats

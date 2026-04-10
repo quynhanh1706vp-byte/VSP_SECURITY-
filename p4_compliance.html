@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VSP — P4 Compliance</title>
+<style>
+:root {
+  --bg: #0a0c10;
+  --bg2: #0f1218;
+  --bg3: #141820;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --t1: #e8eaf0;
+  --t2: #8b92a5;
+  --t3: #4a5168;
+  --cyan: #06b6d4;
+  --cyan-d: rgba(6,182,212,0.15);
+  --green: #10b981;
+  --green-d: rgba(16,185,129,0.15);
+  --amber: #f59e0b;
+  --amber-d: rgba(245,158,11,0.15);
+  --red: #ef4444;
+  --red-d: rgba(239,68,68,0.15);
+  --blue: #3b82f6;
+  --blue-d: rgba(59,130,246,0.15);
+  --purple: #8b5cf6;
+  --purple-d: rgba(139,92,246,0.15);
+  --r: 6px;
+  --mono: 'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size:13px; line-height:1.5; }
+.shell { display:grid; grid-template-columns:180px 1fr; height:100vh; overflow:hidden; }
+
+/* Sidebar nav */
+.sidenav { background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+.sidenav-logo { padding:18px 14px 12px; border-bottom:1px solid var(--border); }
+.logo-badge { font-size:10px; font-weight:700; letter-spacing:.14em; color:var(--cyan); }
+.logo-sub { font-size:9px; color:var(--t3); margin-top:2px; }
+.nav-section { padding:12px 10px 6px; font-size:9px; color:var(--t3); letter-spacing:.1em; }
+.nav-btn { display:flex; align-items:center; gap:8px; padding:7px 14px; cursor:pointer; border:none; background:none; color:var(--t2); font-family:var(--mono); font-size:12px; width:100%; text-align:left; border-left:2px solid transparent; transition:all .15s; }
+.nav-btn:hover { color:var(--t1); background:var(--border); }
+.nav-btn.active { color:var(--cyan); border-left-color:var(--cyan); background:var(--cyan-d); }
+.nav-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+/* Main content */
+.main { overflow-y:auto; background:var(--bg); }
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:10; }
+.topbar-title { font-size:14px; font-weight:600; color:var(--t1); }
+.topbar-meta { font-size:10px; color:var(--t3); }
+.p4-badge { font-size:10px; padding:3px 8px; border-radius:var(--r); background:var(--cyan-d); color:var(--cyan); border:1px solid rgba(6,182,212,.3); }
+
+.content { padding:20px 24px; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
+/* Score hero */
+.hero-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.score-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:14px; }
+.score-label { font-size:10px; color:var(--t3); letter-spacing:.08em; margin-bottom:6px; }
+.score-val { font-size:28px; font-weight:700; line-height:1; }
+.score-sub { font-size:10px; color:var(--t3); margin-top:4px; }
+.score-bar { height:3px; background:var(--border); border-radius:2px; margin-top:8px; }
+.score-bar-fill { height:100%; border-radius:2px; transition:width .6s ease; }
+
+/* Section titles */
+.section-hd { display:flex; align-items:center; justify-content:space-between; margin:20px 0 10px; }
+.section-title { font-size:10px; color:var(--t3); letter-spacing:.1em; }
+.section-action { font-size:11px; color:var(--cyan); cursor:pointer; background:none; border:none; font-family:var(--mono); }
+.section-action:hover { text-decoration:underline; }
+
+/* RMF Steps */
+.rmf-steps { display:flex; flex-direction:column; gap:10px; }
+.rmf-step { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+.rmf-step-header { display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; }
+.rmf-step-num { font-size:10px; color:var(--t3); min-width:16px; }
+.rmf-step-name { font-size:13px; font-weight:600; flex:1; }
+.rmf-step-owner { font-size:10px; color:var(--t3); }
+.rmf-step-status { font-size:10px; padding:3px 8px; border-radius:var(--r); }
+.s-complete { background:var(--green-d); color:var(--green); }
+.s-in_progress { background:var(--amber-d); color:var(--amber); }
+.s-pending { background:var(--border); color:var(--t3); }
+.rmf-tasks { border-top:1px solid var(--border); padding:10px 14px; display:none; }
+.rmf-step.open .rmf-tasks { display:block; }
+.task-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border); }
+.task-row:last-child { border-bottom:none; }
+.task-check { width:14px; height:14px; border-radius:3px; border:1px solid var(--border2); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:.15s; }
+.task-check.done { background:var(--green); border-color:var(--green); }
+.task-check.done::after { content:'✓'; color:#fff; font-size:9px; }
+.task-name { flex:1; font-size:12px; }
+.task-ref { font-size:10px; color:var(--cyan); }
+.task-artifact { font-size:10px; color:var(--t3); }
+
+/* Zero Trust pillars */
+.zt-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+.zt-pillar { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:12px; }
+.zt-pillar-name { font-size:10px; color:var(--t3); margin-bottom:6px; }
+.zt-pillar-score { font-size:22px; font-weight:700; }
+.zt-bar { height:3px; background:var(--border); border-radius:2px; margin-top:6px; }
+.zt-bar-fill { height:100%; border-radius:2px; }
+.p4-target { font-size:10px; color:var(--t3); margin-top:4px; }
+
+/* Capabilities table */
+.cap-table { width:100%; border-collapse:collapse; font-size:12px; }
+.cap-table th { text-align:left; padding:6px 10px; font-size:10px; color:var(--t3); border-bottom:1px solid var(--border); font-weight:500; }
+.cap-table td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+.cap-table tr:last-child td { border-bottom:none; }
+.level-opt { color:var(--green); }
+.level-adv { color:var(--cyan); }
+.level-trad { color:var(--amber); }
+.status-impl { color:var(--green); }
+.status-part { color:var(--amber); }
+.status-plan { color:var(--t3); }
+.status-ns { color:var(--red); }
+.mini-bar { width:60px; height:4px; background:var(--border); border-radius:2px; display:inline-block; vertical-align:middle; }
+.mini-bar-fill { height:100%; border-radius:2px; display:block; }
+
+/* RASP events */
+.rasp-list { display:flex; flex-direction:column; gap:6px; max-height:320px; overflow-y:auto; }
+.rasp-row { display:flex; align-items:center; gap:10px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:8px 12px; animation:fadeIn .3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+.rasp-sev { font-size:10px; padding:2px 6px; border-radius:3px; min-width:62px; text-align:center; }
+.sev-crit { background:var(--red-d); color:var(--red); }
+.sev-high { background:var(--amber-d); color:var(--amber); }
+.sev-med { background:var(--blue-d); color:var(--blue); }
+.sev-low { background:var(--border); color:var(--t3); }
+.rasp-type { flex:1; font-weight:600; font-size:12px; }
+.rasp-svc { font-size:10px; color:var(--t3); }
+.rasp-action-blk { font-size:10px; color:var(--red); }
+.rasp-action-alrt { font-size:10px; color:var(--amber); }
+.rasp-ts { font-size:10px; color:var(--t3); }
+
+/* Pipeline */
+.pipeline-header { display:flex; align-items:center; gap:14px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:14px 18px; margin-bottom:14px; }
+.run-id { font-size:12px; color:var(--cyan); font-weight:700; }
+.run-trigger { font-size:11px; color:var(--t3); }
+.pipeline-scores { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+.fw-score-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:10px 12px; }
+.fw-score-label { font-size:10px; color:var(--t3); margin-bottom:4px; }
+.fw-score-num { font-size:18px; font-weight:700; }
+.fw-delta-pos { font-size:10px; color:var(--green); }
+.fw-delta-neg { font-size:10px; color:var(--red); }
+
+.tests-list { display:flex; flex-direction:column; gap:4px; }
+.test-row { display:flex; align-items:center; gap:10px; padding:7px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); }
+.test-fw { font-size:10px; color:var(--t3); min-width:60px; }
+.test-ctrl { font-size:10px; color:var(--purple); min-width:100px; }
+.test-name { flex:1; font-size:12px; }
+.test-status { font-size:10px; padding:2px 8px; border-radius:3px; }
+.ts-pass { background:var(--green-d); color:var(--green); }
+.ts-fail { background:var(--red-d); color:var(--red); }
+.ts-warn { background:var(--amber-d); color:var(--amber); }
+.ts-skip { background:var(--border); color:var(--t3); }
+.test-score { font-size:11px; min-width:32px; text-align:right; }
+.test-evidence { font-size:10px; color:var(--t3); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* POA&M */
+.poam-list { display:flex; flex-direction:column; gap:6px; }
+.poam-row { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:10px 14px; }
+.poam-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.poam-id { font-size:10px; color:var(--cyan); }
+.poam-ctrl { font-size:10px; color:var(--purple); }
+.poam-name { flex:1; font-size:12px; font-weight:600; }
+.poam-sev { font-size:10px; padding:2px 6px; border-radius:3px; }
+.poam-status { font-size:10px; padding:2px 6px; border-radius:3px; }
+.st-open { background:var(--red-d); color:var(--red); }
+.st-rem { background:var(--amber-d); color:var(--amber); }
+.st-closed { background:var(--green-d); color:var(--green); }
+.poam-plan { font-size:11px; color:var(--t3); }
+
+/* Drift */
+.drift-row { display:flex; align-items:flex-start; gap:10px; padding:10px 14px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); margin-bottom:6px; }
+.drift-icon { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:12px; }
+.drift-info { flex:1; }
+.drift-resource { font-size:12px; font-weight:600; margin-bottom:2px; }
+.drift-change { font-size:11px; color:var(--t3); }
+.drift-reverted { font-size:10px; color:var(--green); }
+.drift-ctrl { font-size:10px; color:var(--purple); }
+
+/* Buttons */
+.btn { font-family:var(--mono); font-size:12px; padding:7px 14px; border-radius:var(--r); cursor:pointer; border:1px solid; transition:all .15s; }
+.btn-primary { background:var(--cyan-d); color:var(--cyan); border-color:rgba(6,182,212,.4); }
+.btn-primary:hover { background:rgba(6,182,212,.25); }
+.btn-ghost { background:none; color:var(--t2); border-color:var(--border2); }
+.btn-ghost:hover { color:var(--t1); background:var(--border); }
+.btn-danger { background:var(--red-d); color:var(--red); border-color:rgba(239,68,68,.3); }
+.btn-sm { padding:4px 10px; font-size:11px; }
+
+/* Microseg rules */
+.rule-table { width:100%; border-collapse:collapse; font-size:12px; }
+.rule-table th { text-align:left; padding:6px 10px; font-size:10px; color:var(--t3); border-bottom:1px solid var(--border); }
+.rule-table td { padding:7px 10px; border-bottom:1px solid var(--border); }
+.rule-table tr:last-child td { border-bottom:none; }
+.action-allow { color:var(--green); }
+.action-deny { color:var(--red); }
+.action-inspect { color:var(--amber); }
+.mtls-yes { color:var(--cyan); }
+.mtls-no { color:var(--t3); }
+
+/* Modal overlay */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:20px; min-width:360px; max-width:520px; }
+.modal-title { font-size:14px; font-weight:700; margin-bottom:14px; }
+.form-row { margin-bottom:12px; }
+.form-label { font-size:10px; color:var(--t3); margin-bottom:4px; display:block; }
+.form-input { width:100%; background:var(--bg2); border:1px solid var(--border2); border-radius:var(--r); color:var(--t1); font-family:var(--mono); font-size:12px; padding:7px 10px; }
+.form-input:focus { outline:none; border-color:var(--cyan); }
+.modal-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+
+/* ATO letter */
+.ato-card { background:var(--bg2); border:1px solid var(--cyan); border-radius:var(--r); padding:16px 20px; }
+.ato-title { font-size:11px; color:var(--cyan); letter-spacing:.1em; margin-bottom:8px; }
+.ato-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.ato-row:last-child { border-bottom:none; }
+.ato-key { color:var(--t3); }
+.ato-val { color:var(--t1); text-align:right; }
+.ato-note { font-size:11px; color:var(--amber); margin-top:4px; padding-left:8px; border-left:2px solid var(--amber); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* Spinner */
+.spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--cyan); border-radius:50%; animation:spin .7s linear infinite; display:inline-block; vertical-align:middle; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.toast { position:fixed; bottom:20px; right:20px; background:var(--bg3); border:1px solid var(--border2); border-radius:var(--r); padding:10px 16px; font-size:12px; color:var(--t1); z-index:200; animation:fadeIn .3s ease; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Sidebar -->
+  <nav class="sidenav">
+    <div class="sidenav-logo">
+      <div class="logo-badge">VSP // P4</div>
+      <div class="logo-sub">DoD Zero Trust Compliance</div>
+    </div>
+    <div class="nav-section">COMPLIANCE</div>
+    <button class="nav-btn active" onclick="switchTab('overview',this)">
+      <div class="nav-dot" style="background:var(--cyan)"></div> Overview
+    </button>
+    <button class="nav-btn" onclick="switchTab('rmf',this)">
+      <div class="nav-dot" style="background:var(--amber)"></div> DoD RMF / ATO
+    </button>
+    <button class="nav-btn" onclick="switchTab('zerotrust',this)">
+      <div class="nav-dot" style="background:var(--purple)"></div> Zero Trust
+    </button>
+    <button class="nav-btn" onclick="switchTab('pipeline',this)">
+      <div class="nav-dot" style="background:var(--green)"></div> Pipeline
+    </button>
+    <button class="nav-btn" onclick="switchTab('microseg',this)">
+      <div class="nav-dot" style="background:var(--blue)"></div> Micro-Seg
+    </button>
+    <button class="nav-btn" onclick="switchTab('rasp',this)">
+      <div class="nav-dot" style="background:var(--red)"></div> RASP Events
+    </button>
+    <button class="nav-btn" onclick="switchTab('poam',this)">
+      <div class="nav-dot" style="background:var(--t3)"></div> POA&M
+    </button>
+    <div class="nav-section" style="margin-top:auto">STATUS</div>
+    <div style="padding:10px 14px">
+      <div style="font-size:10px;color:var(--t3);margin-bottom:4px">P4 Readiness</div>
+      <div id="sidebar-p4" style="font-size:20px;font-weight:700;color:var(--amber)">—</div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">DoD Zero Trust P4 — Compliance Dashboard</div>
+        <div class="topbar-meta">VSP · NIST SP 800-37 Rev 2 · FedRAMP Moderate · CMMC L2 · DoD ZT v2.0</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="p4-badge" id="p4-status-badge">Loading...</span>
+        <button class="btn btn-primary btn-sm" onclick="refreshAll()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- OVERVIEW TAB -->
+      <div id="tab-overview" class="tab-panel active">
+        <div class="hero-grid">
+          <div class="score-card">
+            <div class="score-label">P4 READINESS</div>
+            <div class="score-val" id="ov-p4" style="color:var(--amber)">—</div>
+            <div class="score-sub">DoD ZT Architecture v2.0</div>
+            <div class="score-bar"><div class="score-bar-fill" id="ov-p4-bar" style="background:var(--amber)"></div></div>
+          </div>
+          <div class="score-card">
+            <div class="score-label">FEDRAMP MODERATE</div>
+            <div class="score-val" id="ov-fedramp" style="color:var(--cyan)">62%</div>
+            <div class="score-sub">45 / 73 controls</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:62%;background:var(--cyan)"></div></div>
+          </div>
+          <div class="score-card">
+            <div class="score-label">CMMC LEVEL 2</div>
+            <div class="score-val" id="ov-cmmc" style="color:var(--amber)">54%</div>
+            <div class="score-sub">59 / 110 practices</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:54%;background:var(--amber)"></div></div>
+          </div>
+          <div class="score-card">
+            <div class="score-label">ATO STATUS</div>
+            <div class="score-val" id="ov-ato" style="color:var(--amber);font-size:14px;padding-top:6px">IN PROGRESS</div>
+            <div class="score-sub" id="ov-ato-sub">Steps 1-2 complete</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:33%;background:var(--amber)"></div></div>
+          </div>
+        </div>
+
+        <div class="section-hd"><div class="section-title">ZERO TRUST PILLARS — 7 PILLAR SCORECARD</div></div>
+        <div class="zt-grid" id="ov-pillars">
+          <div class="zt-pillar"><div class="zt-pillar-name">Loading...</div></div>
+        </div>
+
+        <div class="section-hd">
+          <div class="section-title">LATEST PIPELINE RUN</div>
+          <button class="section-action" onclick="switchTab('pipeline',null)">→ View details</button>
+        </div>
+        <div id="ov-pipeline-summary" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;">
+          <div class="spinner"></div>
+        </div>
+
+        <div class="section-hd">
+          <div class="section-title">OPEN POA&M — CRITICAL/HIGH</div>
+          <button class="section-action" onclick="switchTab('poam',null)">→ View all</button>
+        </div>
+        <div id="ov-poam"></div>
+      </div>
+
+      <!-- RMF TAB -->
+      <div id="tab-rmf" class="tab-panel">
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="generateATOLetter()">Generate ATO Letter</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadConMon()">ConMon Report</button>
+        </div>
+
+        <div id="ato-letter-box" style="display:none;margin-bottom:16px"></div>
+
+        <div class="section-hd"><div class="section-title">NIST SP 800-37 REV 2 — 6-STEP RMF</div></div>
+        <div class="rmf-steps" id="rmf-steps-container">
+          <div style="color:var(--t3)"><span class="spinner"></span> Loading RMF data...</div>
+        </div>
+
+        <div class="section-hd" style="margin-top:20px"><div class="section-title">ATO ARTIFACTS</div></div>
+        <div id="ato-artifacts"></div>
+
+        <div id="conmon-box" style="display:none;margin-top:16px"></div>
+      </div>
+
+      <!-- ZERO TRUST TAB -->
+      <div id="tab-zerotrust" class="tab-panel">
+        <div class="section-hd"><div class="section-title">PILLAR SCORES — DoD ZT ARCHITECTURE v2.0</div></div>
+        <div class="zt-grid" id="zt-pillar-grid"></div>
+
+        <div class="section-hd"><div class="section-title">APPLICATION PILLAR — CAPABILITIES BREAKDOWN</div></div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+          <table class="cap-table" id="cap-table">
+            <thead><tr><th>ID</th><th>Capability</th><th>DoD Maturity Level</th><th>Status</th><th>Score</th><th>Controls</th></tr></thead>
+            <tbody id="cap-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="section-hd" style="margin-top:16px">
+          <div class="section-title">SBOM — SOFTWARE BILL OF MATERIALS</div>
+        </div>
+        <div id="sbom-box" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;display:flex;gap:24px">
+          <div><div class="score-label">COMPONENTS</div><div id="sbom-total" style="font-size:20px;font-weight:700;color:var(--cyan)">—</div></div>
+          <div><div class="score-label">CRITICAL CVEs</div><div id="sbom-crit" style="font-size:20px;font-weight:700;color:var(--red)">—</div></div>
+          <div style="flex:1;display:flex;align-items:center;font-size:11px;color:var(--t3)">
+            SA-12 / SR-3 / SR-11 · NIST SP 800-161 · DoD SBOM mandate
+          </div>
+        </div>
+      </div>
+
+      <!-- PIPELINE TAB -->
+      <div id="tab-pipeline" class="tab-panel">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="btn btn-primary btn-sm" onclick="triggerPipeline()">▶ Trigger Scan</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadPipelineHistory()">History</button>
+        </div>
+
+        <div id="pipeline-run-header"></div>
+        <div class="pipeline-scores" id="pipeline-fw-scores"></div>
+
+        <div class="section-hd">
+          <div class="section-title">CONTROL TESTS</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="filterTests('all')">All</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterTests('fail')">Fail</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterTests('warn')">Warn</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterTests('pass')">Pass</button>
+          </div>
+        </div>
+        <div class="tests-list" id="tests-list"></div>
+
+        <div class="section-hd" style="margin-top:16px"><div class="section-title">DRIFT EVENTS</div></div>
+        <div id="drift-list"></div>
+
+        <div class="section-hd" style="margin-top:16px"><div class="section-title">SCHEDULES — ConMon</div></div>
+        <div id="schedules-list"></div>
+      </div>
+
+      <!-- MICROSEG TAB -->
+      <div id="tab-microseg" class="tab-panel">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="btn btn-primary btn-sm" onclick="openSegModal()">+ Add Rule</button>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:auto">
+          <table class="rule-table">
+            <thead><tr><th>ID</th><th>Name</th><th>Source</th><th>Destination</th><th>Port</th><th>Action</th><th>mTLS</th><th>Hits</th></tr></thead>
+            <tbody id="seg-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RASP TAB -->
+      <div id="tab-rasp" class="tab-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:11px;color:var(--t3)">Runtime Application Self-Protection · Live event feed · SI-3 / SI-10 / SI-16</div>
+          <button class="btn btn-primary btn-sm" onclick="pollRASP()">↺ Poll</button>
+        </div>
+        <div class="rasp-list" id="rasp-list">
+          <div style="color:var(--t3)"><span class="spinner"></span> Loading...</div>
+        </div>
+      </div>
+
+      <!-- POA&M TAB -->
+      <div id="tab-poam" class="tab-panel">
+        <div class="section-hd"><div class="section-title">PLAN OF ACTION & MILESTONES — OPEN ITEMS</div></div>
+        <div class="poam-list" id="poam-list">
+          <div style="color:var(--t3)"><span class="spinner"></span> Loading...</div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- Add Micro-Seg Rule Modal -->
+<div class="modal-overlay" id="seg-modal">
+  <div class="modal">
+    <div class="modal-title">Add Micro-Segmentation Rule</div>
+    <div class="form-row">
+      <label class="form-label">Rule Name</label>
+      <input class="form-input" id="seg-name" placeholder="e.g. vsp-scanner → redis">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-row">
+        <label class="form-label">Source Service</label>
+        <input class="form-input" id="seg-src" placeholder="vsp-api">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Destination Service</label>
+        <input class="form-input" id="seg-dst" placeholder="postgres">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="form-row">
+        <label class="form-label">Port</label>
+        <input class="form-input" id="seg-port" type="number" placeholder="5432">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Protocol</label>
+        <select class="form-input" id="seg-proto"><option>TCP</option><option>UDP</option><option>gRPC</option></select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Action</label>
+        <select class="form-input" id="seg-action"><option>allow</option><option>deny</option><option>inspect</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
+        <input type="checkbox" id="seg-mtls" checked> Require mTLS
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeSegModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="submitSegRule()">Add Rule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast" style="display:none"></div>
+
+<script>
+const API = window.location.origin; // tự dùng port VSP hiện tại
+let allTests = [];
+
+// ---- Tab switching ----
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  else {
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      if (b.textContent.toLowerCase().includes(name.replace('-',' '))) b.classList.add('active');
+    });
+  }
+  loadTab(name);
+}
+
+function loadTab(name) {
+  switch(name) {
+    case 'overview':   loadOverview(); break;
+    case 'rmf':        loadRMF(); break;
+    case 'zerotrust':  loadZeroTrust(); break;
+    case 'pipeline':   loadPipeline(); break;
+    case 'microseg':   loadMicroSeg(); break;
+    case 'rasp':       pollRASP(); break;
+    case 'poam':       loadPOAM(); break;
+  }
+}
+
+function refreshAll() { loadTab(currentTab()); toast('Refreshed'); }
+
+function currentTab() {
+  const p = document.querySelector('.tab-panel.active');
+  return p ? p.id.replace('tab-','') : 'overview';
+}
+
+// ---- Fetch helpers ----
+async function api(path) {
+  try {
+    const r = await fetch(API + path);
+    return await r.json();
+  } catch(e) {
+    return null;
+  }
+}
+
+async function post(path, body) {
+  try {
+    const r = await fetch(API + path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+// ---- Overview ----
+async function loadOverview() {
+  const [zt, pipe, rmf] = await Promise.all([
+    api('/api/p4/zt/status'),
+    api('/api/p4/pipeline/latest'),
+    api('/api/p4/rmf')
+  ]);
+
+  if (zt) {
+    // P4 readiness
+    const p4 = zt.p4_readiness;
+    document.getElementById('ov-p4').textContent = p4 + '%';
+    document.getElementById('ov-p4-bar').style.width = p4 + '%';
+    document.getElementById('sidebar-p4').textContent = p4 + '%';
+    document.getElementById('p4-status-badge').textContent = p4 >= 100 ? 'P4 ACHIEVED' : p4 >= 85 ? 'P4 NEAR' : 'P4 IN PROGRESS';
+    document.getElementById('p4-status-badge').style.color = p4 >= 85 ? 'var(--green)' : 'var(--amber)';
+
+    // Pillar cards
+    const grid = document.getElementById('ov-pillars');
+    grid.innerHTML = Object.entries(zt.pillars).map(([k,p]) => `
+      <div class="zt-pillar" style="border-color:${p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)'}">
+        <div class="zt-pillar-name">${p.name}</div>
+        <div class="zt-pillar-score" style="color:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}">${p.score}</div>
+        <div class="p4-target" style="color:var(--t3)">target ${p.target}</div>
+        <div class="zt-bar"><div class="zt-bar-fill" style="width:${p.score}%;background:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}"></div></div>
+      </div>
+    `).join('');
+  }
+
+  if (pipe && pipe.summary) {
+    const s = pipe.summary;
+    document.getElementById('ov-pipeline-summary').innerHTML = `
+      <div style="display:flex;gap:20px;align-items:center">
+        <div><div class="score-label">PASS</div><div style="font-size:18px;font-weight:700;color:var(--green)">${s.pass}</div></div>
+        <div><div class="score-label">WARN</div><div style="font-size:18px;font-weight:700;color:var(--amber)">${s.warn}</div></div>
+        <div><div class="score-label">FAIL</div><div style="font-size:18px;font-weight:700;color:var(--red)">${s.fail}</div></div>
+        <div><div class="score-label">SCORE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${s.score.toFixed(0)}%</div></div>
+        <div style="flex:1;font-size:10px;color:var(--t3)">${pipe.id} · ${pipe.trigger_type} · ${pipe.branch}</div>
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('pipeline',null)">→ Details</button>
+      </div>`;
+  }
+
+  if (rmf) {
+    const critical = rmf.poam_items.filter(p => p.status==='open'||p.status==='in_remediation').slice(0,3);
+    document.getElementById('ov-poam').innerHTML = critical.map(p => renderPOAMRow(p)).join('');
+    // ATO status
+    const complete = rmf.rmf_steps.filter(s=>s.status==='complete').length;
+    document.getElementById('ov-ato').textContent = rmf.ato_status.replace('_',' ').toUpperCase();
+    document.getElementById('ov-ato-sub').textContent = `Steps ${complete}/6 complete`;
+  }
+}
+
+// ---- RMF ----
+let rmfData = null;
+async function loadRMF() {
+  const data = await api('/api/p4/rmf');
+  if (!data) return;
+  rmfData = data;
+
+  const container = document.getElementById('rmf-steps-container');
+  container.innerHTML = data.rmf_steps.map(step => `
+    <div class="rmf-step" id="rmf-step-${step.id}">
+      <div class="rmf-step-header" onclick="toggleStep(${step.id})">
+        <span class="rmf-step-num">${step.id}</span>
+        <span class="rmf-step-name">${step.name}</span>
+        <span class="rmf-step-owner" style="font-size:10px;color:var(--t3)">${step.owner}</span>
+        <span class="rmf-step-status s-${step.status}">${fmtStatus(step.status)}</span>
+        <span style="color:var(--t3);font-size:12px;margin-left:4px">›</span>
+      </div>
+      <div class="rmf-tasks">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px">${step.description}</div>
+        ${step.tasks.map(t => `
+          <div class="task-row">
+            <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleTask(${step.id},'${t.id}','${t.status}')" title="Toggle"></div>
+            <span class="task-name">${t.name}</span>
+            <span class="task-ref">${t.reference}</span>
+            ${t.artifact ? `<span class="task-artifact">📄 ${t.artifact}</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // Artifacts
+  document.getElementById('ato-artifacts').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      ${data.artifacts.map(a => `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:10px">
+          <div style="font-size:22px">${{SSP:'📋',POAM:'📝',SAP:'🔍',SAR:'📊',FedRAMP_Rev5:'🏛'}[a.type]||'📄'}</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600">${a.name}</div>
+            <div style="font-size:10px;color:var(--t3)">${a.type} · v${a.version} · ${a.size_kb}KB</div>
+          </div>
+          <span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${{approved:'var(--green-d)',review:'var(--amber-d)',draft:'var(--border)'}[a.status]};color:${{approved:'var(--green)',review:'var(--amber)',draft:'var(--t3)'}[a.status]}">${a.status}</span>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function toggleStep(id) {
+  const el = document.getElementById('rmf-step-' + id);
+  el.classList.toggle('open');
+}
+
+async function toggleTask(stepId, taskId, currentStatus) {
+  const newStatus = currentStatus === 'done' ? 'open' : 'done';
+  await post('/api/p4/rmf/task', { step_id: String(stepId), task_id: taskId, status: newStatus });
+  await loadRMF();
+  toast(`Task ${taskId} → ${newStatus}`);
+}
+
+async function generateATOLetter() {
+  const data = await api('/api/p4/rmf/ato-letter');
+  if (!data) return;
+  const box = document.getElementById('ato-letter-box');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div class="ato-card">
+      <div class="ato-title">// ${data.document_type} — ${data.classification}</div>
+      ${[
+        ['System', data.system_name],
+        ['System ID', data.system_id],
+        ['Categorization', data.categorization],
+        ['RMF Steps Complete', data.rmf_steps_complete],
+        ['Open POA&M Items', data.open_poam_items],
+        ['ATO Status', data.ato_status.replace('_',' ').toUpperCase()],
+        ['Framework', data.framework],
+        ['Generated', new Date(data.generated_at).toLocaleString()],
+      ].map(([k,v]) => `<div class="ato-row"><span class="ato-key">${k}</span><span class="ato-val">${v}</span></div>`).join('')}
+      ${data.notes.map(n => `<div class="ato-note">${n}</div>`).join('')}
+    </div>`;
+}
+
+async function loadConMon() {
+  const data = await api('/api/p4/rmf/conmon');
+  if (!data) return;
+  const box = document.getElementById('conmon-box');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+      <div class="section-title" style="margin-bottom:10px">CONTINUOUS MONITORING REPORT</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div><div class="score-label">CONTROL COMPLIANCE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${data.control_compliance_rate}%</div></div>
+        <div><div class="score-label">SCAN COVERAGE</div><div style="font-size:18px;font-weight:700;color:var(--green)">${data.scan_coverage_pct}%</div></div>
+        <div><div class="score-label">PATCH COMPLIANCE</div><div style="font-size:18px;font-weight:700;color:var(--amber)">${data.patch_compliance_pct}%</div></div>
+        <div><div class="score-label">CONMON SCORE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${data.conmon_score}</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--t3)">
+        Vulns: <span style="color:var(--red)">${data.vulnerabilities.critical} CRIT</span> · 
+        <span style="color:var(--amber)">${data.vulnerabilities.high} HIGH</span> · 
+        ${data.vulnerabilities.medium} MED · 
+        Drift events: ${data.config_drift_events} · 
+        Audit log: <span style="color:var(--green)">${data.audit_log_integrity}</span> · 
+        Trend: <span style="color:var(--green)">${data.trend}</span>
+      </div>
+    </div>`;
+}
+
+// ---- Zero Trust ----
+async function loadZeroTrust() {
+  const data = await api('/api/p4/zt/status');
+  if (!data) return;
+
+  // Pillar grid
+  const grid = document.getElementById('zt-pillar-grid');
+  grid.innerHTML = Object.entries(data.pillars).map(([k,p]) => `
+    <div class="zt-pillar" style="border-color:${p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.3)'}">
+      <div class="zt-pillar-name">${p.name}</div>
+      <div class="zt-pillar-score" style="color:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}">${p.score}</div>
+      <div class="p4-target">→ target ${p.target}</div>
+      <div class="zt-bar"><div class="zt-bar-fill" style="width:${p.score}%;background:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}"></div></div>
+    </div>
+  `).join('');
+
+  // Application capabilities table
+  const appPillar = data.pillars['application'];
+  if (appPillar) {
+    document.getElementById('cap-tbody').innerHTML = appPillar.capabilities.map(c => `
+      <tr>
+        <td style="color:var(--purple)">${c.id}</td>
+        <td>${c.name}<br><span style="font-size:10px;color:var(--t3)">${c.description||''}</span></td>
+        <td class="level-${c.level==='Optimal'?'opt':c.level==='Advanced'?'adv':'trad'}">${c.level}</td>
+        <td class="status-${c.status==='implemented'?'impl':c.status==='partial'?'part':c.status==='planned'?'plan':'ns'}">${c.status}</td>
+        <td>
+          <span class="mini-bar"><span class="mini-bar-fill" style="width:${c.score/c.max_score*100}%;background:${c.score/c.max_score>=.8?'var(--green)':c.score/c.max_score>=.5?'var(--amber)':'var(--red)'}"></span></span>
+          <span style="font-size:11px;margin-left:4px">${c.score}/${c.max_score}</span>
+        </td>
+        <td style="font-size:10px;color:var(--cyan)">${(c.controls||[]).join(' · ')}</td>
+      </tr>
+    `).join('');
+  }
+
+  // SBOM
+  document.getElementById('sbom-total').textContent = data.sbom_components;
+  document.getElementById('sbom-crit').textContent = data.sbom_critical;
+}
+
+// ---- Pipeline ----
+async function loadPipeline() {
+  const [latest, drift, schedules] = await Promise.all([
+    api('/api/p4/pipeline/latest'),
+    api('/api/p4/pipeline/drift'),
+    api('/api/p4/pipeline/schedules')
+  ]);
+
+  if (latest) renderPipelineRun(latest);
+  if (drift) renderDrift(drift);
+  if (schedules) renderSchedules(schedules);
+}
+
+function renderPipelineRun(run) {
+  const s = run.summary;
+  document.getElementById('pipeline-run-header').innerHTML = `
+    <div class="pipeline-header">
+      <div>
+        <div class="run-id">${run.id}</div>
+        <div class="run-trigger">${run.trigger_type} · ${run.trigger_ref} · ${run.branch} · ${run.duration_sec}s</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="font-size:24px;font-weight:700;color:${s.score>=80?'var(--green)':s.score>=60?'var(--amber)':'var(--red)'}">${s.score.toFixed(0)}%</div>
+      <div style="margin-left:12px">
+        <div style="font-size:11px"><span style="color:var(--green)">✓ ${s.pass} pass</span> · <span style="color:var(--amber)">⚠ ${s.warn} warn</span> · <span style="color:var(--red)">✗ ${s.fail} fail</span></div>
+        <div style="font-size:10px;color:var(--t3)">Total: ${s.total} controls tested</div>
+      </div>
+    </div>`;
+
+  // Framework scores
+  document.getElementById('pipeline-fw-scores').innerHTML = Object.entries(s.frameworks).map(([fw,fs]) => `
+    <div class="fw-score-card">
+      <div class="fw-score-label">${fw}</div>
+      <div class="fw-score-num" style="color:${fs.percent>=80?'var(--green)':fs.percent>=60?'var(--amber)':'var(--red)'}">${fs.percent.toFixed(0)}%</div>
+      <div style="font-size:10px;color:var(--t3)">${fs.pass}/${fs.total} controls</div>
+      <div class="${fs.delta>=0?'fw-delta-pos':'fw-delta-neg'}">${fs.delta>=0?'+':''}${fs.delta.toFixed(1)}% vs prev</div>
+    </div>
+  `).join('');
+
+  allTests = run.tests;
+  renderTests(run.tests);
+}
+
+function renderTests(tests) {
+  document.getElementById('tests-list').innerHTML = tests.map(t => `
+    <div class="test-row">
+      <span class="test-fw">${t.framework}</span>
+      <span class="test-ctrl">${t.control_id}</span>
+      <span class="test-name">${t.name}</span>
+      <span class="test-status ts-${t.status}">${t.status.toUpperCase()}</span>
+      <span class="test-score" style="color:${t.score>=80?'var(--green)':t.score>=50?'var(--amber)':'var(--red)'}">${t.score}</span>
+      <span class="test-evidence" title="${t.evidence}">${t.evidence}</span>
+      ${t.auto_fix_available ? '<span style="font-size:10px;color:var(--cyan)">⚡ autofix</span>' : ''}
+    </div>
+  `).join('');
+}
+
+function filterTests(status) {
+  renderTests(status === 'all' ? allTests : allTests.filter(t => t.status === status));
+}
+
+function renderDrift(events) {
+  const colors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
+  document.getElementById('drift-list').innerHTML = events.map(d => `
+    <div class="drift-row">
+      <div class="drift-icon" style="background:${d.severity==='CRITICAL'?'var(--red-d)':d.severity==='HIGH'?'var(--amber-d)':'var(--blue-d)'}">
+        <span style="color:${colors[d.severity]}">⚠</span>
+      </div>
+      <div class="drift-info">
+        <div class="drift-resource">${d.resource} <span style="font-size:10px;color:var(--t3)">[${d.resource_type}]</span></div>
+        <div class="drift-change">${d.change}</div>
+        <div style="display:flex;gap:10px;margin-top:3px">
+          <span class="drift-ctrl">${d.control_id}</span>
+          ${d.auto_reverted ? '<span class="drift-reverted">✓ auto-reverted</span>' : '<span style="font-size:10px;color:var(--red)">manual review required</span>'}
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--t3)">${new Date(d.detected_at).toLocaleDateString()}</div>
+    </div>
+  `).join('');
+}
+
+function renderSchedules(schedules) {
+  document.getElementById('schedules-list').innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      <table class="rule-table">
+        <thead><tr><th>Name</th><th>Cron</th><th>Framework</th><th>Next Run</th><th>Status</th></tr></thead>
+        <tbody>${schedules.map(s => `
+          <tr>
+            <td style="font-weight:600">${s.name}</td>
+            <td style="color:var(--cyan)">${s.cron}</td>
+            <td style="color:var(--purple)">${s.framework}</td>
+            <td style="color:var(--t3)">${new Date(s.next_run).toLocaleString()}</td>
+            <td><span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${s.enabled?'var(--green-d)':'var(--border)'};color:${s.enabled?'var(--green)':'var(--t3)'}">${s.enabled?'enabled':'disabled'}</span></td>
+          </tr>
+        `).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+async function triggerPipeline() {
+  const res = await post('/api/p4/pipeline/trigger', {});
+  if (res) {
+    toast('Pipeline queued: ' + res.run_id + '. Results in ~3s...');
+    setTimeout(loadPipeline, 3500);
+  }
+}
+
+// ---- Micro-Seg ----
+async function loadMicroSeg() {
+  const rules = await api('/api/p4/zt/microseg');
+  if (!rules) return;
+  document.getElementById('seg-tbody').innerHTML = rules.map(r => `
+    <tr>
+      <td style="color:var(--cyan)">${r.id}</td>
+      <td style="font-weight:600">${r.name}</td>
+      <td>${r.source}</td>
+      <td>${r.destination}</td>
+      <td>${r.port||'any'}</td>
+      <td class="action-${r.action}">${r.action.toUpperCase()}</td>
+      <td class="${r.mtls?'mtls-yes':'mtls-no'}">${r.mtls?'mTLS':'none'}</td>
+      <td style="color:var(--t3)">${r.hit_count.toLocaleString()}</td>
+    </tr>
+  `).join('');
+}
+
+function openSegModal() { document.getElementById('seg-modal').classList.add('open'); }
+function closeSegModal() { document.getElementById('seg-modal').classList.remove('open'); }
+
+async function submitSegRule() {
+  const rule = {
+    name: document.getElementById('seg-name').value,
+    source: document.getElementById('seg-src').value,
+    destination: document.getElementById('seg-dst').value,
+    port: parseInt(document.getElementById('seg-port').value)||0,
+    protocol: document.getElementById('seg-proto').value,
+    action: document.getElementById('seg-action').value,
+    mtls: document.getElementById('seg-mtls').checked,
+  };
+  const res = await post('/api/p4/zt/microseg', rule);
+  if (res && res.status === 'ok') {
+    closeSegModal();
+    await loadMicroSeg();
+    toast('Rule ' + res.id + ' added — Application pillar score updated');
+  }
+}
+
+// ---- RASP ----
+async function pollRASP() {
+  const events = await api('/api/p4/zt/rasp');
+  if (!events) return;
+  const colors = { CRITICAL:'sev-crit', HIGH:'sev-high', MEDIUM:'sev-med', LOW:'sev-low' };
+  document.getElementById('rasp-list').innerHTML = events.map(e => `
+    <div class="rasp-row">
+      <span class="rasp-sev ${colors[e.severity]||'sev-low'}">${e.severity}</span>
+      <span class="rasp-type">${e.attack_type}</span>
+      <span class="rasp-svc">${e.service} ${e.endpoint}</span>
+      <span class="rasp-${e.action==='blocked'?'action-blk':'action-alrt'}">${e.action.toUpperCase()}</span>
+      <span style="font-size:10px;color:var(--t3)">${e.source_ip}</span>
+      <span class="rasp-ts">${new Date(e.timestamp).toLocaleTimeString()}</span>
+      ${e.cve?`<span style="font-size:10px;color:var(--red)">${e.cve}</span>`:''}
+    </div>
+  `).join('');
+}
+
+// ---- POA&M ----
+async function loadPOAM() {
+  const data = await api('/api/p4/rmf');
+  if (!data) return;
+  document.getElementById('poam-list').innerHTML = data.poam_items.map(p => renderPOAMRow(p)).join('');
+}
+
+function renderPOAMRow(p) {
+  const sevColors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
+  const stColors = { open:'st-open', in_remediation:'st-rem', closed:'st-closed', risk_accepted:'st-rem' };
+  return `
+    <div class="poam-row">
+      <div class="poam-header">
+        <span class="poam-id">${p.id}</span>
+        <span class="poam-ctrl">${p.control_id}</span>
+        <span class="poam-name">${p.weakness_name}</span>
+        <span class="poam-sev" style="background:${sevColors[p.severity]+'22'};color:${sevColors[p.severity]}">${p.severity}</span>
+        <span class="poam-status ${stColors[p.status]||'st-open'}">${p.status.replace('_',' ')}</span>
+      </div>
+      <div class="poam-plan">${p.mitigation_plan}</div>
+      ${p.scheduled_completion ? `<div style="font-size:10px;color:var(--t3);margin-top:3px">Due: ${new Date(p.scheduled_completion).toLocaleDateString()}</div>` : ''}
+    </div>`;
+}
+
+// ---- Utils ----
+function fmtStatus(s) {
+  return { complete:'✓ Complete', in_progress:'⟳ In Progress', pending:'○ Pending' }[s] || s;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+// ---- Init ----
+loadOverview();
+// Auto-poll RASP every 30s
+setInterval(() => {
+  if (currentTab() === 'rasp') pollRASP();
+}, 30000);
+</script>
+</body>
+</html>

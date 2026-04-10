@@ -1,0 +1,10 @@
+title = "VSP Gitleaks Config"
+
+[allowlist]
+  description = "Exclude local config files"
+  paths = [
+    '''.env''',
+    '''.env\..*''',
+    '''config/config\.yaml\.bak''',
+    '''.*\.bak''',
+  ]

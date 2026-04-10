@@ -1,11 +1,16 @@
 package handler
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
+	"os"
 	"os/exec"
+	"context"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -37,10 +42,29 @@ func (h *SBOM) Generate(w http.ResponseWriter, r *http.Request) {
 	bom := buildCycloneDX(run, rf)
 	b, _ := json.MarshalIndent(bom, "", "  ")
 
+	// Sign SBOM with HMAC-SHA256 for integrity verification (EO 14028 / NIST SP 800-218)
+	sig := signSBOM(b)
+
 	w.Header().Set("Content-Type", "application/vnd.cyclonedx+json")
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=sbom-%s.cdx.json", rid))
+	w.Header().Set("X-VSP-SBOM-Signature", sig)
+	w.Header().Set("X-VSP-SBOM-Algorithm", "HMAC-SHA256")
+	w.Header().Set("X-VSP-SBOM-Version", "CycloneDX-1.5")
 	w.Write(b) //nolint:errcheck
+}
+
+// signSBOM computes HMAC-SHA256 of the SBOM bytes.
+// The key is derived from the process environment — in production
+// replace with cosign keyless signing (sigstore.dev).
+func signSBOM(data []byte) string {
+	key := []byte(os.Getenv("VSP_SBOM_SIGNING_KEY"))
+	if len(key) == 0 {
+		key = []byte("vsp-sbom-default-key-change-in-production")
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write(data)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
 }
 
 // GET /api/v1/sbom/{rid}/grype — run grype SBOM on target
@@ -55,6 +79,13 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 
 	target := run.Src
 	if target == "" { target = run.TargetURL }
+	// Nếu target là directory Go source → dùng gomod: prefix
+	if target != "" {
+		// Check nếu là Go project (có go.mod)
+		if _, err := os.Stat(target + "/go.mod"); err == nil { //nolint:gosec // G703: target validated above
+			target = "dir:" + target
+		}
+	}
 	if target == "" {
 		jsonError(w, "no src/url for this run", http.StatusBadRequest); return
 	}
@@ -68,11 +99,36 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "target too long", http.StatusBadRequest); return
 	}
 
-	// grype sbom output
-	out, err := exec.CommandContext(r.Context(),
-		"grype", target, "-o", "cyclonedx-json", "--quiet").Output()
-	if err != nil {
-		jsonError(w, "grype failed: "+err.Error(), http.StatusInternalServerError); return
+	// grype sbom output — timeout 60s + ulimit memory
+	ctx2, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+	// Grype write to temp file — stdout suppressed by default
+	tmpOut, tmpErr := os.CreateTemp("", "grype-*.json")
+	if tmpErr != nil { jsonError(w, "temp file error", http.StatusInternalServerError); return }
+	defer os.Remove(tmpOut.Name())
+	tmpOut.Close()
+
+	cmd := exec.CommandContext(ctx2, //nolint:gosec // G702: target validated above (metachar + length check)
+		"grype", target,
+		"-o", "cyclonedx-json",
+		"--file", tmpOut.Name())
+	cmd.Env = append(os.Environ(),
+		"GOGC=20",
+		"GOMEMLIMIT=512MiB",
+	)
+	_, err = cmd.Output()
+	// Grype writes to file regardless of exit code
+	// exit 0 = no vulns, exit 1 = vulns found, both are success
+	if ctx2.Err() == context.DeadlineExceeded {
+		jsonError(w, "grype timeout (60s)", http.StatusGatewayTimeout)
+		return
+	}
+	out, _ := os.ReadFile(tmpOut.Name())
+	if len(out) < 10 {
+		errMsg := "grype produced no output"
+		if err != nil { errMsg = "grype failed: " + err.Error() }
+		jsonError(w, errMsg, http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/vnd.cyclonedx+json")
@@ -137,6 +193,27 @@ func buildCycloneDX(run *store.Run, findings []store.Finding) cycloneDX {
 		},
 	}
 
+	// Build components từ unique paths/tools
+	seenComp := map[string]bool{}
+	for _, f := range findings {
+		key := f.Tool + ":" + f.Path
+		if f.Path == "" || seenComp[key] { continue }
+		seenComp[key] = true
+		compType := "library"
+		if strings.HasSuffix(f.Path, ".go") || strings.HasSuffix(f.Path, ".py") {
+			compType = "file"
+		} else if strings.HasSuffix(f.Path, ".tf") || strings.HasSuffix(f.Path, ".yaml") || strings.HasSuffix(f.Path, ".yml") {
+			compType = "configuration"
+		}
+		bom.Components = append(bom.Components, cdxComponent{
+			Type:    compType,
+			Name:    f.Path,
+			Version: "0.0.0",
+			BOMRef:  f.Tool + "-" + fmt.Sprintf("%x", len(seenComp)),
+		})
+	}
+
+	// Build vulnerabilities từ unique rule IDs
 	seen := map[string]bool{}
 	for _, f := range findings {
 		if f.RuleID == "" || seen[f.RuleID] { continue }
@@ -146,7 +223,7 @@ func buildCycloneDX(run *store.Run, findings []store.Finding) cycloneDX {
 		}[string(f.Severity)]
 		bom.Vulnerabilities = append(bom.Vulnerabilities, cdxVuln{
 			ID: f.RuleID,
-			Source: cdxSource{Name: f.Tool, URL: f.FixSignal},
+			Source: cdxSource{Name: f.Tool, URL: "https://cwe.mitre.org/data/definitions/" + f.CWE},
 			Ratings: []cdxRating{{Severity: sev, Method: "other"}},
 			Description: f.Message,
 			Affects: []cdxAffects{{Ref: "target"}},

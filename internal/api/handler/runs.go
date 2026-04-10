@@ -75,12 +75,13 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 
 	// Tools total depends on mode
 	toolsTotal := map[string]int{
-		"SAST":    3, // bandit + semgrep + codeql
-		"SCA":     2, // grype + trivy
-		"SECRETS": 1, // gitleaks
-		"IAC":     2, // kics + checkov
-		"DAST":    2, // nikto + nuclei
-		"FULL":    10, // all tools
+		"SAST":    3,  // bandit + semgrep + codeql
+		"SCA":     3,  // grype + trivy + license
+		"SECRETS": 2,  // gitleaks + secretcheck
+		"IAC":     2,  // kics + checkov
+		"DAST":    3,  // nikto + nuclei + sslscan
+		"NETWORK": 1,  // sslscan
+		"FULL":    14, // all: sast(3)+sca(3)+secrets(2)+iac(2)+dast(3)+network(1)
 	}[req.Mode]
 	if toolsTotal == 0 { toolsTotal = 3 }
 
@@ -95,7 +96,8 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 	go h.enqueueOrLog(run.RID, claims.TenantID, pipeline.Mode(req.Mode), pipeline.Profile(req.Profile), req.Src, req.URL)
 	// Audit: log scan trigger
 	go func() {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) //nolint:gosec // G118: intentional
+		defer cancel()
 		prevHash, _ := h.DB.GetLastAuditHash(ctx, claims.TenantID)
 		e := audit.Entry{
 			TenantID: claims.TenantID,

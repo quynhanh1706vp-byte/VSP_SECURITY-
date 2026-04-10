@@ -139,7 +139,7 @@ function upgradeFindings() {
     const sev  = document.getElementById('vsp-filter-severity')?.value || '';
     const tool = document.getElementById('vsp-filter-tool')?.value || '';
     const q    = document.getElementById('vsp-filter-search')?.value || '';
-    let url = '/vsp/findings?limit=200';
+    let url = '/vsp/findings?limit=500';
     if (sev)  url += '&severity=' + sev;
     if (tool) url += '&tool=' + tool;
     if (q)    url += '&q=' + encodeURIComponent(q);
@@ -429,7 +429,7 @@ window.loadSBOM = async function() {
     panel.insertBefore(kpis, panel.firstChild);
     const findings = await safeApi('GET', '/vsp/findings?limit=500', {findings:[]});
     const scaFinds = (Array.isArray(findings.findings)?findings.findings:[])
-      .filter(f => f.tool==='grype' || f.tool==='trivy');
+      .filter(f => f.tool==='grype' || f.tool==='trivy' || f.tool==='license');
     const totalEl    = document.getElementById('sbom-total');
     const vulnEl     = document.getElementById('sbom-vuln');
     const outdatedEl = document.getElementById('sbom-outdated');
@@ -592,3 +592,23 @@ setTimeout(() => {
 })();
 
 })(); // end vsp100
+
+// ============ P4 COMPLIANCE PANEL ============
+(function() {
+  // Hook into showPanel
+  const _origShowPanel = window.showPanel;
+  window.showPanel = function(name, btn) {
+    if (name === 'p4compliance') {
+      loadP4CompliancePanel();
+      // update breadcrumb if VSP uses it
+      if (window.updateBreadcrumb) updateBreadcrumb('P4 Compliance', 'VSP / DoD Zero Trust / P4 Status');
+      return;
+    }
+    if (_origShowPanel) _origShowPanel(name, btn);
+  };
+
+  function loadP4CompliancePanel() {
+    // Navigate full page to /p4 — served clean by Python proxy without VSP patches
+    window.location.href = '/p4';
+  }
+})();

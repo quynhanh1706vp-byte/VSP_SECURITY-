@@ -154,6 +154,16 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
   </div>
 </div>
 <script>
+// ─── XSS escape helper ────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 var TOKEN='',API='',ANOMALIES=[];
 var SAMPLE=[
   {type:'score_spike',severity:'CRITICAL',score:88,baseline:72,current:22,deviation_pct:70,
@@ -242,8 +252,8 @@ function renderAnomalies(){
   document.getElementById('anom-list').innerHTML=list.map(function(a){
     var sc=sevClass((a.severity||'').toUpperCase());
     return '<div class="anomaly '+sc+'" onclick=\'openAnomDetailObj('+JSON.stringify(a).replace(/\'/g,"\\'")+')\''+'>'
-      +'<div class="a-hdr"><span class="a-type">'+((a.type||'').replace(/_/g,' '))+'</span>'+sevBadge(a.severity)+'<span class="a-title">'+(a.message||'Anomaly')+'</span><span class="a-score">'+(a.score||0)+'/100</span></div>'
-      +(a.entity?'<div class="a-entity">entity: '+a.entity+'</div>':'')
+      +'<div class="a-hdr"><span class="a-type">'+esc((a.type||'').replace(/_/g,' '))+'</span>'+sevBadge(a.severity)+'<span class="a-title">'+esc(a.message||'Anomaly')+'</span><span class="a-score">'+(a.score||0)+'/100</span></div>'
+      +(a.entity?'<div class="a-entity">entity: '+esc(a.entity)+'</div>':'')
       +'<div class="a-bar-wrap"><div class="a-bar" style="width:'+(a.score||0)+'%;background:'+sevColor(a.severity)+'"></div></div>'
       +'</div>';
   }).join('');
@@ -273,11 +283,11 @@ function openAnomDetailObj(a){
     var maxH=Math.max.apply(null,hist.map(function(h){return h.val;}))||1;
     document.getElementById('amod-history').innerHTML='<div style="display:flex;gap:3px;align-items:flex-end;height:50px">'+hist.map(function(h){
       var hp=Math.round(h.val/maxH*44)+4,bc=h.val<a.baseline?sevColor(sev):'rgba(34,197,94,.6)';
-      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;height:'+hp+'px;background:'+bc+';border-radius:2px 2px 0 0"></div><div style="font-size:8px;color:var(--t3)">'+h.ts+'</div></div>';
+      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;height:'+hp+'px;background:'+bc+';border-radius:2px 2px 0 0"></div><div style="font-size:8px;color:var(--t3)">'+esc(h.ts)+'</div></div>';
     }).join('')+'</div>';
   } else document.getElementById('amod-history').innerHTML='<div style="color:var(--t3);font-size:11px">No historical data</div>';
   var recs=a.recs||[{icon:'▶',label:'Run SOAR playbook',desc:'Trigger automated response',color:'var(--purple2)',tc:'var(--purple)'}];
-  document.getElementById('amod-recs').innerHTML=recs.map(function(r){return '<div class="rec-item"><div class="rec-icon" style="background:'+r.color+';color:'+r.tc+'">'+r.icon+'</div><div><div style="font-size:11px;font-weight:600">'+r.label+'</div><div style="font-size:10px;color:var(--t3)">'+r.desc+'</div></div></div>';}).join('');
+  document.getElementById('amod-recs').innerHTML=recs.map(function(r){return '<div class="rec-item"><div class="rec-icon" style="background:'+r.color+';color:'+r.tc+'">'+esc(r.icon)+'</div><div><div style="font-size:11px;font-weight:600">'+esc(r.label)+'</div><div style="font-size:10px;color:var(--t3)">'+esc(r.desc)+'</div></div></div>';}).join('');
   document.getElementById('amod-soar-btn').onclick=function(){closeModal('anom-modal');window.parent&&window.parent.postMessage({type:'vsp:nav',panel:'soar'},'*');};
   document.getElementById('anom-modal').classList.add('open');
 }

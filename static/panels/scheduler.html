@@ -131,9 +131,12 @@ select.form-ctrl option{background:var(--bg2)}
         <div class="form-group">
           <label class="form-label">Profile</label>
           <select class="form-ctrl" id="s-profile">
-            <option value="FAST">FAST — Quick scan</option>
-            <option value="STANDARD">STANDARD</option>
-            <option value="THOROUGH">THOROUGH — Deep scan</option>
+            <option value="FAST">FAST — 2min quick</option>
+            <option value="EXT">EXT — 5min extended</option>
+            <option value="AGGR">AGGR — 10min aggressive</option>
+            <option value="PREMIUM">PREMIUM — 15min deep</option>
+            <option value="FULL">FULL — 20min all tools</option>
+            <option value="FULL_SOC">FULL_SOC — 30min max depth</option>
           </select>
         </div>
       </div>
@@ -219,11 +222,11 @@ var CRON_PRESETS = [
 ];
 
 var SAMPLE_SCHEDS = [
-  { id:'sc1', name:'Daily production scan',    mode:'SAST',    profile:'STANDARD', cron:'0 2 * * *',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['production','nightly'], next_run:'02:00 UTC', last_run:'yesterday 02:00', last_status:'DONE', last_gate:'FAIL' },
+  { id:'sc1', name:'Daily production scan',    mode:'SAST',    profile:'EXT', cron:'0 2 * * *',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['production','nightly'], next_run:'02:00 UTC', last_run:'yesterday 02:00', last_status:'DONE', last_gate:'FAIL' },
   { id:'sc2', name:'IAC infrastructure check', mode:'IAC',     profile:'FAST',     cron:'0 6 * * *',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['infra','daily'],        next_run:'06:00 UTC', last_run:'today 06:00',     last_status:'DONE', last_gate:'WARN' },
-  { id:'sc3', name:'Weekly deep scan',         mode:'FULL',    profile:'THOROUGH', cron:'0 3 * * 1',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['weekly','thorough'],    next_run:'Mon 03:00', last_run:'last Mon',        last_status:'DONE', last_gate:'FAIL' },
+  { id:'sc3', name:'Weekly deep scan',         mode:'FULL',    profile:'FULL', cron:'0 3 * * 1',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['weekly','thorough'],    next_run:'Mon 03:00', last_run:'last Mon',        last_status:'DONE', last_gate:'FAIL' },
   { id:'sc4', name:'Secrets scan (disabled)',   mode:'SECRETS', profile:'FAST',     cron:'0 12 * * *',   src:'/home/test/Data/GOLANG_VSP', enabled:false, tags:['secrets'],              next_run:'—',         last_run:'3d ago',          last_status:'DONE', last_gate:'PASS' },
-  { id:'sc5', name:'SCA dependency audit',     mode:'SCA',     profile:'STANDARD', cron:'0 0 * * 0',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['deps','weekly'],        next_run:'Sun 00:00', last_run:'last Sun',        last_status:'DONE', last_gate:'WARN' },
+  { id:'sc5', name:'SCA dependency audit',     mode:'SCA',     profile:'EXT', cron:'0 0 * * 0',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['deps','weekly'],        next_run:'Sun 00:00', last_run:'last Sun',        last_status:'DONE', last_gate:'WARN' },
 ];
 
 var SAMPLE_RUNS = [
@@ -463,7 +466,7 @@ function openNewSchedule() {
   document.getElementById('s-name').classList.remove('error');
   document.getElementById('s-name-err').style.display = 'none';
   document.getElementById('s-mode').value = 'SAST';
-  document.getElementById('s-profile').value = 'STANDARD';
+  document.getElementById('s-profile').value = 'EXT';
   document.getElementById('s-cron').value = '0 2 * * *';
   document.getElementById('s-src').value = '';
   document.getElementById('s-tags').value = '';
@@ -508,12 +511,18 @@ function saveSchedule() {
   nameErr.style.display = 'none';
 
   var cron = document.getElementById('s-cron').value.trim() || '0 2 * * *';
+  // Basic cron validation: must have 5 fields
+  var cronParts = cron.split(/\s+/);
+  if (cronParts.length !== 5) {
+    alert('Invalid cron expression. Must have 5 fields: minute hour day month weekday\nExample: 0 2 * * *');
+    return;
+  }
   var payload = {
     name: name,
     mode: document.getElementById('s-mode').value,
     profile: document.getElementById('s-profile').value,
     cron: cron,
-    src: document.getElementById('s-src').value.trim() || '/home/test/Data/GOLANG_VSP',
+    src: document.getElementById('s-src').value.trim(),
     tags: document.getElementById('s-tags').value.split(',').map(function(t){ return t.trim(); }).filter(Boolean),
     enabled: document.getElementById('s-enabled').checked,
   };

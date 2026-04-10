@@ -128,6 +128,16 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   </div>
 </div>
 <script>
+// ─── XSS escape helper ────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 var TOKEN='',API='',_assetFilter='',_activeAsset=null;
 var ASSETS=[
   {id:'a1',name:'API Gateway',type:'service',env:'prod',tool:'kics',critical:7,high:12,medium:8,low:3,risk_score:94,status:'critical',findings_count:30},
@@ -195,8 +205,8 @@ function renderAssets(){
   document.getElementById('asset-count-sub').textContent=list.length+' assets';
   document.getElementById('asset-tbody').innerHTML=list.map(function(a){
     var sc=a.risk_score||0,rc=riskColor(sc);
-    return '<tr data-id="'+a.id+'" onclick="openAssetModal(this.dataset.id)">'
-      +'<td><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+' · '+a.tool+'</div></td>'
+    return '<tr data-id="'+esc(a.id)+'" onclick="openAssetModal(this.dataset.id)">'
+      +'<td><div class="asset-name">'+esc(a.name)+'</div><div class="asset-type">'+esc(a.type)+' · '+esc(a.tool)+'</div></td>'
       +'<td>'+envBadge(a.env)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--red);font-weight:700">'+(a.critical||0)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--amber);font-weight:700">'+(a.high||0)+'</td>'
@@ -220,10 +230,10 @@ function renderFindings(){
   document.getElementById('findings-sub').textContent=list.length+' findings';
   document.getElementById('findings-list').innerHTML=!list.length?'<div style="text-align:center;padding:16px;color:var(--t3);font-size:11px">No findings match filter</div>':list.map(function(f){
     var sc=sevClass((f.severity||'').toUpperCase());
-    return '<div class="finding '+sc+'" data-id="'+f.id+'" onclick="openFindingModal(this.dataset.id)">'
-      +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+f.title+'</span><span class="f-ts">'+f.asset+'</span></div>'
-      +'<div class="f-file">'+f.tool+' · '+f.file+':'+f.line+'</div>'
-      +'<div class="f-tags"><span class="pill pill-gray">'+f.rule+'</span>'+(f.cwe?'<span class="pill pill-gray">'+f.cwe+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+f.cvss+'</span>':'')+'</div>'
+    return '<div class="finding '+sc+'" data-id="'+esc(f.id)+'" onclick="openFindingModal(this.dataset.id)">'
+      +'<div class="f-hdr"><span class="f-id">'+esc(f.id.slice(0,8))+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+esc(f.title)+'</span><span class="f-ts">'+esc(f.asset)+'</span></div>'
+      +'<div class="f-file">'+esc(f.tool)+' · '+esc(f.file)+':'+esc(String(f.line||''))+'</div>'
+      +'<div class="f-tags"><span class="pill pill-gray">'+esc(f.rule)+'</span>'+(f.cwe?'<span class="pill pill-gray">'+esc(f.cwe)+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+esc(String(f.cvss))+'</span>':'')+'</div>'
       +'</div>';
   }).join('');
 }
@@ -263,9 +273,9 @@ async function openAssetModal(id){
   }).join('');
   var af=(a._api_findings||ALL_FINDINGS.filter(function(f){return f.asset_id===a.id;})).slice(0,4);
   document.getElementById('amod-findings').innerHTML=af.length?af.map(function(f){
-    return '<div class="finding '+sevClass((f.severity||'').toUpperCase())+'" data-fid="'+f.id+'" onclick="openFindingModal(this.dataset.fid)">'
-      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+f.title+'</span></div>'
-      +'<div class="f-file">'+f.file+':'+f.line+' · '+f.rule+'</div></div>';
+    return '<div class="finding '+sevClass((f.severity||'').toUpperCase())+'" data-fid="'+esc(f.id)+'" onclick="openFindingModal(this.dataset.fid)">'
+      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+esc(f.title)+'</span></div>'
+      +'<div class="f-file">'+esc(f.file)+':'+esc(String(f.line||''))+' · '+esc(f.rule)+'</div></div>';
   }).join(''):'<div style="color:var(--t3);font-size:11px">No findings for this asset</div>';
   document.getElementById('amod-all-btn').onclick=function(){closeModal('asset-modal');_activeAsset=a;renderFindings();};
   document.getElementById('asset-modal').classList.add('open');
@@ -277,17 +287,21 @@ function openFindingModal(id){
   document.getElementById('fmod-sub').textContent=f.id.slice(0,8)+' · '+f.tool+' · '+f.rule;
   document.getElementById('fmod-sev').innerHTML=sevBadge(sev);
   document.getElementById('fmod-kpis').innerHTML=[
-    {lbl:'Severity',val:sev,color:sevColor(sev)},{lbl:'CVSS',val:f.cvss||'—',color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
-    {lbl:'EPSS',val:f.epss||'—',color:'var(--t1)'},{lbl:'Status',val:f.status||'open',color:f.status==='resolved'?'var(--green)':'var(--amber)'},
+    {lbl:'Severity',val:esc(sev),color:sevColor(sev)},
+    {lbl:'CVSS',val:esc(String(f.cvss||'—')),color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
+    {lbl:'EPSS',val:esc(String(f.epss||'—')),color:'var(--t1)'},
+    {lbl:'Status',val:esc(f.status||'open'),color:f.status==='resolved'?'var(--green)':'var(--amber)'},
   ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
   document.getElementById('fmod-desc').textContent=f.desc||'';
   document.getElementById('fmod-location').textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
-
-
-
-
   document.getElementById('fmod-rem').textContent=f.remediation||'';
-  document.getElementById('fmod-refs').innerHTML=(f.refs||[]).map(function(r){return '<div>· '+r+'</div>';}).join('');
+  document.getElementById('fmod-refs').innerHTML=(f.refs||[]).map(function(r){
+    var safeUrl=esc(r);
+    var isHttp=/^https?:\/\//.test(r);
+    return isHttp
+      ? '<div>· <a href="'+safeUrl+'" target="_blank" rel="noopener noreferrer" style="color:var(--cyan)">'+safeUrl+'</a></div>'
+      : '<div>· '+safeUrl+'</div>';
+  }).join('');
   document.getElementById('finding-modal').classList.add('open');
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}

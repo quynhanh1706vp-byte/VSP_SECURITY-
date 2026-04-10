@@ -56,7 +56,7 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	req.Enabled = true
+	// req.Enabled preserved from request (default true for new schedules handled by DB)
 
 	s, err := h.Engine.AddSchedule(r.Context(), store.StoreSchedule{
 		TenantID: claims.TenantID,
@@ -105,6 +105,34 @@ func (h *Scheduler) RunNow(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonError(w, "schedule not found", http.StatusNotFound)
+}
+
+// PATCH /api/v1/schedules/{id} — update schedule fields
+func (h *Scheduler) Update(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	id := chi.URLParam(r, "id")
+	var req struct {
+		Name    string `json:"name"`
+		Mode    string `json:"mode"`
+		Profile string `json:"profile"`
+		Src     string `json:"src"`
+		URL     string `json:"url"`
+		Cron    string `json:"cron"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest); return
+	}
+	if req.Cron != "" {
+		parts := strings.Fields(req.Cron)
+		if len(parts) != 5 {
+			jsonError(w, "invalid cron: must be 5 fields", http.StatusBadRequest); return
+		}
+	}
+	if err := h.DB.UpdateSchedule(r.Context(), claims.TenantID, id,
+		req.Name, req.Mode, req.Profile, req.Src, req.URL, req.Cron); err != nil {
+		jsonError(w, "update failed", http.StatusInternalServerError); return
+	}
+	jsonOK(w, map[string]string{"id": id, "status": "updated"})
 }
 
 // PATCH /api/v1/schedules/{id}/toggle — enable/disable

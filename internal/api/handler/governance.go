@@ -15,14 +15,21 @@ type Governance struct {
 }
 
 func (h *Governance) getFindings(r *http.Request, tenantID string) []store.Finding {
-	// Only use findings from the latest DONE run to avoid duplicates across runs
-	run, _ := h.DB.GetLatestRun(r.Context(), tenantID)
-	if run == nil || run.Status != "DONE" {
+	// Get latest run that has actual findings (not empty scheduled scans)
+	runs, _ := h.DB.ListRuns(r.Context(), tenantID, 50, 0)
+	var runID string
+	for _, run := range runs {
+		if run.Status == "DONE" && run.TotalFindings > 0 {
+			runID = run.ID
+			break
+		}
+	}
+	if runID == "" {
 		return []store.Finding{}
 	}
 	findings, _, _ := h.DB.ListFindings(r.Context(), tenantID, store.FindingFilter{
-		RunID: run.ID,
-		Limit: 5000,
+		RunID: runID,
+		Limit: 2000, // reasonable cap to prevent OOM
 	})
 	return findings
 }
@@ -66,8 +73,11 @@ func (h *Governance) RACI(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/governance/ownership
 func (h *Governance) Ownership(w http.ResponseWriter, r *http.Request) {
-	// Standard control owners for enterprise
-	owners := []governance.ControlOwner{
+	claims, _ := auth.FromContext(r.Context())
+	tid := claims.TenantID
+
+	// Base control owners — enrich status từ findings thật
+	base := []governance.ControlOwner{
 		{Control: "AC-2",  Framework: "NIST", Owner: "identity-team",   Team: "Platform",  Status: "implemented"},
 		{Control: "AC-17", Framework: "NIST", Owner: "network-team",    Team: "Infra",     Status: "implemented"},
 		{Control: "SI-10", Framework: "NIST", Owner: "appsec-team",     Team: "Security",  Status: "partial"},
@@ -77,6 +87,27 @@ func (h *Governance) Ownership(w http.ResponseWriter, r *http.Request) {
 		{Control: "CM-8",  Framework: "NIST", Owner: "devops-team",     Team: "DevOps",    Status: "partial"},
 		{Control: "SA-11", Framework: "NIST", Owner: "appsec-team",     Team: "Security",  Status: "implemented"},
 	}
+
+	// Enrich: set id + tenant_id, mark "at_risk" nếu có findings open
+	findings := h.getFindings(r, tid)
+	openControls := map[string]bool{}
+	for _, f := range findings {
+		if f.CWE != "" {
+			openControls[f.CWE] = true
+		}
+	}
+
+	owners := make([]governance.ControlOwner, len(base))
+	for i, o := range base {
+		o.ID = "own-" + o.Control + "-" + tid
+		o.TenantID = tid
+		// Downgrade nếu có open findings liên quan
+		if o.Status == "implemented" && openControls[o.Control] {
+			o.Status = "at_risk"
+		}
+		owners[i] = o
+	}
+
 	jsonOK(w, map[string]any{"owners": owners, "total": len(owners)})
 }
 
@@ -94,7 +125,7 @@ func (h *Governance) Evidence(w http.ResponseWriter, r *http.Request) {
 			Type:      "scan",
 			RunID:     run.ID,
 			Path:      run.Src,
-			Hash:      "sha256:" + run.ID,
+			Hash:      "run-id:" + run.ID, // content hash computed at freeze time
 			Frozen:    false,
 			CreatedAt: run.CreatedAt,
 		})
@@ -165,6 +196,8 @@ func (h *Governance) Detection(w http.ResponseWriter, r *http.Request) {
 		{"UC-004","Container CVEs","trivy","HIGH","active",0},
 		{"UC-005","Dependency CVEs","grype","MEDIUM","active",0},
 		{"UC-006","DAST findings","nuclei","HIGH","active",0},
+		{"UC-007","License compliance","license","MEDIUM","active",0},
+		{"UC-008","Live secret validation","secretcheck","CRITICAL","active",0},
 	}
 	toolCount := map[string]int{}
 	for _, f := range findings { toolCount[f.Tool]++ }
@@ -183,7 +216,7 @@ func (h *Governance) Incidents(w http.ResponseWriter, r *http.Request) {
 	for _, f := range findings {
 		if f.Severity != "CRITICAL" && f.Severity != "HIGH" { continue }
 		incidents = append(incidents, map[string]any{
-			"id":       "INC-" + f.ID[:8],
+			"id":       "INC-" + func() string { if len(f.ID) >= 8 { return f.ID[:8] }; return f.ID }(),
 			"title":    f.RuleID + ": " + f.Message[:min(50, len(f.Message))],
 			"severity": f.Severity,
 			"tool":     f.Tool,
@@ -202,14 +235,14 @@ func (h *Governance) SupplyChain(w http.ResponseWriter, r *http.Request) {
 	findings := h.getFindings(r, claims.TenantID)
 	scaFindings := make([]store.Finding, 0)
 	for _, f := range findings {
-		if f.Tool == "grype" || f.Tool == "trivy" {
+		if f.Tool == "grype" || f.Tool == "trivy" || f.Tool == "license" {
 			scaFindings = append(scaFindings, f)
 		}
 	}
 	jsonOK(w, map[string]any{
 		"sca_findings": scaFindings,
 		"total":        len(scaFindings),
-		"summary":      "Supply chain analysis from grype + trivy",
+		"summary":      "Supply chain analysis from grype + trivy + license",
 	})
 }
 

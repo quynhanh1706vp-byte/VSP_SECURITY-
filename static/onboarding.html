@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSP — Getting Started</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0c10;--bg2:#111318;--bg3:#161920;--t1:#e8eaf0;--t2:#8b92a5;--t3:#4a5168;--cyan:#06b6d4;--green:#10b981;--amber:#f59e0b;--purple:#8b5cf6;--border:rgba(255,255,255,.08)}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;display:flex;flex-direction:column}
+
+/* Header */
+.header{padding:20px 40px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:18px;font-weight:800;color:var(--cyan)}
+.header-right{font-size:12px;color:var(--t3)}
+
+/* Progress bar */
+.progress-bar{padding:0 40px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.progress-steps{display:flex;max-width:800px;margin:0 auto}
+.step{flex:1;padding:16px 12px;text-align:center;position:relative;cursor:pointer}
+.step::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:transparent;transition:background .3s}
+.step.active::after{background:var(--cyan)}
+.step.done::after{background:var(--green)}
+.step-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin:0 auto 6px;border:1px solid var(--border);color:var(--t3);background:var(--bg);transition:all .3s}
+.step.active .step-num{border-color:var(--cyan);color:var(--cyan);background:rgba(6,182,212,.1)}
+.step.done .step-num{border-color:var(--green);color:#0a0c10;background:var(--green)}
+.step-label{font-size:11px;color:var(--t3);transition:color .3s}
+.step.active .step-label{color:var(--cyan)}
+.step.done .step-label{color:var(--green)}
+
+/* Content */
+.content{flex:1;display:flex;align-items:center;justify-content:center;padding:40px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px;width:100%;max-width:600px}
+.card-tag{font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:.12em;margin-bottom:12px}
+.card-title{font-size:28px;font-weight:700;margin-bottom:8px;letter-spacing:-.02em}
+.card-sub{font-size:14px;color:var(--t2);margin-bottom:32px;line-height:1.6}
+
+/* Form */
+.form-group{margin-bottom:20px}
+.form-label{font-size:12px;color:var(--t2);margin-bottom:6px;display:block;font-weight:500}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--t1);font-size:14px;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:rgba(6,182,212,.4)}
+.form-input::placeholder{color:var(--t3)}
+.form-select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--t1);font-size:14px;outline:none;appearance:none}
+.form-hint{font-size:11px;color:var(--t3);margin-top:4px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* Options grid */
+.options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}
+.option{border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .2s;position:relative}
+.option:hover{border-color:rgba(255,255,255,.15)}
+.option.selected{border-color:var(--cyan);background:rgba(6,182,212,.06)}
+.option-icon{font-size:20px;margin-bottom:8px}
+.option-title{font-size:13px;font-weight:600;margin-bottom:3px}
+.option-desc{font-size:11px;color:var(--t2);line-height:1.4}
+.option-check{position:absolute;top:10px;right:10px;width:18px;height:18px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .2s}
+.option.selected .option-check{background:var(--cyan);border-color:var(--cyan);color:#0a0c10}
+
+/* Checklist */
+.checklist{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.check-item{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--bg3);border-radius:8px;cursor:pointer;transition:background .2s}
+.check-item:hover{background:rgba(255,255,255,.04)}
+.check-box{width:20px;height:20px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;margin-top:1px;transition:all .2s}
+.check-item.checked .check-box{background:var(--green);border-color:var(--green);color:#0a0c10}
+.check-title{font-size:13px;font-weight:500;margin-bottom:2px}
+.check-desc{font-size:11px;color:var(--t2)}
+
+/* Progress display */
+.progress-display{margin-bottom:24px}
+.progress-item{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.progress-label{font-size:12px;color:var(--t2);min-width:140px}
+.progress-track{flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.progress-pct{font-size:12px;font-weight:600;min-width:36px;text-align:right}
+
+/* Success */
+.success-icon{width:64px;height:64px;border-radius:50%;background:rgba(16,185,129,.15);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 20px}
+.success-badges{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:20px 0}
+.badge{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600}
+.b-green{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:var(--green)}
+.b-cyan{background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);color:var(--cyan)}
+.b-purple{background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);color:var(--purple)}
+
+/* Buttons */
+.btn-row{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+.btn-primary{background:var(--cyan);color:#0a0c10;border:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{background:transparent;color:var(--t2);border:1px solid var(--border);padding:12px 24px;border-radius:8px;font-size:14px;cursor:pointer}
+.btn-secondary:hover{color:var(--t1)}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#0a0c10;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;transform:translateY(100px);transition:transform .3s;z-index:999}
+.toast.show{transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">VSP</div>
+  <div class="header-right">Need help? <span style="color:var(--cyan);cursor:pointer">Contact support →</span></div>
+</div>
+
+<div class="progress-bar">
+  <div class="progress-steps">
+    <div class="step active" id="step-1" onclick="goTo(1)">
+      <div class="step-num">1</div>
+      <div class="step-label">Organization</div>
+    </div>
+    <div class="step" id="step-2" onclick="goTo(2)">
+      <div class="step-num">2</div>
+      <div class="step-label">Compliance Goals</div>
+    </div>
+    <div class="step" id="step-3" onclick="goTo(3)">
+      <div class="step-num">3</div>
+      <div class="step-label">System Setup</div>
+    </div>
+    <div class="step" id="step-4" onclick="goTo(4)">
+      <div class="step-num">4</div>
+      <div class="step-label">Initial Scan</div>
+    </div>
+    <div class="step" id="step-5" onclick="goTo(5)">
+      <div class="step-num">5</div>
+      <div class="step-label">P4 Baseline</div>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- Step 1: Organization -->
+  <div class="card" id="panel-1">
+    <div class="card-tag">Step 1 of 5</div>
+    <div class="card-title">Tell us about your organization.</div>
+    <div class="card-sub">We'll configure VSP to match your compliance requirements and DoD contract type.</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Organization Name</label>
+        <input class="form-input" placeholder="e.g. Acme Defense Systems" id="org-name"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">CAGE Code</label>
+        <input class="form-input" placeholder="e.g. 1ABC2" id="cage-code"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Contract Type</label>
+      <select class="form-select" id="contract-type">
+        <option value="">Select contract type...</option>
+        <option value="dod-prime">DoD Prime Contractor</option>
+        <option value="dod-sub">DoD Subcontractor</option>
+        <option value="federal-agency">Federal Agency</option>
+        <option value="dib">Defense Industrial Base (DIB)</option>
+        <option value="other">Other Government</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Primary POC Email</label>
+        <input class="form-input" type="email" placeholder="isso@agency.gov" id="poc-email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ISSO Name</label>
+        <input class="form-input" placeholder="Full name" id="isso-name"/>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="nextStep()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Compliance Goals -->
+  <div class="card" id="panel-2" style="display:none">
+    <div class="card-tag">Step 2 of 5</div>
+    <div class="card-title">What are your compliance goals?</div>
+    <div class="card-sub">Select all frameworks that apply. VSP will configure the right control baseline automatically.</div>
+    <div class="options-grid">
+      <div class="option selected" onclick="toggleOption(this)">
+        <div class="option-check">✓</div>
+        <div class="option-icon">🎯</div>
+        <div class="option-title">DoD Zero Trust P4</div>
+        <div class="option-desc">Highest maturity level — required for new DoD contracts</div>
+      </div>
+      <div class="option selected" onclick="toggleOption(this)">
+        <div class="option-check">✓</div>
+        <div class="option-icon">🏛</div>
+        <div class="option-title">FedRAMP Moderate</div>
+        <div class="option-desc">Required for cloud services to federal agencies</div>
+      </div>
+      <div class="option selected" onclick="toggleOption(this)">
+        <div class="option-check">✓</div>
+        <div class="option-icon">🔒</div>
+        <div class="option-title">CMMC Level 2</div>
+        <div class="option-desc">Required for DoD contractors handling CUI</div>
+      </div>
+      <div class="option" onclick="toggleOption(this)">
+        <div class="option-check"></div>
+        <div class="option-icon">📋</div>
+        <div class="option-title">NIST SP 800-171</div>
+        <div class="option-desc">Protecting CUI in non-federal systems</div>
+      </div>
+      <div class="option" onclick="toggleOption(this)">
+        <div class="option-check"></div>
+        <div class="option-icon">🛡️</div>
+        <div class="option-title">IL4 / IL5</div>
+        <div class="option-desc">DoD Impact Levels for classified workloads</div>
+      </div>
+      <div class="option" onclick="toggleOption(this)">
+        <div class="option-check"></div>
+        <div class="option-icon">⚡</div>
+        <div class="option-title">StateRAMP</div>
+        <div class="option-desc">State and local government cloud security</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn-primary" onclick="nextStep()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: System Setup -->
+  <div class="card" id="panel-3" style="display:none">
+    <div class="card-tag">Step 3 of 5</div>
+    <div class="card-title">Configure your system.</div>
+    <div class="card-sub">Tell us about the system you're seeking ATO for. This sets up your RMF package and FIPS 199 categorization.</div>
+    <div class="form-group">
+      <label class="form-label">System Name</label>
+      <input class="form-input" placeholder="e.g. Acme Logistics Platform" id="sys-name"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">System ID / Acronym</label>
+        <input class="form-input" placeholder="e.g. ALP-2025-001" id="sys-id"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">FIPS 199 Categorization</label>
+        <select class="form-select" id="fips-cat">
+          <option value="moderate">MODERATE (recommended)</option>
+          <option value="low">LOW</option>
+          <option value="high">HIGH</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Cloud Provider</label>
+      <select class="form-select" id="cloud-provider">
+        <option value="aws">AWS GovCloud</option>
+        <option value="azure">Azure Government</option>
+        <option value="gcp">Google Cloud (FedRAMP)</option>
+        <option value="onprem">On-Premise / Air-Gap</option>
+        <option value="hybrid">Hybrid</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Number of Assets to Scan</label>
+      <select class="form-select" id="asset-count">
+        <option value="small">1-50 assets</option>
+        <option value="medium" selected>51-200 assets</option>
+        <option value="large">201-500 assets</option>
+        <option value="enterprise">500+ assets</option>
+      </select>
+      <div class="form-hint">This determines scan concurrency and reporting frequency</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn-primary" onclick="nextStep()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Initial Scan -->
+  <div class="card" id="panel-4" style="display:none">
+    <div class="card-tag">Step 4 of 5</div>
+    <div class="card-title">Run your first compliance scan.</div>
+    <div class="card-sub">VSP will scan your system against your selected frameworks and generate an initial gap analysis.</div>
+    <div class="checklist" id="scan-checklist">
+      <div class="check-item checked" id="chk-1">
+        <div class="check-box">✓</div>
+        <div><div class="check-title">Framework baseline configured</div><div class="check-desc">DoD ZT P4 + FedRAMP Moderate + CMMC L2 controls loaded</div></div>
+      </div>
+      <div class="check-item" id="chk-2">
+        <div class="check-box"></div>
+        <div><div class="check-title">Scan targets defined</div><div class="check-desc">Add IP ranges, hostnames, or cloud account IDs</div></div>
+      </div>
+      <div class="check-item" id="chk-3">
+        <div class="check-box"></div>
+        <div><div class="check-title">Credentials configured</div><div class="check-desc">SSH keys or API tokens for authenticated scanning</div></div>
+      </div>
+      <div class="check-item" id="chk-4">
+        <div class="check-box"></div>
+        <div><div class="check-title">SBOM source connected</div><div class="check-desc">Connect CI/CD pipeline for automatic SBOM generation</div></div>
+      </div>
+      <div class="check-item" id="chk-5">
+        <div class="check-box"></div>
+        <div><div class="check-title">Scan scheduled</div><div class="check-desc">Daily automated scans for continuous monitoring</div></div>
+      </div>
+    </div>
+    <div id="scan-status" style="display:none;margin-bottom:20px;padding:12px 16px;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);border-radius:8px;font-size:13px;color:var(--cyan)">
+      ⟳ Running initial compliance scan... This takes 2-3 minutes.
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn-primary" onclick="runScan()">▶ Run Initial Scan</button>
+    </div>
+  </div>
+
+  <!-- Step 5: P4 Baseline -->
+  <div class="card" id="panel-5" style="display:none">
+    <div class="card-tag">Step 5 of 5</div>
+    <div class="card-title">Your P4 baseline is ready.</div>
+    <div class="card-sub">Initial scan complete. Here's your compliance starting point — VSP will track your progress toward P4.</div>
+    <div class="progress-display">
+      <div class="progress-item">
+        <div class="progress-label" style="font-size:12px;color:var(--t2)">P4 Readiness</div>
+        <div class="progress-track"><div class="progress-fill" style="width:38%;background:var(--amber)"></div></div>
+        <div class="progress-pct" style="color:var(--amber)">38%</div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label" style="font-size:12px;color:var(--t2)">FedRAMP Moderate</div>
+        <div class="progress-track"><div class="progress-fill" style="width:52%;background:var(--cyan)"></div></div>
+        <div class="progress-pct" style="color:var(--cyan)">52%</div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label" style="font-size:12px;color:var(--t2)">CMMC Level 2</div>
+        <div class="progress-track"><div class="progress-fill" style="width:41%;background:var(--amber)"></div></div>
+        <div class="progress-pct" style="color:var(--amber)">41%</div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label" style="font-size:12px;color:var(--t2)">Zero Trust Pillars</div>
+        <div class="progress-track"><div class="progress-fill" style="width:29%;background:var(--red,#ef4444)"></div></div>
+        <div class="progress-pct" style="color:#ef4444">29%</div>
+      </div>
+    </div>
+    <div style="background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:24px">
+      <div style="font-size:12px;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Initial Findings</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center">
+        <div><div style="font-size:22px;font-weight:700;color:#ef4444">3</div><div style="font-size:10px;color:var(--t3)">CRITICAL</div></div>
+        <div><div style="font-size:22px;font-weight:700;color:var(--amber)">12</div><div style="font-size:10px;color:var(--t3)">HIGH</div></div>
+        <div><div style="font-size:22px;font-weight:700;color:var(--t2)">28</div><div style="font-size:10px;color:var(--t3)">MEDIUM</div></div>
+        <div><div style="font-size:22px;font-weight:700;color:var(--t3)">44</div><div style="font-size:10px;color:var(--t3)">LOW</div></div>
+      </div>
+    </div>
+    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:14px 16px;margin-bottom:24px">
+      <div style="font-size:13px;font-weight:600;color:var(--green);margin-bottom:6px">🤖 AI Advisor recommendation</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.6">Based on your initial scan, VSP estimates <strong style="color:var(--t1)">P4 achievement in 4-5 months</strong>. Top priority: remediate 3 CRITICAL findings (S3 ACL, CVE-2024-45337, API key exposure) within 7 days to unblock RMF Step 4 assessment.</div>
+    </div>
+    <div class="btn-row" style="justify-content:space-between">
+      <button class="btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn-primary" onclick="finishOnboarding()">Go to P4 Dashboard →</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentStep = 1;
+const totalSteps = 5;
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function goTo(n) {
+  document.getElementById('panel-' + currentStep).style.display = 'none';
+  document.getElementById('step-' + currentStep).className = 'step done';
+  currentStep = n;
+  document.getElementById('panel-' + n).style.display = 'block';
+  for (let i = 1; i <= totalSteps; i++) {
+    const s = document.getElementById('step-' + i);
+    if (i < n) s.className = 'step done';
+    else if (i === n) s.className = 'step active';
+    else s.className = 'step';
+    s.querySelector('.step-num').textContent = i < n ? '✓' : i;
+  }
+}
+
+function nextStep() {
+  if (currentStep < totalSteps) goTo(currentStep + 1);
+}
+
+function prevStep() {
+  if (currentStep > 1) goTo(currentStep - 1);
+}
+
+function toggleOption(el) {
+  el.classList.toggle('selected');
+  el.querySelector('.option-check').textContent = el.classList.contains('selected') ? '✓' : '';
+}
+
+function runScan() {
+  // Simulate scan progress
+  const items = ['chk-2','chk-3','chk-4','chk-5'];
+  document.getElementById('scan-status').style.display = 'block';
+  document.querySelector('[onclick="runScan()"]').textContent = '⟳ Scanning...';
+  document.querySelector('[onclick="runScan()"]').disabled = true;
+
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < items.length) {
+      const item = document.getElementById(items[i]);
+      item.classList.add('checked');
+      item.querySelector('.check-box').textContent = '✓';
+      i++;
+    } else {
+      clearInterval(interval);
+      document.getElementById('scan-status').innerHTML = '✓ Initial scan complete — 87 controls tested, 43 findings detected';
+      document.getElementById('scan-status').style.background = 'rgba(16,185,129,.08)';
+      document.getElementById('scan-status').style.borderColor = 'rgba(16,185,129,.2)';
+      document.getElementById('scan-status').style.color = 'var(--green)';
+      setTimeout(() => { nextStep(); }, 1500);
+    }
+  }, 600);
+}
+
+function finishOnboarding() {
+  showToast('✅ Onboarding complete! Redirecting to P4 Dashboard...');
+  setTimeout(() => {
+    window.location.href = '/p4';
+  }, 2000);
+}
+</script>
+</body>
+</html>

@@ -66,17 +66,12 @@ func (rl *RateLimiter) Allow(key string) bool {
 	return true
 }
 
-// realIP extracts the real client IP respecting X-Forwarded-For / X-Real-IP.
+// realIP extracts the real client IP.
+// SECURITY: Uses RemoteAddr (TCP connection) as primary source — cannot be spoofed.
+// X-Forwarded-For is NOT trusted by default to prevent rate-limit bypass attacks.
+// Configure a reverse proxy (nginx/caddy) to overwrite RemoteAddr if needed.
 func realIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if parts := strings.Split(xff, ","); len(parts) > 0 {
-			return strings.TrimSpace(parts[0])
-		}
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-	// Strip port
+	// Use actual TCP connection address — spoof-proof
 	ip := r.RemoteAddr
 	if idx := strings.LastIndex(ip, ":"); idx != -1 {
 		ip = ip[:idx]

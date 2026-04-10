@@ -21,6 +21,7 @@ type Export struct {
 func (h *Export) SARIF(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
+	if !validateRID(rid) { jsonError(w, "invalid rid", http.StatusBadRequest); return }
 
 	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
 	if err != nil || run == nil {
@@ -29,7 +30,7 @@ func (h *Export) SARIF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	findings, _, _ := h.DB.ListFindings(r.Context(), claims.TenantID,
-		store.FindingFilter{Limit: 1000})
+		store.FindingFilter{RunID: run.ID, Limit: 5000})
 
 	doc := report.BuildSARIF(*run, findings)
 	data, _ := report.SARIFToJSON(doc)
@@ -52,7 +53,7 @@ func (h *Export) CSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	findings, _, _ := h.DB.ListFindings(r.Context(), claims.TenantID,
-		store.FindingFilter{Limit: 10000})
+		store.FindingFilter{RunID: run.ID, Limit: 10000})
 
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition",
@@ -61,7 +62,6 @@ func (h *Export) CSV(w http.ResponseWriter, r *http.Request) {
 	cw := csv.NewWriter(w)
 	cw.Write([]string{"severity", "tool", "rule_id", "message", "path", "line", "cwe", "fix_signal", "created_at"})
 	for _, f := range findings {
-		if f.RunID != run.ID { continue }
 		cw.Write([]string{
 			f.Severity, f.Tool, f.RuleID, f.Message,
 			f.Path, fmt.Sprintf("%d", f.LineNum),
@@ -82,15 +82,9 @@ func (h *Export) JSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	findings, total, _ := h.DB.ListFindings(r.Context(), claims.TenantID,
-		store.FindingFilter{Limit: 10000})
-
-	runFindings := make([]store.Finding, 0)
-	for _, f := range findings {
-		if f.RunID == run.ID {
-			runFindings = append(runFindings, f)
-		}
-	}
+	runFindings, total, _ := h.DB.ListFindings(r.Context(), claims.TenantID,
+		store.FindingFilter{RunID: run.ID, Limit: 10000})
+	if runFindings == nil { runFindings = []store.Finding{} }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition",

@@ -33,6 +33,7 @@ func (h *Remediation) Stats(w http.ResponseWriter, r *http.Request) {
 func (h *Remediation) Get(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	fid := chi.URLParam(r, "finding_id")
+	if !validateUUID(fid) { jsonError(w, "invalid finding_id", http.StatusBadRequest); return }
 	rem, err := h.DB.GetRemediation(r.Context(), claims.TenantID, fid)
 	if err != nil {
 		jsonOK(w, map[string]any{"status": "open", "finding_id": fid})

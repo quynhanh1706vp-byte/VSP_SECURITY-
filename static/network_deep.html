@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VSP — Deep Packet Analysis</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#080c14;--bg2:#0c1220;--bg3:#111827;
+  --card:#0f1a2e;--card2:#162035;--card3:#1c2a42;
+  --b1:rgba(255,255,255,.05);--b2:rgba(255,255,255,.09);--b3:rgba(255,255,255,.15);
+  --amber:#f59e0b;--amber2:#fbbf24;--amber3:rgba(245,158,11,.12);
+  --red:#ef4444;--red2:rgba(239,68,68,.12);
+  --green:#22c55e;--green2:rgba(34,197,94,.12);
+  --cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);
+  --blue:#3b82f6;--blue2:rgba(59,130,246,.12);
+  --purple:#8b5cf6;--purple2:rgba(139,92,246,.12);
+  --orange:#f97316;--orange2:rgba(249,115,22,.12);
+  --t1:#f0f4ff;--t2:#8899bb;--t3:#445577;--t4:#2a3a55;
+  --font-display:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --radius:8px;--radius-lg:12px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font-body);background:var(--bg);color:var(--t1);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;overflow:hidden}
+button{cursor:pointer;font-family:inherit}
+input,select{font-family:inherit}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b3);border-radius:2px}
+
+.topbar{height:52px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--b1);background:var(--bg2);position:relative}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--amber3) 30%,var(--amber3) 70%,transparent)}
+.topbar-title{font-family:var(--font-display);font-size:14px;font-weight:800;letter-spacing:-.02em}
+.topbar-sub{font-family:var(--font-mono);font-size:9px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-top:1px}
+.topbar-right{margin-left:auto;display:flex;gap:7px;align-items:center}
+
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 20px;scrollbar-width:thin}
+
+.card{background:var(--card);border:1px solid var(--b1);border-radius:var(--radius-lg);margin-bottom:12px;overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--b1);gap:10px}
+.card-title{font-size:12px;font-weight:700;color:var(--t1);letter-spacing:.02em}
+.card-sub{font-family:var(--font-mono);font-size:9px;color:var(--t3);margin-top:1px}
+.card-body{padding:14px 16px}
+
+.kpi{background:var(--card);border:1px solid var(--b1);border-radius:var(--radius-lg);padding:13px 14px;position:relative;overflow:hidden;transition:border-color .2s}
+.kpi:hover{border-color:var(--b2)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kpi-color,var(--cyan));border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.kpi-label{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;color:var(--t3);text-transform:uppercase;font-weight:600}
+.kpi-value{font-family:var(--font-display);font-size:24px;font-weight:800;line-height:1;margin:6px 0 3px;letter-spacing:-.02em}
+.kpi-sub{font-size:10px;color:var(--t3)}
+.kpi-cyan{--kpi-color:var(--cyan)}.kpi-blue{--kpi-color:var(--blue)}.kpi-green{--kpi-color:var(--green)}
+.kpi-crit{--kpi-color:var(--red)}.kpi-purple{--kpi-color:var(--purple)}.kpi-amber{--kpi-color:var(--amber)}
+.kpi-sm .kpi-value{font-size:18px}
+
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.g6{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.g-4060{display:grid;grid-template-columns:2fr 3fr;gap:12px}
+.g-6040{display:grid;grid-template-columns:3fr 2fr;gap:12px}
+.mb8{margin-bottom:8px}.mb10{margin-bottom:10px}.mb12{margin-bottom:12px}.mb14{margin-bottom:14px}
+.flex{display:flex;align-items:center}.flex-b{display:flex;align-items:center;justify-content:space-between}
+.gap6{gap:6px}.gap8{gap:8px}
+
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:20px;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;white-space:nowrap;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.25)}
+.pill-amber{background:var(--amber3);color:var(--amber);border-color:rgba(245,158,11,.25)}
+.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.25)}
+.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.25)}
+.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.25)}
+.pill-purple{background:var(--purple2);color:var(--purple);border-color:rgba(139,92,246,.25)}
+.pill-orange{background:var(--orange2);color:var(--orange);border-color:rgba(249,115,22,.25)}
+.pill-gray{background:rgba(255,255,255,.05);color:var(--t2);border-color:var(--b2)}
+
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--b2);background:transparent;color:var(--t1);cursor:pointer;transition:all .15s}
+.btn:hover{background:rgba(255,255,255,.05)}
+.btn-sm{padding:3px 8px;font-size:10px}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--t2)}
+.btn-ghost:hover{color:var(--t1);background:rgba(255,255,255,.04)}
+.btn-danger{background:var(--red2);border-color:rgba(239,68,68,.35);color:var(--red)}
+.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}
+
+.tab-bar{display:flex;border-bottom:1px solid var(--b1);padding:0 16px;background:var(--card);overflow-x:auto;scrollbar-width:none}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab{padding:10px 13px;font-size:11px;font-weight:600;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px;white-space:nowrap;background:none;border-left:none;border-right:none;border-top:none}
+.tab:hover{color:var(--t2)}
+.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.tab-panel{display:none;animation:panelIn .18s ease}
+.tab-panel.active{display:block}
+@keyframes panelIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);font-weight:600;padding:8px 13px;border-bottom:1px solid var(--b1);background:rgba(255,255,255,.015);white-space:nowrap}
+tbody td{padding:7px 13px;border-bottom:1px solid var(--b1);font-size:11px;color:var(--t2);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s;cursor:pointer}
+tbody tr:hover td{background:rgba(255,255,255,.02)}
+.mono{font-family:var(--font-mono);font-size:10px}
+.mono-sm{font-family:var(--font-mono);font-size:9px;color:var(--t3)}
+
+.filter-select{background:var(--card);border:1px solid var(--b2);color:var(--t1);padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;outline:none}
+.filter-select:focus{border-color:var(--amber)}
+
+.sev{font-family:var(--font-mono);font-size:10px;font-weight:700}
+.sev-crit{color:var(--red)}.sev-high{color:var(--orange)}.sev-med{color:var(--amber)}
+
+.progress-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px}
+
+.decode-block{background:var(--card2);border:1px solid var(--b1);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px}
+.decode-block.l-http{border-left:2px solid var(--blue)}
+.decode-block.l-dns{border-left:2px solid var(--purple)}
+.decode-block.l-sql{border-left:2px solid var(--orange)}
+.decode-block.l-tls{border-left:2px solid var(--green)}
+.decode-block.l-alert{border-left:2px solid var(--red);background:rgba(239,68,68,.07)}
+.decode-block.l-warn{border-left:2px solid var(--amber);background:rgba(245,158,11,.07)}
+.field-row{display:flex;gap:10px;align-items:baseline;margin-bottom:3px}
+.field-key{font-family:var(--font-mono);font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;min-width:86px;flex-shrink:0}
+.field-val{font-family:var(--font-mono);font-size:10px;color:var(--t1);word-break:break-all;line-height:1.5}
+.field-val.bad{color:var(--red)}.field-val.warn{color:var(--amber)}.field-val.ok{color:var(--green)}
+
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:4px;animation:livePulse 2s ease-in-out infinite}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+.flag-cell{background:var(--card2);border:1px solid var(--b1);border-radius:var(--radius);padding:8px 10px;text-align:center}
+.flag-name{font-family:var(--font-mono);font-size:11px;font-weight:700}
+.flag-count{font-family:var(--font-mono);font-size:10px;color:var(--t2);margin:2px 0 4px}
+
+.hex-view{font-family:var(--font-mono);font-size:10px;line-height:1.8;background:var(--card2);border-radius:var(--radius);padding:12px 14px;overflow-x:auto;white-space:pre;border:1px solid var(--b1)}
+.hex-offset{color:var(--t4)}
+.hex-byte{color:var(--t2)}
+.hex-byte.l3{color:var(--blue)}.hex-byte.l4{color:var(--cyan)}.hex-byte.l7{color:var(--green)}
+.hex-byte.anomaly{color:var(--red);background:rgba(239,68,68,.2);border-radius:2px;padding:0 1px}
+.hex-ascii{color:var(--t3);border-left:1px solid var(--b2);padding-left:8px;margin-left:4px}
+.hex-ascii .pr{color:var(--t1)}
+
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--b1)}
+.stat-row:last-child{border-bottom:none}
+
+.ja3-hash{font-family:var(--font-mono);font-size:9px;background:var(--card3);border-radius:5px;padding:7px 9px;word-break:break-all;color:var(--cyan);letter-spacing:.02em;margin-top:5px;border:1px solid var(--b1)}
+
+.anom-item{border:1px solid var(--b1);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;cursor:pointer;transition:border-color .15s;display:flex}
+.anom-item:hover{border-color:var(--b2)}
+.anom-body{padding:10px 13px;flex:1}
+.anom-header{display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap}
+.anom-title{font-size:12px;font-weight:600;color:var(--t1)}
+.anom-detail{font-size:11px;color:var(--t2);margin-bottom:4px;line-height:1.5}
+.anom-meta{display:flex;gap:14px;font-family:var(--font-mono);font-size:9px;color:var(--t3)}
+
+.stream-card{background:var(--card2);border:1px solid var(--b1);border-radius:var(--radius);padding:10px 12px}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(5,10,20,.8);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--b3);border-radius:var(--radius-lg);width:min(680px,92vw);max-height:85vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.6)}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--b1)}
+.modal-title{font-size:14px;font-weight:700}
+.modal-sub{font-family:var(--font-mono);font-size:9px;color:var(--t3);margin-top:3px}
+.modal-body{padding:18px 20px}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--b1);display:flex;gap:8px;justify-content:flex-end}
+.modal-close{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--b2);color:var(--t3);display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s}
+.modal-close:hover{background:rgba(255,255,255,.09);color:var(--t1)}
+
+.c-t2{color:var(--t2)}.c-t3{color:var(--t3)}
+.c-red{color:var(--red)}.c-green{color:var(--green)}.c-amber{color:var(--amber)}
+.c-cyan{color:var(--cyan)}.c-blue{color:var(--blue)}.c-purple{color:var(--purple)}.c-orange{color:var(--orange)}
+.fw7{font-weight:700}.fw8{font-weight:800}
+.f10{font-size:10px}.f11{font-size:11px}.f12{font-size:12px}
+.ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media(max-width:960px){.g6{grid-template-columns:repeat(3,1fr)}.g-4060,.g-6040{grid-template-columns:1fr}.g4{grid-template-columns:1fr 1fr}.g5{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <div class="topbar-title">Deep Packet Analysis</div>
+    <div class="topbar-sub">L3 · L4 · L7 · tcpdump + tshark · wire decode · anomaly detection</div>
+  </div>
+  <div class="topbar-right" style="gap:6px;flex-wrap:wrap">
+    <!-- Interface selector -->
+    <select id="iface-sel" class="filter-select" style="font-size:10px;padding:3px 8px">
+      <option value="any">any</option>
+    </select>
+    <!-- BPF filter -->
+    <input id="bpf-filter" placeholder="BPF: tcp port 80 or udp port 53" style="font-family:var(--font-mono);font-size:10px;background:var(--card);border:1px solid var(--b2);color:var(--t1);padding:4px 9px;border-radius:6px;width:220px;outline:none" onkeydown="if(event.key==='Enter')applyBPF()">
+    <button class="btn btn-sm btn-primary" onclick="applyBPF()" title="Apply BPF filter and restart capture">&#9654; Apply</button>
+    <!-- Capture toggle -->
+    <span style="font-size:10px;color:var(--green);font-family:var(--font-mono)" id="cap-badge"><span class="live-dot"></span>CAPTURING</span>
+    <button class="btn btn-sm" id="cap-btn" onclick="toggleCapture()">&#9632; Stop</button>
+    <!-- Export -->
+    <button class="btn btn-sm btn-ghost" onclick="exportFlowsCSV()" title="Export flows CSV">&#8595; CSV</button>
+    <button class="btn btn-sm btn-ghost" onclick="exportAnomaliesJSON()" title="Export anomalies JSON">&#8595; JSON</button>
+    <button class="btn btn-sm btn-ghost" onclick="loadFull()">&#8635;</button>
+  </div>
+</header>
+
+<!-- Timeline strip -->
+<div style="background:var(--card2);border-bottom:1px solid var(--b1);padding:6px 20px;display:flex;align-items:center;gap:12px">
+  <span style="font-family:var(--font-mono);font-size:9px;color:var(--t3);white-space:nowrap">PPS HISTORY (2min)</span>
+  <canvas id="timeline-canvas" style="flex:1;height:40px;display:block"></canvas>
+</div>
+
+<div class="content">
+
+  <div class="g6 mb14">
+    <div class="kpi kpi-cyan">
+      <div class="kpi-label">Pkts / sec</div>
+      <div class="kpi-value c-cyan" id="k-pps">12,847</div>
+      <div class="kpi-sub">raw capture rate</div>
+    </div>
+    <div class="kpi kpi-blue">
+      <div class="kpi-label">Active flows</div>
+      <div class="kpi-value c-blue" id="k-flows">2,341</div>
+      <div class="kpi-sub">TCP · UDP · ICMP</div>
+    </div>
+    <div class="kpi kpi-green">
+      <div class="kpi-label">Throughput</div>
+      <div class="kpi-value c-green" id="k-bw">1.24 Gbps</div>
+      <div class="kpi-sub">total bandwidth</div>
+    </div>
+    <div class="kpi kpi-crit">
+      <div class="kpi-label">Anomalies</div>
+      <div class="kpi-value c-red" id="k-anom">14</div>
+      <div class="kpi-sub">L3 / L4 / L7</div>
+    </div>
+    <div class="kpi kpi-purple">
+      <div class="kpi-label">Avg RTT p50</div>
+      <div class="kpi-value c-purple" id="k-rtt">2.8 ms</div>
+      <div class="kpi-sub">p99: 42ms</div>
+    </div>
+    <div class="kpi kpi-amber">
+      <div class="kpi-label">TCP Retransmit</div>
+      <div class="kpi-value c-amber" id="k-retx">3.1%</div>
+      <div class="kpi-sub">above baseline</div>
+    </div>
+  </div>
+
+  <div class="card mb12">
+    <div class="tab-bar" id="tbr">
+      <button class="tab active" data-tab="l3l4" onclick="switchTab('l3l4',this)">&#128279; L3 / L4</button>
+      <button class="tab" data-tab="http" onclick="switchTab('http',this)">&#127760; HTTP / HTTPS</button>
+      <button class="tab" data-tab="dns" onclick="switchTab('dns',this)">&#128269; DNS</button>
+      <button class="tab" data-tab="sql" onclick="switchTab('sql',this)">&#128200; SQL Wire</button>
+      <button class="tab" data-tab="grpc" onclick="switchTab('grpc',this)">&#9889; gRPC</button>
+      <button class="tab" data-tab="tls" onclick="switchTab('tls',this)">&#128274; TLS / JA3</button>
+      <button class="tab" data-tab="hex" onclick="switchTab('hex',this)">&#128190; Packet Hex</button>
+      <button class="tab" data-tab="anom" onclick="switchTab('anom',this)">&#9888; Anomalies <span class="pill pill-red" style="font-size:8px;padding:1px 5px;margin-left:3px" id="anom-tab-badge">14</span></button>
+      <button class="tab" data-tab="map" onclick="switchTab('map',this);setTimeout(initConnMap,100)">&#9673; Map</button>
+    </div>
+
+    <!-- L3/L4 -->
+    <div class="tab-panel active" id="panel-l3l4">
+      <div class="card-body">
+        <div class="g-4060 mb12">
+          <div>
+            <div class="flex-b mb8">
+              <span class="f12 fw7">Active IP flows</span>
+              <div class="flex gap6">
+                <select class="filter-select" id="l3-proto" onchange="renderL3()">
+                  <option value="">All protocols</option>
+                  <option>TCP</option><option>UDP</option><option>ICMP</option>
+                </select>
+                <select class="filter-select" id="l3-flag" onchange="renderL3()">
+                  <option value="">All flags</option>
+                  <option>SYN</option><option>RST</option><option>FIN</option>
+                </select>
+              </div>
+            </div>
+            <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+              <table>
+                <thead><tr><th>Source IP</th><th>Destination</th><th>Proto</th><th>Flags</th><th>TTL</th><th>Volume</th><th>Risk</th></tr></thead>
+                <tbody id="l3-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div class="f11 fw7 c-t2 mb8">TCP flag distribution</div>
+            <div class="g3 mb12" id="flag-grid"></div>
+            <div class="decode-block l-alert mb8">
+              <div class="flex-b mb8"><span class="f11 fw7 c-red">&#9888; Port scan detected</span><span class="pill pill-red">CRITICAL</span></div>
+              <div class="field-row"><div class="field-key">Source</div><div class="field-val bad">185.220.101.47</div></div>
+              <div class="field-row"><div class="field-key">Ports hit</div><div class="field-val bad">4,847 in 30s · SYN scan</div></div>
+              <div class="field-row"><div class="field-key">Open found</div><div class="field-val bad">22, 80, 443, 3306, 5432</div></div>
+              <div class="field-row"><div class="field-key">ASN</div><div class="field-val warn">AS1337 · Tor exit node</div></div>
+            </div>
+            <div class="f11 fw7 c-t2 mb8">ICMP type breakdown</div>
+            <div id="icmp-list"></div>
+          </div>
+        </div>
+        <div class="flex-b mb8"><span class="f12 fw7">TCP stream reassembly</span><span class="pill pill-cyan">Live · 3 active</span></div>
+        <div class="g3" id="tcp-streams"></div>
+      </div>
+    </div>
+
+    <!-- HTTP -->
+    <div class="tab-panel" id="panel-http">
+      <div class="card-body">
+        <div class="g5 mb12">
+          <div class="kpi kpi-blue kpi-sm"><div class="kpi-label">Req / sec</div><div class="kpi-value c-blue">847</div></div>
+          <div class="kpi kpi-crit kpi-sm"><div class="kpi-label">Error rate</div><div class="kpi-value c-red">3.2%</div></div>
+          <div class="kpi kpi-green kpi-sm"><div class="kpi-label">Avg resp</div><div class="kpi-value c-green">124ms</div></div>
+          <div class="kpi kpi-amber kpi-sm"><div class="kpi-label">4xx / 5xx</div><div class="kpi-value c-amber">48/12</div></div>
+          <div class="kpi kpi-crit kpi-sm"><div class="kpi-label">Suspect UA</div><div class="kpi-value c-red">7</div></div>
+        </div>
+        <div class="g-6040">
+          <div>
+            <div class="f11 fw7 c-t2 mb8">HTTP/1.1 · HTTP/2 wire decode</div>
+            <div style="overflow-x:auto;max-height:340px;overflow-y:auto">
+              <table><thead><tr><th>Time</th><th>Method</th><th>URI</th><th>Status</th><th>Size</th><th>RTT</th><th>Flag</th></tr></thead>
+              <tbody id="http-tbody"></tbody></table>
+            </div>
+          </div>
+          <div>
+            <div class="f11 fw7 c-t2 mb8">Decoded request</div>
+            <div class="decode-block l-alert mb8">
+              <div class="mb8"><span class="pill pill-blue">GET</span> <span class="mono c-t1">/api/v1/users/../../etc/passwd</span></div>
+              <div class="field-row"><div class="field-key">Host</div><div class="field-val">10.0.1.10:8080</div></div>
+              <div class="field-row"><div class="field-key">User-Agent</div><div class="field-val bad">sqlmap/1.7.8</div></div>
+              <div class="field-row"><div class="field-key">X-Forwarded-For</div><div class="field-val warn">185.220.101.47</div></div>
+              <div class="field-row"><div class="field-key">Status</div><div class="field-val bad">403 Forbidden</div></div>
+              <div style="margin-top:6px;font-size:10px;color:var(--red)">&#9888; Path traversal · sqlmap UA · WAF blocked</div>
+            </div>
+            <div class="decode-block l-alert mb8">
+              <div class="mb8"><span class="pill pill-orange">POST</span> <span class="mono c-t1">/api/v1/auth/login</span></div>
+              <div class="field-row"><div class="field-key">Body</div><div class="field-val bad">{"user":"admin' OR 1=1--","pass":"x"}</div></div>
+              <div class="field-row"><div class="field-key">Status</div><div class="field-val bad">400 Bad Request</div></div>
+              <div style="margin-top:6px;font-size:10px;color:var(--red)">&#9888; SQLi tautology in body · 45.142.212.100</div>
+            </div>
+            <div class="f11 fw7 c-t2 mb8">Top URIs by volume</div>
+            <div id="top-uris"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DNS -->
+    <div class="tab-panel" id="panel-dns">
+      <div class="card-body">
+        <div class="g4 mb12">
+          <div class="kpi kpi-purple kpi-sm"><div class="kpi-label">Queries / min</div><div class="kpi-value c-purple">847</div></div>
+          <div class="kpi kpi-crit kpi-sm"><div class="kpi-label">NXDOMAIN rate</div><div class="kpi-value c-red">12.4%</div></div>
+          <div class="kpi kpi-cyan kpi-sm"><div class="kpi-label">Unique domains</div><div class="kpi-value c-cyan">341</div></div>
+          <div class="kpi kpi-crit kpi-sm"><div class="kpi-label">Tunnel risk</div><div class="kpi-value c-red">HIGH</div></div>
+        </div>
+        <div class="g-4060">
+          <div>
+            <div class="f11 fw7 c-t2 mb8">DNS wire decode</div>
+            <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
+              <table><thead><tr><th>Time</th><th>Query</th><th>Type</th><th>Response</th><th>TTL</th><th>Flag</th></tr></thead>
+              <tbody id="dns-tbody"></tbody></table>
+            </div>
+          </div>
+          <div>
+            <div class="decode-block l-alert mb8">
+              <div class="flex-b mb8"><span class="f11 fw7 c-red">DNS tunneling detected</span><span class="pill pill-red">HIGH</span></div>
+              <div class="field-row"><div class="field-key">Source</div><div class="field-val bad">10.0.1.10</div></div>
+              <div class="field-row"><div class="field-key">Pattern</div><div class="field-val bad">TXT · base64 subdomain</div></div>
+              <div class="field-row"><div class="field-key">Sample</div><div class="field-val bad">aGVsbG8.evil-c2.com</div></div>
+              <div class="field-row"><div class="field-key">Entropy</div><div class="field-val bad">7.84 (threshold: 6.0)</div></div>
+              <div class="field-row"><div class="field-key">Volume</div><div class="field-val warn">847 q/min × 22m</div></div>
+            </div>
+            <div class="decode-block l-dns mb8">
+              <div class="f11 fw7 mb8">Wire decode · sample packet</div>
+              <div class="field-row"><div class="field-key">TX ID</div><div class="field-val">0xA7F3</div></div>
+              <div class="field-row"><div class="field-key">Flags</div><div class="field-val">0x0100 (RD=1)</div></div>
+              <div class="field-row"><div class="field-key">QNAME</div><div class="field-val bad">dGVzdA.malicious-domain.net</div></div>
+              <div class="field-row"><div class="field-key">QTYPE</div><div class="field-val warn">TXT (16) ⚠ unusual</div></div>
+              <div class="field-row"><div class="field-key">QCLASS</div><div class="field-val">IN (1)</div></div>
+            </div>
+            <div class="f11 fw7 c-t2 mb8">Top NXDOMAIN sources</div>
+            <div id="dns-nx"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SQL -->
+    <div class="tab-panel" id="panel-sql">
+      <div class="card-body">
+        <div class="g4 mb12">
+          <div class="kpi kpi-amber kpi-sm"><div class="kpi-label">Queries / sec</div><div class="kpi-value c-amber">1,247</div></div>
+          <div class="kpi kpi-amber kpi-sm"><div class="kpi-label">Slow queries</div><div class="kpi-value c-amber">23</div></div>
+          <div class="kpi kpi-crit kpi-sm"><div class="kpi-label">Errors</div><div class="kpi-value c-red">8</div></div>
+          <div class="kpi kpi-crit kpi-sm"><div class="kpi-label">Injection risk</div><div class="kpi-value c-red">HIGH</div></div>
+        </div>
+        <div class="g-6040">
+          <div>
+            <div class="f11 fw7 c-t2 mb8">PostgreSQL wire protocol · port 5432</div>
+            <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
+              <table><thead><tr><th>Time</th><th>Client</th><th>Type</th><th>Query (decoded)</th><th>Rows</th><th>Dur</th><th>Risk</th></tr></thead>
+              <tbody id="sql-tbody"></tbody></table>
+            </div>
+          </div>
+          <div>
+            <div class="decode-block l-alert mb8">
+              <div class="flex-b mb8"><span class="f11 fw7 c-red">&#9888; SQLi in wire</span><span class="pill pill-red">CRITICAL</span></div>
+              <div class="field-row"><div class="field-key">Client</div><div class="field-val bad">10.0.1.11:43821</div></div>
+              <div class="field-row"><div class="field-key">Msg type</div><div class="field-val">Query (Q)</div></div>
+              <div class="field-row"><div class="field-key">SQL text</div><div class="field-val bad">SELECT * FROM users WHERE id='1' OR '1'='1'</div></div>
+              <div class="field-row"><div class="field-key">Response</div><div class="field-val bad">ErrorResponse: syntax error</div></div>
+            </div>
+            <div class="decode-block l-sql mb8">
+              <div class="f11 fw7 mb8">Normal query decode</div>
+              <div class="field-row"><div class="field-key">Msg type</div><div class="field-val">Parse (P)</div></div>
+              <div class="field-row"><div class="field-key">Statement</div><div class="field-val ok">SELECT id, email FROM users WHERE org_id=$1 LIMIT 50</div></div>
+              <div class="field-row"><div class="field-key">Params</div><div class="field-val">'acme-corp'</div></div>
+              <div class="field-row"><div class="field-key">Duration</div><div class="field-val ok">2.1ms · Index Scan</div></div>
+            </div>
+            <div class="f11 fw7 c-t2 mb8">Query type distribution</div>
+            <div id="sql-types"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TLS -->
+    <div class="tab-panel" id="panel-tls">
+      <div class="card-body">
+        <div class="g4 mb12">
+          <div class="kpi kpi-green kpi-sm"><div class="kpi-label">TLS sessions</div><div class="kpi-value c-green">1,284</div></div>
+          <div class="kpi kpi-amber kpi-sm"><div class="kpi-label">TLS 1.2 legacy</div><div class="kpi-value c-amber">18%</div></div>
+          <div class="kpi kpi-cyan kpi-sm"><div class="kpi-label">Unique JA3</div><div class="kpi-value c-cyan">47</div></div>
+          <div class="kpi kpi-crit kpi-sm"><div class="kpi-label">Known bad JA3</div><div class="kpi-value c-red">3</div></div>
+        </div>
+        <div class="g-4060">
+          <div>
+            <div class="f11 fw7 c-t2 mb8">TLS handshake stream</div>
+            <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
+              <table><thead><tr><th>Client</th><th>SNI</th><th>Version</th><th>Cipher</th><th>JA3</th><th>Risk</th></tr></thead>
+              <tbody id="tls-tbody"></tbody></table>
+            </div>
+          </div>
+          <div>
+            <div class="decode-block l-alert mb8">
+              <div class="flex-b mb8"><span class="f11 fw7 c-red">&#9888; Cobalt Strike JA3</span><span class="pill pill-red">HIGH</span></div>
+              <div class="field-row"><div class="field-key">Client</div><div class="field-val bad">185.220.101.47</div></div>
+              <div class="field-row"><div class="field-key">Offered ver</div><div class="field-val warn">TLSv1.0 (legacy ⚠)</div></div>
+              <div class="field-row"><div class="field-key">JA3 hash</div></div>
+              <div class="ja3-hash">769,47-53-5-10-49161-49162-49171-49172-50-56-19-4,0-10-11,23-24-25,0</div>
+              <div class="field-row" style="margin-top:8px"><div class="field-key">Known as</div><div class="field-val bad">Metasploit / Cobalt Strike</div></div>
+              <div class="field-row"><div class="field-key">Threat DB</div><div class="field-val bad">847 known malicious sessions</div></div>
+            </div>
+            <div class="decode-block l-tls mb8">
+              <div class="f11 fw7 mb8">ClientHello decode</div>
+              <div class="field-row"><div class="field-key">Record</div><div class="field-val mono">0x16 (Handshake)</div></div>
+              <div class="field-row"><div class="field-key">Msg type</div><div class="field-val mono">0x01 (ClientHello)</div></div>
+              <div class="field-row"><div class="field-key">Ciphers</div><div class="field-val f10">AES-256-GCM, CHACHA20, AES-128-GCM</div></div>
+              <div class="field-row"><div class="field-key">Extensions</div><div class="field-val f10">SNI, ALPN (h2), supported_groups</div></div>
+            </div>
+            <div class="f11 fw7 c-t2 mb8">TLS version distribution</div>
+            <div id="tls-versions"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HEX -->
+    <div class="tab-panel" id="panel-hex">
+      <div class="card-body">
+        <div class="flex gap8 mb12">
+          <select id="hex-sel" class="filter-select" onchange="renderHex()">
+            <option value="portscan">Port scan SYN · 185.220.101.47</option>
+            <option value="sqli">SQL injection · POST body</option>
+            <option value="dns_tunnel">DNS tunnel · TXT query</option>
+            <option value="tls_cs">TLS Cobalt Strike · ClientHello</option>
+            <option value="normal">Normal HTTPS GET</option>
+          </select>
+          <div style="flex:1"></div>
+          <span class="mono-sm">
+            <span style="color:var(--blue)">&#9632;</span> L3 &nbsp;
+            <span style="color:var(--cyan)">&#9632;</span> L4 &nbsp;
+            <span style="color:var(--green)">&#9632;</span> L7 &nbsp;
+            <span style="color:var(--red)">&#9632;</span> anomaly
+          </span>
+        </div>
+        <div id="hex-summary" class="decode-block mb10" style="margin-bottom:10px"></div>
+        <div class="hex-view" id="hex-dump" style="min-height:160px"></div>
+        <div class="f11 fw7 c-t2" style="margin:12px 0 8px">Field decode tree</div>
+        <div id="hex-fields"></div>
+      </div>
+    </div>
+
+    <!-- ANOMALIES -->
+    <div class="tab-panel" id="panel-anom">
+      <div class="card-body">
+        <div class="g4 mb12">
+          <div class="kpi kpi-crit kpi-sm"><div class="kpi-label">Critical</div><div class="kpi-value c-red">3</div></div>
+          <div class="kpi kpi-amber kpi-sm"><div class="kpi-label">High</div><div class="kpi-value c-amber">6</div></div>
+          <div class="kpi kpi-blue kpi-sm"><div class="kpi-label">Medium</div><div class="kpi-value c-blue">5</div></div>
+          <div class="kpi kpi-sm"><div class="kpi-label">Suppressed</div><div class="kpi-value c-t2">12</div></div>
+        </div>
+        <div id="anom-list"></div>
+      </div>
+    </div>
+
+    <!-- gRPC -->
+    <div class="tab-panel" id="panel-grpc">
+      <div class="card-body">
+        <div class="g4 mb12">
+          <div class="kpi kpi-cyan kpi-sm"><div class="kpi-label">gRPC events</div><div class="kpi-value c-cyan" id="k-grpc">0</div></div>
+          <div class="kpi kpi-sm"><div class="kpi-label">Port</div><div class="kpi-value c-t2" style="font-size:16px">50051</div></div>
+          <div class="kpi kpi-sm"><div class="kpi-label">Protocol</div><div class="kpi-value c-t2" style="font-size:14px">HTTP/2</div></div>
+          <div class="kpi kpi-sm"><div class="kpi-label">Decoder</div><div class="kpi-value c-green" style="font-size:14px">tshark</div></div>
+        </div>
+        <div class="decode-block l-warn mb12">
+          <span class="f11 c-t2">gRPC decode requires <span class="mono" style="color:var(--amber)">tshark</span> with protobuf dissector. Install: <span class="mono" style="color:var(--cyan)">sudo apt install tshark</span>. Once running, events appear here automatically.</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Time</th><th>Client IP</th><th>Service</th><th>Method</th><th>Status</th><th>Duration</th></tr></thead>
+            <tbody id="grpc-tbody">
+              <tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No gRPC traffic captured — waiting for port 50051 traffic</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONNECTION MAP -->
+    <div class="tab-panel" id="panel-map">
+      <div class="card-body">
+        <div class="flex-b mb10">
+          <span class="f12 fw7">Live connection map</span>
+          <div class="flex gap6">
+            <button class="btn btn-sm btn-ghost" onclick="initConnMap()">&#8635; Redraw</button>
+          </div>
+        </div>
+        <canvas id="conn-canvas" style="width:100%;border-radius:var(--radius);background:var(--card2);border:1px solid var(--b1);display:block;cursor:pointer"></canvas>
+        <div style="margin-top:8px;font-family:var(--font-mono);font-size:9px;color:var(--t3);display:flex;gap:16px">
+          <span><span style="color:var(--cyan)">●</span> Internal</span>
+          <span><span style="color:var(--red)">●</span> External / threat</span>
+          <span style="margin-left:auto">Click tab to refresh · updates every 8s</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="pkt-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title" id="pkt-title">Detail</div><div class="modal-sub" id="pkt-sub"></div></div>
+      <button class="modal-close" onclick="closeModal()">&#10005;</button>
+    </div>
+    <div class="modal-body" id="pkt-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
+      <button class="btn btn-danger btn-sm">&#9724; Block source</button>
+      <button class="btn btn-primary btn-sm">&#128221; Create ticket</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var L3_FLOWS=[
+  {s:'185.220.101.47',d:'10.0.1.10',p:'TCP',f:'SYN',t:48,b:'28.4MB',risk:'critical',geo:'RU',a:'AS1337',l7:'SSH'},
+  {s:'10.0.1.11',d:'10.0.1.10',p:'TCP',f:'ACK',t:64,b:'1.2GB',risk:'ok',geo:'—',a:'—',l7:'HTTPS/TLS'},
+  {s:'10.0.1.10',d:'10.0.1.20',p:'TCP',f:'PSH/ACK',t:64,b:'512MB',risk:'ok',geo:'—',a:'—',l7:'PostgreSQL'},
+  {s:'45.142.212.100',d:'10.0.1.10',p:'TCP',f:'SYN',t:51,b:'12.1MB',risk:'high',geo:'NL',a:'AS4242',l7:'SSH'},
+  {s:'10.0.1.10',d:'8.8.8.8',p:'UDP',f:'—',t:64,b:'2.4MB',risk:'warn',geo:'US',a:'AS15169',l7:'DNS'},
+  {s:'10.0.3.1',d:'10.0.1.10',p:'TCP',f:'ACK',t:64,b:'156MB',risk:'ok',geo:'—',a:'—',l7:'HTTP'},
+  {s:'10.0.1.10',d:'185.220.101.47',p:'TCP',f:'RST',t:64,b:'124KB',risk:'warn',geo:'RU',a:'AS1337',l7:''},
+  {s:'192.168.99.1',d:'10.0.1.10',p:'ICMP',f:'echo-req',t:255,b:'84B',risk:'ok',geo:'—',a:'—',l7:''},
+  {s:'10.0.1.20',d:'10.0.1.10',p:'TCP',f:'FIN/ACK',t:64,b:'4.2MB',risk:'ok',geo:'—',a:'—',l7:'PostgreSQL'},
+];
+var TCP_FLAGS=[
+  {f:'SYN',n:4847,c:'var(--red)',p:62},{f:'ACK',n:28421,c:'var(--green)',p:100},
+  {f:'PSH',n:14211,c:'var(--blue)',p:50},{f:'RST',n:1247,c:'var(--amber)',p:15},
+  {f:'FIN',n:3421,c:'var(--cyan)',p:12},{f:'URG',n:3,c:'var(--red)',p:1},
+];
+var ICMP=[
+  {t:'Echo Request (8)',n:2847,c:'var(--cyan)'},{t:'Echo Reply (0)',n:2841,c:'var(--green)'},
+  {t:'Dest Unreach (3)',n:124,c:'var(--amber)'},{t:'TTL Exceeded (11)',n:18,c:'var(--orange)'},
+  {t:'Redirect (5)',n:3,c:'var(--red)'},
+];
+var TCP_STREAMS=[
+  {id:'stream-0001',src:'185.220.101.47:49221',dst:'10.0.1.10:22',state:'SYN_RECV',pkts:4847,risk:'critical',proto:'SSH'},
+  {id:'stream-0002',src:'10.0.1.11:443',dst:'0.0.0.0',state:'ESTABLISHED',pkts:28421,risk:'ok',proto:'HTTPS'},
+  {id:'stream-0003',src:'10.0.1.10:43821',dst:'10.0.1.20:5432',state:'ESTABLISHED',pkts:14211,risk:'ok',proto:'PostgreSQL'},
+];
+var HTTP=[
+  {ts:'16:26:01',m:'GET',uri:'/api/v1/users/../../etc/passwd',s:403,sz:'0B',rtt:'42ms',f:'path-traversal'},
+  {ts:'16:26:03',m:'POST',uri:'/api/v1/auth/login',s:400,sz:'128B',rtt:'8ms',f:'sqli-body'},
+  {ts:'16:26:04',m:'GET',uri:'/api/v1/health',s:200,sz:'48B',rtt:'2ms',f:null},
+  {ts:'16:26:05',m:'GET',uri:'/api/v1/users?limit=50&org=acme',s:200,sz:'4.2KB',rtt:'24ms',f:null},
+  {ts:'16:26:06',m:'DELETE',uri:'/api/v1/admin/users/1',s:403,sz:'64B',rtt:'3ms',f:'priv-esc'},
+  {ts:'16:26:07',m:'GET',uri:'/wp-admin/admin-ajax.php',s:404,sz:'0B',rtt:'1ms',f:'probe'},
+  {ts:'16:26:08',m:'POST',uri:'/api/v1/upload',s:413,sz:'0B',rtt:'1ms',f:'oversize'},
+  {ts:'16:26:09',m:'GET',uri:'/api/v1/metrics',s:200,sz:'12KB',rtt:'18ms',f:null},
+  {ts:'16:26:11',m:'PUT',uri:"/api/v1/users/1;DROP TABLE users;--",s:400,sz:'0B',rtt:'2ms',f:'sqli-uri'},
+];
+var TOP_URIS=[
+  {u:'/api/v1/health',n:8421,p:100,c:'var(--green)'},{u:'/api/v1/users',n:4211,p:50,c:'var(--blue)'},
+  {u:'/api/v1/auth/token',n:2847,p:34,c:'var(--cyan)'},{u:'/wp-admin/*',n:847,p:10,c:'var(--red)'},
+];
+var DNS=[
+  {ts:'16:26:01',q:'aGVsbG8.evil-c2.com',t:'TXT',r:'NXDOMAIN',ttl:'—',f:'tunnel'},
+  {ts:'16:26:02',q:'api.github.com',t:'A',r:'140.82.114.3',ttl:'60s',f:null},
+  {ts:'16:26:03',q:'cmVkLXRlYW0.malware.net',t:'TXT',r:'NXDOMAIN',ttl:'—',f:'tunnel'},
+  {ts:'16:26:04',q:'registry.npmjs.org',t:'A',r:'104.16.24.35',ttl:'300s',f:null},
+  {ts:'16:26:05',q:'totally-legit-update.ru',t:'A',r:'185.220.101.47',ttl:'1s',f:'suspicious'},
+  {ts:'16:26:07',q:'ZXhmaWx0cmF0aW9u.c2.io',t:'TXT',r:'NXDOMAIN',ttl:'—',f:'tunnel'},
+  {ts:'16:26:08',q:'api.anthropic.com',t:'A',r:'104.18.6.192',ttl:'300s',f:null},
+];
+var DNS_NX=[
+  {src:'10.0.1.10',n:847,risk:'high'},{src:'10.0.3.1',n:12,risk:'low'},{src:'10.0.1.11',n:3,risk:'ok'},
+];
+var SQL=[
+  {ts:'16:26:01',cl:'10.0.1.11',t:'Query',q:"SELECT * FROM users WHERE id='1' OR '1'='1'",r:0,d:'2ms',risk:'critical'},
+  {ts:'16:26:02',cl:'10.0.1.10',t:'Parse',q:'SELECT id, email FROM users WHERE org_id=$1 LIMIT 50',r:48,d:'2.1ms',risk:'ok'},
+  {ts:'16:26:03',cl:'10.0.1.10',t:'Query',q:'SELECT * FROM scan_results ORDER BY created_at DESC LIMIT 100',r:100,d:'124ms',risk:'warn'},
+  {ts:'16:26:04',cl:'10.0.1.11',t:'Query',q:"INSERT INTO audit_log (user_id, action) VALUES (1, 'login')",r:1,d:'1.2ms',risk:'ok'},
+  {ts:'16:26:05',cl:'10.0.1.11',t:'Query',q:"UPDATE users SET role='admin' WHERE id=1 OR 1=1",r:0,d:'1ms',risk:'critical'},
+  {ts:'16:26:07',cl:'10.0.1.10',t:'Query',q:"SELECT * FROM secrets WHERE env='prod'",r:14,d:'3ms',risk:'high'},
+];
+var SQL_TYPES=[
+  {t:'SELECT',n:8421,p:68,c:'var(--blue)'},{t:'INSERT',n:1247,p:10,c:'var(--green)'},
+  {t:'UPDATE',n:847,p:7,c:'var(--amber)'},{t:'DELETE',n:124,p:1,c:'var(--red)'},
+];
+var TLS=[
+  {cl:'185.220.101.47',sni:'api.internal.corp',v:'TLSv1.2',ci:'TLS_RSA_WITH_RC4_128_MD5',ja3:'769,47-53-5…',risk:'critical'},
+  {cl:'10.0.1.11',sni:'api.github.com',v:'TLSv1.3',ci:'TLS_AES_256_GCM_SHA384',ja3:'771,4866-4867…',risk:'ok'},
+  {cl:'10.0.1.10',sni:'registry.npmjs.org',v:'TLSv1.3',ci:'TLS_CHACHA20_POLY1305',ja3:'771,4866-4867…',risk:'ok'},
+  {cl:'45.142.212.100',sni:'10.0.1.10',v:'TLSv1.2',ci:'TLS_ECDHE_RSA_AES_128_CBC_SHA',ja3:'769,49161…',risk:'high'},
+];
+var TLS_VER=[
+  {v:'TLSv1.3',p:78,c:'var(--green)'},{v:'TLSv1.2',p:18,c:'var(--amber)'},
+  {v:'TLSv1.1',p:3,c:'var(--red)'},{v:'TLSv1.0',p:1,c:'var(--red)'},
+];
+var ANOMALIES=[
+  {sev:'critical',layer:'L4',type:'Port Scan',src:'185.220.101.47',detail:'4,847 SYN packets to 4,847 ports in 30s. Half-open scan. Tor exit node AS1337.',mitre:'T1046',ts:'2m ago'},
+  {sev:'critical',layer:'L7',type:'SQL Injection',src:'10.0.1.11',detail:'SQLi tautology in PostgreSQL wire: OR 1=1. Application returned ErrorResponse.',mitre:'T1190',ts:'2m ago'},
+  {sev:'critical',layer:'L7',type:'JA3 Match: Cobalt Strike',src:'185.220.101.47',detail:'TLS ClientHello matches Cobalt Strike/Metasploit fingerprint. 847 known malicious sessions.',mitre:'T1071.001',ts:'3m ago'},
+  {sev:'high',layer:'L7',type:'DNS Tunneling',src:'10.0.1.10',detail:'TXT queries Shannon entropy 7.84 (threshold 6.0). Base64 in subdomain. 847 q/min × 22m.',mitre:'T1071.004',ts:'5m ago'},
+  {sev:'high',layer:'L7',type:'Path Traversal',src:'185.220.101.47',detail:'GET /api/v1/users/../../etc/passwd. WAF blocked 403. UA: sqlmap/1.7.8.',mitre:'T1083',ts:'6m ago'},
+  {sev:'high',layer:'L4',type:'SSH Brute Force',src:'45.142.212.100',detail:'124 failed SSH auth in 45s. Rate: 2.8/sec. Country: Netherlands AS4242.',mitre:'T1110',ts:'8m ago'},
+  {sev:'medium',layer:'L7',type:'Sensitive SQL Query',src:'10.0.1.10',detail:"SELECT * FROM secrets WHERE env='prod' — plaintext secrets table from app server.",mitre:'T1552',ts:'10m ago'},
+  {sev:'medium',layer:'L3',type:'TTL Anomaly',src:'45.142.212.100',detail:'TTL=51 from NL IP. Expected Linux=64 or Windows=128. Possible OS spoofing.',mitre:'T1001',ts:'12m ago'},
+  {sev:'medium',layer:'L7',type:'CMS Probe',src:'185.220.101.47',detail:'GET /wp-admin/ on non-WordPress app. Automated scanner probing CMS paths.',mitre:'T1595',ts:'14m ago'},
+];
+var HEX_PKTS={
+  portscan:{
+    sum:{type:'TCP SYN',src:'185.220.101.47:49221',dst:'10.0.1.10:22',sz:'60 bytes',risk:'critical',note:'Port scan — SYN only, Tor exit node'},
+    bytes:[{b:'ff ff ff ff ff ff',c:''},{b:'00 1a 2b 3c 4d 5e',c:''},{b:'08 00',c:''},
+      {b:'45 00 00 3c',c:'l3'},{b:'1a 2b 40 00',c:'l3'},{b:'30 06 b4 e2',c:'l3'},
+      {b:'b9 dc 65 2f',c:'l3'},{b:'0a 00 01 0a',c:'l3'},
+      {b:'c0 85 00 16',c:'l4'},{b:'a1 b2 c3 d4',c:'l4'},{b:'00 00 00 00',c:'l4'},{b:'a0 02 ff ff',c:'l4'},
+      {b:'e5 67 00 00',c:'l4'},{b:'02 04 05 b4',c:'l4'},{b:'04 02 08 0a',c:'l4'},{b:'00 00 00 00 00 00 00 00 01 03 03 07',c:'l4'},
+    ],
+    fields:[
+      {layer:'L3 · IP',items:[{k:'Version/IHL',v:'4/5 (20 bytes)'},{k:'Total len',v:'0x003c (60)'},{k:'TTL',v:'48 (Linux=64 − 16 hops)'},{k:'Protocol',v:'6 (TCP)'},{k:'Src',v:'185.220.101.47'},{k:'Dst',v:'10.0.1.10'}]},
+      {layer:'L4 · TCP',items:[{k:'Src port',v:'49221'},{k:'Dst port',v:'22 (SSH)'},{k:'Flags',v:'0x002 → SYN only ⚠'},{k:'Window',v:'65535'},{k:'Options',v:'MSS=1460, SACK, TS, WScale=7'}]},
+    ]
+  },
+  sqli:{
+    sum:{type:'HTTP POST',src:'45.142.212.100:52341',dst:'10.0.1.10:8080',sz:'312 bytes',risk:'critical',note:'SQL injection in POST body'},
+    bytes:[{b:'45 00 01 38',c:'l3'},{b:'3c d1 40 00',c:'l3'},{b:'40 06 00 00',c:'l3'},
+      {b:'2d 8e d4 64',c:'l3'},{b:'0a 00 01 0a',c:'l3'},
+      {b:'cc 85 1f 90',c:'l4'},{b:'b1 c2 d3 e4',c:'l4'},{b:'f5 a6 b7 c8',c:'l4'},{b:'80 18 01 f6 d9 e1 00 00',c:'l4'},
+      {b:'50 4f 53 54 20 2f 61 70 69 2f 76 31',c:'l7'},{b:'2f 61 75 74 68 2f 6c 6f 67 69 6e 20',c:'l7'},
+      {b:"27 4f 52 20 31 3d 31 2d 2d",c:'l7 anomaly'},
+    ],
+    fields:[
+      {layer:'L3 · IP',items:[{k:'Src',v:'45.142.212.100'},{k:'Dst',v:'10.0.1.10'},{k:'TTL',v:'51'}]},
+      {layer:'L4 · TCP',items:[{k:'Dst port',v:'8080 (HTTP)'},{k:'Flags',v:'PSH/ACK'}]},
+      {layer:'L7 · HTTP',items:[{k:'Method',v:'POST'},{k:'URI',v:'/api/v1/auth/login'},{k:'UA',v:"sqlmap/1.7.8 ⚠"},{k:'Body',v:"admin' OR 1=1-- ⚠ SQLi tautology"}]},
+    ]
+  },
+  dns_tunnel:{
+    sum:{type:'DNS TXT Query',src:'10.0.1.10:53842',dst:'8.8.8.8:53',sz:'98 bytes',risk:'high',note:'DNS tunneling — high entropy subdomain'},
+    bytes:[{b:'45 00 00 62',c:'l3'},{b:'ab cd 40 00',c:'l3'},{b:'40 11 00 00',c:'l3'},
+      {b:'0a 00 01 0a',c:'l3'},{b:'08 08 08 08',c:'l3'},
+      {b:'d2 6a 00 35',c:'l4'},{b:'00 4e 00 00',c:'l4'},
+      {b:'a7 f3 01 00 00 01 00 00 00 00 00 00',c:'l7'},
+      {b:'14 61 47 56 73 62 47 38 67 64 32 39 79 62 47 51 3d 3d',c:'l7 anomaly'},
+      {b:'09 65 76 69 6c 2d 63 32 2e 63 6f 6d 00',c:'l7 anomaly'},{b:'00 10 00 01',c:'l7'},
+    ],
+    fields:[
+      {layer:'L3 · IP',items:[{k:'Src',v:'10.0.1.10'},{k:'Dst',v:'8.8.8.8'}]},
+      {layer:'L4 · UDP',items:[{k:'Dst port',v:'53 (DNS)'},{k:'Length',v:'78 bytes'}]},
+      {layer:'L7 · DNS',items:[{k:'TX ID',v:'0xA7F3'},{k:'Flags',v:'0x0100 (RD=1)'},{k:'QTYPE',v:'TXT (16) ⚠ unusual'},{k:'QNAME',v:'aGVsbG8gd29ybGQ.evil-c2.com'},{k:'Entropy',v:'7.84 ⚠ (threshold 6.0)'},{k:'Decoded',v:'"hello world" — base64 confirmed'}]},
+    ]
+  },
+  tls_cs:{
+    sum:{type:'TLS ClientHello',src:'185.220.101.47:51234',dst:'10.0.1.10:443',sz:'184 bytes',risk:'critical',note:'Cobalt Strike JA3 fingerprint'},
+    bytes:[{b:'45 00 00 b8',c:'l3'},{b:'1f 2a 40 00',c:'l3'},{b:'30 06 00 00',c:'l3'},
+      {b:'b9 dc 65 2f',c:'l3'},{b:'0a 00 01 0a',c:'l3'},
+      {b:'c8 22 01 bb',c:'l4'},{b:'d4 e5 f6 07 a1 b2 c3 d4 80 18 ff ff 00 00 00 00',c:'l4'},
+      {b:'16 03 01 00 a5 01 00 00 a1',c:'l7'},
+      {b:'03 01',c:'l7 anomaly'},
+      {b:'a3 f2 e1 9d 7c 4b 2a 11 3e 5a 8f 02 c7 d9 41 b6 00',c:'l7'},
+      {b:'00 0e',c:'l7 anomaly'},{b:'00 2f 00 35 00 05 00 0a c0 09 c0 0a c0 13 c0 14',c:'l7 anomaly'},
+    ],
+    fields:[
+      {layer:'L3 · IP',items:[{k:'Src',v:'185.220.101.47'},{k:'TTL',v:'48 (−16 hops)'}]},
+      {layer:'L4 · TCP',items:[{k:'Dst port',v:'443 (HTTPS)'}]},
+      {layer:'L7 · TLS',items:[{k:'Record type',v:'0x16 (Handshake)'},{k:'Offered ver',v:'TLSv1.0 (0x0301) ⚠ legacy'},{k:'Cipher suites',v:'RSA, RC4, weak ciphers ⚠ Cobalt Strike pattern'},{k:'JA3',v:'769,47-53-5-10-49161-49162… → 847 known malicious ⚠'}]},
+    ]
+  },
+  normal:{
+    sum:{type:'TLS Application Data',src:'10.0.1.11:43821',dst:'api.github.com:443',sz:'256 bytes',risk:'ok',note:'Normal HTTPS — encrypted payload'},
+    bytes:[{b:'45 00 01 00',c:'l3'},{b:'9a b1 40 00',c:'l3'},{b:'40 06 00 00',c:'l3'},
+      {b:'0a 00 01 0b',c:'l3'},{b:'8c 52 72 03',c:'l3'},
+      {b:'ab cd 01 bb 11 22 33 44 55 66 77 88 80 18 01 f6 00 00 00 00',c:'l4'},
+      {b:'17 03 03 00 f0',c:'l7'},
+      {b:'a3 b4 c5 d6 e7 f8 09 1a 2b 3c 4d 5e 6f 70 81 92',c:'l7'},
+      {b:'a3 b4 c5 d6 e7 f8 09 1a 2b 3c 4d 5e 6f 70 81 92',c:'l7'},
+    ],
+    fields:[
+      {layer:'L3 · IP',items:[{k:'Src',v:'10.0.1.11'},{k:'Dst',v:'140.82.114.3 (api.github.com)'},{k:'TTL',v:'64'}]},
+      {layer:'L4 · TCP',items:[{k:'Dst port',v:'443'},{k:'Flags',v:'PSH/ACK'}]},
+      {layer:'L7 · TLS',items:[{k:'Record type',v:'0x17 (Application Data)'},{k:'Version',v:'TLS 1.3'},{k:'Payload',v:'Encrypted — no session key'},{k:'Risk',v:'None — legitimate GitHub API ✓'}]},
+    ]
+  },
+};
+
+function riskPill(r){var m={critical:'pill-red',high:'pill-red',warn:'pill-amber',medium:'pill-amber',ok:'pill-green',low:'pill-green'};return '<span class="pill '+(m[r]||'pill-gray')+'">'+r+'</span>';}
+function riskColor(r){return{critical:'var(--red)',high:'var(--orange)',warn:'var(--amber)',ok:'var(--green)',low:'var(--green)'}[r]||'var(--t2)';}
+function methPill(m){var c={GET:'pill-blue',POST:'pill-cyan',PUT:'pill-amber',DELETE:'pill-red',OPTIONS:'pill-gray',PATCH:'pill-purple'};return '<span class="pill '+(c[m]||'pill-gray')+'">'+m+'</span>';}
+function statusColor(s){return s>=500?'var(--red)':s>=400?'var(--amber)':s>=300?'var(--cyan)':'var(--green)';}
+
+function renderL3(){
+  var pf=document.getElementById('l3-proto').value;
+  var ff=document.getElementById('l3-flag').value;
+  var list=L3_FLOWS.filter(function(f){
+    var proto=f.p||f.proto||'';
+    var flags=f.f||f.flags||'';
+    if(pf&&proto.toUpperCase()!==pf.toUpperCase())return false;
+    if(ff&&!flags.toUpperCase().includes(ff.toUpperCase()))return false;
+    return true;
+  });
+  document.getElementById('l3-tbody').innerHTML=list.map(function(f,i){
+    // Support both static {src,dst,proto,flags,ttl,vol} and API {s,d,p,f,t,b}
+    var src=f.s||f.src||'';var dst=f.d||f.dst||'';
+    var proto=(f.p||f.proto||'TCP').toUpperCase();
+    var flags=f.f||f.flags||'—';var ttl=f.t||f.ttl||64;
+    var vol=f.b||f.vol||'—';var risk=f.risk||'ok';
+    var geo=f.geo||'—';var asn=f.a||f.asn||'—';var l7=f.l7||'';
+    var pc={TCP:'pill-cyan',UDP:'pill-amber',ICMP:'pill-purple'}[proto]||'pill-gray';
+    var rc={critical:'pill-red',high:'pill-amber',warn:'pill-amber',ok:'pill-green'}[risk]||'pill-gray';
+    return '<tr onclick="openFlowDetail('+i+')">'
+      +'<td class="mono f10 ell" style="max-width:120px;color:'+riskColor(risk)+'">'+src+(geo!=='—'?' <span style="color:var(--t3);font-size:9px">'+geo+'</span>':'')+'</td>'
+      +'<td class="mono f10 c-t2">'+dst+'</td>'
+      +'<td><span class="pill '+pc+'" style="font-size:8px">'+proto+'</span>'+(l7?' <span class="mono-sm c-t3">'+l7+'</span>':'')+'</td>'
+      +'<td class="mono f10 c-t2">'+flags+'</td>'
+      +'<td class="mono-sm">'+ttl+'</td>'
+      +'<td class="mono f10 c-cyan">'+vol+'</td>'
+      +'<td><span class="pill '+rc+'" style="font-size:8px">'+risk+'</span></td>'
+      +'</tr>';
+  }).join('');
+}
+function openFlowDetail(i){
+  var f=L3_FLOWS[i];if(!f)return;
+  var src=f.s||f.src||'';var dst=f.d||f.dst||'';
+  var proto=f.p||f.proto||'';var flags=f.f||f.flags||'—';
+  var ttl=f.t||f.ttl||0;var vol=f.b||f.vol||'—';var risk=f.risk||'ok';
+  var geo=f.geo||'—';var asn=f.a||f.asn||'—';var l7=f.l7||'';
+  var isBad=risk==='critical'||risk==='high';
+  openModal('IP Flow detail',src+' → '+dst+' · '+proto,
+    '<div class="decode-block '+(isBad?'l-alert':'')+'"><div class="field-row"><div class="field-key">Source IP</div><div class="field-val '+(isBad?'bad':'')+'">'+src+'</div></div>'
+    +'<div class="field-row"><div class="field-key">Destination</div><div class="field-val">'+dst+'</div></div>'
+    +'<div class="field-row"><div class="field-key">Protocol</div><div class="field-val">'+proto+'</div></div>'
+    +'<div class="field-row"><div class="field-key">TCP Flags</div><div class="field-val">'+flags+'</div></div>'
+    +'<div class="field-row"><div class="field-key">TTL</div><div class="field-val">'+ttl+'</div></div>'
+    +'<div class="field-row"><div class="field-key">Volume</div><div class="field-val ok">'+vol+'</div></div>'
+    +(l7?'<div class="field-row"><div class="field-key">L7 Protocol</div><div class="field-val c-cyan">'+l7+'</div></div>':'')
+    +(geo!=='—'?'<div class="field-row"><div class="field-key">GeoIP / ASN</div><div class="field-val warn">'+geo+' · '+asn+'</div></div>':'')
+    +'</div>');
+}
+function renderFlags(){
+  document.getElementById('flag-grid').innerHTML=TCP_FLAGS.map(function(f){
+    return '<div class="flag-cell"><div class="flag-name" style="color:'+f.c+'">'+f.f+'</div><div class="flag-count">'+f.n.toLocaleString()+'</div><div class="progress-bar"><div class="progress-fill" style="width:'+f.p+'%;background:'+f.c+'"></div></div></div>';
+  }).join('');
+}
+function renderICMP(){
+  var max=ICMP[0].n;
+  document.getElementById('icmp-list').innerHTML=ICMP.map(function(i){
+    return '<div class="stat-row"><span class="f10 c-t2" style="min-width:130px">'+i.t+'</span><div style="flex:1;margin:0 10px"><div class="progress-bar"><div class="progress-fill" style="width:'+Math.round(i.n/max*100)+'%;background:'+i.c+'"></div></div></div><span class="mono-sm">'+i.n.toLocaleString()+'</span></div>';
+  }).join('');
+}
+function renderStreams(){
+  document.getElementById('tcp-streams').innerHTML=TCP_STREAMS.map(function(s){
+    var rc=riskColor(s.risk);
+    return '<div class="stream-card" style="border-left:2px solid '+rc+'">'
+      +'<div class="flex-b mb8"><span class="mono f10 fw7" style="color:'+rc+'">'+s.id+'</span><span class="pill pill-cyan">'+s.state+'</span></div>'
+      +'<div class="field-row"><div class="field-key">Flow</div><div class="field-val f10">'+s.src+' → '+s.dst+'</div></div>'
+      +'<div class="field-row"><div class="field-key">Protocol</div><div class="field-val">'+s.proto+'</div></div>'
+      +'<div class="field-row"><div class="field-key">Packets</div><div class="field-val">'+s.pkts.toLocaleString()+'</div></div>'
+      +'</div>';
+  }).join('');
+}
+function renderHTTP(){
+  var fc={'path-traversal':'pill-red','sqli-body':'pill-red','sqli-uri':'pill-red','priv-esc':'pill-amber','probe':'pill-amber','oversize':'pill-gray'};
+  document.getElementById('http-tbody').innerHTML=HTTP.map(function(r){
+    return '<tr>'
+      +'<td class="mono-sm c-t3">'+r.ts+'</td>'
+      +'<td>'+methPill(r.m)+'</td>'
+      +'<td class="mono f10 ell" style="max-width:160px;color:'+(r.f?'var(--red)':'var(--t1)')+'" title="'+r.uri+'">'+r.uri+'</td>'
+      +'<td class="mono f10" style="color:'+statusColor(r.s)+'">'+r.s+'</td>'
+      +'<td class="mono-sm">'+r.sz+'</td>'
+      +'<td class="mono-sm">'+r.rtt+'</td>'
+      +'<td>'+(r.f?'<span class="pill '+(fc[r.f]||'pill-gray')+'" style="font-size:8px">'+r.f+'</span>':'<span class="c-t3 f10">—</span>')+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('top-uris').innerHTML=TOP_URIS.map(function(u){
+    return '<div class="stat-row"><span class="mono f10 ell" style="min-width:130px;color:var(--t1)">'+u.u+'</span><div style="flex:1;margin:0 10px"><div class="progress-bar"><div class="progress-fill" style="width:'+u.p+'%;background:'+u.c+'"></div></div></div><span class="mono-sm">'+u.n.toLocaleString()+'</span></div>';
+  }).join('');
+}
+function renderDNS(){
+  document.getElementById('dns-tbody').innerHTML=DNS.map(function(q){
+    return '<tr>'
+      +'<td class="mono-sm c-t3">'+q.ts+'</td>'
+      +'<td class="mono f10 ell" style="max-width:160px;color:'+(q.f?'var(--red)':'var(--t1)')+'" title="'+q.q+'">'+q.q+'</td>'
+      +'<td><span class="pill pill-purple">'+q.t+'</span></td>'
+      +'<td class="mono f10" style="color:'+(q.r==='NXDOMAIN'?'var(--red)':'var(--t2)')+'">'+q.r+'</td>'
+      +'<td class="mono-sm">'+q.ttl+'</td>'
+      +'<td>'+(q.f?'<span class="pill '+(q.f==='tunnel'?'pill-red':'pill-amber')+'" style="font-size:8px">'+q.f+'</span>':'<span class="c-t3">—</span>')+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('dns-nx').innerHTML=DNS_NX.map(function(d){
+    return '<div class="stat-row"><span class="mono f10" style="color:'+riskColor(d.risk)+'">'+d.src+'</span><span class="mono-sm c-amber">'+d.n+' NX</span><span class="pill '+(d.risk==='high'?'pill-red':d.risk==='low'?'pill-blue':'pill-green')+'">'+d.risk+'</span></div>';
+  }).join('');
+}
+function renderSQL(){
+  document.getElementById('sql-tbody').innerHTML=SQL.map(function(q){
+    return '<tr>'
+      +'<td class="mono-sm c-t3">'+q.ts+'</td>'
+      +'<td class="mono f10 c-t2">'+q.cl+'</td>'
+      +'<td><span class="pill pill-orange" style="font-size:8px">'+q.t+'</span></td>'
+      +'<td class="mono f10 ell" style="max-width:190px;color:'+(q.risk==='ok'?'var(--t1)':'var(--red)')+'" title="'+q.q+'">'+q.q+'</td>'
+      +'<td class="mono-sm">'+q.r+'</td>'
+      +'<td class="mono f10" style="color:'+(parseFloat(q.d)>50?'var(--amber)':'var(--t3)')+'">'+q.d+'</td>'
+      +'<td>'+riskPill(q.risk)+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('sql-types').innerHTML=SQL_TYPES.map(function(t){
+    return '<div class="stat-row"><span class="mono f10 fw7" style="color:'+t.c+';min-width:55px">'+t.t+'</span><div style="flex:1;margin:0 10px"><div class="progress-bar"><div class="progress-fill" style="width:'+t.p+'%;background:'+t.c+'"></div></div></div><span class="mono-sm">'+t.n.toLocaleString()+'</span></div>';
+  }).join('');
+}
+function renderTLS(){
+  document.getElementById('tls-tbody').innerHTML=TLS.map(function(s){
+    return '<tr>'
+      +'<td class="mono f10" style="color:'+riskColor(s.risk)+'">'+s.cl+'</td>'
+      +'<td class="mono f10 c-t1">'+s.sni+'</td>'
+      +'<td><span class="pill '+(s.v==='TLSv1.3'?'pill-green':'pill-amber')+'">'+s.v+'</span></td>'
+      +'<td class="mono f10 c-t3 ell" style="max-width:130px" title="'+s.ci+'">'+s.ci+'</td>'
+      +'<td class="mono f10 c-t3 ell" style="max-width:80px" title="'+s.ja3+'">'+s.ja3+'</td>'
+      +'<td>'+riskPill(s.risk)+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('tls-versions').innerHTML=TLS_VER.map(function(v){
+    return '<div class="stat-row"><span class="mono f10 fw7" style="color:'+v.c+';min-width:70px">'+v.v+'</span><div style="flex:1;margin:0 10px"><div class="progress-bar"><div class="progress-fill" style="width:'+v.p+'%;background:'+v.c+'"></div></div></div><span class="mono-sm">'+v.p+'%</span></div>';
+  }).join('');
+}
+function renderHex(){
+  var k=document.getElementById('hex-sel').value;
+  var p=HEX_PKTS[k];if(!p)return;
+  var pc={ok:'pill-green',high:'pill-amber',critical:'pill-red'}[p.sum.risk];
+  var rc={ok:'var(--green)',high:'var(--amber)',critical:'var(--red)'}[p.sum.risk];
+  document.getElementById('hex-summary').innerHTML='<div class="flex gap8" style="flex-wrap:wrap"><span class="pill '+pc+'">'+p.sum.type+'</span><span class="mono f10 c-t2">'+p.sum.src+' → '+p.sum.dst+'</span><span class="mono-sm">'+p.sum.sz+'</span><span style="flex:1"></span><span class="f11" style="color:'+rc+'">'+p.sum.note+'</span></div>';
+  var allB=[];
+  p.bytes.forEach(function(g){g.b.split(' ').forEach(function(b){allB.push({b:b,c:g.c});});});
+  var lines=[];
+  for(var i=0;i<allB.length;i+=16){
+    var row=allB.slice(i,i+16);
+    var off=('0000'+i.toString(16).toUpperCase()).slice(-4);
+    var hex=row.map(function(x){
+      var parts=(x.c||'').trim().split(' ');
+      var cls='hex-byte'+(parts[0]?' '+parts[0]:'')+(parts[1]?' '+parts[1]:'');
+      return '<span class="'+cls+'">'+x.b+'</span>';
+    }).join(' ');
+    var pad=row.length<16?Array(16-row.length).fill('  ').join(' ')+' ':'';
+    var asc=row.map(function(x){var v=parseInt(x.b,16);var ch=(v>=32&&v<127)?String.fromCharCode(v):'.';return '<span class="'+(v>=32&&v<127?'pr':'')+'">'+(ch==='<'?'&lt;':ch==='>'?'&gt;':ch)+'</span>';}).join('');
+    lines.push('<span class="hex-offset">'+off+'</span>  '+hex+pad+'  <span class="hex-ascii">'+asc+'</span>');
+  }
+  document.getElementById('hex-dump').innerHTML=lines.join('\n');
+  document.getElementById('hex-fields').innerHTML=p.fields.map(function(layer){
+    return '<div class="decode-block mb8"><div class="f11 fw7 c-cyan mb8">'+layer.layer+'</div>'+layer.items.map(function(it){var bad=it.v&&(it.v.includes('⚠')||it.v.includes('weak')||it.v.includes('Cobalt')||it.v.includes('SQLi'));return '<div class="field-row"><div class="field-key">'+it.k+'</div><div class="field-val '+(bad?'bad':'')+'">'+it.v+'</div></div>';}).join('')+'</div>';
+  }).join('');
+}
+function renderAnomalies(){
+  var ord={critical:0,high:1,medium:2,low:3};
+  var sorted=ANOMALIES.slice().sort(function(a,b){return ord[a.sev]-ord[b.sev];});
+  document.getElementById('anom-list').innerHTML=sorted.map(function(a,i){
+    var sc={critical:'var(--red)',high:'var(--orange)',medium:'var(--amber)',low:'var(--green)'}[a.sev];
+    var pc={critical:'pill-red',high:'pill-amber',medium:'pill-amber',low:'pill-green'}[a.sev];
+    var lc={L3:'pill-purple',L4:'pill-cyan',L7:'pill-blue'}[a.layer]||'pill-gray';
+    return '<div class="anom-item" onclick="openAnom('+i+')" style="border-left:2px solid '+sc+'"><div class="anom-body"><div class="anom-header"><span class="pill '+pc+'">'+a.sev.toUpperCase()+'</span><span class="pill '+lc+'">'+a.layer+'</span><span class="anom-title">'+a.type+'</span><span style="flex:1"></span><span class="mono-sm">'+a.ts+'</span></div><div class="anom-detail">'+a.detail+'</div><div class="anom-meta"><span>src: '+a.src+'</span><span style="color:'+sc+'">MITRE: '+a.mitre+'</span></div></div></div>';
+  }).join('');
+}
+function openAnom(i){
+  var a=ANOMALIES[i];if(!a)return;
+  var cls=a.sev==='critical'||a.sev==='high'?'l-alert':'l-warn';
+  openModal(a.type,a.layer+' anomaly · '+a.sev.toUpperCase()+' · '+a.ts,
+    '<div class="decode-block '+cls+'"><div class="field-row"><div class="field-key">Severity</div><div class="field-val bad">'+a.sev.toUpperCase()+'</div></div><div class="field-row"><div class="field-key">Layer</div><div class="field-val">'+a.layer+'</div></div><div class="field-row"><div class="field-key">Source</div><div class="field-val bad">'+a.src+'</div></div><div class="field-row"><div class="field-key">MITRE</div><div class="field-val warn">'+a.mitre+'</div></div><div class="field-row"><div class="field-key">Detail</div><div class="field-val">'+a.detail+'</div></div></div>');
+}
+function openModal(title,sub,body){
+  document.getElementById('pkt-title').textContent=title;
+  document.getElementById('pkt-sub').textContent=sub;
+  document.getElementById('pkt-body').innerHTML=body;
+  document.getElementById('pkt-modal').classList.add('open');
+}
+function closeModal(){document.getElementById('pkt-modal').classList.remove('open');}
+function switchTab(id,el){
+  document.querySelectorAll('#tbr .tab').forEach(function(t){t.classList.remove('active');});
+  el.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+id).classList.add('active');
+  if(id==='hex')renderHex();
+}
+// ═══════════════════════════════════════════════════════════════
+// API + REAL-TIME ENGINE
+// ═══════════════════════════════════════════════════════════════
+var TOKEN='', API_BASE='', _cap=false, _sse=null;
+var _timelineData={pps:[],bytes:[],ts:[]};
+var MAX_TIMELINE=60; // 60 data points = 2min at 2s interval
+
+// ── Token / theme from parent ──
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token){
+    TOKEN=e.data.token;
+    API_BASE=e.data.api||'';
+    boot();
+  }
+  if(e.data.type==='vsp:theme')applyTheme(e.data.theme);
+});
+if(window.parent!==window){
+  window.parent.postMessage({type:'vsp:request_token'},'*');
+  window.parent.postMessage({type:'vsp:request_theme'},'*');
+}
+
+function apiUrl(path){
+  var base=API_BASE;
+  if(base.endsWith('/api/v1'))return base+'/netcap'+path;
+  if(base.endsWith('/'))return base+'api/v1/netcap'+path;
+  return base+'/api/v1/netcap'+path;
+}
+function apiHeaders(){return {Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'};}
+
+// ── Boot sequence ──
+function boot(){
+  if(!TOKEN)return;
+  loadInterfaces();
+  loadFull();
+  startSSE();
+  setInterval(pollStats,6000);
+  setInterval(pollData,15000);
+}
+
+// ── Load interfaces ──
+function loadInterfaces(){
+  fetch(apiUrl('/interfaces'),{headers:apiHeaders()})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var sel=document.getElementById('iface-sel');
+    if(!sel||!d.interfaces)return;
+    sel.innerHTML=d.interfaces.map(function(i){
+      return '<option value="'+i+'"'+(i===d.default?' selected':'')+'>'+i+'</option>';
+    }).join('');
+  }).catch(function(){});
+}
+
+// ── Initial full load ──
+function loadFull(){
+  fetch(apiUrl('/full?limit=100'),{headers:apiHeaders()})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d.flows)     { L3_FLOWS=mapFlows(d.flows); renderL3(); }
+    if(d.anomalies) { ANOMALIES=mapAnomalies(d.anomalies); renderAnomalies(); updateAnomBadge(); }
+    if(d.tcp_flags) { updateTCPFlags(d.tcp_flags); renderFlags(); }
+    if(d.stats)     { updateKPIs(d.stats); updateCapState(d.stats.running); }
+    if(d.http_requests){ HTTP=mapHTTP(d.http_requests); renderHTTP(); }
+    if(d.dns_queries)  { DNS=mapDNS(d.dns_queries); renderDNS(); }
+    if(d.sql_events)   { SQL=mapSQL(d.sql_events); renderSQL(); }
+    if(d.tls_sessions) { TLS=mapTLS(d.tls_sessions); renderTLS(); }
+    if(d.grpc_events)  { GRPC=mapGRPC(d.grpc_events); renderGRPC(); }
+    if(d.proto_breakdown){ updateProtoBreakdown(d.proto_breakdown); }
+  }).catch(function(e){ console.warn('[netcap] full load failed',e); });
+}
+
+// ── Poll stats KPIs ──
+function pollStats(){
+  if(!TOKEN)return;
+  fetch(apiUrl('/stats'),{headers:apiHeaders()})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    updateKPIs(d);
+    pushTimeline(d.pps||0, d.throughput_mb||0);
+    drawTimeline();
+  }).catch(function(){});
+}
+
+// ── Poll data tables ──
+function pollData(){
+  if(!TOKEN)return;
+  fetch(apiUrl('/flows?limit=100'),{headers:apiHeaders()})
+  .then(function(r){return r.json();})
+  .then(function(d){if(d.flows){L3_FLOWS=mapFlows(d.flows);renderL3();}}).catch(function(){});
+
+  fetch(apiUrl('/anomalies?limit=50'),{headers:apiHeaders()})
+  .then(function(r){return r.json();})
+  .then(function(d){if(d.anomalies){ANOMALIES=mapAnomalies(d.anomalies);renderAnomalies();updateAnomBadge();}}).catch(function(){});
+
+  var tab=document.querySelector('#tbr .tab.active');
+  var tid=tab?tab.getAttribute('data-tab'):'';
+  if(tid==='http')  loadTabData('/l7/http','http_requests',mapHTTP,function(d){HTTP=d;renderHTTP();});
+  if(tid==='dns')   loadTabData('/l7/dns','queries',mapDNS,function(d){DNS=d;renderDNS();});
+  if(tid==='sql')   loadTabData('/l7/sql','events',mapSQL,function(d){SQL=d;renderSQL();});
+  if(tid==='tls')   loadTabData('/l7/tls','sessions',mapTLS,function(d){TLS=d;renderTLS();});
+  if(tid==='grpc')  loadTabData('/l7/grpc','events',mapGRPC,function(d){GRPC=d;renderGRPC();});
+}
+
+function loadTabData(path,key,mapper,cb){
+  fetch(apiUrl(path+'?limit=100'),{headers:apiHeaders()})
+  .then(function(r){return r.json();})
+  .then(function(d){if(d[key])cb(mapper(d[key]));}).catch(function(){});
+}
+
+// ── SSE stream ──
+function startSSE(){
+  if(_sse){_sse.close();}
+  if(!TOKEN)return;
+  var url=apiUrl('/stream?token='+encodeURIComponent(TOKEN));
+  _sse=new EventSource(url);
+  _sse.onmessage=function(e){
+    try{
+      var msg=JSON.parse(e.data);
+      if(msg.event==='stats'&&msg.data){
+        updateKPIs(msg.data);
+        pushTimeline(msg.data.pps||0, msg.data.throughput_mb||0);
+        drawTimeline();
+        updateCapState(msg.data.running);
+      }
+      if(msg.event==='anomaly'&&msg.data){
+        ANOMALIES.unshift(mapAnomaly(msg.data));
+        if(ANOMALIES.length>200)ANOMALIES.pop();
+        renderAnomalies();
+        updateAnomBadge();
+        flashAnomaly(msg.data);
+      }
+    }catch(err){}
+  };
+  _sse.onerror=function(){
+    setTimeout(startSSE, 5000); // reconnect
+  };
+}
+
+// ── Capture start/stop ──
+function toggleCapture(){
+  if(!TOKEN){alert('No token — demo mode only');return;}
+  if(_cap){
+    fetch(apiUrl('/stop'),{method:'POST',headers:apiHeaders()})
+    .then(function(){_cap=false;updateCapState(false);}).catch(function(){});
+  } else {
+    var iface=document.getElementById('iface-sel')?document.getElementById('iface-sel').value:'any';
+    var bpf=document.getElementById('bpf-filter')?document.getElementById('bpf-filter').value.trim():'';
+    fetch(apiUrl('/start'),{method:'POST',headers:apiHeaders(),body:JSON.stringify({interface:iface,bpf_filter:bpf,snaplen:1500,promiscuous:true})})
+    .then(function(r){return r.json();})
+    .then(function(d){_cap=true;updateCapState(true);startSSE();}).catch(function(){});
+  }
+}
+
+function updateCapState(running){
+  _cap=!!running;
+  var btn=document.getElementById('cap-btn');
+  var badge=document.getElementById('cap-badge');
+  if(btn) btn.textContent=running?'■ Stop':'▶ Start';
+  if(badge){
+    badge.textContent=running?'● CAPTURING':'○ STOPPED';
+    badge.style.color=running?'var(--green)':'var(--t3)';
+  }
+}
+
+// ── Apply BPF filter (restart capture) ──
+function applyBPF(){
+  if(!_cap)return;
+  fetch(apiUrl('/stop'),{method:'POST',headers:apiHeaders()}).then(function(){
+    setTimeout(toggleCapture,300);
+  }).catch(function(){});
+}
+
+// ── KPI update ──
+function updateKPIs(s){
+  setText('k-pps',(s.pps||0).toLocaleString());
+  setText('k-flows',(s.active_flows||0).toLocaleString());
+  setText('k-bw',((s.throughput_mb||0).toFixed(2)));
+  setText('k-anom',(s.anomalies||0).toString());
+  setText('k-rtt',((s.avg_rtt_ms||0).toFixed(1)));
+  setText('k-retx',((s.retx_pct||0).toFixed(1))+'%');
+}
+
+function setText(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+
+function updateAnomBadge(){
+  var el=document.getElementById('anom-tab-badge');
+  if(el)el.textContent=ANOMALIES.length;
+}
+
+function flashAnomaly(a){
+  if(a.severity==='critical'||a.severity==='high'){
+    var kpi=document.getElementById('k-anom');
+    if(kpi){kpi.style.color='var(--red)';setTimeout(function(){kpi.style.color='';},1000);}
+  }
+}
+
+// ── TCP flags from API ──
+function updateTCPFlags(f){
+  // Rebuild static data from API
+  TCP_FLAGS[0].n=f.syn||0; TCP_FLAGS[1].n=f.ack||0; TCP_FLAGS[2].n=f.psh||0;
+  TCP_FLAGS[3].n=f.rst||0; TCP_FLAGS[4].n=f.fin||0; TCP_FLAGS[5].n=f.urg||0;
+  var max=Math.max.apply(null,TCP_FLAGS.map(function(x){return x.n;}));
+  TCP_FLAGS.forEach(function(x){x.p=max?Math.round(x.n/max*100):0;});
+}
+
+// ── Proto breakdown ──
+function updateProtoBreakdown(protos){
+  PROTOS=protos||PROTOS;
+}
+
+// ── Data mappers API → local format ──
+function mapFlows(arr){
+  return (arr||[]).map(function(f){
+    return {
+      s:f.src_ip,d:f.dst_ip,p:f.proto,f:f.flags||'—',t:f.ttl||64,
+      b:fmtBytes(f.bytes),risk:f.risk||'ok',geo:f.geo_cc||'—',a:f.asn||'—',
+      l7:f.l7_proto||''
+    };
+  });
+}
+function mapAnomalies(arr){
+  return (arr||[]).map(mapAnomaly);
+}
+function mapAnomaly(a){
+  return {
+    sev:a.severity||'medium',layer:a.layer||'L4',type:a.type||'Unknown',
+    src:a.src_ip||'—',dst:a.dst_ip||'—',detail:a.detail||'',
+    mitre:a.mitre||'—',ts:fmtRelTime(a.timestamp)
+  };
+}
+function mapHTTP(arr){
+  return (arr||[]).map(function(r){
+    return {ts:fmtTime(r.timestamp),m:r.method||'GET',uri:r.uri||'/',
+      s:r.status_code||0,sz:fmtBytes(r.size),rtt:r.rtt_ms?r.rtt_ms.toFixed(0)+'ms':'—',
+      f:r.flag||null,ua:r.user_agent||''};
+  });
+}
+function mapDNS(arr){
+  return (arr||[]).map(function(q){
+    return {ts:fmtTime(q.timestamp),q:q.query||'',t:q.qtype||'A',
+      r:q.response||'—',ttl:q.ttl?q.ttl+'s':'—',f:q.flag||null,ent:(q.entropy||0).toFixed(2)};
+  });
+}
+function mapSQL(arr){
+  return (arr||[]).map(function(e){
+    return {ts:fmtTime(e.timestamp),cl:e.client_ip||'—',t:e.msg_type||'Query',
+      q:e.sql||'',r:e.rows||0,d:e.duration_ms?e.duration_ms.toFixed(1)+'ms':'—',risk:e.risk||'ok'};
+  });
+}
+function mapTLS(arr){
+  return (arr||[]).map(function(s){
+    return {cl:s.client_ip||'—',sni:s.sni||'—',v:s.version||'?',
+      ci:s.cipher_suite||'—',ja3:s.ja3||'—',risk:s.risk||'ok',bad:s.known_bad||false};
+  });
+}
+function mapGRPC(arr){
+  return (arr||[]).map(function(e){
+    return {ts:fmtTime(e.timestamp),cl:e.client_ip||'—',svc:e.service||'—',
+      m:e.method||'—',st:e.status||'OK',d:e.duration_ms?e.duration_ms.toFixed(1)+'ms':'—'};
+  });
+}
+
+// ── gRPC render ──
+var GRPC=[];
+function renderGRPC(){
+  var el=document.getElementById('grpc-tbody');
+  if(!el)return;
+  if(!GRPC.length){el.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No gRPC traffic captured yet</td></tr>';return;}
+  el.innerHTML=GRPC.map(function(e){
+    return '<tr>'
+      +'<td class="mono-sm c-t3">'+e.ts+'</td>'
+      +'<td class="mono f10 c-t2">'+e.cl+'</td>'
+      +'<td class="mono f10 c-cyan">'+e.svc+'</td>'
+      +'<td class="mono f10 c-t1">'+e.m+'</td>'
+      +'<td><span class="pill '+(e.st==='OK'?'pill-green':'pill-red')+'" style="font-size:8px">'+e.st+'</span></td>'
+      +'<td class="mono-sm">'+e.d+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+// ── Timeline chart ──
+function pushTimeline(pps,bw){
+  var now=new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  _timelineData.pps.push(pps);
+  _timelineData.bytes.push(parseFloat(bw)||0);
+  _timelineData.ts.push(now);
+  if(_timelineData.pps.length>MAX_TIMELINE){
+    _timelineData.pps.shift();_timelineData.bytes.shift();_timelineData.ts.shift();
+  }
+}
+
+function drawTimeline(){
+  var canvas=document.getElementById('timeline-canvas');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var W=canvas.offsetWidth||600;
+  var H=80;
+  canvas.width=W;canvas.height=H;
+  ctx.clearRect(0,0,W,H);
+
+  var data=_timelineData.pps;
+  if(!data.length)return;
+  var max=Math.max.apply(null,data)||1;
+
+  // Draw PPS sparkline
+  ctx.beginPath();
+  ctx.strokeStyle='rgba(6,182,212,0.8)';
+  ctx.lineWidth=1.5;
+  ctx.lineJoin='round';
+  data.forEach(function(v,i){
+    var x=i/(data.length-1||1)*W;
+    var y=H-(v/max)*(H-8)-4;
+    if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Fill area
+  ctx.beginPath();
+  data.forEach(function(v,i){
+    var x=i/(data.length-1||1)*W;
+    var y=H-(v/max)*(H-8)-4;
+    if(i===0)ctx.moveTo(x,H);
+    ctx.lineTo(x,y);
+  });
+  ctx.lineTo(W,H);
+  ctx.closePath();
+  ctx.fillStyle='rgba(6,182,212,0.08)';
+  ctx.fill();
+
+  // Labels
+  ctx.font='9px monospace';
+  ctx.fillStyle='rgba(255,255,255,0.3)';
+  ctx.fillText(max.toLocaleString()+' pps', 4, 12);
+  if(_timelineData.ts.length){
+    var last=_timelineData.ts[_timelineData.ts.length-1];
+    ctx.textAlign='right';
+    ctx.fillText(last, W-4, 12);
+  }
+}
+
+// ── Connection map (canvas) ──
+var _map={nodes:[],edges:[],sel:null};
+function initConnMap(){
+  var canvas=document.getElementById('conn-canvas');
+  if(!canvas)return;
+  var W=canvas.offsetWidth||600;
+  var H=220;
+  canvas.width=W;canvas.height=H;
+
+  // Build nodes from flows
+  var ipMap={};
+  L3_FLOWS.forEach(function(f){
+    if(!ipMap[f.s])ipMap[f.s]={id:f.s,ip:f.s,type:isPrivateIP(f.s)?'internal':'external',risk:f.risk};
+    if(!ipMap[f.d])ipMap[f.d]={id:f.d,ip:f.d,type:isPrivateIP(f.d)?'internal':'external',risk:'ok'};
+  });
+  var nodes=Object.values(ipMap).slice(0,12);
+  // Layout: internal IPs left, external right
+  var intNodes=nodes.filter(function(n){return n.type==='internal';});
+  var extNodes=nodes.filter(function(n){return n.type==='external';});
+  intNodes.forEach(function(n,i){n.x=0.2;n.y=(i+1)/(intNodes.length+1);});
+  extNodes.forEach(function(n,i){n.x=0.75;n.y=(i+1)/(extNodes.length+1);});
+  _map.nodes=nodes;
+
+  // Edges from flows
+  _map.edges=L3_FLOWS.slice(0,20).map(function(f){
+    return {from:f.s,to:f.d,risk:f.risk,proto:f.l7||f.p};
+  });
+
+  drawConnMap();
+}
+
+function drawConnMap(){
+  var canvas=document.getElementById('conn-canvas');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var W=canvas.width;var H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  var nodeMap={};
+  _map.nodes.forEach(function(n){nodeMap[n.id]=n;});
+
+  // Draw edges
+  _map.edges.forEach(function(e){
+    var fn=nodeMap[e.from],tn=nodeMap[e.to];
+    if(!fn||!tn)return;
+    var fx=fn.x*W,fy=fn.y*H,tx=tn.x*W,ty=tn.y*H;
+    ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(tx,ty);
+    ctx.strokeStyle=e.risk==='critical'||e.risk==='high'?'rgba(239,68,68,0.6)':'rgba(255,255,255,0.08)';
+    ctx.lineWidth=e.risk==='critical'?2:1;
+    if(e.risk==='critical')ctx.setLineDash([5,3]); else ctx.setLineDash([]);
+    ctx.stroke();ctx.setLineDash([]);
+  });
+
+  // Draw nodes
+  _map.nodes.forEach(function(n){
+    var x=n.x*W,y=n.y*H;
+    var col=n.type==='external'?'#ef4444':n.risk==='critical'?'#ef4444':n.risk==='high'?'#f97316':'#06b6d4';
+    ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);
+    ctx.fillStyle=col.replace(')',',0.2)').replace('rgb','rgba').replace('#','rgba(').replace('rgba(','rgba(')+'20';
+    ctx.fill();
+    ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+    ctx.font='9px monospace';ctx.fillStyle='rgba(255,255,255,0.6)';ctx.textAlign='center';
+    ctx.fillText(n.ip.slice(-7),x,y+16);
+  });
+}
+
+function isPrivateIP(ip){
+  return /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|::1)/.test(ip);
+}
+
+// ── Export ──
+function exportFlowsCSV(){
+  if(!TOKEN){alert('No token');return;}
+  window.location=apiUrl('/export/flows.csv')+'?token='+encodeURIComponent(TOKEN);
+}
+function exportAnomaliesJSON(){
+  if(!TOKEN){alert('No token');return;}
+  window.location=apiUrl('/export/anomalies.json')+'?token='+encodeURIComponent(TOKEN);
+}
+
+// ── Format helpers ──
+function fmtBytes(n){
+  if(!n)return '0B';
+  if(n>1073741824)return (n/1073741824).toFixed(1)+'GB';
+  if(n>1048576)return (n/1048576).toFixed(1)+'MB';
+  if(n>1024)return (n/1024).toFixed(0)+'KB';
+  return n+'B';
+}
+function fmtTime(ts){
+  if(!ts)return '—';
+  try{return new Date(ts).toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+  catch(e){return ts;}
+}
+function fmtRelTime(ts){
+  if(!ts)return 'now';
+  try{
+    var diff=Math.floor((Date.now()-new Date(ts).getTime())/1000);
+    if(diff<60)return diff+'s ago';
+    if(diff<3600)return Math.floor(diff/60)+'m ago';
+    return Math.floor(diff/3600)+'h ago';
+  }catch(e){return 'now';}
+}
+
+function applyTheme(t){
+  if(t!=='light')return;
+  var r=document.documentElement;
+  r.style.setProperty('--bg','#f2f4f8');r.style.setProperty('--bg2','#e8edf5');r.style.setProperty('--bg3','#dde4f0');
+  r.style.setProperty('--card','#ffffff');r.style.setProperty('--card2','#f0f4fa');r.style.setProperty('--card3','#e4eaf5');
+  r.style.setProperty('--b1','rgba(0,0,0,.07)');r.style.setProperty('--b2','rgba(0,0,0,.12)');r.style.setProperty('--b3','rgba(0,0,0,.2)');
+  r.style.setProperty('--t1','#1a1e2a');r.style.setProperty('--t2','#4a5268');r.style.setProperty('--t3','#7a839a');r.style.setProperty('--t4','#b0bac8');
+  document.body.style.background='#f2f4f8';
+}
+
+window.addEventListener('load',function(){
+  // Render with static mock data first (instant paint)
+  renderL3();renderFlags();renderICMP();renderStreams();
+  renderHTTP();renderDNS();renderSQL();renderTLS();
+  renderGRPC();renderAnomalies();renderHex();
+  // Then connect to real API
+  if(TOKEN)boot();
+  // Timeline canvas
+  pushTimeline(12847,1.24);drawTimeline();
+  // Resize handler for timeline
+  window.addEventListener('resize',function(){drawTimeline();initConnMap();});
+});
+</script>
+</body>
+</html>

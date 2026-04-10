@@ -57,6 +57,44 @@ func NormaliseSeverity(raw string) Severity {
 
 // Finding is the canonical, tool-agnostic representation of a security finding.
 // Every tool adapter MUST normalise its output into this struct.
+// SourceCategory classifies findings by analysis type for weighted scoring.
+type SourceCategory string
+
+const (
+	SourceDAST    SourceCategory = "DAST"    // runtime-confirmed, weight 1.5x
+	SourceSAST    SourceCategory = "SAST"    // static analysis, weight 1.0x
+	SourceSCA     SourceCategory = "SCA"     // dependency CVE, weight 1.2x
+	SourceSecrets SourceCategory = "SECRETS" // live secrets, always blocking
+	SourceIAC     SourceCategory = "IAC"     // infra misconfiguration, weight 0.8x
+	SourceNetwork SourceCategory = "NETWORK" // network scan, weight 1.3x
+)
+
+// toolCategory maps tool name → SourceCategory
+var toolCategory = map[string]SourceCategory{
+	"nikto":       SourceDAST,
+	"nuclei":      SourceDAST,
+	"sslscan":     SourceNetwork,
+	"bandit":      SourceSAST,
+	"semgrep":     SourceSAST,
+	"codeql":      SourceSAST,
+	"grype":       SourceSCA,
+	"trivy":       SourceSCA,
+	"license":     SourceSCA,
+	"gitleaks":    SourceSecrets,
+	"secretcheck": SourceSecrets,
+	"checkov":     SourceIAC,
+	"kics":        SourceIAC,
+	"hadolint":    SourceIAC,
+}
+
+// CategoryOf returns the SourceCategory for a given tool name.
+func CategoryOf(tool string) SourceCategory {
+	if c, ok := toolCategory[tool]; ok {
+		return c
+	}
+	return SourceSAST // default
+}
+
 type Finding struct {
 	Tool      string            `json:"tool"`
 	Severity  Severity          `json:"severity"`
@@ -65,8 +103,10 @@ type Finding struct {
 	Path      string            `json:"path"`       // file path or package name
 	Line      int               `json:"line"`       // 0 = not applicable
 	CWE       string            `json:"cwe"`        // e.g. "CWE-79", "CVE-2024-1234", "GHSA-xxxx"
+	CVSS      float64           `json:"cvss"`       // CVSS v3.1 base score 0.0-10.0; 0 = unknown
 	FixSignal string            `json:"fix_signal"` // upgrade hint or remediation note
 	Raw       map[string]any    `json:"raw"`        // original tool output for audit
+	Category  SourceCategory    `json:"category"`   // DAST|SAST|SCA|SECRETS|IAC|NETWORK
 }
 
 // ── RunOpts ───────────────────────────────────────────────────────────────────
@@ -178,18 +218,26 @@ func RunAll(ctx context.Context, runners []Runner, opts RunOpts) ([]Finding, []R
 
 // Summarise counts findings by severity from a slice.
 type Summary struct {
-	Critical   int
-	High       int
-	Medium     int
-	Low        int
-	Info       int
-	Trace      int
-	HasSecrets bool // true if any gitleaks finding present
+	Critical       int
+	High           int
+	Medium         int
+	Low            int
+	Info           int
+	Trace          int
+	HasSecrets     bool // true if any gitleaks/secretcheck finding present
+	DASTConfirmed  int  // findings from DAST tools (runtime-confirmed exploitable)
+	DASTRan        bool // true if at least one DAST tool was included in this scan
+	WeightedHigh   int  // weighted HIGH count for scoring: DAST×1.5, SCA×1.2, IAC×0.8
+	WeightedCrit   int  // weighted CRITICAL count
 }
 
 func Summarise(findings []Finding) Summary {
 	var s Summary
 	for _, f := range findings {
+		// Ensure category is set
+		if f.Category == "" {
+			f.Category = CategoryOf(f.Tool)
+		}
 		switch f.Severity {
 		case SevCritical:
 			s.Critical++
@@ -204,11 +252,35 @@ func Summarise(findings []Finding) Summary {
 		default:
 			s.Trace++
 		}
-		if f.Tool == "gitleaks" {
+		if f.Category == SourceSecrets {
 			s.HasSecrets = true
+		}
+		if f.Category == SourceDAST || f.Category == SourceNetwork {
+			s.DASTConfirmed++
+			s.DASTRan = true
+		}
+		// Weighted counts for gate scoring
+		w := sourceWeight(f.Category)
+		if f.Severity == SevCritical {
+			s.WeightedCrit += w
+		} else if f.Severity == SevHigh {
+			s.WeightedHigh += w
 		}
 	}
 	return s
+}
+
+// sourceWeight returns integer weight per-source (×10 for int math, divide in Score).
+// DAST=15 (1.5x), Network=13 (1.3x), SCA=12 (1.2x), SAST=10 (1.0x), IAC=8 (0.8x)
+func sourceWeight(c SourceCategory) int {
+	switch c {
+	case SourceDAST:    return 15
+	case SourceNetwork: return 13
+	case SourceSCA:     return 12
+	case SourceSecrets: return 10
+	case SourceIAC:     return 8
+	default:            return 10 // SAST baseline
+	}
 }
 
 // Total returns the sum of all severity counts.

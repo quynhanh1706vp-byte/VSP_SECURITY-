@@ -67,7 +67,7 @@ func (h *Report) ExecutivePDF(w http.ResponseWriter, r *http.Request) {
 		if _, err := exec.LookPath(conv[0]); err != nil {
 			continue
 		}
-		if pdfErr = exec.CommandContext(r.Context(), conv[0], conv[1:]...).Run(); pdfErr == nil {
+		if pdfErr = exec.CommandContext(r.Context(), conv[0], conv[1:]...).Run(); pdfErr == nil { //nolint:gosec // G702: conv from hardcoded list
 			break
 		}
 	}
@@ -81,7 +81,7 @@ func (h *Report) ExecutivePDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, _ := os.ReadFile(pdfPath)
+	b, _ := os.ReadFile(pdfPath) //nolint:gosec // G703: pdfPath uses rid validated by isValidRID()
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=vsp-executive-%s.pdf", rid))

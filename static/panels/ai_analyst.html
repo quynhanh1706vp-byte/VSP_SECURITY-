@@ -243,6 +243,13 @@ textarea::placeholder{color:var(--t3)}
 <script>
 // ── State ──────────────────────────────────────────────────
 var TOKEN = '', API_BASE = window.location.origin;
+function getTenantID() {
+  try {
+    var payload = TOKEN.split('.')[1];
+    var d = JSON.parse(atob(payload.replace(/-/g,'+').replace(/_/g,'/')));
+    return d.tid || '';
+  } catch(e) { return ''; }
+}
 var _ctx = 'all', _loading = false, _hist = [];
 var _ctxData = {};
 
@@ -414,17 +421,15 @@ async function send() {
 
   try {
     // Try streaming via gateway first
-    var response = await fetch(API_BASE + '/api/v1/ai/analyze', {
+    var response = await fetch(API_BASE + '/api/v1/ai/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + TOKEN
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: buildSystem(),
-        messages: _hist.slice(-12)
+        messages: _hist.slice(-12),
+        tenant_id: getTenantID()
       })
     });
 
@@ -436,10 +441,9 @@ async function send() {
     } else if (data.reply) {
       reply = data.reply;
     } else if (data.error) {
-      // Gateway API key invalid — use Anthropic directly via fetch
-      reply = await callAnthropicDirect(txt);
+      reply = 'AI Advisor tạm thời không khả dụng. Vui lòng thử lại.';
     } else {
-      reply = await callAnthropicDirect(txt);
+      reply = 'Không nhận được phản hồi từ AI.';
     }
 
     rmTyping();
@@ -448,13 +452,7 @@ async function send() {
 
   } catch(e) {
     rmTyping();
-    var fallback = await callAnthropicDirect(txt).catch(function(){
-      return 'Không kết nối được API. Kiểm tra network và thử lại.';
-    });
-    addStreaming('ai', fallback);
-    if (fallback !== 'Không kết nối được API. Kiểm tra network và thử lại.') {
-      _hist.push({ role: 'assistant', content: fallback });
-    }
+    addStreaming('ai', 'Lỗi kết nối. Kiểm tra network và thử lại.');
   }
 
   _loading = false;
@@ -462,25 +460,6 @@ async function send() {
   setStatus('ready', 'Ready');
 }
 
-async function callAnthropicDirect(txt) {
-  var r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      system: buildSystem(),
-      messages: _hist.slice(-12)
-    })
-  });
-  var d = await r.json();
-  if (d.content && d.content[0]) return d.content[0].text;
-  throw new Error('No content');
-}
 
 // ── UI helpers ─────────────────────────────────────────────
 function setStatus(type, txt) {
@@ -638,3 +617,246 @@ function init() {
 </script>
 </body>
 </html>
+<script>
+(function(){
+var _h=[];
+var _busy=false;
+
+function tok(){var t=localStorage.getItem('vsp_token')||'';try{if(!t)t=window.parent.TOKEN||'';}catch(e){}return t;}
+function hdr(){return {Authorization:'Bearer '+tok()};}
+
+function fetchD(){
+  return Promise.all([
+    fetch('/api/v1/vsp/run/latest',{headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{};}),
+    fetch('/api/v1/vsp/findings?limit=200',{headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{findings:[]};}),
+    fetch('/api/v1/correlation/incidents?limit=50',{headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{incidents:[]};})
+  ]).then(function(a){return{run:a[0],findings:a[1].findings||[],incidents:a[2].incidents||[]};});
+}
+
+function norm(s){
+  return (s||'').toLowerCase()
+    .replace(/\u00e0|\u00e1|\u1ea1|\u1ea3|\u00e3|\u00e2|\u1ea7|\u1ea5|\u1ead|\u1ea9|\u1eab|\u0103|\u1eb1|\u1eaf|\u1eb7|\u1eb3|\u1eb5/g,'a')
+    .replace(/\u00e8|\u00e9|\u1eb9|\u1ebb|\u1ebd|\u00ea|\u1ec1|\u1ebf|\u1ec7|\u1ec3|\u1ec5/g,'e')
+    .replace(/\u00ec|\u00ed|\u1ecb|\u1ec9|\u0129/g,'i')
+    .replace(/\u00f2|\u00f3|\u1ecd|\u1ecf|\u00f5|\u00f4|\u1ed3|\u1ed1|\u1ed9|\u1ed5|\u1ed7|\u01a1|\u1edd|\u1edb|\u1ee3|\u1edf|\u1ee1/g,'o')
+    .replace(/\u00f9|\u00fa|\u1ee5|\u1ee7|\u0169|\u01b0|\u1eeb|\u1ee9|\u1ef1|\u1eed|\u1eef/g,'u')
+    .replace(/\u1ef3|\u00fd|\u1ef5|\u1ef7|\u1ef9/g,'y')
+    .replace(/\u0111/g,'d');
+}
+
+function genR(q,data){
+  var run=data.run||{},s=run.summary||{},fi=data.findings||[],inc=data.incidents||[];
+  var seen={};
+  var ufi=fi.filter(function(f){var k=(f.rule_id||f.tool)+'|'+(f.message||'').slice(0,30);if(seen[k])return false;seen[k]=true;return true;});
+  var crits=ufi.filter(function(f){return f.severity==='CRITICAL';});
+  var highs=ufi.filter(function(f){return f.severity==='HIGH';});
+  var seenI={};
+  var openI=inc.filter(function(i){if(i.status!=='open')return false;var k=(i.title||'').slice(0,40);if(seenI[k])return false;seenI[k]=true;return true;});
+  var gate=run.gate||'N/A',score=s.SCORE||0;
+  var nq=norm(q);
+  var r='';
+
+  // Context from history
+  var prevT='';
+  for(var hi=_h.length-1;hi>=0;hi--){
+    var hq=norm(_h[hi].content||'');
+    if(hq.indexOf('triage')>=0||hq.indexOf('incident')>=0){prevT='triage';break;}
+    if(hq.indexOf('cve')>=0||hq.indexOf('fix')>=0||hq.indexOf('patch')>=0){prevT='cve';break;}
+    if(hq.indexOf('executive')>=0||hq.indexOf('brief')>=0){prevT='executive';break;}
+    if(hq.indexOf('mitre')>=0){prevT='mitre';break;}
+    if(hq.indexOf('playbook')>=0||hq.indexOf('soar')>=0){prevT='playbook';break;}
+  }
+  var isShort=nq.length<50;
+  var isMake=nq.indexOf('tao')>=0||nq.indexOf('create')>=0||nq.indexOf('viet')>=0||nq.indexOf('gen')>=0;
+  var isExpl=nq.indexOf('giai')>=0||nq.indexOf('chi tiet')>=0||nq.indexOf('detail')>=0||nq.indexOf('p1')>=0||nq.indexOf('p2')>=0;
+  var isVague=nq.indexOf('cai do')>=0||nq.indexOf('cai nay')>=0||nq.indexOf('do')===nq.length-2;
+  if(prevT&&(isVague||(isMake&&isShort)||(isExpl&&isShort))) nq=prevT+' '+nq;
+  else if(!prevT&&isMake) nq='playbook '+nq;
+
+  if(nq.indexOf('triage')>=0||nq.indexOf('incident')>=0||nq.indexOf('priority')>=0||nq.indexOf('p1')>=0||nq.indexOf('p2')>=0){
+    r+='## Incident Triage\n\nGate: '+gate+' | Score: '+score+'/100 | '+crits.length+' critical\n\n';
+    var det=nq.indexOf('giai')>=0||nq.indexOf('chi tiet')>=0||nq.indexOf('detail')>=0||nq.indexOf('explain')>=0;
+    if(crits.length){
+      r+='### P1 - Xu ly ngay (0-4h)\n';
+      crits.slice(0,5).forEach(function(f){
+        r+='- **'+f.tool+'**: '+(f.message||'').slice(0,70)+'\n';
+        if(det){r+='  - Path: `'+(f.path||'N/A')+'`\n';r+='  - SLA: 3 days\n';}
+      });
+      r+='\n';
+    }
+    if(det&&crits.length){
+      r+='### Remediation steps\n';
+      crits.slice(0,3).forEach(function(f){
+        r+='**'+f.tool+'**\n';
+        if(f.tool==='kics')r+='- Add `acl = "private"` to S3 bucket in Terraform\n';
+        if(f.tool==='trivy')r+='- Run: `go get golang.org/x/crypto@latest && go mod tidy`\n';
+        if(f.tool==='gitleaks')r+='- Rotate key immediately, remove from .env, add to .gitignore\n';
+        r+='\n';
+      });
+    }
+    if(highs.length) r+='### P2 - Urgent (4-24h)\n- **'+highs.length+' HIGH findings** need review\n\n';
+    if(openI.length){r+='### Open Incidents ('+openI.length+')\n';openI.slice(0,5).forEach(function(i){r+='- ['+( i.severity||'HIGH')+'] '+(i.title||'')+'\n';});}
+    return r;
+  }
+
+  if(nq.indexOf('cve')>=0||nq.indexOf('fix')>=0||nq.indexOf('patch')>=0||nq.indexOf('vuln')>=0){
+    var cves=ufi.filter(function(f){return f.rule_id&&f.rule_id.indexOf('CVE-')===0;});
+    r+='## CVE Analysis\n\n**'+cves.length+' CVEs** in latest scan\n\n';
+    cves.filter(function(f){return f.severity==='CRITICAL';}).forEach(function(f){
+      r+='### '+f.rule_id+' (CRITICAL)\n'+(f.message||'').slice(0,100)+'\n- Path: `'+(f.path||'N/A')+'`\n\n';
+    });
+    r+='### Fix Commands\n```\ngo get golang.org/x/crypto@latest\ngo get golang.org/x/net@latest\ngo mod tidy\n```\n';
+    return r;
+  }
+
+  if(nq.indexOf('executive')>=0||nq.indexOf('brief')>=0||nq.indexOf('summary')>=0||nq.indexOf('tom tat')>=0){
+    r+='## Executive Security Brief\n\n**Score:** '+score+'/100 | **Gate:** '+gate+' | **Posture:** '+(run.posture||'?')+'\n\n';
+    r+='### Risk Summary\n- Critical: **'+crits.length+'** findings\n- High: **'+highs.length+'** findings\n- Open incidents: **'+openI.length+'**\n\n';
+    r+='### Top Recommendations\n1. Patch CVE-2024-45337 (CVSS 9.1) immediately\n2. Rotate exposed API credentials\n3. Fix S3 bucket ACL misconfigurations\n';
+    return r;
+  }
+
+  if(nq.indexOf('mitre')>=0){
+    r+='## MITRE ATT&CK Mapping\n\n';
+    r+='### T1552 - Unsecured Credentials\n- gitleaks: API key in .env (CWE-798)\n\n';
+    r+='### T1190 - Exploit Public App\n- trivy: CVE-2024-45337\n\n';
+    r+='### T1530 - Cloud Storage\n- kics: S3 bucket ACL\n';
+    return r;
+  }
+
+  if(nq.indexOf('playbook')>=0||nq.indexOf('soar')>=0||nq.indexOf('tao')>=0){
+    r+='## SOAR Playbook\n\n**Trigger:** '+crits.length+' critical findings\n\n';
+    r+='### Step 1: Alert & Notify\n- Send alert to security team\n- Create Jira ticket: [SECURITY] '+gate+' Gate\n\n';
+    r+='### Step 2: Triage (0-2h)\n';
+    crits.slice(0,3).forEach(function(f,i){r+=''+(i+1)+'. '+f.tool+': '+(f.message||'').slice(0,60)+'\n';});
+    r+='\n### Step 3: Remediate\n- Assign P1 to lead engineer (SLA: 3 days)\n- Assign HIGH to team (SLA: 14 days)\n\n';
+    r+='### Step 4: Verify\n- Re-scan after fixes\n- Close when gate = PASS\n';
+    return r;
+  }
+
+  r+='## VSP Security Analysis\n\n**Score:** '+score+'/100 | **Gate:** '+gate+'\n\n';
+  if(crits.length){r+='### Critical Findings\n';crits.slice(0,3).forEach(function(f){r+='- **'+( f.rule_id||f.tool)+'**: '+(f.message||'').slice(0,60)+'\n';});r+='\n';}
+  r+='*Ask: "triage", "CVE fix", "executive brief", "MITRE mapping", "playbook"*';
+  return r;
+}
+
+function renderMd(t){
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```([\s\S]*?)```/g,function(m,c){return '<pre style="background:#0d1117;border:1px solid rgba(56,139,253,.12);border-radius:7px;padding:10px;margin:7px 0;font-family:monospace;font-size:10.5px;color:#8b949e;overflow-x:auto">'+c.trim()+'</pre>';})
+    .replace(/\*\*([^*\n]+)\*\*/g,'<strong style="color:#e6edf3">$1</strong>')
+    .replace(/`([^`\n]+)`/g,'<code style="background:#1a2332;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:10.5px;color:#79c0ff">$1</code>')
+    .replace(/^### (.+)$/gm,'<div style="font-weight:700;color:#e6edf3;margin:10px 0 4px;font-size:12px;border-bottom:1px solid rgba(56,139,253,.1);padding-bottom:3px">$1</div>')
+    .replace(/^## (.+)$/gm,'<div style="font-weight:700;color:#79c0ff;margin:12px 0 6px;font-size:13px">$1</div>')
+    .replace(/^- (.+)$/gm,'<div style="padding-left:14px;margin:3px 0;position:relative"><span style="position:absolute;left:4px;color:#388bfd">·</span>$1</div>')
+    .replace(/^(\d+)\. (.+)$/gm,'<div style="padding-left:20px;margin:3px 0;position:relative"><span style="position:absolute;left:4px;color:#388bfd;font-family:monospace;font-size:10px">$1.</span>$2</div>')
+    .replace(/\n/g,'<br>');
+}
+
+function addM(role,txt){
+  var body=document.getElementById('msgs');
+  if(!body)return;
+  var isAI=role==='ai';
+  var el=document.createElement('div');
+  el.className='msg';
+  el.style.cssText='display:flex;gap:8px;margin-bottom:12px;align-items:flex-start;'+(isAI?'':'flex-direction:row-reverse');
+  el.innerHTML='<div class="av" style="background:'+(isAI?'linear-gradient(135deg,#388bfd,#bc8cff)':'#1a2332;border:1px solid rgba(56,139,253,.2)')+';min-width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">'+(isAI?'AI':'A')+'</div>'
+    +'<div style="flex:1;min-width:0;'+(isAI?'':'display:flex;flex-direction:column;align-items:flex-end')+'"><div class="bbl '+(isAI?'ai':'usr')+'" style="'+(isAI?'':'max-width:82%')+'">'+(isAI?renderMd(txt):txt.replace(/</g,'&lt;'))+'</div></div>';
+  body.appendChild(el);
+  body.scrollTop=body.scrollHeight;
+}
+
+window.sendMsg=function(){
+  var inp=document.getElementById('inp')||document.getElementById('chat-inp');
+  var text=(inp&&inp.value||'').trim();
+  if(!text||_busy)return;
+  _busy=true;
+  if(inp)inp.value='';
+  _h.push({role:'user',content:text});
+  if(_h.length>20)_h=_h.slice(-20);
+  addM('user',text);
+  var body=document.getElementById('msgs');
+  var th=document.createElement('div');
+  th.id='vsp-thinking';th.className='msg';
+  th.style.cssText='display:flex;gap:8px;margin-bottom:12px';
+  th.innerHTML='<div class="av" style="background:linear-gradient(135deg,#388bfd,#bc8cff);min-width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">AI</div><div class="bbl ai"><div class="dots"><span></span><span></span><span></span></div></div>';
+  if(body){body.appendChild(th);body.scrollTop=body.scrollHeight;}
+  fetchD().then(function(data){
+    var thEl=document.getElementById('vsp-thinking');
+    if(thEl)thEl.remove();
+    var reply=genR(text,data);
+    _h.push({role:'ai',content:reply});
+    addM('ai',reply);
+    _busy=false;
+  }).catch(function(){_busy=false;});
+};
+
+function loadKPI(){
+  fetch('/api/v1/vsp/run/latest',{headers:hdr()}).then(function(r){return r.json();}).then(function(run){
+    var s=run.summary||{};
+    var kpis=document.querySelectorAll('.kpi-item');
+    if(kpis[0]&&kpis[0].querySelector('.kpi-val')){var v=kpis[0].querySelector('.kpi-val');v.textContent=s.SCORE||0;v.style.color=(s.SCORE||0)>=70?'#3fb950':(s.SCORE||0)>=40?'#d29922':'#f85149';}
+    if(kpis[1]&&kpis[1].querySelector('.kpi-val')){var v2=kpis[1].querySelector('.kpi-val');v2.textContent=run.gate||'N/A';v2.style.color=run.gate==='PASS'?'#3fb950':run.gate==='WARN'?'#d29922':'#f85149';}
+    if(kpis[2]&&kpis[2].querySelector('.kpi-val'))kpis[2].querySelector('.kpi-val').textContent=(s.CRITICAL||0)+(s.HIGH||0)+(s.MEDIUM||0)+(s.LOW||0);
+    var sub=document.getElementById('ctx-scan-sub');
+    if(sub)sub.textContent=(run.mode||'—')+' · '+(run.total_findings||0)+' findings';
+  }).catch(function(){});
+  fetch('/api/v1/correlation/incidents?limit=5',{headers:hdr()}).then(function(r){return r.json();}).then(function(d){
+    var open=(d.incidents||[]).filter(function(i){return i.status==='open';}).length||d.total||0;
+    var kpis=document.querySelectorAll('.kpi-item');
+    if(kpis[3]&&kpis[3].querySelector('.kpi-val')){var v3=kpis[3].querySelector('.kpi-val');v3.textContent=open;v3.style.color=open>0?'#f85149':'#3fb950';}
+    var sub2=document.getElementById('ctx-inc-sub');
+    if(sub2)sub2.textContent=open+' open incidents';
+  }).catch(function(){});
+}
+
+function showWelcome(){
+  var msgs=document.getElementById('msgs');
+  if(!msgs||msgs.children.length>0)return;
+  fetchD().then(function(data){
+    var run=data.run||{},s=run.summary||{};
+    var crits=data.findings.filter(function(f){return f.severity==='CRITICAL';});
+    var seen2={};
+    var ucrits=crits.filter(function(f){var k=f.tool+'|'+(f.message||'').slice(0,30);if(seen2[k])return false;seen2[k]=true;return true;}).slice(0,3);
+    var openI=(data.incidents||[]).filter(function(i){return i.status==='open';}).length;
+    var sc=s.SCORE||0,gate=run.gate||'N/A';
+    var scCol=sc>=70?'#3fb950':sc>=40?'#d29922':'#f85149';
+    var gtCol=gate==='PASS'?'#3fb950':gate==='WARN'?'#d29922':'#f85149';
+    var cards=ucrits.map(function(f){
+      return '<div style="background:#1a2332;border:1px solid rgba(248,81,73,.25);border-left:2px solid #f85149;border-radius:7px;padding:7px 10px;margin-top:6px;display:flex;align-items:center;gap:8px">'
+        +'<span style="background:rgba(248,81,73,.12);color:#fca5a5;font-family:monospace;font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0">CRITICAL</span>'
+        +'<div><div style="font-size:11px;font-weight:500;color:#e6edf3">'+(f.rule_id||f.tool)+' — '+(f.message||'').slice(0,55)+'</div>'
+        +'<div style="font-family:monospace;font-size:9px;color:#484f58;margin-top:1px">'+f.tool+' · '+(f.path||'').split('/').pop()+'</div></div></div>';
+    }).join('');
+    var welcome='Xin chao! Toi la <strong style="color:#79c0ff">VSP AI Security Analyst</strong>.<br><br>'
+      +'Trang thai: Score <strong style="color:'+scCol+'">'+sc+'/100</strong> · Gate <strong style="color:'+gtCol+'">'+gate+'</strong> · <strong style="color:#f85149">'+openI+' incidents</strong> mo<br><br>'
+      +'Toi co the giup: triage incidents, phan tich CVEs, tao SOAR playbooks, MITRE mapping, executive brief.'
+      +cards;
+    addM('ai',welcome);
+  }).catch(function(){addM('ai','Xin chao! Toi la VSP AI Security Analyst. San sang ho tro!');});
+}
+
+// Bind input
+(function tryBind(){
+  var inp=document.getElementById('inp');
+  var btn=document.getElementById('sbtn');
+  if(!inp||!btn){setTimeout(tryBind,100);return;}
+  inp.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();window.sendMsg();}};
+  btn.onclick=window.sendMsg;
+  console.log('VSP Smart AI v3 loaded');
+})();
+
+// Helpers
+window.qa=window.quickSend=window.sh=function(p){var i=document.getElementById('inp')||document.getElementById('chat-inp');if(i)i.value=p;window.sendMsg&&window.sendMsg();};
+window.clr=function(){_h=[];var m=document.getElementById('msgs');if(m)m.innerHTML='';showWelcome();};
+window.setCtx=function(c,el){document.querySelectorAll('.ctx').forEach(function(x){x.classList.remove('active');});if(el)el.classList.add('active');};
+window.send=function(){window.sendMsg&&window.sendMsg();};
+window.onKey=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();window.sendMsg&&window.sendMsg();}};
+window.resize=function(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';};
+window.exportChat=function(){var t=_h.map(function(m){return '['+m.role.toUpperCase()+']\n'+m.content;}).join('\n\n---\n\n');var a=document.createElement('a');a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(t);a.download='vsp-chat.txt';a.click();};
+window.switchTab=function(n){document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('on');});document.querySelectorAll('.tab-x').forEach(function(b){b.classList.remove('on');});var p=document.getElementById('pane-'+n);var b=document.getElementById('tab-'+n);if(p)p.classList.add('on');if(b)b.classList.add('on');};
+window.autoTriage=function(){window.qa('triage incidents');};
+window.showToast=function(m){console.log(m);};
+
+setTimeout(function(){loadKPI();showWelcome();setInterval(loadKPI,30000);},600);
+})();
+</script>

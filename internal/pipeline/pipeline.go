@@ -12,11 +12,15 @@ import (
 	"github.com/vsp/platform/internal/scanner/gitleaks"
 	"github.com/vsp/platform/internal/scanner/grype"
 	"github.com/vsp/platform/internal/scanner/checkov"
+	"github.com/vsp/platform/internal/scanner/hadolint"
 	"github.com/vsp/platform/internal/scanner/kics"
 	"github.com/vsp/platform/internal/scanner/nikto"
 	"github.com/vsp/platform/internal/scanner/nuclei"
 	"github.com/vsp/platform/internal/scanner/semgrep"
 	"github.com/vsp/platform/internal/scanner/trivy"
+	"github.com/vsp/platform/internal/scanner/sslscan"
+	"github.com/vsp/platform/internal/scanner/license"
+	"github.com/vsp/platform/internal/scanner/secretcheck"
 )
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -42,6 +46,7 @@ const (
 	ModeSecrets Mode = "SECRETS"
 	ModeIAC     Mode = "IAC"
 	ModeFull    Mode = "FULL"
+	ModeNetwork Mode = "NETWORK"
 )
 
 type Profile string
@@ -86,7 +91,8 @@ type JobPayload struct {
 	Profile   Profile           `json:"profile"`
 	Src       string            `json:"src"`
 	TargetURL string            `json:"target_url"`
-	ExtraArgs map[string][]string `json:"extra_args,omitempty"`
+	ExtraArgs  map[string][]string `json:"extra_args,omitempty"`
+	TimeoutSec int                 `json:"timeout_sec,omitempty"`
 }
 
 // ── ToolSet — select runners based on mode ────────────────────────────────────
@@ -102,17 +108,21 @@ func RunnersFor(mode Mode) []scanner.Runner {
 	sca := []scanner.Runner{
 		grype.New(),
 		trivy.New(),
+		license.NewRunner(),
 	}
 	secrets := []scanner.Runner{
 		gitleaks.New(),
+		secretcheck.NewRunner(),
 	}
 	iac := []scanner.Runner{
 		kics.New(),
 		checkov.New(),
+		hadolint.New(), // Dockerfile linting — CIS Docker Benchmark
 	}
 	dast := []scanner.Runner{
 		nikto.New(),
 		nuclei.New(),
+		sslscan.New(),
 	}
 
 	switch mode {
@@ -126,6 +136,8 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		return iac
 	case ModeDAST:
 		return dast
+	case ModeNetwork:
+		return []scanner.Runner{sslscan.New()}
 	case ModeFull:
 		all := make([]scanner.Runner, 0, 9)
 		all = append(all, sast...)
@@ -173,8 +185,9 @@ func (e *Executor) Execute(ctx context.Context, payload JobPayload) (*ExecuteRes
 	opts := scanner.RunOpts{
 		Src:       payload.Src,
 		URL:       payload.TargetURL,
-		Mode:      string(payload.Mode),
-		ExtraArgs: payload.ExtraArgs,
+			Mode:       string(payload.Mode),
+		ExtraArgs:  payload.ExtraArgs,
+		TimeoutSec: payload.TimeoutSec,
 	}
 
 	log.Info().
@@ -207,6 +220,33 @@ func (e *Executor) Execute(ctx context.Context, payload JobPayload) (*ExecuteRes
 		}
 	}
 
+	return &ExecuteResult{
+		Findings:   allFindings,
+		ToolErrors: toolErrors,
+		Summary:    scanner.Summarise(allFindings),
+		Duration:   time.Since(start),
+	}, nil
+}
+
+// ExecuteWith runs pipeline with an explicit runner list (used by worker for profile filtering).
+func (e *Executor) ExecuteWith(ctx context.Context, payload JobPayload, runners []scanner.Runner) (*ExecuteResult, error) {
+	if len(runners) == 0 {
+		return nil, fmt.Errorf("no runners provided for mode %s profile %s", payload.Mode, payload.Profile)
+	}
+	opts := scanner.RunOpts{
+		Src:       payload.Src,
+		URL:       payload.TargetURL,
+		Mode:      string(payload.Mode),
+		ExtraArgs: payload.ExtraArgs,
+	}
+	start := time.Now()
+	allFindings, details := e.runWithProgress(ctx, runners, opts)
+	toolErrors := make(map[string]error)
+	for _, d := range details {
+		if d.Err != nil {
+			toolErrors[d.Tool] = d.Err
+		}
+	}
 	return &ExecuteResult{
 		Findings:   allFindings,
 		ToolErrors: toolErrors,

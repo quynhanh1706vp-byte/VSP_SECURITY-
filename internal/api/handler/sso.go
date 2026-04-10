@@ -22,6 +22,20 @@ func NewSSO(cfg auth.OIDCConfig, authH *Auth, db *store.DB) *SSO {
 		AuthH:  authH,
 		states: make(map[string]time.Time),
 	}
+	// Cleanup expired states every 5 minutes to prevent memory leak
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		for range ticker.C {
+			h.mu.Lock()
+			now := time.Now()
+			for state, expiry := range h.states {
+				if now.After(expiry) {
+					delete(h.states, state)
+				}
+			}
+			h.mu.Unlock()
+		}
+	}()
 	if !cfg.Enabled { return h }
 	// Merge preset
 	if preset, ok := auth.ProviderPresets[cfg.ProviderName]; ok {

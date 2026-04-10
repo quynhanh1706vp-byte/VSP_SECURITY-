@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -11,7 +12,13 @@ import (
 	"github.com/spf13/viper"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/siem"
+	"strings"
+
 	"github.com/vsp/platform/internal/store"
+	aiPkg "github.com/vsp/platform/internal/ai"
+	licenseScanner "github.com/vsp/platform/internal/scanner/license"
+	"github.com/vsp/platform/internal/scanner/secretcheck"
+	"github.com/vsp/platform/internal/threatintel"
 	"github.com/rs/zerolog/log"
 )
 
@@ -41,8 +48,11 @@ func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid body", http.StatusBadRequest); return
 	}
 	if req.Name == "" { jsonError(w, "name required", http.StatusBadRequest); return }
-	if req.WindowMin == 0 { req.WindowMin = 5 }
-	if req.Severity == ""  { req.Severity = "HIGH" }
+	if len(req.Name) > 200 { req.Name = req.Name[:200] }
+	if req.WindowMin <= 0 { req.WindowMin = 5 }
+	if req.WindowMin > 1440 { req.WindowMin = 1440 } // max 24h
+	validSevs := map[string]bool{"CRITICAL":true,"HIGH":true,"MEDIUM":true,"LOW":true}
+	if !validSevs[req.Severity] { req.Severity = "HIGH" }
 	if req.Sources == nil  { req.Sources = []string{"scan"} }
 
 	id, err := h.DB.CreateCorrelationRule(r.Context(), store.CorrelationRule{
@@ -210,9 +220,20 @@ func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(ctxRaw, &runCtxMap); err != nil { log.Warn().Err(err).Caller().Msg("ignored error") }
 	if runCtxMap == nil { runCtxMap = map[string]string{} }
 
-	// Parse steps
+	// Parse + validate steps
 	var rawSteps []map[string]string
 	if err := json.Unmarshal(stepsRaw, &rawSteps); err != nil { log.Warn().Err(err).Caller().Msg("ignored error") }
+	// Validate step types — prevent injection of unknown step types
+	validStepTypes := map[string]bool{
+		"condition":true,"notify":true,"ticket":true,"block":true,
+		"webhook":true,"enrich":true,"remediate":true,"wait":true,
+	}
+	for _, step := range rawSteps {
+		if t := step["Type"]; t != "" && !validStepTypes[t] {
+			jsonError(w, "invalid step type: "+t, http.StatusBadRequest)
+			return
+		}
+	}
 	// Load executor config từ env/config
 	rc := siem.RunCtx{
 		TenantID:        claims.TenantID,
@@ -233,7 +254,7 @@ func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
 	if rc.Severity == "" { rc.Severity = "HIGH" }
 
 	// Execute async
-	go siem.ExecutePlaybook(context.Background(), h.DB, runID, rawSteps, rc)
+	go siem.ExecutePlaybook(context.Background(), h.DB, runID, rawSteps, rc) //nolint:gosec // G118: playbook runs async beyond request lifetime
 
 	jsonOK(w, map[string]any{"run_id": runID, "playbook": name, "status": "running"})
 }
@@ -408,4 +429,231 @@ func (h *ThreatIntel) MITRE(w http.ResponseWriter, r *http.Request) {
 func (h *ThreatIntel) SyncFeeds(w http.ResponseWriter, r *http.Request) {
 	go h.DB.SeedIOCsFromFindings(r.Context())
 	jsonOK(w, map[string]any{"status": "sync_started", "started_at": time.Now()})
+}
+
+// ── Threat Intel Enrichment (NVD + EPSS + KEV) ────────────────────────────
+
+var _tiClient = threatintel.NewClient()
+
+func init() {
+	go func() {
+		ctx := context.Background()
+		_tiClient.LoadKEV(ctx) //nolint:errcheck
+	}()
+}
+
+// GET /api/v1/ti/enrich?cve=CVE-2024-45337
+func (h *ThreatIntel) Enrich(w http.ResponseWriter, r *http.Request) {
+	cveID := strings.TrimSpace(r.URL.Query().Get("cve"))
+	if cveID == "" {
+		jsonError(w, "cve param required", http.StatusBadRequest)
+		return
+	}
+	enr, err := _tiClient.EnrichCVE(r.Context(), cveID)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	jsonOK(w, enr)
+}
+
+// POST /api/v1/ti/enrich/batch
+func (h *ThreatIntel) EnrichBatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		CVEs []string `json:"cves"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if len(req.CVEs) == 0 {
+		jsonError(w, "cves required", http.StatusBadRequest)
+		return
+	}
+	if len(req.CVEs) > 50 {
+		req.CVEs = req.CVEs[:50]
+	}
+	results := _tiClient.EnrichBatch(r.Context(), req.CVEs)
+	jsonOK(w, map[string]any{"enrichments": results, "total": len(results)})
+}
+
+// GET /api/v1/vsp/findings/dedup — deduplicated findings với fingerprint
+func (h *ThreatIntel) DedupFindings(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Load all findings for tenant
+	findings, total, err := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{
+		Limit: 5000,
+	})
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	// Deduplicate
+	deduped := threatintel.Deduplicate(findings)
+
+	// Stats
+	persistent := 0
+	for _, d := range deduped {
+		if d.IsPersistent { persistent++ }
+	}
+
+	jsonOK(w, map[string]any{
+		"findings":        deduped,
+		"total_raw":       total,
+		"total_unique":    len(deduped),
+		"persistent":      persistent,
+		"dedup_ratio":     fmt.Sprintf("%.1f%%", float64(int64(len(deduped))-total)*-1/float64(total)*100),
+	})
+}
+
+// GET /api/v1/vsp/findings/chains — detect attack chains
+func (h *ThreatIntel) ExploitChains(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	findings, _, err := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{Limit: 5000})
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	chains := threatintel.DetectChains(findings)
+	if chains == nil {
+		chains = []threatintel.ExploitChain{}
+	}
+	jsonOK(w, map[string]any{
+		"chains": chains,
+		"total":  len(chains),
+	})
+}
+
+// POST /api/v1/ai/analyze/findings — semantic analysis với Claude
+func (h *ThreatIntel) SemanticAnalyze(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		FindingIDs []string `json:"finding_ids"` // optional: specific findings
+		MaxItems   int      `json:"max_items"`   // default 5
+		Severity   string   `json:"severity"`    // filter: CRITICAL/HIGH/etc
+	}
+	json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+	if req.MaxItems == 0 { req.MaxItems = 5 }
+	if req.MaxItems > 20 { req.MaxItems = 20 }
+
+	filter := store.FindingFilter{Limit: 500}
+	if req.Severity != "" { filter.Severity = req.Severity }
+
+	findings, _, err := h.DB.ListFindings(r.Context(), claims.TenantID, filter)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	// Filter by specific IDs if provided
+	if len(req.FindingIDs) > 0 {
+		idSet := make(map[string]bool)
+		for _, id := range req.FindingIDs { idSet[id] = true }
+		filtered := findings[:0]
+		for _, f := range findings {
+			if idSet[f.ID] { filtered = append(filtered, f) }
+		}
+		findings = filtered
+	}
+
+	analyzer := aiPkg.NewSemanticAnalyzer()
+	result, err := analyzer.AnalyzeBatch(r.Context(), findings, req.MaxItems)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	jsonOK(w, result)
+}
+
+// POST /api/v1/ti/secret/check — check if a secret is still valid
+func (h *ThreatIntel) CheckSecret(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value string `json:"value"`
+		Type  string `json:"type"` // optional, auto-detect if empty
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Value == "" {
+		jsonError(w, "value required", http.StatusBadRequest)
+		return
+	}
+	checker := secretcheck.NewChecker()
+	stype := secretcheck.DetectType(req.Value)
+	if req.Type != "" {
+		stype = secretcheck.SecretType(req.Type)
+	}
+	result := checker.Check(r.Context(), stype, req.Value)
+	jsonOK(w, result)
+}
+
+// POST /api/v1/ti/secret/check/batch — check multiple secrets from findings
+func (h *ThreatIntel) CheckSecretBatch(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	// Load gitleaks findings
+	findings, _, err := h.DB.ListFindings(r.Context(), claims.TenantID, store.FindingFilter{
+		Limit: 100,
+	})
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	checker := secretcheck.NewChecker()
+	type result struct {
+		FindingID  string                      `json:"finding_id"`
+		Tool       string                      `json:"tool"`
+		RuleID     string                      `json:"rule_id"`
+		Validity   *secretcheck.SecretValidity `json:"validity"`
+	}
+	var results []result
+	seen := make(map[string]bool)
+	for _, f := range findings {
+		if f.Tool != "gitleaks" { continue }
+		if seen[f.RuleID] { continue }
+		seen[f.RuleID] = true
+		stype := secretcheck.DetectType(f.FixSignal)
+		if stype == secretcheck.SecretGeneric { continue } // skip undetectable
+		v := checker.Check(r.Context(), stype, f.FixSignal)
+		results = append(results, result{
+			FindingID: f.ID, Tool: f.Tool,
+			RuleID: f.RuleID, Validity: v,
+		})
+	}
+	if results == nil { results = []result{} }
+	jsonOK(w, map[string]any{"results": results, "total": len(results)})
+}
+
+// GET /api/v1/compliance/license — scan license compliance
+func (h *ThreatIntel) LicenseCompliance(w http.ResponseWriter, r *http.Request) {
+	_, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	// Scan VSP project itself
+	projectPath := "/home/test/Data/GOLANG_VSP"
+	sc := licenseScanner.NewScanner(licenseScanner.DefaultPolicy)
+	result, err := sc.Scan(projectPath)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, result)
 }

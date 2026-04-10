@@ -36,11 +36,21 @@ type StoreDriftEvent struct {
 }
 
 
-func (db *DB) ListStoreSchedules(ctx context.Context) ([]StoreSchedule, error) {
-	rows, err := db.pool.Query(ctx,
-		`SELECT id,tenant_id,name,mode,profile,src,url,cron_expr,
-		        enabled,last_run_at,next_run_at,created_at
-		 FROM scan_schedules ORDER BY created_at DESC`)
+func (db *DB) ListStoreSchedules(ctx context.Context, tenantID ...string) ([]StoreSchedule, error) {
+	var rows interface{ Next() bool; Close(); Scan(...any) error }
+	var err error
+	if len(tenantID) > 0 && tenantID[0] != "" {
+		rows, err = db.pool.Query(ctx,
+			`SELECT id,tenant_id,name,mode,profile,src,url,cron_expr,
+			        enabled,last_run_at,next_run_at,created_at
+			 FROM scan_schedules WHERE tenant_id=$1 ORDER BY created_at DESC`,
+			tenantID[0])
+	} else {
+		rows, err = db.pool.Query(ctx,
+			`SELECT id,tenant_id,name,mode,profile,src,url,cron_expr,
+			        enabled,last_run_at,next_run_at,created_at
+			 FROM scan_schedules ORDER BY created_at DESC`)
+	}
 	if err != nil { return nil, err }
 	defer rows.Close()
 	var list []StoreSchedule
@@ -113,5 +123,14 @@ func (db *DB) UpdateScheduleEnabled(ctx context.Context, tenantID, id string, en
 	_, err := db.pool.Exec(ctx,
 		`UPDATE scan_schedules SET enabled=$1 WHERE id=$2 AND tenant_id=$3`,
 		enabled, id, tenantID)
+	return err
+}
+
+func (db *DB) UpdateSchedule(ctx context.Context, tenantID, id, name, mode, profile, src, url, cron string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE scan_schedules
+		 SET name=$3, mode=$4, profile=$5, src=$6, url=$7, cron_expr=$8
+		 WHERE id=$1 AND tenant_id=$2`,
+		id, tenantID, name, mode, profile, src, url, cron)
 	return err
 }

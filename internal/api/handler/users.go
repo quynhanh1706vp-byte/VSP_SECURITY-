@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"context"
+	"time"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -72,12 +74,14 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 
 	user, err := u.DB.CreateUser(r.Context(), claims.TenantID, req.Email, string(hash), req.Role)
 	if err != nil {
-		jsonError(w, "create user failed: "+err.Error(), http.StatusBadRequest)
+		jsonError(w, "create user failed", http.StatusBadRequest)
 		return
 	}
 	// Audit log
 	go func() {
-		prevHash, _ := u.DB.GetLastAuditHash(r.Context(), claims.TenantID)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		prevHash, _ := u.DB.GetLastAuditHash(ctx, claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "USER_CREATED", Resource: "/admin/users/" + user.ID, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
 		u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "USER_CREATED", Resource: "/admin/users/"+ user.ID, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
@@ -95,7 +99,9 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go func() {
-		prevHash, _ := u.DB.GetLastAuditHash(r.Context(), claims.TenantID)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		prevHash, _ := u.DB.GetLastAuditHash(ctx, claims.TenantID)
 		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "USER_DELETED", Resource: "/admin/users/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
 		u.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "USER_DELETED", Resource: "/admin/users/"+ id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck

@@ -56,7 +56,7 @@ func NewSyslogReceiver(udpAddr, tcpAddr string, db *store.DB, tenantID string) *
 		tcpAddr:  tcpAddr,
 		db:       db,
 		tenantID: tenantID,
-		buf:      make(chan ParsedEvent, 10000),
+		buf:      make(chan ParsedEvent, 10000), // bounded buffer — drops when full (rate limiting)
 	}
 }
 
@@ -242,13 +242,18 @@ var (
 	// RFC3164: <PRI>TIMESTAMP HOST PROCESS[PID]: MSG
 	re3164 = regexp.MustCompile(`^<(\d+)>(\w{3}\s+\d+\s+\d+:\d+:\d+)\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)$`)
 	// RFC5424: <PRI>1 TIMESTAMP HOST APP PROCID MSGID STRUCTURED-DATA MSG
-	re5424 = regexp.MustCompile(`^<(\d+)>1\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\S+\s+(?:\[.*?\]\s*)?(.*)$`)
+	re5424 = regexp.MustCompile(`^<(\d+)>1\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\S+\s+(?:\[[^\]]*\]\s*)?(\S.*)$`)
 	// CEF: CEF:0|vendor|product|version|sigid|name|severity|ext
 	reCEF  = regexp.MustCompile(`^CEF:(\d+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|(\d+)\|(.*)$`)
 )
 
 // ParseSyslog auto-detects format and returns a normalized ParsedEvent.
 func ParseSyslog(raw, srcIP string) (ParsedEvent, error) {
+	// Cap message size to prevent OOM from malformed/malicious syslog
+	const maxMsgSize = 64 * 1024 // 64KB
+	if len(raw) > maxMsgSize {
+		raw = raw[:maxMsgSize]
+	}
 	ev := ParsedEvent{Raw: raw, SourceIP: srcIP, Timestamp: time.Now()}
 
 	// Try CEF first

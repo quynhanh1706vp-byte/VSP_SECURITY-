@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"time"
 	"net/http"
 
 	"github.com/rs/zerolog/log"
@@ -16,25 +18,31 @@ func logAudit(r *http.Request, db *store.DB, action, resource string) {
 	if !ok {
 		return
 	}
-	go func() {
-		prevHash, err := db.GetLastAuditHash(r.Context(), claims.TenantID)
+	// Capture values before goroutine — r may be gone by the time goroutine runs
+	tenantID := claims.TenantID
+	userID   := claims.UserID
+	remoteIP := r.RemoteAddr
+	go func() { //#nosec G118 -- intentional: audit goroutine outlives request
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) //nolint:gosec // G118: intentional — request ctx cancelled after response
+		defer cancel()
+		prevHash, err := db.GetLastAuditHash(ctx, tenantID)
 		if err != nil {
 			log.Warn().Err(err).Msg("audit: get last hash failed")
 			return
 		}
 		e := audit.Entry{
-			TenantID: claims.TenantID,
-			UserID:   claims.UserID,
+			TenantID: tenantID,
+			UserID:   userID,
 			Action:   action,
 			Resource: resource,
-			IP:       r.RemoteAddr,
+			IP:       remoteIP,
 			PrevHash: prevHash,
 		}
 		e.StoredHash = audit.Hash(e)
-		_, _, err2 := db.InsertAudit(r.Context(), store.AuditWriteParams{
-			TenantID: claims.TenantID, UserID: &claims.UserID,
+		_, _, err2 := db.InsertAudit(ctx, store.AuditWriteParams{
+			TenantID: tenantID, UserID: &userID,
 			Action: action, Resource: resource,
-			IP: r.RemoteAddr, PrevHash: prevHash,
+			IP: remoteIP, PrevHash: prevHash,
 		})
 		if err2 != nil {
 			log.Warn().Err(err2).Str("action", action).Msg("audit: insert failed")

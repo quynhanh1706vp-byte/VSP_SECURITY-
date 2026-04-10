@@ -110,6 +110,8 @@ CREATE TABLE IF NOT EXISTS remediations (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_remediations_tenant  ON remediations(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_remediations_finding ON remediations(finding_id);
 
 CREATE TABLE IF NOT EXISTS remediation_comments (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),

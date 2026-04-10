@@ -1,0 +1,3 @@
+# Local env file — not committed, not a real leak
+.env
+.env.example

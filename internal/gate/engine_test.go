@@ -91,7 +91,9 @@ func TestPosture(t *testing.T) {
 
 func TestScore(t *testing.T) {
 	assert.Equal(t, 100, gate.Score(scanner.Summary{}))
-	assert.Equal(t, 92, gate.Score(scanner.Summary{High: 1}))  // 100-8
-	assert.Equal(t, 85, gate.Score(scanner.Summary{Critical: 1})) // 100-15
-	assert.Equal(t, 70, gate.Score(scanner.Summary{Critical: 10})) // 100-30 (capped at 2x15)
+	assert.Equal(t, 92,  gate.Score(scanner.Summary{High: 1}))          // 100-8
+	assert.Equal(t, 85,  gate.Score(scanner.Summary{Critical: 1}))      // 100-15
+	assert.Equal(t, 70,  gate.Score(scanner.Summary{Critical: 10}))     // 100-30 (capped)
+	assert.Equal(t, 75,  gate.Score(scanner.Summary{HasSecrets: true})) // 100-25
+	assert.Equal(t, 60,  gate.Score(scanner.Summary{HasSecrets: true, Critical: 1})) // 100-25-15
 }

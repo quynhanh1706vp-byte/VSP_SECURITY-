@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSP — API Documentation</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0c10;--bg2:#111318;--bg3:#161920;--t1:#e8eaf0;--t2:#8b92a5;--t3:#4a5168;--cyan:#06b6d4;--green:#10b981;--amber:#f59e0b;--purple:#8b5cf6;--red:#ef4444;--border:rgba(255,255,255,.08)}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--t1);display:flex;min-height:100vh}
+.sidebar{width:260px;background:var(--bg2);border-right:1px solid var(--border);padding:0;flex-shrink:0;overflow-y:auto}
+.sidebar-logo{padding:20px;border-bottom:1px solid var(--border)}
+.sidebar-logo .logo{font-size:18px;font-weight:800;color:var(--cyan)}
+.sidebar-logo .sub{font-size:11px;color:var(--t3);margin-top:2px}
+.sidebar-section{padding:14px 16px 6px;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em}
+.sidebar-item{padding:7px 16px;font-size:12px;color:var(--t2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
+.sidebar-item:hover{color:var(--t1);background:rgba(255,255,255,.03)}
+.sidebar-item.active{color:var(--cyan);background:rgba(6,182,212,.06)}
+.method-badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.get{background:rgba(16,185,129,.2);color:var(--green)}
+.post{background:rgba(245,158,11,.2);color:var(--amber)}
+.main{flex:1;overflow-y:auto}
+.topbar{padding:16px 32px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;justify-content:space-between}
+.topbar-title{font-size:15px;font-weight:600}
+.content{padding:32px;max-width:860px}
+.hero{margin-bottom:40px}
+.hero h1{font-size:32px;font-weight:700;margin-bottom:8px}
+.hero p{font-size:14px;color:var(--t2);line-height:1.7;max-width:560px}
+.base-url{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-family:monospace;font-size:13px;margin-top:16px;display:flex;align-items:center;gap:12px}
+.base-url-label{font-size:10px;color:var(--t3);text-transform:uppercase}
+.endpoint-group{margin-bottom:40px}
+.group-title{font-size:18px;font-weight:700;margin-bottom:6px}
+.group-desc{font-size:13px;color:var(--t2);margin-bottom:20px}
+.endpoint{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.endpoint-header{padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:background .15s}
+.endpoint-header:hover{background:rgba(255,255,255,.03)}
+.method{font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px;min-width:46px;text-align:center}
+.endpoint-path{font-family:monospace;font-size:13px;font-weight:500}
+.endpoint-desc{font-size:12px;color:var(--t2);margin-left:auto}
+.endpoint-body{display:none;border-top:1px solid var(--border);padding:18px}
+.endpoint-body.open{display:block}
+.param-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
+.param-table th{padding:7px 10px;text-align:left;color:var(--t3);font-weight:500;border-bottom:1px solid var(--border);font-size:11px}
+.param-table td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.param-name{font-family:monospace;color:var(--cyan)}
+.param-type{color:var(--amber);font-size:11px}
+.required{color:var(--red);font-size:10px;font-weight:700}
+.optional{color:var(--t3);font-size:10px}
+.code-block{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:monospace;font-size:12px;overflow-x:auto;margin-bottom:12px;white-space:pre;color:var(--t2)}
+.code-title{font-size:11px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.auth-note{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:16px;display:flex;gap:8px}
+.response-code{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-right:8px}
+.r200{background:rgba(16,185,129,.15);color:var(--green)}
+.r401{background:rgba(239,68,68,.15);color:var(--red)}
+.r404{background:rgba(245,158,11,.15);color:var(--amber)}
+.copy-btn{float:right;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--t3);padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer}
+.copy-btn:hover{color:var(--t1)}
+.tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;margin-left:8px}
+.tag-new{background:rgba(16,185,129,.15);color:var(--green)}
+.tag-auth{background:rgba(139,92,246,.15);color:var(--purple)}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo">VSP API</div>
+    <div class="sub">v2.0.0 · OSCAL 1.1.2 · JWT Auth</div>
+  </div>
+  <div class="sidebar-section">Getting Started</div>
+  <div class="sidebar-item active" onclick="scrollTo('intro')">📖 Introduction</div>
+  <div class="sidebar-item" onclick="scrollTo('auth')">🔐 Authentication</div>
+
+  <div class="sidebar-section">P4 Compliance</div>
+  <div class="sidebar-item" onclick="scrollTo('health')"><span class="method-badge get">GET</span>/api/p4/health</div>
+  <div class="sidebar-item" onclick="scrollTo('zt-status')"><span class="method-badge get">GET</span>/api/p4/zt/status</div>
+  <div class="sidebar-item" onclick="scrollTo('microseg')"><span class="method-badge get">GET</span>/api/p4/zt/microseg</div>
+  <div class="sidebar-item" onclick="scrollTo('rasp')"><span class="method-badge get">GET</span>/api/p4/zt/rasp</div>
+  <div class="sidebar-item" onclick="scrollTo('api-policy')"><span class="method-badge get">GET</span>/api/p4/zt/api-policy</div>
+
+  <div class="sidebar-section">RMF / ATO</div>
+  <div class="sidebar-item" onclick="scrollTo('rmf')"><span class="method-badge get">GET</span>/api/p4/rmf</div>
+  <div class="sidebar-item" onclick="scrollTo('ato-letter')"><span class="method-badge get">GET</span>/api/p4/rmf/ato-letter</div>
+  <div class="sidebar-item" onclick="scrollTo('conmon')"><span class="method-badge get">GET</span>/api/p4/rmf/conmon</div>
+  <div class="sidebar-item" onclick="scrollTo('ato-expiry')"><span class="method-badge get">GET</span>/api/p4/ato/expiry</div>
+
+  <div class="sidebar-section">Pipeline</div>
+  <div class="sidebar-item" onclick="scrollTo('pipeline-latest')"><span class="method-badge get">GET</span>/api/p4/pipeline/latest</div>
+  <div class="sidebar-item" onclick="scrollTo('pipeline-trigger')"><span class="method-badge post">POST</span>/api/p4/pipeline/trigger</div>
+  <div class="sidebar-item" onclick="scrollTo('pipeline-drift')"><span class="method-badge get">GET</span>/api/p4/pipeline/drift</div>
+
+  <div class="sidebar-section">Integrations</div>
+  <div class="sidebar-item" onclick="scrollTo('findings-sync')"><span class="method-badge post">POST</span>/api/p4/findings/sync</div>
+  <div class="sidebar-item" onclick="scrollTo('sbom')"><span class="method-badge get">GET</span>/api/p4/sbom/view</div>
+  <div class="sidebar-item" onclick="scrollTo('oscal')"><span class="method-badge get">GET</span>/api/p4/oscal/ssp</div>
+  <div class="sidebar-item" onclick="scrollTo('conmon-report')"><span class="method-badge get">GET</span>/api/p4/conmon/report</div>
+
+  <div class="sidebar-section">Alerts</div>
+  <div class="sidebar-item" onclick="scrollTo('alerts-history')"><span class="method-badge get">GET</span>/api/p4/alerts/history</div>
+  <div class="sidebar-item" onclick="scrollTo('alerts-test')"><span class="method-badge post">POST</span>/api/p4/alerts/test</div>
+
+  <div class="sidebar-section">Links</div>
+  <div class="sidebar-item" onclick="window.location.href='/p4'">← P4 Dashboard</div>
+  <div class="sidebar-item" onclick="window.location.href='/admin'">⚙ Admin Console</div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">API Documentation</div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span style="font-size:12px;color:var(--t3)">Base URL:</span>
+      <code style="font-size:12px;color:var(--cyan)">http://127.0.0.1:8921</code>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Intro -->
+    <div class="hero" id="intro">
+      <h1>VSP P4 Compliance API</h1>
+      <p>REST API for DoD Zero Trust P4 compliance management. Provides programmatic access to RMF workflow, Zero Trust scoring, compliance pipeline, SBOM, OSCAL export, and alert management.</p>
+      <div class="base-url">
+        <span class="base-url-label">Base URL</span>
+        <code>http://127.0.0.1:8921</code>
+        <span style="color:var(--t3);font-size:11px">· Version 2.0.0 · OSCAL 1.1.2</span>
+      </div>
+    </div>
+
+    <!-- Auth -->
+    <div class="endpoint-group" id="auth">
+      <div class="group-title">Authentication</div>
+      <div class="group-desc">All P4 API endpoints (except /health) require authentication via Bearer token or X-API-Key header.</div>
+      <div class="code-title">Request Headers</div>
+      <div class="code-block">Authorization: Bearer &lt;your-jwt-token&gt;
+# OR
+X-API-Key: &lt;your-api-key&gt;
+# OR (dev/testing only)
+?token=&lt;your-jwt-token&gt;</div>
+      <div class="code-title">Get JWT Token</div>
+      <div class="code-block">curl -X POST http://127.0.0.1:8921/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@vsp.local","password":"your-password"}'
+
+# Response:
+{"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}</div>
+    </div>
+
+    <!-- Health -->
+    <div class="endpoint-group" id="health">
+      <div class="group-title">P4 Compliance</div>
+      <div class="group-desc">Core P4 compliance endpoints for Zero Trust scoring, RMF workflow, and pipeline management.</div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/health</span>
+          <span class="endpoint-desc">Public health check — no auth required</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Response</div>
+          <div class="code-block">{"status":"ok","module":"VSP-P4","version":"2.0.0","p4_achieved":true}</div>
+          <span class="response-code r200">200 OK</span>
+        </div>
+      </div>
+
+      <div class="endpoint" id="zt-status">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/zt/status</span>
+          <span class="endpoint-desc">Full Zero Trust 7-pillar scorecard<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="auth-note">⚠ Requires authentication</div>
+          <div class="code-title">Example Request</div>
+          <div class="code-block">curl http://127.0.0.1:8921/api/p4/zt/status \
+  -H "Authorization: Bearer $TOKEN"</div>
+          <div class="code-title">Response Fields</div>
+          <table class="param-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td class="param-name">pillars</td><td class="param-type">object</td><td>All 7 ZT pillar scores and capabilities</td></tr>
+            <tr><td class="param-name">p4_readiness</td><td class="param-type">int</td><td>Overall P4 readiness percentage (0-100)</td></tr>
+            <tr><td class="param-name">p4_achieved</td><td class="param-type">bool</td><td>True if all pillars ≥85 (P4 threshold)</td></tr>
+            <tr><td class="param-name">overall_score</td><td class="param-type">int</td><td>Average score across all 7 pillars</td></tr>
+            <tr><td class="param-name">sbom</td><td class="param-type">object</td><td>SBOM summary (total, critical, high CVEs)</td></tr>
+            <tr><td class="param-name">rasp_coverage</td><td class="param-type">array</td><td>RASP deployment status per service</td></tr>
+          </table>
+          <span class="response-code r200">200 OK</span>
+          <span class="response-code r401">401 Unauthorized</span>
+        </div>
+      </div>
+
+      <div class="endpoint" id="microseg">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/zt/microseg</span>
+          <span class="endpoint-desc">List micro-segmentation rules<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="auth-note">⚠ Requires authentication</div>
+          <div class="code-title">Add New Rule (POST)</div>
+          <div class="code-block">curl -X POST http://127.0.0.1:8921/api/p4/zt/microseg \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "vsp-api → new-service",
+    "source": "vsp-api",
+    "destination": "new-service",
+    "port": 8080,
+    "protocol": "TCP",
+    "action": "allow",
+    "mtls": true
+  }'</div>
+          <span class="response-code r200">200 OK</span>
+        </div>
+      </div>
+
+      <div class="endpoint" id="rasp">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/zt/rasp</span>
+          <span class="endpoint-desc">RASP events feed (live attack detection)<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Response Sample</div>
+          <div class="code-block">[{
+  "id": "RASP-001",
+  "timestamp": "2026-04-07T15:47:03Z",
+  "severity": "CRITICAL",
+  "attack_type": "SQL Injection",
+  "service": "vsp-api",
+  "endpoint": "/api/query",
+  "source_ip": "203.0.113.44",
+  "action": "blocked",
+  "cve": "CVE-2024-45337"
+}]</div>
+          <span class="response-code r200">200 OK</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RMF -->
+    <div class="endpoint-group" id="rmf">
+      <div class="group-title">RMF / ATO</div>
+      <div class="group-desc">NIST SP 800-37 Rev 2 Risk Management Framework endpoints for ATO tracking and authorization package management.</div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/rmf</span>
+          <span class="endpoint-desc">Full ATO package with all 6 RMF steps<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="auth-note">⚠ Requires authentication</div>
+          <div class="code-title">Response Fields</div>
+          <table class="param-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td class="param-name">system_id</td><td class="param-type">string</td><td>System identifier (e.g. VSP-DOD-2025-001)</td></tr>
+            <tr><td class="param-name">ato_status</td><td class="param-type">string</td><td>authorized | ato_in_progress | expired</td></tr>
+            <tr><td class="param-name">authorization_date</td><td class="param-type">datetime</td><td>Date ATO was issued</td></tr>
+            <tr><td class="param-name">expiration_date</td><td class="param-type">datetime</td><td>ATO expiration date (3 years from issue)</td></tr>
+            <tr><td class="param-name">rmf_steps</td><td class="param-type">array</td><td>All 6 RMF steps with tasks and artifacts</td></tr>
+            <tr><td class="param-name">poam_items</td><td class="param-type">array</td><td>Plan of Action & Milestones items</td></tr>
+            <tr><td class="param-name">artifacts</td><td class="param-type">array</td><td>SSP, SAR, SAP, POA&M, ATO Letter artifacts</td></tr>
+            <tr><td class="param-name">conmon_score</td><td class="param-type">int</td><td>Continuous monitoring score (0-100)</td></tr>
+          </table>
+          <span class="response-code r200">200 OK</span>
+        </div>
+      </div>
+
+      <div class="endpoint" id="ato-letter">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/rmf/ato-letter</span>
+          <span class="endpoint-desc">Generate ATO authorization letter<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Response Sample</div>
+          <div class="code-block">{
+  "document_type": "AUTHORITY TO OPERATE (ATO)",
+  "classification": "UNCLASSIFIED // FOR OFFICIAL USE ONLY",
+  "system_name": "VSP — Vulnerability Security Platform",
+  "ato_status": "authorized",
+  "authorization_type": "Full ATO — 3 year",
+  "assessor": "Coalfire (3PAO)",
+  "conmon_score": 94,
+  "open_poam_items": 1,
+  "closed_poam_items": 6
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint" id="ato-expiry">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/ato/expiry</span>
+          <span class="endpoint-desc">ATO expiration tracking + renewal checklist<span class="tag tag-auth">Auth</span><span class="tag tag-new">New</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Response Fields</div>
+          <table class="param-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td class="param-name">days_remaining</td><td class="param-type">int</td><td>Days until ATO expires</td></tr>
+            <tr><td class="param-name">expiry_level</td><td class="param-type">string</td><td>ok | warning (&lt;180d) | critical (&lt;90d) | expired</td></tr>
+            <tr><td class="param-name">renewal_required</td><td class="param-type">bool</td><td>True if renewal should begin</td></tr>
+            <tr><td class="param-name">renewal_checklist</td><td class="param-type">array</td><td>10-item renewal task checklist with due weeks</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline -->
+    <div class="endpoint-group" id="pipeline-latest">
+      <div class="group-title">Compliance Pipeline</div>
+      <div class="group-desc">Automated compliance testing pipeline across FedRAMP, CMMC, NIST, and Zero Trust frameworks.</div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/pipeline/latest</span>
+          <span class="endpoint-desc">Latest pipeline run with all control test results<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Summary Object</div>
+          <div class="code-block">"summary": {
+  "total": 52,
+  "pass": 47,
+  "fail": 0,
+  "warn": 5,
+  "score": 90.38,
+  "frameworks": {
+    "FedRAMP": {"pass": 22, "total": 24, "percent": 91.67},
+    "CMMC":    {"pass": 14, "total": 16, "percent": 87.5},
+    "ZT":      {"pass": 9,  "total": 9,  "percent": 100},
+    "NIST":    {"pass": 3,  "total": 4,  "percent": 75}
+  }
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint" id="pipeline-trigger">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(245,158,11,.2);color:var(--amber)">POST</span>
+          <span class="endpoint-path">/api/p4/pipeline/trigger</span>
+          <span class="endpoint-desc">Trigger manual compliance scan<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Request</div>
+          <div class="code-block">curl -X POST http://127.0.0.1:8921/api/p4/pipeline/trigger \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+{"status": "queued", "run_id": "RUN-1234", "message": "Results in ~3s."}</div>
+        </div>
+      </div>
+
+      <div class="endpoint" id="pipeline-drift">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/pipeline/drift</span>
+          <span class="endpoint-desc">Configuration drift detection log<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Response Sample</div>
+          <div class="code-block">[{
+  "id": "DRIFT-001",
+  "detected_at": "2026-04-07T08:21:00Z",
+  "resource_type": "network",
+  "resource": "sg-vsp-db",
+  "change": "Port 5432 opened to 0.0.0.0/0",
+  "control_id": "SC-7",
+  "severity": "CRITICAL",
+  "auto_reverted": true
+}]</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Integrations -->
+    <div class="endpoint-group" id="findings-sync">
+      <div class="group-title">Integrations</div>
+      <div class="group-desc">Integration endpoints for findings sync, SBOM management, OSCAL export, and ConMon reporting.</div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(245,158,11,.2);color:var(--amber)">POST</span>
+          <span class="endpoint-path">/api/p4/findings/sync</span>
+          <span class="endpoint-desc">Sync VSP scan findings → POA&M items<span class="tag tag-auth">Auth</span><span class="tag tag-new">New</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Response</div>
+          <div class="code-block">{
+  "status": "ok",
+  "message": "3 findings synced → 3 new POA&M items",
+  "sync": {
+    "created": 3,
+    "updated": 0,
+    "skipped": 0,
+    "new_poam_ids": ["POAM-VSP-008", "POAM-VSP-009", "POAM-VSP-010"]
+  },
+  "findings": [...]
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint" id="sbom">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/sbom/view</span>
+          <span class="endpoint-desc">SBOM viewer — 412 components, NTIA compliant<span class="tag tag-auth">Auth</span><span class="tag tag-new">New</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Response Fields</div>
+          <table class="param-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td class="param-name">total_components</td><td class="param-type">int</td><td>Total software components tracked</td></tr>
+            <tr><td class="param-name">critical</td><td class="param-type">int</td><td>Components with CRITICAL CVEs</td></tr>
+            <tr><td class="param-name">high</td><td class="param-type">int</td><td>Components with HIGH CVEs</td></tr>
+            <tr><td class="param-name">ntia_compliance_pct</td><td class="param-type">float</td><td>NTIA minimum elements compliance %</td></tr>
+            <tr><td class="param-name">frameworks</td><td class="param-type">array</td><td>SBOM frameworks: CycloneDX 1.4, SPDX 2.3</td></tr>
+            <tr><td class="param-name">components</td><td class="param-type">array</td><td>First 50 components with CVE details</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="endpoint" id="oscal">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/oscal/ssp</span>
+          <span class="endpoint-desc">NIST OSCAL 1.1.2 System Security Plan export<span class="tag tag-auth">Auth</span><span class="tag tag-new">New</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Download SSP</div>
+          <div class="code-block">curl http://127.0.0.1:8921/api/p4/oscal/ssp \
+  -H "Authorization: Bearer $TOKEN" \
+  -o vsp-ssp-oscal.json
+
+# Returns NIST OSCAL 1.1.2 compliant JSON:
+{
+  "system-security-plan": {
+    "uuid": "a7e8b9c0-...",
+    "metadata": {"oscal-version": "1.1.2", ...},
+    "system-characteristics": {...},
+    "control-implementation": {
+      "implemented-requirements": [22 controls]
+    }
+  }
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint" id="conmon-report">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/conmon/report</span>
+          <span class="endpoint-desc">Generate ConMon report (weekly/monthly)<span class="tag tag-auth">Auth</span><span class="tag tag-new">New</span></span>
+        </div>
+        <div class="endpoint-body">
+          <table class="param-table">
+            <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+            <tr><td class="param-name">period</td><td class="param-type">string</td><td class="optional">optional</td><td>weekly | monthly (default: monthly)</td></tr>
+          </table>
+          <div class="code-title">Example</div>
+          <div class="code-block">curl "http://127.0.0.1:8921/api/p4/conmon/report?period=weekly" \
+  -H "Authorization: Bearer $TOKEN"</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="endpoint-group" id="alerts-history">
+      <div class="group-title">Alerts</div>
+      <div class="group-desc">Webhook alert management for CRITICAL findings, ATO expiry notifications, and Slack integration.</div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(16,185,129,.2);color:var(--green)">GET</span>
+          <span class="endpoint-path">/api/p4/alerts/history</span>
+          <span class="endpoint-desc">Alert history log<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Response Sample</div>
+          <div class="code-block">[{
+  "id": "ALT-1234567890",
+  "type": "critical_finding",
+  "title": "1 CRITICAL POA&M items require immediate attention",
+  "message": "CRITICAL findings must be remediated within 7 days.",
+  "severity": "CRITICAL",
+  "sent_at": "2026-04-07T15:47:05Z",
+  "channel": "slack"
+}]</div>
+        </div>
+      </div>
+
+      <div class="endpoint" id="alerts-test">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method" style="background:rgba(245,158,11,.2);color:var(--amber)">POST</span>
+          <span class="endpoint-path">/api/p4/alerts/test</span>
+          <span class="endpoint-desc">Send test alert to configured channels<span class="tag tag-auth">Auth</span></span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-title">Example</div>
+          <div class="code-block">curl -X POST http://127.0.0.1:8921/api/p4/alerts/test \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+{"status": "ok", "alert": {"id": "ALT-TEST-...", "type": "test"}}</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function toggleEndpoint(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+function scrollTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+}
+
+// Copy code blocks
+document.querySelectorAll('.code-block').forEach(block => {
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.textContent = 'Copy';
+  btn.onclick = () => {
+    navigator.clipboard.writeText(block.textContent.trim());
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  };
+  block.style.position = 'relative';
+  block.prepend(btn);
+});
+</script>
+</body>
+</html>

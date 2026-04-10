@@ -107,6 +107,7 @@ func (h *OIDCHandler) ExchangeCode(ctx context.Context, code string) (accessToke
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil { return }
+	if resp == nil { return }
 	defer resp.Body.Close()
 
 	var tok struct {
@@ -136,6 +137,7 @@ func (h *OIDCHandler) FetchUserInfo(ctx context.Context, accessToken string) (*U
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil { return nil, err }
+	if resp == nil { return nil, fmt.Errorf("oidc: empty response") }
 	defer resp.Body.Close()
 
 	var info UserInfo

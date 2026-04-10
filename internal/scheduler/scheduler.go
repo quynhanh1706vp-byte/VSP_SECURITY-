@@ -71,7 +71,12 @@ func (e *Engine) tick(ctx context.Context) {
 }
 
 func (e *Engine) checkDrift(ctx context.Context, s store.StoreSchedule, rid string) {
-	time.Sleep(5 * time.Minute)
+	// Respect context cancellation during sleep
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(5 * time.Minute):
+	}
 	runs, err := e.db.ListRuns(ctx, s.TenantID, 2, 0)
 	if err != nil || len(runs) < 2 { return }
 	postureScore := map[string]int{"A": 100, "B": 85, "C": 70, "D": 55, "F": 20}

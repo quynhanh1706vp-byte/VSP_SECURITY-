@@ -34,8 +34,15 @@ func (h *Runs) enqueueOrLog(rid, tenantID string, mode pipeline.Mode, profile pi
 
 // EnqueueDirect is called by the scheduler engine to trigger a scan.
 func (h *Runs) EnqueueDirect(rid, tenantID string, mode pipeline.Mode, profile pipeline.Profile, src, url string) {
+	// Sync với RunnersFor() — SECRETS:2(gitleaks+secretcheck), SCA:3(grype+trivy+license)
 	toolsTotal := map[string]int{
-		"SAST": 3, "SCA": 2, "SECRETS": 1, "IAC": 2, "DAST": 2, "FULL": 10,
+		"SAST":    3,  // bandit+semgrep+codeql
+		"SCA":     3,  // grype+trivy+license
+		"SECRETS": 2,  // gitleaks+secretcheck
+		"IAC":     2,  // kics+checkov
+		"DAST":    3,  // nikto+nuclei+sslscan
+		"NETWORK": 1,  // sslscan
+		"FULL":    14, // all tools
 	}[string(mode)]
 	if toolsTotal == 0 { toolsTotal = 3 }
 	h.DB.CreateRun(context.Background(), rid, tenantID, string(mode), string(profile), src, url, toolsTotal) //nolint:errcheck

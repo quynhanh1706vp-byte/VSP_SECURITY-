@@ -60,8 +60,10 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	// Mark RUNNING
 	h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "RUNNING", 0)
 
-	// Execute
-	result, err := h.Exec.Execute(ctx, payload)
+	// Execute — apply profile filtering + timeout per profile
+	profileRunners := RunnersForProfile(payload.Mode, payload.Profile)
+	payload.TimeoutSec = TimeoutForProfile(payload.Profile)
+	result, err := h.Exec.ExecuteWith(ctx, payload, profileRunners)
 	if err != nil {
 		h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "FAILED", 0)
 		return err
@@ -74,6 +76,18 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	dbFindings := make([]store.Finding, 0, len(result.Findings))
 	for _, f := range result.Findings {
 		raw, _ := json.Marshal(f.Raw)
+		// Enrich CWE + CVSS for tools that don't emit them natively
+		enrichedCWE := f.CWE
+		enrichedCVSS := f.CVSS
+		if enrichedCWE == "" || enrichedCVSS == 0 {
+			cwe, cvss := scanner.EnrichFinding(f.Tool, f.RuleID, string(f.Severity), f.Message)
+			if enrichedCWE == "" {
+				enrichedCWE = cwe
+			}
+			if enrichedCVSS == 0 {
+				enrichedCVSS = cvss
+			}
+		}
 		dbFindings = append(dbFindings, store.Finding{
 			TenantID:  payload.TenantID,
 			Tool:      f.Tool,
@@ -82,7 +96,8 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 			Message:   f.Message,
 			Path:      f.Path,
 			LineNum:   f.Line,
-			CWE:       f.CWE,
+			CWE:       enrichedCWE,
+			CVSS:      enrichedCVSS,
 			FixSignal: f.FixSignal,
 			Raw:       raw,
 		})
@@ -190,7 +205,7 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		go func() {
 			sev := "HIGH"
 			if s.Critical > 0 { sev = "CRITICAL" }
-			pbs, err := h.DB.FindEnabledPlaybooks(context.Background(), payload.TenantID, "gate_fail", sev)
+			pbs, err := h.DB.FindEnabledPlaybooks(context.Background(), payload.TenantID, "gate_fail", sev) //#nosec G118 -- async goroutine, request ctx already done
 			if err != nil { return }
 			for _, pb := range pbs {
 				ctxJSON, _ := json.Marshal(map[string]any{

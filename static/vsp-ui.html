@@ -1372,7 +1372,12 @@ select.form-ctrl option { background: var(--bg3); }
         <div class="form-group mb8">
           <label class="form-label">Profile</label>
           <select id="scanProfile" class="form-ctrl">
-            <option>FAST</option><option>EXT</option><option>FULL</option>
+            <option value="FAST">FAST — 2min</option>
+            <option value="EXT">EXT — 5min</option>
+            <option value="AGGR">AGGR — 10min</option>
+            <option value="PREMIUM">PREMIUM — 15min</option>
+            <option value="FULL">FULL — 20min</option>
+            <option value="FULL_SOC">FULL_SOC — 30min</option>
           </select>
         </div>
       </div>
@@ -1671,7 +1676,10 @@ select.form-ctrl option { background: var(--bg3); }
         <div class="log-tool-cell done" id="ltc-trivy"><div class="log-tool-name">trivy</div><div class="log-tool-status c-green f10 fmono">9 findings</div></div>
         <div class="log-tool-cell done" id="ltc-gitleaks"><div class="log-tool-name">gitleaks</div><div class="log-tool-status c-green f10 fmono">3 findings</div></div>
         <div class="log-tool-cell done" id="ltc-checkov"><div class="log-tool-name">checkov</div><div class="log-tool-status c-green f10 fmono">13 findings</div></div>
-        <div class="log-tool-cell" id="ltc-trufflehog"><div class="log-tool-name">trufflehog</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-secretcheck"><div class="log-tool-name">secretcheck</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-nikto"><div class="log-tool-name">nikto</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-sslscan"><div class="log-tool-name">sslscan</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-license"><div class="log-tool-name">license</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
       </div>
 
       <div class="log-toolbar">
@@ -2633,7 +2641,13 @@ function filterLogs() {
     return true;
   });
 
-  const toolColors = {kics:'#818cf8',bandit:'#38bdf8',semgrep:'#4ade80',grype:'#fb923c',trivy:'#fbbf24',gitleaks:'#f87171',checkov:'#a78bfa',trufflehog:'#f472b6',scanner:'#8899bb',gate:'#38bdf8'};
+  const toolColors = {
+    kics:'#818cf8', bandit:'#38bdf8', semgrep:'#4ade80', grype:'#fb923c',
+    trivy:'#fbbf24', gitleaks:'#f87171', checkov:'#a78bfa', codeql:'#e879f9',
+    nikto:'#34d399', nuclei:'#60a5fa', sslscan:'#06b6d4',
+    license:'#a3e635', secretcheck:'#f97316',
+    scanner:'#8899bb', gate:'#38bdf8',
+  };
   document.getElementById('log-count').textContent = filtered.length + ' lines';
   stream.innerHTML = filtered.length ? filtered.map(l => `
     <div class="log-line">
@@ -2674,10 +2688,46 @@ function loadLatestLog() {
   showToast('Loaded: RID_SCHED_20260329_194714_0', 'info');
 }
 
-function loadRunLog(rid) {
+async function loadRunLog(rid) {
   if (!rid) return;
+  if (!window.TOKEN) { setTimeout(loadLatestLog, 400); return; }
   showToast('Loading log for ' + rid.slice(-12) + '…', 'info');
-  setTimeout(loadLatestLog, 400);
+  try {
+    const run = await fetch('/api/v1/vsp/run/'+rid, {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const findings = fd.findings || [];
+    window._findingsCache = findings;
+    const TBM = {
+      IAC:['kics','checkov'], SAST:['bandit','semgrep','codeql'],
+      SCA:['trivy','grype','license'], SECRETS:['gitleaks','secretcheck'],
+      DAST:['nikto','nuclei','sslscan'], NETWORK:['sslscan'],
+      FULL:['kics','checkov','bandit','semgrep','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'],
+    };
+    const tools = TBM[run.mode||'FULL'] || TBM.FULL;
+    const byTool = {}; findings.forEach(f=>{if(!byTool[f.tool])byTool[f.tool]=[];byTool[f.tool].push(f);});
+    const grid = document.querySelector('.log-tool-grid');
+    if (grid) grid.innerHTML = tools.map(t=>{
+      const tF=byTool[t]||[]; const done=tF.length>0;
+      return `<div class="log-tool-cell ${done?'done':''}"><div class="log-tool-name">${t}</div><div class="log-tool-status f10 fmono" style="color:${done?'var(--green)':'var(--t4)'}">${done?tF.length+' findings':'—'}</div></div>`;
+    }).join('');
+    const lines=[], pad=n=>String(n).padStart(2,'0'), ts=s=>`${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`;
+    let t=0; const sum=run.summary||{};
+    lines.push({ts:ts(t++),tool:'scanner',level:'INFO',msg:'Run started: '+run.rid});
+    lines.push({ts:ts(t++),tool:'scanner',level:'INFO',msg:'Mode: '+run.mode+' · Profile: '+(run.profile||'FAST')+' · Source: '+(run.src||'—')});
+    tools.forEach(tool=>{
+      const tF=byTool[tool]||[]; lines.push({ts:ts(t++),tool,level:'INFO',msg:'Starting scan…'});
+      const crits=tF.filter(f=>f.severity==='CRITICAL'), highs=tF.filter(f=>f.severity==='HIGH');
+      if(crits.length) lines.push({ts:ts(t++),tool,level:'ERROR',msg:`Found ${crits.length} CRITICAL (${crits.slice(0,3).map(f=>f.rule_id).filter(Boolean).join(', ')})`});
+      if(highs.length) lines.push({ts:ts(t++),tool,level:'WARN',msg:`Found ${highs.length} HIGH findings`});
+      lines.push({ts:ts(t++),tool,level:'DONE',msg:`Completed · ${tF.length} findings`});
+    });
+    const gL=run.gate==='PASS'?'DONE':run.gate==='WARN'?'WARN':'ERROR';
+    lines.push({ts:ts(t++),tool:'gate',level:gL,msg:`Gate: ${run.gate} · ${run.total_findings} findings · Score: ${sum.SCORE||0}/100`});
+    window._allLogs = lines;
+    filterLogs && filterLogs();
+    const cnt = document.getElementById('log-count'); if(cnt) cnt.textContent = lines.length+' lines';
+    const info = document.getElementById('log-run-info'); if(info) info.textContent = run.status+' · '+run.total_findings+' findings';
+  } catch(e) { setTimeout(loadLatestLog, 400); }
 }
 
 function clearLog() {
@@ -3007,5 +3057,6 @@ window.loadCurrentPanel = loadCurrentPanel;
 window.loadExecutive = loadExecutive;
 </script>
 
+<script src="vsp_netdeep_patch.js"></script>
 </body>
 </html>

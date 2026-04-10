@@ -1,0 +1,9 @@
+# VSP scan exclusions
+/tmp/
+/var/tmp/
+*.bak
+.env
+.env.*
+!.env.example
+*_test.tf
+/tmp/iac_test/
