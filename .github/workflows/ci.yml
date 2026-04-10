@@ -89,7 +89,7 @@ jobs:
       - name: Integration tests — store
         env:
           TEST_DATABASE_URL: postgres://vsp:vsp_test@localhost:5432/vsp_test?sslmode=disable
-        run: go test -tags integration -count=1 -timeout=300s ./internal/store/...
+        run: go test -tags integration,containers -count=1 -timeout=300s ./internal/store/...
 
       - name: Integration tests — API
         env:
