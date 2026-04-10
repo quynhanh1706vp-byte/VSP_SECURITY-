@@ -89,7 +89,7 @@ func TestRunsTrigger_InvalidURLScheme(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var resp map[string]string
 	json.NewDecoder(w.Body).Decode(&resp)
-	assert.Contains(t, resp["error"], "http/https")
+	assert.Contains(t, resp["error"], "scheme must be http or https")
 }
 
 func TestRunsTrigger_ValidHTTPSURL(t *testing.T) {
