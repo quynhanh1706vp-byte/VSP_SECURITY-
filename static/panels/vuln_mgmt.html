@@ -270,8 +270,7 @@ function renderTrend(points) {
           borderWidth: 1,
           titleColor: '#e8eaf0',
           bodyColor: '#9aa3b8',
-          padding: 10,
-        }
+          padding: 10}
       },
       scales: {
         x: { ticks: { color:'#64748b', font:{ size:9 }, maxTicksLimit: 10 }, grid: dg },
@@ -399,9 +398,9 @@ async function loadAll() {
   var h = { Authorization: 'Bearer ' + TOKEN };
   try {
     var res = await Promise.all([
-      fetch(API + '/api/v1/vulns/trend?days=' + days, { headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { trend:[] }; }),
-      fetch(API + '/api/v1/vulns/top-cves', { headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { cves:[] }; }),
-      fetch(API + '/api/v1/vulns/by-tool', { headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { tools:[] }; }),
+      fetch(API + '/api/v1/vulns/trend?days=' + days, {credentials:'same-origin', headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { trend:[] }; }),
+      fetch(API + '/api/v1/vulns/top-cves', {credentials:'same-origin', headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { cves:[] }; }),
+      fetch(API + '/api/v1/vulns/by-tool', {credentials:'same-origin', headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { tools:[] }; }),
     ]);
     var td = res[0].trend || [];
     var cd = res[1].cves  || [];

@@ -305,7 +305,7 @@ async function runAnalysis(){
 function loadBaseline(){
   var def={avg_score:72,std_score:8.4,avg_findings:82,gate_pass_rate:.38,avg_scans_per_day:3.2,period:'30d'};
   if(!TOKEN){renderBaseline(def);return;}
-  fetch(API+'/api/v1/ueba/baseline',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json();}).then(renderBaseline).catch(function(){renderBaseline(def);});
+  fetch(API+'/api/v1/ueba/baseline', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json();}).then(renderBaseline).catch(function(){renderBaseline(def);});
 }
 function _onTokenReady(){}
 window.addEventListener('message',function(e){

@@ -379,7 +379,7 @@ async function loadUsers(){
   if(!TOKEN)return;
   var h={Authorization:'Bearer '+TOKEN};
   try{
-    var r=await fetch(API+'/api/v1/admin/users',{headers:h});
+    var r=await fetch(API+'/api/v1/admin/users', {credentials:'same-origin', headers:h});
     if(r.ok){
       var d=await r.json();
       if(d.users&&d.users.length){

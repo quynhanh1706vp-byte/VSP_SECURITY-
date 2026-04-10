@@ -275,8 +275,7 @@ var STEP_TYPES={
   block:    {label:'Block CI',color:'var(--red)',   bg:'var(--red2)'},
   enrich:   {label:'Enrich',  color:'var(--green)', bg:'var(--green2)'},
   wait:     {label:'Wait',    color:'var(--t3)',    bg:'rgba(255,255,255,.05)'},
-  remediate:{label:'Remediate',color:'var(--orange)',bg:'var(--orange2)'},
-};
+  remediate:{label:'Remediate',color:'var(--orange)',bg:'var(--orange2)'}};
 
 var STEP_OUTS={
   condition:'PASS — condition met',
@@ -286,8 +285,7 @@ var STEP_OUTS={
   block:'BLOCKED — pipeline set to failure',
   enrich:'ENRICHED — CVSS 9.1 · EPSS 0.72 · KEV: YES',
   wait:'WAITED — delay complete',
-  remediate:'ASSIGNED — findings → security-oncall',
-};
+  remediate:'ASSIGNED — findings → security-oncall'};
 
 var TPLS={
   notify:[
@@ -314,8 +312,7 @@ var TPLS={
     {Type:'notify',Name:'Email CISO',Desc:'Send executive summary',Config:'to: ciso@agency.gov\ntemplate: executive_summary'},
     {Type:'remediate',Name:'Auto-assign findings',Desc:'Assign to on-call',Config:'assignee: security-oncall\npriority: P1'},
   ],
-  custom:[],
-};
+  custom:[]};
 
 var DEF_PB=[
   {id:'pb-001',name:'Gate FAIL auto-response',enabled:true,trigger:'gate_fail',sev:'any',desc:'Full: block CI, Jira, notify',steps:TPLS.full,runs:47,success:44,last:'2m ago'},
@@ -556,8 +553,7 @@ async function execPlaybook(){
   renderList();loadRunHistory();
   if(TOKEN) fetch(API+'/api/v1/soar/playbooks/'+pb.id+'/run',{
     method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
-    body:document.getElementById('run-ctx').value,
-  }).catch(function(){});
+    body:document.getElementById('run-ctx').value}).catch(function(){});
 }
 
 function renderDetailWithStatus(pb,statuses,outputs){
@@ -585,7 +581,7 @@ function loadRunHistory(){
       +'<span class="run-dur">'+r.dur+'</span>'
       +'</div>';
   }).join('');
-  if(TOKEN) fetch(API+'/api/v1/soar/runs?limit=20',{headers:{Authorization:'Bearer '+TOKEN}})
+  if(TOKEN) fetch(API+'/api/v1/soar/runs?limit=20', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}})
     .then(function(r){return r.json();}).then(function(d){
       if(d.runs&&d.runs.length){
         d.runs.forEach(function(r){
@@ -658,8 +654,7 @@ function createPB(){
   renderList();selectPB(newPB.id);
   if(TOKEN) fetch(API+'/api/v1/soar/playbooks',{method:'POST',
     headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
-    body:JSON.stringify({name:newPB.name,description:newPB.desc,trigger:newPB.trigger,sev_filter:newPB.sev,enabled:true}),
-  }).catch(function(){});
+    body:JSON.stringify({name:newPB.name,description:newPB.desc,trigger:newPB.trigger,sev_filter:newPB.sev,enabled:true})}).catch(function(){});
 }
 
 // ── Token + data ───────────────────────────────────────────

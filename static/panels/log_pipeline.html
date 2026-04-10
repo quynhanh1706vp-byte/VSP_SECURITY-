@@ -346,8 +346,8 @@ async function loadSources(){
   var h={Authorization:'Bearer '+TOKEN};
   try{
     var [sr,st]=await Promise.all([
-      fetch(API+'/api/v1/logs/sources',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-      fetch(API+'/api/v1/logs/stats',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(API+'/api/v1/logs/sources', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(API+'/api/v1/logs/stats', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
     ]);
     if(sr&&sr.sources&&sr.sources.length){SOURCES=sr.sources.map(function(s){return Object.assign({eps:0,lastEvent:'—',parseRate:100,events:0,status:s.status||'ok'},s);});renderSources();}
     if(st&&st.eps)document.getElementById('k-eps').textContent=(st.eps||0).toLocaleString();

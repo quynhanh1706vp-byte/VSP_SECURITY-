@@ -234,8 +234,7 @@ async function openIOCDetail(id){
   if(TOKEN&&ioc){
     try{
       // Get matched findings via hunt
-      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(ioc.val||'')+'&hours=72&limit=5',
-        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
+      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(ioc.val||'')+'&hours=72&limit=5', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
       if(hunted.events&&hunted.events.length){
         ioc._log_hits=hunted.events.length;
         ioc.findings=(hunted.events||[]).slice(0,3).map(function(e){return e.message;});
@@ -263,7 +262,7 @@ async function openCVEDetail(id){
   if(!c&&TOKEN){
     // Try fetch from top-cves API
     try{
-      var d=await fetch(API+'/api/v1/vulns/top-cves',{headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({cves:[]}));
+      var d=await fetch(API+'/api/v1/vulns/top-cves', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({cves:[]}));
       var found=(d.cves||[]).find(function(x){return x.cve===id;});
       if(found) c={id:found.cve,severity:found.severity,cvss:found.cvss||'N/A',epss:found.epss||'N/A',kev:false,desc:found.cve+' — '+found.severity+' vulnerability',component:found.tools,fix:'Update affected component',ttp:'T1190',refs:[]};
     }catch(e){}
@@ -272,8 +271,7 @@ async function openCVEDetail(id){
   // Fetch related findings count
   if(TOKEN){
     try{
-      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(id)+'&hours=168&limit=10',
-        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
+      var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(id)+'&hours=168&limit=10', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
       if(hunted.count) c._log_hits=hunted.count;
     }catch(e){}
   }
@@ -308,9 +306,9 @@ function loadFromAPI(){
   if(!TOKEN)return;
   var h={Authorization:'Bearer '+TOKEN};
   Promise.all([
-    fetch(API+'/api/v1/ti/iocs?limit=20',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-    fetch(API+'/api/v1/ti/feeds',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-    fetch(API+'/api/v1/ti/matches',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch(API+'/api/v1/ti/iocs?limit=20', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch(API+'/api/v1/ti/feeds', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch(API+'/api/v1/ti/matches', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
   ]).then(function(res){
     if(res[0]&&res[0].iocs&&res[0].iocs.length){IOCS=res[0].iocs.map(function(i){return Object.assign({id:i.id||Math.random().toString(36).slice(2),matched:false,findings:[],mitre:[]},i);});renderIOCs();}
     if(res[1]&&res[1].feeds&&res[1].feeds.length){FEEDS=res[1].feeds.map(function(f){return Object.assign({icon:'◈',lastSync:'—'},f);});renderFeeds();}

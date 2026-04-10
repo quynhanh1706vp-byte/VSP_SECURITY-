@@ -288,10 +288,10 @@ async function loadAllData() {
   var h = { Authorization: 'Bearer ' + TOKEN };
   try {
     var results = await Promise.all([
-      fetch(API_BASE + '/api/v1/vsp/run/latest', { headers: h }).then(function(r){ return r.json(); }).catch(function(){ return {}; }),
-      fetch(API_BASE + '/api/v1/correlation/incidents?limit=20&status=open', { headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { incidents:[] }; }),
-      fetch(API_BASE + '/api/v1/schedules', { headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { schedules:[] }; }),
-      fetch(API_BASE + '/api/v1/vsp/runs?limit=5', { headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { runs:[] }; }),
+      fetch(API_BASE + '/api/v1/vsp/run/latest', {credentials:'same-origin', headers: h }).then(function(r){ return r.json(); }).catch(function(){ return {}; }),
+      fetch(API_BASE + '/api/v1/correlation/incidents?limit=20&status=open', {credentials:'same-origin', headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { incidents:[] }; }),
+      fetch(API_BASE + '/api/v1/schedules', {credentials:'same-origin', headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { schedules:[] }; }),
+      fetch(API_BASE + '/api/v1/vsp/runs?limit=5', {credentials:'same-origin', headers: h }).then(function(r){ return r.json(); }).catch(function(){ return { runs:[] }; }),
     ]);
 
     var run = results[0], incData = results[1], schedData = results[2], runsData = results[3];
@@ -396,8 +396,7 @@ function buildSystem() {
     incidents: base + '\n\n=== FOCUS: INCIDENT TRIAGE ===\nTập trung phân tích và ưu tiên xử lý incidents.',
     findings: base + '\n\n=== FOCUS: FINDINGS & REMEDIATION ===\nTập trung remediation steps cụ thể cho findings.',
     threats: base + '\n\n=== FOCUS: THREAT INTELLIGENCE ===\nTập trung threat landscape, IOC analysis, MITRE ATT&CK mapping.',
-    schedules: base + '\n\n=== FOCUS: SCAN SCHEDULES ===\nTập trung tối ưu hóa scan schedules và coverage.',
-  };
+    schedules: base + '\n\n=== FOCUS: SCAN SCHEDULES ===\nTập trung tối ưu hóa scan schedules và coverage.'};
 
   return ctxMap[_ctx] || base;
 }
@@ -424,9 +423,7 @@ async function send() {
     var response = await fetch(API_BASE + '/api/v1/ai/chat', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + TOKEN
-      },
+        'Content-Type': 'application/json'},
       body: JSON.stringify({
         messages: _hist.slice(-12),
         tenant_id: getTenantID()
@@ -627,9 +624,9 @@ function hdr(){return {Authorization:'Bearer '+tok()};}
 
 function fetchD(){
   return Promise.all([
-    fetch('/api/v1/vsp/run/latest',{headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{};}),
-    fetch('/api/v1/vsp/findings?limit=200',{headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{findings:[]};}),
-    fetch('/api/v1/correlation/incidents?limit=50',{headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{incidents:[]};})
+    fetch('/api/v1/vsp/run/latest', {credentials:'same-origin', headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{};}),
+    fetch('/api/v1/vsp/findings?limit=200', {credentials:'same-origin', headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{findings:[]};}),
+    fetch('/api/v1/correlation/incidents?limit=50', {credentials:'same-origin', headers:hdr()}).then(function(r){return r.json();}).catch(function(){return{incidents:[]};})
   ]).then(function(a){return{run:a[0],findings:a[1].findings||[],incidents:a[2].incidents||[]};});
 }
 
@@ -791,7 +788,7 @@ window.sendMsg=function(){
 };
 
 function loadKPI(){
-  fetch('/api/v1/vsp/run/latest',{headers:hdr()}).then(function(r){return r.json();}).then(function(run){
+  fetch('/api/v1/vsp/run/latest', {credentials:'same-origin', headers:hdr()}).then(function(r){return r.json();}).then(function(run){
     var s=run.summary||{};
     var kpis=document.querySelectorAll('.kpi-item');
     if(kpis[0]&&kpis[0].querySelector('.kpi-val')){var v=kpis[0].querySelector('.kpi-val');v.textContent=s.SCORE||0;v.style.color=(s.SCORE||0)>=70?'#3fb950':(s.SCORE||0)>=40?'#d29922':'#f85149';}
@@ -800,7 +797,7 @@ function loadKPI(){
     var sub=document.getElementById('ctx-scan-sub');
     if(sub)sub.textContent=(run.mode||'—')+' · '+(run.total_findings||0)+' findings';
   }).catch(function(){});
-  fetch('/api/v1/correlation/incidents?limit=5',{headers:hdr()}).then(function(r){return r.json();}).then(function(d){
+  fetch('/api/v1/correlation/incidents?limit=5', {credentials:'same-origin', headers:hdr()}).then(function(r){return r.json();}).then(function(d){
     var open=(d.incidents||[]).filter(function(i){return i.status==='open';}).length||d.total||0;
     var kpis=document.querySelectorAll('.kpi-item');
     if(kpis[3]&&kpis[3].querySelector('.kpi-val')){var v3=kpis[3].querySelector('.kpi-val');v3.textContent=open;v3.style.color=open>0?'#f85149':'#3fb950';}

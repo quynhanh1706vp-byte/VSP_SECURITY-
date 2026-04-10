@@ -439,8 +439,7 @@ async function openIncidentDetail(id){
   // Fetch fresh data from API
   if(TOKEN){
     try{
-      var fresh=await fetch(API+'/api/v1/correlation/incidents/'+id,
-        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
+      var fresh=await fetch(API+'/api/v1/correlation/incidents/'+id, {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
       if(fresh&&fresh.id) inc=Object.assign(inc||{},fresh);
     }catch(e){}
     // Fetch related log events
@@ -448,8 +447,7 @@ async function openIncidentDetail(id){
       var refs=inc&&inc.source_refs?inc.source_refs:{};
       var q=refs.matched_hosts&&refs.matched_hosts[0]?refs.matched_hosts[0]:'';
       if(q){
-        var evts=await fetch(API+'/api/v1/logs/hunt?source_ip='+encodeURIComponent(q)+'&hours=2&limit=5',
-          {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
+        var evts=await fetch(API+'/api/v1/logs/hunt?source_ip='+encodeURIComponent(q)+'&hours=2&limit=5', {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
         if(evts&&evts.events&&evts.events.length){
           inc._related_events=evts.events;
         }
@@ -578,8 +576,7 @@ function saveRule(){
   renderRules();
   if(TOKEN) fetch(API+'/api/v1/correlation/rules',{
     method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
-    body:JSON.stringify({name:name,sources:sources,window_min:win,severity:sev,condition:cond,enabled:true}),
-  }).catch(function(){});
+    body:JSON.stringify({name:name,sources:sources,window_min:win,severity:sev,condition:cond,enabled:true})}).catch(function(){});
 }
 
 // ── Source health ──────────────────────────────────────────
@@ -628,8 +625,8 @@ function loadFromAPI(){
   if(!TOKEN) return;
   var h={Authorization:'Bearer '+TOKEN};
   Promise.all([
-    fetch(API+'/api/v1/correlation/rules',    {headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-    fetch(API+'/api/v1/correlation/incidents',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch(API+'/api/v1/correlation/rules', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch(API+'/api/v1/correlation/incidents', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
   ]).then(function(res){
     if(res[0]&&res[0].rules&&res[0].rules.length){
       RULES=res[0].rules.map(function(r){
@@ -647,8 +644,7 @@ function loadFromAPI(){
           actions:[
             {icon:'▶',label:'Run SOAR playbook',color:'var(--purple2)',tc:'var(--purple)'},
             {icon:'⊕',label:'Create Jira ticket',color:'var(--cyan2)',tc:'var(--cyan)'},
-          ],
-        });
+          ]});
       });
       renderIncidents();
     }

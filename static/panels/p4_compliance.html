@@ -1225,8 +1225,7 @@ async function submitSegRule() {
     port: parseInt(document.getElementById('seg-port').value)||0,
     protocol: document.getElementById('seg-proto').value,
     action: document.getElementById('seg-action').value,
-    mtls: document.getElementById('seg-mtls').checked,
-  };
+    mtls: document.getElementById('seg-mtls').checked};
   const res = await post('/api/p4/zt/microseg', rule);
   if (res && res.status === 'ok') {
     closeSegModal();

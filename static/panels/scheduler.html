@@ -524,8 +524,7 @@ function saveSchedule() {
     cron: cron,
     src: document.getElementById('s-src').value.trim(),
     tags: document.getElementById('s-tags').value.split(',').map(function(t){ return t.trim(); }).filter(Boolean),
-    enabled: document.getElementById('s-enabled').checked,
-  };
+    enabled: document.getElementById('s-enabled').checked};
 
   if (_editId) {
     var s = SCHEDULES.find(function(x){ return x.id === _editId; });
@@ -584,7 +583,7 @@ document.addEventListener('keydown', function(e) {
 async function loadSchedules() {
   if (!TOKEN) { renderSchedules(); return; }
   try {
-    var r = await fetch(API + '/api/v1/schedules', { headers: { Authorization: 'Bearer ' + TOKEN } });
+    var r = await fetch(API + '/api/v1/schedules', {credentials:'same-origin', headers: { Authorization: 'Bearer ' + TOKEN } });
     if (r.ok) {
       var d = await r.json();
       if (d.schedules && d.schedules.length) {
@@ -601,8 +600,7 @@ async function loadSchedules() {
             next_run:    s.next_run_at ? (function(d){ var n=new Date(d),now=new Date(),tom=new Date(now);tom.setDate(tom.getDate()+1);var hm=n.toTimeString().slice(0,5);return n.toDateString()===now.toDateString()?'today '+hm:n.toDateString()===tom.toDateString()?'tomorrow '+hm:(n.getMonth()+1)+'/'+n.getDate()+' '+hm; })(s.next_run_at) : '—',
             last_run:    s.last_run_at ? (function(d){ var n=new Date(d),now=new Date(),tom=new Date(now);tom.setDate(tom.getDate()+1);var hm=n.toTimeString().slice(0,5);return n.toDateString()===now.toDateString()?'today '+hm:n.toDateString()===tom.toDateString()?'tomorrow '+hm:(n.getMonth()+1)+'/'+n.getDate()+' '+hm; })(s.last_run_at) : '—',
             last_status: '—',
-            last_gate:   '—',
-          };
+            last_gate:   '—'};
         });
         renderSchedules();
       }
@@ -613,7 +611,7 @@ async function loadSchedules() {
 async function loadRecentRuns() {
   if (!TOKEN) { renderRecentRuns(); return; }
   try {
-    var r = await fetch(API + '/api/v1/vsp/runs?limit=20', { headers: { Authorization: 'Bearer ' + TOKEN } });
+    var r = await fetch(API + '/api/v1/vsp/runs?limit=20', {credentials:'same-origin', headers: { Authorization: 'Bearer ' + TOKEN } });
     if (r.ok) {
       var d = await r.json();
       if (d.runs && d.runs.length) {

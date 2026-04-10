@@ -196,8 +196,7 @@ async function runHunt(){
 
   var t0=Date.now();
   try{
-    var d=await fetch(API+'/api/v1/logs/hunt?'+params.toString(),
-      {headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json();});
+    var d=await fetch(API+'/api/v1/logs/hunt?'+params.toString(), {credentials:'same-origin', headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json();});
     var elapsed=Date.now()-t0;
 
     _results=d.events||[];
