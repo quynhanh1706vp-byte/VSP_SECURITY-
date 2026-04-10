@@ -2294,7 +2294,7 @@ function _exportCompCSV() {
 async function _loadComplianceData(type) {
   await ensureToken();
   var url = type==='fedramp' ? '/api/v1/compliance/fedramp' : '/api/v1/compliance/cmmc';
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   try {
     var d = await fetch(url, {headers:h}).then(function(r){ return r.json(); });
     _compData = d.controls || d.practices || [];
@@ -2519,7 +2519,7 @@ async function renderQS(q) {
   try {
     await ensureToken();
     const fd = await fetch('/api/v1/vsp/findings?q='+encodeURIComponent(q)+'&limit=5', {
-      headers:{'Authorization':'Bearer '+window.TOKEN}
+      headers:{}
     }).then(r=>r.json());
     const findings = fd.findings||[];
     if (findings.length) {
@@ -3028,7 +3028,7 @@ async function applyFindingsFilter() {
   if (tool) url += '&tool=' + tool;
   if (q)    url += '&q=' + encodeURIComponent(q);
   try {
-    const r = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const r = await fetch(url, {headers:{}});
     const d = await r.json();
     const findings = d.findings || [];
     window._findingsCache = findings;
@@ -3065,7 +3065,7 @@ window.saveRemediation = async function() {
   try {
     const r = await fetch('/api/v1/remediation/finding/' + (window._remCurrentId||''), {
       method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':'Bearer '+window.TOKEN},
+      headers: {'Content-Type':'application/json',},
       body: JSON.stringify({status,priority,assignee,ticket_url:ticket,notes})
     });
     if (r.ok) {
@@ -3084,7 +3084,7 @@ window.saveRemediation = async function() {
 // ── Governance load data thật ──────────────────────────────────────────────
 async function loadGovernanceReal() {
   await ensureToken();
-  const headers = {'Authorization':'Bearer '+window.TOKEN};
+  const headers = {};
   try {
     // Load risk register
     const rr = await fetch('/api/v1/governance/risk-register', {headers}).then(r=>r.json());
@@ -3123,9 +3123,9 @@ window.downloadExecutivePDF = async function() {
   await ensureToken();
   if (typeof showToast==='function') showToast('Generating PDF...','info');
   try {
-    const latest = await fetch('/api/v1/vsp/run/latest',{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const latest = await fetch('/api/v1/vsp/run/latest',{headers:{}}).then(r=>r.json());
     const rid = latest.rid || '';
-    const res = await fetch('/api/v1/vsp/executive_report_pdf/'+rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const res = await fetch('/api/v1/vsp/executive_report_pdf/'+rid, {headers:{}});
     if (!res.ok) throw new Error('PDF endpoint not available');
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -3142,7 +3142,7 @@ window.downloadExecutivePDF = async function() {
 window.updateTicker = async function() {
   if (!window.TOKEN || window.TOKEN === '') return;
   try {
-    const r = await fetch('/api/v1/vsp/run/latest',{headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const r = await fetch('/api/v1/vsp/run/latest',{headers:{}});
     if (!r.ok) return;
     const d = await r.json();
     const el = document.getElementById('ticker-content');
@@ -3189,7 +3189,7 @@ const ALL_TOOLS = ['kics','checkov','hadolint','bandit','semgrep','codeql','triv
 async function loadRunsDropdown() {
   if (!await ensureToken()) return;
   try {
-    const r = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const r = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{}});
     const d = await r.json();
     const runs = d.runs || [];
     const sel = document.getElementById('log-run-select');
@@ -3210,7 +3210,7 @@ async function loadRunLog(rid) {
   await ensureToken();
   try {
     // Lấy thông tin run
-    const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{}});
     const run = await r.json();
     const mode = run.mode || 'FULL';
     const tools = TOOLS_BY_MODE[mode] || ALL_TOOLS;
@@ -3224,7 +3224,7 @@ async function loadRunLog(rid) {
     if (infoEl) infoEl.textContent = run.status + ' · ' + (run.total_findings||0) + ' findings · ' + tools.length + ' tools';
 
     // Lấy findings để tạo log lines
-    const f = await fetch('/api/v1/vsp/findings?rid='+rid+'&limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const f = await fetch('/api/v1/vsp/findings?rid='+rid+'&limit=200', {headers:{}});
     const fd = await f.json();
     const findings = fd.findings || [];
 
@@ -3341,12 +3341,12 @@ async function loadRunLog(rid) {
   if (!rid) return;
   await ensureToken();
   try {
-    const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{}});
     const run = await r.json();
     const mode = run.mode || 'FULL';
 
     // Load findings để biết tools thực sự có data
-    const f = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const f = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{}});
     const fd = await f.json();
     const findings = fd.findings || [];
     window._findingsCache = findings;
@@ -3441,7 +3441,7 @@ async function loadRunLog(rid) {
   if (!rid) return;
   await ensureToken();
   try {
-    const run = await fetch('/api/v1/vsp/run/'+rid, {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const run = await fetch('/api/v1/vsp/run/'+rid, {headers:{}}).then(r=>r.json());
     const mode = run.mode || 'FULL';
     const TOOLS_BY_MODE = {
       IAC:['kics','checkov'], SAST:['bandit','semgrep','codeql'],
@@ -3452,7 +3452,7 @@ async function loadRunLog(rid) {
     const expectedTools = TOOLS_BY_MODE[mode] || ['kics','checkov'];
 
     // Findings đúng run_id
-    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{}}).then(r=>r.json());
     const findings = fd.findings || [];
     window._findingsCache = findings;
 
@@ -3535,7 +3535,7 @@ console.log('VSP Patch v2.4 loaded ✓');
 async function loadRuns() {
   await ensureToken();
   try {
-    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{}}).then(r=>r.json());
     const runs = d.runs || [];
     const tbody = document.getElementById('runs-table');
     if (!tbody) return;
@@ -3630,7 +3630,7 @@ const _loadRuns25 = window.loadRuns;
 window.loadRuns = async function() {
   await ensureToken();
   try {
-    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{}}).then(r=>r.json());
     const runs = d.runs || [];
 
     // ── KPI calc
@@ -3736,9 +3736,9 @@ window.viewRunLog = async function(rid) {
   await ensureToken();
   window._rdmRid = rid;
   try {
-    const run = await fetch('/api/v1/vsp/run/'+rid,{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const run = await fetch('/api/v1/vsp/run/'+rid,{headers:{}}).then(r=>r.json());
     window._rdmRun = run;
-    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:{}}).then(r=>r.json());
     const findings = fd.findings || [];
     const byTool = {};
     const bySev = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0,INFO:0};
@@ -3819,7 +3819,7 @@ window.downloadRunReport = async function(fmt) {
   var run = window._rdmRun;
   if (!run) return;
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   if (fmt==='json') {
     var fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:h}).then(function(r){return r.json();});
     var out = {run_id:run.rid,mode:run.mode,gate:run.gate,posture:run.posture,total:run.total_findings,findings:fd.findings};
@@ -3876,7 +3876,7 @@ async function loadFindingsRunSelector() {
   var sel = document.getElementById('findings-run-sel');
   if (!sel) return;
   try {
-    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{}}).then(function(r){return r.json();});
     var runs = d.runs || [];
     sel.innerHTML = '<option value="">All runs</option>' +
       runs.map(function(r) {
@@ -3898,7 +3898,7 @@ async function loadFindingsPanel() {
   if (state.q) params.set('q', state.q);
 
   try {
-    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {headers:{}});
     var d = await r.json();
     var findings = d.findings || [];
     window._findingsCache = findings;
@@ -4120,7 +4120,7 @@ window.loadFindingsPanel = async function() { if(typeof loadFindings==='function
   if (state.q) params.set('q', state.q);
 
   try {
-    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {headers:{}});
     var d = await r.json();
     var findings = d.findings || [];
     window._findingsCache = findings;
@@ -4209,7 +4209,7 @@ window.loadFindingsRunSelector = async function() {
   var sel = document.getElementById('findings-run-sel');
   if (!sel) return;
   try {
-    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{}}).then(function(r){return r.json();});
     var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total>0;});
     sel.innerHTML = '<option value="">All runs</option>' +
       runs.map(function(r){
@@ -4298,7 +4298,7 @@ window.loadFindingsRunSelector = async function() {
   var sel = document.getElementById('findings-run-sel');
   if (!sel) return;
   try {
-    var d = await fetch('/api/v1/vsp/runs', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs', {headers:{}}).then(function(r){return r.json();});
     var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total_findings>0;});
     sel.innerHTML = '<option value="">All runs</option>' +
       runs.map(function(r){
@@ -4341,7 +4341,7 @@ window.applyFindingsFilter = function() {
   // Update KPI nếu chọn run cụ thể
   if (sel && sel.value) {
     var opt = sel.options[sel.selectedIndex];
-    fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {headers:{'Authorization':'Bearer '+window.TOKEN}})
+    fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {headers:{}})
       .then(function(r){return r.json();})
       .then(function(d){
         var panel = document.getElementById('panel-findings');
@@ -4390,7 +4390,7 @@ function patchFindingsDropdown() {
 
     // Update KPI từ summary API
     if (sel.value) {
-      fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {headers:{'Authorization':'Bearer '+window.TOKEN}})
+      fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {headers:{}})
         .then(function(r){return r.json();})
         .then(function(s) {
           var panel = document.getElementById('panel-findings');
@@ -4413,7 +4413,7 @@ window.loadFindingsRunSelector = async function() {
   var sel = document.getElementById('findings-run-sel');
   if (!sel) return;
   try {
-    var d = await fetch('/api/v1/vsp/runs?limit=50', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs?limit=50', {headers:{}}).then(function(r){return r.json();});
     var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total_findings>0;});
     sel.innerHTML = '<option value="">All runs</option>' +
       runs.map(function(r){
@@ -4562,7 +4562,7 @@ window.loadFindingsPanel = async function() { if(typeof loadFindings==='function
   if (state.q) params.set('q', state.q);
 
   try {
-    var r = await fetch('/api/v1/vsp/findings?'+params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var r = await fetch('/api/v1/vsp/findings?'+params.toString(), {headers:{}});
     var d = await r.json();
     var findings = d.findings || [];
     window._findingsCache = findings;
@@ -4587,7 +4587,7 @@ window.loadFindingsPanel = async function() { if(typeof loadFindings==='function
     // Nếu có run cụ thể thì lấy summary từ API để có tổng đúng
     if (state.runUUID) {
       try {
-        var s = await fetch('/api/v1/vsp/findings/summary?run_id='+state.runUUID, {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+        var s = await fetch('/api/v1/vsp/findings/summary?run_id='+state.runUUID, {headers:{}}).then(function(r){return r.json();});
         updateFindingsKPIDirect(s.CRITICAL||0, s.HIGH||0, s.MEDIUM||0, s.LOW||0, state.total);
       } catch(e) {
         updateFindingsKPIDirect(bySev.CRITICAL, bySev.HIGH, bySev.MEDIUM, bySev.LOW, state.total);
@@ -4656,7 +4656,7 @@ console.log('VSP Patch v2.14 loaded OK');
     if (name === 'remediation') {
       setTimeout(function() {
         if (!window.TOKEN) return;
-        fetch('/api/v1/remediation/stats', {headers:{'Authorization':'Bearer '+window.TOKEN}})
+        fetch('/api/v1/remediation/stats', {headers:{}})
           .then(function(r){return r.json();})
           .then(function(s) {
             var map = {
@@ -4697,7 +4697,7 @@ window.runEval = async function() {
   try {
     var r = await fetch('/api/v1/policy/evaluate', {
       method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':'Bearer '+window.TOKEN},
+      headers: {'Content-Type':'application/json',},
       body: JSON.stringify({})
     });
     var d = await r.json();
@@ -4717,7 +4717,7 @@ window.runEval = async function() {
 window.loadRulesFromAPI = async function() {
   await ensureToken();
   try {
-    var r = await fetch('/api/v1/policy/rules', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var r = await fetch('/api/v1/policy/rules', {headers:{}});
     var d = await r.json();
     var rules = Array.isArray(d) ? d : (d.rules || []);
     var list = document.getElementById('rules-list');
@@ -4760,7 +4760,7 @@ window.deleteRuleAPI = async function(btn) {
   if (!confirm('Delete this rule?')) return;
   await ensureToken();
   try {
-    await fetch('/api/v1/policy/rules/'+id, {method:'DELETE',headers:{'Authorization':'Bearer '+window.TOKEN}});
+    await fetch('/api/v1/policy/rules/'+id, {method:'DELETE',headers:{}});
     showToast && showToast('Rule deleted','success');
     loadRulesFromAPI();
   } catch(e) { showToast && showToast('Error: '+e.message,'error'); }
@@ -4830,7 +4830,7 @@ window.saveNR = async function() {
     };
     var r = await fetch('/api/v1/policy/rules', {
       method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':'Bearer '+window.TOKEN},
+      headers: {'Content-Type':'application/json',},
       body: JSON.stringify(payload)
     });
     var d = await r.json();
@@ -4878,7 +4878,7 @@ window.verifyAudit = async function() {
   await ensureToken();
   try {
     // Load runs để build audit timeline thật
-    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{}}).then(function(r){return r.json();});
     var runs = (d.runs||[]).slice(0,10);
     // Update KPIs
     var scanTriggers = runs.length;
@@ -4947,7 +4947,7 @@ async function loadSOCv2() {
   var panel = document.getElementById('panel-soc');
   if (!panel) return;
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
 
   try {
     var [runsD, summaryD, remD] = await Promise.all([
@@ -5358,7 +5358,7 @@ async function loadGovernanceV2() {
   var panel = document.getElementById('panel-governance');
   if (!panel) return;
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
 
   try {
     var [riskD, traceD, raciD, runsD] = await Promise.all([
@@ -5650,7 +5650,7 @@ var _sbomPageSize = 15;
 
 async function loadSBOM() {
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   try {
     var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:h}).then(function(r){ return r.json(); });
     _sbomRuns = (d.runs||[]).filter(function(r){ return r.status==='DONE'; });
@@ -5735,7 +5735,7 @@ async function sbomDownload(rid) {
   showToast('Generating SBOM…','info');
   try {
     var resp = await fetch('/api/v1/sbom/'+rid, {
-      headers: {'Authorization':'Bearer '+window.TOKEN}
+      headers: {}
     });
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();
@@ -5754,7 +5754,7 @@ async function sbomDetail(rid) {
   showToast('Loading SBOM…','info');
   try {
     var resp = await fetch('/api/v1/sbom/'+rid, {
-      headers: {'Authorization':'Bearer '+window.TOKEN}
+      headers: {}
     });
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var bom = await resp.json();
@@ -5812,7 +5812,7 @@ function _showSBOMModal(rid, bom) {
 <script>
 async function loadSLA() {
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   try {
     var [slaD, sloD] = await Promise.all([
       fetch('/api/v1/vsp/sla_tracker',  {headers:h}).then(function(r){return r.json();}),
@@ -6021,7 +6021,7 @@ async function loadFindings(offset) {
   if (search) params.set('q', search);
   try {
     var d = await fetch('/api/v1/vsp/findings?'+params, {
-      headers:{'Authorization':'Bearer '+window.TOKEN}
+      headers:{}
     }).then(function(r){return r.json();});
     _findingsTotal = d.total || 0;
     window._findingsData = d.findings || [];
@@ -6149,7 +6149,7 @@ window.exportFindingsCSV = async function() {
   showToast('Exporting CSV…','info');
   try {
     var d = await fetch('/api/v1/vsp/findings?'+params, {
-      headers:{'Authorization':'Bearer '+window.TOKEN}
+      headers:{}
     }).then(function(r){return r.json();});
     var rows = [['ID','Severity','Tool','Rule','Message','Path','Line','CWE']];
     (d.findings||[]).forEach(function(f){
@@ -6180,7 +6180,7 @@ var _remData = [];
 
 async function loadRemediations() {
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   var status = (document.getElementById('rem-filter-status')||{}).value||'';
   try {
     var [remD, statsD, findD] = await Promise.all([
@@ -6325,7 +6325,7 @@ async function _saveRemediation(findingId) {
   try {
     await fetch('/api/v1/remediation/finding/'+findingId, {
       method:'POST',
-      headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+      headers:{,'Content-Type':'application/json'},
       body: JSON.stringify({status,priority,assignee,ticket_url:ticket,notes})
     });
     document.getElementById('rem-edit-modal').classList.remove('open');
@@ -6342,7 +6342,7 @@ var _exportRID = '';
 
 async function loadExportRuns() {
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   try {
     var d = await fetch('/api/v1/vsp/runs/index?limit=50', {headers:h}).then(function(r){return r.json();});
     var runs = (d.runs||[]).filter(function(r){return r.status==='DONE';});
@@ -6370,7 +6370,7 @@ async function updateExportRID() {
 
   // Load preview
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   try {
     var d = await fetch('/api/v1/vsp/findings?run_id='+_exportRID+'&limit=1000', {headers:h}).then(function(r){return r.json();});
     var findings = d.findings || [];
@@ -6405,7 +6405,7 @@ async function exportDownload(fmt) {
   showToast('Generating '+fmt.toUpperCase()+'…','info');
   try {
     var url = '/api/v1/export/'+fmt+'/'+_exportRID;
-    var resp = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var resp = await fetch(url, {headers:{}});
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();
     var ext  = fmt==='sarif'?'.sarif.json':fmt==='csv'?'.csv':'.json';
@@ -6422,7 +6422,7 @@ async function exportOSCAL(type) {
   showToast('Generating OSCAL '+type.toUpperCase()+'…','info');
   try {
     var url = '/api/v1/compliance/oscal/'+type+(_exportRID?'?run_id='+_exportRID:'');
-    var resp = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var resp = await fetch(url, {headers:{}});
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();
     var a = document.createElement('a');
@@ -6440,7 +6440,7 @@ async function exportOSCAL(type) {
 async function loadUsers() {
   
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   try {
     var d = await fetch('/api/v1/admin/users?limit=100', {headers:h}).then(function(r){return r.json();});
     var users = d.users || [];
@@ -6490,7 +6490,7 @@ async function _deleteUser(id, email) {
   try {
     var r = await fetch('/api/v1/admin/users/'+id, {
       method:'DELETE',
-      headers:{'Authorization':'Bearer '+window.TOKEN}
+      headers:{}
     });
     if (r.ok) { showToast('User deleted','success'); loadUsers(); }
     else { showToast('Delete failed','error'); }
@@ -6538,7 +6538,7 @@ async function _createUser() {
   try {
     var r = await fetch('/api/v1/admin/users', {
       method:'POST',
-      headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+      headers:{,'Content-Type':'application/json'},
       body: JSON.stringify({email, password, role})
     });
     var d = await r.json();
@@ -6688,7 +6688,7 @@ function _destroyChart(id) {
 
 async function loadAnalytics() {
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   var days = parseInt((document.getElementById('analytics-days')||{value:'14'}).value)||14;
   try {
     var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:h}).then(function(r){return r.json();});
@@ -6847,7 +6847,7 @@ async function _doSearch(q) {
   document.getElementById('search-results-body').innerHTML = '<div style="padding:12px;color:var(--t3);font-size:11px">Searching…</div>';
 
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN};
+  var h = {}; // cookie-based auth — no Authorization header needed
   try {
     var [findD, runD] = await Promise.all([
       fetch('/api/v1/vsp/findings?q='+encodeURIComponent(q)+'&limit=5', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};}),
@@ -6925,7 +6925,7 @@ async function bulkAssign() {
   if (!assignee) return;
   var status = 'in_progress';
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'};
+  var h = {,'Content-Type':'application/json'};
   var ids = Array.from(_bulkSelected);
   var ok = 0;
   for (var id of ids) {
@@ -6945,7 +6945,7 @@ async function bulkAssign() {
 async function bulkSetStatus(status) {
   if (!_bulkSelected.size) { showToast('No findings selected','error'); return; }
   await ensureToken();
-  var h = {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'};
+  var h = {,'Content-Type':'application/json'};
   var ids = Array.from(_bulkSelected);
   var ok = 0;
   for (var id of ids) {
@@ -7303,7 +7303,7 @@ async function profileSubmitPassword() {
     var uid = window._profileUserId;
     if (!uid) {
       var rList = await fetch('/api/v1/admin/users', {
-        headers: {'Authorization':'Bearer '+window.TOKEN}
+        headers: {}
       });
       var dList = await rList.json();
       var me = (dList.users||[]).find(function(u){ return u.email===email; });
@@ -7313,7 +7313,7 @@ async function profileSubmitPassword() {
     if (uid) {
       var r2 = await fetch('/api/v1/admin/users/'+uid+'/password', {
         method: 'PUT',
-        headers: {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+        headers: {,'Content-Type':'application/json'},
         body: JSON.stringify({password: newpw})
       });
       if (!r2.ok) {
@@ -7401,8 +7401,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── GOV PATCH v1.5: OSCAL Downloads ──────────────────────────────────────
 async function downloadOSCAL(type) {
   await ensureToken();
-  var h = {'Authorization': 'Bearer ' + window.TOKEN,
-        'X-CSRF-Token': getCSRFToken()};
+  var h = {'X-CSRF-Token': getCSRFToken()}; // cookie auth
 
   // Get latest run_id
   var runId = null;
@@ -7521,7 +7520,7 @@ async function _submitNewRule() {
   try {
     var r = await fetch('/api/v1/policy/rules', {
       method: 'POST',
-      headers: {'Authorization':'Bearer '+window.TOKEN, 'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         name: name,
         description: desc,
@@ -7561,8 +7560,7 @@ window.loadRuns = async function() {
   if (!await ensureToken()) return;
   try {
     var d = await fetch('/api/v1/vsp/runs/index?limit=200', {
-      headers: {'Authorization': 'Bearer ' + window.TOKEN,
-        'X-CSRF-Token': getCSRFToken()}
+      credentials: 'same-origin'
     }).then(function(r){ return r.json(); });
     var runs = d.runs || [];
 
@@ -7734,7 +7732,7 @@ async function _updateFindingsKPI() {
   try {
     await ensureToken();
     var r = await fetch('/api/v1/vsp/findings/summary', {
-      headers: {'Authorization': 'Bearer ' + window.TOKEN,
+      headers: {,
         'X-CSRF-Token': getCSRFToken()}
     });
     if (!r.ok) return;
@@ -7890,8 +7888,7 @@ window.loadRuns = async function() {
   await ensureToken();
   try {
     var d = await fetch('/api/v1/vsp/runs/index?limit=200', {
-      headers: {'Authorization': 'Bearer ' + window.TOKEN,
-        'X-CSRF-Token': getCSRFToken()}
+      credentials: 'same-origin'
     }).then(function(r){ return r.json(); });
     var runs = d.runs || [];
     window._runsState.allRuns = runs;
@@ -7997,8 +7994,7 @@ window.loadRuns = async function() {
 // ── Audit Panel ───────────────────────────────────────────────────────────
 async function loadAuditReal() {
   await ensureToken();
-  var h = {'Authorization': 'Bearer ' + window.TOKEN,
-        'X-CSRF-Token': getCSRFToken()};
+  var h = {'X-CSRF-Token': getCSRFToken()}; // cookie auth
 
   try {
     // Fetch audit log
@@ -8094,7 +8090,7 @@ async function _fetchRealNotifications() {
   if (!await ensureToken()) return;
   try {
     var d = await fetch('/api/v1/notifications', {
-      headers: {'Authorization': 'Bearer ' + window.TOKEN,
+      headers: {,
         'X-CSRF-Token': getCSRFToken()}
     }).then(function(r){ return r.json(); });
 
