@@ -288,6 +288,7 @@ func main() {
 
 	authMw := auth.Middleware(jwtSecret, keyStore)
 	r.With(authMw).Get("/api/v1/auth/check", authH.Check) // session check — validates cookie
+	r.With(authMw).Get("/api/v1/auth/check", authH.Check) // session check — validates cookie
 
 	// SSE — cookie-based auth (no ?token= in URL — prevents log leakage)
 	r.With(authMw).Get("/api/v1/events", handler.SSEHandler)
