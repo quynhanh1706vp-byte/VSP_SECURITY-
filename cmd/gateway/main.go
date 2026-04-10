@@ -280,6 +280,7 @@ func main() {
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
 	r.Get("/api/v1/auth/check", authH.Check)   // session validation (cookie-based)
+	r.Get("/api/v1/auth/check", authH.Check)   // session validation (cookie-based)
 	r.Post("/api/v1/billing/webhook", billingH.Webhook)
 
 	authMw := auth.Middleware(jwtSecret, keyStore)
