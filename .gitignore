@@ -34,7 +34,6 @@ static/vsp_features_patch.js
 
 # Build cache
 *.test
-start.sh
 .env
 /*.py
 *.sh
