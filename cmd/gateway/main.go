@@ -407,6 +407,9 @@ func main() {
 		r.Post("/api/v1/auth/mfa/verify", mfaH.Verify)
 		r.Delete("/api/v1/auth/mfa", mfaH.Disable)
 		r.Post("/api/v1/auth/password/change", authH.ChangePassword)
+		// POST /api/v1/auth/api-token — tạo short-lived API key (1h) cho CLI/scripts
+		// NIST 800-63B: short-lived tokens, OWASP ASVS V3.4.3
+		r.Post("/api/v1/auth/api-token", authH.CreateAPIToken)
 
 		// Admin
 		r.Group(func(r chi.Router) {

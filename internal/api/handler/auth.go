@@ -266,3 +266,31 @@ func (a *Auth) Check(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]bool{"authenticated": true})
 }
+
+// POST /api/v1/auth/api-token
+// NIST 800-63B: short-lived token (1h) for CLI/script access
+// OWASP ASVS V3.4.3: token binding
+func (a *Auth) CreateAPIToken(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	// Generate short-lived token (1 hour) — separate from session
+	token, err := auth.IssueJWT(a.JWTSecret, auth.Claims{
+		UserID:   claims.UserID,
+		TenantID: claims.TenantID,
+		Role:     claims.Role,
+		Email:    claims.Email,
+	}, time.Hour)
+	if err != nil {
+		jsonError(w, "token generation failed", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{
+		"token":      token,
+		"expires_in": 3600,
+		"type":       "api-token",
+		"note":       "Short-lived token for API/CLI use. Do not store persistently.",
+	})
+}

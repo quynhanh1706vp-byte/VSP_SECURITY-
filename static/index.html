@@ -1629,8 +1629,9 @@ async function api(method, path, body, noAuth) {
   if (!noAuth && (!window.TOKEN || window.TOKEN === '')) {
     throw new Error('not_authenticated');
   }
-  const opts = { method, credentials: 'same-origin', headers: {'Content-Type':'application/json'} };
-  /* Cookie sent automatically — no Authorization header needed for cookie sessions */
+  // FIX 3: OWASP ASVS V4.2.2 — Double Submit Cookie CSRF protection
+  var csrfToken = document.cookie.split(';').map(function(c){return c.trim();}).reduce(function(v,c){return c.startsWith('vsp_csrf=')?c.split('=')[1]:v;},'');
+  const opts = { method, credentials: 'same-origin', headers: {'Content-Type':'application/json', 'X-CSRF-Token': csrfToken} };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(API + path, opts);
   if (!r.ok) {
@@ -1800,14 +1801,30 @@ function drawGauge(id, pct, color) {
 
 async function initDashboardCharts() {
   if (!window.TOKEN) { drawScoreRing('score-ring', 22, '#ef4444'); return; }
-  updateTicker(); // Update KPIs immediately
-  var h = {Authorization:'Bearer '+window.TOKEN};
+  updateTicker();
+  var h = {credentials: 'same-origin', headers: {'Content-Type':'application/json'}};
   try {
-    var [runData, runsIdx] = await Promise.all([
-      fetch('/api/v1/vsp/run/latest',{headers:h}).then(r=>r.json()).catch(()=>({})),
-      fetch('/api/v1/vsp/runs/index?limit=50',{headers:h}).then(r=>r.json()).catch(()=>({runs:[]})),
+    var [runData, runsIdx, postureData] = await Promise.all([
+      fetch('/api/v1/vsp/run/latest',{...h}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/vsp/runs/index?limit=50',{...h}).then(r=>r.json()).catch(()=>({runs:[]})),
+      fetch('/api/v1/vsp/posture/latest',{...h}).then(r=>r.json()).catch(()=>({})),
     ]);
-    var score = (runData.summary&&runData.summary.SCORE)||0;
+    // FIX 2: Dùng posture/latest thay vì hardcode (NIST 800-53 SI-12: dữ liệu phải từ hệ thống)
+    var score = postureData.score || (runData.summary&&runData.summary.SCORE) || 0;
+    var grade = postureData.grade || runData.posture || '—';
+    var critCount = postureData.critical || (runData.summary&&runData.summary.CRITICAL) || 0;
+    var highCount = postureData.high    || (runData.summary&&runData.summary.HIGH)     || 0;
+    // Update score/grade elements
+    ['d-score','d-score2','exec-score-num'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el){el.textContent=score;el.className=el.className.replace(/c-\w+/g,'')+(score>=70?' c-green':score>=40?' c-amber':' c-red');}
+    });
+    ['d-grade','exec-grade-static'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el){el.textContent=grade;el.className=el.className.replace(/c-\w+/g,'')+(grade==='A'||grade==='B'?' c-green':grade==='C'?' c-amber':' c-red');}
+    });
+    ['d-critical','exec-crit'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=critCount;});
+    ['d-high','exec-high'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=highCount;});
     var scoreColor = score>=70?'#22c55e':score>=40?'#f59e0b':'#ef4444';
     drawScoreRing('score-ring', score, scoreColor);
     drawScoreRing('exec-ring',  score, scoreColor);
@@ -1893,10 +1910,10 @@ function initGovernance() {
   const ctx = document.getElementById('gov-radar')?.getContext('2d');
   if (ctx && window.TOKEN) {
     Promise.all([
-      fetch('/api/v1/compliance/fedramp',{headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
-      fetch('/api/v1/compliance/cmmc',   {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
-      fetch('/api/v1/vsp/gate/latest',   {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json()).catch(()=>({})),
-      fetch('/api/v1/soc/framework-scorecard',{headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/compliance/fedramp',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
+      fetch('/api/v1/compliance/cmmc',   {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
+      fetch('/api/v1/vsp/gate/latest',   {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/soc/framework-scorecard',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
     ]).then(function([fr,cmmc,gate,sc]){
       var fedrampPct = fr.coverage_pct||0;
       var cmmcPct   = cmmc.coverage_pct||0;
@@ -1972,7 +1989,7 @@ function initExecutiveRing() {
 function drawSocRadar() {
   // Fetch real Zero Trust pillar scores
   if (window.TOKEN) {
-    fetch('/api/v1/soc/zero-trust',{headers:{Authorization:'Bearer '+window.TOKEN}})
+    fetch('/api/v1/soc/zero-trust',{credentials:'same-origin'})
       .then(r=>r.json()).then(function(d){
         var pillars=d.pillars||[];
         var wrap=document.getElementById('zt-pillars');
@@ -2559,7 +2576,7 @@ document.addEventListener('keydown', e => {
 function updateTicker() {
   // Update remediation count
   if (window.TOKEN) {
-    fetch('/api/v1/remediation/stats',{headers:{Authorization:'Bearer '+window.TOKEN}})
+    fetch('/api/v1/remediation/stats',{credentials:'same-origin'})
       .then(r=>r.json()).then(function(d){
         var open=d.open||0;
         var el=document.getElementById('d-rem'); if(el) el.textContent=open.toLocaleString();
@@ -2569,7 +2586,7 @@ function updateTicker() {
   }
   // Update score/grade from latest run
   if (window.TOKEN) {
-    fetch('/api/v1/vsp/run/latest',{headers:{Authorization:'Bearer '+window.TOKEN}})
+    fetch('/api/v1/vsp/run/latest',{credentials:'same-origin'})
       .then(r=>r.json()).then(function(d){
         var score=(d.summary&&d.summary.SCORE)||0;
         var posture=d.posture||'F';
@@ -2605,7 +2622,7 @@ function updateTicker() {
         var ringColor=gate==='PASS'?'#22c55e':gate==='WARN'?'#f59e0b':'#ef4444';
         if(typeof drawScoreRing==='function') drawScoreRing('score-ring', score, ringColor);
       }).catch(function(){});
-    fetch('/api/v1/vsp/runs/index?limit=200',{headers:{Authorization:'Bearer '+window.TOKEN}})
+    fetch('/api/v1/vsp/runs/index?limit=200',{credentials:'same-origin'})
       .then(r=>r.json()).then(function(d){
         var total=d.total||(d.runs&&d.runs.length)||0;
         var el=document.getElementById('d-runs-count'); if(el&&total) el.textContent=total;
@@ -2875,7 +2892,7 @@ async function govLoginSubmit() {
     // httpOnly cookie is set by server (cannot be accessed via JS — XSS safe)
     // localStorage kept for Authorization: Bearer header in API fetch calls
     // If migrating to full cookie-only, remove this line and update all fetch() calls
-    if (data.token) { window.TOKEN = '✓'; /* cookie set by server */ }
+    if (data.token || r.ok) { window.TOKEN = '✓'; window._tokenChecked = true; /* httpOnly cookie set by server — NEVER store raw JWT in JS (CWE-522) */ }
 
     // Sync user info to topbar
     if (data.email) {
@@ -8184,9 +8201,9 @@ async function loadSIEMKPIs() {
   } catch(e) {}
 }
 // Gọi sau khi login
+// FIX 5: Poll SIEM KPIs khi đã authenticate (TOKEN='✓') — không decode JWT (httpOnly cookie)
 var _siemKPIpoll = setInterval(function() {
-  if (!window.TOKEN || window.TOKEN.length < 50 || window.TOKEN.split('.').length !== 3) return;
-  try { var p=decodeJwt(window.TOKEN); if(!p||(p.exp&&p.exp*1000<Date.now())){/* vsp_token cookie cleared server-side */window.TOKEN='';return;} } catch(e){return;}
+  if (!window.TOKEN || window.TOKEN !== '✓') return;
   clearInterval(_siemKPIpoll);
   loadSIEMKPIs();
   setInterval(loadSIEMKPIs, 60000);
