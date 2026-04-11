@@ -242,7 +242,8 @@ async function openAssetModal(id){
   // Fetch real findings từ API
   if(TOKEN){
     try{
-      var d=await fetch(API+'/api/v1/assets/'+id+'/findings', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({}));
+      var d=await fetch(API+'/api/v1/assets/'+id+'/findings',
+        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
       if(d.findings&&d.findings.length){
         a._api_findings=d.findings;
         // Update counts from real data
@@ -306,9 +307,9 @@ function openFindingModal(id){
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 async function loadAssets(){
   if(!TOKEN)return;
-  var h = {};
+  var h={Authorization:'Bearer '+TOKEN};
   try{
-    var r=await fetch(API+'/api/v1/assets', {credentials:'same-origin', headers:h});
+    var r=await fetch(API+'/api/v1/assets',{headers:h});
     if(r.ok){var d=await r.json();if(d.assets&&d.assets.length){ASSETS=d.assets.map(function(a){return Object.assign({},a,{risk_score:a.risk_score||Math.round((a.critical||0)*20+(a.high||0)*8+(a.medium||0)*3+(a.low||0)),status:a.critical>0?'critical':a.high>0?'high':a.medium>0?'medium':'clean'});});updateKPIs();renderHeatmap();renderAssets();}}
   }catch(e){}
 }

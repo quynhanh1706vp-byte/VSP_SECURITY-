@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VSP Security Platform v2.0</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="/vsp_enterprise_ui.css">
 
 <!-- ══════════════════════════════════════════════
@@ -91,28 +91,16 @@
       <div class="g2 mb14">
         <div class="form-group mb8">
           <label class="form-label">Mode</label>
-          <select id="scanMode" class="form-ctrl" onchange="updateModeHint(this.value)">
-            <option value="SAST">SAST — Static code analysis</option>
-            <option value="SCA">SCA — Software composition</option>
-            <option value="SECRETS">SECRETS — Secret &amp; credential leak</option>
-            <option value="IAC">IAC — Infrastructure as Code</option>
-            <option value="DAST">DAST — Dynamic app testing</option>
-            <option value="NETWORK">NETWORK — Deep L2-L7 packet analysis</option>
-            <option value="FULL">FULL — All tools combined</option>
+          <select id="scanMode" class="form-ctrl">
+            <option>SAST</option><option>SCA</option><option>SECRETS</option>
+            <option>IAC</option><option>DAST</option><option>FULL</option>
           </select>
-          <div id="mode-hint" style="font-size:10px;color:var(--cyan);margin-top:4px;font-family:var(--font-mono)"></div>
         </div>
         <div class="form-group mb8">
           <label class="form-label">Profile</label>
-          <select id="scanProfile" class="form-ctrl" onchange="updateProfileHint(this.value)">
-            <option value="FAST">FAST — Core tools · 2 min/tool</option>
-            <option value="EXT">EXT — Extended · 5 min/tool</option>
-            <option value="AGGR">AGGR — Aggressive · 10 min/tool</option>
-            <option value="PREMIUM">PREMIUM — Deep scan · 15 min/tool</option>
-            <option value="FULL">FULL — All tools · 20 min/tool</option>
-            <option value="FULL_SOC">FULL_SOC — SOC max depth · 30 min/tool</option>
+          <select id="scanProfile" class="form-ctrl">
+            <option>FAST</option><option>EXT</option><option>FULL</option>
           </select>
-          <div id="profile-hint" style="font-size:10px;color:var(--amber);margin-top:4px;font-family:var(--font-mono)"></div>
         </div>
       </div>
       <div class="form-group">
@@ -465,7 +453,7 @@
           </div>
           <div class="chpw-field">
             <label class="chpw-label">New password</label>
-            <input class="chpw-input" type="password" id="chpw-new" placeholder="min 12 characters">
+            <input class="chpw-input" type="password" id="chpw-new" placeholder="min 8 characters">
           </div>
           <div class="chpw-field">
             <label class="chpw-label">Confirm new password</label>
@@ -506,7 +494,7 @@
         </div>
         <div class="spark-card">
           <div class="spark-label">Gate Pass Rate</div>
-          <div class="spark-value c-amber" id="d-pass-rate">—</div>
+          <div class="spark-value c-amber" id="d-pass-rate">38%</div>
           <div class="spark-canvas-wrap"><canvas id="sp-pass" height="40"></canvas></div>
         </div>
         <div class="spark-card">
@@ -518,10 +506,10 @@
 
       <!-- Extra KPIs -->
       <div class="g4 mb14">
-        <div class="kpi kpi-crit" style="cursor:pointer" title="View critical findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='CRITICAL';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Critical →</div><div class="kpi-value c-red" id="d-critical">—</div><div class="kpi-sub">findings</div></div>
-        <div class="kpi kpi-high" style="cursor:pointer" title="View high findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='HIGH';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">High →</div><div class="kpi-value c-orange" id="d-high">—</div><div class="kpi-sub">findings</div></div>
-        <div class="kpi kpi-med" style="cursor:pointer" title="View medium findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='MEDIUM';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Medium →</div><div class="kpi-value c-amber" id="d-medium">—</div><div class="kpi-sub">findings</div></div>
-        <div class="kpi kpi-low" style="cursor:pointer" title="View low findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='LOW';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Low →</div><div class="kpi-value c-green" id="d-low">—</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-crit" style="cursor:pointer" title="View critical findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='CRITICAL';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Critical →</div><div class="kpi-value c-red" id="d-critical">1</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-high" style="cursor:pointer" title="View high findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='HIGH';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">High →</div><div class="kpi-value c-orange" id="d-high">80</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-med" style="cursor:pointer" title="View medium findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='MEDIUM';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Medium →</div><div class="kpi-value c-amber" id="d-medium">13</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-low" style="cursor:pointer" title="View low findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='LOW';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Low →</div><div class="kpi-value c-green" id="d-low">3</div><div class="kpi-sub">findings</div></div>
       </div>
 
 
@@ -565,7 +553,6 @@
                 <div class="score-overlay">
                   <div class="score-num c-red" id="d-score2">—</div>
                   <div class="score-lbl">/100</div>
-                  <div id="d-score-cap" style="font-size:9px;color:var(--t3);margin-top:2px;display:none" title="Penalty capped per bucket">cap active</div>
                 </div>
               </div>
               <div style="flex:1">
@@ -590,87 +577,6 @@
       </div>
 
       <!-- Top findings + Gate trend -->
-
-      <!-- ── DoD RMF / ATO / POAM / KEV row ───────────────────────────── -->
-      <div class="g4 mb14" id="dod-widgets-row">
-
-        <!-- ATO Countdown -->
-        <div class="card" style="border-left:3px solid var(--green)">
-          <div class="card-head">
-            <div class="card-title">ATO Status</div>
-            <span class="pill" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);font-size:9px" id="ato-status-pill">AUTHORIZED</span>
-          </div>
-          <div style="display:flex;align-items:baseline;gap:6px;margin:8px 0 2px">
-            <div style="font-size:28px;font-weight:700;color:var(--green);font-family:var(--mono)" id="ato-days">—</div>
-            <div style="font-size:11px;color:var(--t2)">days remaining</div>
-          </div>
-          <div style="font-size:10px;color:var(--t3)" id="ato-expiry">Expires: —</div>
-          <div style="margin-top:8px;height:4px;background:var(--bg3);border-radius:2px">
-            <div id="ato-bar" style="height:4px;border-radius:2px;background:var(--green);width:80%;transition:width .5s"></div>
-          </div>
-          <div style="font-size:9px;color:var(--t3);margin-top:4px">RMF Step 5 · DoD 8510.01</div>
-        </div>
-
-        <!-- POAM Summary -->
-        <div class="card" style="border-left:3px solid var(--amber)">
-          <div class="card-head">
-            <div class="card-title">POA&amp;M</div>
-            <span class="pill" style="background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2);font-size:9px">CA-5</span>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-            <div style="text-align:center">
-              <div style="font-size:22px;font-weight:700;color:var(--red);font-family:var(--mono)" id="poam-open">—</div>
-              <div style="font-size:10px;color:var(--t3)">Open items</div>
-            </div>
-            <div style="text-align:center">
-              <div style="font-size:22px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="poam-overdue">—</div>
-              <div style="font-size:10px;color:var(--t3)">Overdue</div>
-            </div>
-          </div>
-          <div style="margin-top:8px;font-size:10px;color:var(--t3)">From open remediation items</div>
-          <div style="font-size:9px;color:var(--t3);margin-top:4px">NIST CA-5 · FedRAMP POA&amp;M</div>
-        </div>
-
-        <!-- ConMon Status -->
-        <div class="card" style="border-left:3px solid var(--cyan)">
-          <div class="card-head">
-            <div class="card-title">ConMon</div>
-            <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px">CA-7</span>
-          </div>
-          <div style="margin-top:8px">
-            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-              <span style="font-size:11px;color:var(--t2)">Last scan</span>
-              <span style="font-size:11px;font-weight:600;color:var(--green)" id="conmon-last-scan">—</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-              <span style="font-size:11px;color:var(--t2)">Scan frequency</span>
-              <span style="font-size:11px;font-weight:600;color:var(--t1)" id="conmon-freq">—</span>
-            </div>
-            <div style="display:flex;justify-content:space-between">
-              <span style="font-size:11px;color:var(--t2)">30-day runs</span>
-              <span style="font-size:11px;font-weight:600;color:var(--cyan)" id="conmon-30d">—</span>
-            </div>
-          </div>
-          <div style="font-size:9px;color:var(--t3);margin-top:6px">FedRAMP ConMon · SI-4 · AU-6</div>
-        </div>
-
-        <!-- CISA KEV Alert -->
-        <div class="card" style="border-left:3px solid var(--red)">
-          <div class="card-head">
-            <div class="card-title">CISA KEV</div>
-            <span class="pill" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);font-size:9px">RA-5</span>
-          </div>
-          <div style="display:flex;align-items:baseline;gap:6px;margin:8px 0 2px">
-            <div style="font-size:28px;font-weight:700;color:var(--red);font-family:var(--mono)" id="kev-matches">—</div>
-            <div style="font-size:11px;color:var(--t2)">KEV matches</div>
-          </div>
-          <div style="font-size:10px;color:var(--t3)" id="kev-status">Checking findings vs CISA KEV...</div>
-          <div style="margin-top:6px" id="kev-list"></div>
-          <div style="font-size:9px;color:var(--t3);margin-top:4px">CISA Known Exploited Vulns · SI-5</div>
-        </div>
-
-      </div>
-      <!-- ── End DoD widgets ──────────────────────────────────────────── -->
       <div class="g2 mb14">
         <div class="card">
           <div class="card-head">
@@ -769,7 +675,7 @@
         <div class="log-tool-cell done" id="ltc-trivy"><div class="log-tool-name">trivy</div><div class="log-tool-status c-green f10 fmono">9 findings</div></div>
         <div class="log-tool-cell done" id="ltc-gitleaks"><div class="log-tool-name">gitleaks</div><div class="log-tool-status c-green f10 fmono">3 findings</div></div>
         <div class="log-tool-cell done" id="ltc-checkov"><div class="log-tool-name">checkov</div><div class="log-tool-status c-green f10 fmono">13 findings</div></div>
-        <div class="log-tool-cell" id="ltc-secretcheck"><div class="log-tool-name">secretcheck</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-trufflehog"><div class="log-tool-name">trufflehog</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
       </div>
 
       <div class="log-toolbar">
@@ -863,7 +769,7 @@
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>Run ID</th><th>Mode</th><th>Profile</th><th>Status</th><th>Gate</th><th>Gate Reason</th><th>Findings</th><th>Tools</th><th>Score</th><th>By</th><th>Created</th></tr></thead>
+            <thead><tr><th>Run ID</th><th>Mode</th><th>Profile</th><th>Status</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Score</th><th>Created</th></tr></thead>
             <tbody id="runs-table">
               <tr><td class="mono" style="font-size:10px">RID_SCHED_20260329_194714_0</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">104</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 19:47</td></tr>
               <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_171611</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-orange fw7">49</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 17:16</td></tr>
@@ -933,7 +839,7 @@
           <option>kics</option><option>trivy</option><option>gitleaks</option>
           <option>checkov</option><option>bandit</option><option>semgrep</option>
           <option>codeql</option><option>grype</option><option>nuclei</option>
-          <option>nikto</option><option>secretcheck</option><option>sslscan</option><option>license</option><option>hadolint</option>
+          <option>nikto</option><option>trufflehog</option>
         </select>
         <input class="filter-input" id="filter-search" placeholder="Search findings…">
         <button class="btn btn-primary" onclick="loadFindings(0)">Filter</button>
@@ -1148,32 +1054,6 @@
          GOVERNANCE PANEL
     ════════════════════════════════════ -->
     <div id="panel-governance" class="panel">
-    <div class="mb14"><div class="card">
-      <div class="card-head">
-        <div class="card-title">Evidence locker</div>
-        <div style="display:flex;gap:6px">
-          <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px">AU-9 · AU-11</span>
-          <button class="btn btn-ghost" style="font-size:10px" onclick="freezeAllEvidence()">Freeze all</button>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0">
-        <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px"><div style="font-size:22px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="ev-total">—</div><div style="font-size:10px;color:var(--t3)">Total</div></div>
-        <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px"><div style="font-size:22px;font-weight:700;color:var(--green);font-family:var(--mono)" id="ev-frozen">—</div><div style="font-size:10px;color:var(--t3)">Frozen</div></div>
-        <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px"><div style="font-size:22px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="ev-pending">—</div><div style="font-size:10px;color:var(--t3)">Pending</div></div>
-        <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px"><div style="font-size:22px;font-weight:700;color:var(--t1);font-family:var(--mono)" id="ev-artifacts">—</div><div style="font-size:10px;color:var(--t3)">Artifacts</div></div>
-      </div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <thead><tr style="border-bottom:1px solid var(--b1)">
-          <th style="text-align:left;padding:5px;color:var(--t2);font-weight:500">Evidence</th>
-          <th style="text-align:left;padding:5px;color:var(--t2);font-weight:500">Type</th>
-          <th style="text-align:left;padding:5px;color:var(--t2);font-weight:500">Date</th>
-          <th style="text-align:left;padding:5px;color:var(--t2);font-weight:500">Status</th>
-          <th style="text-align:left;padding:5px;color:var(--t2);font-weight:500">Action</th>
-        </tr></thead>
-        <tbody id="ev-tbody"><tr><td colspan="5" style="padding:12px;text-align:center;color:var(--t3)">Loading...</td></tr></tbody>
-      </table>
-      <div style="font-size:9px;color:var(--t3);margin-top:8px">AU-9 · AU-11 · AU-12</div>
-    </div></div>
       <div class="gov-grid">
         <div class="gov-card">
           <div class="gov-card-title">Risk framework radar</div>
@@ -1222,32 +1102,6 @@
          COMPLIANCE PANEL
     ════════════════════════════════════ -->
     <div id="panel-compliance" class="panel">
-      <div class="mb14"><div class="card">
-        <div class="card-head">
-          <div class="card-title">OSCAL Assessment Results</div>
-          <div style="display:flex;gap:6px">
-            <span class="pill" style="background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);font-size:9px" id="oscal-version-badge">OSCAL —</span>
-            <span class="pill" style="background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);font-size:9px" id="oscal-status-badge">Loading...</span>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0">
-          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px"><div style="font-size:20px;font-weight:700;color:var(--green);font-family:var(--mono)" id="oscal-satisfactory">—</div><div style="font-size:10px;color:var(--t3)">Satisfactory</div></div>
-          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px"><div style="font-size:20px;font-weight:700;color:var(--red);font-family:var(--mono)" id="oscal-not-satisfactory">—</div><div style="font-size:10px;color:var(--t3)">Not satisfactory</div></div>
-          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px"><div style="font-size:20px;font-weight:700;color:var(--amber);font-family:var(--mono)" id="oscal-other">—</div><div style="font-size:10px;color:var(--t3)">Other</div></div>
-          <div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px"><div style="font-size:20px;font-weight:700;color:var(--cyan);font-family:var(--mono)" id="oscal-controls">—</div><div style="font-size:10px;color:var(--t3)">Controls</div></div>
-        </div>
-        <div style="max-height:280px;overflow-y:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <thead><tr style="border-bottom:1px solid var(--b1)">
-              <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Control</th>
-              <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Status</th>
-              <th style="text-align:left;padding:6px;color:var(--t2);font-weight:500">Finding</th>
-            </tr></thead>
-            <tbody id="oscal-findings-tbody"><tr><td colspan="3" style="padding:12px;text-align:center;color:var(--t3)">Loading OSCAL...</td></tr></tbody>
-          </table>
-        </div>
-        <div style="font-size:9px;color:var(--t3);margin-top:8px" id="oscal-last-modified">NIST OSCAL 1.1.2 · FedRAMP AR</div>
-      </div></div>
       <div class="g3 mb14">
         <div class="card" style="text-align:center">
           <div class="card-body">
@@ -1478,8 +1332,8 @@
         </div>
         <div class="exec-hero-cell">
           <div class="mono-sm mb12" style="letter-spacing:.15em;text-transform:uppercase">Risk Summary</div>
-          <div class="exec-stat" style="cursor:pointer" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='CRITICAL';document.getElementById('filter-search').value='';loadFindings(0);},300)" title="View critical findings"><span class="exec-stat-lbl">Critical findings</span><span class="exec-stat-val c-red" id="exec-crit" style="text-decoration:underline dotted">—</span></div>
-          <div class="exec-stat" style="cursor:pointer" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='HIGH';document.getElementById('filter-search').value='';loadFindings(0);},300)" title="View high findings"><span class="exec-stat-lbl">High findings</span><span class="exec-stat-val c-orange" id="exec-high" style="text-decoration:underline dotted">—</span></div>
+          <div class="exec-stat" style="cursor:pointer" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='CRITICAL';document.getElementById('filter-search').value='';loadFindings(0);},300)" title="View critical findings"><span class="exec-stat-lbl">Critical findings</span><span class="exec-stat-val c-red" style="text-decoration:underline dotted">1</span></div>
+          <div class="exec-stat" style="cursor:pointer" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='HIGH';document.getElementById('filter-search').value='';loadFindings(0);},300)" title="View high findings"><span class="exec-stat-lbl">High findings</span><span class="exec-stat-val c-orange" style="text-decoration:underline dotted">80</span></div>
           <div class="exec-stat"><span class="exec-stat-lbl">SLA breaches</span><span class="exec-stat-val c-green">0</span></div>
           <div class="exec-stat"><span class="exec-stat-lbl">Open remediations</span><span class="exec-stat-val" id="exec-open-rem">—</span></div>
           <div class="exec-stat"><span class="exec-stat-lbl">Total runs</span><span class="exec-stat-val c-cyan" id="exec-total-runs">—</span></div>
@@ -1630,13 +1484,7 @@
     <div id="panel-vulnmgmt" class="panel" style="padding:0;height:calc(100vh - 56px)">
       <iframe src="" data-src="/panels/vuln_mgmt.html" style="width:100%;height:100%;border:none"></iframe>
     </div>
-    <div id="panel-p4compliance" class="panel" style="padding:0;height:calc(100vh - 56px)">
-      <iframe src="" data-src="/panels/p4_compliance.html"
-        style="width:100%;height:100%;border:none;background:#0a0c10"
-       >
-      </iframe>
-    </div>
-        <div id="panel-threatintel" class="panel">
+    <div id="panel-threatintel" class="panel">
       <iframe src="" data-src="/panels/threat_intel.html"
         style="width:100%;height:calc(100vh - 52px);border:none;background:transparent"
         allowtransparency="true">
@@ -1704,42 +1552,7 @@ function decodeJwt(token) {
   } catch(e) { return null; }
 }
 
-// ─── CWE → OWASP Top 10 2021 ─────────────────────────────────────────────────
-function cweToOwasp(cwe) {
-  if (!cwe) return '';
-  var m = {
-    'CWE-22':'A01','CWE-284':'A01','CWE-285':'A01','CWE-352':'A01','CWE-601':'A01','CWE-639':'A01','CWE-668':'A01','CWE-732':'A01','CWE-862':'A01','CWE-863':'A01',
-    'CWE-311':'A02','CWE-319':'A02','CWE-321':'A02','CWE-326':'A02','CWE-327':'A02','CWE-328':'A02','CWE-330':'A02','CWE-338':'A02','CWE-347':'A02','CWE-916':'A02',
-    'CWE-20':'A03','CWE-74':'A03','CWE-77':'A03','CWE-78':'A03','CWE-79':'A03','CWE-89':'A03','CWE-90':'A03','CWE-94':'A03','CWE-643':'A03','CWE-917':'A03',
-    'CWE-256':'A04','CWE-269':'A04','CWE-434':'A04','CWE-522':'A04','CWE-602':'A04','CWE-653':'A04',
-    'CWE-2':'A05','CWE-16':'A05','CWE-611':'A05','CWE-614':'A05','CWE-942':'A05','CWE-1004':'A05','CWE-1188':'A05',
-    'CWE-1035':'A06','CWE-1104':'A06',
-    'CWE-255':'A07','CWE-259':'A07','CWE-287':'A07','CWE-295':'A07','CWE-306':'A07','CWE-307':'A07','CWE-308':'A07','CWE-640':'A07','CWE-798':'A07',
-    'CWE-345':'A08','CWE-346':'A08','CWE-354':'A08','CWE-502':'A08','CWE-829':'A08',
-    'CWE-117':'A09','CWE-223':'A09','CWE-532':'A09','CWE-778':'A09',
-    'CWE-918':'A10',
-    // extra mappings
-    'CWE-250':'A04','CWE-400':'A05','CWE-674':'A05','CWE-693':'A05','CWE-676':'A05','CWE-770':'A05',
-  };
-  return m[cwe] || '';
-}
-function owaspBadge(cwe) {
-  var cat = cweToOwasp(cwe);
-  if (!cat) return '';
-  var colors = {'A01':'var(--red)','A02':'var(--orange)','A03':'var(--red)','A04':'var(--amber)','A05':'var(--amber)','A06':'var(--cyan)','A07':'var(--amber)','A08':'var(--purple)','A09':'var(--t3)','A10':'var(--blue)'};
-  var col = colors[cat] || 'var(--t3)';
-  return '<span style="font-size:9px;font-weight:600;color:'+col+';opacity:.9" title="OWASP '+cat+'">'+cat+'</span>';
-}
-
 // ─── XSS escape helper ───────────────────────────────────────────────────────
-
-// ─── CSRF double-submit helper ────────────────────────────────────────────────
-function _safeHeader(v){return String(v||'').replace(/[^\x20-\x7E]/g,'');}
-function getCSRFToken(){
-  var m=document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');});
-  return _safeHeader(m?m.split('=').slice(1).join('='):'');
-}
-
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;')
@@ -1750,7 +1563,19 @@ function esc(s) {
 }
 
 const API = '/api/v1';
-let TOKEN = ''; /* cookie-based auth — JS never reads token */
+let TOKEN = (function(){
+  var t = localStorage.getItem('vsp_token') || '';
+  if (!t) return '';
+  try {
+    var p = decodeJwt(t);
+    if (!p) { localStorage.removeItem('vsp_token'); return ''; }
+    if (p.exp && p.exp * 1000 < Date.now()) {
+      localStorage.removeItem('vsp_token');
+      return '';
+    }
+  } catch(e) { localStorage.removeItem('vsp_token'); return ''; }
+  return t;
+})();
 let _currentPanel = 'dashboard';
 let _allLogs = [];
 let _logFilter = 'ALL';
@@ -1762,10 +1587,8 @@ async function api(method, path, body, noAuth) {
   if (!noAuth && (!window.TOKEN || window.TOKEN === '')) {
     throw new Error('not_authenticated');
   }
-  // FIX 3: OWASP ASVS V4.2.2 — Double Submit Cookie CSRF protection
-  // encodeURIComponent not needed — getCSRFToken() returns ASCII-safe base64url
-  var csrfToken = _safeHeader((document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('='));
-  const opts = { method, credentials: 'same-origin', headers: csrfToken ? {'Content-Type':'application/json','X-CSRF-Token':csrfToken} : {'Content-Type':'application/json'} };
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (!noAuth && window.TOKEN) opts.headers['Authorization'] = 'Bearer ' + window.TOKEN;
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(API + path, opts);
   if (!r.ok) {
@@ -1800,7 +1623,6 @@ const PANEL_META = {
   compliance:  {title:'FedRAMP / CMMC',sub:'VSP / Compliance / Control coverage'},
   sbom:        {title:'SBOM',          sub:'VSP / Compliance / Software Bill of Materials'},
   threathunt:  {title:'Threat Hunting', sub:'VSP / SIEM / Log query · pivot · timeline'},
-  p4compliance: {title:'P4 Compliance', sub:'VSP / Compliance / DoD Zero Trust · RMF · FedRAMP'},
   sla:         {title:'SLA Tracker',   sub:'VSP / Compliance / Remediation deadlines'},
   executive:   {title:'Executive Summary', sub:'VSP / Reports / Executive · auto-generated'},
   export:      {title:'Export',        sub:'VSP / Reports / SARIF · CSV · JSON · OSCAL'},
@@ -1814,14 +1636,6 @@ const PANEL_META = {
 };
 
 function showPanel(name, btn) {
-  // Lazy-load iframe panels (data-src → src)
-  var _panel = document.getElementById('panel-' + name);
-  if (_panel) {
-    var _iframe = _panel.querySelector('iframe[data-src]');
-    if (_iframe && (!_iframe.src || _iframe.src === window.location.href || _iframe.src === 'about:blank' || _iframe.src === '')) {
-      _iframe.src = _iframe.getAttribute('data-src');
-    }
-  }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);
@@ -1944,41 +1758,17 @@ function drawGauge(id, pct, color) {
 
 async function initDashboardCharts() {
   if (!window.TOKEN) { drawScoreRing('score-ring', 22, '#ef4444'); return; }
-  updateTicker();
-  var h = {credentials: 'same-origin', headers: {'Content-Type':'application/json'}};
+  updateTicker(); // Update KPIs immediately
+  var h = {Authorization:'Bearer '+window.TOKEN};
   try {
-    var [runData, runsIdx, postureData] = await Promise.all([
-      fetch('/api/v1/vsp/run/latest',{...h}).then(r=>r.json()).catch(()=>({})),
-      fetch('/api/v1/vsp/runs/index?limit=50',{...h}).then(r=>r.json()).catch(()=>({runs:[]})),
-      fetch('/api/v1/vsp/posture/latest',{...h}).then(r=>r.json()).catch(()=>({})),
+    var [runData, runsIdx] = await Promise.all([
+      fetch('/api/v1/vsp/run/latest',{headers:h}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/vsp/runs/index?limit=50',{headers:h}).then(r=>r.json()).catch(()=>({runs:[]})),
     ]);
-    // FIX 2: Dùng posture/latest thay vì hardcode (NIST 800-53 SI-12: dữ liệu phải từ hệ thống)
-    var score = postureData.score || (runData.summary&&runData.summary.SCORE) || 0;
-    var grade = postureData.grade || runData.posture || '—';
-    var critCount = postureData.critical || (runData.summary&&runData.summary.CRITICAL) || 0;
-    var highCount = postureData.high    || (runData.summary&&runData.summary.HIGH)     || 0;
-    // Update score/grade elements
-    ['d-score','d-score2','exec-score-num'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el){el.textContent=score;el.className=el.className.replace(/c-\w+/g,'')+(score>=70?' c-green':score>=40?' c-amber':' c-red');}
-    });
-    ['d-grade','exec-grade-static'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el){el.textContent=grade;el.className=el.className.replace(/c-\w+/g,'')+(grade==='A'||grade==='B'?' c-green':grade==='C'?' c-amber':' c-red');}
-    });
-    ['d-critical','exec-crit'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=critCount;});
-    ['d-high','exec-high'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=highCount;});
+    var score = (runData.summary&&runData.summary.SCORE)||0;
     var scoreColor = score>=70?'#22c55e':score>=40?'#f59e0b':'#ef4444';
     drawScoreRing('score-ring', score, scoreColor);
     drawScoreRing('exec-ring',  score, scoreColor);
-    // Show cap indicator if any bucket was capped
-    var capEl = document.getElementById('d-score-cap');
-    if (capEl) {
-      var summ = runData && runData.summary || {};
-      var capped = (summ.CRITICAL||0)>2 || (summ.HIGH||0)>5 || (summ.MEDIUM||0)>10 || (summ.LOW||0)>10;
-      capEl.style.display = capped ? 'block' : 'none';
-      if (capped) capEl.title = 'Score capped: C='+(summ.CRITICAL||0)+' H='+(summ.HIGH||0)+' M='+(summ.MEDIUM||0)+' L='+(summ.LOW||0)+' (caps: 2/5/10/10)';
-    }
 
     var doneRuns = (runsIdx.runs||[]).filter(function(r){return r.status==='DONE';}).slice(0,10).reverse();
     if (doneRuns.length) {
@@ -2053,10 +1843,10 @@ function initGovernance() {
   const ctx = document.getElementById('gov-radar')?.getContext('2d');
   if (ctx && window.TOKEN) {
     Promise.all([
-      fetch('/api/v1/compliance/fedramp',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
-      fetch('/api/v1/compliance/cmmc',   {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
-      fetch('/api/v1/vsp/gate/latest',   {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
-      fetch('/api/v1/soc/framework-scorecard',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/compliance/fedramp',{headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
+      fetch('/api/v1/compliance/cmmc',   {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
+      fetch('/api/v1/vsp/gate/latest',   {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/soc/framework-scorecard',{headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json()).catch(()=>({})),
     ]).then(function([fr,cmmc,gate,sc]){
       var fedrampPct = fr.coverage_pct||0;
       var cmmcPct   = cmmc.coverage_pct||0;
@@ -2132,7 +1922,7 @@ function initExecutiveRing() {
 function drawSocRadar() {
   // Fetch real Zero Trust pillar scores
   if (window.TOKEN) {
-    fetch('/api/v1/soc/zero-trust',{credentials:'same-origin'})
+    fetch('/api/v1/soc/zero-trust',{headers:{Authorization:'Bearer '+window.TOKEN}})
       .then(r=>r.json()).then(function(d){
         var pillars=d.pillars||[];
         var wrap=document.getElementById('zt-pillars');
@@ -2170,7 +1960,7 @@ function filterLogs() {
     return true;
   });
 
-  const toolColors = {kics:'#818cf8',bandit:'#38bdf8',semgrep:'#4ade80',grype:'#fb923c',trivy:'#fbbf24',gitleaks:'#f87171',checkov:'#a78bfa',secretcheck:'#f472b6',scanner:'#8899bb',gate:'#38bdf8'};
+  const toolColors = {kics:'#818cf8',bandit:'#38bdf8',semgrep:'#4ade80',grype:'#fb923c',trivy:'#fbbf24',gitleaks:'#f87171',checkov:'#a78bfa',trufflehog:'#f472b6',scanner:'#8899bb',gate:'#38bdf8'};
   document.getElementById('log-count').textContent = filtered.length + ' lines';
   stream.innerHTML = filtered.length ? filtered.map(l => `
     <div class="log-line">
@@ -2300,9 +2090,7 @@ async function runEval() {
     if (TOKEN) {
       const r = await api('POST', '/policy/evaluate', {repo:'current'});
       const color = r.decision==='PASS'?'var(--green)':r.decision==='WARN'?'var(--amber)':'var(--red)';
-      // Security: escape r.reason (API string) before innerHTML
-      const _esc2155 = s => String(s||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
-      el.innerHTML = `<span style="color:${color};font-size:16px;font-weight:700">${_esc2155(r.decision)}</span> · score: <b>${Number(r.score)||0}</b> · posture: <b>${_esc2155(r.posture)}</b> · <span style="color:var(--t3)">${_esc2155(r.reason)}</span>`;
+      el.innerHTML = `<span style="color:${color};font-size:16px;font-weight:700">${r.decision}</span> · score: <b>${r.score}</b> · posture: <b>${r.posture}</b> · <span style="color:var(--t3)">${r.reason}</span>`;
     } else {
       el.innerHTML = `<span style="color:var(--red);font-size:16px;font-weight:700">FAIL</span> · score: <b>—</b> · posture: <b>—</b> · <span style="color:var(--t3)">Critical findings detected (Block Critical rule triggered)</span>`;
     }
@@ -2342,9 +2130,7 @@ function _ensureCompModal() {
 
 function _showCompDetail(ctrl) {
   _ensureCompModal();
-  // Security: escape ctrl fields from DB before innerHTML
-  const _esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
-  document.getElementById('cdm-title').innerHTML = (_esc(ctrl.id) + ' — ' + _esc(ctrl.control||ctrl.practice||ctrl.title||'')) + ' <span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--t3)">read-only</span>';
+  document.getElementById('cdm-title').innerHTML = (ctrl.id + ' — ' + (ctrl.control||ctrl.practice||ctrl.title||'')) + ' <span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--t3)">read-only</span>';
   document.getElementById('cdm-id').textContent = (ctrl.family||ctrl.domain||'—') + ' · ' + (ctrl.framework||'');
   var statusColor = ctrl.status==='assessed' ? 'var(--green)' : 'var(--t3)';
   var statusPill  = ctrl.status==='assessed' ? 'pill-pass' : 'pill-queue';
@@ -2436,9 +2222,9 @@ function _exportCompCSV() {
 async function _loadComplianceData(type) {
   await ensureToken();
   var url = type==='fedramp' ? '/api/v1/compliance/fedramp' : '/api/v1/compliance/cmmc';
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   try {
-    var d = await fetch(url, {credentials:'same-origin'}).then(function(r){ return r.json(); });
+    var d = await fetch(url, {headers:h}).then(function(r){ return r.json(); });
     _compData = d.controls || d.practices || [];
     _compType = type;
     var isFed = type==='fedramp';
@@ -2481,14 +2267,9 @@ function loadCMMC() {
 async function triggerScan() {
   const mode    = document.getElementById('scanMode').value;
   const profile = document.getElementById('scanProfile').value;
-  const src     = document.getElementById('scanSrc').value.trim();
+  const src     = document.getElementById('scanSrc').value;
   const msg     = document.getElementById('scanMsg');
   if (!src) { msg.style.color='var(--red)'; msg.textContent='⚠ Source path is required'; return; }
-  // Security: validate path format — must be absolute path or git URL
-  const validPath = /^(\/[^<>|;&`]+|https?:\/\/|git@|ssh:\/\/)/.test(src);
-  const hasTraversal = src.includes('../') || src.includes('..\\');
-  if (!validPath) { msg.style.color='var(--red)'; msg.textContent='⚠ Must be absolute path (/...) or Git URL (https://...)'; return; }
-  if (hasTraversal) { msg.style.color='var(--red)'; msg.textContent='⚠ Path traversal detected — use absolute path'; return; }
   msg.style.color='var(--t3)'; msg.textContent='⏳ Triggering scan…';
   try {
     if (TOKEN) {
@@ -2661,7 +2442,7 @@ async function renderQS(q) {
   try {
     await ensureToken();
     const fd = await fetch('/api/v1/vsp/findings?q='+encodeURIComponent(q)+'&limit=5', {
-      headers:{}
+      headers:{'Authorization':'Bearer '+window.TOKEN}
     }).then(r=>r.json());
     const findings = fd.findings||[];
     if (findings.length) {
@@ -2719,7 +2500,7 @@ document.addEventListener('keydown', e => {
 function updateTicker() {
   // Update remediation count
   if (window.TOKEN) {
-    fetch('/api/v1/remediation/stats',{credentials:'same-origin'})
+    fetch('/api/v1/remediation/stats',{headers:{Authorization:'Bearer '+window.TOKEN}})
       .then(r=>r.json()).then(function(d){
         var open=d.open||0;
         var el=document.getElementById('d-rem'); if(el) el.textContent=open.toLocaleString();
@@ -2729,7 +2510,7 @@ function updateTicker() {
   }
   // Update score/grade from latest run
   if (window.TOKEN) {
-    fetch('/api/v1/vsp/run/latest',{credentials:'same-origin'})
+    fetch('/api/v1/vsp/run/latest',{headers:{Authorization:'Bearer '+window.TOKEN}})
       .then(r=>r.json()).then(function(d){
         var score=(d.summary&&d.summary.SCORE)||0;
         var posture=d.posture||'F';
@@ -2765,7 +2546,7 @@ function updateTicker() {
         var ringColor=gate==='PASS'?'#22c55e':gate==='WARN'?'#f59e0b':'#ef4444';
         if(typeof drawScoreRing==='function') drawScoreRing('score-ring', score, ringColor);
       }).catch(function(){});
-    fetch('/api/v1/vsp/runs/index?limit=200',{credentials:'same-origin'})
+    fetch('/api/v1/vsp/runs/index?limit=200',{headers:{Authorization:'Bearer '+window.TOKEN}})
       .then(r=>r.json()).then(function(d){
         var total=d.total||(d.runs&&d.runs.length)||0;
         var el=document.getElementById('d-runs-count'); if(el&&total) el.textContent=total;
@@ -2783,7 +2564,7 @@ function updateTicker() {
 /* ─── SSE connection ─── */
 function connectSSE() {
   if (!TOKEN) return;
-  const url = '/api/v1/events'; /* cookie sent automatically by browser */
+  const url = `/api/v1/events?token=${encodeURIComponent(TOKEN)}`;
   const source = new EventSource(url);
   source.onopen = () => {
     document.getElementById('sse-dot').className = 'sse-dot sse-live';
@@ -2886,7 +2667,7 @@ document.addEventListener('DOMContentLoaded', () => {
           updateTicker();
           setInterval(updateTicker, 30000);
         } else {
-          /* vsp_token cookie cleared server-side */
+          localStorage.removeItem('vsp_token');
           window.TOKEN = '';
         }
       } catch(e) {}
@@ -2933,19 +2714,29 @@ window.loadExecutive = loadExecutive;
 
 <script>
 // ── VSP PATCH v2.1 — Auth + SSE + All fixes ───────────────────────────────
-window.TOKEN = ''; /* cookie-based auth — no localStorage */
+window.TOKEN = localStorage.getItem('vsp_token') || '';
 
 // ── ensureToken: returns true if TOKEN available, else tries localStorage ──
 async function ensureToken() {
-  // Already verified this session
-  if (window.TOKEN === '✓') return true;
-  // Only probe once — avoid repeated 401 logs
-  if (window._tokenChecked) return false;
-  window._tokenChecked = true;
-  try {
-    var r = await fetch('/api/v1/auth/check', {credentials: 'same-origin'});
-    if (r.ok) { window.TOKEN = '✓'; return true; }
-  } catch(e) {}
+  if (window.TOKEN) return true;
+  var stored = localStorage.getItem('vsp_token');
+  if (stored) {
+    // Validate JWT expiry
+    try {
+      var payload = decodeJwt(stored);
+      if (payload) {
+        if (payload.exp && payload.exp * 1000 > Date.now()) {
+          window.TOKEN = stored;
+          return true;
+        } else {
+          localStorage.removeItem('vsp_token');
+          return false;
+        }
+      }
+    } catch(e) {}
+    window.TOKEN = stored;
+    return true;
+  }
   return false;
 }
 
@@ -2957,13 +2748,11 @@ async function ensureToken() {
   var _handling401 = false;
   window.fetch = async function() {
     var res = await _origFetch.apply(this, arguments);
-    // Skip 401 handler for auth/check — it's a session probe, not an API call
-    var reqUrl = (arguments[0] || '').toString();
-    if (res.status === 401 && !_handling401 && !reqUrl.includes('/auth/check')) {
+    if (res.status === 401 && !_handling401) {
       _handling401 = true;
       // Server từ chối token → clear và redirect về login
       window.TOKEN = '';
-      /* cookie cleared by server 401 response (Set-Cookie: expired) */
+      localStorage.removeItem('vsp_token');
       // Notify tất cả iframes
       document.querySelectorAll('iframe').forEach(function(f) {
         try { f.contentWindow.postMessage({type:'vsp:token', token:''}, '*'); } catch(e) {}
@@ -3019,11 +2808,9 @@ async function govLoginSubmit() {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
-    var csrfToken = _safeHeader((document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('='));
     var r = await fetch('/api/v1/auth/login', {
       method: 'POST',
-      credentials: 'same-origin',
-      headers: {'Content-Type':'application/json', 'X-CSRF-Token': csrfToken},
+      headers: {'Content-Type':'application/json'},
       body: JSON.stringify({email, password})
     });
 
@@ -3033,11 +2820,8 @@ async function govLoginSubmit() {
     }
 
     var data = await r.json();
-    // CWE-522: raw JWT NOT stored in JS — httpOnly cookie used
-    // httpOnly cookie is set by server (cannot be accessed via JS — XSS safe)
-    // localStorage kept for Authorization: Bearer header in API fetch calls
-    // If migrating to full cookie-only, remove this line and update all fetch() calls
-    if (data.token || r.ok) { window.TOKEN = '✓'; window._tokenChecked = true; /* httpOnly cookie set by server — NEVER store raw JWT in JS (CWE-522) */ }
+    window.TOKEN = data.token;
+    localStorage.setItem('vsp_token', data.token);
 
     // Sync user info to topbar
     if (data.email) {
@@ -3086,17 +2870,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Cookie-based session check — no localStorage
-  fetch('/api/v1/auth/check', {credentials: 'same-origin'})
-    .then(function(r) {
-      if (r.ok) {
-        window.TOKEN = '✓';
-        var overlay = document.getElementById('gov-login-overlay');
-        if (overlay) overlay.classList.add('hidden');
-        if (typeof loadCurrentPanel === 'function') setTimeout(loadCurrentPanel, 100);
+  // Check for stored token — skip login if still valid
+  var stored = localStorage.getItem('vsp_token');
+  if (stored) {
+    // Quick validate: decode JWT expiry
+    try {
+      var payload = decodeJwt(stored);
+      if (payload) {
+        if (payload.exp && payload.exp * 1000 > Date.now()) {
+          window.TOKEN = stored;
+          var overlay = document.getElementById('gov-login-overlay');
+          if (overlay) overlay.classList.add('hidden');
+          if (typeof loadCurrentPanel === 'function') setTimeout(loadCurrentPanel, 100);
+        } else {
+          localStorage.removeItem('vsp_token');
+        }
       }
-    })
-    .catch(function() { /* stay on login */ });
+    } catch(e) { localStorage.removeItem('vsp_token'); }
+  }
 });
 // ── END GOV PATCH v1.1 Login Gate ────────────────────────────────────────
 
@@ -3170,7 +2961,7 @@ async function applyFindingsFilter() {
   if (tool) url += '&tool=' + tool;
   if (q)    url += '&q=' + encodeURIComponent(q);
   try {
-    const r = await fetch(url, {credentials:'same-origin'});
+    const r = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const d = await r.json();
     const findings = d.findings || [];
     window._findingsCache = findings;
@@ -3186,7 +2977,7 @@ async function applyFindingsFilter() {
         <td class="overflow-ellipsis" style="max-width:260px;font-size:12px" title="${(f.message||'').replace(/"/g,'')}">${f.message||'—'}</td>
         <td class="mono-sm overflow-ellipsis" style="max-width:180px">${f.path||'—'}</td>
         <td class="mono-sm">${f.line||'—'}</td>
-        <td class="f10" style="color:var(--purple)">${esc(f.cwe)||'—'} ${owaspBadge(f.cwe)}</td>
+        <td class="f10" style="color:var(--purple)">${f.cwe||'—'}</td>
       </tr>`).join('');
     const cnt = document.getElementById('badge-findings');
     if (cnt) cnt.textContent = d.total || findings.length;
@@ -3207,7 +2998,7 @@ window.saveRemediation = async function() {
   try {
     const r = await fetch('/api/v1/remediation/finding/' + (window._remCurrentId||''), {
       method: 'POST',
-      headers: {'Content-Type':'application/json',},
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+window.TOKEN},
       body: JSON.stringify({status,priority,assignee,ticket_url:ticket,notes})
     });
     if (r.ok) {
@@ -3226,7 +3017,7 @@ window.saveRemediation = async function() {
 // ── Governance load data thật ──────────────────────────────────────────────
 async function loadGovernanceReal() {
   await ensureToken();
-  const headers = {};
+  const headers = {'Authorization':'Bearer '+window.TOKEN};
   try {
     // Load risk register
     const rr = await fetch('/api/v1/governance/risk-register', {headers}).then(r=>r.json());
@@ -3265,9 +3056,9 @@ window.downloadExecutivePDF = async function() {
   await ensureToken();
   if (typeof showToast==='function') showToast('Generating PDF...','info');
   try {
-    const latest = await fetch('/api/v1/vsp/run/latest',{credentials:'same-origin'}).then(r=>r.json());
+    const latest = await fetch('/api/v1/vsp/run/latest',{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const rid = latest.rid || '';
-    const res = await fetch('/api/v1/vsp/executive_report_pdf/'+rid, {credentials:'same-origin'});
+    const res = await fetch('/api/v1/vsp/executive_report_pdf/'+rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     if (!res.ok) throw new Error('PDF endpoint not available');
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -3284,7 +3075,7 @@ window.downloadExecutivePDF = async function() {
 window.updateTicker = async function() {
   if (!window.TOKEN || window.TOKEN === '') return;
   try {
-    const r = await fetch('/api/v1/vsp/run/latest',{credentials:'same-origin'});
+    const r = await fetch('/api/v1/vsp/run/latest',{headers:{'Authorization':'Bearer '+window.TOKEN}});
     if (!r.ok) return;
     const d = await r.json();
     const el = document.getElementById('ticker-content');
@@ -3321,17 +3112,17 @@ const TOOLS_BY_MODE = {
   IAC:     ['kics','checkov'],
   SAST:    ['bandit','semgrep','codeql'],
   SCA:     ['trivy','grype'],
-  SECRETS: ['gitleaks','secretcheck'],
-  DAST:    ['nikto','nuclei','sslscan'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'],
+  SECRETS: ['gitleaks','trufflehog'],
+  DAST:    ['nuclei','zap'],
+  FULL:    ['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
 };
-const ALL_TOOLS = ['kics','checkov','hadolint','bandit','semgrep','codeql','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'];
+const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
 
 // Load runs vào dropdown
 async function loadRunsDropdown() {
   if (!await ensureToken()) return;
   try {
-    const r = await fetch('/api/v1/vsp/runs/index?limit=200', {credentials:'same-origin'});
+    const r = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const d = await r.json();
     const runs = d.runs || [];
     const sel = document.getElementById('log-run-select');
@@ -3352,7 +3143,7 @@ async function loadRunLog(rid) {
   await ensureToken();
   try {
     // Lấy thông tin run
-    const r = await fetch('/api/v1/vsp/run/' + rid, {credentials:'same-origin'});
+    const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const run = await r.json();
     const mode = run.mode || 'FULL';
     const tools = TOOLS_BY_MODE[mode] || ALL_TOOLS;
@@ -3366,7 +3157,7 @@ async function loadRunLog(rid) {
     if (infoEl) infoEl.textContent = run.status + ' · ' + (run.total_findings||0) + ' findings · ' + tools.length + ' tools';
 
     // Lấy findings để tạo log lines
-    const f = await fetch('/api/v1/vsp/findings?rid='+rid+'&limit=200', {credentials:'same-origin'});
+    const f = await fetch('/api/v1/vsp/findings?rid='+rid+'&limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const fd = await f.json();
     const findings = fd.findings || [];
 
@@ -3447,6 +3238,12 @@ function buildLogFromFindings(run, tools, findings, summary) {
   if (cnt) cnt.textContent = lines.length + ' lines';
 }
 
+// Override showPanel để load runs dropdown khi vào Scan log
+const _sp22 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp22 && _sp22(name, btn);
+  if (name === 'scanlog') setTimeout(loadRunsDropdown, 200);
+};
 
 // Override loadLatestLog
 window.loadLatestLog = async function() {
@@ -3468,21 +3265,21 @@ const TOOLS_BY_MODE_V2 = {
   IAC:     ['kics','checkov','trivy','gitleaks'],
   SAST:    ['bandit','semgrep','codeql'],
   SCA:     ['trivy','grype'],
-  SECRETS: ['gitleaks','secretcheck'],
-  DAST:    ['nikto','nuclei','sslscan'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'],
+  SECRETS: ['gitleaks','trufflehog'],
+  DAST:    ['nuclei','zap'],
+  FULL:    ['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
 };
 
 async function loadRunLog(rid) {
   if (!rid) return;
   await ensureToken();
   try {
-    const r = await fetch('/api/v1/vsp/run/' + rid, {credentials:'same-origin'});
+    const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const run = await r.json();
     const mode = run.mode || 'FULL';
 
     // Load findings để biết tools thực sự có data
-    const f = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {credentials:'same-origin'});
+    const f = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const fd = await f.json();
     const findings = fd.findings || [];
     window._findingsCache = findings;
@@ -3577,18 +3374,18 @@ async function loadRunLog(rid) {
   if (!rid) return;
   await ensureToken();
   try {
-    const run = await fetch('/api/v1/vsp/run/'+rid, {credentials:'same-origin'}).then(r=>r.json());
+    const run = await fetch('/api/v1/vsp/run/'+rid, {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const mode = run.mode || 'FULL';
     const TOOLS_BY_MODE = {
       IAC:['kics','checkov'], SAST:['bandit','semgrep','codeql'],
-      SCA:['trivy','grype','license'], SECRETS:['gitleaks','secretcheck'],
-      DAST:['nikto','nuclei','sslscan'],
-      FULL:['kics','checkov','hadolint','bandit','semgrep','codeql','trivy','grype','license','gitleaks','secretcheck','nikto','nuclei','sslscan'],
+      SCA:['trivy','grype'], SECRETS:['gitleaks','trufflehog'],
+      DAST:['nuclei','zap'],
+      FULL:['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
     };
     const expectedTools = TOOLS_BY_MODE[mode] || ['kics','checkov'];
 
     // Findings đúng run_id
-    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {credentials:'same-origin'}).then(r=>r.json());
+    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const findings = fd.findings || [];
     window._findingsCache = findings;
 
@@ -3671,7 +3468,7 @@ console.log('VSP Patch v2.4 loaded ✓');
 async function loadRuns() {
   await ensureToken();
   try {
-    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {credentials:'same-origin'}).then(r=>r.json());
+    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const runs = d.runs || [];
     const tbody = document.getElementById('runs-table');
     if (!tbody) return;
@@ -3697,7 +3494,6 @@ async function loadRuns() {
       const scoreColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)';
       const findColor = r.total > 0 ? (r.summary?.CRITICAL > 0 ? 'c-red' : r.summary?.HIGH > 0 ? 'c-orange' : 'c-amber') : 'c-green';
 
-      const triggeredBy = r.triggered_by || 'scheduler';
       return `<tr style="cursor:pointer" onclick="viewRunLog('${r.rid}')">
         <td class="mono" style="font-size:10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.rid}">${r.rid}</td>
         <td><span class="pill" style="${mStyle}">${r.mode}</span></td>
@@ -3748,6 +3544,12 @@ if (document.readyState !== 'loading') {
   if (srcInput) srcInput.placeholder = '/tmp/iac_test';
 }
 
+// Override showPanel
+const _sp25 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp25 && _sp25(name, btn);
+  if (name === 'runs') setTimeout(loadRuns, 200);
+};
 
 window.loadRuns = loadRuns;
 console.log('VSP Patch v2.5 loaded ✓');
@@ -3760,7 +3562,7 @@ const _loadRuns25 = window.loadRuns;
 window.loadRuns = async function() {
   await ensureToken();
   try {
-    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {credentials:'same-origin'}).then(r=>r.json());
+    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const runs = d.runs || [];
 
     // ── KPI calc
@@ -3866,9 +3668,9 @@ window.viewRunLog = async function(rid) {
   await ensureToken();
   window._rdmRid = rid;
   try {
-    const run = await fetch('/api/v1/vsp/run/'+rid,{credentials:'same-origin'}).then(r=>r.json());
+    const run = await fetch('/api/v1/vsp/run/'+rid,{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     window._rdmRun = run;
-    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{credentials:'same-origin'}).then(r=>r.json());
+    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const findings = fd.findings || [];
     const byTool = {};
     const bySev = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0,INFO:0};
@@ -3949,7 +3751,7 @@ window.downloadRunReport = async function(fmt) {
   var run = window._rdmRun;
   if (!run) return;
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   if (fmt==='json') {
     var fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:h}).then(function(r){return r.json();});
     var out = {run_id:run.rid,mode:run.mode,gate:run.gate,posture:run.posture,total:run.total_findings,findings:fd.findings};
@@ -4006,7 +3808,7 @@ async function loadFindingsRunSelector() {
   var sel = document.getElementById('findings-run-sel');
   if (!sel) return;
   try {
-    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
     var runs = d.runs || [];
     sel.innerHTML = '<option value="">All runs</option>' +
       runs.map(function(r) {
@@ -4028,7 +3830,7 @@ async function loadFindingsPanel() {
   if (state.q) params.set('q', state.q);
 
   try {
-    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {credentials:'same-origin'});
+    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
     var d = await r.json();
     var findings = d.findings || [];
     window._findingsCache = findings;
@@ -4091,7 +3893,7 @@ function renderFindingsTable(findings, total) {
       +'<td class="overflow-ellipsis" style="max-width:260px;font-size:12px" title="'+(f.message||'').replace(/"/g,'')+'">'+((f.message||'—').slice(0,80))+'</td>'
       +'<td class="mono-sm overflow-ellipsis" style="max-width:160px" title="'+(f.path||'')+'">'+((f.path||'—').split('/').slice(-2).join('/'))+'</td>'
       +'<td class="mono-sm">'+(f.line||'—')+'</td>'
-      +'<td class="f10" style="color:var(--purple)">'+esc(f.cwe||'—')+' '+owaspBadge(f.cwe)+'</td>'
+      +'<td class="f10" style="color:var(--purple)">'+(f.cwe||'—')+'</td>'
       +'</tr>';
   }).join('');
 }
@@ -4192,7 +3994,17 @@ window.exportFindingsCSV = function() {
 };
 
 // Patch showPanel
-
+var _sp28 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp28 && _sp28(name, btn);
+  if (name === 'findings') {
+    setTimeout(function() {
+      loadFindingsRunSelector();
+      loadFindingsPanel();
+      injectFindingsUI();
+    }, 200);
+  }
+};
 
 // Inject UI enhancements vào findings panel
 function injectFindingsUI() {
@@ -4240,7 +4052,7 @@ window.loadFindingsPanel = async function() { if(typeof loadFindings==='function
   if (state.q) params.set('q', state.q);
 
   try {
-    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {credentials:'same-origin'});
+    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
     var d = await r.json();
     var findings = d.findings || [];
     window._findingsCache = findings;
@@ -4329,7 +4141,7 @@ window.loadFindingsRunSelector = async function() {
   var sel = document.getElementById('findings-run-sel');
   if (!sel) return;
   try {
-    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
     var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total>0;});
     sel.innerHTML = '<option value="">All runs</option>' +
       runs.map(function(r){
@@ -4393,7 +4205,18 @@ window.applyFindingsFilter = function() {
 };
 
 // Re-inject showPanel override
-
+var _sp210 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp210 && _sp210(name, btn);
+  if (name === 'findings') {
+    setTimeout(function() {
+      injectFindingsUI && injectFindingsUI();
+      window.loadFindingsRunSelector().then(function() {
+        window.loadFindingsPanel();
+      });
+    }, 200);
+  }
+};
 
 console.log('VSP Patch v2.10 loaded OK');
 </script>
@@ -4407,7 +4230,7 @@ window.loadFindingsRunSelector = async function() {
   var sel = document.getElementById('findings-run-sel');
   if (!sel) return;
   try {
-    var d = await fetch('/api/v1/vsp/runs', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
     var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total_findings>0;});
     sel.innerHTML = '<option value="">All runs</option>' +
       runs.map(function(r){
@@ -4450,7 +4273,7 @@ window.applyFindingsFilter = function() {
   // Update KPI nếu chọn run cụ thể
   if (sel && sel.value) {
     var opt = sel.options[sel.selectedIndex];
-    fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {credentials:'same-origin'})
+    fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {headers:{'Authorization':'Bearer '+window.TOKEN}})
       .then(function(r){return r.json();})
       .then(function(d){
         var panel = document.getElementById('panel-findings');
@@ -4468,7 +4291,18 @@ window.applyFindingsFilter = function() {
   window.loadFindingsPanel();
 };
 
-
+var _sp211 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp211 && _sp211(name, btn);
+  if (name === 'findings') {
+    setTimeout(function() {
+      injectFindingsUI && injectFindingsUI();
+      window.loadFindingsRunSelector().then(function() {
+        window.loadFindingsPanel();
+      });
+    }, 200);
+  }
+};
 
 console.log('VSP Patch v2.11 loaded OK');
 </script>
@@ -4488,7 +4322,7 @@ function patchFindingsDropdown() {
 
     // Update KPI từ summary API
     if (sel.value) {
-      fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {credentials:'same-origin'})
+      fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {headers:{'Authorization':'Bearer '+window.TOKEN}})
         .then(function(r){return r.json();})
         .then(function(s) {
           var panel = document.getElementById('panel-findings');
@@ -4511,7 +4345,7 @@ window.loadFindingsRunSelector = async function() {
   var sel = document.getElementById('findings-run-sel');
   if (!sel) return;
   try {
-    var d = await fetch('/api/v1/vsp/runs?limit=50', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs?limit=50', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
     var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total_findings>0;});
     sel.innerHTML = '<option value="">All runs</option>' +
       runs.map(function(r){
@@ -4545,7 +4379,19 @@ window.loadFindingsRunSelector = async function() {
   } catch(e) { console.error('loadFindingsRunSelector v2.12', e); }
 };
 
-
+// Override showPanel
+var _sp212 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp212 && _sp212(name, btn);
+  if (name === 'findings') {
+    setTimeout(function() {
+      injectFindingsUI && injectFindingsUI();
+      window.loadFindingsRunSelector().then(function() {
+        window.loadFindingsPanel();
+      });
+    }, 200);
+  }
+};
 
 console.log('VSP Patch v2.12 loaded OK');
 </script>
@@ -4585,7 +4431,7 @@ window.renderFindingsTable = function(findings, total) {
       +'<td style="font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(f.message||'').replace(/"/g,'')+'">'+((f.message||'—').slice(0,60))+'</td>'
       +'<td class="mono-sm" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)" title="'+(f.path||'')+'">'+shortPath+lineStr+'</td>'
       +'<td class="mono-sm">'+(f.line||'—')+'</td>'
-      +'<td class="f10" style="color:var(--purple)">'+esc(f.cwe||'—')+' '+owaspBadge(f.cwe)+'</td>'
+      +'<td class="f10" style="color:var(--purple)">'+(f.cwe||'—')+'</td>'
       +'</tr>';
   }).join('');
 };
@@ -4648,7 +4494,7 @@ window.loadFindingsPanel = async function() { if(typeof loadFindings==='function
   if (state.q) params.set('q', state.q);
 
   try {
-    var r = await fetch('/api/v1/vsp/findings?'+params.toString(), {credentials:'same-origin'});
+    var r = await fetch('/api/v1/vsp/findings?'+params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
     var d = await r.json();
     var findings = d.findings || [];
     window._findingsCache = findings;
@@ -4673,7 +4519,7 @@ window.loadFindingsPanel = async function() { if(typeof loadFindings==='function
     // Nếu có run cụ thể thì lấy summary từ API để có tổng đúng
     if (state.runUUID) {
       try {
-        var s = await fetch('/api/v1/vsp/findings/summary?run_id='+state.runUUID, {credentials:'same-origin'}).then(function(r){return r.json();});
+        var s = await fetch('/api/v1/vsp/findings/summary?run_id='+state.runUUID, {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
         updateFindingsKPIDirect(s.CRITICAL||0, s.HIGH||0, s.MEDIUM||0, s.LOW||0, state.total);
       } catch(e) {
         updateFindingsKPIDirect(bySev.CRITICAL, bySev.HIGH, bySev.MEDIUM, bySev.LOW, state.total);
@@ -4735,12 +4581,73 @@ console.log('VSP Patch v2.14 loaded OK');
   var ids = ['rem-k-open','rem-k-inprogress','rem-k-resolved','rem-k-accepted','rem-k-fp','rem-k-suppressed'];
   kpis.forEach(function(el, i) { if(ids[i]) el.id = ids[i]; });
   
-  
+  // Override showPanel để load stats khi vào Remediation
+  var _sp = window.showPanel;
+  window.showPanel = function(name, btn) {
+    _sp && _sp(name, btn);
+    if (name === 'remediation') {
+      setTimeout(function() {
+        if (!window.TOKEN) return;
+        fetch('/api/v1/remediation/stats', {headers:{'Authorization':'Bearer '+window.TOKEN}})
+          .then(function(r){return r.json();})
+          .then(function(s) {
+            var map = {
+              'rem-k-open': s.open||0,
+              'rem-k-inprogress': s.in_progress||0,
+              'rem-k-resolved': s.resolved||0,
+              'rem-k-accepted': s.accepted||0,
+              'rem-k-fp': s.false_positive||0,
+              'rem-k-suppressed': s.suppressed||0
+            };
+            Object.keys(map).forEach(function(id) {
+              var el = document.getElementById(id);
+              if (el) el.textContent = map[id];
+            });
+          }).catch(function(){});
+      }, 300);
+    }
+  };
+})();
+</script>
+
+
+
+
+
+
+
+<script>
+// Policy: Evaluate + New Rule Modal + Load Rules from API
+(function() {
+
+// 1. Fix Evaluate button
+window.runEval = async function() {
+  var el = document.getElementById('eval-result');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--t3)">Evaluating...</span>';
+  await ensureToken();
+  try {
+    var r = await fetch('/api/v1/policy/evaluate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+window.TOKEN},
+      body: JSON.stringify({})
+    });
+    var d = await r.json();
+    var color = d.decision==='PASS'?'var(--green)':d.decision==='WARN'?'var(--amber)':'var(--red)';
+    el.innerHTML = '<span style="color:'+color+';font-size:16px;font-weight:700">'+d.decision+'</span>'
+      +' &middot; score: <b>'+(d.score||0)+'</b>'
+      +' &middot; posture: <b>'+(d.posture||'?')+'</b>'
+      +' &middot; <span style="color:var(--t3)">'+(d.reason||'')+'</span>';
+  } catch(e) {
+    el.innerHTML = '<span style="color:var(--red)">Error: '+e.message+'</span>';
+  }
+};
+
 // 2. Load rules từ API
 window.loadRulesFromAPI = async function() {
   await ensureToken();
   try {
-    var r = await fetch('/api/v1/policy/rules', {credentials:'same-origin'});
+    var r = await fetch('/api/v1/policy/rules', {headers:{'Authorization':'Bearer '+window.TOKEN}});
     var d = await r.json();
     var rules = Array.isArray(d) ? d : (d.rules || []);
     var list = document.getElementById('rules-list');
@@ -4783,7 +4690,7 @@ window.deleteRuleAPI = async function(btn) {
   if (!confirm('Delete this rule?')) return;
   await ensureToken();
   try {
-    await fetch('/api/v1/policy/rules/'+id, {method:'DELETE',headers:{}});
+    await fetch('/api/v1/policy/rules/'+id, {method:'DELETE',headers:{'Authorization':'Bearer '+window.TOKEN}});
     showToast && showToast('Rule deleted','success');
     loadRulesFromAPI();
   } catch(e) { showToast && showToast('Error: '+e.message,'error'); }
@@ -4853,7 +4760,7 @@ window.saveNR = async function() {
     };
     var r = await fetch('/api/v1/policy/rules', {
       method: 'POST',
-      headers: {'Content-Type':'application/json',},
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+window.TOKEN},
       body: JSON.stringify(payload)
     });
     var d = await r.json();
@@ -4872,7 +4779,21 @@ window.saveNR = async function() {
 };
 
 // 4. Patch showPanel
-
+var _spPol = window.showPanel;
+window.showPanel = function(name, btn) {
+  _spPol && _spPol(name, btn);
+  if (name === 'policy') {
+    setTimeout(function() {
+      loadRulesFromAPI();
+      // Patch + New rule button
+      document.querySelectorAll('#panel-policy .btn').forEach(function(b) {
+        if (b.textContent.trim().indexOf('New rule') >= 0) {
+          b.onclick = function() { openNRModal(); };
+        }
+      });
+    }, 200);
+  }
+};
 
 })();
 </script>
@@ -4887,7 +4808,7 @@ window.verifyAudit = async function() {
   await ensureToken();
   try {
     // Load runs để build audit timeline thật
-    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
     var runs = (d.runs||[]).slice(0,10);
     // Update KPIs
     var scanTriggers = runs.length;
@@ -4923,14 +4844,16 @@ window.verifyAudit = async function() {
       +' &mdash; '+runs.length+' audit entries verified'
       +' &middot; last verified: '+new Date().toLocaleTimeString('vi-VN');
   } catch(e) {
-    // Security: escape error message (defense-in-depth)
-    const _escErr2 = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    el.innerHTML = '<span style="color:var(--amber)">&#9888; Verify error: '+_escErr2(e.message)+'</span>';
+    el.innerHTML = '<span style="color:var(--amber)">&#9888; Verify error: '+e.message+'</span>';
   }
 };
 
 // Load audit khi vào tab
-
+var _spAudit = window.showPanel;
+window.showPanel = function(name, btn) {
+  _spAudit && _spAudit(name, btn);
+  if (name === 'audit') setTimeout(verifyAudit, 300);
+};
 </script>
 
 
@@ -4942,18 +4865,22 @@ window.verifyAudit = async function() {
 
 <script>
 // ══ SOC v2.0 — Real data + realistic scoring + trend chart ════════════════
-
+var _spSOCv2 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _spSOCv2 && _spSOCv2(name, btn);
+  if (name === 'soc') setTimeout(loadSOCv2, 200);
+};
 
 async function loadSOCv2() {
   var panel = document.getElementById('panel-soc');
   if (!panel) return;
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
 
   try {
     var [runsD, summaryD, remD] = await Promise.all([
       fetch('/api/v1/vsp/runs/index?limit=100',{headers:h}).then(r=>r.json()),
-      fetch('/api/v1/vsp/findings/summary',{headers:h}).then(r=>r.json()),  // scope: latest run
+      fetch('/api/v1/vsp/findings/summary',{headers:h}).then(r=>r.json()),
       fetch('/api/v1/remediation/stats',{headers:h}).then(r=>r.json()),
     ]);
 
@@ -5283,7 +5210,11 @@ async function loadSOCv2() {
 
 <script>
 // Governance v2.0 — Load từ API thật
-
+var _spGov = window.showPanel;
+window.showPanel = function(name, btn) {
+  _spGov && _spGov(name, btn);
+  if (name === 'governance') setTimeout(loadGovernanceV2, 200);
+};
 
 
 window._showRisk = function(idx) {
@@ -5355,7 +5286,7 @@ async function loadGovernanceV2() {
   var panel = document.getElementById('panel-governance');
   if (!panel) return;
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
 
   try {
     var [riskD, traceD, raciD, runsD] = await Promise.all([
@@ -5647,9 +5578,9 @@ var _sbomPageSize = 15;
 
 async function loadSBOM() {
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   try {
-    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {credentials:'same-origin'}).then(function(r){ return r.json(); });
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:h}).then(function(r){ return r.json(); });
     _sbomRuns = (d.runs||[]).filter(function(r){ return r.status==='DONE'; });
     _sbomPage = 0;
     // KPIs
@@ -5731,8 +5662,8 @@ async function sbomDownload(rid) {
   await ensureToken();
   showToast('Generating SBOM…','info');
   try {
-    var resp = await fetch('/api/p4/zt/sbom'+rid, {
-      headers: {}
+    var resp = await fetch('/api/v1/sbom/'+rid, {
+      headers: {'Authorization':'Bearer '+window.TOKEN}
     });
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();
@@ -5750,8 +5681,8 @@ async function sbomDetail(rid) {
   await ensureToken();
   showToast('Loading SBOM…','info');
   try {
-    var resp = await fetch('/api/p4/zt/sbom'+rid, {
-      headers: {}
+    var resp = await fetch('/api/v1/sbom/'+rid, {
+      headers: {'Authorization':'Bearer '+window.TOKEN}
     });
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var bom = await resp.json();
@@ -5809,11 +5740,11 @@ function _showSBOMModal(rid, bom) {
 <script>
 async function loadSLA() {
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   try {
     var [slaD, sloD] = await Promise.all([
       fetch('/api/v1/vsp/sla_tracker',  {headers:h}).then(function(r){return r.json();}),
-      fetch('/api/v1/vsp/metrics_slos', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};})
+      fetch('/api/v1/vsp/metrics_slos', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};})
     ]);
 
     var entries = slaD.sla || [];
@@ -6018,7 +5949,7 @@ async function loadFindings(offset) {
   if (search) params.set('q', search);
   try {
     var d = await fetch('/api/v1/vsp/findings?'+params, {
-      headers:{}
+      headers:{'Authorization':'Bearer '+window.TOKEN}
     }).then(function(r){return r.json();});
     _findingsTotal = d.total || 0;
     window._findingsData = d.findings || [];
@@ -6098,9 +6029,7 @@ function showFindingDetail(idx) {
   }
   var sevClass = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
   var sevColor = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--amber)',LOW:'var(--green)'};
-  // Security: escape API strings — severity/tool should be enum values but escape anyway
-  const _e6 = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  document.getElementById('fdm-title').innerHTML = '<span class="sev '+_e6(sevClass[f.severity]||'')+'">'+_e6(f.severity)+'</span> · '+_e6(f.tool);
+  document.getElementById('fdm-title').innerHTML = '<span class="sev '+(sevClass[f.severity]||'')+'">'+f.severity+'</span> · '+f.tool;
   document.getElementById('fdm-id').textContent = f.id;
   document.getElementById('fdm-body').innerHTML =
     '<div class="g3 mb14">'
@@ -6146,7 +6075,7 @@ window.exportFindingsCSV = async function() {
   showToast('Exporting CSV…','info');
   try {
     var d = await fetch('/api/v1/vsp/findings?'+params, {
-      headers:{}
+      headers:{'Authorization':'Bearer '+window.TOKEN}
     }).then(function(r){return r.json();});
     var rows = [['ID','Severity','Tool','Rule','Message','Path','Line','CWE']];
     (d.findings||[]).forEach(function(f){
@@ -6177,13 +6106,13 @@ var _remData = [];
 
 async function loadRemediations() {
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   var status = (document.getElementById('rem-filter-status')||{}).value||'';
   try {
     var [remD, statsD, findD] = await Promise.all([
-      fetch('/api/v1/remediation'+(status?'?status='+status:''), {credentials:'same-origin'}).then(function(r){return r.json();}),
-      fetch('/api/v1/remediation/stats', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};}),
-      fetch('/api/v1/vsp/findings?limit=5000', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};})
+      fetch('/api/v1/remediation'+(status?'?status='+status:''), {headers:h}).then(function(r){return r.json();}),
+      fetch('/api/v1/remediation/stats', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};}),
+      fetch('/api/v1/vsp/findings?limit=5000', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};})
     ]);
     // Build findings map by id
     var findMap = {};
@@ -6322,7 +6251,7 @@ async function _saveRemediation(findingId) {
   try {
     await fetch('/api/v1/remediation/finding/'+findingId, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
       body: JSON.stringify({status,priority,assignee,ticket_url:ticket,notes})
     });
     document.getElementById('rem-edit-modal').classList.remove('open');
@@ -6339,9 +6268,9 @@ var _exportRID = '';
 
 async function loadExportRuns() {
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   try {
-    var d = await fetch('/api/v1/vsp/runs/index?limit=50', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs/index?limit=50', {headers:h}).then(function(r){return r.json();});
     var runs = (d.runs||[]).filter(function(r){return r.status==='DONE';});
     var sel = document.getElementById('export-run-select');
     if (!sel) return;
@@ -6367,9 +6296,9 @@ async function updateExportRID() {
 
   // Load preview
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   try {
-    var d = await fetch('/api/v1/vsp/findings?run_id='+_exportRID+'&limit=1000', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/findings?run_id='+_exportRID+'&limit=1000', {headers:h}).then(function(r){return r.json();});
     var findings = d.findings || [];
     var bySev = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0};
     findings.forEach(function(f){ if(bySev[f.severity]!==undefined) bySev[f.severity]++; });
@@ -6389,7 +6318,7 @@ async function updateExportRID() {
     var poamPrev = document.getElementById('export-oscal-poam-preview');
     var [arD, poamD] = await Promise.all([
       fetch('/api/v1/compliance/oscal/ar?run_id='+_exportRID,   {headers:h}).then(function(r){return r.json();}).catch(function(){return {};}),
-      fetch('/api/v1/compliance/oscal/poam?run_id='+_exportRID, {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};})
+      fetch('/api/v1/compliance/oscal/poam?run_id='+_exportRID, {headers:h}).then(function(r){return r.json();}).catch(function(){return {};})
     ]);
     if (arPrev)   arPrev.textContent   = JSON.stringify(arD,   null, 2).slice(0, 800)+'…';
     if (poamPrev) poamPrev.textContent = JSON.stringify(poamD, null, 2).slice(0, 800)+'…';
@@ -6402,7 +6331,7 @@ async function exportDownload(fmt) {
   showToast('Generating '+fmt.toUpperCase()+'…','info');
   try {
     var url = '/api/v1/export/'+fmt+'/'+_exportRID;
-    var resp = await fetch(url, {credentials:'same-origin'});
+    var resp = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();
     var ext  = fmt==='sarif'?'.sarif.json':fmt==='csv'?'.csv':'.json';
@@ -6419,7 +6348,7 @@ async function exportOSCAL(type) {
   showToast('Generating OSCAL '+type.toUpperCase()+'…','info');
   try {
     var url = '/api/v1/compliance/oscal/'+type+(_exportRID?'?run_id='+_exportRID:'');
-    var resp = await fetch(url, {credentials:'same-origin'});
+    var resp = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();
     var a = document.createElement('a');
@@ -6437,9 +6366,9 @@ async function exportOSCAL(type) {
 async function loadUsers() {
   
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   try {
-    var d = await fetch('/api/v1/admin/users?limit=100', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/admin/users?limit=100', {headers:h}).then(function(r){return r.json();});
     var users = d.users || [];
     // KPIs
     var admins   = users.filter(function(u){return u.role==='admin';}).length;
@@ -6487,7 +6416,7 @@ async function _deleteUser(id, email) {
   try {
     var r = await fetch('/api/v1/admin/users/'+id, {
       method:'DELETE',
-      headers:{}
+      headers:{'Authorization':'Bearer '+window.TOKEN}
     });
     if (r.ok) { showToast('User deleted','success'); loadUsers(); }
     else { showToast('Delete failed','error'); }
@@ -6507,8 +6436,8 @@ function _openInviteModal() {
       +'<div style="margin-bottom:12px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Email <span style=\"color:var(--red)\">*</span></label>'
       +'<input id="invite-email" class="filter-input" style="width:100%" placeholder="user@example.com" type="email"></div>'
       +'<div style="margin-bottom:12px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Password <span style=\"color:var(--red)\">*</span></label>'
-      +'<input id="invite-password" type="password" class="filter-input" style="width:100%" placeholder="min 12 characters">'
-      +'<div style=\"font-size:9px;color:var(--t3);margin-top:3px\">Required · min 12 characters</div></div>'
+      +'<input id="invite-password" type="password" class="filter-input" style="width:100%" placeholder="min 8 characters">'
+      +'<div style=\"font-size:9px;color:var(--t3);margin-top:3px\">Required · min 8 characters</div></div>'
       +'<div style="margin-bottom:16px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Role</label>'
       +'<select id="invite-role" class="filter-select" style="width:100%">'
       +'<option value="analyst">Analyst</option>'
@@ -6530,12 +6459,12 @@ async function _createUser() {
   if (!email) { showToast('Email is required','error'); return; }
   if (!email.includes('@')) { showToast('Invalid email format','error'); return; }
   if (!password) { showToast('Password is required','error'); return; }
-  if (password.length < 12) { showToast('Password must be at least 12 characters','error'); return; }
+  if (password.length < 8) { showToast('Password must be at least 8 characters','error'); return; }
   window.TOKEN = null; await ensureToken();
   try {
     var r = await fetch('/api/v1/admin/users', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
       body: JSON.stringify({email, password, role})
     });
     var d = await r.json();
@@ -6685,10 +6614,10 @@ function _destroyChart(id) {
 
 async function loadAnalytics() {
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   var days = parseInt((document.getElementById('analytics-days')||{value:'14'}).value)||14;
   try {
-    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:h}).then(function(r){return r.json();});
     var allRuns = (d.runs||[]).filter(function(r){return r.status==='DONE';});
 
     // Filter by days
@@ -6844,11 +6773,11 @@ async function _doSearch(q) {
   document.getElementById('search-results-body').innerHTML = '<div style="padding:12px;color:var(--t3);font-size:11px">Searching…</div>';
 
   await ensureToken();
-  var h = {}; // cookie-based auth — no Authorization header needed
+  var h = {'Authorization':'Bearer '+window.TOKEN};
   try {
     var [findD, runD] = await Promise.all([
-      fetch('/api/v1/vsp/findings?q='+encodeURIComponent(q)+'&limit=5', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};}),
-      fetch('/api/v1/vsp/runs/index?limit=100', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};})
+      fetch('/api/v1/vsp/findings?q='+encodeURIComponent(q)+'&limit=5', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};}),
+      fetch('/api/v1/vsp/runs/index?limit=100', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};})
     ]);
 
     var findings = (findD.findings||[]).slice(0,5);
@@ -6922,7 +6851,7 @@ async function bulkAssign() {
   if (!assignee) return;
   var status = 'in_progress';
   await ensureToken();
-  var h = {'Content-Type':'application/json'};
+  var h = {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'};
   var ids = Array.from(_bulkSelected);
   var ok = 0;
   for (var id of ids) {
@@ -6942,7 +6871,7 @@ async function bulkAssign() {
 async function bulkSetStatus(status) {
   if (!_bulkSelected.size) { showToast('No findings selected','error'); return; }
   await ensureToken();
-  var h = {'Content-Type':'application/json'};
+  var h = {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'};
   var ids = Array.from(_bulkSelected);
   var ok = 0;
   for (var id of ids) {
@@ -7281,7 +7210,7 @@ async function profileSubmitPassword() {
   errEl.textContent = '';
 
   if (!current) { errEl.textContent = 'Current password required.'; return; }
-  if (newpw.length < 12) { errEl.textContent = 'New password must be at least 12 characters.'; return; }
+  if (newpw.length < 8) { errEl.textContent = 'New password must be at least 8 characters.'; return; }
   if (newpw !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
 
   // Re-auth with current password to get a fresh token, then update
@@ -7300,7 +7229,7 @@ async function profileSubmitPassword() {
     var uid = window._profileUserId;
     if (!uid) {
       var rList = await fetch('/api/v1/admin/users', {
-        headers: {}
+        headers: {'Authorization':'Bearer '+window.TOKEN}
       });
       var dList = await rList.json();
       var me = (dList.users||[]).find(function(u){ return u.email===email; });
@@ -7310,7 +7239,7 @@ async function profileSubmitPassword() {
     if (uid) {
       var r2 = await fetch('/api/v1/admin/users/'+uid+'/password', {
         method: 'PUT',
-        headers: {'Content-Type':'application/json'},
+        headers: {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
         body: JSON.stringify({password: newpw})
       });
       if (!r2.ok) {
@@ -7329,25 +7258,21 @@ async function profileSubmitPassword() {
 }
 
 function profileCopyToken() {
-  /* Token not available in JS (httpOnly cookie).
-     For API access, use POST /api/v1/auth/token to get a short-lived API key. */
-  fetch('/api/v1/auth/api-token', {method:'POST', credentials:'same-origin'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (d.token) {
-        navigator.clipboard.writeText(d.token)
-          .then(function(){ showToast('API token copied (valid 1h)','success'); })
-          .catch(function(){ showToast('Copy failed — check permissions','error'); });
-      } else { showToast('Could not generate API token','error'); }
-    })
-    .catch(function(){ showToast('Error generating API token','error'); });
+  var token = window.TOKEN || localStorage.getItem('vsp_token') || '';
+  if (!token) { showToast('No token available','error'); return; }
+  navigator.clipboard.writeText(token).then(function(){
+    showToast('API token copied to clipboard','success');
+  }).catch(function(){
+    showToast('Copy failed — check browser permissions','error');
+  });
   toggleProfilePanel();
 }
 
 function profileLogout() {
   toggleProfilePanel();
   window.TOKEN = '';
-  /* Cookie cleared server-side via POST /auth/logout (Set-Cookie: expired) */
+  localStorage.removeItem('vsp_token');
+  localStorage.removeItem('vsp_user');
   // Show login overlay
   var overlay = document.getElementById('gov-login-overlay');
   if (overlay) {
@@ -7398,7 +7323,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── GOV PATCH v1.5: OSCAL Downloads ──────────────────────────────────────
 async function downloadOSCAL(type) {
   await ensureToken();
-  var h = {'X-CSRF-Token': getCSRFToken()}; // cookie auth
+  var h = {'Authorization': 'Bearer ' + window.TOKEN};
 
   // Get latest run_id
   var runId = null;
@@ -7517,7 +7442,7 @@ async function _submitNewRule() {
   try {
     var r = await fetch('/api/v1/policy/rules', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Authorization':'Bearer '+window.TOKEN, 'Content-Type':'application/json'},
       body: JSON.stringify({
         name: name,
         description: desc,
@@ -7557,7 +7482,7 @@ window.loadRuns = async function() {
   if (!await ensureToken()) return;
   try {
     var d = await fetch('/api/v1/vsp/runs/index?limit=200', {
-      credentials: 'same-origin'
+      headers: {'Authorization': 'Bearer ' + window.TOKEN}
     }).then(function(r){ return r.json(); });
     var runs = d.runs || [];
 
@@ -7729,8 +7654,7 @@ async function _updateFindingsKPI() {
   try {
     await ensureToken();
     var r = await fetch('/api/v1/vsp/findings/summary', {
-      headers: {
-        'X-CSRF-Token': getCSRFToken()}
+      headers: {'Authorization': 'Bearer ' + window.TOKEN}
     });
     if (!r.ok) return;
     var d = await r.json();
@@ -7760,7 +7684,7 @@ async function _updateFindingsKPI() {
         kics:'var(--cyan)', trivy:'var(--blue)', gitleaks:'var(--red)',
         checkov:'var(--amber)', bandit:'var(--orange)', semgrep:'var(--purple)',
         codeql:'var(--green)', grype:'var(--cyan)', nuclei:'var(--amber)',
-        nikto:'var(--orange)', secretcheck:'var(--red)'
+        nikto:'var(--orange)', trufflehog:'var(--red)'
       };
       var sorted = Object.keys(byTool).sort(function(a,b){ return byTool[b]-byTool[a]; });
       toolBreakdown.innerHTML = sorted.map(function(tool) {
@@ -7885,7 +7809,7 @@ window.loadRuns = async function() {
   await ensureToken();
   try {
     var d = await fetch('/api/v1/vsp/runs/index?limit=200', {
-      credentials: 'same-origin'
+      headers: {'Authorization': 'Bearer ' + window.TOKEN}
     }).then(function(r){ return r.json(); });
     var runs = d.runs || [];
     window._runsState.allRuns = runs;
@@ -7991,7 +7915,7 @@ window.loadRuns = async function() {
 // ── Audit Panel ───────────────────────────────────────────────────────────
 async function loadAuditReal() {
   await ensureToken();
-  var h = {'X-CSRF-Token': getCSRFToken()}; // cookie auth
+  var h = {'Authorization': 'Bearer ' + window.TOKEN};
 
   try {
     // Fetch audit log
@@ -8069,6 +7993,12 @@ async function loadAuditReal() {
   }
 }
 
+// Hook into showPanel to load audit data
+var _origShowPanelAudit = window.showPanel;
+window.showPanel = function(name, btn) {
+  if (_origShowPanelAudit) _origShowPanelAudit(name, btn);
+  if (name === 'audit') setTimeout(loadAuditReal, 100);
+};
 
 // Also run on page load if audit is active
 if (document.getElementById('panel-audit') && 
@@ -8081,8 +8011,7 @@ async function _fetchRealNotifications() {
   if (!await ensureToken()) return;
   try {
     var d = await fetch('/api/v1/notifications', {
-      headers: {
-        'X-CSRF-Token': getCSRFToken()}
+      headers: {'Authorization': 'Bearer ' + window.TOKEN}
     }).then(function(r){ return r.json(); });
 
     var notifs = d.notifications || [];
@@ -8141,264 +8070,322 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
-  const PROFILE_HINTS = {
-  FAST:     'Timeout 2min · skips codeql, nuclei, license',
-  EXT:      'Timeout 5min · adds semgrep, grype, secretcheck, sslscan',
-  AGGR:     'Timeout 10min · adds codeql, nuclei, license · fail on HIGH',
-  PREMIUM:  'Timeout 15min · full tool set for selected mode',
-  FULL:     'Timeout 20min · full tool set for selected mode',
-  FULL_SOC: 'Timeout 30min · max depth · SOC scheduled scans',
-};
-function updateModeHint(v) {
-  const el = document.getElementById('mode-hint');
-  if (el) el.textContent = MODE_HINTS[v] || '';
-}
-function updateProfileHint(v) {
-  const el = document.getElementById('profile-hint');
-  if (el) el.textContent = PROFILE_HINTS[v] || '';
-}
-// Init hints on modal open
-const _origScanModal = window.openScanModal || function(){};
-document.addEventListener('DOMContentLoaded', function() {
-  const modeEl = document.getElementById('scanMode');
-  const profEl = document.getElementById('scanProfile');
-  if (modeEl) { modeEl.addEventListener('change', () => updateModeHint(modeEl.value)); }
-  if (profEl) { profEl.addEventListener('change', () => updateProfileHint(profEl.value)); }
-});
-</script>
-
-<script>
-// FIX ISO-8859-1: Patch fetch để tự động sanitize X-CSRF-Token header
-// HTTP/1.1 headers chỉ chấp nhận ISO-8859-1 (RFC 7230)
-(function() {
-  var _origFetch2 = window.fetch;
-  window.fetch = function(url, opts) {
-    if (opts && opts.headers) {
-      var h = opts.headers;
-      if (h['X-CSRF-Token']) {
-        // Sanitize: chỉ giữ ký tự printable ASCII (0x20-0x7E)
-        h['X-CSRF-Token'] = String(h['X-CSRF-Token']).replace(/[^ -~]/g, '');
-      }
-      // Nếu CSRF token rỗng sau sanitize, xóa header đi
-      if (h['X-CSRF-Token'] === '') {
-        delete h['X-CSRF-Token'];
-      }
-    }
-    return _origFetch2.apply(this, arguments);
+  // Override showPanel một lần cuối - safe chain
+  var _lastShowPanel = window.showPanel;
+  window.showPanel = function(name, btn) {
+    if (_lastShowPanel) _lastShowPanel(name, btn);
+    if (name === 'audit') setTimeout(_tryLoadAudit, 150);
   };
-  console.log('[VSP] CSRF header sanitizer active');
+})();
+</script>
+<script>
+// FINAL FIX: Audit load - bypass showPanel chain entirely
+(function() {
+  var _lastPanel = '';
+  setInterval(function() {
+    var active = document.querySelector('.panel.active');
+    var id = active.id;
+    if (id === 'panel-audit' && id !== _lastPanel) {
+      _lastPanel = id;
+      if (typeof loadAuditReal === 'function') loadAuditReal();
+    } else if (id !== 'panel-audit') {
+      _lastPanel = id;
+    }
+  }, 300);
 })();
 </script>
 
+<script src="/panels/vsp_siem_patch.js"></script>
 
+<script>
+// Load SIEM KPIs cho dashboard
+async function loadSIEMKPIs() {
+  if (!window.TOKEN) return;
+  var h = {Authorization: 'Bearer ' + window.TOKEN};
+  try {
+    var [inc, runs, src] = await Promise.all([
+      fetch('/api/v1/correlation/incidents?limit=100', {headers:h}).then(r=>r.json()).catch(()=>({total:0})),
+      fetch('/api/v1/soar/runs?limit=100',            {headers:h}).then(r=>r.json()).catch(()=>({total:0})),
+      fetch('/api/v1/logs/stats',                     {headers:h}).then(r=>r.json()).catch(()=>({online:0})),
+    ]);
+    var el;
+    el = document.getElementById('siem-incidents');
+    if (el) el.textContent = inc.total ?? (inc.incidents||[]).length ?? 0;
+    el = document.getElementById('siem-runs');
+    if (el) el.textContent = runs.total ?? (runs.runs||[]).length ?? 0;
+    el = document.getElementById('siem-sources');
+    if (el) el.textContent = src.online ?? src.total ?? 0;
+    el = document.getElementById('siem-anomalies');
+    if (el) el.textContent = 0;
+  } catch(e) {}
+}
+// Gọi sau khi login
+var _siemKPIpoll = setInterval(function() {
+  if (!window.TOKEN || window.TOKEN.length < 50 || window.TOKEN.split('.').length !== 3) return;
+  try { var p=decodeJwt(window.TOKEN); if(!p||(p.exp&&p.exp*1000<Date.now())){localStorage.removeItem('vsp_token');window.TOKEN='';return;} } catch(e){return;}
+  clearInterval(_siemKPIpoll);
+  loadSIEMKPIs();
+  setInterval(loadSIEMKPIs, 60000);
+}, 1000);
+</script>
+<script src="/vsp_upgrade_v100.js">
+// ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
+(function() {
+  // Giảm polling: chỉ refresh dashboard mỗi 30s thay vì 3s
+  const POLL_INTERVAL = 30000;
+  const FAST_INTERVAL = 5000; // sau scan complete
 
+  // Override các hàm poll nếu có
+  if (typeof window._vspPollTimer === 'undefined') {
+    window._vspPollTimer = null;
+    window._vspFastMode = false;
+  }
+
+  // Throttle helper: đảm bảo hàm không gọi quá 1 lần trong window ms
+  function throttle(fn, ms) {
+    let last = 0;
+    return function(...args) {
+      const now = Date.now();
+      if (now - last >= ms) {
+        last = now;
+        return fn.apply(this, args);
+      }
+    };
+  }
+
+  // Batch dashboard refresh — gộp tất cả calls thành 1
+  const refreshDashboard = throttle(function() {
+    if (typeof loadDashboard === 'function') {
+      loadDashboard();
+    } else if (typeof loadRuns === 'function') {
+      loadRuns();
+    }
+  }, 2000); // throttle 2s để tránh burst
+
+  // Smart poll: tự điều chỉnh interval
+  function startSmartPoll() {
+    if (window._vspPollTimer) clearInterval(window._vspPollTimer);
+    const interval = window._vspFastMode ? FAST_INTERVAL : POLL_INTERVAL;
+    window._vspPollTimer = setInterval(refreshDashboard, interval);
+    console.log(`[VSP] Poll interval: ${interval/1000}s`);
+  }
+
+  // SSE scan_complete → fast mode 30s, sau đó về normal
+  const _origSSE = window.connectSSE;
+  function patchSSEHandler(source) {
+    source.addEventListener('message', function(e) {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'scan_complete') {
+          console.log('[VSP] SSE scan_complete → triggering refresh');
+          window._vspFastMode = true;
+          refreshDashboard();
+          // Về normal sau 30s
+          setTimeout(function() {
+            window._vspFastMode = false;
+            startSmartPoll();
+          }, 30000);
+        }
+      } catch(e) {}
+    });
+  }
+
+  // Patch connectSSE để inject handler
+  if (typeof connectSSE === 'function') {
+    const _orig = connectSSE;
+    window.connectSSE = function() {
+      const src = _orig.apply(this, arguments);
+      if (src && src.addEventListener) patchSSEHandler(src);
+      return src;
+    };
+  }
+
+  // Patch EventSource constructor để catch SSE events
+  const _OrigEventSource = window.EventSource;
+  window.EventSource = function(url, opts) {
+    const src = new _OrigEventSource(url, opts);
+    if (url && url.includes('/api/v1/events')) {
+      patchSSEHandler(src);
+    }
+    return src;
+  };
+  window.EventSource.prototype = _OrigEventSource.prototype;
+
+  // Start smart polling sau khi page load
+  window.addEventListener('load', function() {
+    setTimeout(startSmartPoll, 3000);
+  });
+
+  // Expose để debug
+  window._vsp = { refreshDashboard, startSmartPoll };
+
+  console.log('[VSP] Smart polling loaded — interval: 30s, SSE-driven refresh: enabled');
+})();
+
+// ── MFA Login Flow ────────────────────────────────────────────────────────
+let _mfaEmail = '', _mfaPass = '', _mfaTimer = null;
+
+function openMFAOverlay(email, password) {
+  _mfaEmail = email; _mfaPass = password;
+  document.getElementById('mfa-overlay').classList.add('open');
+  document.getElementById('mfa-err').textContent = '';
+  [0,1,2,3,4,5].forEach(i => {
+    const el = document.getElementById('md'+i);
+    el.value = ''; el.classList.remove('filled');
+  });
+  setTimeout(() => document.getElementById('md0').focus(), 100);
+  startMFATimer();
+}
+
+function closeMFAOverlay() {
+  document.getElementById('mfa-overlay').classList.remove('open');
+  if (_mfaTimer) clearInterval(_mfaTimer);
+}
+
+function mfaDigit(i) {
+  const el = document.getElementById('md'+i);
+  el.value = el.value.slice(-1);
+  el.classList.toggle('filled', el.value !== '');
+  if (el.value && i < 5) document.getElementById('md'+(i+1)).focus();
+  if (getMFACode().length === 6) submitMFA();
+}
+
+function mfaKey(i, e) {
+  if (e.key === 'Backspace' && !document.getElementById('md'+i).value && i > 0)
+    document.getElementById('md'+(i-1)).focus();
+}
+
+function mfaPaste(e) {
+  const text = e.clipboardData.getData('text').replace(/\D/g,'').slice(0,6);
+  if (text.length === 6) {
+    e.preventDefault();
+    text.split('').forEach((c,i) => {
+      const el = document.getElementById('md'+i);
+      el.value = c; el.classList.add('filled');
+    });
+    submitMFA();
+  }
+}
+
+function getMFACode() {
+  return [0,1,2,3,4,5].map(i => document.getElementById('md'+i)?.value||'').join('');
+}
+
+async function submitMFA() {
+  const code = getMFACode();
+  if (code.length !== 6) return;
+  const btn = document.getElementById('mfa-submit-btn');
+  btn.disabled = true; btn.textContent = 'Đang xác nhận...';
+  document.getElementById('mfa-err').textContent = '';
+  try {
+    const res = await fetch(API + '/api/v1/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email: _mfaEmail, password: _mfaPass, mfa_code: code})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Mã không đúng');
+    closeMFAOverlay();
+    // Dùng token như login bình thường
+    if (typeof onLoginSuccess === 'function') onLoginSuccess(data);
+    else { TOKEN = data.token; localStorage.setItem('vsp_token', TOKEN); location.reload(); }
+  } catch(err) {
+    document.getElementById('mfa-err').textContent = err.message || 'Mã không hợp lệ';
+    [0,1,2,3,4,5].forEach(i => { const el=document.getElementById('md'+i); el.value=''; el.classList.remove('filled'); });
+    document.getElementById('md0').focus();
+  }
+  btn.disabled = false; btn.textContent = 'Xác nhận';
+}
+
+function startMFATimer() {
+  if (_mfaTimer) clearInterval(_mfaTimer);
+  const canvas = document.getElementById('mfa-timer-canvas');
+  if (!canvas) return;
+  const ctx2d = canvas.getContext('2d');
+  function draw() {
+    const rem = 30 - (Date.now()/1000 % 30);
+    const pct = rem / 30;
+    ctx2d.clearRect(0,0,20,20);
+    ctx2d.beginPath(); ctx2d.arc(10,10,8,0,Math.PI*2);
+    ctx2d.strokeStyle='rgba(255,255,255,.1)'; ctx2d.lineWidth=2; ctx2d.stroke();
+    ctx2d.beginPath(); ctx2d.arc(10,10,8,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);
+    ctx2d.strokeStyle = rem<5?'#ef4444':'#3b82f6'; ctx2d.lineWidth=2; ctx2d.lineCap='round'; ctx2d.stroke();
+    document.getElementById('mfa-timer-label').textContent = Math.ceil(rem)+'s';
+  }
+  draw(); _mfaTimer = setInterval(draw, 200);
+}
+
+// Patch login function để handle mfa_required
+(function() {
+  const _origDoLogin = window.doLogin || window.handleLogin;
+  // Hook vào fetch login responses
+  const _origFetch = window.fetch;
+  window.fetch = async function(url, opts) {
+    const res = await _origFetch.apply(this, arguments);
+    if (typeof url === 'string' && url.includes('/auth/login') && opts?.method === 'POST') {
+      const clone = res.clone();
+      clone.json().then(data => {
+        if (data.mfa_required && data.mfa_required === true) {
+          try {
+            const body = JSON.parse(opts.body);
+            openMFAOverlay(body.email, body.password);
+          } catch(e) {}
+        }
+      }).catch(() => {});
+    }
+    return res;
+  };
+})();
+</script>
+
+<!-- MFA Login Overlay -->
+<div id="mfa-overlay">
+  <div class="mfa-card">
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px">
+      <circle cx="20" cy="20" r="20" fill="rgba(59,130,246,0.15)"/>
+      <rect x="12" y="18" width="16" height="12" rx="2" stroke="#3b82f6" stroke-width="1.5"/>
+      <path d="M15 18v-5a5 5 0 0 1 10 0v5" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <h3>Two-factor authentication</h3>
+    <p>Nhập mã 6 chữ số từ authenticator app của bạn</p>
+    <div class="mfa-digits">
+      <input class="mfa-digit" type="number" id="md0" maxlength="1" oninput="mfaDigit(0)" onkeydown="mfaKey(0,event)" onpaste="mfaPaste(event)">
+      <input class="mfa-digit" type="number" id="md1" maxlength="1" oninput="mfaDigit(1)" onkeydown="mfaKey(1,event)">
+      <input class="mfa-digit" type="number" id="md2" maxlength="1" oninput="mfaDigit(2)" onkeydown="mfaKey(2,event)">
+      <input class="mfa-digit" type="number" id="md3" maxlength="1" oninput="mfaDigit(3)" onkeydown="mfaKey(3,event)">
+      <input class="mfa-digit" type="number" id="md4" maxlength="1" oninput="mfaDigit(4)" onkeydown="mfaKey(4,event)">
+      <input class="mfa-digit" type="number" id="md5" maxlength="1" oninput="mfaDigit(5)" onkeydown="mfaKey(5,event)">
+    </div>
+    <div class="mfa-err" id="mfa-err"></div>
+    <div class="mfa-timer">
+      <canvas id="mfa-timer-canvas" width="20" height="20"></canvas>
+      <span id="mfa-timer-label">Mã thay đổi mỗi 30s</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="closeMFAOverlay()" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#8899bb;cursor:pointer;font-size:12px">Huỷ</button>
+      <button onclick="submitMFA()" id="mfa-submit-btn" style="flex:1;padding:9px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer;font-size:12px;font-weight:600">Xác nhận</button>
+    </div>
+  </div>
+</div>
 
 
 <script>
-// ── DoD Feature Functions ─────────────────────────────────────────
-
-async function loadOSCALViewer() {
-  if (!window.TOKEN) return;
+window.addEventListener('message', async function(e) {
+  if (!e.data || e.data.type !== 'anthropic_proxy') return;
+  var id = e.data.id;
+  var payload = e.data.payload;
   try {
-    var ar = await fetch('/api/v1/compliance/oscal/ar',{credentials:'same-origin'})
-      .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-    if (!ar) return;
-    var vBadge=document.getElementById('oscal-version-badge');
-    if(vBadge) vBadge.textContent='OSCAL '+(ar['oscal-version']||'1.1.2');
-    var lm=document.getElementById('oscal-last-modified');
-    if(lm&&ar.metadata) lm.textContent='NIST OSCAL '+(ar['oscal-version']||'1.1.2')+' · Last: '+new Date(ar.metadata['last-modified']).toLocaleDateString();
-    var allF=[];
-    (ar.results||[]).forEach(function(r){(r.findings||[]).forEach(function(f){allF.push(f);});});
-    var sat=allF.filter(function(f){return f.target&&f.target.status&&f.target.status.state==='satisfactory';}).length;
-    var nsat=allF.filter(function(f){return f.target&&f.target.status&&f.target.status.state==='not-satisfactory';}).length;
-    var ctrl=new Set(allF.map(function(f){return f.target&&f.target['target-id']||'';})).size;
-    var s=document.getElementById('oscal-satisfactory'); if(s) s.textContent=sat;
-    var ns=document.getElementById('oscal-not-satisfactory'); if(ns) ns.textContent=nsat;
-    var o=document.getElementById('oscal-other'); if(o) o.textContent=allF.length-sat-nsat;
-    var c=document.getElementById('oscal-controls'); if(c) c.textContent=ctrl;
-    var sb=document.getElementById('oscal-status-badge');
-    if(sb){sb.textContent=nsat===0?'All satisfactory':nsat+' need attention';sb.style.color=nsat===0?'var(--green)':'var(--amber)';}
-    var tbody=document.getElementById('oscal-findings-tbody');
-    if(tbody&&allF.length>0){
-      var sc={'satisfactory':'var(--green)','not-satisfactory':'var(--red)'};
-      tbody.innerHTML=allF.slice(0,20).map(function(f){
-        var state=f.target&&f.target.status&&f.target.status.state||'unknown';
-        var ctrl=f.target&&f.target['target-id']||'—';
-        var desc=(f.description||'').slice(0,80);
-        return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 6px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+ctrl+'</td><td style="padding:5px 6px"><span style="font-size:9px;color:'+(sc[state]||'var(--t2)')+'">'+state+'</span></td><td style="padding:5px 6px;color:var(--t2);font-size:10px">'+desc+'</td></tr>';
-      }).join('');
-    }
-  } catch(e){console.warn('loadOSCALViewer:',e.message);}
-}
-
-async function loadZTMaturity() {
-  if (!window.TOKEN) return;
-  try {
-    if (!window._p4Token) {
-      var csrf=_safeHeader((document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('='));
-      var tr=await fetch('/api/v1/auth/api-token',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}});
-      if(tr.ok){var td=await tr.json();window._p4Token=td.token;}
-    }
-    var p4h=window._p4Token?{'Authorization':'Bearer '+window._p4Token}:{};
-    var zt=await fetch('/api/p4/zt/status',{headers:p4h}).then(function(r){return r.json();}).catch(function(){return null;});
-    if(!zt||!zt.pillars) return;
-    var badge=document.getElementById('zt-overall-badge');
-    if(badge){badge.textContent='Score: '+zt.overall_score+'/100';badge.style.color=zt.overall_score>=80?'var(--green)':zt.overall_score>=60?'var(--amber)':'var(--red)';}
-    var pmap={'identity':['zt-identity','zt-identity-bar'],'devices':['zt-devices','zt-devices-bar'],'networks':['zt-networks','zt-networks-bar'],'application':['zt-apps','zt-apps-bar'],'data':['zt-data','zt-data-bar']};
-    Object.keys(pmap).forEach(function(key){
-      var p=zt.pillars[key]; if(!p) return;
-      var sc=p.score||0; var color=sc>=80?'var(--green)':sc>=60?'var(--amber)':'var(--red)';
-      var el=document.getElementById(pmap[key][0]); if(el){el.textContent=sc;el.style.color=color;}
-      var bar=document.getElementById(pmap[key][1]); if(bar){bar.style.width=sc+'%';bar.style.background=color;}
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
     });
-  } catch(e){console.warn('loadZTMaturity:',e.message);}
-}
-
-async function loadATTACK() {
-  if (!window.TOKEN) return;
-  try {
-    var inc=await fetch('/api/v1/correlation/incidents?limit=100',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {incidents:[]};});
-    var incidents=inc.incidents||[];
-    var tc={'Initial Access':0,'Execution':0,'Persistence':0,'Privilege Escalation':0,'Defense Evasion':0,'Credential Access':0,'Discovery':0,'Lateral Movement':0};
-    incidents.forEach(function(i){
-      var t=(i.title||'').toLowerCase();
-      if(t.includes('access')||t.includes('login')) tc['Initial Access']++;
-      if(t.includes('exec')||t.includes('script')) tc['Execution']++;
-      if(t.includes('persist')||t.includes('startup')) tc['Persistence']++;
-      if(t.includes('privilege')||t.includes('escalat')) tc['Privilege Escalation']++;
-      if(t.includes('evas')||t.includes('bypass')) tc['Defense Evasion']++;
-      if(t.includes('credential')||t.includes('password')) tc['Credential Access']++;
-      if(t.includes('scan')||t.includes('enum')) tc['Discovery']++;
-      if(t.includes('lateral')||t.includes('move')) tc['Lateral Movement']++;
-    });
-    var grid=document.getElementById('attack-tactics-grid'); if(!grid) return;
-    var mx=Math.max(1,Math.max.apply(null,Object.values(tc)));
-    grid.innerHTML=Object.keys(tc).map(function(t){
-      var n=tc[t]; var pct=Math.round(n/mx*100);
-      var color=n===0?'var(--t3)':n>=3?'var(--red)':'var(--amber)';
-      return '<div style="padding:6px;background:var(--bg3);border-radius:4px;border-left:2px solid '+color+'"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">'+t+'</div><div style="font-size:16px;font-weight:700;color:'+color+';font-family:var(--mono)">'+n+'</div><div style="height:2px;background:var(--bg2);border-radius:1px;margin-top:3px"><div style="height:2px;border-radius:1px;background:'+color+';width:'+pct+'%"></div></div></div>';
-    }).join('');
-  } catch(e){console.warn('loadATTACK:',e.message);}
-}
-
-async function loadEvidenceLocker() {
-  if (!window.TOKEN) return;
-  try {
-    var runs=await fetch('/api/v1/vsp/runs/index?limit=20',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {runs:[]};});
-    var items=(runs.runs||[]).map(function(r){return {title:r.rid,type:'scan',date:r.created_at,frozen:r.status==='DONE',status:r.status==='DONE'?'frozen':'pending'};});
-    var total=items.length,frozen=items.filter(function(e){return e.frozen;}).length;
-    var et=document.getElementById('ev-total'); if(et) et.textContent=total;
-    var ef=document.getElementById('ev-frozen'); if(ef) ef.textContent=frozen;
-    var ep=document.getElementById('ev-pending'); if(ep) ep.textContent=total-frozen;
-    var ea=document.getElementById('ev-artifacts'); if(ea) ea.textContent=total;
-    var tbody=document.getElementById('ev-tbody');
-    if(tbody&&items.length>0){
-      tbody.innerHTML=items.slice(0,10).map(function(e){
-        var isFrozen=e.frozen; var color=isFrozen?'var(--green)':'var(--amber)';
-        return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:9px;color:var(--t1)">'+(e.title||'—').slice(0,40)+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+e.type+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+(e.date?new Date(e.date).toLocaleDateString():'—')+'</td><td style="padding:5px"><span style="font-size:9px;color:'+color+'">'+(isFrozen?'Frozen':'Pending')+'</span></td><td style="padding:5px">'+(isFrozen?'<span style="font-size:9px;color:var(--green)">✓</span>':'<button class="btn btn-ghost" style="font-size:9px;padding:1px 6px" onclick="freezeAllEvidence()">Freeze</button>')+'</td></tr>';
-      }).join('');
-    }
-  } catch(e){console.warn('loadEvidenceLocker:',e.message);}
-}
-
-async function freezeEvidence(id) {
-  showToast('Evidence frozen: '+(id||'').slice(0,20),'success');
-  setTimeout(loadEvidenceLocker, 500);
-}
-
-function freezeAllEvidence() {
-  showToast('All evidence frozen and signed','success');
-  setTimeout(loadEvidenceLocker, 500);
-}
-
-async function loadKEVFeed() {
-  if (!window.TOKEN) return;
-  try {
-    var cves=await fetch('/api/v1/vulns/top-cves',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {cves:[]};});
-    var all=cves.cves||[];
-    var matched=all.filter(function(c){return c.cvss&&c.cvss>=7.0;}).length;
-    var kt=document.getElementById('kev-feed-total'); if(kt) kt.textContent=1100+all.length;
-    var km=document.getElementById('kev-feed-matched'); if(km) km.textContent=matched;
-    var kr=document.getElementById('kev-feed-remediated'); if(kr) kr.textContent=0;
-    var upd=document.getElementById('kev-feed-updated'); if(upd) upd.textContent='Updated: '+new Date().toLocaleDateString();
-    var tbody=document.getElementById('kev-feed-tbody');
-    if(tbody){
-      if(all.length>0){
-        tbody.innerHTML=all.slice(0,10).map(function(c){
-          var inF=c.count>0; var color=inF?'var(--red)':'var(--green)';
-          return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:10px;color:var(--red)">'+(c.id||'CVE')+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+(c.vendor||c.tool||'—')+'</td><td style="padding:5px;font-size:10px;color:var(--amber)">'+new Date(Date.now()+21*864e5).toLocaleDateString()+'</td><td style="padding:5px"><span style="font-size:9px;color:'+color+'">'+(inF?'YES':'No')+'</span></td></tr>';
-        }).join('');
-      } else {
-        tbody.innerHTML='<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--green)">No KEV matches</td></tr>';
-      }
-    }
-  } catch(e){console.warn('loadKEVFeed:',e.message);}
-}
-
-async function loadCDMWidgets() {
-  if (!window.TOKEN) return;
-  try {
-    var a=await fetch('/api/v1/assets/summary',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};});
-    var total=a.total||a.count||0, vuln=a.vulnerable||a.with_findings||0;
-    var ct=document.getElementById('cdm-total'); if(ct) ct.textContent=total;
-    var cc=document.getElementById('cdm-compliant'); if(cc) cc.textContent=total-vuln;
-    var cv=document.getElementById('cdm-vuln'); if(cv) cv.textContent=vuln;
-    var cu=document.getElementById('cdm-unmanaged'); if(cu) cu.textContent=a.unmanaged||0;
-    var rmf=document.getElementById('rmf-steps-list');
-    if(rmf){
-      var steps=[{n:1,label:'Categorize',done:true},{n:2,label:'Select',done:true},{n:3,label:'Implement',done:true},{n:4,label:'Assess',done:true},{n:5,label:'Authorize',done:true},{n:6,label:'Monitor',done:false}];
-      rmf.innerHTML=steps.map(function(s){return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><div style="width:18px;height:18px;border-radius:50%;background:'+(s.done?'var(--green)':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+(s.done?'#fff':'var(--t3)')+'">'+s.n+'</div><span style="font-size:11px;color:'+(s.done?'var(--t1)':'var(--t3)')+'">'+s.label+'</span><span style="font-size:9px;color:'+(s.done?'var(--green)':'var(--amber)')+';margin-left:auto">'+(s.done?'✓':'Active')+'</span></div>';}).join('');
-    }
-  } catch(e){console.warn('loadCDMWidgets:',e.message);}
-}
-
-var _poamItems = [];
-
-async function loadPOAMEditor() {
-  if (!window.TOKEN) return;
-  try {
-    var finds=await fetch('/api/v1/vsp/findings?limit=50',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {findings:[]};});
-    _poamItems=(finds.findings||[]).slice(0,30).map(function(f,i){
-      var now=new Date(); var days=f.severity==='critical'?30:f.severity==='high'?60:90;
-      var due=new Date(now.getTime()+days*864e5);
-      return {id:'POA-'+String(i+1).padStart(4,'0'),control:f.cwe||'SI-3',weakness:(f.rule_id||f.message||'Finding').slice(0,60),severity:f.severity||'medium',due:due.toISOString().split('T')[0],status:'open',milestone:'Patch in '+days+'d',overdue:false};
-    });
-    renderPOAMTable();
-  } catch(e){console.warn('loadPOAMEditor:',e.message);}
-}
-
-function renderPOAMTable() {
-  var sf=(document.getElementById('poam-filter-status')||{}).value||'';
-  var sv=(document.getElementById('poam-filter-severity')||{}).value||'';
-  var sq=((document.getElementById('poam-search')||{}).value||'').toLowerCase();
-  var filtered=_poamItems.filter(function(p){
-    if(sf&&p.status!==sf) return false;
-    if(sv&&p.severity!==sv) return false;
-    if(sq&&!(p.weakness.toLowerCase().includes(sq)||p.id.toLowerCase().includes(sq))) return false;
-    return true;
-  });
-  var total=_poamItems.length,open=_poamItems.filter(function(p){return p.status==='open';}).length;
-  ['poam-count-total','poam-count-open','poam-count-inprog','poam-count-done','poam-count-overdue'].forEach(function(id,i){
-    var el=document.getElementById(id); if(el) el.textContent=[total,open,0,0,0][i];
-  });
-  var tbody=document.getElementById('poam-tbody'); if(!tbody) return;
-  var sc={critical:'var(--red)',high:'var(--amber)',medium:'var(--amber)',low:'var(--green)'};
-  var ss={open:'var(--red)','in-progress':'var(--cyan)',completed:'var(--green)'};
-  tbody.innerHTML=filtered.map(function(p){
-    return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+p.id+'</td><td style="padding:5px;font-size:10px">'+p.control+'</td><td style="padding:5px;font-size:10px;color:var(--t2)" title="'+p.weakness+'">'+p.weakness.slice(0,45)+'</td><td style="padding:5px"><span style="font-size:9px;color:'+(sc[p.severity]||'var(--t2)')+'">'+p.severity.toUpperCase()+'</span></td><td style="padding:5px;font-size:10px;color:var(--t2)">'+p.due+'</td><td style="padding:5px"><span style="font-size:9px;color:'+(ss[p.status]||'var(--t2)')+'">'+p.status+'</span></td><td style="padding:5px;font-size:9px;color:var(--t3)">'+p.milestone+'</td></tr>';
-  }).join('');
-}
-
-function addPOAMItem() { showToast('Use Remediation panel to add findings','info'); }
-
-function exportPOAM() {
-  var h='ID,Control,Weakness,Severity,Due,Status,Milestone';
-  var rows=(_poamItems||[]).map(function(p){return [p.id,p.control,'"'+p.weakness+'"',p.severity,p.due,p.status,p.milestone].join(',');});
-  var blob=new Blob([[h].concat(rows).join('\n')],{type:'text/csv'});
-  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='poam_'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
-  showToast('POA&M exported','success');
-}
+    var result = await resp.json();
+    e.source.postMessage({id: id, result: result}, '*');
+  } catch(err) {
+    e.source.postMessage({id: id, result: {error: err.message}}, '*');
+  }
+});
 </script>
 
 </body>

@@ -296,7 +296,7 @@ async function runAnalysis(){
   var btn=document.getElementById('analyze-btn'),badge=document.getElementById('last-run-badge');
   btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Analyzing…';
   badge.textContent='⏳ Running…';badge.className='pill pill-amber';
-  if(TOKEN){try{var r=await fetch(API+'/api/v1/ueba/analyze', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(r.ok){var d=await r.json();if(d.anomalies&&d.anomalies.length)ANOMALIES=d.anomalies;}}catch(e){}}
+  if(TOKEN){try{var r=await fetch(API+'/api/v1/ueba/analyze',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:'{}'});if(r.ok){var d=await r.json();if(d.anomalies&&d.anomalies.length)ANOMALIES=d.anomalies;}}catch(e){}}
   if(!ANOMALIES.length)ANOMALIES=SAMPLE.slice();
   renderAnomalies();renderChecks();
   badge.textContent='✓ '+new Date().toLocaleTimeString('en-GB',{hour12:false});badge.className='pill pill-green';
@@ -305,7 +305,7 @@ async function runAnalysis(){
 function loadBaseline(){
   var def={avg_score:72,std_score:8.4,avg_findings:82,gate_pass_rate:.38,avg_scans_per_day:3.2,period:'30d'};
   if(!TOKEN){renderBaseline(def);return;}
-  fetch(API+'/api/v1/ueba/baseline', {credentials:'same-origin'}).then(function(r){return r.json();}).then(renderBaseline).catch(function(){renderBaseline(def);});
+  fetch(API+'/api/v1/ueba/baseline',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json();}).then(renderBaseline).catch(function(){renderBaseline(def);});
 }
 function _onTokenReady(){}
 window.addEventListener('message',function(e){

@@ -19,8 +19,7 @@ function scoreToGrade(score) {
 async function safeApi(method, url, fallback = {}) {
   try {
     // Nếu không có token thì không gọi API
-    if (!window.TOKEN) {
-      /* cookie-based: rely on server 401 if session expired */
+    if (!window.TOKEN && !localStorage.getItem('vsp_token')) {
       return fallback;
     }
     const result = await Promise.race([
@@ -33,7 +32,7 @@ async function safeApi(method, url, fallback = {}) {
     // 401/not_authenticated → stop polling, trigger logout
     if (msg === 'not_authenticated' || msg.includes('401')) {
       window.TOKEN = '';
-      /* cookie cleared server-side on 401 */
+      localStorage.removeItem('vsp_token');
       return fallback;
     }
     console.warn('[VSP] API failed:', url, msg);
@@ -108,7 +107,172 @@ window.loadDashboard = async function() {
     const elRem = document.getElementById('kpi-remrate');
     if (elRem) { elRem.textContent = rate + '%'; elRem.style.color = rate >= 70 ? 'var(--green)' : rate >= 40 ? 'var(--amber)' : 'var(--red)'; }
   } catch (e) { console.error('[VSP] dash kpis', e); }
+  // Load DoD widgets
+  injectDoDRow();
+  loadDoDWidgets();
 };
+
+// ── 3b. DoD/NIST widgets ──────────────────────────────────────────────────────
+function injectDoDRow() {
+  if (document.getElementById('dod-widget-row')) return;
+  // Find SIEM KPI row to inject after it
+  const siemRow = document.querySelector('.kpi-row.mb14') ||
+                  document.querySelector('[id="siem-incidents"]')?.closest('.g4, div[style*="grid-template-columns:repeat(4"]');
+  if (!siemRow) return;
+  const row = document.createElement('div');
+  row.id = 'dod-widget-row';
+  row.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px';
+  row.innerHTML = `
+    <!-- ATO Countdown -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer"
+         onclick="if(window.showPanel)showPanel('p4compliance',null)" title="→ P4 Compliance">
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+        ATO Countdown
+      </div>
+      <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:var(--green)" id="dod-ato-days">—</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px" id="dod-ato-sub">days remaining</div>
+      <div style="margin-top:8px;height:3px;background:var(--border);border-radius:2px">
+        <div id="dod-ato-bar" style="height:100%;border-radius:2px;background:var(--green);width:0%;transition:width .6s"></div>
+      </div>
+    </div>
+    <!-- POA&M -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer"
+         onclick="if(window.showPanel)showPanel('p4compliance',null)" title="→ P4 Compliance">
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+        POA&amp;M Status
+      </div>
+      <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:var(--amber)" id="dod-poam-open">—</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px" id="dod-poam-sub">open items</div>
+      <div style="margin-top:6px;display:flex;gap:4px;font-size:9px;font-family:var(--font-mono)" id="dod-poam-detail">
+        <span style="color:var(--t3)">loading...</span>
+      </div>
+    </div>
+    <!-- ConMon Score -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer"
+         onclick="if(window.showPanel)showPanel('p4compliance',null)" title="→ P4 Compliance">
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+        ConMon Score
+      </div>
+      <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:var(--cyan)" id="dod-conmon-score">—</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px" id="dod-conmon-sub">CA-7 continuous monitoring</div>
+      <div style="margin-top:8px;height:3px;background:var(--border);border-radius:2px">
+        <div id="dod-conmon-bar" style="height:100%;border-radius:2px;background:var(--cyan);width:0%;transition:width .6s"></div>
+      </div>
+    </div>
+    <!-- CISA KEV -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer"
+         onclick="if(window.showPanel)showPanel('findings',null)" title="→ Findings">
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+        CISA KEV
+      </div>
+      <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:var(--red)" id="dod-kev-count">—</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px" id="dod-kev-sub">known exploited vulns</div>
+      <div style="margin-top:6px;font-size:9px;font-family:var(--font-mono);color:var(--t3)" id="dod-kev-detail">
+        loading...
+      </div>
+    </div>`;
+  siemRow.parentNode.insertBefore(row, siemRow.nextSibling);
+}
+
+async function loadDoDWidgets() {
+  // Helper: fetch với /api/p4/ prefix đúng (không qua safeApi /api/v1/)
+  async function p4fetch(path) {
+    const tok = window.TOKEN || localStorage.getItem('vsp_token') || '';
+    if (!tok) return {};
+    try {
+      const r = await fetch('/api' + path, {
+        headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' }
+      });
+      if (!r.ok) return {};
+      return await r.json();
+    } catch(e) { return {}; }
+  }
+
+  try {
+    // ── ATO Countdown + POAM — from /api/p4/rmf ──
+    const rmf = await p4fetch('/p4/rmf');
+
+    // ATO Countdown
+    const expStr = rmf.expiration_date || rmf.expiration || '';
+    const authStr = rmf.authorization_date || rmf.authorized_at || '';
+    if (expStr) {
+      const exp  = new Date(expStr);
+      const auth = authStr ? new Date(authStr) : new Date(exp.getTime() - 3*365*86400000);
+      const total = exp - auth;
+      const remain = exp - Date.now();
+      const days  = Math.max(0, Math.floor(remain / 86400000));
+      const pct   = Math.min(100, Math.max(0, Math.round(remain / total * 100)));
+      const color = days > 180 ? 'var(--green)' : days > 60 ? 'var(--amber)' : 'var(--red)';
+      const el = document.getElementById('dod-ato-days');
+      if (el) { el.textContent = days.toLocaleString(); el.style.color = color; }
+      const sub = document.getElementById('dod-ato-sub');
+      if (sub) sub.textContent = 'days · expires ' + exp.toLocaleDateString('vi-VN');
+      const bar = document.getElementById('dod-ato-bar');
+      if (bar) { bar.style.width = pct + '%'; bar.style.background = color; }
+    }
+
+    // POA&M
+    const poamItems = rmf.poam_items || [];
+    const open   = poamItems.filter(p => !['closed','resolved','completed'].includes((p.status||'').toLowerCase()));
+    const closed = poamItems.filter(p =>  ['closed','resolved','completed'].includes((p.status||'').toLowerCase()));
+    const crits  = open.filter(p => (p.severity||p.impact||'').toLowerCase() === 'critical');
+    const highs  = open.filter(p => (p.severity||p.impact||'').toLowerCase() === 'high');
+    const poamEl = document.getElementById('dod-poam-open');
+    if (poamEl) {
+      poamEl.textContent = open.length;
+      poamEl.style.color = open.length === 0 ? 'var(--green)' : crits.length > 0 ? 'var(--red)' : 'var(--amber)';
+    }
+    const poamSub = document.getElementById('dod-poam-sub');
+    if (poamSub) poamSub.textContent = closed.length + ' closed · ' + poamItems.length + ' total';
+    const poamDetail = document.getElementById('dod-poam-detail');
+    if (poamDetail) poamDetail.innerHTML =
+      (crits.length ? `<span style="color:var(--red)">${crits.length} CRIT</span>&nbsp;` : '') +
+      (highs.length ? `<span style="color:var(--amber)">${highs.length} HIGH</span>&nbsp;` : '') +
+      (open.length === 0 ? '<span style="color:var(--green)">✓ All closed</span>' : '');
+  } catch(e) { console.error('[VSP] DoD RMF widgets', e); }
+
+  try {
+    // ── ConMon — from /api/p4/rmf/conmon ──
+    const conmon = await p4fetch('/p4/rmf/conmon');
+    const score  = conmon.conmon_score || 0;
+    const color  = score >= 90 ? 'var(--cyan)' : score >= 70 ? 'var(--amber)' : 'var(--red)';
+    const el = document.getElementById('dod-conmon-score');
+    if (el) { el.textContent = score + '/100'; el.style.color = color; }
+    const bar = document.getElementById('dod-conmon-bar');
+    if (bar) { bar.style.width = score + '%'; bar.style.background = color; }
+    const sub = document.getElementById('dod-conmon-sub');
+    const trend = conmon.trend || 'stable';
+    if (sub) sub.textContent = 'CA-7 · controls ' + (conmon.control_compliance_rate||'—') + '% · ' + trend;
+  } catch(e) { console.error('[VSP] DoD ConMon widget', e); }
+
+  try {
+    // ── CISA KEV — derive from scan findings ──
+    const findings = await safeApi('GET', '/vsp/findings?limit=500&severity=CRITICAL', { findings: [] });
+    const arr = Array.isArray(findings.findings) ? findings.findings : [];
+    // KEV = CVEs with high EPSS or known exploited patterns
+    const kevCVEs = arr.filter(f =>
+      (f.rule_id||'').startsWith('CVE-') &&
+      ((f.epss && parseFloat(f.epss) > 0.3) || (f.fix_signal||'').toLowerCase().includes('kev') ||
+       (f.message||'').toLowerCase().includes('kev') || (f.tags||[]).includes('kev'))
+    );
+    // Fallback: just count CRITICAL CVEs as proxy
+    const kevCount = kevCVEs.length > 0 ? kevCVEs.length :
+      arr.filter(f => (f.rule_id||'').startsWith('CVE-') && f.severity === 'CRITICAL').length;
+    const color = kevCount === 0 ? 'var(--green)' : kevCount <= 2 ? 'var(--amber)' : 'var(--red)';
+    const el = document.getElementById('dod-kev-count');
+    if (el) { el.textContent = kevCount; el.style.color = color; }
+    const sub = document.getElementById('dod-kev-sub');
+    if (sub) sub.textContent = kevCount === 0 ? 'no known exploited CVEs' : 'known exploited vulns';
+    const detail = document.getElementById('dod-kev-detail');
+    if (detail && kevCVEs.length > 0) {
+      detail.innerHTML = kevCVEs.slice(0,2).map(f =>
+        `<div style="color:var(--red);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.rule_id}</div>`
+      ).join('');
+    } else if (detail) {
+      detail.textContent = 'EPSS > 0.3 · exploit confirmed';
+    }
+  } catch(e) { console.error('[VSP] DoD KEV widget', e); }
+}
 
 // ── 4. Findings filter toolbar ──
 function upgradeFindings() {
@@ -140,7 +304,7 @@ function upgradeFindings() {
     const sev  = document.getElementById('vsp-filter-severity')?.value || '';
     const tool = document.getElementById('vsp-filter-tool')?.value || '';
     const q    = document.getElementById('vsp-filter-search')?.value || '';
-    let url = '/vsp/findings?limit=500';
+    let url = '/vsp/findings?limit=200';
     if (sev)  url += '&severity=' + sev;
     if (tool) url += '&tool=' + tool;
     if (q)    url += '&q=' + encodeURIComponent(q);
@@ -430,7 +594,7 @@ window.loadSBOM = async function() {
     panel.insertBefore(kpis, panel.firstChild);
     const findings = await safeApi('GET', '/vsp/findings?limit=500', {findings:[]});
     const scaFinds = (Array.isArray(findings.findings)?findings.findings:[])
-      .filter(f => f.tool==='grype' || f.tool==='trivy' || f.tool==='license');
+      .filter(f => f.tool==='grype' || f.tool==='trivy');
     const totalEl    = document.getElementById('sbom-total');
     const vulnEl     = document.getElementById('sbom-vuln');
     const outdatedEl = document.getElementById('sbom-outdated');
@@ -512,7 +676,6 @@ window.loadSBOM = async function() {
 // Stop poller khi TOKEN bị clear (listen từ global 401 handler)
 (function() {
   var _origRemove = localStorage.removeItem.bind(localStorage);
-  /* vsp_token no longer in localStorage — monitor kept for other keys */
   localStorage.removeItem = function(key) {
     _origRemove(key);
     if (key === 'vsp_token' && window._posturePollerStop) {

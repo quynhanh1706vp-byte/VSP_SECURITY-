@@ -941,12 +941,7 @@ if(window.parent!==window){
   window.parent.postMessage({type:'vsp:request_theme'},'*');
 }
 
-function apiUrl(path){
-  var base=API_BASE;
-  if(base.endsWith('/api/v1'))return base+'/netcap'+path;
-  if(base.endsWith('/'))return base+'api/v1/netcap'+path;
-  return base+'/api/v1/netcap'+path;
-}
+function apiUrl(path){return API_BASE+'/api/v1/netcap'+path;}
 function apiHeaders(){return {Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'};}
 
 // ── Boot sequence ──
@@ -955,8 +950,8 @@ function boot(){
   loadInterfaces();
   loadFull();
   startSSE();
-  setInterval(pollStats,6000);
-  setInterval(pollData,15000);
+  setInterval(pollStats,3000);
+  setInterval(pollData,8000);
 }
 
 // ── Load interfaces ──
