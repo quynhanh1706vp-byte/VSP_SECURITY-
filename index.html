@@ -1713,7 +1713,21 @@ function showPanel(name, btn) {
     if (name === 'sbom') setTimeout(loadSBOM, 200);
     if (name === 'analytics') setTimeout(loadAnalytics, 300);
     if (name === 'sla') setTimeout(loadSLA, 200);
-    if (name === 'findings') loadFindings(0);
+    if (name === 'findings') {
+      loadFindings(0);
+      // Fetch full breakdown data once
+      if (!window._findingsBreakdownLoaded && window.TOKEN) {
+        window._findingsBreakdownLoaded = true;
+        setTimeout(function() {
+          fetch('/api/v1/vsp/findings?limit=500', {headers:{Authorization:'Bearer '+window.TOKEN}})
+            .then(function(r){return r.json();})
+            .then(function(d){
+              if(window._renderFindingsToolBreakdown)
+                window._renderFindingsToolBreakdown(d.findings||[], d.total||0);
+            }).catch(function(){window._findingsBreakdownLoaded=false;});
+        }, 1000);
+      }
+    }
     if (name === 'export') setTimeout(loadExportRuns, 200);
     if (name === 'remediation') loadRemediations();
     if (name === 'soc')         drawSocRadar();
@@ -6020,6 +6034,7 @@ window._renderFindingsToolBreakdown = function(findings, total) {
   var lbl = document.getElementById('findings-tool-total-lbl');
   if (!breakdown) return;
   if (lbl) lbl.textContent = total + ' total findings';
+
   var byTool = {};
   findings.forEach(function(f) {
     var t = f.tool || 'unknown';

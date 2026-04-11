@@ -667,7 +667,7 @@ window.loadSBOM = async function() {
     setTimeout(poll, 100);
     setTimeout(poll, 1500);
   });
-  const _pollInterval = setInterval(poll, 3000);
+  const _pollInterval = setInterval(poll, 30000);
   // Expose để có thể clear khi logout/401
   window._posturePollerStop = function() { clearInterval(_pollInterval); };
 })();
