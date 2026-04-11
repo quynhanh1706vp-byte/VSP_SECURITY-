@@ -3447,12 +3447,6 @@ function buildLogFromFindings(run, tools, findings, summary) {
   if (cnt) cnt.textContent = lines.length + ' lines';
 }
 
-// Override showPanel để load runs dropdown khi vào Scan log
-const _sp22 = window.showPanel;
-window.showPanel = function(name, btn) {
-  _sp22 && _sp22(name, btn);
-  if (name === 'scanlog') setTimeout(loadRunsDropdown, 200);
-};
 
 // Override loadLatestLog
 window.loadLatestLog = async function() {
@@ -3754,12 +3748,6 @@ if (document.readyState !== 'loading') {
   if (srcInput) srcInput.placeholder = '/tmp/iac_test';
 }
 
-// Override showPanel
-const _sp25 = window.showPanel;
-window.showPanel = function(name, btn) {
-  _sp25 && _sp25(name, btn);
-  if (name === 'runs') setTimeout(loadRuns, 200);
-};
 
 window.loadRuns = loadRuns;
 console.log('VSP Patch v2.5 loaded ✓');
@@ -4204,17 +4192,7 @@ window.exportFindingsCSV = function() {
 };
 
 // Patch showPanel
-var _sp28 = window.showPanel;
-window.showPanel = function(name, btn) {
-  _sp28 && _sp28(name, btn);
-  if (name === 'findings') {
-    setTimeout(function() {
-      loadFindingsRunSelector();
-      loadFindingsPanel();
-      injectFindingsUI();
-    }, 200);
-  }
-};
+
 
 // Inject UI enhancements vào findings panel
 function injectFindingsUI() {
@@ -4415,18 +4393,7 @@ window.applyFindingsFilter = function() {
 };
 
 // Re-inject showPanel override
-var _sp210 = window.showPanel;
-window.showPanel = function(name, btn) {
-  _sp210 && _sp210(name, btn);
-  if (name === 'findings') {
-    setTimeout(function() {
-      injectFindingsUI && injectFindingsUI();
-      window.loadFindingsRunSelector().then(function() {
-        window.loadFindingsPanel();
-      });
-    }, 200);
-  }
-};
+
 
 console.log('VSP Patch v2.10 loaded OK');
 </script>
@@ -4501,18 +4468,7 @@ window.applyFindingsFilter = function() {
   window.loadFindingsPanel();
 };
 
-var _sp211 = window.showPanel;
-window.showPanel = function(name, btn) {
-  _sp211 && _sp211(name, btn);
-  if (name === 'findings') {
-    setTimeout(function() {
-      injectFindingsUI && injectFindingsUI();
-      window.loadFindingsRunSelector().then(function() {
-        window.loadFindingsPanel();
-      });
-    }, 200);
-  }
-};
+
 
 console.log('VSP Patch v2.11 loaded OK');
 </script>
@@ -4589,19 +4545,7 @@ window.loadFindingsRunSelector = async function() {
   } catch(e) { console.error('loadFindingsRunSelector v2.12', e); }
 };
 
-// Override showPanel
-var _sp212 = window.showPanel;
-window.showPanel = function(name, btn) {
-  _sp212 && _sp212(name, btn);
-  if (name === 'findings') {
-    setTimeout(function() {
-      injectFindingsUI && injectFindingsUI();
-      window.loadFindingsRunSelector().then(function() {
-        window.loadFindingsPanel();
-      });
-    }, 200);
-  }
-};
+
 
 console.log('VSP Patch v2.12 loaded OK');
 </script>
@@ -4791,70 +4735,7 @@ console.log('VSP Patch v2.14 loaded OK');
   var ids = ['rem-k-open','rem-k-inprogress','rem-k-resolved','rem-k-accepted','rem-k-fp','rem-k-suppressed'];
   kpis.forEach(function(el, i) { if(ids[i]) el.id = ids[i]; });
   
-  // Override showPanel để load stats khi vào Remediation
-  var _sp = window.showPanel;
-  window.showPanel = function(name, btn) {
-    _sp && _sp(name, btn);
-    if (name === 'remediation') {
-      setTimeout(function() {
-        if (!window.TOKEN) return;
-        fetch('/api/v1/remediation/stats', {credentials:'same-origin'})
-          .then(function(r){return r.json();})
-          .then(function(s) {
-            var map = {
-              'rem-k-open': s.open||0,
-              'rem-k-inprogress': s.in_progress||0,
-              'rem-k-resolved': s.resolved||0,
-              'rem-k-accepted': s.accepted||0,
-              'rem-k-fp': s.false_positive||0,
-              'rem-k-suppressed': s.suppressed||0
-            };
-            Object.keys(map).forEach(function(id) {
-              var el = document.getElementById(id);
-              if (el) el.textContent = map[id];
-            });
-          }).catch(function(){});
-      }, 300);
-    }
-  };
-})();
-</script>
-
-
-
-
-
-
-
-<script>
-// Policy: Evaluate + New Rule Modal + Load Rules from API
-(function() {
-
-// 1. Fix Evaluate button
-window.runEval = async function() {
-  var el = document.getElementById('eval-result');
-  if (!el) return;
-  el.innerHTML = '<span style="color:var(--t3)">Evaluating...</span>';
-  await ensureToken();
-  try {
-    var r = await fetch('/api/v1/policy/evaluate', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json',},
-      body: JSON.stringify({})
-    });
-    var d = await r.json();
-    var color = d.decision==='PASS'?'var(--green)':d.decision==='WARN'?'var(--amber)':'var(--red)';
-    el.innerHTML = '<span style="color:'+color+';font-size:16px;font-weight:700">'+d.decision+'</span>'
-      +' &middot; score: <b>'+(d.score||0)+'</b>'
-      +' &middot; posture: <b>'+(d.posture||'?')+'</b>'
-      +' &middot; <span style="color:var(--t3)">'+(d.reason||'')+'</span>';
-  } catch(e) {
-    // Security: escape error message (defense-in-depth)
-    const _escErr = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    el.innerHTML = '<span style="color:var(--red)">Error: '+_escErr(e.message)+'</span>';
-  }
-};
-
+  
 // 2. Load rules từ API
 window.loadRulesFromAPI = async function() {
   await ensureToken();
@@ -4991,21 +4872,7 @@ window.saveNR = async function() {
 };
 
 // 4. Patch showPanel
-var _spPol = window.showPanel;
-window.showPanel = function(name, btn) {
-  _spPol && _spPol(name, btn);
-  if (name === 'policy') {
-    setTimeout(function() {
-      loadRulesFromAPI();
-      // Patch + New rule button
-      document.querySelectorAll('#panel-policy .btn').forEach(function(b) {
-        if (b.textContent.trim().indexOf('New rule') >= 0) {
-          b.onclick = function() { openNRModal(); };
-        }
-      });
-    }, 200);
-  }
-};
+
 
 })();
 </script>
@@ -5063,11 +4930,7 @@ window.verifyAudit = async function() {
 };
 
 // Load audit khi vào tab
-var _spAudit = window.showPanel;
-window.showPanel = function(name, btn) {
-  _spAudit && _spAudit(name, btn);
-  if (name === 'audit') setTimeout(verifyAudit, 300);
-};
+
 </script>
 
 
@@ -5079,11 +4942,7 @@ window.showPanel = function(name, btn) {
 
 <script>
 // ══ SOC v2.0 — Real data + realistic scoring + trend chart ════════════════
-var _spSOCv2 = window.showPanel;
-window.showPanel = function(name, btn) {
-  _spSOCv2 && _spSOCv2(name, btn);
-  if (name === 'soc') setTimeout(loadSOCv2, 200);
-};
+
 
 async function loadSOCv2() {
   var panel = document.getElementById('panel-soc');
@@ -5424,11 +5283,7 @@ async function loadSOCv2() {
 
 <script>
 // Governance v2.0 — Load từ API thật
-var _spGov = window.showPanel;
-window.showPanel = function(name, btn) {
-  _spGov && _spGov(name, btn);
-  if (name === 'governance') setTimeout(loadGovernanceV2, 200);
-};
+
 
 
 window._showRisk = function(idx) {
@@ -8214,12 +8069,6 @@ async function loadAuditReal() {
   }
 }
 
-// Hook into showPanel to load audit data
-var _origShowPanelAudit = window.showPanel;
-window.showPanel = function(name, btn) {
-  if (_origShowPanelAudit) _origShowPanelAudit(name, btn);
-  if (name === 'audit') setTimeout(loadAuditReal, 100);
-};
 
 // Also run on page load if audit is active
 if (document.getElementById('panel-audit') && 
@@ -8292,339 +8141,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
-  // Override showPanel một lần cuối - safe chain
-  var _lastShowPanel = window.showPanel;
-  window.showPanel = function(name, btn) {
-    if (_lastShowPanel) _lastShowPanel(name, btn);
-    if (name === 'audit') setTimeout(_tryLoadAudit, 150);
-  };
-})();
-</script>
-<script>
-// FINAL FIX: Audit load - bypass showPanel chain entirely
-(function() {
-  var _lastPanel = '';
-  setInterval(function() {
-    var active = document.querySelector('.panel.active');
-    var id = active.id;
-    if (id === 'panel-audit' && id !== _lastPanel) {
-      _lastPanel = id;
-      if (typeof loadAuditReal === 'function') loadAuditReal();
-    } else if (id !== 'panel-audit') {
-      _lastPanel = id;
-    }
-  }, 300);
-})();
-</script>
-
-<script src="/panels/vsp_siem_patch.js"></script>
-
-<script>
-// Load SIEM KPIs cho dashboard
-async function loadSIEMKPIs() {
-  if (!window.TOKEN) return;
-  var h = {Authorization: 'Bearer ' + window.TOKEN};
-  try {
-    var [inc, runs, src] = await Promise.all([
-      fetch('/api/v1/correlation/incidents?limit=100', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({total:0})),
-      fetch('/api/v1/soar/runs?limit=100',            {headers:h}).then(r=>r.json()).catch(()=>({total:0})),
-      fetch('/api/v1/logs/stats',                     {headers:h}).then(r=>r.json()).catch(()=>({online:0})),
-    ]);
-    var el;
-    el = document.getElementById('siem-incidents');
-    if (el) el.textContent = inc.total ?? (inc.incidents||[]).length ?? 0;
-    el = document.getElementById('siem-runs');
-    if (el) el.textContent = runs.total ?? (runs.runs||[]).length ?? 0;
-    el = document.getElementById('siem-sources');
-    if (el) el.textContent = src.online ?? src.total ?? 0;
-    el = document.getElementById('siem-anomalies');
-    if (el) el.textContent = 0;
-  } catch(e) {}
-}
-// Gọi sau khi login
-// FIX 5: Poll SIEM KPIs khi đã authenticate (TOKEN='✓') — không decode JWT (httpOnly cookie)
-var _siemKPIpoll = setInterval(function() {
-  if (!window.TOKEN || window.TOKEN !== '✓') return;
-  clearInterval(_siemKPIpoll);
-  loadSIEMKPIs();
-  setInterval(loadSIEMKPIs, 60000);
-}, 1000);
-</script>
-<script>
-window.api = api;
-</script>
-<script src="/vsp_upgrade_v100.js">
-// ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
-(function() {
-  // Giảm polling: chỉ refresh dashboard mỗi 30s thay vì 3s
-  const POLL_INTERVAL = 30000;
-  const FAST_INTERVAL = 5000; // sau scan complete
-
-  // Override các hàm poll nếu có
-  if (typeof window._vspPollTimer === 'undefined') {
-    window._vspPollTimer = null;
-    window._vspFastMode = false;
-  }
-
-  // Throttle helper: đảm bảo hàm không gọi quá 1 lần trong window ms
-  function throttle(fn, ms) {
-    let last = 0;
-    return function(...args) {
-      const now = Date.now();
-      if (now - last >= ms) {
-        last = now;
-        return fn.apply(this, args);
-      }
-    };
-  }
-
-  // Batch dashboard refresh — gộp tất cả calls thành 1
-  const refreshDashboard = throttle(function() {
-    if (typeof loadDashboard === 'function') {
-      loadDashboard();
-    } else if (typeof loadRuns === 'function') {
-      loadRuns();
-    }
-  }, 2000); // throttle 2s để tránh burst
-
-  // Smart poll: tự điều chỉnh interval
-  function startSmartPoll() {
-    if (window._vspPollTimer) clearInterval(window._vspPollTimer);
-    const interval = window._vspFastMode ? FAST_INTERVAL : POLL_INTERVAL;
-    window._vspPollTimer = setInterval(refreshDashboard, interval);
-    console.log(`[VSP] Poll interval: ${interval/1000}s`);
-  }
-
-  // SSE scan_complete → fast mode 30s, sau đó về normal
-  const _origSSE = window.connectSSE;
-  function patchSSEHandler(source) {
-    source.addEventListener('message', function(e) {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'scan_complete') {
-          console.log('[VSP] SSE scan_complete → triggering refresh');
-          window._vspFastMode = true;
-          refreshDashboard();
-          // Về normal sau 30s
-          setTimeout(function() {
-            window._vspFastMode = false;
-            startSmartPoll();
-          }, 30000);
-        }
-      } catch(e) {}
-    });
-  }
-
-  // Patch connectSSE để inject handler
-  if (typeof connectSSE === 'function') {
-    const _orig = connectSSE;
-    window.connectSSE = function() {
-      const src = _orig.apply(this, arguments);
-      if (src && src.addEventListener) patchSSEHandler(src);
-      return src;
-    };
-  }
-
-  // Patch EventSource constructor để catch SSE events
-  const _OrigEventSource = window.EventSource;
-  window.EventSource = function(url, opts) {
-    const src = new _OrigEventSource(url, opts);
-    if (url && url.includes('/api/v1/events')) {
-      patchSSEHandler(src);
-    }
-    return src;
-  };
-  window.EventSource.prototype = _OrigEventSource.prototype;
-
-  // Start smart polling sau khi page load
-  window.addEventListener('load', function() {
-    setTimeout(startSmartPoll, 3000);
-  });
-
-  // Expose để debug
-  window._vsp = { refreshDashboard, startSmartPoll };
-
-  console.log('[VSP] Smart polling loaded — interval: 30s, SSE-driven refresh: enabled');
-})();
-
-// ── MFA Login Flow ────────────────────────────────────────────────────────
-let _mfaEmail = '', _mfaPass = '', _mfaTimer = null;
-
-function openMFAOverlay(email, password) {
-  _mfaEmail = email; _mfaPass = password;
-  document.getElementById('mfa-overlay').classList.add('open');
-  document.getElementById('mfa-err').textContent = '';
-  [0,1,2,3,4,5].forEach(i => {
-    const el = document.getElementById('md'+i);
-    el.value = ''; el.classList.remove('filled');
-  });
-  setTimeout(() => document.getElementById('md0').focus(), 100);
-  startMFATimer();
-}
-
-function closeMFAOverlay() {
-  document.getElementById('mfa-overlay').classList.remove('open');
-  if (_mfaTimer) clearInterval(_mfaTimer);
-}
-
-function mfaDigit(i) {
-  const el = document.getElementById('md'+i);
-  el.value = el.value.slice(-1);
-  el.classList.toggle('filled', el.value !== '');
-  if (el.value && i < 5) document.getElementById('md'+(i+1)).focus();
-  if (getMFACode().length === 6) submitMFA();
-}
-
-function mfaKey(i, e) {
-  if (e.key === 'Backspace' && !document.getElementById('md'+i).value && i > 0)
-    document.getElementById('md'+(i-1)).focus();
-}
-
-function mfaPaste(e) {
-  const text = e.clipboardData.getData('text').replace(/\D/g,'').slice(0,6);
-  if (text.length === 6) {
-    e.preventDefault();
-    text.split('').forEach((c,i) => {
-      const el = document.getElementById('md'+i);
-      el.value = c; el.classList.add('filled');
-    });
-    submitMFA();
-  }
-}
-
-function getMFACode() {
-  return [0,1,2,3,4,5].map(i => document.getElementById('md'+i)?.value||'').join('');
-}
-
-async function submitMFA() {
-  const code = getMFACode();
-  if (code.length !== 6) return;
-  const btn = document.getElementById('mfa-submit-btn');
-  btn.disabled = true; btn.textContent = 'Đang xác nhận...';
-  document.getElementById('mfa-err').textContent = '';
-  try {
-    const res = await fetch(API + '/api/v1/auth/login', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({email: _mfaEmail, password: _mfaPass, mfa_code: code})
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Mã không đúng');
-    closeMFAOverlay();
-    // Dùng token như login bình thường
-    if (typeof onLoginSuccess === 'function') onLoginSuccess(data);
-    else { window.TOKEN = '✓'; /* cookie set by server */ location.reload(); }
-  } catch(err) {
-    document.getElementById('mfa-err').textContent = err.message || 'Mã không hợp lệ';
-    [0,1,2,3,4,5].forEach(i => { const el=document.getElementById('md'+i); el.value=''; el.classList.remove('filled'); });
-    document.getElementById('md0').focus();
-  }
-  btn.disabled = false; btn.textContent = 'Xác nhận';
-}
-
-function startMFATimer() {
-  if (_mfaTimer) clearInterval(_mfaTimer);
-  const canvas = document.getElementById('mfa-timer-canvas');
-  if (!canvas) return;
-  const ctx2d = canvas.getContext('2d');
-  function draw() {
-    const rem = 30 - (Date.now()/1000 % 30);
-    const pct = rem / 30;
-    ctx2d.clearRect(0,0,20,20);
-    ctx2d.beginPath(); ctx2d.arc(10,10,8,0,Math.PI*2);
-    ctx2d.strokeStyle='rgba(255,255,255,.1)'; ctx2d.lineWidth=2; ctx2d.stroke();
-    ctx2d.beginPath(); ctx2d.arc(10,10,8,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);
-    ctx2d.strokeStyle = rem<5?'#ef4444':'#3b82f6'; ctx2d.lineWidth=2; ctx2d.lineCap='round'; ctx2d.stroke();
-    document.getElementById('mfa-timer-label').textContent = Math.ceil(rem)+'s';
-  }
-  draw(); _mfaTimer = setInterval(draw, 200);
-}
-
-// Patch login function để handle mfa_required
-(function() {
-  const _origDoLogin = window.doLogin || window.handleLogin;
-  // Hook vào fetch login responses
-  const _origFetch = window.fetch;
-  window.fetch = async function(url, opts) {
-    const res = await _origFetch.apply(this, arguments);
-    if (typeof url === 'string' && url.includes('/auth/login') && opts?.method === 'POST') {
-      const clone = res.clone();
-      clone.json().then(data => {
-        if (data.mfa_required && data.mfa_required === true) {
-          try {
-            const body = JSON.parse(opts.body);
-            openMFAOverlay(body.email, body.password);
-          } catch(e) {}
-        }
-      }).catch(() => {});
-    }
-    return res;
-  };
-})();
-</script>
-
-<!-- MFA Login Overlay -->
-<div id="mfa-overlay">
-  <div class="mfa-card">
-    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px">
-      <circle cx="20" cy="20" r="20" fill="rgba(59,130,246,0.15)"/>
-      <rect x="12" y="18" width="16" height="12" rx="2" stroke="#3b82f6" stroke-width="1.5"/>
-      <path d="M15 18v-5a5 5 0 0 1 10 0v5" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
-    <h3>Two-factor authentication</h3>
-    <p>Nhập mã 6 chữ số từ authenticator app của bạn</p>
-    <div class="mfa-digits">
-      <input class="mfa-digit" type="number" id="md0" maxlength="1" oninput="mfaDigit(0)" onkeydown="mfaKey(0,event)" onpaste="mfaPaste(event)">
-      <input class="mfa-digit" type="number" id="md1" maxlength="1" oninput="mfaDigit(1)" onkeydown="mfaKey(1,event)">
-      <input class="mfa-digit" type="number" id="md2" maxlength="1" oninput="mfaDigit(2)" onkeydown="mfaKey(2,event)">
-      <input class="mfa-digit" type="number" id="md3" maxlength="1" oninput="mfaDigit(3)" onkeydown="mfaKey(3,event)">
-      <input class="mfa-digit" type="number" id="md4" maxlength="1" oninput="mfaDigit(4)" onkeydown="mfaKey(4,event)">
-      <input class="mfa-digit" type="number" id="md5" maxlength="1" oninput="mfaDigit(5)" onkeydown="mfaKey(5,event)">
-    </div>
-    <div class="mfa-err" id="mfa-err"></div>
-    <div class="mfa-timer">
-      <canvas id="mfa-timer-canvas" width="20" height="20"></canvas>
-      <span id="mfa-timer-label">Mã thay đổi mỗi 30s</span>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="closeMFAOverlay()" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#8899bb;cursor:pointer;font-size:12px">Huỷ</button>
-      <button onclick="submitMFA()" id="mfa-submit-btn" style="flex:1;padding:9px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer;font-size:12px;font-weight:600">Xác nhận</button>
-    </div>
-  </div>
-</div>
-
-
-<script>
-window.addEventListener('message', async function(e) {
-  if (!e.data || e.data.type !== 'anthropic_proxy') return;
-  var id = e.data.id;
-  var payload = e.data.payload;
-  try {
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    });
-    var result = await resp.json();
-    e.source.postMessage({id: id, result: result}, '*');
-  } catch(err) {
-    e.source.postMessage({id: id, result: {error: err.message}}, '*');
-  }
-});
-</script>
-
-<script>
-// ── Scan modal hints ──────────────────────────────────────────
-const MODE_HINTS = {
-  SAST:    'Tools: bandit · semgrep · codeql',
-  SCA:     'Tools: trivy · grype · license',
-  SECRETS: 'Tools: gitleaks · secretcheck',
-  IAC:     'Tools: kics · checkov · hadolint',
-  DAST:    'Tools: nikto · nuclei · sslscan',
-  NETWORK: 'Tools: netcap (L2-L7 live) · sslscan — requires active capture engine',
-  FULL:    'Tools: all 15 scanners combined',
-};
-const PROFILE_HINTS = {
+  const PROFILE_HINTS = {
   FAST:     'Timeout 2min · skips codeql, nuclei, license',
   EXT:      'Timeout 5min · adds semgrep, grype, secretcheck, sslscan',
   AGGR:     'Timeout 10min · adds codeql, nuclei, license · fail on HIGH',
