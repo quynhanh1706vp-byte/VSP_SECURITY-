@@ -867,7 +867,7 @@ async function sendMessage() {
         : [{role:'user',content:text}]
     };
     try {
-      const gwResp = await fetch((window.API_BASE||'') + '/api/v1/ai/analyze', {
+      const gwResp = await fetch((window.API_BASE||'') + '/api/v1/ai/chat', {
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+(window.TOKEN||window.parent?.TOKEN||'')},
         body: JSON.stringify(gwPayload)
