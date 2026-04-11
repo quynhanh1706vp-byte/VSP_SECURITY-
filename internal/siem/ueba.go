@@ -412,12 +412,15 @@ func RunUEBA(ctx context.Context, db *store.DB) {
 			if len(title) > 200 {
 				title = title[:200]
 			}
+			// Dedup by anomaly type — not title (title changes as counts change)
+			anomalyType := string(a.Type)
 			db.Pool().QueryRow(ctx, `
 				SELECT COUNT(*) FROM incidents
-				WHERE tenant_id=$1 AND title=$2
+				WHERE tenant_id=$1
+				  AND source_refs::text LIKE '%' || $2 || '%'
 				  AND status='open'
-				  AND created_at > NOW() - INTERVAL '24 hours'`,
-				tenantID, title).Scan(&existing) //nolint:errcheck
+				  AND created_at > NOW() - INTERVAL '6 hours'`,
+				tenantID, anomalyType).Scan(&existing) //nolint:errcheck
 			if existing > 0 {
 				continue
 			}
