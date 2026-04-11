@@ -108,16 +108,15 @@ window.loadDashboard = async function() {
     if (elRem) { elRem.textContent = rate + '%'; elRem.style.color = rate >= 70 ? 'var(--green)' : rate >= 40 ? 'var(--amber)' : 'var(--red)'; }
   } catch (e) { console.error('[VSP] dash kpis', e); }
   // Load DoD widgets
-  injectDoDRow();
-  loadDoDWidgets();
+  setTimeout(function(){ injectDoDRow(); loadDoDWidgets(); }, 500);
 };
 
 // ── 3b. DoD/NIST widgets ──────────────────────────────────────────────────────
-function injectDoDRow() {
+window.injectDoDRow = function injectDoDRow() {
   if (document.getElementById('dod-widget-row')) return;
   // Find SIEM KPI row to inject after it
-  const siemRow = document.querySelector('.kpi-row.mb14') ||
-                  document.querySelector('[id="siem-incidents"]')?.closest('.g4, div[style*="grid-template-columns:repeat(4"]');
+  const siemEl = document.getElementById('siem-incidents');
+  const siemRow = siemEl ? siemEl.closest('.kpi-row') : document.querySelector('.kpi-row.mb14');
   if (!siemRow) return;
   const row = document.createElement('div');
   row.id = 'dod-widget-row';
@@ -174,7 +173,7 @@ function injectDoDRow() {
   siemRow.parentNode.insertBefore(row, siemRow.nextSibling);
 }
 
-async function loadDoDWidgets() {
+window.loadDoDWidgets = async function loadDoDWidgets() {
   // Helper: fetch với /api/p4/ prefix đúng (không qua safeApi /api/v1/)
   async function p4fetch(path) {
     const tok = window.TOKEN || localStorage.getItem('vsp_token') || '';
@@ -776,4 +775,27 @@ setTimeout(() => {
     // Navigate full page to /p4 — served clean by Python proxy without VSP patches
     window.location.href = '/p4';
   }
+})();
+
+// ── Auto-inject DoD widgets khi page load ────────────────────────────────
+(function() {
+  function tryInjectDoD() {
+    if (typeof injectDoDRow !== 'function') return;
+    if (!window.TOKEN || window.TOKEN.length < 10) return;
+    if (document.getElementById('dod-widget-row')) return;
+    injectDoDRow();
+    loadDoDWidgets();
+    console.log('[VSP] DoD widgets auto-injected');
+  }
+  // Thử nhiều lần: 1s, 2s, 3s, 5s sau khi load
+  [1000, 2000, 3000, 5000].forEach(function(ms) {
+    setTimeout(tryInjectDoD, ms);
+  });
+  // Cũng hook vào loadDashboard nếu chưa có DoD row
+  var _origLD = window.loadDashboard;
+  window.loadDashboard = function() {
+    var r = _origLD ? _origLD.apply(this, arguments) : undefined;
+    setTimeout(tryInjectDoD, 800);
+    return r;
+  };
 })();
