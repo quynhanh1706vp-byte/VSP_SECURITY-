@@ -423,7 +423,7 @@ window.loadFedRAMP = async function() {
       const f = c.family||'Other';
       if (!families[f]) families[f] = {total:0,assessed:0};
       families[f].total++;
-      if (c.status==='assessed') families[f].assessed++;
+      if (['pass','warn','fail'].includes(c.status)) families[f].assessed++;
     });
     const el = document.getElementById('fedramp-family-chart');
     if (el) el.innerHTML = Object.entries(families).map(([f,v]) => {
@@ -462,7 +462,7 @@ window.loadCMMC = async function() {
       const d = p.domain||'Other';
       if (!domains[d]) domains[d] = {total:0,assessed:0};
       domains[d].total++;
-      if (p.status==='assessed') domains[d].assessed++;
+      if (['pass','warn','fail'].includes(p.status)) domains[d].assessed++;
     });
     const el = document.getElementById('cmmc-domain-chart');
     if (el) el.innerHTML = Object.entries(domains).map(([d,v]) => {
