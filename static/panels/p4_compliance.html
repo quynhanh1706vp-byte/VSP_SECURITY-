@@ -886,9 +886,9 @@ function getP4Token() {
 
 async function api(path) {
   try {
-    const token = getP4Token();
-    const headers = token ? {} : {};
-    const r = await fetch(API + path, {headers});
+    const token = getP4Token() || window._p4Token;
+    const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+    const r = await fetch(API + path, {credentials:'same-origin', headers});
     return await r.json();
   } catch(e) {
     return null;
@@ -900,7 +900,7 @@ async function post(path, body) {
     const token = getP4Token();
     const h = {'Content-Type':'application/json'};
     
-    const r = await fetch(API + path, {credentials:"same-origin",  method:'POST', headers:h, body:JSON.stringify(body) });
+        const r = await fetch(API + path, {method:'POST', credentials:'same-origin', headers:Object.assign({'Content-Type':'application/json'}, token?{'Authorization':'Bearer '+token}:{}), body:JSON.stringify(body)});
     return await r.json();
   } catch(e) { return null; }
 }
