@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>.panel{display:none!important}.panel.active{display:block!important}</style>
 <style>
 .panel { display: none !important; }
 .panel.active { display: block !important; }
@@ -1494,7 +1495,12 @@
         allowtransparency="true">
       </iframe>
     </div>
-  </div><!-- /content -->
+  
+    <!-- P4 Compliance Panel -->
+    <div id="panel-p4compliance" class="panel">
+      <iframe id="p4-iframe" src="" style="width:100%;height:calc(100vh - 56px);border:none;background:transparent" allowtransparency="true"></iframe>
+    </div>
+</div><!-- /content -->
 </div><!-- /main -->
 
 <!-- RUN DETAIL MODAL -->
@@ -1624,6 +1630,7 @@ const PANEL_META = {
   audit:       {title:'Audit log',     sub:'VSP / Security / Audit · hash-chain verified'},
   soc:         {title:'SOC Center',    sub:'VSP / Security / SOC · Zero Trust · Incidents'},
   governance:  {title:'Governance',    sub:'VSP / Compliance / Governance · RACI · Traceability'},
+  p4compliance: {title:'P4 Compliance',  sub:'VSP / Compliance / DoD Zero Trust P4'},
   compliance:  {title:'FedRAMP / CMMC',sub:'VSP / Compliance / Control coverage'},
   sbom:        {title:'SBOM',          sub:'VSP / Compliance / Software Bill of Materials'},
   threathunt:  {title:'Threat Hunting', sub:'VSP / SIEM / Log query · pivot · timeline'},
@@ -1660,7 +1667,14 @@ function showPanel(name, btn) {
     if (!window.TOKEN || window.TOKEN === '') return;
     if (name === 'dashboard')   initDashboardCharts();
     if (name === 'governance')  initGovernance();
-    if (name === 'compliance')  { initGauges(); setTimeout(loadFedRAMP, 300); }
+    if (name === 'p4compliance') {
+    var iframe = document.getElementById('p4-iframe');
+    if (iframe && (!iframe.src || iframe.src === '' || iframe.src === 'about:blank')) {
+      var tok = window.TOKEN || localStorage.getItem('vsp_token') || '';
+      iframe.src = '/p4' + (tok ? '?token=' + encodeURIComponent(tok) : '');
+    }
+  }
+  if (name === 'compliance')  { initGauges(); setTimeout(loadFedRAMP, 300); }
     if (name === 'sbom') setTimeout(loadSBOM, 200);
     if (name === 'analytics') setTimeout(loadAnalytics, 300);
     if (name === 'sla') setTimeout(loadSLA, 200);
@@ -8079,6 +8093,16 @@ document.addEventListener('DOMContentLoaded', function() {
   window.showPanel = function(name, btn) {
     if (_lastShowPanel) _lastShowPanel(name, btn);
     if (name === 'audit') setTimeout(_tryLoadAudit, 150);
+    if (name === 'p4compliance') {
+      setTimeout(function() {
+        var iframe = document.getElementById('p4-iframe');
+        if (!iframe) return;
+        var tok = window.TOKEN || localStorage.getItem('vsp_token') || '';
+        if (!iframe.src || iframe.src === 'about:blank' || iframe.src === window.location.href) {
+          iframe.src = '/p4' + (tok ? '?token=' + encodeURIComponent(tok) : '');
+        }
+      }, 100);
+    }
   };
 })();
 </script>

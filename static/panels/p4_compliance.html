@@ -1,6 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script>
+// Auto-get token từ parent window hoặc localStorage
+(function() {
+  var tok = '';
+  // Thử lấy từ URL param ?token=
+  var params = new URLSearchParams(window.location.search);
+  tok = params.get('token') || '';
+  // Fallback: lấy từ localStorage
+  if (!tok) tok = localStorage.getItem('vsp_token') || '';
+  // Fallback: lấy từ parent window
+  if (!tok) { try { tok = window.parent.TOKEN || window.parent.localStorage.getItem('vsp_token') || ''; } catch(e) {} }
+  if (tok) {
+    window.TOKEN = tok;
+    localStorage.setItem('vsp_token', tok);
+    console.log('[P4] token bootstrapped, length:', tok.length);
+  }
+})();
+</script>
 <style>
 :root {
   --color-background-primary: #0f1218;
@@ -830,7 +847,9 @@ function currentTab() {
 // ---- Fetch helpers ----
 async function api(path) {
   try {
-    const r = await fetch(API + path);
+    const tok = window.TOKEN || localStorage.getItem('vsp_token') || '';
+    const headers = tok ? {'Authorization': 'Bearer ' + tok} : {};
+    const r = await fetch(API + path, {headers});
     return await r.json();
   } catch(e) {
     return null;
