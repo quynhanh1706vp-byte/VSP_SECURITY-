@@ -49,6 +49,7 @@ type Playbook struct {
 	RunCount     int             `json:"runs"`
 	SuccessCount int             `json:"success"`
 	CreatedAt    time.Time       `json:"created_at"`
+	Status       string          `json:"status"`
 }
 
 type PlaybookRun struct {
@@ -221,7 +222,8 @@ func (db *DB) GetIncident(ctx context.Context, tenantID, id string) (*Incident, 
 func (db *DB) ListPlaybooks(ctx context.Context, tenantID string) ([]Playbook, error) {
 	rows, err := db.pool.Query(ctx, `
 		SELECT id, name, description, trigger_event, sev_filter,
-		       steps, enabled, run_count, success_count, created_at
+		       steps, enabled, run_count, success_count, created_at,
+		       CASE WHEN enabled THEN 'active' ELSE 'disabled' END as status
 		FROM   playbooks WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200`, tenantID)
 	if err != nil {
 		return nil, err
@@ -233,7 +235,7 @@ func (db *DB) ListPlaybooks(ctx context.Context, tenantID string) ([]Playbook, e
 		p.TenantID = tenantID
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Trigger,
 			&p.SevFilter, &p.Steps, &p.Enabled, &p.RunCount,
-			&p.SuccessCount, &p.CreatedAt); err != nil {
+			&p.SuccessCount, &p.CreatedAt, &p.Status); err != nil {
 			return nil, fmt.Errorf("scan playbook: %w", err)
 		}
 		out = append(out, p)
