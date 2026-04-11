@@ -4,10 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>.panel{display:none!important}.panel.active{display:block!important}</style>
-<style>
-.panel { display: none !important; }
-.panel.active { display: block !important; }
-</style>
 <title>VSP Security Platform v2.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="/vsp_enterprise_ui.css">
@@ -1495,12 +1491,7 @@
         allowtransparency="true">
       </iframe>
     </div>
-  
-    <!-- P4 Compliance Panel -->
-    <div id="panel-p4compliance" class="panel">
-      <iframe id="p4-iframe" src="" style="width:100%;height:calc(100vh - 56px);border:none;background:transparent" allowtransparency="true"></iframe>
-    </div>
-</div><!-- /content -->
+  </div><!-- /content -->
 </div><!-- /main -->
 
 <!-- RUN DETAIL MODAL -->
@@ -1630,7 +1621,6 @@ const PANEL_META = {
   audit:       {title:'Audit log',     sub:'VSP / Security / Audit · hash-chain verified'},
   soc:         {title:'SOC Center',    sub:'VSP / Security / SOC · Zero Trust · Incidents'},
   governance:  {title:'Governance',    sub:'VSP / Compliance / Governance · RACI · Traceability'},
-  p4compliance: {title:'P4 Compliance',  sub:'VSP / Compliance / DoD Zero Trust P4'},
   compliance:  {title:'FedRAMP / CMMC',sub:'VSP / Compliance / Control coverage'},
   sbom:        {title:'SBOM',          sub:'VSP / Compliance / Software Bill of Materials'},
   threathunt:  {title:'Threat Hunting', sub:'VSP / SIEM / Log query · pivot · timeline'},
@@ -1667,14 +1657,7 @@ function showPanel(name, btn) {
     if (!window.TOKEN || window.TOKEN === '') return;
     if (name === 'dashboard')   initDashboardCharts();
     if (name === 'governance')  initGovernance();
-    if (name === 'p4compliance') {
-    var iframe = document.getElementById('p4-iframe');
-    if (iframe && (!iframe.src || iframe.src === '' || iframe.src === 'about:blank')) {
-      var tok = window.TOKEN || localStorage.getItem('vsp_token') || '';
-      iframe.src = '/p4' + (tok ? '?token=' + encodeURIComponent(tok) : '');
-    }
-  }
-  if (name === 'compliance')  { initGauges(); setTimeout(loadFedRAMP, 300); }
+    if (name === 'compliance')  { initGauges(); setTimeout(loadFedRAMP, 300); }
     if (name === 'sbom') setTimeout(loadSBOM, 200);
     if (name === 'analytics') setTimeout(loadAnalytics, 300);
     if (name === 'sla') setTimeout(loadSLA, 200);
@@ -2150,8 +2133,10 @@ function _showCompDetail(ctrl) {
   _ensureCompModal();
   document.getElementById('cdm-title').innerHTML = (ctrl.id + ' — ' + (ctrl.control||ctrl.practice||ctrl.title||'')) + ' <span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--t3)">read-only</span>';
   document.getElementById('cdm-id').textContent = (ctrl.family||ctrl.domain||'—') + ' · ' + (ctrl.framework||'');
-  var statusColor = ctrl.status==='assessed' ? 'var(--green)' : 'var(--t3)';
-  var statusPill  = ctrl.status==='assessed' ? 'pill-pass' : 'pill-queue';
+  var sp = {pass:'pill-pass',warn:'pill-warn',fail:'pill-fail',assessed:'pill-pass'}[ctrl.status]||'pill-queue';
+  var score = ctrl.score||0;
+  var sc = score>=70?'var(--green)':score>=40?'var(--amber)':score>0?'var(--red)':'var(--t3)';
+  var tools = Array.isArray(ctrl.tools)?ctrl.tools.join(', '):(ctrl.tool||ctrl.tools||'—');
   document.getElementById('cdm-body').innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
     +'<div style="background:var(--surface2);border-radius:8px;padding:12px"><div style="font-size:9px;letter-spacing:.1em;color:var(--t3);margin-bottom:5px">STATUS</div>'
@@ -2174,34 +2159,83 @@ function _showCompDetail(ctrl) {
 var _compData = [];
 var _compType = 'fedramp';
 
-function _renderCompTable(filter, statusFilter) {
-  var rows = _compData.filter(function(c) {
+var _compPage = 0;
+var _compPageSize = 20;
+
+function _compGoPage(p) {
+  _compPage = p;
+  var q = (document.getElementById('comp-search')||{}).value||'';
+  var s = (document.getElementById('comp-status-filter')||{}).value||'';
+  _renderCompTable(q, s, true);
+}
+
+function _renderCompTable(filter, statusFilter, keepPage) {
+  if (!keepPage) _compPage = 0;
+  var rows = _compData.filter(function(ctrl) {
     var q = (filter||'').toLowerCase();
-    var matchQ = !q || (c.id||'').toLowerCase().includes(q)
-      || (c.family||'').toLowerCase().includes(q)
-      || (c.control||c.practice||'').toLowerCase().includes(q);
-    var matchS = !statusFilter || c.status === statusFilter;
+    var matchQ = !q || (ctrl.id||'').toLowerCase().includes(q)
+      || (ctrl.family||ctrl.domain||'').toLowerCase().includes(q)
+      || (ctrl.control||ctrl.practice||ctrl.title||'').toLowerCase().includes(q)
+      || (ctrl.evidence||'').toLowerCase().includes(q);
+    var matchS = !statusFilter || ctrl.status === statusFilter;
     return matchQ && matchS;
   });
+  var total = rows.length;
+  var start = _compPage * _compPageSize;
+  var end2 = Math.min(start + _compPageSize, total);
+  var pageRows = rows.slice(start, end2);
+  window._compRows = rows;
+
   var tbody = document.getElementById('comp-tbody');
   if (!tbody) return;
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:20px">No results</td></tr>'; return; }
-  window._compRows = rows;
-  tbody.innerHTML = rows.map(function(c, i) {
-    var sp = c.status==='assessed' ? 'pill-pass' : 'pill-queue';
-    return '<tr class="comp-row" data-ci="'+i+'" style="cursor:pointer;transition:background .15s">'
-      +'<td class="mono f10 c-blue">'+c.id+'</td>'
-      +'<td class="mono-sm c-t3">'+(c.family||c.domain||'—')+'</td>'
-      +'<td class="f12">'+( c.control||c.practice||c.title||'')+'</td>'
-      +'<td class="mono-sm">'+(c.tool||c.tools||'—')+'</td>'
-      +'<td><span class="pill '+sp+'">'+c.status+'</span></td>'
-      +'</tr>';
-  }).join('');
-  tbody.querySelectorAll('.comp-row').forEach(function(row) {
-    row.onmouseenter = function(){ this.style.background='var(--surface2)'; };
-    row.onmouseleave = function(){ this.style.background=''; };
-    row.onclick = function(){ _showCompDetail(window._compRows[parseInt(this.getAttribute('data-ci'))]); };
-  });
+
+  if (!pageRows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No results</td></tr>';
+  } else {
+    var statusPill2 = {pass:'pill-pass',warn:'pill-warn',fail:'pill-fail',assessed:'pill-pass',not_assessed:'pill-queue'};
+    tbody.innerHTML = pageRows.map(function(ctrl, i) {
+      var sp2 = statusPill2[ctrl.status] || 'pill-queue';
+      var score = ctrl.score || 0;
+      var sc2 = score>=70?'var(--green)':score>=40?'var(--amber)':score>0?'var(--red)':'var(--t4)';
+      var tools2 = Array.isArray(ctrl.tools)?ctrl.tools.join(', '):(ctrl.tool||ctrl.tools||'—');
+      var critF = ctrl.crit_findings||0, highF = ctrl.high_findings||0;
+      return '<tr class="comp-row" data-ci="'+(start+i)+'" style="cursor:pointer;transition:background .15s">'
+        +'<td class="mono f10 c-blue">'+ctrl.id+'</td>'
+        +'<td class="mono-sm c-t3">'+(ctrl.family||ctrl.domain||'—')+'</td>'
+        +'<td class="f12" style="max-width:260px">'+(ctrl.control||ctrl.practice||ctrl.title||'')+'</td>'
+        +'<td class="mono-sm">'+(tools2.length>22?tools2.slice(0,22)+'…':tools2)+'</td>'
+        +'<td><div style="display:flex;align-items:center;gap:5px"><span style="font-size:11px;font-weight:700;color:'+sc2+';font-family:var(--font-mono)">'+score+'</span><div class="progress-bar" style="width:34px;height:4px;flex-shrink:0"><div class="progress-fill" style="width:'+score+'%;background:'+sc2+'"></div></div></div></td>'
+        +'<td><span class="pill '+sp2+'">'+ctrl.status+'</span>'+(critF>0?'<span style="margin-left:3px;font-size:9px;color:var(--red)">'+critF+'C</span>':'')+(highF>0?'<span style="margin-left:2px;font-size:9px;color:var(--amber)">'+highF+'H</span>':'')+'</td>'
+        +'</tr>';
+    }).join('');
+    tbody.querySelectorAll('.comp-row').forEach(function(row) {
+      row.onmouseenter = function(){ this.style.background='var(--surface2)'; };
+      row.onmouseleave = function(){ this.style.background=''; };
+      row.onclick = function(){
+        var idx2 = parseInt(this.getAttribute('data-ci'));
+        _showCompDetail(window._compRows[idx2]);
+      };
+    });
+  }
+
+  // Pagination
+  var pages = Math.ceil(total/_compPageSize);
+  var pag = document.getElementById('comp-pagination');
+  if (pag) {
+    if (pages <= 1) { pag.innerHTML = ''; }
+    else {
+      var cur = _compPage;
+      var btns = '<span class="pagination-info">'+(start+1)+'–'+end2+' of '+total+'</span><div class="page-btns">';
+      if (cur>0) btns += '<button class="page-btn" onclick="_compGoPage('+(cur-1)+')">‹</button>';
+      for (var pi=Math.max(0,cur-2); pi<=Math.min(pages-1,cur+2); pi++)
+        btns += '<button class="page-btn'+(pi===cur?' active':'')+'" onclick="_compGoPage('+pi+')">'+(pi+1)+'</button>';
+      if (cur<pages-1) btns += '<button class="page-btn" onclick="_compGoPage('+(cur+1)+')">›</button>';
+      pag.innerHTML = btns + '</div>';
+    }
+  }
+
+  var countEl = document.getElementById('comp-filter-count');
+  if (countEl) countEl.textContent = total + ' controls';
 }
 
 function _setupCompFilters() {
@@ -2213,16 +2247,30 @@ function _setupCompFilters() {
   fb.id = 'comp-filter-bar';
   fb.className = 'filter-bar';
   fb.style.cssText = 'padding:10px 14px;border-bottom:1px solid var(--border)';
-  fb.innerHTML = '<input class="filter-input" id="comp-search" placeholder="Search ID, family, control…" style="flex:1;max-width:300px" oninput="_renderCompTable(this.value, document.getElementById(\'comp-status-filter\').value)">'
-    +'<select class="filter-select" id="comp-status-filter" onchange="_renderCompTable(document.getElementById(\'comp-search\').value, this.value)">'
+  fb.innerHTML = '<input class="filter-input" id="comp-search" placeholder="Search ID, family, control, evidence…" style="flex:1;min-width:180px" oninput="_renderCompTable(this.value, (document.getElementById(\'comp-status-filter\')||{}).value||\'\')">'
+    +'<select class="filter-select" id="comp-status-filter" style="max-width:130px" onchange="_compPage=0;_renderCompTable((document.getElementById(\'comp-search\')||{}).value||\'\',this.value)">'
     +'<option value="">All statuses</option>'
+    +'<option value="pass">Pass</option>'
+    +'<option value="warn">Warn</option>'
+    +'<option value="fail">Fail</option>'
     +'<option value="assessed">Assessed</option>'
     +'<option value="not_assessed">Not assessed</option>'
+    +'</select>'
+    +'<select class="filter-select" id="comp-family-filter" style="max-width:150px" onchange="_compPage=0;_renderCompTable((document.getElementById(\'comp-search\')||{}).value||\'\',(document.getElementById(\'comp-status-filter\')||{}).value||\'\')">'
+    +'<option value="">All families</option>'
     +'</select>'
     +'<button class="btn btn-ghost" style="font-size:10px" onclick="_exportCompCSV()">↓ CSV</button>'
     +'<span class="mono-sm c-t3" id="comp-filter-count"></span>';
   var tblWrap = card.querySelector('.tbl-wrap');
-  if (tblWrap) card.insertBefore(fb, tblWrap);
+  if (tblWrap) {
+    card.insertBefore(fb, tblWrap);
+    // Add pagination container after table
+    var pag = document.createElement('div');
+    pag.id = 'comp-pagination';
+    pag.className = 'pagination';
+    pag.style.cssText = 'padding:8px 14px;border-top:1px solid var(--border)';
+    card.appendChild(pag);
+  }
 }
 
 function _exportCompCSV() {
@@ -2261,6 +2309,15 @@ async function _loadComplianceData(type) {
     // Reset filters
     var si = document.getElementById('comp-search'); if(si) si.value='';
     var sf = document.getElementById('comp-status-filter'); if(sf) sf.value='';
+    var ff = document.getElementById('comp-family-filter');
+    if (ff) {
+      var families = [...new Set(_compData.map(function(x){return x.family||x.domain||'';}).filter(Boolean))].sort();
+      ff.innerHTML = '<option value="">All families</option>' + families.map(function(f){return '<option value="'+f+'">'+f+'</option>';}).join('');
+    }
+    // Update thead
+    var thead = document.querySelector('#panel-compliance thead tr');
+    if (thead && thead.children.length < 6) thead.innerHTML = '<th>ID</th><th>Family</th><th>Control</th><th>Tools</th><th>Score</th><th>Status</th>';
+    _compPage = 0;
     _renderCompTable('','');
     showToast(d.framework+' loaded · '+d.assessed+' assessed','info');
   } catch(e) {
@@ -8093,16 +8150,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.showPanel = function(name, btn) {
     if (_lastShowPanel) _lastShowPanel(name, btn);
     if (name === 'audit') setTimeout(_tryLoadAudit, 150);
-    if (name === 'p4compliance') {
-      setTimeout(function() {
-        var iframe = document.getElementById('p4-iframe');
-        if (!iframe) return;
-        var tok = window.TOKEN || localStorage.getItem('vsp_token') || '';
-        if (!iframe.src || iframe.src === 'about:blank' || iframe.src === window.location.href) {
-          iframe.src = '/p4' + (tok ? '?token=' + encodeURIComponent(tok) : '');
-        }
-      }, 100);
-    }
   };
 })();
 </script>
