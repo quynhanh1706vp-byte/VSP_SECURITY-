@@ -518,214 +518,7 @@
 
       <!-- Extra KPIs -->
       <div class="g4 mb14">
-        <div class="kpi kpi-crit" style="cursor:pointer" title="View critical findings" onclick="showPanel('findings',null);setTimeout
-<script>
-// ── DoD Feature Functions ─────────────────────────────────────────
-
-async function loadOSCALViewer() {
-  if (!window.TOKEN) return;
-  try {
-    var ar = await fetch('/api/v1/compliance/oscal/ar',{credentials:'same-origin'})
-      .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-    if (!ar) return;
-    var vBadge=document.getElementById('oscal-version-badge');
-    if(vBadge) vBadge.textContent='OSCAL '+(ar['oscal-version']||'1.1.2');
-    var lm=document.getElementById('oscal-last-modified');
-    if(lm&&ar.metadata) lm.textContent='NIST OSCAL '+(ar['oscal-version']||'1.1.2')+' · Last: '+new Date(ar.metadata['last-modified']).toLocaleDateString();
-    var allF=[];
-    (ar.results||[]).forEach(function(r){(r.findings||[]).forEach(function(f){allF.push(f);});});
-    var sat=allF.filter(function(f){return f.target&&f.target.status&&f.target.status.state==='satisfactory';}).length;
-    var nsat=allF.filter(function(f){return f.target&&f.target.status&&f.target.status.state==='not-satisfactory';}).length;
-    var ctrl=new Set(allF.map(function(f){return f.target&&f.target['target-id']||'';})).size;
-    var s=document.getElementById('oscal-satisfactory'); if(s) s.textContent=sat;
-    var ns=document.getElementById('oscal-not-satisfactory'); if(ns) ns.textContent=nsat;
-    var o=document.getElementById('oscal-other'); if(o) o.textContent=allF.length-sat-nsat;
-    var c=document.getElementById('oscal-controls'); if(c) c.textContent=ctrl;
-    var sb=document.getElementById('oscal-status-badge');
-    if(sb){sb.textContent=nsat===0?'All satisfactory':nsat+' need attention';sb.style.color=nsat===0?'var(--green)':'var(--amber)';}
-    var tbody=document.getElementById('oscal-findings-tbody');
-    if(tbody&&allF.length>0){
-      var sc={'satisfactory':'var(--green)','not-satisfactory':'var(--red)'};
-      tbody.innerHTML=allF.slice(0,20).map(function(f){
-        var state=f.target&&f.target.status&&f.target.status.state||'unknown';
-        var ctrl=f.target&&f.target['target-id']||'—';
-        var desc=(f.description||'').slice(0,80);
-        return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 6px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+ctrl+'</td><td style="padding:5px 6px"><span style="font-size:9px;color:'+(sc[state]||'var(--t2)')+'">'+state+'</span></td><td style="padding:5px 6px;color:var(--t2);font-size:10px">'+desc+'</td></tr>';
-      }).join('');
-    }
-  } catch(e){console.warn('loadOSCALViewer:',e.message);}
-}
-
-async function loadZTMaturity() {
-  if (!window.TOKEN) return;
-  try {
-    if (!window._p4Token) {
-      var csrf=_safeHeader((document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('='));
-      var tr=await fetch('/api/v1/auth/api-token',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}});
-      if(tr.ok){var td=await tr.json();window._p4Token=td.token;}
-    }
-    var p4h=window._p4Token?{'Authorization':'Bearer '+window._p4Token}:{};
-    var zt=await fetch('/api/p4/zt/status',{headers:p4h}).then(function(r){return r.json();}).catch(function(){return null;});
-    if(!zt||!zt.pillars) return;
-    var badge=document.getElementById('zt-overall-badge');
-    if(badge){badge.textContent='Score: '+zt.overall_score+'/100';badge.style.color=zt.overall_score>=80?'var(--green)':zt.overall_score>=60?'var(--amber)':'var(--red)';}
-    var pmap={'identity':['zt-identity','zt-identity-bar'],'devices':['zt-devices','zt-devices-bar'],'networks':['zt-networks','zt-networks-bar'],'application':['zt-apps','zt-apps-bar'],'data':['zt-data','zt-data-bar']};
-    Object.keys(pmap).forEach(function(key){
-      var p=zt.pillars[key]; if(!p) return;
-      var sc=p.score||0; var color=sc>=80?'var(--green)':sc>=60?'var(--amber)':'var(--red)';
-      var el=document.getElementById(pmap[key][0]); if(el){el.textContent=sc;el.style.color=color;}
-      var bar=document.getElementById(pmap[key][1]); if(bar){bar.style.width=sc+'%';bar.style.background=color;}
-    });
-  } catch(e){console.warn('loadZTMaturity:',e.message);}
-}
-
-async function loadATTACK() {
-  if (!window.TOKEN) return;
-  try {
-    var inc=await fetch('/api/v1/correlation/incidents?limit=100',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {incidents:[]};});
-    var incidents=inc.incidents||[];
-    var tc={'Initial Access':0,'Execution':0,'Persistence':0,'Privilege Escalation':0,'Defense Evasion':0,'Credential Access':0,'Discovery':0,'Lateral Movement':0};
-    incidents.forEach(function(i){
-      var t=(i.title||'').toLowerCase();
-      if(t.includes('access')||t.includes('login')) tc['Initial Access']++;
-      if(t.includes('exec')||t.includes('script')) tc['Execution']++;
-      if(t.includes('persist')||t.includes('startup')) tc['Persistence']++;
-      if(t.includes('privilege')||t.includes('escalat')) tc['Privilege Escalation']++;
-      if(t.includes('evas')||t.includes('bypass')) tc['Defense Evasion']++;
-      if(t.includes('credential')||t.includes('password')) tc['Credential Access']++;
-      if(t.includes('scan')||t.includes('enum')) tc['Discovery']++;
-      if(t.includes('lateral')||t.includes('move')) tc['Lateral Movement']++;
-    });
-    var grid=document.getElementById('attack-tactics-grid'); if(!grid) return;
-    var mx=Math.max(1,Math.max.apply(null,Object.values(tc)));
-    grid.innerHTML=Object.keys(tc).map(function(t){
-      var n=tc[t]; var pct=Math.round(n/mx*100);
-      var color=n===0?'var(--t3)':n>=3?'var(--red)':'var(--amber)';
-      return '<div style="padding:6px;background:var(--bg3);border-radius:4px;border-left:2px solid '+color+'"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">'+t+'</div><div style="font-size:16px;font-weight:700;color:'+color+';font-family:var(--mono)">'+n+'</div><div style="height:2px;background:var(--bg2);border-radius:1px;margin-top:3px"><div style="height:2px;border-radius:1px;background:'+color+';width:'+pct+'%"></div></div></div>';
-    }).join('');
-  } catch(e){console.warn('loadATTACK:',e.message);}
-}
-
-async function loadEvidenceLocker() {
-  if (!window.TOKEN) return;
-  try {
-    var runs=await fetch('/api/v1/vsp/runs/index?limit=20',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {runs:[]};});
-    var items=(runs.runs||[]).map(function(r){return {title:r.rid,type:'scan',date:r.created_at,frozen:r.status==='DONE',status:r.status==='DONE'?'frozen':'pending'};});
-    var total=items.length,frozen=items.filter(function(e){return e.frozen;}).length;
-    var et=document.getElementById('ev-total'); if(et) et.textContent=total;
-    var ef=document.getElementById('ev-frozen'); if(ef) ef.textContent=frozen;
-    var ep=document.getElementById('ev-pending'); if(ep) ep.textContent=total-frozen;
-    var ea=document.getElementById('ev-artifacts'); if(ea) ea.textContent=total;
-    var tbody=document.getElementById('ev-tbody');
-    if(tbody&&items.length>0){
-      tbody.innerHTML=items.slice(0,10).map(function(e){
-        var isFrozen=e.frozen; var color=isFrozen?'var(--green)':'var(--amber)';
-        return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:9px;color:var(--t1)">'+(e.title||'—').slice(0,40)+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+e.type+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+(e.date?new Date(e.date).toLocaleDateString():'—')+'</td><td style="padding:5px"><span style="font-size:9px;color:'+color+'">'+(isFrozen?'Frozen':'Pending')+'</span></td><td style="padding:5px">'+(isFrozen?'<span style="font-size:9px;color:var(--green)">✓</span>':'<button class="btn btn-ghost" style="font-size:9px;padding:1px 6px" onclick="freezeAllEvidence()">Freeze</button>')+'</td></tr>';
-      }).join('');
-    }
-  } catch(e){console.warn('loadEvidenceLocker:',e.message);}
-}
-
-async function freezeEvidence(id) {
-  showToast('Evidence frozen: '+(id||'').slice(0,20),'success');
-  setTimeout(loadEvidenceLocker, 500);
-}
-
-function freezeAllEvidence() {
-  showToast('All evidence frozen and signed','success');
-  setTimeout(loadEvidenceLocker, 500);
-}
-
-async function loadKEVFeed() {
-  if (!window.TOKEN) return;
-  try {
-    var cves=await fetch('/api/v1/vulns/top-cves',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {cves:[]};});
-    var all=cves.cves||[];
-    var matched=all.filter(function(c){return c.cvss&&c.cvss>=7.0;}).length;
-    var kt=document.getElementById('kev-feed-total'); if(kt) kt.textContent=1100+all.length;
-    var km=document.getElementById('kev-feed-matched'); if(km) km.textContent=matched;
-    var kr=document.getElementById('kev-feed-remediated'); if(kr) kr.textContent=0;
-    var upd=document.getElementById('kev-feed-updated'); if(upd) upd.textContent='Updated: '+new Date().toLocaleDateString();
-    var tbody=document.getElementById('kev-feed-tbody');
-    if(tbody){
-      if(all.length>0){
-        tbody.innerHTML=all.slice(0,10).map(function(c){
-          var inF=c.count>0; var color=inF?'var(--red)':'var(--green)';
-          return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:10px;color:var(--red)">'+(c.id||'CVE')+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+(c.vendor||c.tool||'—')+'</td><td style="padding:5px;font-size:10px;color:var(--amber)">'+new Date(Date.now()+21*864e5).toLocaleDateString()+'</td><td style="padding:5px"><span style="font-size:9px;color:'+color+'">'+(inF?'YES':'No')+'</span></td></tr>';
-        }).join('');
-      } else {
-        tbody.innerHTML='<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--green)">No KEV matches</td></tr>';
-      }
-    }
-  } catch(e){console.warn('loadKEVFeed:',e.message);}
-}
-
-async function loadCDMWidgets() {
-  if (!window.TOKEN) return;
-  try {
-    var a=await fetch('/api/v1/assets/summary',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};});
-    var total=a.total||a.count||0, vuln=a.vulnerable||a.with_findings||0;
-    var ct=document.getElementById('cdm-total'); if(ct) ct.textContent=total;
-    var cc=document.getElementById('cdm-compliant'); if(cc) cc.textContent=total-vuln;
-    var cv=document.getElementById('cdm-vuln'); if(cv) cv.textContent=vuln;
-    var cu=document.getElementById('cdm-unmanaged'); if(cu) cu.textContent=a.unmanaged||0;
-    var rmf=document.getElementById('rmf-steps-list');
-    if(rmf){
-      var steps=[{n:1,label:'Categorize',done:true},{n:2,label:'Select',done:true},{n:3,label:'Implement',done:true},{n:4,label:'Assess',done:true},{n:5,label:'Authorize',done:true},{n:6,label:'Monitor',done:false}];
-      rmf.innerHTML=steps.map(function(s){return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><div style="width:18px;height:18px;border-radius:50%;background:'+(s.done?'var(--green)':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+(s.done?'#fff':'var(--t3)')+'">'+s.n+'</div><span style="font-size:11px;color:'+(s.done?'var(--t1)':'var(--t3)')+'">'+s.label+'</span><span style="font-size:9px;color:'+(s.done?'var(--green)':'var(--amber)')+';margin-left:auto">'+(s.done?'✓':'Active')+'</span></div>';}).join('');
-    }
-  } catch(e){console.warn('loadCDMWidgets:',e.message);}
-}
-
-var _poamItems = [];
-
-async function loadPOAMEditor() {
-  if (!window.TOKEN) return;
-  try {
-    var finds=await fetch('/api/v1/vsp/findings?limit=50',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {findings:[]};});
-    _poamItems=(finds.findings||[]).slice(0,30).map(function(f,i){
-      var now=new Date(); var days=f.severity==='critical'?30:f.severity==='high'?60:90;
-      var due=new Date(now.getTime()+days*864e5);
-      return {id:'POA-'+String(i+1).padStart(4,'0'),control:f.cwe||'SI-3',weakness:(f.rule_id||f.message||'Finding').slice(0,60),severity:f.severity||'medium',due:due.toISOString().split('T')[0],status:'open',milestone:'Patch in '+days+'d',overdue:false};
-    });
-    renderPOAMTable();
-  } catch(e){console.warn('loadPOAMEditor:',e.message);}
-}
-
-function renderPOAMTable() {
-  var sf=(document.getElementById('poam-filter-status')||{}).value||'';
-  var sv=(document.getElementById('poam-filter-severity')||{}).value||'';
-  var sq=((document.getElementById('poam-search')||{}).value||'').toLowerCase();
-  var filtered=_poamItems.filter(function(p){
-    if(sf&&p.status!==sf) return false;
-    if(sv&&p.severity!==sv) return false;
-    if(sq&&!(p.weakness.toLowerCase().includes(sq)||p.id.toLowerCase().includes(sq))) return false;
-    return true;
-  });
-  var total=_poamItems.length,open=_poamItems.filter(function(p){return p.status==='open';}).length;
-  ['poam-count-total','poam-count-open','poam-count-inprog','poam-count-done','poam-count-overdue'].forEach(function(id,i){
-    var el=document.getElementById(id); if(el) el.textContent=[total,open,0,0,0][i];
-  });
-  var tbody=document.getElementById('poam-tbody'); if(!tbody) return;
-  var sc={critical:'var(--red)',high:'var(--amber)',medium:'var(--amber)',low:'var(--green)'};
-  var ss={open:'var(--red)','in-progress':'var(--cyan)',completed:'var(--green)'};
-  tbody.innerHTML=filtered.map(function(p){
-    return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+p.id+'</td><td style="padding:5px;font-size:10px">'+p.control+'</td><td style="padding:5px;font-size:10px;color:var(--t2)" title="'+p.weakness+'">'+p.weakness.slice(0,45)+'</td><td style="padding:5px"><span style="font-size:9px;color:'+(sc[p.severity]||'var(--t2)')+'">'+p.severity.toUpperCase()+'</span></td><td style="padding:5px;font-size:10px;color:var(--t2)">'+p.due+'</td><td style="padding:5px"><span style="font-size:9px;color:'+(ss[p.status]||'var(--t2)')+'">'+p.status+'</span></td><td style="padding:5px;font-size:9px;color:var(--t3)">'+p.milestone+'</td></tr>';
-  }).join('');
-}
-
-function addPOAMItem() { showToast('Use Remediation panel to add findings','info'); }
-
-function exportPOAM() {
-  var h='ID,Control,Weakness,Severity,Due,Status,Milestone';
-  var rows=(_poamItems||[]).map(function(p){return [p.id,p.control,'"'+p.weakness+'"',p.severity,p.due,p.status,p.milestone].join(',');});
-  var blob=new Blob([[h].concat(rows).join('\n')],{type:'text/csv'});
-  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='poam_'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
-  showToast('POA&M exported','success');
-}
-</script>
-(function(){document.getElementById('filter-severity').value='CRITICAL';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Critical →</div><div class="kpi-value c-red" id="d-critical">—</div><div class="kpi-sub">findings</div></div>
+        <div class="kpi kpi-crit" style="cursor:pointer" title="View critical findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='CRITICAL';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Critical →</div><div class="kpi-value c-red" id="d-critical">—</div><div class="kpi-sub">findings</div></div>
         <div class="kpi kpi-high" style="cursor:pointer" title="View high findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='HIGH';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">High →</div><div class="kpi-value c-orange" id="d-high">—</div><div class="kpi-sub">findings</div></div>
         <div class="kpi kpi-med" style="cursor:pointer" title="View medium findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='MEDIUM';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Medium →</div><div class="kpi-value c-amber" id="d-medium">—</div><div class="kpi-sub">findings</div></div>
         <div class="kpi kpi-low" style="cursor:pointer" title="View low findings" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='LOW';document.getElementById('filter-search').value='';loadFindings(0);},400)"><div class="kpi-label">Low →</div><div class="kpi-value c-green" id="d-low">—</div><div class="kpi-sub">findings</div></div>
@@ -8880,6 +8673,214 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 
+
+
+<script>
+// ── DoD Feature Functions ─────────────────────────────────────────
+
+async function loadOSCALViewer() {
+  if (!window.TOKEN) return;
+  try {
+    var ar = await fetch('/api/v1/compliance/oscal/ar',{credentials:'same-origin'})
+      .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+    if (!ar) return;
+    var vBadge=document.getElementById('oscal-version-badge');
+    if(vBadge) vBadge.textContent='OSCAL '+(ar['oscal-version']||'1.1.2');
+    var lm=document.getElementById('oscal-last-modified');
+    if(lm&&ar.metadata) lm.textContent='NIST OSCAL '+(ar['oscal-version']||'1.1.2')+' · Last: '+new Date(ar.metadata['last-modified']).toLocaleDateString();
+    var allF=[];
+    (ar.results||[]).forEach(function(r){(r.findings||[]).forEach(function(f){allF.push(f);});});
+    var sat=allF.filter(function(f){return f.target&&f.target.status&&f.target.status.state==='satisfactory';}).length;
+    var nsat=allF.filter(function(f){return f.target&&f.target.status&&f.target.status.state==='not-satisfactory';}).length;
+    var ctrl=new Set(allF.map(function(f){return f.target&&f.target['target-id']||'';})).size;
+    var s=document.getElementById('oscal-satisfactory'); if(s) s.textContent=sat;
+    var ns=document.getElementById('oscal-not-satisfactory'); if(ns) ns.textContent=nsat;
+    var o=document.getElementById('oscal-other'); if(o) o.textContent=allF.length-sat-nsat;
+    var c=document.getElementById('oscal-controls'); if(c) c.textContent=ctrl;
+    var sb=document.getElementById('oscal-status-badge');
+    if(sb){sb.textContent=nsat===0?'All satisfactory':nsat+' need attention';sb.style.color=nsat===0?'var(--green)':'var(--amber)';}
+    var tbody=document.getElementById('oscal-findings-tbody');
+    if(tbody&&allF.length>0){
+      var sc={'satisfactory':'var(--green)','not-satisfactory':'var(--red)'};
+      tbody.innerHTML=allF.slice(0,20).map(function(f){
+        var state=f.target&&f.target.status&&f.target.status.state||'unknown';
+        var ctrl=f.target&&f.target['target-id']||'—';
+        var desc=(f.description||'').slice(0,80);
+        return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 6px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+ctrl+'</td><td style="padding:5px 6px"><span style="font-size:9px;color:'+(sc[state]||'var(--t2)')+'">'+state+'</span></td><td style="padding:5px 6px;color:var(--t2);font-size:10px">'+desc+'</td></tr>';
+      }).join('');
+    }
+  } catch(e){console.warn('loadOSCALViewer:',e.message);}
+}
+
+async function loadZTMaturity() {
+  if (!window.TOKEN) return;
+  try {
+    if (!window._p4Token) {
+      var csrf=_safeHeader((document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('vsp_csrf=');})||'').split('=').slice(1).join('='));
+      var tr=await fetch('/api/v1/auth/api-token',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}});
+      if(tr.ok){var td=await tr.json();window._p4Token=td.token;}
+    }
+    var p4h=window._p4Token?{'Authorization':'Bearer '+window._p4Token}:{};
+    var zt=await fetch('/api/p4/zt/status',{headers:p4h}).then(function(r){return r.json();}).catch(function(){return null;});
+    if(!zt||!zt.pillars) return;
+    var badge=document.getElementById('zt-overall-badge');
+    if(badge){badge.textContent='Score: '+zt.overall_score+'/100';badge.style.color=zt.overall_score>=80?'var(--green)':zt.overall_score>=60?'var(--amber)':'var(--red)';}
+    var pmap={'identity':['zt-identity','zt-identity-bar'],'devices':['zt-devices','zt-devices-bar'],'networks':['zt-networks','zt-networks-bar'],'application':['zt-apps','zt-apps-bar'],'data':['zt-data','zt-data-bar']};
+    Object.keys(pmap).forEach(function(key){
+      var p=zt.pillars[key]; if(!p) return;
+      var sc=p.score||0; var color=sc>=80?'var(--green)':sc>=60?'var(--amber)':'var(--red)';
+      var el=document.getElementById(pmap[key][0]); if(el){el.textContent=sc;el.style.color=color;}
+      var bar=document.getElementById(pmap[key][1]); if(bar){bar.style.width=sc+'%';bar.style.background=color;}
+    });
+  } catch(e){console.warn('loadZTMaturity:',e.message);}
+}
+
+async function loadATTACK() {
+  if (!window.TOKEN) return;
+  try {
+    var inc=await fetch('/api/v1/correlation/incidents?limit=100',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {incidents:[]};});
+    var incidents=inc.incidents||[];
+    var tc={'Initial Access':0,'Execution':0,'Persistence':0,'Privilege Escalation':0,'Defense Evasion':0,'Credential Access':0,'Discovery':0,'Lateral Movement':0};
+    incidents.forEach(function(i){
+      var t=(i.title||'').toLowerCase();
+      if(t.includes('access')||t.includes('login')) tc['Initial Access']++;
+      if(t.includes('exec')||t.includes('script')) tc['Execution']++;
+      if(t.includes('persist')||t.includes('startup')) tc['Persistence']++;
+      if(t.includes('privilege')||t.includes('escalat')) tc['Privilege Escalation']++;
+      if(t.includes('evas')||t.includes('bypass')) tc['Defense Evasion']++;
+      if(t.includes('credential')||t.includes('password')) tc['Credential Access']++;
+      if(t.includes('scan')||t.includes('enum')) tc['Discovery']++;
+      if(t.includes('lateral')||t.includes('move')) tc['Lateral Movement']++;
+    });
+    var grid=document.getElementById('attack-tactics-grid'); if(!grid) return;
+    var mx=Math.max(1,Math.max.apply(null,Object.values(tc)));
+    grid.innerHTML=Object.keys(tc).map(function(t){
+      var n=tc[t]; var pct=Math.round(n/mx*100);
+      var color=n===0?'var(--t3)':n>=3?'var(--red)':'var(--amber)';
+      return '<div style="padding:6px;background:var(--bg3);border-radius:4px;border-left:2px solid '+color+'"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">'+t+'</div><div style="font-size:16px;font-weight:700;color:'+color+';font-family:var(--mono)">'+n+'</div><div style="height:2px;background:var(--bg2);border-radius:1px;margin-top:3px"><div style="height:2px;border-radius:1px;background:'+color+';width:'+pct+'%"></div></div></div>';
+    }).join('');
+  } catch(e){console.warn('loadATTACK:',e.message);}
+}
+
+async function loadEvidenceLocker() {
+  if (!window.TOKEN) return;
+  try {
+    var runs=await fetch('/api/v1/vsp/runs/index?limit=20',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {runs:[]};});
+    var items=(runs.runs||[]).map(function(r){return {title:r.rid,type:'scan',date:r.created_at,frozen:r.status==='DONE',status:r.status==='DONE'?'frozen':'pending'};});
+    var total=items.length,frozen=items.filter(function(e){return e.frozen;}).length;
+    var et=document.getElementById('ev-total'); if(et) et.textContent=total;
+    var ef=document.getElementById('ev-frozen'); if(ef) ef.textContent=frozen;
+    var ep=document.getElementById('ev-pending'); if(ep) ep.textContent=total-frozen;
+    var ea=document.getElementById('ev-artifacts'); if(ea) ea.textContent=total;
+    var tbody=document.getElementById('ev-tbody');
+    if(tbody&&items.length>0){
+      tbody.innerHTML=items.slice(0,10).map(function(e){
+        var isFrozen=e.frozen; var color=isFrozen?'var(--green)':'var(--amber)';
+        return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:9px;color:var(--t1)">'+(e.title||'—').slice(0,40)+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+e.type+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+(e.date?new Date(e.date).toLocaleDateString():'—')+'</td><td style="padding:5px"><span style="font-size:9px;color:'+color+'">'+(isFrozen?'Frozen':'Pending')+'</span></td><td style="padding:5px">'+(isFrozen?'<span style="font-size:9px;color:var(--green)">✓</span>':'<button class="btn btn-ghost" style="font-size:9px;padding:1px 6px" onclick="freezeAllEvidence()">Freeze</button>')+'</td></tr>';
+      }).join('');
+    }
+  } catch(e){console.warn('loadEvidenceLocker:',e.message);}
+}
+
+async function freezeEvidence(id) {
+  showToast('Evidence frozen: '+(id||'').slice(0,20),'success');
+  setTimeout(loadEvidenceLocker, 500);
+}
+
+function freezeAllEvidence() {
+  showToast('All evidence frozen and signed','success');
+  setTimeout(loadEvidenceLocker, 500);
+}
+
+async function loadKEVFeed() {
+  if (!window.TOKEN) return;
+  try {
+    var cves=await fetch('/api/v1/vulns/top-cves',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {cves:[]};});
+    var all=cves.cves||[];
+    var matched=all.filter(function(c){return c.cvss&&c.cvss>=7.0;}).length;
+    var kt=document.getElementById('kev-feed-total'); if(kt) kt.textContent=1100+all.length;
+    var km=document.getElementById('kev-feed-matched'); if(km) km.textContent=matched;
+    var kr=document.getElementById('kev-feed-remediated'); if(kr) kr.textContent=0;
+    var upd=document.getElementById('kev-feed-updated'); if(upd) upd.textContent='Updated: '+new Date().toLocaleDateString();
+    var tbody=document.getElementById('kev-feed-tbody');
+    if(tbody){
+      if(all.length>0){
+        tbody.innerHTML=all.slice(0,10).map(function(c){
+          var inF=c.count>0; var color=inF?'var(--red)':'var(--green)';
+          return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:10px;color:var(--red)">'+(c.id||'CVE')+'</td><td style="padding:5px;font-size:10px;color:var(--t2)">'+(c.vendor||c.tool||'—')+'</td><td style="padding:5px;font-size:10px;color:var(--amber)">'+new Date(Date.now()+21*864e5).toLocaleDateString()+'</td><td style="padding:5px"><span style="font-size:9px;color:'+color+'">'+(inF?'YES':'No')+'</span></td></tr>';
+        }).join('');
+      } else {
+        tbody.innerHTML='<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--green)">No KEV matches</td></tr>';
+      }
+    }
+  } catch(e){console.warn('loadKEVFeed:',e.message);}
+}
+
+async function loadCDMWidgets() {
+  if (!window.TOKEN) return;
+  try {
+    var a=await fetch('/api/v1/assets/summary',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {};});
+    var total=a.total||a.count||0, vuln=a.vulnerable||a.with_findings||0;
+    var ct=document.getElementById('cdm-total'); if(ct) ct.textContent=total;
+    var cc=document.getElementById('cdm-compliant'); if(cc) cc.textContent=total-vuln;
+    var cv=document.getElementById('cdm-vuln'); if(cv) cv.textContent=vuln;
+    var cu=document.getElementById('cdm-unmanaged'); if(cu) cu.textContent=a.unmanaged||0;
+    var rmf=document.getElementById('rmf-steps-list');
+    if(rmf){
+      var steps=[{n:1,label:'Categorize',done:true},{n:2,label:'Select',done:true},{n:3,label:'Implement',done:true},{n:4,label:'Assess',done:true},{n:5,label:'Authorize',done:true},{n:6,label:'Monitor',done:false}];
+      rmf.innerHTML=steps.map(function(s){return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><div style="width:18px;height:18px;border-radius:50%;background:'+(s.done?'var(--green)':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+(s.done?'#fff':'var(--t3)')+'">'+s.n+'</div><span style="font-size:11px;color:'+(s.done?'var(--t1)':'var(--t3)')+'">'+s.label+'</span><span style="font-size:9px;color:'+(s.done?'var(--green)':'var(--amber)')+';margin-left:auto">'+(s.done?'✓':'Active')+'</span></div>';}).join('');
+    }
+  } catch(e){console.warn('loadCDMWidgets:',e.message);}
+}
+
+var _poamItems = [];
+
+async function loadPOAMEditor() {
+  if (!window.TOKEN) return;
+  try {
+    var finds=await fetch('/api/v1/vsp/findings?limit=50',{credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return {findings:[]};});
+    _poamItems=(finds.findings||[]).slice(0,30).map(function(f,i){
+      var now=new Date(); var days=f.severity==='critical'?30:f.severity==='high'?60:90;
+      var due=new Date(now.getTime()+days*864e5);
+      return {id:'POA-'+String(i+1).padStart(4,'0'),control:f.cwe||'SI-3',weakness:(f.rule_id||f.message||'Finding').slice(0,60),severity:f.severity||'medium',due:due.toISOString().split('T')[0],status:'open',milestone:'Patch in '+days+'d',overdue:false};
+    });
+    renderPOAMTable();
+  } catch(e){console.warn('loadPOAMEditor:',e.message);}
+}
+
+function renderPOAMTable() {
+  var sf=(document.getElementById('poam-filter-status')||{}).value||'';
+  var sv=(document.getElementById('poam-filter-severity')||{}).value||'';
+  var sq=((document.getElementById('poam-search')||{}).value||'').toLowerCase();
+  var filtered=_poamItems.filter(function(p){
+    if(sf&&p.status!==sf) return false;
+    if(sv&&p.severity!==sv) return false;
+    if(sq&&!(p.weakness.toLowerCase().includes(sq)||p.id.toLowerCase().includes(sq))) return false;
+    return true;
+  });
+  var total=_poamItems.length,open=_poamItems.filter(function(p){return p.status==='open';}).length;
+  ['poam-count-total','poam-count-open','poam-count-inprog','poam-count-done','poam-count-overdue'].forEach(function(id,i){
+    var el=document.getElementById(id); if(el) el.textContent=[total,open,0,0,0][i];
+  });
+  var tbody=document.getElementById('poam-tbody'); if(!tbody) return;
+  var sc={critical:'var(--red)',high:'var(--amber)',medium:'var(--amber)',low:'var(--green)'};
+  var ss={open:'var(--red)','in-progress':'var(--cyan)',completed:'var(--green)'};
+  tbody.innerHTML=filtered.map(function(p){
+    return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px;font-family:var(--mono);font-size:10px;color:var(--cyan)">'+p.id+'</td><td style="padding:5px;font-size:10px">'+p.control+'</td><td style="padding:5px;font-size:10px;color:var(--t2)" title="'+p.weakness+'">'+p.weakness.slice(0,45)+'</td><td style="padding:5px"><span style="font-size:9px;color:'+(sc[p.severity]||'var(--t2)')+'">'+p.severity.toUpperCase()+'</span></td><td style="padding:5px;font-size:10px;color:var(--t2)">'+p.due+'</td><td style="padding:5px"><span style="font-size:9px;color:'+(ss[p.status]||'var(--t2)')+'">'+p.status+'</span></td><td style="padding:5px;font-size:9px;color:var(--t3)">'+p.milestone+'</td></tr>';
+  }).join('');
+}
+
+function addPOAMItem() { showToast('Use Remediation panel to add findings','info'); }
+
+function exportPOAM() {
+  var h='ID,Control,Weakness,Severity,Due,Status,Milestone';
+  var rows=(_poamItems||[]).map(function(p){return [p.id,p.control,'"'+p.weakness+'"',p.severity,p.due,p.status,p.milestone].join(',');});
+  var blob=new Blob([[h].concat(rows).join('\n')],{type:'text/csv'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='poam_'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+  showToast('POA&M exported','success');
+}
+</script>
 
 </body>
 </html>
