@@ -1317,7 +1317,14 @@ function toast(msg) {
 }
 
 // ---- Init ----
-loadOverview();
+// Wait for P4 auth token before loading
+(async function() {
+  var maxWait = 30; // 3 seconds max
+  while (!window._p4Token && maxWait-- > 0) {
+    await new Promise(function(r){ setTimeout(r, 100); });
+  }
+  loadOverview();
+})();
 // Auto-poll RASP every 30s
 setInterval(() => {
   if (currentTab() === 'rasp') pollRASP();
