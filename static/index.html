@@ -5757,7 +5757,7 @@ async function exportOSCAL(type) {
   await ensureToken();
   showToast('Generating OSCAL '+type.toUpperCase()+'…','info');
   try {
-    var url = '/api/v1/compliance/oscal/'+type+(_exportRID?'?run_id='+_exportRID:'');
+    var url = '/api/v1/compliance/oscal/ar'+type+(_exportRID?'?run_id='+_exportRID:'');
     var resp = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();

@@ -1,4 +1,5 @@
 server:
+  metrics_token: "55983356adf759937523f79d60f96b58"
   gateway_port: 8921
   scanner_port: 8921
   shell_port:   8922

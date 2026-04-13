@@ -2693,7 +2693,7 @@ async function loadRunLog(rid) {
   if (!window.TOKEN) { setTimeout(loadLatestLog, 400); return; }
   showToast('Loading log for ' + rid.slice(-12) + '…', 'info');
   try {
-    const run = await fetch('/api/v1/vsp/run/'+rid, {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const run = await fetch('/api/v1/vsp/runs'+rid, {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json());
     const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{Authorization:'Bearer '+window.TOKEN}}).then(r=>r.json());
     const findings = fd.findings || [];
     window._findingsCache = findings;
