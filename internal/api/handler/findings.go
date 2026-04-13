@@ -56,12 +56,12 @@ func (h *Findings) Summary(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	runID := r.URL.Query().Get("run_id")
 
-	// Auto-select latest DONE run with findings unless scope=all
+	// Auto-select latest DONE run unless scope=all
 	if runID == "" && r.URL.Query().Get("scope") != "all" {
-		runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, 20, 0)
+		runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, 5, 0)
 		if err == nil {
 			for _, run := range runs {
-				if run.Status == "DONE" && run.TotalFindings > 0 {
+				if run.Status == "DONE" {
 					runID = run.ID
 					break
 				}
