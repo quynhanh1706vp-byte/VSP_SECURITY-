@@ -1759,14 +1759,14 @@ function renderVNGrid(standards) {
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
         '<div style="font-size:11px;font-weight:700;color:'+col+';letter-spacing:.08em">'+ic+' '+s.name+'</div>' +
         '<div style="position:relative">' +
-          '<button onclick="toggleVNDropdown('dd-'+s.id)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer">⋯</button>' +
+          '<button onclick="toggleVNDropdown(&apos;dd-&apos;+s.id)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer">⋯</button>' +
           '<div id="dd-'+s.id+'" class="dropdown-menu" style="display:none;right:0;left:auto">' +
-            '<div class="dropdown-item" onclick="updateVNStatus(s.id,'passed')">✓ Đánh dấu ĐẠT</div>' +
-            '<div class="dropdown-item" onclick="updateVNStatus(s.id,'partial')">⚠ Đánh dấu CHỜ</div>' +
-            '<div class="dropdown-item" onclick="updateVNStatus(s.id,'failed')" style="color:var(--red)">✗ Đánh dấu KHÔNG ĐẠT</div>' +
+            '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;passed&apos;)">✓ Đánh dấu ĐẠT</div>' +
+            '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;partial&apos;)">⚠ Đánh dấu CHỜ</div>' +
+            '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;failed&apos;)" style="color:var(--red)">✗ Đánh dấu KHÔNG ĐẠT</div>' +
             '<div style="border-top:1px solid var(--border);margin:4px 0"></div>' +
             '<div class="dropdown-item" onclick="openVNDetail(s.id)">📋 Xem chi tiết</div>' +
-            '<div class="dropdown-item" onclick="openAIAdvisor({id:s.id,weakness:s.name,control:s.framework,severity:'MEDIUM',mitigation:''})">🤖 AI Advisor</div>' +
+            '<div class="dropdown-item" onclick="openAIAdvisor({id:s.id,weakness:s.name,control:s.framework,severity:&apos;MEDIUM&apos;,mitigation:&apos;&apos;})">🤖 AI Advisor</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -1817,8 +1817,8 @@ function renderVNMatrix(standards) {
       '<td style="padding:8px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí'+(s.notes?' · '+s.notes:'')+'</td>' +
       '<td style="padding:8px"><button onclick="event.stopPropagation();toggleVNDropdown('dd2-'+s.id)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer;position:relative">⋯' +
         '<div id="dd2-'+s.id+'" class="dropdown-menu" style="display:none;right:0">' +
-          '<div class="dropdown-item" onclick="event.stopPropagation();updateVNStatus(s.id,'passed')">✓ ĐẠT</div>' +
-          '<div class="dropdown-item" onclick="event.stopPropagation();updateVNStatus(s.id,'partial')">⚠ CHỜ</div>' +
+          '<div class="dropdown-item" onclick="event.stopPropagation();updateVNStatus(s.id,&apos;passed&apos;)">✓ ĐẠT</div>' +
+          '<div class="dropdown-item" onclick="event.stopPropagation();updateVNStatus(s.id,&apos;partial&apos;)">⚠ CHỜ</div>' +
           '<div class="dropdown-item" onclick="event.stopPropagation();openVNDetail(s.id)">📋 Chi tiết</div>' +
         '</div>' +
       '</button></td>' +
@@ -1878,9 +1878,9 @@ function openVNDetail(id) {
     }).join('') +
     '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-      '<button class="btn btn-primary btn-sm" onclick="updateVNStatus(s.id,'passed')">✓ Mark ĐẠT</button>' +
+      '<button class="btn btn-primary btn-sm" onclick="updateVNStatus(s.id,&apos;passed&apos;)">✓ Mark ĐẠT</button>' +
       '<button class="btn btn-ghost btn-sm" onclick="updateVNStatus(s.id,'partial')" style="color:var(--amber);border-color:rgba(245,158,11,.4)">⚠ Mark CHỜ</button>' +
-      '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:s.id,weakness:s.name,control:s.framework,severity:'MEDIUM',mitigation:''})">🤖 AI Advisor</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:s.id,weakness:s.name,control:s.framework,severity:&apos;MEDIUM&apos;,mitigation:&apos;&apos;})">🤖 AI Advisor</button>' +
     '</div>';
   document.getElementById('vn-detail-title').textContent = s.name;
   modal.classList.add('open');
