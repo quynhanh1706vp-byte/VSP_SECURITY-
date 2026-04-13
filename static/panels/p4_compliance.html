@@ -1897,7 +1897,7 @@ function renderVNGrid(standards) {
             '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;partial&apos;)">⚠ Đánh dấu CHỜ</div>' +
             '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;failed&apos;)" style="color:var(--red)">✗ Đánh dấu KHÔNG ĐẠT</div>' +
             '<div style="border-top:1px solid var(--border);margin:4px 0"></div>' +
-            '<div class="dropdown-item" onclick="openVNDetail(s.id)">📋 Xem chi tiết</div>' +
+            '<div class="dropdown-item vn-det" data-sid="'+s.id+'">📋 Xem chi tiết</div>' +
             '<div class="dropdown-item" onclick="openAIAdvisor({id:s.id,weakness:s.name,control:s.framework,severity:&apos;MEDIUM&apos;,mitigation:&apos;&apos;})">🤖 AI Advisor</div>' +
           '</div>' +
         '</div>' +
@@ -1941,7 +1941,7 @@ function renderVNMatrix(standards) {
     const lbl = _statusLabel[s.status] || s.status;
     const items = Array.isArray(s.items) ? s.items : [];
     const done = items.filter(function(i){return i.done;}).length;
-    return '<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="openVNDetail(s.id)">' +
+    return '<tr style="border-top:1px solid var(--border);cursor:pointer" data-sid="'+s.id+'" onclick="openVNDetail(this.dataset.sid)">' +
       '<td style="padding:8px 12px;font-weight:600;color:var(--cyan)">'+s.name+'</td>' +
       '<td style="padding:8px;text-align:center;color:var(--t3)">'+(_fwLabel[s.framework]||s.framework)+'</td>' +
       '<td style="padding:8px;text-align:center;font-weight:700;color:'+col+'">'+s.score+'%</td>' +
