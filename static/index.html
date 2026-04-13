@@ -7565,6 +7565,15 @@ async function loadConMonKPIs() {
 
   // Expose để debug
   window._vsp = { refreshDashboard, startSmartPoll };
+  // Load KPI widgets after all scripts
+  setTimeout(function(){
+    if(typeof loadConMonKPIs==='function') {
+      console.log('[VSP] Calling loadConMonKPIs from smart poll init');
+      loadConMonKPIs();
+    } else {
+      console.warn('[VSP] loadConMonKPIs not found at smart poll init');
+    }
+  }, 1500);
 
   console.log('[VSP] Smart polling loaded — interval: 30s, SSE-driven refresh: enabled');
 })();
