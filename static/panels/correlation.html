@@ -209,7 +209,7 @@ var SOURCES = [
 ];
 var SPARK_DATA = [12,18,9,24,31,19,14,28,44,38,21,17];
 
-function sevBadge(s){s=(s||'MEDIUM').toUpperCase();var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};return '<span class="pill '+(m[s]||'pill-gray')+'">'+s.charAt(0)+s.slice(1).toLowerCase()+'</span>'}
+function sevBadge(s){var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};return '<span class="pill '+(m[s]||'pill-gray')+'">'+s.charAt(0)+s.slice(1).toLowerCase()+'</span>'}
 
 function renderRules(){
   var f=document.getElementById('rule-filter').value;
@@ -242,6 +242,7 @@ function toggleRule(id,e){
 function renderIncidents(){
   var f=document.getElementById('inc-filter').value;
   var list=INCIDENTS.filter(function(i){return !f||i.sev===f});
+  if(!list||!list.length){document.getElementById('incidents-list').innerHTML='<div style="color:var(--t3);padding:16px;font-size:12px">No incidents</div>';return;}
   document.getElementById('inc-sub').textContent=list.length+' incidents';
   document.getElementById('k-inc').textContent=INCIDENTS.length;
   var sevCls={CRITICAL:'crit',HIGH:'high',MEDIUM:'med'};
@@ -249,7 +250,7 @@ function renderIncidents(){
     return '<div class="incident '+(sevCls[i.sev]||'')+'">'
       +'<div class="inc-hdr"><span class="inc-title">'+i.id+' · '+i.title+'</span><span class="inc-time">'+i.time+'</span></div>'
       +'<div class="inc-desc">'+i.desc+'</div>'
-      +'<div class="inc-tags">'+i.sources.map(function(s){return '<span class="pill pill-cyan">'+s+'</span>'}).join('')+'<span class="pill pill-gray">open</span></div>'
+      +'<div class="inc-tags">'+(i.sources||[]).map(function(s){return '<span class="pill pill-cyan">'+s+'</span>'}).join('')+'<span class="pill pill-gray">open</span></div>'
       +'</div>';
   }).join('');
 }
@@ -334,7 +335,22 @@ function loadFromAPI(){
     fetch('/api/v1/correlation/incidents',{headers:h}).then(function(r){return r.json()}).catch(function(){return null}),
   ]).then(function(res){
     if(res[0]&&res[0].rules&&res[0].rules.length){RULES=res[0].rules;renderRules()}
-    if(res[1]&&res[1].incidents&&res[1].incidents.length){INCIDENTS=res[1].incidents;renderIncidents()}
+    if(res[1]&&res[1].incidents&&res[1].incidents.length){
+      INCIDENTS=res[1].incidents.map(function(i){
+        var sr=i.source_refs;
+        if(typeof sr==='string'){try{sr=JSON.parse(sr)}catch(e){sr={}}}
+        return {
+          id:      i.id||'INC-???',
+          title:   i.title||'Untitled',
+          sev:     i.severity||i.sev||'MEDIUM',
+          status:  i.status||'open',
+          desc:    i.description||(sr&&sr.rule_id?'Rule: '+sr.rule_id:'No description'),
+          sources: (sr&&sr.sources)||i.sources||[],
+          time:    i.created_at?new Date(i.created_at).toLocaleString():'',
+        };
+      });
+      renderIncidents();
+    }
   });
 }
 
