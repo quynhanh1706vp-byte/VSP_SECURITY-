@@ -2113,6 +2113,16 @@ function setSBOMFilter(f, btn) {
   }
 }
 
+window._aiTest = function(btn) {
+  openAIAdvisor({
+    id: btn.dataset.c,
+    weakness: btn.dataset.c,
+    control: btn.dataset.c,
+    severity: btn.dataset.s,
+    mitigation: ''
+  });
+};
+
 // ---- Init ----
 loadOverview();
 // Auto-poll RASP every 30s
