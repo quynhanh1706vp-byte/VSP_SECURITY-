@@ -1154,9 +1154,12 @@ function currentTab() {
 // ---- Fetch helpers ----
 async function api(path) {
   try {
-    const tok = window.TOKEN || localStorage.getItem('vsp_token') || '';
-    const headers = tok ? {'Authorization': 'Bearer ' + tok} : {};
+    const tok = window.TOKEN || '';
+    const p4key = window.VSP_P4_API_KEY || '';
+    const headers = tok ? {'Authorization': 'Bearer ' + tok}
+                  : p4key ? {'X-API-Key': p4key} : {};
     const r = await fetch(API + path, {headers});
+    if (!r.ok) return null;
     return await r.json();
   } catch(e) {
     return null;
