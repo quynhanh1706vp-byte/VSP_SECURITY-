@@ -1791,7 +1791,7 @@ function renderVNGrid(standards) {
             '</div>';
         }).join('') +
         '</div>' +
-        '<button onclick="toggleExpand(''+expandId+'',this)" style="background:none;border:none;color:var(--cyan);font-size:10px;cursor:pointer;padding:4px 0;text-align:left">▸ Xem thêm '+(items.length-3)+' tiêu chí</button>' : '') +
+        '<button onclick="toggleExpand(this.dataset.id,this)" data-id="'+expandId+'" style="background:none;border:none;color:var(--cyan);font-size:10px;cursor:pointer;padding:4px 0;text-align:left">▸ Xem thêm '+(items.length-3)+' tiêu chí</button>' : '') +
       '</div>' +
       // Footer badge
       '<div style="margin-top:10px;padding:5px 10px;background:rgba('+(s.status==='passed'?'0,255,163':'255,184,0')+',.07);border-radius:6px;display:flex;justify-content:space-between;align-items:center">' +
