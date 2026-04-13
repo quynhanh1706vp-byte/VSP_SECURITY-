@@ -372,7 +372,7 @@ window.addEventListener('message',function(e){
   if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){
     TOKEN=e.data.token;
     // Dùng origin của parent frame để tránh CORS
-    API=window.parent!==window?(window.location.origin==='null'?'':window.location.origin):(window.location.origin.replace(/:\d+$/,':8921'));
+    API=window.parent!==window?(window.location.origin==='null'?'':window.location.origin):(window.location.origin);
     renderSavedQueries();
     document.getElementById('hunt-q').value='Failed password';
     document.getElementById('hunt-process').value='sshd';
