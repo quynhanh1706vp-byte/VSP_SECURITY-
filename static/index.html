@@ -3329,7 +3329,7 @@ setTimeout(function() {
 document.addEventListener('DOMContentLoaded', () => {
   // Init dashboard charts immediately
   setTimeout(initDashboardCharts, 300);
-  setTimeout(loadConMonKPIs, 500);
+  setTimeout(function(){ if(typeof loadConMonKPIs==='function') loadConMonKPIs(); }, 2000);
   if (TOKEN) setTimeout(loadLatestLog, 500);
 
   // Try connecting to API if token exists
