@@ -781,10 +781,20 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
 
       <!-- RASP TAB -->
       <div id="tab-rasp" class="tab-panel">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div style="font-size:11px;color:var(--t3)">Runtime Application Self-Protection · Live event feed · SI-3 / SI-10 / SI-16</div>
-          <button class="btn btn-primary btn-sm" onclick="pollRASP()">↺ Poll</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="filter-pills">
+              <button class="filter-pill active" onclick="setRASPFilter('all',this)">All</button>
+              <button class="filter-pill" onclick="setRASPFilter('CRITICAL',this)" style="color:var(--red)">CRITICAL</button>
+              <button class="filter-pill" onclick="setRASPFilter('HIGH',this)" style="color:var(--amber)">HIGH</button>
+              <button class="filter-pill" onclick="setRASPFilter('MEDIUM',this)">MEDIUM</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="exportRASP()">⬇ Export</button>
+            <button class="btn btn-primary btn-sm" onclick="pollRASP()">↺ Poll</button>
+          </div>
         </div>
+        <div id="rasp-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px"></div>
         <div class="rasp-list" id="rasp-list">
           <div style="color:var(--t3)"><span class="spinner"></span> Loading...</div>
         </div>
@@ -1029,6 +1039,28 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /shell -->
+
+<!-- Test Detail Modal -->
+<div class="modal-overlay" id="test-detail-modal">
+  <div class="modal detail-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div id="test-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('test-detail-modal').classList.remove('open')">✕</button>
+    </div>
+    <div id="test-detail-body"></div>
+  </div>
+</div>
+
+<!-- RASP Detail Modal -->
+<div class="modal-overlay" id="rasp-detail-modal">
+  <div class="modal detail-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div id="rasp-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('rasp-detail-modal').classList.remove('open')">✕</button>
+    </div>
+    <div id="rasp-detail-body"></div>
+  </div>
+</div>
 
 <!-- VN Standard Detail Modal -->
 <div class="modal-overlay" id="vn-detail-modal">
@@ -1430,16 +1462,43 @@ function renderPipelineRun(run) {
 
 function renderTests(tests) {
   document.getElementById('tests-list').innerHTML = tests.map(t => `
-    <div class="test-row">
+    <div class="test-row" style="cursor:pointer" onclick="openTestDetail(${JSON.stringify(t).replace(/"/g,'&quot;')})">
       <span class="test-fw">${t.framework}</span>
-      <span class="test-ctrl">${t.control_id}</span>
-      <span class="test-name">${t.name}</span>
-      <span class="test-status ts-${t.status}">${t.status.toUpperCase()}</span>
-      <span class="test-score" style="color:${t.score>=80?'var(--green)':t.score>=50?'var(--amber)':'var(--red)'}">${t.score}</span>
-      <span class="test-evidence" title="${t.evidence}">${t.evidence}</span>
-      ${t.auto_fix_available ? '<span style="font-size:10px;color:var(--cyan)">⚡ autofix</span>' : ''}
+      <span class="test-ctrl" style="font-family:var(--mono);color:var(--cyan)">${t.control_id}</span>
+      <span class="test-name" style="flex:1">${t.name}</span>
+      <span style="display:flex;gap:4px"></span>
+      <span class="ctrl-status ctrl-status-${t.status}">${t.status.toUpperCase()}</span>
+      <span class="test-score" style="color:${t.score>=80?'var(--green)':t.score>=50?'var(--amber)':'var(--red)'};font-family:var(--mono)">${t.score}</span>
+      ${t.auto_fix_available ? '<span style="font-size:10px;color:var(--cyan)">⚡</span>' : ''}
     </div>
   `).join('');
+}
+
+function openTestDetail(t) {
+  const modal = document.getElementById('test-detail-modal');
+  const body = document.getElementById('test-detail-body');
+  if (!modal || !body) return;
+  const col = t.status==='pass'?'var(--green)':t.status==='warn'?'var(--amber)':'var(--red)';
+  const scoreCol = t.score>=80?'var(--green)':t.score>=50?'var(--amber)':'var(--red)';
+  body.innerHTML =
+    '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
+      '<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--cyan)">'+t.control_id+'</span>' +
+      '<span style="padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.05);font-size:10px;color:var(--t3)">'+t.framework+'</span>' +
+      '<span style="padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.05);font-size:10px;color:var(--t3)">'+t.test_type+'</span>' +
+      '<span style="margin-left:auto;font-size:28px;font-weight:700;color:'+scoreCol+'">'+t.score+'</span>' +
+    '</div>' +
+    '<div class="detail-row"><div class="detail-key">Test Name</div><div class="detail-val" style="font-weight:600">'+t.name+'</div></div>' +
+    '<div class="detail-row"><div class="detail-key">Status</div><div class="detail-val"><span class="ctrl-status ctrl-status-'+t.status+'">'+t.status.toUpperCase()+'</span></div></div>' +
+    '<div class="detail-row"><div class="detail-key">Evidence</div><div class="detail-val" style="color:var(--cyan)">'+t.evidence+'</div></div>' +
+    '<div class="detail-row"><div class="detail-key">Duration</div><div class="detail-val">'+(t.duration_ms>0?t.duration_ms+'ms':'manual')+'</div></div>' +
+    '<div class="detail-row"><div class="detail-key">Last Run</div><div class="detail-val">'+new Date(t.last_run).toLocaleString('vi-VN')+'</div></div>' +
+    '<div class="detail-row"><div class="detail-key">Run ID</div><div class="detail-val" style="font-family:var(--mono)">'+t.run_id+'</div></div>' +
+    (t.auto_fix_available?'<div style="margin-top:14px;padding:10px;background:rgba(6,182,212,.07);border:1px solid rgba(6,182,212,.2);border-radius:6px;font-size:11px;color:var(--cyan)">⚡ Auto-fix available for this control</div>':'') +
+    '<div style="display:flex;gap:8px;margin-top:16px">' +
+      '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:''+t.control_id+'',weakness:''+t.name+'',control:''+t.control_id+'',severity:''+( t.status==='pass'?'LOW':'HIGH')+'',mitigation:''+t.evidence+''})">🤖 AI Advisor</button>' +
+    '</div>';
+  document.getElementById('test-detail-title').textContent = t.control_id + ' — ' + t.framework;
+  modal.classList.add('open');
 }
 
 function filterTests(status) {
@@ -1637,21 +1696,91 @@ async function submitSegRule() {
 }
 
 // ---- RASP ----
+let _raspData = [];
+let _raspFilter = 'all';
+
 async function pollRASP() {
   const events = await api('/api/p4/zt/rasp');
   if (!events) return;
+  _raspData = events;
+  // Stats
+  const stats = document.getElementById('rasp-stats');
+  if (stats) {
+    const total = events.length;
+    const blocked = events.filter(e=>e.action==='blocked').length;
+    const critical = events.filter(e=>e.severity==='CRITICAL').length;
+    const high = events.filter(e=>e.severity==='HIGH').length;
+    stats.innerHTML = [
+      ['TOTAL EVENTS', total, 'var(--cyan)'],
+      ['BLOCKED', blocked, 'var(--green)'],
+      ['CRITICAL', critical, 'var(--red)'],
+      ['HIGH', high, 'var(--amber)']
+    ].map(function(x){
+      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px;text-align:center">' +
+        '<div style="font-size:20px;font-weight:700;color:'+x[2]+'">'+x[1]+'</div>' +
+        '<div style="font-size:9px;color:var(--t3);margin-top:2px">'+x[0]+'</div>' +
+      '</div>';
+    }).join('');
+  }
+  renderRASP(events, _raspFilter);
+}
+
+function setRASPFilter(f, btn) {
+  _raspFilter = f;
+  document.querySelectorAll('.filter-pill').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderRASP(_raspData, f);
+}
+
+function renderRASP(events, filter) {
+  const filtered = filter==='all' ? events : events.filter(e=>e.severity===filter);
   const colors = { CRITICAL:'sev-crit', HIGH:'sev-high', MEDIUM:'sev-med', LOW:'sev-low' };
-  document.getElementById('rasp-list').innerHTML = events.map(e => `
-    <div class="rasp-row">
-      <span class="rasp-sev ${colors[e.severity]||'sev-low'}">${e.severity}</span>
-      <span class="rasp-type">${e.attack_type}</span>
-      <span class="rasp-svc">${e.service} ${e.endpoint}</span>
-      <span class="rasp-${e.action==='blocked'?'action-blk':'action-alrt'}">${e.action.toUpperCase()}</span>
-      <span style="font-size:10px;color:var(--t3)">${e.source_ip}</span>
-      <span class="rasp-ts">${new Date(e.timestamp).toLocaleTimeString()}</span>
-      ${e.cve?`<span style="font-size:10px;color:var(--red)">${e.cve}</span>`:''}
-    </div>
-  `).join('');
+  document.getElementById('rasp-list').innerHTML = filtered.map(e => {
+    return '<div class="rasp-row" style="cursor:pointer" onclick="openRASPDetail('+JSON.stringify(e).replace(/"/g,'&quot;')+')">' +
+      '<span class="rasp-sev '+(colors[e.severity]||'sev-low')+'">'+e.severity+'</span>' +
+      '<span class="rasp-type">'+e.attack_type+'</span>' +
+      '<span class="rasp-svc">'+e.service+' '+e.endpoint+'</span>' +
+      '<span class="rasp-'+(e.action==='blocked'?'action-blk':'action-alrt')+'">'+e.action.toUpperCase()+'</span>' +
+      '<span style="font-size:10px;color:var(--t3)">'+e.source_ip+'</span>' +
+      '<span class="rasp-ts">'+new Date(e.timestamp).toLocaleTimeString('vi-VN')+'</span>' +
+      (e.cve?'<span style="font-size:10px;color:var(--red)">'+e.cve+'</span>':'') +
+    '</div>';
+  }).join('') || '<div style="color:var(--t3);font-size:11px;padding:12px">No events match filter</div>';
+}
+
+function openRASPDetail(e) {
+  const modal = document.getElementById('rasp-detail-modal');
+  const body = document.getElementById('rasp-detail-body');
+  if (!modal || !body) return;
+  const sevCol = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[e.severity]||'var(--t3)';
+  body.innerHTML =
+    '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
+      '<span class="rasp-sev sev-'+(e.severity||'low').toLowerCase()+'">'+e.severity+'</span>' +
+      '<span style="font-size:15px;font-weight:700;color:var(--t1)">'+e.attack_type+'</span>' +
+      '<span class="rasp-'+(e.action==='blocked'?'action-blk':'action-alrt')+'" style="margin-left:auto">'+e.action.toUpperCase()+'</span>' +
+    '</div>' +
+    '<div class="detail-row"><div class="detail-key">Service</div><div class="detail-val" style="font-family:var(--mono)">'+e.service+'</div></div>' +
+    '<div class="detail-row"><div class="detail-key">Endpoint</div><div class="detail-val" style="font-family:var(--mono);color:var(--cyan)">'+e.endpoint+'</div></div>' +
+    '<div class="detail-row"><div class="detail-key">Source IP</div><div class="detail-val" style="font-family:var(--mono)">'+e.source_ip+'</div></div>' +
+    '<div class="detail-row"><div class="detail-key">Timestamp</div><div class="detail-val">'+new Date(e.timestamp).toLocaleString('vi-VN')+'</div></div>' +
+    (e.cve?'<div class="detail-row"><div class="detail-key">CVE</div><div class="detail-val"><a href="https://nvd.nist.gov/vuln/detail/'+e.cve+'" target="_blank" style="color:var(--red)">'+e.cve+'</a></div></div>':'') +
+    '<div style="margin-top:14px;display:flex;gap:8px">' +
+      '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:''+e.attack_type+'',weakness:''+e.attack_type+' attack',control:'SI-3',severity:''+e.severity+'',mitigation:''})">🤖 AI Advisor</button>' +
+    '</div>';
+  document.getElementById('rasp-detail-title').textContent = e.attack_type + ' — ' + e.service;
+  modal.classList.add('open');
+}
+
+function exportRASP() {
+  if (!_raspData.length) { toast('No data to export'); return; }
+  const csv = ['Severity,Type,Service,Endpoint,Action,Source IP,Timestamp,CVE']
+    .concat(_raspData.map(e=>[e.severity,e.attack_type,e.service,e.endpoint,e.action,e.source_ip,new Date(e.timestamp).toISOString(),e.cve||''].join(',')))
+    .join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='rasp-events-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+  URL.revokeObjectURL(url);
+  toast('Exported '+_raspData.length+' RASP events');
 }
 
 // ---- POA&M ----
