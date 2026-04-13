@@ -1469,7 +1469,8 @@ async function exportPDF(){
     "<tr><td>DoD ZT Architecture v2.0</td><td><strong style=color:#10b981>100%</strong></td><td>85%</td><td><span class='badge bg'>P4 ACHIEVED</span></td></tr>",
     "</table>",
     "<div class=ft><div>VSP-DOD-2025-001 | UNCLASSIFIED // FOR OFFICIAL USE ONLY | April 07, 2026</div><div>VSP Security Platform v0.10.0</div></div>",
-    "</body></html>"
+    "<script src="/static/vsp_compliance_table_patch.js"></script>
+</body></html>"
   ].join("");
   const blob=new Blob([htm],{type:'text/html'});
   const url=URL.createObjectURL(blob);
@@ -1707,5 +1708,6 @@ function switchTenant(id) {
 }
 
 </script>
+<script src="/static/vsp_compliance_table_patch.js"></script>
 </body>
 </html>

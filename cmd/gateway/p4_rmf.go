@@ -312,7 +312,7 @@ func handleRMFConMon(w http.ResponseWriter, r *http.Request) {
 				controlComplianceRate = int((fedrampPct + cmmcPct + nistPct + ztPct) / 4)
 			}
 		}
-		p4SQLDB.QueryRowContext(ctx, "SELECT COUNT(*) FILTER (WHERE severity='critical' AND status='open'), COUNT(*) FILTER (WHERE severity='HIGH' AND status='open'), COUNT(*) FILTER (WHERE severity='MEDIUM' AND status='open'), COUNT(*) FILTER (WHERE severity='LOW' AND status='open'), COUNT(*) FILTER (WHERE status='open' OR status='in_remediation'), COUNT(*) FILTER (WHERE status='closed') FROM p4_poam_items WHERE system_id = 'VSP-DOD-2025-001'").Scan(&critOpen, &highOpen, &medOpen, &lowOpen, &totalOpen, &totalClosed)
+		p4SQLDB.QueryRowContext(ctx, "SELECT COUNT(*) FILTER (WHERE UPPER(severity)='CRITICAL' AND status='open'), COUNT(*) FILTER (WHERE UPPER(severity)='HIGH' AND status='open'), COUNT(*) FILTER (WHERE UPPER(severity)='MEDIUM' AND status='open'), COUNT(*) FILTER (WHERE UPPER(severity)='LOW' AND status='open'), COUNT(*) FILTER (WHERE status='open' OR status='in_remediation'), COUNT(*) FILTER (WHERE status='closed') FROM p4_poam_items").Scan(&critOpen, &highOpen, &medOpen, &lowOpen, &totalOpen, &totalClosed)
 		p4SQLDB.QueryRowContext(ctx, "SELECT conmon_score FROM p4_ato_packages WHERE id = 'VSP-DOD-2025-001' OR id = 'TENANT-NGIT-001' ORDER BY CASE WHEN id='VSP-DOD-2025-001' THEN 0 ELSE 1 END LIMIT 1").Scan(&conmonScore)
 	}
 	patchCompliance := 97

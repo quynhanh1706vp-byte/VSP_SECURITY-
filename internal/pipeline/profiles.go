@@ -9,7 +9,7 @@ type ProfileConfig struct {
 
 var Profiles = map[Profile]ProfileConfig{
 	ProfileFast:    {TimeoutSec: 120, Description: "Fast — core tools, 2min"},
-	ProfileExt:     {TimeoutSec: 300, Description: "Extended — all tools, 5min"},
+	ProfileExt:     {TimeoutSec: 360, Description: "Extended — all tools, 6min"},
 	ProfileAggr:    {TimeoutSec: 600, Description: "Aggressive — fail on any HIGH"},
 	ProfilePremium: {TimeoutSec: 900, Description: "Premium — deep scan 15min"},
 	ProfileFull:    {TimeoutSec: 1200, Description: "Full — all tools 20min"},

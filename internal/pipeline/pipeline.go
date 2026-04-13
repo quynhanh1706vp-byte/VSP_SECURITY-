@@ -16,6 +16,7 @@ import (
 	"github.com/vsp/platform/internal/scanner/kics"
 	"github.com/vsp/platform/internal/scanner/license"
 	"github.com/vsp/platform/internal/scanner/nikto"
+	"github.com/vsp/platform/internal/scanner/nmap"
 	"github.com/vsp/platform/internal/scanner/nuclei"
 	"github.com/vsp/platform/internal/scanner/secretcheck"
 	"github.com/vsp/platform/internal/scanner/semgrep"
@@ -123,6 +124,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		nikto.New(),
 		nuclei.New(),
 		sslscan.New(),
+		nmap.New(),
 	}
 
 	switch mode {
