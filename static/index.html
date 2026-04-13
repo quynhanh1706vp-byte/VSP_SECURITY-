@@ -3329,6 +3329,7 @@ setTimeout(function() {
 document.addEventListener('DOMContentLoaded', () => {
   // Init dashboard charts immediately
   setTimeout(initDashboardCharts, 300);
+  setTimeout(loadConMonKPIs, 500);
   if (TOKEN) setTimeout(loadLatestLog, 500);
 
   // Try connecting to API if token exists
@@ -7398,7 +7399,66 @@ var _siemKPIpoll = setInterval(function() {
 </script>
 <script src="/vsp_consolidated.js?v=20260412b"></script>
 <script src="/vsp_upgrade_v100.js?v=20260412b"></script>
-<script src="/vsp_upgrade_v101.js?v=20260412b"></script>
+<script src="/vsp_upgrade_v101.js?v=20260412b">
+async function loadConMonKPIs() {
+  if (!window.TOKEN) return;
+  var h = {Authorization:'Bearer '+window.TOKEN};
+  var P4KEY = window.VSP_P4_API_KEY || '';
+  var p4h = P4KEY ? {'X-API-Key':P4KEY} : h;
+  try {
+    var [conmon, audit, fedramp] = await Promise.all([
+      fetch('/api/p4/rmf/conmon',{headers:p4h}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/audit/stats',{headers:h}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/compliance/fedramp',{headers:h}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
+    ]);
+    // ConMon score
+    var sc = document.getElementById('d-conmon-score');
+    if(sc && conmon.conmon_score!=null) {
+      sc.textContent = conmon.conmon_score;
+      sc.style.color = conmon.conmon_score>=80?'var(--green)':conmon.conmon_score>=60?'var(--amber)':'var(--red)';
+    }
+    // POAM open
+    var po = document.getElementById('d-poam-open');
+    if(po && conmon.open_poam_items!=null) {
+      po.textContent = conmon.open_poam_items;
+      po.style.color = conmon.open_poam_items>50?'var(--red)':conmon.open_poam_items>10?'var(--amber)':'var(--green)';
+    }
+    var ps = document.getElementById('d-poam-sub');
+    if(ps && conmon.open_poam_items!=null) ps.textContent = conmon.open_poam_items+' critical + high';
+    // FedRAMP %
+    var fp = document.getElementById('d-fedramp-pct');
+    if(fp) fp.textContent = Math.round(fedramp.coverage_pct||0)+'%';
+    // Audit entries
+    var at = document.getElementById('d-audit-total');
+    var as2 = document.getElementById('d-audit-sub');
+    if(at) at.textContent = (audit.total||0).toLocaleString();
+    if(as2) as2.textContent = 'last 24h: '+(audit.last_24h||0);
+    // Gate widget bottom-left
+    fetch('/api/v1/vsp/gate/latest',{headers:h}).then(r=>r.json()).then(function(g){
+      var gw = document.getElementById('gate-widget');
+      var gl = gw && gw.querySelector('.gate-label');
+      var gs = document.getElementById('d-gate-score');
+      if(gl) { gl.textContent='GATE '+g.gate; }
+      if(gs) gs.textContent='score: '+(g.score||'—');
+      if(gw) gw.className='gate-status gate-'+(g.gate==='PASS'?'pass':g.gate==='WARN'?'warn':'fail');
+    }).catch(function(){});
+    // ATO countdown format
+    fetch('/api/p4/ato/expiry',{headers:p4h}).then(r=>r.json()).then(function(a){
+      var atEl = document.getElementById('d-ato-days');
+      if(atEl) atEl.textContent = (a.days_remaining||0).toLocaleString();
+    }).catch(function(){});
+    // Findings by severity — use all-time data
+    fetch('/api/v1/vsp/findings/summary?scope=all',{headers:h}).then(r=>r.json()).then(function(s){
+      if(!s.total) return;
+      var tf = document.getElementById('d-total-findings');
+      if(tf) tf.textContent = s.total.toLocaleString();
+      var c = window._charts && window._charts['chartSeverity'];
+      if(c) { c.data.datasets[0].data=[s.critical||0,s.high||0,s.medium||0,s.low||0]; c.update(); }
+    }).catch(function(){});
+  } catch(e) { console.error('loadConMonKPIs',e); }
+}
+
+</script>
 <script src="/panels/vsp_siem_patch.js?v=20260412d"></script>
 <script>
 // ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
