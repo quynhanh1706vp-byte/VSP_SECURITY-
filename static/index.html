@@ -7574,6 +7574,16 @@ async function loadConMonKPIs() {
           }
         });
       }
+      // Also fix ATO COUNTDOWN widget in main dashboard
+      var atoEl = document.querySelector('#d-ato-countdown,.ato-days,[id*="ato"][id*="count"]');
+      if(!atoEl) {
+        // Find by content pattern
+        document.querySelectorAll('.kpi-value,.spark-value').forEach(function(el){
+          if(el.textContent.includes('1.064')||el.textContent.includes('1,064')) {
+            el.textContent = (a.days_remaining||0).toLocaleString();
+          }
+        });
+      }
     }).catch(function(){});
     // Findings by severity — use all-time data
     fetch('/api/v1/vsp/findings/summary?scope=all',{headers:h}).then(r=>r.json()).then(function(s){
