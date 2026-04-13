@@ -1945,7 +1945,7 @@ function openVNDetail(id) {
     '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
       '<button class="btn btn-primary btn-sm" onclick="updateVNStatus(s.id,&apos;passed&apos;)">✓ Mark ĐẠT</button>' +
-      '<button class="btn btn-ghost btn-sm" onclick="updateVNStatus(s.id,'partial')" style="color:var(--amber);border-color:rgba(245,158,11,.4)">⚠ Mark CHỜ</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="updateVNStatus(s.id,\'partial\')" style="color:var(--amber);border-color:rgba(245,158,11,.4)">⚠ Mark CHỜ</button>' +
       '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:s.id,weakness:s.name,control:s.framework,severity:&apos;MEDIUM&apos;,mitigation:&apos;&apos;})">🤖 AI Advisor</button>' +
     '</div>';
   document.getElementById('vn-detail-title').textContent = s.name;
