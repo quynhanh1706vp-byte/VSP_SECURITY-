@@ -1765,7 +1765,7 @@ function openRASPDetail(e) {
     '<div class="detail-row"><div class="detail-key">Timestamp</div><div class="detail-val">'+new Date(e.timestamp).toLocaleString('vi-VN')+'</div></div>' +
     (e.cve?'<div class="detail-row"><div class="detail-key">CVE</div><div class="detail-val"><a href="https://nvd.nist.gov/vuln/detail/'+e.cve+'" target="_blank" style="color:var(--red)">'+e.cve+'</a></div></div>':'') +
     '<div style="margin-top:14px;display:flex;gap:8px">' +
-      '<button class="btn btn-ghost btn-sm" data-type="'+e.attack_type+'" data-sev="'+e.severity+'" onclick="openAIAdvisor({id:this.dataset.type,weakness:this.dataset.type,control:'SI-3',severity:this.dataset.sev,mitigation:\'\'})">🤖 AI Advisor</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="window._aiRasp(this)" data-t="'+e.attack_type+'" data-s="'+e.severity+'">🤖 AI Advisor</button>' +
     '</div>';
   document.getElementById('rasp-detail-title').textContent = e.attack_type + ' — ' + e.service;
   modal.classList.add('open');
@@ -2113,6 +2113,9 @@ function setSBOMFilter(f, btn) {
   }
 }
 
+window._aiRasp = function(btn) {
+  openAIAdvisor({id:btn.dataset.t, weakness:btn.dataset.t+' attack', control:'SI-3', severity:btn.dataset.s, mitigation:''});
+};
 window._aiTest = function(btn) {
   openAIAdvisor({
     id: btn.dataset.c,
