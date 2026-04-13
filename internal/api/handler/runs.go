@@ -190,17 +190,21 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	// Return minimal fields only
+	// Return fields needed by FE charts
 	type indexRow struct {
+		ID         string          `json:"id"`
 		RID        string          `json:"rid"`
 		Status     string          `json:"status"`
 		Mode       string          `json:"mode"`
 		Profile    string          `json:"profile"`
 		Gate       string          `json:"gate"`
-		Total      int             `json:"total"`
+		Posture    string          `json:"posture"`
+		Total      int             `json:"total_findings"`
 		ToolsDone  int             `json:"tools_done"`
 		ToolsTotal int             `json:"tools_total"`
 		Summary    json.RawMessage `json:"summary"`
+		StartedAt  *time.Time      `json:"started_at"`
+		FinishedAt *time.Time      `json:"finished_at"`
 		CreatedAt  time.Time       `json:"created_at"`
 	}
 	rows := make([]indexRow, 0, len(runs))
@@ -210,19 +214,23 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 			summ = json.RawMessage("{}")
 		}
 		rows = append(rows, indexRow{
+			ID:         run.ID,
 			RID:        run.RID,
 			Status:     run.Status,
 			Mode:       run.Mode,
 			Profile:    run.Profile,
 			Gate:       run.Gate,
+			Posture:    run.Posture,
 			Total:      run.TotalFindings,
 			ToolsDone:  run.ToolsDone,
 			ToolsTotal: run.ToolsTotal,
 			Summary:    summ,
+			StartedAt:  run.StartedAt,
+			FinishedAt: run.FinishedAt,
 			CreatedAt:  run.CreatedAt,
 		})
 	}
-	jsonOK(w, map[string]any{"runs": rows})
+	jsonOK(w, map[string]any{"runs": rows, "total": len(rows)})
 }
 
 // POST /api/v1/vsp/run/{rid}/cancel
