@@ -785,7 +785,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
       <!-- VIETNAMESE STANDARDS TAB -->
       <div id="tab-vn-standards" class="tab-panel">
         <div class="section-hd"><div class="section-title">VIETNAMESE SECURITY STANDARDS — VNCERT / BKAV / VIETTEL / VNPT</div></div>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px">
+        <div id="vn-standards-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px">
           <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
             <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:.08em;margin-bottom:8px">🇻🇳 VNCERT/CC — TT17/2017/TT-BTTTT</div>
             <div style="font-size:10px;color:var(--t3);margin-bottom:10px">Thông tư 17/2017 Bộ TT&TT — An toàn hệ thống thông tin theo cấp độ</div>
@@ -920,7 +920,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
                 <th style="padding:8px;text-align:left;color:var(--t3)">Ghi chú</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="vn-matrix-tbody">
               <tr style="border-top:1px solid var(--border)">
                 <td style="padding:8px 12px;font-weight:600;color:var(--cyan)">FedRAMP Moderate</td>
                 <td style="padding:8px;text-align:center;color:var(--t3)">Cloud Gov</td>
@@ -1063,7 +1063,7 @@ function loadTab(name) {
     case 'poam':       loadPOAM(); break;
     case 'ato-expiry': loadATOExpiry(); break;
     case 'sbom-view':  loadSBOMView(); break;
-    case 'vn-standards': break; // static content
+    case 'vn-standards': loadVNStandards(); break;
   }
 }
 
@@ -1610,6 +1610,76 @@ function toast(msg) {
   setTimeout(() => { t.style.display = 'none'; }, 2500);
 }
 
+// ---- VN Standards ----
+async function loadVNStandards() {
+  const res = await api('/api/p4/vn-standards');
+  if (!res || !res.standards) return;
+  const standards = res.standards;
+
+  const statusColor = {passed:'var(--green)', partial:'var(--amber)', failed:'var(--red)', pending:'var(--t3)'};
+  const statusLabel = {passed:'ĐẠT', partial:'CHỜ', failed:'KHÔNG ĐẠT', pending:'PENDING'};
+  const frameworkLabel = {
+    VN_GOV:'VN Gov', VN_ISO27001:'VN ISO27001', VN_PRIVATE:'VN Private',
+    VN_SOC:'VN SOC', VN_LAW:'VN Law'
+  };
+
+  // Render 4-card grid (first 4 standards)
+  const grid = document.getElementById('vn-standards-grid');
+  if (grid) {
+    const icons = {
+      'TT17-2017':'🇻🇳', 'TCVN-11943':'🔒', 'BKAV-SCORE':'📡',
+      'VIETTEL-SOC':'📶', 'LATM-2015':'⚖️', 'ND13-2023':'🛡️'
+    };
+    const colors = {
+      'TT17-2017':'var(--red)', 'TCVN-11943':'var(--amber)',
+      'BKAV-SCORE':'var(--cyan)', 'VIETTEL-SOC':'var(--purple)',
+      'LATM-2015':'var(--green)', 'ND13-2023':'var(--blue)'
+    };
+    grid.innerHTML = standards.map(function(s) {
+      const items = Array.isArray(s.items) ? s.items : [];
+      const done = items.filter(function(i){return i.done;}).length;
+      const col = colors[s.id] || 'var(--cyan)';
+      const ic = icons[s.id] || '📋';
+      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">' +
+        '<div style="font-size:11px;font-weight:700;color:'+col+';letter-spacing:.08em;margin-bottom:6px">'+ic+' '+s.name+'</div>' +
+        '<div style="font-size:10px;color:var(--t3);margin-bottom:10px">'+s.scope+'</div>' +
+        '<div style="display:flex;flex-direction:column;gap:5px">' +
+        items.map(function(item) {
+          return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">' +
+            '<span>'+item.name+'</span>' +
+            '<span style="color:'+(item.done?'var(--green)':'var(--amber)')+';font-weight:700">'+(item.done?'✓ ĐẠT':'⚠ CHỜ')+'</span>' +
+            '</div>';
+        }).join('') +
+        '</div>' +
+        '<div style="margin-top:10px;padding:6px 10px;background:rgba('+
+          (s.status==='passed'?'0,255,163':'255,184,0')+',.07);border-radius:6px;font-size:10px;color:'+
+          statusColor[s.status]+'">' +
+          s.name+' — '+done+'/'+items.length+' đạt · '+s.score+'%' +
+        '</div></div>';
+    }).join('');
+  }
+
+  // Render compliance matrix
+  const tbody = document.getElementById('vn-matrix-tbody');
+  if (tbody) {
+    tbody.innerHTML = standards.map(function(s) {
+      const col = statusColor[s.status] || 'var(--t3)';
+      const lbl = statusLabel[s.status] || s.status;
+      const items = Array.isArray(s.items) ? s.items : [];
+      const done = items.filter(function(i){return i.done;}).length;
+      return '<tr style="border-top:1px solid var(--border)">' +
+        '<td style="padding:8px 12px;font-weight:600;color:var(--cyan)">'+s.name+'</td>' +
+        '<td style="padding:8px;text-align:center;color:var(--t3)">'+frameworkLabel[s.framework]+'</td>' +
+        '<td style="padding:8px;text-align:center;font-weight:700;color:'+col+'">'+s.score+'%</td>' +
+        '<td style="padding:8px;text-align:center"><span style="background:rgba('+
+          (s.status==='passed'?'0,255,163':'255,184,0')+',.1);color:'+col+
+          ';padding:2px 8px;border-radius:4px;font-size:10px">'+lbl+'</span></td>' +
+        '<td style="padding:8px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí'+(s.notes?' · '+s.notes:'')+'</td>' +
+        '</tr>';
+    }).join('');
+  }
+}
+
 // ---- Init ----
 loadOverview();
 // Auto-poll RASP every 30s
@@ -1743,7 +1813,7 @@ async function loadATOExpiry() {
 async function loadSBOMView() {
   const el = document.getElementById('sbom-view-content');
   if (el) el.innerHTML = '<div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>';
-  const res = await api('/api/p4/sbom/view');
+  const res = await api('/api/p4/sbom/view-db');
   if (!res || !el) return;
   const rows = (res.components||[]).slice(0,20).map(function(c){
     return '<tr><td style="font-family:monospace;font-size:11px">'+c.name+'</td><td style="font-size:11px">'+c.version+'</td><td style="font-size:11px">'+c.type+'</td><td style="font-size:11px">'+c.license+'</td>' +

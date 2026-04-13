@@ -299,3 +299,151 @@ func handleSBOMView(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{"total_components": totalComps, "critical": 0, "high": high, "medium": 0, "clean": 412 - high, "last_scan": time.Now().AddDate(0, 0, -1), "ntia_compliance_pct": 100.0, "components": comps, "frameworks": []string{"CycloneDX 1.4", "SPDX 2.3", "NTIA minimum elements"}, "policy_violations": violations})
 }
+
+// handleVNStandards returns Vietnamese security standards from DB
+func handleVNStandards(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Vary", "Origin")
+
+	type VNStandard struct {
+		ID        string          `json:"id"`
+		Name      string          `json:"name"`
+		Framework string          `json:"framework"`
+		Scope     string          `json:"scope"`
+		Score     int             `json:"score"`
+		MaxScore  int             `json:"max_score"`
+		Status    string          `json:"status"`
+		Items     json.RawMessage `json:"items"`
+		Notes     string          `json:"notes"`
+		UpdatedAt time.Time       `json:"updated_at"`
+	}
+
+	standards := []VNStandard{}
+
+	if p4SQLDB != nil {
+		rows, err := p4SQLDB.Query(`
+			SELECT id, name, framework, COALESCE(scope,''), score, max_score, 
+			       status, COALESCE(items,'[]'::jsonb), COALESCE(notes,''), updated_at
+			FROM p4_vn_standards ORDER BY id`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var s VNStandard
+				var items []byte
+				if err := rows.Scan(&s.ID, &s.Name, &s.Framework, &s.Scope,
+					&s.Score, &s.MaxScore, &s.Status, &items, &s.Notes, &s.UpdatedAt); err == nil {
+					s.Items = json.RawMessage(items)
+					standards = append(standards, s)
+				}
+			}
+		}
+	}
+
+	// Fallback nếu DB empty
+	if len(standards) == 0 {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"standards": []interface{}{},
+			"error":     "no data",
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"standards":    standards,
+		"total":        len(standards),
+		"last_updated": time.Now(),
+	})
+}
+
+// handleSBOMViewDB returns SBOM data from DB
+func handleSBOMViewDB(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Vary", "Origin")
+
+	if p4SQLDB == nil {
+		// Fallback to existing handler
+		handleSBOMView(w, r)
+		return
+	}
+
+	var (
+		id                                        int
+		scanDate                                  time.Time
+		total, critical, high, medium, low, clean int
+		ntiaPct                                   float64
+		scanner                                   string
+		components                                []byte
+		violations                                []byte
+	)
+
+	err := p4SQLDB.QueryRow(`
+		SELECT id, scan_date, total, critical, high, medium, low, clean,
+		       ntia_pct, scanner,
+		       COALESCE(components,'[]'::jsonb),
+		       COALESCE(violations,'[]'::jsonb)
+		FROM p4_sbom_scans
+		ORDER BY scan_date DESC LIMIT 1`).Scan(
+		&id, &scanDate, &total, &critical, &high, &medium, &low, &clean,
+		&ntiaPct, &scanner, &components, &violations)
+
+	if err != nil {
+		// Fallback
+		handleSBOMView(w, r)
+		return
+	}
+
+	var comps []interface{}
+	json.Unmarshal(components, &comps)
+
+	var viols []string
+	json.Unmarshal(violations, &viols)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"total_components":    total,
+		"critical":            critical,
+		"high":                high,
+		"medium":              medium,
+		"low":                 low,
+		"clean":               clean,
+		"ntia_compliance_pct": ntiaPct,
+		"last_scan":           scanDate,
+		"scanner":             scanner,
+		"components":          comps,
+		"frameworks":          []string{"CycloneDX 1.4", "SPDX 2.3", "NTIA minimum elements"},
+		"policy_violations":   viols,
+	})
+}
+
+// handleVNStandardUpdate allows updating a VN standard status
+func handleVNStandardUpdate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	var req struct {
+		ID     string `json:"id"`
+		Score  int    `json:"score"`
+		Status string `json:"status"`
+		Notes  string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	if p4SQLDB != nil {
+		_, err := p4SQLDB.Exec(`
+			UPDATE p4_vn_standards 
+			SET score=$1, status=$2, notes=$3, updated_at=NOW()
+			WHERE id=$4`,
+			req.Score, req.Status, req.Notes, req.ID)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": req.ID})
+}
