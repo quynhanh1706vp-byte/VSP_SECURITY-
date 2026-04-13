@@ -315,7 +315,9 @@ func main() {
 	r.Get("/panels/*", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Del("Content-Security-Policy")
 		w.Header().Del("X-Frame-Options")
-		w.Header().Set("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: http://127.0.0.1:8922 http://127.0.0.1:8921; connect-src *; frame-ancestors *;")
+		w.Header().Set("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: http:; connect-src *; frame-ancestors *;")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
 		http.StripPrefix("/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
 	})
 	// P4 Compliance — public routes (no auth required)
