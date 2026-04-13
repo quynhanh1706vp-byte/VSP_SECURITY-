@@ -444,6 +444,7 @@ func main() {
 		r.Get("/api/v1/vsp/run/latest", runsH.Latest)
 		r.Get("/api/v1/vsp/run/{rid}", runsH.Get)
 		r.Get("/api/v1/vsp/runs", runsH.List)
+		r.Get("/api/v1/vsp/runs/index", runsH.List)
 		r.With(ca.Middleware("runs-index", 10*time.Second)).Get("/api/v1/vsp/runs/index", runsH.Index)
 		// ── Batch scan ──────────────────────────────────────────────
 		batchH := newBatchHandler(db, runsH)
