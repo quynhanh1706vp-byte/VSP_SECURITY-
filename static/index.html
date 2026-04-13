@@ -7402,76 +7402,6 @@ var _siemKPIpoll = setInterval(function() {
 <script src="/vsp_upgrade_v101.js?v=20260412b">
 
 
-async function loadConMonKPIs() {
-  console.log('[VSP] loadConMonKPIs called');
-  if (!window.TOKEN) return;
-  var h = {Authorization:'Bearer '+window.TOKEN};
-  var P4KEY = window.VSP_P4_API_KEY || '';
-  var p4h = P4KEY ? {'X-API-Key':P4KEY} : h;
-  try {
-    var [conmon, audit, fedramp] = await Promise.all([
-      fetch('/api/p4/rmf/conmon',{headers:P4KEY?p4h:h}).then(r=>r.json()).catch(()=>({})),
-      fetch('/api/v1/audit/stats',{headers:h}).then(r=>r.json()).catch(()=>({})),
-      fetch('/api/v1/compliance/fedramp',{headers:h}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
-    ]);
-    // ConMon score — update both d- and dod- IDs
-    var cscore = conmon.conmon_score;
-    var ccolor = cscore>=80?'var(--green)':cscore>=60?'var(--amber)':'var(--red)';
-    ['d-conmon-score','dod-conmon-score'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el && cscore!=null){el.textContent=cscore+(id.startsWith('dod')?'/100':'');el.style.color=ccolor;}
-    });
-    var cbar=document.getElementById('dod-conmon-bar');
-    if(cbar) {cbar.style.width=cscore+'%';cbar.style.background=ccolor;}
-    // POAM open — update both
-    var openPoam = conmon.open_poam_items;
-    var pcolor = openPoam>50?'var(--red)':openPoam>10?'var(--amber)':'var(--green)';
-    ['d-poam-open','dod-poam-open'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el && openPoam!=null){el.textContent=openPoam;el.style.color=pcolor;}
-    });
-    var ps=document.getElementById('d-poam-sub');
-    if(ps && openPoam!=null) ps.textContent=openPoam+' critical + high';
-    // FedRAMP % — update both
-    var fpct = Math.round(fedramp.coverage_pct||0);
-    var el=document.getElementById('d-fedramp-pct');
-    if(el) el.textContent=fpct+'%';
-    // Audit entries — update both
-    var atotal = audit.total||0;
-    var a24h = audit.last_24h||0;
-    var at=document.getElementById('d-audit-total');
-    var as2=document.getElementById('d-audit-sub');
-    if(at) at.textContent=atotal.toLocaleString();
-    if(as2) as2.textContent='last 24h: '+a24h;
-    // Also update CONMON SCORE sparkline widget
-    var cscoreEl=document.getElementById('d-conmon-score');
-    if(cscoreEl && cscore) {
-      var parentCard=cscoreEl.closest('.kpi-card,.card,[class*="kpi"]');
-    }
-    // Gate widget bottom-left
-    fetch('/api/v1/vsp/gate/latest',{headers:h}).then(r=>r.json()).then(function(g){
-      var gw = document.getElementById('gate-widget');
-      var gl = gw && gw.querySelector('.gate-label');
-      var gs = document.getElementById('d-gate-score');
-      if(gl) { gl.textContent='GATE '+g.gate; }
-      if(gs) gs.textContent='score: '+(g.score||'—');
-      if(gw) gw.className='gate-status gate-'+(g.gate==='PASS'?'pass':g.gate==='WARN'?'warn':'fail');
-    }).catch(function(){});
-    // ATO countdown format
-    fetch('/api/p4/ato/expiry',{headers:p4h}).then(r=>r.json()).then(function(a){
-      var atEl = document.getElementById('d-ato-days');
-      if(atEl) atEl.textContent = (a.days_remaining||0).toLocaleString();
-    }).catch(function(){});
-    // Findings by severity — use all-time data
-    fetch('/api/v1/vsp/findings/summary?scope=all',{headers:h}).then(r=>r.json()).then(function(s){
-      if(!s.total) return;
-      var tf = document.getElementById('d-total-findings');
-      if(tf) tf.textContent = s.total.toLocaleString();
-      var c = window._charts && window._charts['chartSeverity'];
-      if(c) { c.data.datasets[0].data=[s.critical||0,s.high||0,s.medium||0,s.low||0]; c.update(); }
-    }).catch(function(){});
-  } catch(e) { console.error('loadConMonKPIs',e); }
-}
 
 </script>
 <script src="/panels/vsp_siem_patch.js?v=20260412d"></script>
@@ -7564,6 +7494,77 @@ async function loadConMonKPIs() {
   });
 
   // Expose để debug
+async function loadConMonKPIs() {
+  console.log('[VSP] loadConMonKPIs called');
+  if (!window.TOKEN) return;
+  var h = {Authorization:'Bearer '+window.TOKEN};
+  var P4KEY = window.VSP_P4_API_KEY || '';
+  var p4h = P4KEY ? {'X-API-Key':P4KEY} : h;
+  try {
+    var [conmon, audit, fedramp] = await Promise.all([
+      fetch('/api/p4/rmf/conmon',{headers:P4KEY?p4h:h}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/audit/stats',{headers:h}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/v1/compliance/fedramp',{headers:h}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
+    ]);
+    // ConMon score — update both d- and dod- IDs
+    var cscore = conmon.conmon_score;
+    var ccolor = cscore>=80?'var(--green)':cscore>=60?'var(--amber)':'var(--red)';
+    ['d-conmon-score','dod-conmon-score'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el && cscore!=null){el.textContent=cscore+(id.startsWith('dod')?'/100':'');el.style.color=ccolor;}
+    });
+    var cbar=document.getElementById('dod-conmon-bar');
+    if(cbar) {cbar.style.width=cscore+'%';cbar.style.background=ccolor;}
+    // POAM open — update both
+    var openPoam = conmon.open_poam_items;
+    var pcolor = openPoam>50?'var(--red)':openPoam>10?'var(--amber)':'var(--green)';
+    ['d-poam-open','dod-poam-open'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el && openPoam!=null){el.textContent=openPoam;el.style.color=pcolor;}
+    });
+    var ps=document.getElementById('d-poam-sub');
+    if(ps && openPoam!=null) ps.textContent=openPoam+' critical + high';
+    // FedRAMP % — update both
+    var fpct = Math.round(fedramp.coverage_pct||0);
+    var el=document.getElementById('d-fedramp-pct');
+    if(el) el.textContent=fpct+'%';
+    // Audit entries — update both
+    var atotal = audit.total||0;
+    var a24h = audit.last_24h||0;
+    var at=document.getElementById('d-audit-total');
+    var as2=document.getElementById('d-audit-sub');
+    if(at) at.textContent=atotal.toLocaleString();
+    if(as2) as2.textContent='last 24h: '+a24h;
+    // Also update CONMON SCORE sparkline widget
+    var cscoreEl=document.getElementById('d-conmon-score');
+    if(cscoreEl && cscore) {
+      var parentCard=cscoreEl.closest('.kpi-card,.card,[class*="kpi"]');
+    }
+    // Gate widget bottom-left
+    fetch('/api/v1/vsp/gate/latest',{headers:h}).then(r=>r.json()).then(function(g){
+      var gw = document.getElementById('gate-widget');
+      var gl = gw && gw.querySelector('.gate-label');
+      var gs = document.getElementById('d-gate-score');
+      if(gl) { gl.textContent='GATE '+g.gate; }
+      if(gs) gs.textContent='score: '+(g.score||'—');
+      if(gw) gw.className='gate-status gate-'+(g.gate==='PASS'?'pass':g.gate==='WARN'?'warn':'fail');
+    }).catch(function(){});
+    // ATO countdown format
+    fetch('/api/p4/ato/expiry',{headers:p4h}).then(r=>r.json()).then(function(a){
+      var atEl = document.getElementById('d-ato-days');
+      if(atEl) atEl.textContent = (a.days_remaining||0).toLocaleString();
+    }).catch(function(){});
+    // Findings by severity — use all-time data
+    fetch('/api/v1/vsp/findings/summary?scope=all',{headers:h}).then(r=>r.json()).then(function(s){
+      if(!s.total) return;
+      var tf = document.getElementById('d-total-findings');
+      if(tf) tf.textContent = s.total.toLocaleString();
+      var c = window._charts && window._charts['chartSeverity'];
+      if(c) { c.data.datasets[0].data=[s.critical||0,s.high||0,s.medium||0,s.low||0]; c.update(); }
+    }).catch(function(){});
+  } catch(e) { console.error('loadConMonKPIs',e); }
+}
+
   window._vsp = { refreshDashboard, startSmartPoll };
   // Load KPI widgets after all scripts
   setTimeout(function(){
