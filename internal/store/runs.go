@@ -51,7 +51,7 @@ func (db *DB) GetRunByRID(ctx context.Context, tenantID, rid string) (*Run, erro
 
 func (db *DB) GetLatestRun(ctx context.Context, tenantID string) (*Run, error) {
 	row := db.pool.QueryRow(ctx,
-		`SELECT `+runCols+` FROM runs WHERE tenant_id=$1 AND status='DONE' AND total_findings > 0 ORDER BY created_at DESC LIMIT 1`,
+		`SELECT `+runCols+` FROM runs WHERE tenant_id=$1 AND status='DONE' ORDER BY created_at DESC LIMIT 1`,
 		tenantID)
 	return scanRun(row)
 }
