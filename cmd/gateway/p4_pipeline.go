@@ -229,6 +229,41 @@ func seedPipelineStore() {
 func handlePipelineLatest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Vary", "Origin")
+
+	// Try DB first for latest run with full data
+	if p4SQLDB != nil {
+		var id, triggerType, triggerRef, branch, status string
+		var startedAt time.Time
+		var completedAt *time.Time
+		var durationSec int
+		var testsJSON, summaryJSON []byte
+
+		err := p4SQLDB.QueryRow(`
+			SELECT id, trigger_type, COALESCE(trigger_ref,''), COALESCE(branch,'main'),
+			       status, started_at, completed_at, COALESCE(duration_sec,60),
+			       COALESCE(tests,'[]'::jsonb), COALESCE(summary,'{}'::jsonb)
+			FROM p4_pipeline_runs ORDER BY started_at DESC LIMIT 1`).
+			Scan(&id, &triggerType, &triggerRef, &branch, &status,
+				&startedAt, &completedAt, &durationSec, &testsJSON, &summaryJSON)
+
+		if err == nil {
+			// Build full run with live tests from buildTestSuite
+			now := time.Now()
+			tests := buildTestSuite(id)
+			summary := buildSummary(tests)
+			run := PipelineRun{
+				ID: id, TriggerType: triggerType, TriggerRef: triggerRef,
+				Branch: branch, Status: status, StartedAt: startedAt,
+				CompletedAt: completedAt, DurationSec: durationSec,
+				Tests: tests, Summary: summary,
+			}
+			_ = now
+			json.NewEncoder(w).Encode(run)
+			return
+		}
+	}
+
+	// Fallback to in-memory
 	pipeStore.mu.RLock()
 	defer pipeStore.mu.RUnlock()
 	if len(pipeStore.Runs) == 0 {
