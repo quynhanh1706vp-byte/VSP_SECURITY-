@@ -1028,6 +1028,17 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
   </div><!-- /main -->
 </div><!-- /shell -->
 
+<!-- VN Standard Detail Modal -->
+<div class="modal-overlay" id="vn-detail-modal">
+  <div class="modal detail-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div id="vn-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('vn-detail-modal').classList.remove('open')">✕</button>
+    </div>
+    <div id="vn-detail-body"></div>
+  </div>
+</div>
+
 <!-- POAM Detail Modal -->
 <div class="modal-overlay" id="poam-detail-modal">
   <div class="modal detail-modal">
@@ -1716,74 +1727,181 @@ function toast(msg) {
 }
 
 // ---- VN Standards ----
+let _vnStandards = [];
+
 async function loadVNStandards() {
   const res = await api('/api/p4/vn-standards');
   if (!res || !res.standards) return;
-  const standards = res.standards;
+  _vnStandards = res.standards;
+  renderVNGrid(_vnStandards);
+  renderVNMatrix(_vnStandards);
+}
 
-  const statusColor = {passed:'var(--green)', partial:'var(--amber)', failed:'var(--red)', pending:'var(--t3)'};
-  const statusLabel = {passed:'ĐẠT', partial:'CHỜ', failed:'KHÔNG ĐẠT', pending:'PENDING'};
-  const frameworkLabel = {
-    VN_GOV:'VN Gov', VN_ISO27001:'VN ISO27001', VN_PRIVATE:'VN Private',
-    VN_SOC:'VN SOC', VN_LAW:'VN Law'
-  };
+const _vnIcons = {'TT17-2017':'🇻🇳','TCVN-11943':'🔒','BKAV-SCORE':'📡','VIETTEL-SOC':'📶','LATM-2015':'⚖️','ND13-2023':'🛡️'};
+const _vnColors = {'TT17-2017':'var(--red)','TCVN-11943':'var(--amber)','BKAV-SCORE':'var(--cyan)','VIETTEL-SOC':'var(--purple)','LATM-2015':'var(--green)','ND13-2023':'var(--blue)'};
+const _statusColor = {passed:'var(--green)',partial:'var(--amber)',failed:'var(--red)',pending:'var(--t3)'};
+const _statusLabel = {passed:'ĐẠT',partial:'CHỜ',failed:'KHÔNG ĐẠT',pending:'PENDING'};
+const _fwLabel = {VN_GOV:'VN Gov',VN_ISO27001:'VN ISO27001',VN_PRIVATE:'VN Private',VN_SOC:'VN SOC',VN_LAW:'VN Law'};
 
-  // Render 4-card grid (first 4 standards)
+function renderVNGrid(standards) {
   const grid = document.getElementById('vn-standards-grid');
-  if (grid) {
-    const icons = {
-      'TT17-2017':'🇻🇳', 'TCVN-11943':'🔒', 'BKAV-SCORE':'📡',
-      'VIETTEL-SOC':'📶', 'LATM-2015':'⚖️', 'ND13-2023':'🛡️'
-    };
-    const colors = {
-      'TT17-2017':'var(--red)', 'TCVN-11943':'var(--amber)',
-      'BKAV-SCORE':'var(--cyan)', 'VIETTEL-SOC':'var(--purple)',
-      'LATM-2015':'var(--green)', 'ND13-2023':'var(--blue)'
-    };
-    grid.innerHTML = standards.map(function(s) {
-      const items = Array.isArray(s.items) ? s.items : [];
-      const done = items.filter(function(i){return i.done;}).length;
-      const col = colors[s.id] || 'var(--cyan)';
-      const ic = icons[s.id] || '📋';
-      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">' +
-        '<div style="font-size:11px;font-weight:700;color:'+col+';letter-spacing:.08em;margin-bottom:6px">'+ic+' '+s.name+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-bottom:10px">'+s.scope+'</div>' +
-        '<div style="display:flex;flex-direction:column;gap:5px">' +
-        items.map(function(item) {
-          return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">' +
-            '<span>'+item.name+'</span>' +
-            '<span style="color:'+(item.done?'var(--green)':'var(--amber)')+';font-weight:700">'+(item.done?'✓ ĐẠT':'⚠ CHỜ')+'</span>' +
+  if (!grid) return;
+  grid.innerHTML = standards.map(function(s) {
+    const items = Array.isArray(s.items) ? s.items : [];
+    const done = items.filter(function(i){return i.done;}).length;
+    const col = _vnColors[s.id] || 'var(--cyan)';
+    const ic = _vnIcons[s.id] || '📋';
+    const expandId = 'vn-expand-'+s.id;
+    return '<div class="vn-card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px;position:relative">' +
+      // Header row với dropdown
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
+        '<div style="font-size:11px;font-weight:700;color:'+col+';letter-spacing:.08em">'+ic+' '+s.name+'</div>' +
+        '<div style="position:relative">' +
+          '<button onclick="toggleVNDropdown('dd-'+s.id+'')" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer">⋯</button>' +
+          '<div id="dd-'+s.id+'" class="dropdown-menu" style="display:none;right:0;left:auto">' +
+            '<div class="dropdown-item" onclick="updateVNStatus(''+s.id+'','passed')">✓ Đánh dấu ĐẠT</div>' +
+            '<div class="dropdown-item" onclick="updateVNStatus(''+s.id+'','partial')">⚠ Đánh dấu CHỜ</div>' +
+            '<div class="dropdown-item" onclick="updateVNStatus(''+s.id+'','failed')" style="color:var(--red)">✗ Đánh dấu KHÔNG ĐẠT</div>' +
+            '<div style="border-top:1px solid var(--border);margin:4px 0"></div>' +
+            '<div class="dropdown-item" onclick="openVNDetail(''+s.id+'')">📋 Xem chi tiết</div>' +
+            '<div class="dropdown-item" onclick="openAIAdvisor({id:''+s.id+'',weakness:''+s.name+'',control:''+s.framework+'',severity:'MEDIUM',mitigation:''})">🤖 AI Advisor</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--t3);margin-bottom:8px">'+s.scope+'</div>' +
+      // Progress bar
+      '<div style="background:var(--border);border-radius:2px;height:4px;margin-bottom:10px">' +
+        '<div style="background:'+col+';height:4px;border-radius:2px;width:'+s.score+'%;transition:width .5s"></div>' +
+      '</div>' +
+      // Items list (collapsible)
+      '<div style="display:flex;flex-direction:column;gap:4px">' +
+      items.slice(0,3).map(function(item) {
+        return '<div class="vn-item-row">' +
+          '<span style="flex:1">'+item.name+'</span>' +
+          '<span style="color:'+(item.done?'var(--green)':'var(--amber)')+';font-weight:700;font-size:10px">'+(item.done?'✓ ĐẠT':'⚠ CHỜ')+'</span>' +
+          '</div>';
+      }).join('') +
+      (items.length > 3 ? '<div id="'+expandId+'" style="display:none">' +
+        items.slice(3).map(function(item) {
+          return '<div class="vn-item-row">' +
+            '<span style="flex:1">'+item.name+'</span>' +
+            '<span style="color:'+(item.done?'var(--green)':'var(--amber)')+';font-weight:700;font-size:10px">'+(item.done?'✓ ĐẠT':'⚠ CHỜ')+'</span>' +
             '</div>';
         }).join('') +
         '</div>' +
-        '<div style="margin-top:10px;padding:6px 10px;background:rgba('+
-          (s.status==='passed'?'0,255,163':'255,184,0')+',.07);border-radius:6px;font-size:10px;color:'+
-          statusColor[s.status]+'">' +
-          s.name+' — '+done+'/'+items.length+' đạt · '+s.score+'%' +
-        '</div></div>';
-    }).join('');
-  }
+        '<button onclick="toggleExpand(''+expandId+'',this)" style="background:none;border:none;color:var(--cyan);font-size:10px;cursor:pointer;padding:4px 0;text-align:left">▸ Xem thêm '+(items.length-3)+' tiêu chí</button>' : '') +
+      '</div>' +
+      // Footer badge
+      '<div style="margin-top:10px;padding:5px 10px;background:rgba('+(s.status==='passed'?'0,255,163':'255,184,0')+',.07);border-radius:6px;display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-size:10px;color:'+(_statusColor[s.status]||'var(--t3)')+'">'+s.name+' — '+done+'/'+items.length+' đạt</span>' +
+        '<span style="font-size:11px;font-weight:700;color:'+(_statusColor[s.status]||'var(--t3)')+'">'+s.score+'%</span>' +
+      '</div></div>';
+  }).join('');
+}
 
-  // Render compliance matrix
+function renderVNMatrix(standards) {
   const tbody = document.getElementById('vn-matrix-tbody');
-  if (tbody) {
-    tbody.innerHTML = standards.map(function(s) {
-      const col = statusColor[s.status] || 'var(--t3)';
-      const lbl = statusLabel[s.status] || s.status;
-      const items = Array.isArray(s.items) ? s.items : [];
-      const done = items.filter(function(i){return i.done;}).length;
-      return '<tr style="border-top:1px solid var(--border)">' +
-        '<td style="padding:8px 12px;font-weight:600;color:var(--cyan)">'+s.name+'</td>' +
-        '<td style="padding:8px;text-align:center;color:var(--t3)">'+frameworkLabel[s.framework]+'</td>' +
-        '<td style="padding:8px;text-align:center;font-weight:700;color:'+col+'">'+s.score+'%</td>' +
-        '<td style="padding:8px;text-align:center"><span style="background:rgba('+
-          (s.status==='passed'?'0,255,163':'255,184,0')+',.1);color:'+col+
-          ';padding:2px 8px;border-radius:4px;font-size:10px">'+lbl+'</span></td>' +
-        '<td style="padding:8px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí'+(s.notes?' · '+s.notes:'')+'</td>' +
-        '</tr>';
-    }).join('');
+  if (!tbody) return;
+  tbody.innerHTML = standards.map(function(s) {
+    const col = _statusColor[s.status] || 'var(--t3)';
+    const lbl = _statusLabel[s.status] || s.status;
+    const items = Array.isArray(s.items) ? s.items : [];
+    const done = items.filter(function(i){return i.done;}).length;
+    return '<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="openVNDetail(''+s.id+'')">' +
+      '<td style="padding:8px 12px;font-weight:600;color:var(--cyan)">'+s.name+'</td>' +
+      '<td style="padding:8px;text-align:center;color:var(--t3)">'+(_fwLabel[s.framework]||s.framework)+'</td>' +
+      '<td style="padding:8px;text-align:center;font-weight:700;color:'+col+'">'+s.score+'%</td>' +
+      '<td style="padding:8px;text-align:center"><span style="background:rgba('+(s.status==='passed'?'0,255,163':'255,184,0')+',.1);color:'+col+';padding:2px 8px;border-radius:4px;font-size:10px">'+lbl+'</span></td>' +
+      '<td style="padding:8px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí'+(s.notes?' · '+s.notes:'')+'</td>' +
+      '<td style="padding:8px"><button onclick="event.stopPropagation();toggleVNDropdown('dd2-'+s.id+'')" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer;position:relative">⋯' +
+        '<div id="dd2-'+s.id+'" class="dropdown-menu" style="display:none;right:0">' +
+          '<div class="dropdown-item" onclick="event.stopPropagation();updateVNStatus(''+s.id+'','passed')">✓ ĐẠT</div>' +
+          '<div class="dropdown-item" onclick="event.stopPropagation();updateVNStatus(''+s.id+'','partial')">⚠ CHỜ</div>' +
+          '<div class="dropdown-item" onclick="event.stopPropagation();openVNDetail(''+s.id+'')">📋 Chi tiết</div>' +
+        '</div>' +
+      '</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function toggleVNDropdown(id) {
+  document.querySelectorAll('.dropdown-menu').forEach(function(d) {
+    if (d.id !== id) d.style.display = 'none';
+  });
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleExpand(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? '▸ Xem thêm' : '▴ Thu gọn';
+}
+
+function openVNDetail(id) {
+  document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
+  const s = _vnStandards.find(function(x){return x.id===id;});
+  if (!s) return;
+  const modal = document.getElementById('vn-detail-modal');
+  const body = document.getElementById('vn-detail-body');
+  if (!modal || !body) return;
+  const items = Array.isArray(s.items) ? s.items : [];
+  const done = items.filter(function(i){return i.done;}).length;
+  const col = _statusColor[s.status] || 'var(--t3)';
+  body.innerHTML =
+    '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
+      '<span style="font-size:24px">'+(_vnIcons[s.id]||'📋')+'</span>' +
+      '<div>' +
+        '<div style="font-size:13px;font-weight:700;color:'+(_vnColors[s.id]||'var(--cyan)')+'">'+s.name+'</div>' +
+        '<div style="font-size:10px;color:var(--t3)">'+s.scope+' · '+(_fwLabel[s.framework]||s.framework)+'</div>' +
+      '</div>' +
+      '<div style="margin-left:auto;text-align:right">' +
+        '<div style="font-size:28px;font-weight:700;color:'+col+'">'+s.score+'%</div>' +
+        '<div style="font-size:10px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí đạt</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="background:var(--border);border-radius:2px;height:6px;margin-bottom:16px">' +
+      '<div style="background:'+col+';height:6px;border-radius:2px;width:'+s.score+'%"></div>' +
+    '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px">' +
+    items.map(function(item,i) {
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:'+(i%2===0?'transparent':'rgba(255,255,255,.01)')+'">' +
+        '<div style="width:20px;height:20px;border-radius:50%;background:'+(item.done?'rgba(0,255,163,.15)':'rgba(255,184,0,.15)')+';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">'+(item.done?'✓':'⚠')+'</div>' +
+        '<div style="flex:1;font-size:11px;color:var(--t1)">'+item.name+'</div>' +
+        (item.note?'<div style="font-size:10px;color:var(--t3);max-width:200px">'+item.note+'</div>':'') +
+        '<span style="font-size:10px;font-weight:700;color:'+(item.done?'var(--green)':'var(--amber)')+';">'+(item.done?'ĐẠT':'CHỜ')+'</span>' +
+        '</div>';
+    }).join('') +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn btn-primary btn-sm" onclick="updateVNStatus(''+s.id+'','passed')">✓ Mark ĐẠT</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="updateVNStatus(''+s.id+'','partial')" style="color:var(--amber);border-color:rgba(245,158,11,.4)">⚠ Mark CHỜ</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:''+s.id+'',weakness:''+s.name+'',control:''+s.framework+'',severity:'MEDIUM',mitigation:''})">🤖 AI Advisor</button>' +
+    '</div>';
+  document.getElementById('vn-detail-title').textContent = s.name;
+  modal.classList.add('open');
+}
+
+async function updateVNStatus(id, status) {
+  document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
+  const s = _vnStandards.find(function(x){return x.id===id;});
+  if (!s) return;
+  const res = await post('/api/p4/vn-standards/update', {id, score: s.score, status, notes: s.notes||''});
+  if (res && res.status === 'ok') {
+    toast(id + ' → ' + status);
+    document.getElementById('vn-detail-modal') && document.getElementById('vn-detail-modal').classList.remove('open');
+    loadVNStandards();
   }
 }
+
+// Close dropdowns on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dropdown-menu') && !e.target.closest('button[onclick*="toggleVNDropdown"]')) {
+    document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
+  }
+});
 
 function setSBOMFilter(f, btn) {
   window._sbomFilter = f;
