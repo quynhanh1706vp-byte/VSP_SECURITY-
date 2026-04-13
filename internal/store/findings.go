@@ -23,6 +23,7 @@ type Finding struct {
 	FixSignal string          `json:"fix_signal"`
 	Raw       json.RawMessage `json:"raw,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
+	Status    string          `json:"status"`
 }
 
 type FindingFilter struct {
@@ -82,16 +83,19 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 
 	args = append(args, f.Limit, f.Offset)
 	rows, err := db.pool.Query(ctx,
-		fmt.Sprintf(`SELECT id, run_id, tenant_id, tool, severity, rule_id,
-		             message, path, line_num, cwe, cvss, fix_signal, created_at
-		             FROM findings WHERE %s
+		fmt.Sprintf(`SELECT f.id, f.run_id, f.tenant_id, f.tool, f.severity, f.rule_id,
+		             f.message, f.path, f.line_num, f.cwe, f.cvss, f.fix_signal, f.created_at,
+		             COALESCE(r.status::text, 'open') as remediation_status
+		             FROM findings f
+		             LEFT JOIN remediations r ON r.finding_id=f.id AND r.tenant_id=f.tenant_id
+		             WHERE %s
 		             ORDER BY
-		               CASE severity
+		               CASE f.severity
 		                 WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2
 		                 WHEN 'MEDIUM'   THEN 3 WHEN 'LOW'  THEN 4
 		                 ELSE 5
 		               END,
-		               created_at DESC
+		               f.created_at DESC
 		             LIMIT $%d OFFSET $%d`, whereSQL, i, i+1),
 		args...)
 	if err != nil {
@@ -107,7 +111,7 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 		var lineNum *int
 		if err := rows.Scan(&fn.ID, &fn.RunID, &fn.TenantID, &fn.Tool,
 			&fn.Severity, &ruleID, &message, &fpath,
-			&lineNum, &cwe, &cvss, &fixSignal, &fn.CreatedAt); err != nil {
+			&lineNum, &cwe, &cvss, &fixSignal, &fn.CreatedAt, &fn.Status); err != nil {
 			return nil, 0, err
 		}
 		if ruleID != nil {
