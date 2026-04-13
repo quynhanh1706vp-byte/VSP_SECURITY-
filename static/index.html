@@ -3945,7 +3945,7 @@ window.deleteRuleAPI = async function(btn) {
   if (!confirm('Delete this rule?')) return;
   await ensureToken();
   try {
-    await fetch('/api/v1/policy/rules/'+id, {method:'DELETE',headers:{'Authorization':'Bearer '+window.TOKEN}});
+    await fetch('/api/v1/policy/rules'+id, {method:'DELETE',headers:{'Authorization':'Bearer '+window.TOKEN}});
     showToast && showToast('Rule deleted','success');
     loadRulesFromAPI();
   } catch(e) { showToast && showToast('Error: '+e.message,'error'); }
@@ -5824,7 +5824,7 @@ async function _deleteUser(id, email) {
   if (!confirm('Delete user '+email+'?')) return;
   window.TOKEN = null; await ensureToken();
   try {
-    var r = await fetch('/api/v1/admin/users/'+id, {
+    var r = await fetch('/api/v1/admin/users'+id, {
       method:'DELETE',
       headers:{'Authorization':'Bearer '+window.TOKEN}
     });
@@ -6655,7 +6655,7 @@ async function profileSubmitPassword() {
     }
 
     if (uid) {
-      var r2 = await fetch('/api/v1/admin/users/'+uid+'/password', {
+      var r2 = await fetch('/api/v1/admin/users'+uid+'/password', {
         method: 'PUT',
         headers: {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
         body: JSON.stringify({password: newpw})
