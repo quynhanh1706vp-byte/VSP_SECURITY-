@@ -227,6 +227,38 @@ body {
 }
 .poam-row:hover { background: rgba(255,255,255,.02) !important; }
 
+/* ── UI Enhancements ── */
+.detail-modal { min-width:600px; max-width:780px; max-height:80vh; overflow-y:auto; }
+.detail-row { display:flex; gap:8px; padding:8px 0; border-bottom:1px solid var(--border); font-size:11px; }
+.detail-row:last-child { border-bottom:none; }
+.detail-key { width:140px; flex-shrink:0; color:var(--t3); font-family:var(--mono); font-size:10px; text-transform:uppercase; }
+.detail-val { flex:1; color:var(--t1); }
+.expand-btn { background:none; border:none; color:var(--cyan); cursor:pointer; font-size:10px; padding:2px 6px; border-radius:4px; }
+.expand-btn:hover { background:rgba(6,182,212,.1); }
+.expandable { display:none; }
+.expandable.open { display:block; }
+.filter-pills { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.filter-pill { padding:3px 10px; border-radius:12px; font-size:10px; cursor:pointer; border:1px solid var(--border2); color:var(--t3); background:transparent; transition:all .15s; }
+.filter-pill:hover { border-color:var(--cyan); color:var(--cyan); }
+.filter-pill.active { background:rgba(6,182,212,.15); border-color:var(--cyan); color:var(--cyan); }
+.sbom-search { background:var(--bg3); border:1px solid var(--border2); border-radius:6px; padding:6px 10px; color:var(--t1); font-size:11px; width:200px; outline:none; }
+.sbom-search:focus { border-color:var(--cyan); }
+.timeline { display:flex; flex-direction:column; gap:0; }
+.timeline-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); position:relative; }
+.timeline-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.timeline-line { position:absolute; left:4px; top:22px; bottom:-10px; width:2px; background:var(--border); }
+.progress-ring { transition:stroke-dashoffset .5s ease; }
+.vn-card { cursor:pointer; transition:border-color .15s; }
+.vn-card:hover { border-color:var(--cyan) !important; }
+.vn-item-row { display:flex; justify-content:space-between; align-items:center; font-size:11px; padding:4px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+.vn-item-row:last-child { border-bottom:none; }
+.vn-item-row:hover { background:rgba(255,255,255,.02); }
+.badge-score { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:600; }
+.dropdown-menu { position:absolute; top:100%; right:0; background:var(--bg2); border:1px solid var(--border2); border-radius:8px; padding:6px; min-width:160px; z-index:50; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+.dropdown-item { padding:6px 10px; border-radius:4px; font-size:11px; cursor:pointer; color:var(--t2); }
+.dropdown-item:hover { background:rgba(255,255,255,.06); color:var(--t1); }
+.tab-badge { display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px; border-radius:8px; font-size:9px; font-weight:700; padding:0 4px; margin-left:4px; }
+
 /* AI advisor modal */
 #ai-advisor-modal .modal {
   border: 1px solid rgba(157,111,255,.2) !important;
@@ -776,7 +808,17 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
 
       <!-- SBOM VIEW TAB -->
       <div id="tab-sbom-view" class="tab-panel">
-        <div class="section-hd"><div class="section-title">SOFTWARE BILL OF MATERIALS — SBOM VIEW</div></div>
+        <div class="section-hd">
+          <div class="section-title">SOFTWARE BILL OF MATERIALS — SBOM VIEW</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="sbom-search-input" class="sbom-search" placeholder="Search component..." oninput="window._sbomData&&renderSBOMTable(window._sbomData,this.value,window._sbomFilter||'all')">
+            <div class="filter-pills">
+              <button class="filter-pill active" onclick="setSBOMFilter('all',this)">All</button>
+              <button class="filter-pill" onclick="setSBOMFilter('vuln',this)">⚠ Vulnerable</button>
+              <button class="filter-pill" onclick="setSBOMFilter('clean',this)">✓ Clean</button>
+            </div>
+          </div>
+        </div>
         <div id="sbom-view-content" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px">
           <div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>
         </div>
@@ -985,6 +1027,28 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /shell -->
+
+<!-- POAM Detail Modal -->
+<div class="modal-overlay" id="poam-detail-modal">
+  <div class="modal detail-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div id="poam-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('poam-detail-modal').classList.remove('open')">✕</button>
+    </div>
+    <div id="poam-detail-body"></div>
+  </div>
+</div>
+
+<!-- SBOM Detail Modal -->
+<div class="modal-overlay" id="sbom-detail-modal">
+  <div class="modal detail-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div id="sbom-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('sbom-detail-modal').classList.remove('open')">✕</button>
+    </div>
+    <div id="sbom-detail-body"></div>
+  </div>
+</div>
 
 <!-- Add Micro-Seg Rule Modal -->
 <div class="modal-overlay" id="seg-modal">
@@ -1584,18 +1648,59 @@ async function loadPOAM() {
 function renderPOAMRow(p) {
   const sevColors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
   const stColors = { open:'st-open', in_remediation:'st-rem', closed:'st-closed', risk_accepted:'st-rem' };
+  const due = p.scheduled_completion ? new Date(p.scheduled_completion) : null;
+  const overdue = due && due < new Date() && p.status !== 'closed';
   return `
-    <div class="poam-row">
+    <div class="poam-row" onclick="openPOAMDetail(${JSON.stringify(p).replace(/"/g,'&quot;')})" style="cursor:pointer">
       <div class="poam-header">
         <span class="poam-id">${p.id}</span>
         <span class="poam-ctrl">${p.control_id}</span>
         <span class="poam-name">${p.weakness_name}</span>
         <span class="poam-sev" style="background:${sevColors[p.severity]+'22'};color:${sevColors[p.severity]}">${p.severity}</span>
         <span class="poam-status ${stColors[p.status]||'st-open'}">${p.status.replace('_',' ')}</span>
+        ${overdue ? '<span style="font-size:9px;color:var(--red);font-weight:700;margin-left:4px">OVERDUE</span>' : ''}
+        <span style="margin-left:auto;font-size:10px;color:var(--cyan)">→ Detail</span>
       </div>
       <div class="poam-plan">${p.mitigation_plan}</div>
-      ${p.scheduled_completion ? `<div style="font-size:10px;color:var(--t3);margin-top:3px">Due: ${new Date(p.scheduled_completion).toLocaleDateString()}</div>` : ''}
+      ${due ? `<div style="font-size:10px;color:${overdue?'var(--red)':'var(--t3)'};margin-top:3px">Due: ${due.toLocaleDateString('vi-VN')}</div>` : ''}
     </div>`;
+}
+
+function openPOAMDetail(p) {
+  const sevColors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
+  const stColors = { open:'#22c55e', in_remediation:'#f59e0b', closed:'#6b7280', risk_accepted:'#8b5cf6' };
+  const modal = document.getElementById('poam-detail-modal');
+  const body = document.getElementById('poam-detail-body');
+  if (!modal || !body) return;
+  const due = p.scheduled_completion ? new Date(p.scheduled_completion).toLocaleDateString('vi-VN') : 'N/A';
+  const sev = p.severity || 'MEDIUM';
+  const st = p.status || 'open';
+  body.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span style="font-size:20px;font-weight:700;color:var(--cyan)">${p.id}</span>
+      <span style="padding:2px 10px;border-radius:4px;background:${(sevColors[sev]||'var(--t3)')+'22'};color:${sevColors[sev]||'var(--t3)'};font-size:11px;font-weight:700">${sev}</span>
+      <span style="padding:2px 10px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--t2);font-size:11px">${st.replace('_',' ')}</span>
+    </div>
+    <div class="detail-row"><div class="detail-key">Weakness</div><div class="detail-val" style="font-weight:600">${p.weakness_name}</div></div>
+    <div class="detail-row"><div class="detail-key">Control ID</div><div class="detail-val"><span style="font-family:var(--mono);color:var(--cyan)">${p.control_id}</span></div></div>
+    <div class="detail-row"><div class="detail-key">Mitigation Plan</div><div class="detail-val">${p.mitigation_plan}</div></div>
+    <div class="detail-row"><div class="detail-key">Due Date</div><div class="detail-val">${due}</div></div>
+    ${p.cwe_id ? `<div class="detail-row"><div class="detail-key">CWE</div><div class="detail-val"><a href="https://cwe.mitre.org/data/definitions/${p.cwe_id.replace('CWE-','')}.html" target="_blank" style="color:var(--cyan)">${p.cwe_id}</a></div></div>` : ''}
+    <div style="margin-top:16px">
+      <div style="font-size:10px;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Actions</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="updatePOAMStatus('${p.id}','in_remediation')">Mark In Remediation</button>
+        <button class="btn btn-ghost btn-sm" onclick="updatePOAMStatus('${p.id}','closed')" style="color:var(--green);border-color:rgba(16,185,129,.4)">Mark Closed</button>
+        <button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:'${p.id}',weakness:'${p.weakness_name}',control:'${p.control_id}',severity:'${sev}',mitigation:'${p.mitigation_plan}'})">🤖 AI Advisor</button>
+      </div>
+    </div>`;
+  document.getElementById('poam-detail-title').textContent = p.id + ' — ' + p.weakness_name;
+  modal.classList.add('open');
+}
+
+async function updatePOAMStatus(id, status) {
+  const res = await post('/api/p4/rmf/task', {step_id:'poam', task_id:id, status});
+  if (res) { toast('POA&M '+id+' → '+status); document.getElementById('poam-detail-modal').classList.remove('open'); loadPOAM(); }
 }
 
 // ---- Utils ----
@@ -1677,6 +1782,16 @@ async function loadVNStandards() {
         '<td style="padding:8px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí'+(s.notes?' · '+s.notes:'')+'</td>' +
         '</tr>';
     }).join('');
+  }
+}
+
+function setSBOMFilter(f, btn) {
+  window._sbomFilter = f;
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (window._sbomData) {
+    const search = document.getElementById('sbom-search-input');
+    renderSBOMTable(window._sbomData, search ? search.value : '', f);
   }
 }
 
@@ -1820,6 +1935,34 @@ async function loadSBOMView() {
     '<td style="text-align:center;font-size:11px;color:'+(c.cves>0?(c.severity==='CRITICAL'?'var(--red)':'var(--amber)'):'var(--green)')+'">'+( c.cves>0?c.cves+' '+c.severity:'✓')+'</td>' +
     '<td style="text-align:center;font-size:11px;color:'+(c.ntia_compliant?'var(--green)':'var(--red)')+'">'+( c.ntia_compliant?'✓':'✗')+'</td></tr>';
   }).join('');
+  // Store globally for filtering
+  window._sbomData = res;
+  renderSBOMTable(res, '', 'all');
+}
+
+function renderSBOMTable(res, search, filter) {
+  const el = document.getElementById('sbom-view-content');
+  if (!el) return;
+  let comps = (res.components||[]);
+  if (search) comps = comps.filter(c => (c.name||'').toLowerCase().includes(search.toLowerCase()) || (c.license||'').toLowerCase().includes(search.toLowerCase()));
+  if (filter === 'vuln') comps = comps.filter(c => c.cves > 0);
+  if (filter === 'clean') comps = comps.filter(c => !c.cves || c.cves === 0);
+  const rows = comps.slice(0,50).map(function(c){
+    const hasCVE = c.cves > 0;
+    const sevLabel = c.severity || (hasCVE ? 'MEDIUM' : '');
+    const sevColor = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[sevLabel] || 'var(--t3)';
+    return '<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="openSBOMDetail('+JSON.stringify(c).replace(/"/g,'&quot;')+')">' +
+      '<td style="font-family:monospace;font-size:11px;padding:6px 8px;color:var(--t1)">' + (c.name||'') + '</td>' +
+      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.version||'') + '</td>' +
+      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.type||'') + '</td>' +
+      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.license||'') + '</td>' +
+      '<td style="text-align:center;padding:6px 8px">' + (hasCVE ?
+        '<span style="color:'+sevColor+';font-weight:700;font-size:11px">' + c.cves + ' ' + sevLabel + '</span>' :
+        '<span style="color:var(--green)">✓</span>') + '</td>' +
+      '<td style="text-align:center;padding:6px 8px;color:'+(c.ntia_compliant?'var(--green)':'var(--red)')+';">' + (c.ntia_compliant?'✓':'✗') + '</td>' +
+      '</tr>';
+  }).join('');
+
   el.innerHTML =
     '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">' +
     ['<div style="color:var(--cyan);font-size:22px;font-weight:700">'+res.total_components+'</div><div style="font-size:9px;color:var(--t3)">TOTAL</div>',
@@ -1834,7 +1977,24 @@ async function loadSBOMView() {
     '<table style="width:100%;border-collapse:collapse"><thead><tr style="color:var(--t3);font-size:10px">' +
     '<th style="text-align:left;padding:4px 8px">Component</th><th style="padding:4px">Version</th><th style="padding:4px">Type</th><th style="padding:4px">License</th><th style="text-align:center;padding:4px">CVEs</th><th style="text-align:center;padding:4px">NTIA</th></tr></thead>' +
     '<tbody>'+rows+'</tbody></table>' +
-    '<div style="font-size:10px;color:var(--t3);margin-top:8px">Showing 20 of '+res.total_components+' components · Last scan: '+new Date(res.last_scan).toLocaleDateString()+'</div>';
+    '<div style="font-size:10px;color:var(--t3);margin-top:8px">Showing '+Math.min(50,comps.length)+' of '+res.total_components+' components · Last scan: '+new Date(res.last_scan).toLocaleDateString()+'</div>';
+}
+
+function openSBOMDetail(c) {
+  const sevColor = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[c.severity]||'var(--green)';
+  const modal = document.getElementById('sbom-detail-modal');
+  const body = document.getElementById('sbom-detail-body');
+  if (!modal || !body) return;
+  body.innerHTML =
+    '<div class="detail-row"><div class="detail-key">Component</div><div class="detail-val" style="font-family:monospace;font-weight:600">'+c.name+'</div></div>'+
+    '<div class="detail-row"><div class="detail-key">Version</div><div class="detail-val">'+c.version+'</div></div>'+
+    '<div class="detail-row"><div class="detail-key">Type</div><div class="detail-val">'+c.type+'</div></div>'+
+    '<div class="detail-row"><div class="detail-key">License</div><div class="detail-val"><span style="background:rgba(139,92,246,.15);color:var(--purple);padding:1px 6px;border-radius:4px;font-size:10px">'+c.license+'</span></div></div>'+
+    '<div class="detail-row"><div class="detail-key">CVEs</div><div class="detail-val">'+(c.cves>0?'<span style="color:'+sevColor+';font-weight:700">'+c.cves+' '+c.severity+'</span>':'<span style="color:var(--green)">✓ No CVEs</span>')+'</div></div>'+
+    '<div class="detail-row"><div class="detail-key">NTIA Compliant</div><div class="detail-val">'+(c.ntia_compliant?'<span style="color:var(--green)">✓ Compliant</span>':'<span style="color:var(--red)">✗ Non-compliant</span>')+'</div></div>'+
+    (c.cves>0?'<div style="margin-top:14px;padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:6px;font-size:11px;color:var(--amber)">⚠ Remediation required within 30 days · Update '+c.name+' to latest version</div>':'');
+  document.getElementById('sbom-detail-title').textContent = c.name + ' v' + c.version;
+  modal.classList.add('open');
 }
 
 
