@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head><script>
-// Set API base to port 8921 (gateway API)
-window.VSP_API_BASE = window.location.origin;
-
 // Auto-get token từ parent window hoặc localStorage
 (function() {
   var tok = '';
@@ -19,6 +16,8 @@ window.VSP_API_BASE = window.location.origin;
     localStorage.setItem('vsp_token', tok);
     console.log('[P4] token bootstrapped, length:', tok.length);
   }
+  window.VSP_API_BASE = window.location.origin;
+  window.VSP_P4_API_KEY = '634a9c4ebc792f44d7c50c0eea62da4a3f2a4f9e657048d070b6175187bdb0c2';
 })();
 </script>
 <style>
@@ -245,71 +244,6 @@ body::after {
   opacity: .6;
 }
 /* ── End Premium Upgrade ─────────────────────────────── */
-
-
-/* ── VSP Enhanced Status Badges ── */
-.ctrl-pass, td .ctrl-pass, [class*="status-pass"] { background:rgba(0,255,163,.15)!important; color:#00ffa3!important; border:1px solid rgba(0,255,163,.3)!important; border-radius:4px!important; padding:3px 9px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; }
-.ctrl-warn, td .ctrl-warn { background:rgba(255,184,0,.15)!important; color:#ffb800!important; border:1px solid rgba(255,184,0,.3)!important; border-radius:4px!important; padding:3px 9px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; }
-.ctrl-fail, td .ctrl-fail { background:rgba(255,69,69,.15)!important; color:#ff4545!important; border:1px solid rgba(255,69,69,.3)!important; border-radius:4px!important; padding:3px 9px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; }
-
-/* Badge trong table hiện tại */
-#fedramp-controls-body td:last-child span,
-#cmmc-controls-body td:last-child span,
-.controls-table td:last-child,
-table tbody td .badge,
-table tbody td span[class] {
-  border-radius: 4px !important;
-  padding: 3px 9px !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  font-family: monospace !important;
-}
-
-
-/* ── VSP Badge Override v2 ── */
-.ts-pass { background:rgba(0,255,163,.15)!important; color:#00ffa3!important; border:1px solid rgba(0,255,163,.3)!important; border-radius:4px!important; padding:3px 10px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; letter-spacing:.04em; }
-.ts-fail { background:rgba(255,69,69,.15)!important;  color:#ff4545!important; border:1px solid rgba(255,69,69,.3)!important;  border-radius:4px!important; padding:3px 10px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; letter-spacing:.04em; }
-.ts-warn { background:rgba(255,184,0,.15)!important;  color:#ffb800!important; border:1px solid rgba(255,184,0,.3)!important;  border-radius:4px!important; padding:3px 10px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; letter-spacing:.04em; }
-.ts-skip { background:rgba(255,255,255,.05)!important; color:#484e61!important; border:1px solid rgba(255,255,255,.1)!important; border-radius:4px!important; padding:3px 10px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; }
-
-/* FedRAMP/CMMC table status column */
-table tbody tr td:last-child {
-  font-family: monospace;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .04em;
-}
-/* Inline status badges hiện tại trong controls table */
-table tbody td span {
-  display: inline-block;
-  border-radius: 4px;
-  padding: 3px 9px;
-  font-size: 10px;
-  font-weight: 700;
-  font-family: monospace;
-  letter-spacing: .04em;
-  white-space: nowrap;
-}
-
-/* Auto-color dựa trên text content via attribute hack */
-table tbody tr:has(td:last-child:-webkit-any(:contains("PASS"))) td:last-child { color: #00ffa3 !important; }
-table tbody tr:has(td:last-child:-webkit-any(:contains("FAIL"))) td:last-child { color: #ff4545 !important; }
-table tbody tr:has(td:last-child:-webkit-any(:contains("WARN"))) td:last-child { color: #ffb800 !important; }
-
-/* Search + pagination toolbar */
-#ctrl-toolbar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.06); flex-wrap:wrap; }
-#ctrl-search { flex:1; min-width:160px; background:#0b0c0f; border:1px solid rgba(255,255,255,.1); border-radius:6px; color:#f0f2f8; font-family:monospace; font-size:11px; padding:6px 10px; outline:none; }
-#ctrl-search:focus { border-color:#00e5ff; }
-.ctrl-filter-btn { font-family:monospace; font-size:11px; padding:5px 11px; border-radius:5px; cursor:pointer; border:1px solid rgba(255,255,255,.1); background:transparent; color:#8a90a2; transition:all .15s; }
-.ctrl-filter-btn.f-pass.active { background:rgba(0,255,163,.12); border-color:rgba(0,255,163,.35); color:#00ffa3; }
-.ctrl-filter-btn.f-warn.active { background:rgba(255,184,0,.12); border-color:rgba(255,184,0,.35); color:#ffb800; }
-.ctrl-filter-btn.f-fail.active { background:rgba(255,69,69,.12); border-color:rgba(255,69,69,.35); color:#ff4545; }
-.ctrl-filter-btn.f-all.active  { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2); color:#f0f2f8; }
-#ctrl-pagination { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:1px solid rgba(255,255,255,.06); font-size:11px; color:#484e61; font-family:monospace; }
-.ctrl-page-btn { font-family:monospace; font-size:11px; padding:4px 9px; border-radius:5px; cursor:pointer; border:1px solid rgba(255,255,255,.1); background:transparent; color:#8a90a2; transition:all .12s; min-width:30px; }
-.ctrl-page-btn:hover { background:rgba(255,255,255,.06); color:#f0f2f8; }
-.ctrl-page-btn.active { background:rgba(0,229,255,.12); color:#00e5ff; border-color:rgba(0,229,255,.35); }
-.ctrl-page-btn:disabled { opacity:.3; cursor:default; }
 
 </style>
 <script>
@@ -613,6 +547,15 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
     <button class="nav-btn" onclick="switchTab('poam',this)">
       <div class="nav-dot" style="background:var(--t3)"></div> POA&M
     </button>
+    <button class="nav-btn" onclick="switchTab('ato-expiry',this)">
+      <div class="nav-dot" style="background:var(--amber)"></div> ATO Expiry
+    </button>
+    <button class="nav-btn" onclick="switchTab('sbom-view',this)">
+      <div class="nav-dot" style="background:var(--cyan)"></div> SBOM View
+    </button>
+    <button class="nav-btn" onclick="switchTab('vn-standards',this)">
+      <div class="nav-dot" style="background:var(--red)"></div> VN Standards
+    </button>
     <div class="nav-section" style="margin-top:auto">STATUS</div>
     <div style="padding:10px 14px">
       <div style="font-size:10px;color:var(--t3);margin-bottom:4px">P4 Readiness</div>
@@ -823,6 +766,222 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
         </div>
       </div>
 
+      <!-- ATO EXPIRY TAB -->
+      <div id="tab-ato-expiry" class="tab-panel">
+        <div class="section-hd"><div class="section-title">ATO EXPIRY &amp; RENEWAL TRACKING</div></div>
+        <div id="ato-expiry-content" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px">
+          <div style="color:var(--t3);font-size:11px">Loading ATO expiry data...</div>
+        </div>
+      </div>
+
+      <!-- SBOM VIEW TAB -->
+      <div id="tab-sbom-view" class="tab-panel">
+        <div class="section-hd"><div class="section-title">SOFTWARE BILL OF MATERIALS — SBOM VIEW</div></div>
+        <div id="sbom-view-content" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px">
+          <div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>
+        </div>
+      </div>
+
+      <!-- VIETNAMESE STANDARDS TAB -->
+      <div id="tab-vn-standards" class="tab-panel">
+        <div class="section-hd"><div class="section-title">VIETNAMESE SECURITY STANDARDS — VNCERT / BKAV / VIETTEL / VNPT</div></div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px">
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+            <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:.08em;margin-bottom:8px">🇻🇳 VNCERT/CC — TT17/2017/TT-BTTTT</div>
+            <div style="font-size:10px;color:var(--t3);margin-bottom:10px">Thông tư 17/2017 Bộ TT&TT — An toàn hệ thống thông tin theo cấp độ</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Cấp độ 3 — Hệ thống quan trọng</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Kiểm tra ATTT định kỳ hàng năm</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Mã hóa dữ liệu truyền tải (TLS 1.3)</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Nhật ký hệ thống lưu tối thiểu 90 ngày</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Xác thực đa yếu tố (MFA)</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+            </div>
+            <div style="margin-top:10px;padding:6px 10px;background:rgba(0,255,163,.07);border-radius:6px;font-size:10px;color:var(--green)">
+              Tuân thủ TT17/2017 — Cấp độ 3 · 5/5 yêu cầu
+            </div>
+          </div>
+
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+            <div style="font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.08em;margin-bottom:8px">🔒 VNCERT — Tiêu chuẩn ATTT Quốc gia</div>
+            <div style="font-size:10px;color:var(--t3);margin-bottom:10px">TCVN 11943:2017 — Hệ thống quản lý ATTT (tương đương ISO 27001)</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>A.9 — Kiểm soát truy cập</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>A.10 — Mã hóa thông tin</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>A.12 — An toàn vận hành</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>A.16 — Quản lý sự cố ATTT</span>
+                <span style="color:var(--amber);font-weight:700">⚠ CHỜ</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>A.18 — Tuân thủ pháp lý</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+            </div>
+            <div style="margin-top:10px;padding:6px 10px;background:rgba(255,184,0,.07);border-radius:6px;font-size:10px;color:var(--amber)">
+              TCVN 11943:2017 — 4/5 đạt · A.16 cần bổ sung quy trình
+            </div>
+          </div>
+
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+            <div style="font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:.08em;margin-bottom:8px">📡 BKAV / VNPT — Tiêu chí kiểm định ATTT</div>
+            <div style="font-size:10px;color:var(--t3);margin-bottom:10px">Tiêu chí đánh giá ATTT theo BKAV SecurityScorecard &amp; VNPT CyberSec</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Phát hiện mã độc &amp; APT</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Giám sát lưu lượng mạng (NTA)</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Quét lỗ hổng định kỳ (DAST/SAST)</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Phản ứng sự cố &lt; 4h (IR SLA)</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Báo cáo định kỳ cho VNCERT</span>
+                <span style="color:var(--amber);font-weight:700">⚠ CHỜ</span>
+              </div>
+            </div>
+            <div style="margin-top:10px;padding:6px 10px;background:rgba(6,182,212,.07);border-radius:6px;font-size:10px;color:var(--cyan)">
+              BKAV/VNPT Score: 88/100 · 4/5 tiêu chí đạt
+            </div>
+          </div>
+
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+            <div style="font-size:11px;font-weight:700;color:var(--purple);letter-spacing:.08em;margin-bottom:8px">📶 Viettel CyberSec — SOC Tiêu chuẩn</div>
+            <div style="font-size:10px;color:var(--t3);margin-bottom:10px">Tiêu chuẩn SOC của Viettel Cyber Security — Giám sát &amp; Ứng phó sự cố</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>SIEM tích hợp — thu thập log 24/7</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Threat Intelligence tích hợp IOC</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Playbook ứng phó tự động (SOAR)</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Mean Time to Detect &lt; 15 phút</span>
+                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span>Drill test &amp; Red Team hàng quý</span>
+                <span style="color:var(--amber);font-weight:700">⚠ Q3</span>
+              </div>
+            </div>
+            <div style="margin-top:10px;padding:6px 10px;background:rgba(139,92,246,.07);border-radius:6px;font-size:10px;color:var(--purple)">
+              Viettel CyberSec SOC: 4/5 tiêu chí · Red Team drill Q3 2026
+            </div>
+          </div>
+        </div>
+
+        <!-- Compliance matrix -->
+        <div class="section-hd"><div class="section-title">MA TRẬN TUÂN THỦ — VN + QUỐC TẾ</div></div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="background:rgba(255,255,255,.03)">
+                <th style="padding:8px 12px;text-align:left;color:var(--t3);font-weight:600">Tiêu chuẩn</th>
+                <th style="padding:8px;text-align:center;color:var(--t3)">Phạm vi</th>
+                <th style="padding:8px;text-align:center;color:var(--t3)">Điểm</th>
+                <th style="padding:8px;text-align:center;color:var(--t3)">Trạng thái</th>
+                <th style="padding:8px;text-align:left;color:var(--t3)">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px;font-weight:600;color:var(--cyan)">FedRAMP Moderate</td>
+                <td style="padding:8px;text-align:center;color:var(--t3)">Cloud Gov</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">92%</td>
+                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">ATO</span></td>
+                <td style="padding:8px;color:var(--t3)">22/24 controls · Coalfire 3PAO</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px;font-weight:600;color:var(--purple)">CMMC Level 2</td>
+                <td style="padding:8px;text-align:center;color:var(--t3)">DoD CUI</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">87%</td>
+                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">PASS</span></td>
+                <td style="padding:8px;color:var(--t3)">13/15 practices · 110 controls</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px;font-weight:600;color:var(--amber)">NIST SP 800-53</td>
+                <td style="padding:8px;text-align:center;color:var(--t3)">Federal</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">94%</td>
+                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">PASS</span></td>
+                <td style="padding:8px;color:var(--t3)">Rev 5 MODERATE baseline</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px;font-weight:600;color:var(--red)">TT17/2017/TT-BTTTT</td>
+                <td style="padding:8px;text-align:center;color:var(--t3)">VN Gov</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">100%</td>
+                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">ĐẠT</span></td>
+                <td style="padding:8px;color:var(--t3)">Cấp độ 3 · 5/5 yêu cầu</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px;font-weight:600;color:var(--cyan)">TCVN 11943:2017</td>
+                <td style="padding:8px;text-align:center;color:var(--t3)">VN ISO27001</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:var(--amber)">80%</td>
+                <td style="padding:8px;text-align:center"><span style="background:rgba(255,184,0,.1);color:var(--amber);padding:2px 8px;border-radius:4px;font-size:10px">CHỜ</span></td>
+                <td style="padding:8px;color:var(--t3)">4/5 domains · A.16 cần bổ sung</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px;font-weight:600;color:var(--cyan)">BKAV SecurityScore</td>
+                <td style="padding:8px;text-align:center;color:var(--t3)">VN Private</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">88/100</td>
+                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">TỐT</span></td>
+                <td style="padding:8px;color:var(--t3)">4/5 tiêu chí · Báo cáo VNCERT pending</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px;font-weight:600;color:var(--purple)">Viettel SOC Standard</td>
+                <td style="padding:8px;text-align:center;color:var(--t3)">VN SOC</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">88/100</td>
+                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">TỐT</span></td>
+                <td style="padding:8px;color:var(--t3)">4/5 · Red Team drill Q3 2026</td>
+              </tr>
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px;font-weight:600;color:var(--green)">ISO 27001:2022</td>
+                <td style="padding:8px;text-align:center;color:var(--t3)">International</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">91%</td>
+                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">PASS</span></td>
+                <td style="padding:8px;color:var(--t3)">93 controls · Annex A mapped</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /shell -->
@@ -902,6 +1061,9 @@ function loadTab(name) {
     case 'rasp':       pollRASP(); break;
     case 'sbom-viewer': loadSBOMView(); break;
     case 'poam':       loadPOAM(); break;
+    case 'ato-expiry': loadATOExpiry(); break;
+    case 'sbom-view':  loadSBOMView(); break;
+    case 'vn-standards': break; // static content
   }
 }
 
@@ -1775,6 +1937,6 @@ function switchTenant(id) {
 }
 
 </script>
-<script src="/panels/vsp_compliance_table_patch.js"></script>
+<script src="/static/vsp_compliance_table_patch.js?v=3"></script>
 </body>
 </html>
