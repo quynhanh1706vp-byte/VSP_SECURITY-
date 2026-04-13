@@ -1495,7 +1495,7 @@ function openTestDetail(t) {
     '<div class="detail-row"><div class="detail-key">Run ID</div><div class="detail-val" style="font-family:var(--mono)">'+t.run_id+'</div></div>' +
     (t.auto_fix_available?'<div style="margin-top:14px;padding:10px;background:rgba(6,182,212,.07);border:1px solid rgba(6,182,212,.2);border-radius:6px;font-size:11px;color:var(--cyan)">⚡ Auto-fix available for this control</div>':'') +
     '<div style="display:flex;gap:8px;margin-top:16px">' +
-      '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:''+t.control_id+'',weakness:''+t.name+'',control:''+t.control_id+'',severity:''+( t.status==='pass'?'LOW':'HIGH')+'',mitigation:''+t.evidence+''})">🤖 AI Advisor</button>' +
+      '<button class="btn btn-ghost btn-sm" data-ctrl="'+t.control_id+'" data-sev="'+(t.status==="pass"?"LOW":"HIGH")+'" onclick="openAIAdvisor({id:this.dataset.ctrl,weakness:this.dataset.ctrl,control:this.dataset.ctrl,severity:this.dataset.sev,mitigation:\'\'})">🤖 AI Advisor</button>' +
     '</div>';
   document.getElementById('test-detail-title').textContent = t.control_id + ' — ' + t.framework;
   modal.classList.add('open');
@@ -1765,7 +1765,7 @@ function openRASPDetail(e) {
     '<div class="detail-row"><div class="detail-key">Timestamp</div><div class="detail-val">'+new Date(e.timestamp).toLocaleString('vi-VN')+'</div></div>' +
     (e.cve?'<div class="detail-row"><div class="detail-key">CVE</div><div class="detail-val"><a href="https://nvd.nist.gov/vuln/detail/'+e.cve+'" target="_blank" style="color:var(--red)">'+e.cve+'</a></div></div>':'') +
     '<div style="margin-top:14px;display:flex;gap:8px">' +
-      '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:''+e.attack_type+'',weakness:''+e.attack_type+' attack',control:'SI-3',severity:''+e.severity+'',mitigation:''})">🤖 AI Advisor</button>' +
+      '<button class="btn btn-ghost btn-sm" data-ctrl="'+t.control_id+'" data-sev="'+(t.status==="pass"?"LOW":"HIGH")+'" onclick="openAIAdvisor({id:this.dataset.ctrl,weakness:this.dataset.ctrl,control:this.dataset.ctrl,severity:this.dataset.sev,mitigation:\'\'})">🤖 AI Advisor</button>' +
     '</div>';
   document.getElementById('rasp-detail-title').textContent = e.attack_type + ' — ' + e.service;
   modal.classList.add('open');
