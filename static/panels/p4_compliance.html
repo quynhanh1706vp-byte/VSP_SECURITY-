@@ -1759,7 +1759,7 @@ function renderVNGrid(standards) {
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
         '<div style="font-size:11px;font-weight:700;color:'+col+';letter-spacing:.08em">'+ic+' '+s.name+'</div>' +
         '<div style="position:relative">' +
-          '<button onclick="toggleVNDropdown(&apos;dd-&apos;+s.id)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer">⋯</button>' +
+          '<button class="vn-dd-btn" data-sid="'+s.id+'" onclick="vnCardDD(this)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer">⋯</button>' +
           '<div id="dd-'+s.id+'" class="dropdown-menu" style="display:none;right:0;left:auto">' +
             '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;passed&apos;)">✓ Đánh dấu ĐẠT</div>' +
             '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;partial&apos;)">⚠ Đánh dấu CHỜ</div>' +
@@ -1815,15 +1815,55 @@ function renderVNMatrix(standards) {
       '<td style="padding:8px;text-align:center;font-weight:700;color:'+col+'">'+s.score+'%</td>' +
       '<td style="padding:8px;text-align:center"><span style="background:rgba('+(s.status==='passed'?'0,255,163':'255,184,0')+',.1);color:'+col+';padding:2px 8px;border-radius:4px;font-size:10px">'+lbl+'</span></td>' +
       '<td style="padding:8px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí'+(s.notes?' · '+s.notes:'')+'</td>' +
-      '<td style="padding:8px"><button onclick="event.stopPropagation();toggleVNDropdown('dd2-'+s.id)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer;position:relative">⋯' +
-        '<div id="dd2-'+s.id+'" class="dropdown-menu" style="display:none;right:0">' +
-          '<div class="dropdown-item" onclick="event.stopPropagation();updateVNStatus(s.id,&apos;passed&apos;)">✓ ĐẠT</div>' +
-          '<div class="dropdown-item" onclick="event.stopPropagation();updateVNStatus(s.id,&apos;partial&apos;)">⚠ CHỜ</div>' +
-          '<div class="dropdown-item" onclick="event.stopPropagation();openVNDetail(s.id)">📋 Chi tiết</div>' +
+      '<td style="padding:8px"><div style="position:relative">' +
+        '<button class="vn-dd-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();vnMatrixDD(this)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer">⋯</button>' +
+        '<div class="vn-dd-menu dropdown-menu" style="display:none;position:absolute;right:0;top:100%">' +
+          '<div class="dropdown-item vn-dd-pass">✓ ĐẠT</div>' +
+          '<div class="dropdown-item vn-dd-partial">⚠ CHỜ</div>' +
+          '<div class="dropdown-item vn-dd-detail">📋 Chi tiết</div>' +
         '</div>' +
-      '</button></td>' +
+      '</div></td>' +
     '</tr>';
   }).join('');
+}
+
+// Data-attribute based dropdown handlers (no inline quote issues)
+function vnCardDD(btn) {
+  const sid = btn.getAttribute('data-sid');
+  const s = _vnStandards.find(function(x){return x.id===sid;});
+  if (!s) return;
+  // Create/show dropdown next to button
+  let menu = btn.nextElementSibling;
+  if (!menu || !menu.classList.contains('vn-dd-card-menu')) {
+    menu = document.createElement('div');
+    menu.className = 'dropdown-menu vn-dd-card-menu';
+    menu.style.cssText = 'position:absolute;right:0;top:100%;display:block;z-index:100';
+    menu.innerHTML = 
+      '<div class="dropdown-item" onclick="updateVNStatus(''+sid+'','passed')">✓ Đánh dấu ĐẠT</div>'+
+      '<div class="dropdown-item" onclick="updateVNStatus(''+sid+'','partial')">⚠ Đánh dấu CHỜ</div>'+
+      '<div class="dropdown-item" onclick="updateVNStatus(''+sid+'','failed')" style="color:var(--red)">✗ Không ĐẠT</div>'+
+      '<div style="border-top:1px solid var(--border);margin:4px 0"></div>'+
+      '<div class="dropdown-item" onclick="openVNDetail(''+sid+'')">📋 Xem chi tiết</div>'+
+      '<div class="dropdown-item" onclick="openAIAdvisor({id:''+sid+'',weakness:''+s.name.replace(/'/g,"\'")+'',control:''+s.framework+'',severity:'MEDIUM',mitigation:''})">🤖 AI Advisor</div>';
+    btn.parentElement.style.position = 'relative';
+    btn.parentElement.appendChild(menu);
+  } else {
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  }
+  event.stopPropagation();
+}
+
+function vnMatrixDD(btn) {
+  const sid = btn.getAttribute('data-sid');
+  const menu = btn.nextElementSibling;
+  if (!menu) return;
+  // Update menu item handlers
+  const items = menu.querySelectorAll('.dropdown-item');
+  if (items[0]) items[0].onclick = function(e){e.stopPropagation();updateVNStatus(sid,'passed');};
+  if (items[1]) items[1].onclick = function(e){e.stopPropagation();updateVNStatus(sid,'partial');};
+  if (items[2]) items[2].onclick = function(e){e.stopPropagation();openVNDetail(sid);};
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  event.stopPropagation();
 }
 
 function toggleVNDropdown(id) {
