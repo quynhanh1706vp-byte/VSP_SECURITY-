@@ -301,3 +301,11 @@ type ErrToolNotFound struct{ Tool string }
 func (e ErrToolNotFound) Error() string {
 	return fmt.Sprintf("tool not found on PATH: %s", e.Tool)
 }
+
+// FullSOCModes — danh sách sub-modes cho FULL_SOC scan
+var FullSOCModes = []string{"SAST", "SCA", "SECRETS", "IAC", "DAST", "NETWORK"}
+
+// IsFullSOC trả về true nếu mode là FULL_SOC
+func IsFullSOC(mode string) bool {
+	return mode == "FULL_SOC"
+}

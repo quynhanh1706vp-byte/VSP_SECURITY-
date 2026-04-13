@@ -32,6 +32,11 @@ type Remediation struct {
 	ResolvedAt *time.Time        `json:"resolved_at,omitempty"`
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`
+	// Joined from findings
+	Title    string `json:"title,omitempty"`
+	Severity string `json:"severity,omitempty"`
+	Tool     string `json:"tool,omitempty"`
+	RuleID   string `json:"rule_id,omitempty"`
 }
 
 type RemediationComment struct {
@@ -44,14 +49,19 @@ type RemediationComment struct {
 
 func (db *DB) GetRemediation(ctx context.Context, tenantID, findingID string) (*Remediation, error) {
 	row := db.pool.QueryRow(ctx,
-		`SELECT id,finding_id,tenant_id,status,assignee,priority,due_date,
-		        notes,ticket_url,resolved_at,created_at,updated_at
-		 FROM remediations WHERE finding_id=$1 AND tenant_id=$2 LIMIT 1`,
+		`SELECT r.id,r.finding_id,r.tenant_id,r.status,r.assignee,r.priority,r.due_date,
+		        r.notes,r.ticket_url,r.resolved_at,r.created_at,r.updated_at,
+		        COALESCE(f.message,'') as title, COALESCE(f.severity,'') as severity,
+		        COALESCE(f.tool,'') as tool, COALESCE(f.rule_id,'') as rule_id
+		 FROM remediations r
+		 LEFT JOIN findings f ON f.id=r.finding_id
+		 WHERE r.finding_id=$1 AND r.tenant_id=$2 LIMIT 1`,
 		findingID, tenantID)
 	var r Remediation
 	err := row.Scan(&r.ID, &r.FindingID, &r.TenantID, &r.Status,
 		&r.Assignee, &r.Priority, &r.DueDate, &r.Notes,
-		&r.TicketURL, &r.ResolvedAt, &r.CreatedAt, &r.UpdatedAt)
+		&r.TicketURL, &r.ResolvedAt, &r.CreatedAt, &r.UpdatedAt,
+		&r.Title, &r.Severity, &r.Tool, &r.RuleID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,16 +96,20 @@ func (db *DB) UpsertRemediation(ctx context.Context, r Remediation) (*Remediatio
 }
 
 func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]Remediation, error) {
-	where := "tenant_id=$1"
+	where := "r.tenant_id=$1"
 	args := []any{tenantID}
 	if status != "" {
-		where += " AND status=$2"
+		where += " AND r.status=$2"
 		args = append(args, status)
 	}
 	rows, err := db.pool.Query(ctx,
-		`SELECT id,finding_id,tenant_id,status,assignee,priority,due_date,
-		        notes,ticket_url,resolved_at,created_at,updated_at
-		 FROM remediations WHERE `+where+` ORDER BY updated_at DESC LIMIT 200`,
+		`SELECT r.id,r.finding_id,r.tenant_id,r.status,r.assignee,r.priority,r.due_date,
+		        r.notes,r.ticket_url,r.resolved_at,r.created_at,r.updated_at,
+		        COALESCE(f.message,'') as title, COALESCE(f.severity,'') as severity,
+		        COALESCE(f.tool,'') as tool, COALESCE(f.rule_id,'') as rule_id
+		 FROM remediations r
+		 LEFT JOIN findings f ON f.id=r.finding_id
+		 WHERE `+where+` ORDER BY r.updated_at DESC LIMIT 200`,
 		args...)
 	if err != nil {
 		return nil, err
@@ -106,7 +120,8 @@ func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]
 		var r Remediation
 		rows.Scan(&r.ID, &r.FindingID, &r.TenantID, &r.Status,
 			&r.Assignee, &r.Priority, &r.DueDate, &r.Notes,
-			&r.TicketURL, &r.ResolvedAt, &r.CreatedAt, &r.UpdatedAt) //nolint
+			&r.TicketURL, &r.ResolvedAt, &r.CreatedAt, &r.UpdatedAt,
+			&r.Title, &r.Severity, &r.Tool, &r.RuleID) //nolint
 		list = append(list, r)
 	}
 	return list, nil
@@ -163,6 +178,18 @@ func (db *DB) RemediationStats(ctx context.Context, tenantID string) (map[string
 		var n int
 		rows.Scan(&s, &n) //nolint
 		stats[s] = n
+	}
+	var total int
+	for _, v := range stats {
+		total += v
+	}
+	if total > 0 {
+		// remediation_rate as integer percent (avoids changing return type)
+		stats["total"] = total
+		stats["remediation_rate_pct"] = int(float64(stats["resolved"]+stats["accepted"]) / float64(total) * 100)
+	} else {
+		stats["total"] = 0
+		stats["remediation_rate_pct"] = 0
 	}
 	return stats, nil
 }

@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"crypto/tls"
+	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/vsp/platform/internal/api/handler"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
@@ -309,6 +310,13 @@ func main() {
 		// Wrap to set CSP after middleware
 		rw := &p4ResponseWriter{ResponseWriter: w, cspSet: false}
 		http.StripPrefix("/static/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(rw, r)
+	})
+	// Serve panels/ with relaxed CSP for iframes
+	r.Get("/panels/*", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Del("Content-Security-Policy")
+		w.Header().Del("X-Frame-Options")
+		w.Header().Set("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: http://127.0.0.1:8922 http://127.0.0.1:8921; connect-src *; frame-ancestors *;")
+		http.StripPrefix("/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
 	})
 	// P4 Compliance — public routes (no auth required)
 	r.Get("/api/p4/health", p4Health)
@@ -962,12 +970,571 @@ func main() {
 		r.Post("/api/v1/remediation/finding/{finding_id}", remediationH.Upsert)
 		r.Post("/api/v1/remediation/{rem_id}/comments", remediationH.AddComment)
 
+		// PATCH /api/v1/remediation/finding/{finding_id}/status
+		r.Patch("/api/v1/remediation/finding/{finding_id}/status", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			fid := chi.URLParam(r, "finding_id")
+			var req struct {
+				Status  string `json:"status"`
+				Comment string `json:"comment"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, `{"error":"invalid body"}`, http.StatusBadRequest)
+				return
+			}
+			valid := map[string]bool{"open": true, "in_progress": true, "resolved": true, "accepted": true, "false_positive": true, "suppressed": true}
+			if !valid[req.Status] {
+				http.Error(w, `{"error":"invalid status"}`, http.StatusBadRequest)
+				return
+			}
+			rem, err := remediationH.DB.UpsertRemediation(r.Context(), store.Remediation{
+				FindingID: fid,
+				TenantID:  claims.TenantID,
+				Status:    store.RemediationStatus(req.Status),
+				Notes:     req.Comment,
+			})
+			if err != nil {
+				http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+				"ok": true, "finding_id": fid,
+				"new_status": req.Status, "resolved_at": rem.ResolvedAt,
+			})
+		})
 		// SBOM
 		r.Get("/api/v1/sbom/{rid}", sbomH.Generate)
 		r.Get("/api/v1/sbom/{rid}/grype", sbomH.Grype)
+		r.Get("/api/v1/sbom/{rid}/diff", sbomH.Diff)
 		// Reports
 		r.Get("/api/v1/vsp/run_report_html/{rid}", reportH.HTML)
 		r.Get("/api/v1/vsp/run_report_pdf/{rid}", reportH.PDF)
+		r.Get("/api/v1/vsp/tt13_report/{rid}", reportH.TT13)
+		// ── Webhook alerts ──────────────────────────────────────────────
+		r.Get("/api/v1/alerts/webhooks", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			ctx := r.Context()
+			rows, err := db.Pool().Query(ctx,
+				"SELECT id,label,url,type,min_sev,active,created_at FROM siem_webhooks WHERE tenant_id=$1 ORDER BY created_at DESC",
+				claims.TenantID)
+			if err != nil {
+				http.Error(w, `{"error":"db"}`, 500)
+				return
+			}
+			defer rows.Close()
+			type WH struct {
+				ID        string   `json:"id"`
+				Name      string   `json:"name"`
+				URL       string   `json:"url"`
+				Events    []string `json:"events"`
+				Enabled   bool     `json:"enabled"`
+				CreatedAt string   `json:"created_at"`
+			}
+			var whs []WH
+			for rows.Next() {
+				var wh WH
+				var createdAt time.Time
+				var whType, minSev string
+				rows.Scan(&wh.ID, &wh.Name, &wh.URL, &whType, &minSev, &wh.Enabled, &createdAt)
+				wh.Events = []string{whType, minSev}
+				wh.CreatedAt = createdAt.Format(time.RFC3339)
+				whs = append(whs, wh)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"webhooks": whs, "total": len(whs)})
+		})
+		r.Post("/api/v1/alerts/webhooks/test", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			_ = claims
+			var req struct {
+				URL  string `json:"url"`
+				Name string `json:"name"`
+			}
+			json.NewDecoder(r.Body).Decode(&req)
+			if req.URL == "" {
+				http.Error(w, `{"error":"url required"}`, 400)
+				return
+			}
+			// Send test payload
+			payload := map[string]interface{}{
+				"type":      "test",
+				"platform":  "VSP Security Platform v0.10",
+				"message":   "Webhook test from VSP — connection successful",
+				"timestamp": time.Now().Format(time.RFC3339),
+				"severity":  "INFO",
+			}
+			b, _ := json.Marshal(payload)
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, err := client.Post(req.URL, "application/json", bytes.NewReader(b))
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": err.Error()})
+				return
+			}
+			defer resp.Body.Close()
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"ok": resp.StatusCode < 300, "status": resp.StatusCode, "message": "Webhook test sent"})
+		})
+		r.Post("/api/v1/alerts/notify", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			ctx := r.Context()
+			// Send immediate alert to all enabled webhooks for CRITICAL findings
+			rows, err := db.Pool().Query(ctx,
+				"SELECT url,label FROM siem_webhooks WHERE tenant_id=$1 AND active=true AND (min_sev='CRITICAL' OR min_sev='HIGH')",
+				claims.TenantID)
+			if err != nil {
+				http.Error(w, `{"error":"db"}`, 500)
+				return
+			}
+			defer rows.Close()
+			// Get latest critical findings
+			frows, _ := db.Pool().Query(ctx,
+				"SELECT severity,tool,rule_id,message,path FROM findings WHERE tenant_id=$1 AND severity='CRITICAL' ORDER BY created_at DESC LIMIT 5",
+				claims.TenantID)
+			type F struct{ Sev, Tool, Rule, Msg, Path string }
+			var findings []F
+			if frows != nil {
+				defer frows.Close()
+				for frows.Next() {
+					var f F
+					frows.Scan(&f.Sev, &f.Tool, &f.Rule, &f.Msg, &f.Path)
+					findings = append(findings, f)
+				}
+			}
+			payload, _ := json.Marshal(map[string]interface{}{
+				"type": "critical_alert", "platform": "VSP Security Platform",
+				"timestamp":         time.Now().Format(time.RFC3339),
+				"critical_findings": len(findings), "findings": findings,
+			})
+			sent := 0
+			client := &http.Client{Timeout: 10 * time.Second}
+			for rows.Next() {
+				var url, name string
+				rows.Scan(&url, &name)
+				resp, err := client.Post(url, "application/json", bytes.NewReader(payload))
+				if err == nil && resp.StatusCode < 300 {
+					sent++
+				}
+				if resp != nil {
+					resp.Body.Close()
+				}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"sent": sent, "findings": len(findings), "message": fmt.Sprintf("Notified %d webhooks", sent)})
+		})
+
+		r.Get("/api/v1/audit/stats", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			ctx := r.Context()
+			var total, h24, d7, d30, users, actions, archivable int
+			var oldest, newest string
+			db.Pool().QueryRow(ctx,
+				"SELECT COUNT(*),"+
+					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours'),"+
+					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days'),"+
+					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days'),"+
+					"COUNT(DISTINCT user_id),COUNT(DISTINCT action),"+
+					"COALESCE(MIN(created_at)::text,'—'),COALESCE(MAX(created_at)::text,'—'),"+
+					"COUNT(*) FILTER (WHERE created_at < NOW() - INTERVAL '90 days')"+
+														" FROM audit_log WHERE tenant_id=$1", claims.TenantID).
+				Scan(&total, &h24, &d7, &d30, &users, &actions, &oldest, &newest, &archivable) //nolint:errcheck
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"total": total, "last_24h": h24, "last_7d": d7, "last_30d": d30,
+				"unique_users": users, "unique_actions": actions,
+				"oldest": oldest, "newest": newest, "archivable": archivable,
+			})
+		})
+		r.Post("/api/v1/audit/rotate", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			if claims.Role != "admin" {
+				http.Error(w, "{\"error\":\"admin only\"}", 403)
+				return
+			}
+			keepDays := 90
+			var req struct {
+				KeepDays int `json:"keep_days"`
+			}
+			json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+			if req.KeepDays > 0 {
+				keepDays = req.KeepDays
+			}
+			ctx := r.Context()
+			var archived, remaining int64
+			db.Pool().QueryRow(ctx, "SELECT * FROM rotate_audit_log($1)", keepDays).Scan(&archived, &remaining) //nolint:errcheck
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"archived": archived, "remaining": remaining, "keep_days": keepDays,
+				"message": fmt.Sprintf("Archived %d entries older than %d days", archived, keepDays),
+			})
+		})
+		r.Get("/api/v1/audit/monthly", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			ctx := r.Context()
+			rows, err := db.Pool().Query(ctx,
+				"SELECT DATE_TRUNC('month',created_at)::text,"+
+					"COUNT(*),COUNT(DISTINCT user_id),COUNT(DISTINCT action),"+
+					"COUNT(*) FILTER (WHERE action LIKE '%scan%'),"+
+					"COUNT(*) FILTER (WHERE action LIKE '%login%')"+
+					" FROM audit_log WHERE tenant_id=$1"+
+					" GROUP BY 1 ORDER BY 1 DESC LIMIT 12", claims.TenantID)
+			if err != nil {
+				http.Error(w, "{\"error\":\"db\"}", 500)
+				return
+			}
+			defer rows.Close()
+			type Month struct {
+				Month   string `json:"month"`
+				Total   int    `json:"total"`
+				Users   int    `json:"users"`
+				Actions int    `json:"actions"`
+				Scans   int    `json:"scans"`
+				Logins  int    `json:"logins"`
+			}
+			var months []Month
+			for rows.Next() {
+				var m Month
+				rows.Scan(&m.Month, &m.Total, &m.Users, &m.Actions, &m.Scans, &m.Logins) //nolint:errcheck
+				months = append(months, m)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"months": months, "total": len(months)}) //nolint:errcheck
+		})
+
+		// ── Auto-remediation engine ──────────────────────────────────────
+		// POST /api/v1/remediation/auto — auto-create remediations from findings
+		r.Post("/api/v1/remediation/auto", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			ctx := r.Context()
+
+			var req struct {
+				RunID    string `json:"run_id"`
+				Severity string `json:"severity"` // CRITICAL,HIGH,MEDIUM,ALL
+				Assignee string `json:"assignee"`
+			}
+			json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+			if req.Severity == "" {
+				req.Severity = "HIGH"
+			}
+			if req.Assignee == "" {
+				req.Assignee = "auto-assigned"
+			}
+
+			sevFilter := "'CRITICAL','HIGH'"
+			switch req.Severity {
+			case "ALL":
+				sevFilter = "'CRITICAL','HIGH','MEDIUM','LOW'"
+			case "MEDIUM":
+				sevFilter = "'CRITICAL','HIGH','MEDIUM'"
+			case "HIGH":
+				sevFilter = "'CRITICAL','HIGH'"
+			case "CRITICAL":
+				sevFilter = "'CRITICAL'"
+			}
+
+			query := "SELECT f.id, f.severity, f.tool, f.rule_id, f.message, f.path, f.fix_signal " +
+				"FROM findings f " +
+				"WHERE f.tenant_id=$1 AND f.severity IN (" + sevFilter + ") " +
+				"AND NOT EXISTS (SELECT 1 FROM remediations rem WHERE rem.finding_id=f.id AND rem.tenant_id=$1) "
+			if req.RunID != "" {
+				query += "AND f.run_id=(SELECT id FROM runs WHERE rid=$2 AND tenant_id=$1 LIMIT 1) "
+			}
+			query += "ORDER BY CASE f.severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END LIMIT 200"
+
+			var rows pgx.Rows
+			var err error
+			if req.RunID != "" {
+				rows, err = db.Pool().Query(ctx, query, claims.TenantID, req.RunID)
+			} else {
+				rows, err = db.Pool().Query(ctx, query, claims.TenantID)
+			}
+			if err != nil {
+				http.Error(w, `{"error":"db"}`, 500)
+				return
+			}
+			defer rows.Close()
+
+			type Finding struct{ ID, Sev, Tool, Rule, Msg, Path, Fix string }
+			var findings []Finding
+			for rows.Next() {
+				var f Finding
+				rows.Scan(&f.ID, &f.Sev, &f.Tool, &f.Rule, &f.Msg, &f.Path, &f.Fix)
+				findings = append(findings, f)
+			}
+
+			// SLA due dates per severity
+			dueDays := map[string]int{"CRITICAL": 1, "HIGH": 7, "MEDIUM": 30, "LOW": 90}
+			priority := map[string]string{"CRITICAL": "critical", "HIGH": "high", "MEDIUM": "medium", "LOW": "low"}
+
+			created := 0
+			for _, f := range findings {
+				days := dueDays[f.Sev]
+				if days == 0 {
+					days = 30
+				}
+				due := time.Now().AddDate(0, 0, days)
+				pri := priority[f.Sev]
+				if pri == "" {
+					pri = "medium"
+				}
+				notes := fmt.Sprintf("Auto-created from VSP scan.\nTool: %s\nRule: %s\nPath: %s\n", f.Tool, f.Rule, f.Path)
+				if f.Fix != "" {
+					notes += fmt.Sprintf("Fix signal: %s\n", f.Fix)
+				}
+				_, e := db.Pool().Exec(ctx,
+					"INSERT INTO remediations (id,finding_id,tenant_id,status,assignee,priority,due_date,notes,created_at,updated_at) "+
+						"VALUES (gen_random_uuid(),$1::uuid,$2,'open',$3,$4,$5,$6,NOW(),NOW()) ON CONFLICT DO NOTHING",
+					f.ID, claims.TenantID, req.Assignee, pri, due, notes)
+				if e == nil {
+					created++
+				}
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"created":   created,
+				"available": len(findings),
+				"severity":  req.Severity,
+				"message":   fmt.Sprintf("Auto-created %d remediation items (sev>=%s)", created, req.Severity),
+			})
+		})
+
+		// GET /api/v1/remediation/stats — remediation stats
+		r.Get("/api/v1/remediation/stats", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			ctx := r.Context()
+			var total, open, inprog, resolved, overdue int
+			db.Pool().QueryRow(ctx, //nolint:errcheck
+				"SELECT COUNT(*), "+
+					"COUNT(*) FILTER (WHERE status='open'), "+
+					"COUNT(*) FILTER (WHERE status='in_progress'), "+
+					"COUNT(*) FILTER (WHERE status='resolved'), "+
+					"COUNT(*) FILTER (WHERE status='open' AND due_date < NOW()) "+
+					"FROM remediations WHERE tenant_id=$1", claims.TenantID).
+				Scan(&total, &open, &inprog, &resolved, &overdue)
+			var bySev []map[string]interface{}
+			rows, _ := db.Pool().Query(ctx,
+				"SELECT f.severity, COUNT(*), COUNT(*) FILTER (WHERE rem.status='resolved') "+
+					"FROM remediations rem JOIN findings f ON f.id=rem.finding_id "+
+					"WHERE rem.tenant_id=$1 GROUP BY f.severity "+
+					"ORDER BY CASE f.severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END",
+				claims.TenantID)
+			if rows != nil {
+				defer rows.Close()
+				for rows.Next() {
+					var sev string
+					var tot, res int
+					rows.Scan(&sev, &tot, &res)
+					bySev = append(bySev, map[string]interface{}{
+						"severity": sev, "total": tot, "resolved": res,
+						"open": tot - res, "pct": func() int {
+							if tot > 0 {
+								return res * 100 / tot
+							}
+							return 0
+						}(),
+					})
+				}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"total": total, "open": open, "in_progress": inprog,
+				"resolved": resolved, "overdue": overdue,
+				"by_severity": bySev,
+				"resolution_rate": func() int {
+					if total > 0 {
+						return resolved * 100 / total
+					}
+					return 0
+				}(),
+			})
+		})
+
+		// POST /api/v1/scan/all-modes — trigger scan cho tất cả modes chưa có data
+		// FULL_SOC — trigger all scan modes in sequence
+		r.Post("/api/v1/vsp/run/full-soc", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			ctx := r.Context()
+			var req struct {
+				Src string `json:"src"`
+			}
+			json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+			if req.Src == "" {
+				http.Error(w, `{"error":"src required"}`, http.StatusBadRequest)
+				return
+			}
+			rid := fmt.Sprintf("FULL_SOC_%s", time.Now().Format("20060102_150405"))
+			_, err := db.Pool().Exec(ctx,
+				"INSERT INTO runs (rid,tenant_id,mode,profile,src,status,started_at) "+
+					"VALUES ($1,$2,$3,$4,$5,'QUEUED',NOW())",
+				rid, claims.TenantID, "FULL_SOC", "FULL_SOC", req.Src)
+			if err != nil {
+				http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+				"ok": true, "rid": rid, "mode": "FULL_SOC",
+				"message": "FULL_SOC queued — SAST+SCA+SECRETS+IAC+DAST+NETWORK",
+			})
+		})
+		r.Get("/api/v1/vsp/runs/full-soc", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			rows, err := db.Pool().Query(r.Context(),
+				"SELECT rid,status,started_at,"+
+					"COALESCE(total_findings,0),COALESCE(gate,'PENDING'),0 "+
+					"FROM runs WHERE tenant_id=$1 AND mode='FULL_SOC' "+
+					"ORDER BY started_at DESC LIMIT 20", claims.TenantID)
+			if err != nil {
+				http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+			type Row struct {
+				ID            string    `json:"id"`
+				Status        string    `json:"status"`
+				StartedAt     time.Time `json:"started_at"`
+				TotalFindings int       `json:"total_findings"`
+				Gate          string    `json:"gate"`
+				Score         int       `json:"score"`
+			}
+			var runs []Row
+			for rows.Next() {
+				var row Row
+				rows.Scan(&row.ID, &row.Status, &row.StartedAt, //nolint:errcheck
+					&row.TotalFindings, &row.Gate, &row.Score)
+				runs = append(runs, row)
+			}
+			if runs == nil {
+				runs = []Row{}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"runs": runs, "total": len(runs)}) //nolint:errcheck
+		})
+		r.Post("/api/v1/scan/all-modes", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = auth.FromContext(r.Context())
+			var req struct {
+				Src     string `json:"src"`
+				URL     string `json:"url"`
+				Profile string `json:"profile"`
+			}
+			json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+			if req.Src == "" {
+				req.Src = "/home/test/Data/GOLANG_VSP"
+			}
+			if req.Profile == "" {
+				req.Profile = "FAST"
+			}
+
+			modes := []struct{ Mode, Profile, Src, URL string }{
+				{"SAST", req.Profile, req.Src, ""},
+				{"SCA", req.Profile, req.Src, ""},
+				{"SECRETS", req.Profile, req.Src, ""},
+				{"IAC", req.Profile, req.Src, ""},
+				{"DAST", "EXT", "", req.URL},
+				{"NETWORK", "EXT", "", req.URL},
+			}
+
+			var triggered []map[string]interface{}
+			for _, m := range modes {
+				if m.URL == "" && (m.Mode == "DAST" || m.Mode == "NETWORK") {
+					triggered = append(triggered, map[string]interface{}{
+						"mode": m.Mode, "status": "skipped", "reason": "no URL provided",
+					})
+					continue
+				}
+				// Create run record
+				_ = fmt.Sprintf("RID_ALLMODE_%s_%s", m.Mode, time.Now().Format("20060102_150405"))
+				// Trigger via runsH directly
+				trigPayload, _ := json.Marshal(map[string]string{
+					"mode": m.Mode, "profile": m.Profile, "src": m.Src, "url": m.URL,
+				})
+				trigReq, _ := http.NewRequestWithContext(ctx, "POST", "http://127.0.0.1:8921/api/v1/vsp/run",
+					bytes.NewReader(trigPayload))
+				// Copy auth header
+				trigReq.Header.Set("Content-Type", "application/json")
+				trigReq.Header.Set("Authorization", r.Header.Get("Authorization"))
+				trigReq.AddCookie(&http.Cookie{Name: "vsp_csrf", Value: ""})
+				client2 := &http.Client{Timeout: 10 * time.Second}
+				resp2, err := client2.Do(trigReq)
+				if err != nil {
+					triggered = append(triggered, map[string]interface{}{
+						"mode": m.Mode, "status": "error", "reason": err.Error(),
+					})
+					continue
+				}
+				var runRes map[string]interface{}
+				json.NewDecoder(resp2.Body).Decode(&runRes) //nolint:errcheck
+				resp2.Body.Close()
+				rid2, _ := runRes["rid"].(string)
+				if rid2 == "" {
+					rid2 = fmt.Sprintf("error-%d", resp2.StatusCode)
+				}
+				triggered = append(triggered, map[string]interface{}{
+					"mode": m.Mode, "rid": rid2, "status": runRes["status"],
+					"profile": m.Profile,
+				})
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"triggered": triggered, "total": len(triggered),
+			})
+		})
+
+		r.Post("/api/v1/poam/sync", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.FromContext(r.Context())
+			ctx := r.Context()
+			rows, err := db.Pool().Query(ctx,
+				"SELECT f.id::text, f.severity, f.tool, f.rule_id, f.message, f.path FROM findings f "+
+					"WHERE f.tenant_id = $1 AND f.severity IN ('CRITICAL','HIGH') "+
+					"AND NOT EXISTS (SELECT 1 FROM p4_poam_items p WHERE p.finding_id = f.id::text) "+
+					"ORDER BY CASE f.severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 END, f.created_at DESC LIMIT 100",
+				claims.TenantID)
+			if err != nil {
+				http.Error(w, `{"error":"db"}`, 500)
+				return
+			}
+			defer rows.Close()
+			type frow struct{ id, sev, tool, rule, msg, path string }
+			var findings []frow
+			for rows.Next() {
+				var f frow
+				rows.Scan(&f.id, &f.sev, &f.tool, &f.rule, &f.msg, &f.path)
+				findings = append(findings, f)
+			}
+			var maxNum int
+			db.Pool().QueryRow(ctx, "SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM 10) AS INTEGER)),0) FROM p4_poam_items WHERE id LIKE 'POAM-VSP-%'").Scan(&maxNum) //nolint:errcheck
+			ctrlMap := map[string]string{"semgrep": "SA-11", "bandit": "SA-11", "trivy": "RA-5", "grype": "RA-5", "gitleaks": "IA-5", "kics": "CM-6", "checkov": "CM-6", "nuclei": "CA-2", "nikto": "CA-2", "nmap": "SC-7"}
+			created := 0
+			for i, f := range findings {
+				poamID := fmt.Sprintf("POAM-VSP-%03d", maxNum+i+1)
+				due := time.Now().Add(7 * 24 * time.Hour)
+				if f.sev == "CRITICAL" {
+					due = time.Now().Add(24 * time.Hour)
+				}
+				ctrl := ctrlMap[f.tool]
+				if ctrl == "" {
+					ctrl = "SI-3"
+				}
+				title := f.msg
+				if len(title) > 100 {
+					title = title[:97] + "..."
+				}
+				mit := fmt.Sprintf("VSP auto-sync. Tool:%s Rule:%s Path:%s", f.tool, f.rule, f.path)
+				_, e := db.Pool().Exec(ctx,
+					"INSERT INTO p4_poam_items (id,system_id,weakness_name,control_id,severity,status,mitigation_plan,finding_id,scheduled_completion,tenant_id,created_at,updated_at) "+
+						"VALUES ($1,$2,$3,$4,$5,'open',$6,$7,$8,$9,NOW(),NOW()) ON CONFLICT (id) DO NOTHING",
+					poamID, "VSP-AUTO-SYNC", title, ctrl, f.sev, mit, f.id, due, claims.TenantID)
+				if e == nil {
+					created++
+				}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"synced": created, "available": len(findings), "message": fmt.Sprintf("Created %d POA&M items", created)}) //nolint:errcheck
+		})
+		r.Get("/api/v1/vsp/tt13_report_pdf/{rid}", reportH.TT13PDF)
+		r.Get("/api/v1/reports/conmon_pdf", reportH.ConMonPDF)
 		r.Get("/api/v1/vsp/executive_report_pdf/{rid}", reportH.ExecutivePDF)
 		r.Get("/api/v1/vsp/executive_report_html/{rid}", reportH.ExecutiveHTML)
 		// SLA + Sandbox + Imports
@@ -987,6 +1554,14 @@ func main() {
 		r.Get("/api/v1/export/sarif/{rid}", exportH.SARIF)
 		r.Get("/api/v1/export/csv/{rid}", exportH.CSV)
 		r.Get("/api/v1/export/json/{rid}", exportH.JSON)
+
+		// Software Inventory routes
+		swH := &handler.SoftwareInventoryHandler{DB: db}
+		r.Post("/api/v1/software-inventory/report", swH.ReceiveReport)
+		r.Get("/api/v1/software-inventory/stats", swH.GetStats)
+		r.Get("/api/v1/software-inventory/eol-database", swH.ListEOL)
+		r.Get("/api/v1/software-inventory/{hostname}", swH.GetAsset)
+		r.Get("/api/v1/software-inventory", swH.ListAssets)
 	})
 
 	addr := fmt.Sprintf(":%d", viper.GetInt("server.gateway_port"))
