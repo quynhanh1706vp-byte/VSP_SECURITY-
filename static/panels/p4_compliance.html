@@ -1859,6 +1859,37 @@ document.addEventListener('click', function(e) {
   }
 });
 
+function vnBuildCardMenu(sid, s) {
+  const name = (s && s.name || '').replace(/\\/g,'').replace(/'/g,'');
+  const fw = (s && s.framework || '');
+  return '<div class="dropdown-item vn-act" data-act="passed" data-sid="' + sid + '">✓ Đánh dấu ĐẠT</div>' +
+         '<div class="dropdown-item vn-act" data-act="partial" data-sid="' + sid + '">⚠ Đánh dấu CHỜ</div>' +
+         '<div class="dropdown-item vn-act" data-act="failed" data-sid="' + sid + '" style="color:var(--red)">✗ Không ĐẠT</div>' +
+         '<div style="border-top:1px solid var(--border);margin:4px 0"></div>' +
+         '<div class="dropdown-item vn-det" data-sid="' + sid + '">📋 Xem chi tiết</div>' +
+         '<div class="dropdown-item vn-ai" data-sid="' + sid + '" data-name="' + name + '" data-fw="' + fw + '">🤖 AI Advisor</div>';
+}
+
+// Event delegation for VN dropdown items
+document.addEventListener('click', function(e) {
+  const el = e.target.closest('.vn-act, .vn-det, .vn-ai');
+  if (el) {
+    e.stopPropagation();
+    const sid = el.dataset.sid;
+    if (el.classList.contains('vn-act')) updateVNStatus(sid, el.dataset.act);
+    if (el.classList.contains('vn-det')) openVNDetail(sid);
+    if (el.classList.contains('vn-ai')) {
+      const s = _vnStandards.find(function(x){return x.id===sid;});
+      openAIAdvisor({id:sid, weakness:el.dataset.name, control:el.dataset.fw, severity:'MEDIUM', mitigation:''});
+    }
+    return;
+  }
+  // Close all dropdowns on outside click
+  if (!e.target.closest('.dropdown-menu') && !e.target.closest('.vn-dd-btn')) {
+    document.querySelectorAll('.vn-dd-card-menu, .vn-dd-menu').forEach(function(d){ d.style.display='none'; });
+  }
+});
+
 function vnCardDD(btn) {
   const sid = btn.getAttribute('data-sid');
   const s = _vnStandards.find(function(x){return x.id===sid;});
@@ -1870,330 +1901,6 @@ function vnCardDD(btn) {
     menu.className = 'dropdown-menu vn-dd-card-menu';
     menu.style.cssText = 'position:absolute;right:0;top:100%;display:block;z-index:100';
     menu.innerHTML = vnBuildCardMenu(sid, s);
-    btn.parentElement.style.position = 'relative';
-    btn.parentElement.appendChild(menu);
-  } else {
-    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-  }
-  event.stopPropagation();
-}
-
-function vnMatrixDD(btn) {
-  const sid = btn.getAttribute('data-sid');
-  const menu = btn.nextElementSibling;
-  if (!menu) return;
-  // Update menu item handlers
-  const items = menu.querySelectorAll('.dropdown-item');
-  if (items[0]) items[0].onclick = function(e){e.stopPropagation();updateVNStatus(sid,'passed');};
-  if (items[1]) items[1].onclick = function(e){e.stopPropagation();updateVNStatus(sid,'partial');};
-  if (items[2]) items[2].onclick = function(e){e.stopPropagation();openVNDetail(sid);};
-  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-  event.stopPropagation();
-}
-
-function toggleVNDropdown(id) {
-  document.querySelectorAll('.dropdown-menu').forEach(function(d) {
-    if (d.id !== id) d.style.display = 'none';
-  });
-  const el = document.getElementById(id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-function toggleExpand(id, btn) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const open = el.style.display !== 'none';
-  el.style.display = open ? 'none' : 'block';
-  btn.textContent = open ? '▸ Xem thêm' : '▴ Thu gọn';
-}
-
-function openVNDetail(id) {
-  document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
-  const s = _vnStandards.find(function(x){return x.id===id;});
-  if (!s) return;
-  const modal = document.getElementById('vn-detail-modal');
-  const body = document.getElementById('vn-detail-body');
-  if (!modal || !body) return;
-  const items = Array.isArray(s.items) ? s.items : [];
-  const done = items.filter(function(i){return i.done;}).length;
-  const col = _statusColor[s.status] || 'var(--t3)';
-  body.innerHTML =
-    '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
-      '<span style="font-size:24px">'+(_vnIcons[s.id]||'📋')+'</span>' +
-      '<div>' +
-        '<div style="font-size:13px;font-weight:700;color:'+(_vnColors[s.id]||'var(--cyan)')+'">'+s.name+'</div>' +
-        '<div style="font-size:10px;color:var(--t3)">'+s.scope+' · '+(_fwLabel[s.framework]||s.framework)+'</div>' +
-      '</div>' +
-      '<div style="margin-left:auto;text-align:right">' +
-        '<div style="font-size:28px;font-weight:700;color:'+col+'">'+s.score+'%</div>' +
-        '<div style="font-size:10px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí đạt</div>' +
-      '</div>' +
-    '</div>' +
-    '<div style="background:var(--border);border-radius:2px;height:6px;margin-bottom:16px">' +
-      '<div style="background:'+col+';height:6px;border-radius:2px;width:'+s.score+'%"></div>' +
-    '</div>' +
-    '<div style="display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px">' +
-    items.map(function(item,i) {
-      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:'+(i%2===0?'transparent':'rgba(255,255,255,.01)')+'">' +
-        '<div style="width:20px;height:20px;border-radius:50%;background:'+(item.done?'rgba(0,255,163,.15)':'rgba(255,184,0,.15)')+';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">'+(item.done?'✓':'⚠')+'</div>' +
-        '<div style="flex:1;font-size:11px;color:var(--t1)">'+item.name+'</div>' +
-        (item.note?'<div style="font-size:10px;color:var(--t3);max-width:200px">'+item.note+'</div>':'') +
-        '<span style="font-size:10px;font-weight:700;color:'+(item.done?'var(--green)':'var(--amber)')+';">'+(item.done?'ĐẠT':'CHỜ')+'</span>' +
-        '</div>';
-    }).join('') +
-    '</div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-      '<button class="btn btn-primary btn-sm" onclick="updateVNStatus(s.id,&apos;passed&apos;)">✓ Mark ĐẠT</button>' +
-      '<button class="btn btn-ghost btn-sm" onclick="updateVNStatus(s.id,'partial')" style="color:var(--amber);border-color:rgba(245,158,11,.4)">⚠ Mark CHỜ</button>' +
-      '<button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:s.id,weakness:s.name,control:s.framework,severity:&apos;MEDIUM&apos;,mitigation:&apos;&apos;})">🤖 AI Advisor</button>' +
-    '</div>';
-  document.getElementById('vn-detail-title').textContent = s.name;
-  modal.classList.add('open');
-}
-
-async function updateVNStatus(id, status) {
-  document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
-  const s = _vnStandards.find(function(x){return x.id===id;});
-  if (!s) return;
-  const res = await post('/api/p4/vn-standards/update', {id, score: s.score, status, notes: s.notes||''});
-  if (res && res.status === 'ok') {
-    toast(id + ' → ' + status);
-    document.getElementById('vn-detail-modal') && document.getElementById('vn-detail-modal').classList.remove('open');
-    loadVNStandards();
-  }
-}
-
-// Close dropdowns on outside click
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.dropdown-menu') && !e.target.closest('button[onclick*="toggleVNDropdown"]')) {
-    document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
-  }
-});
-
-function setSBOMFilter(f, btn) {
-  window._sbomFilter = f;
-  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  if (window._sbomData) {
-    const search = document.getElementById('sbom-search-input');
-    renderSBOMTable(window._sbomData, search ? search.value : '', f);
-  }
-}
-
-// ---- Init ----
-loadOverview();
-// Auto-poll RASP every 30s
-setInterval(() => {
-  if (currentTab() === 'rasp') pollRASP();
-}, 30000);
-
-const DEMO_STEPS=[
-  {title:"01 — P4 Readiness: 100% Achieved",color:"var(--green)",points:["DoD Zero Trust Architecture v2.0 — mức cao nhất (P4)","Tất cả 7 pillars đạt ≥85/100 — threshold P4","ATO (Authority to Operate) đã được cấp — 3 năm","NIST SP 800-37 Rev 2 | DoD Instruction 8510.01"],action:"→ Show: Overview tab, P4 ACHIEVED badge"},
-  {title:"02 — Zero Trust: 7 Pillars All Green",color:"var(--cyan)",points:["Network 100, Data 100 — Optimal maturity","User 96 — MFA 100%, PAM, UEBA","Application 91 — RASP 5/5, 13 micro-seg rules","Automation 93 — 12 SOAR playbooks, OPA/Rego"],action:"→ Show: Zero Trust tab"},
-  {title:"03 — DoD RMF: All 6 Steps Complete",color:"var(--amber)",points:["Steps 1-2: Categorize + Select (FIPS 199 MODERATE)","Step 3: Implement — RASP, micro-seg, SCRM","Step 4: Assess — Coalfire 3PAO: 94% effective","Step 5: Authorize — ATO signed CISO/DAA","Step 6: Monitor — ConMon 94/100"],action:"→ Show: DoD RMF → Generate ATO Letter"},
-  {title:"04 — Compliance Pipeline: 90% Pass Rate",color:"var(--purple)",points:["FedRAMP Moderate: 92% (above 80% target)","CMMC Level 2: 87% (above 80% target)","NIST 800-53: 94% effective","Zero Trust P4: 100% (9/9 passing)","Drift: 3 events auto-reverted"],action:"→ Show: Pipeline → Trigger Scan (live)"},
-  {title:"05 — Application Security: RASP + Micro-Seg",color:"var(--green)",points:["RASP deployed 5/5 services — active mode","847 attacks blocked this month","13 micro-seg rules — Istio + mTLS","20/20 API endpoints: RBAC + mTLS + JWT"],action:"→ Show: RASP Events + Micro-Seg tabs"},
-  {title:"06 — Continuous Monitoring",color:"var(--cyan)",points:["5 automated schedules: daily FedRAMP/CMMC/ZT/NIST","Hourly drift detection — auto-revert","SBOM: 412 components, 0 critical CVEs","ConMon 94/100 — exceeds FedRAMP requirement"],action:"→ Show: Pipeline → Schedules"},
-  {title:"07 — POA&M: Only 1 LOW Remaining",color:"var(--green)",points:["6/7 POA&M items CLOSED — all CRIT/HIGH resolved","Remaining: POAM-007 — annual assessment (LOW)","System under full ATO — no conditions","Export PDF report cho stakeholders"],action:"→ Show: POA&M → Generate ATO Letter → Export PDF"}
-];
-let demoIdx=0;
-function startDemoMode(){demoIdx=0;renderDemoStep();document.getElementById('demo-modal').classList.add('open');}
-function closeDemoMode(){document.getElementById('demo-modal').classList.remove('open');}
-function demoNav(d){demoIdx=Math.max(0,Math.min(DEMO_STEPS.length-1,demoIdx+d));renderDemoStep();}
-function renderDemoStep(){
-  const s=DEMO_STEPS[demoIdx];
-  document.getElementById('demo-step-display').innerHTML='<div style="border-left:3px solid '+s.color+';padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;background:rgba(255,255,255,.03)"><div style="font-size:13px;font-weight:600;color:'+s.color+';margin-bottom:10px">'+s.title+'</div><ul style="list-style:none;display:flex;flex-direction:column;gap:6px">'+s.points.map(function(p){return'<li style="font-size:11px;color:var(--t2);display:flex;gap:8px"><span style="color:'+s.color+';flex-shrink:0">▸</span>'+p+'</li>';}).join('')+'</ul></div><div style="font-size:11px;color:var(--cyan);padding:6px 10px;background:rgba(6,182,212,.08);border-radius:6px;border:1px solid rgba(6,182,212,.2)">'+s.action+'</div>';
-  document.getElementById('demo-dots').innerHTML=DEMO_STEPS.map(function(_,i){return'<div style="width:8px;height:8px;border-radius:50%;background:'+(i===demoIdx?'var(--cyan)':'var(--border2)')+'"></div>';}).join('');
-  document.getElementById('demo-prev').disabled=demoIdx===0;
-  var nb=document.getElementById('demo-next');
-  if(demoIdx===DEMO_STEPS.length-1){nb.textContent='Done';nb.onclick=closeDemoMode;}
-  else{nb.textContent='Next →';nb.onclick=function(){demoNav(1);};}
-}
-async function exportPDF(){
-  const r=await Promise.all([api('/api/p4/zt/status'),api('/api/p4/rmf'),api('/api/p4/pipeline/latest')]);
-  const zt=r[0],rmf=r[1],pipe=r[2];
-  const now=new Date(),ds=now.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-  const p4=zt?zt.p4_readiness:100,ato=rmf?rmf.ato_status.replace(/_/g,' ').toUpperCase():'AUTHORIZED';
-  const steps=rmf?rmf.rmf_steps.filter(function(s){return s.status==='complete';}).length:6;
-  const op=rmf?rmf.poam_items.filter(function(p){return p.status==='open'||p.status==='in_remediation';}).length:1;
-  const ps=pipe?Math.round(pipe.summary.score):90;
-  const fr=pipe?Math.round((pipe.summary.frameworks['FedRAMP']||{}).percent||92):92;
-  const cm=pipe?Math.round((pipe.summary.frameworks['CMMC']||{}).percent||87):87;
-  const pillars=zt?Object.entries(zt.pillars).map(function(e){var k=e[0],p=e[1];return'<tr><td>'+p.name+'</td><td style="text-align:center;color:'+(p.score>=85?'#10b981':p.score>=60?'#f59e0b':'#ef4444')+';font-weight:600">'+p.score+'</td><td style="text-align:center">'+(p.maturity_level||'Advanced')+'</td><td style="text-align:center;color:'+(p.score>=85?'#10b981':'#f59e0b')+'">'+(p.score>=85?'✓ P4':'⚠ Below')+'</td></tr>';}).join(''):'';
-  const htm = [
-    "<!DOCTYPE html><html><head><meta charset=UTF-8><title>VSP P4 Report</title>",
-    "<style>body{font-family:Arial,sans-serif;padding:40px;color:#1a1a2e}",
-    ".hdr{border-bottom:3px solid #0f4c81;padding-bottom:16px;margin-bottom:24px}",
-    ".logo{font-size:24px;font-weight:700;color:#0f4c81}",
-    ".cls{float:right;background:#cc0000;color:#fff;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700}",
-    ".ttl{font-size:18px;font-weight:700;color:#0f4c81;margin:12px 0 4px}",
-    ".sc{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0}",
-    ".sb{border:1px solid #e0e0e0;border-radius:8px;padding:12px;text-align:center}",
-    ".sv{font-size:26px;font-weight:700}.sl{font-size:10px;color:#888;margin-top:4px;text-transform:uppercase}",
-    "h2{font-size:13px;font-weight:700;color:#0f4c81;border-left:4px solid #0f4c81;padding-left:8px;margin:20px 0 10px;text-transform:uppercase}",
-    "table{width:100%;border-collapse:collapse;font-size:12px}",
-    "th{background:#0f4c81;color:#fff;padding:7px 10px;text-align:left}",
-    "td{padding:6px 10px;border-bottom:1px solid #f0f0f0}",
-    "tr:nth-child(even) td{background:#f8f9fc}",
-    ".bg{background:#d1fae5;color:#065f46}.ba{background:#fef3c7;color:#92400e}.bb{background:#dbeafe;color:#1e40af}",
-    ".badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}",
-    ".ft{margin-top:32px;padding-top:12px;border-top:1px solid #e0e0e0;font-size:10px;color:#888;display:flex;justify-content:space-between}",
-    "</style></head><body>",
-    "<div class=hdr><span class=cls>UNCLASSIFIED // FOR OFFICIAL USE ONLY</span>",
-    "<div class=logo>VSP Security Platform</div>",
-    "<div class=ttl>DoD Zero Trust P4 - Compliance Status Report</div>",
-    "<div style=font-size:11px;color:#666>System: VSP-DOD-2025-001 | MODERATE | Generated: April 07, 2026</div></div>",
-    "<div class=sc>",
-    "<div class=sb><div class=sv style=color:#10b981>" + p4 + "%</div><div class=sl>P4 Readiness</div></div>",
-    "<div class=sb><div class=sv style=color:#1e88e5>" + fr + "%</div><div class=sl>FedRAMP Moderate</div></div>",
-    "<div class=sb><div class=sv style=color:#f59e0b>" + cm + "%</div><div class=sl>CMMC Level 2</div></div>",
-    "<div class=sb><div class=sv style=color:#10b981;font-size:14px;padding-top:8px>" + ato + "</div><div class=sl>ATO Status</div></div>",
-    "</div>",
-    "<h2>Executive Summary</h2><table>",
-    "<tr><th>Item</th><th>Status</th><th>Details</th></tr>",
-    "<tr><td>DoD Zero Trust P4</td><td><span class='badge bg'>ACHIEVED</span></td><td>All 7 pillars above 85 - P4 met</td></tr>",
-    "<tr><td>ATO Authorization</td><td><span class='badge bg'>AUTHORIZED</span></td><td>Full 3-year ATO - Steps " + steps + "/6</td></tr>",
-    "<tr><td>Compliance Pipeline</td><td><span class='badge bg'>PASSING</span></td><td>" + ps + "% pass rate</td></tr>",
-    "<tr><td>3PAO Assessor</td><td><span class='badge bb'>COALFIRE</span></td><td>94% controls effective</td></tr>",
-    "<tr><td>ConMon Score</td><td><span class='badge bg'>94/100</span></td><td>Continuous monitoring active</td></tr>",
-    "</table>",
-    "<h2>Zero Trust 7-Pillar Scorecard</h2><table>",
-    "<tr><th>Pillar</th><th>Score</th><th>Maturity</th><th>P4</th></tr>",
-    pillars,
-    "</table>",
-    "<h2>Framework Compliance</h2><table>",
-    "<tr><th>Framework</th><th>Score</th><th>Target</th><th>Status</th></tr>",
-    "<tr><td>FedRAMP Moderate</td><td><strong style=color:#1e88e5>" + fr + "%</strong></td><td>80%</td><td><span class='badge bg'>ABOVE TARGET</span></td></tr>",
-    "<tr><td>CMMC Level 2</td><td><strong style=color:#f59e0b>" + cm + "%</strong></td><td>80%</td><td><span class='badge bg'>ABOVE TARGET</span></td></tr>",
-    "<tr><td>NIST SP 800-53</td><td><strong style=color:#10b981>94%</strong></td><td>80%</td><td><span class='badge bg'>ABOVE TARGET</span></td></tr>",
-    "<tr><td>DoD ZT Architecture v2.0</td><td><strong style=color:#10b981>100%</strong></td><td>85%</td><td><span class='badge bg'>P4 ACHIEVED</span></td></tr>",
-    "</table>",
-    "<div class=ft><div>VSP-DOD-2025-001 | UNCLASSIFIED // FOR OFFICIAL USE ONLY | April 07, 2026</div><div>VSP Security Platform v0.10.0</div></div>",
-    "</body></html>"
-  ].join("");
-  const blob=new Blob([htm],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='VSP-P4-Report-'+now.toISOString().slice(0,10)+'.html';a.click();
-  URL.revokeObjectURL(url);
-  toast('Report exported — Ctrl+P để save PDF');
-}
-
-
-async function syncFindings() {
-  const btn = document.getElementById('sync-findings-btn');
-  if (btn) { btn.textContent = '⟳ Syncing...'; btn.disabled = true; }
-  const res = await api('/api/p4/findings/sync');
-  if (btn) { btn.textContent = '↺ Sync Findings'; btn.disabled = false; }
-  if (res) { toast(res.message || 'Sync complete'); loadRMF && loadRMF(); }
-}
-
-async function loadATOExpiry() {
-  const res = await api('/api/p4/ato/expiry');
-  const el = document.getElementById('ato-expiry-content');
-  if (!res || !el) return;
-  const days = res.days_remaining;
-  const col = res.expiry_level==='ok'?'var(--green)':res.expiry_level==='warning'?'var(--amber)':'var(--red)';
-  const exp = res.expiration_date ? new Date(res.expiration_date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
-  const done = (res.renewal_checklist||[]).filter(c=>c.done).length;
-  const total = (res.renewal_checklist||[]).length;
-  el.innerHTML =
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:10px">' +
-    '<div style="text-align:center"><div style="font-size:32px;font-weight:700;color:'+col+'">'+days+'</div><div style="font-size:10px;color:var(--t3)">DAYS REMAINING</div></div>' +
-    '<div style="text-align:center"><div style="font-size:13px;font-weight:600;color:var(--t1);margin-top:8px">'+exp+'</div><div style="font-size:10px;color:var(--t3)">EXPIRATION DATE</div></div>' +
-    '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--cyan)">'+done+'/'+total+'</div><div style="font-size:10px;color:var(--t3)">RENEWAL TASKS</div></div>' +
-    '</div>' +
-    '<div style="padding:8px 12px;background:rgba(0,0,0,.2);border-radius:6px;font-size:11px;color:'+col+'">' +
-    (res.expiry_level==='ok'?'✓ ATO valid — no action required':res.expiry_level==='warning'?'⚠ Begin renewal process — under 6 months remaining':'⚡ URGENT — ATO renewal required immediately') +
-    '</div>' +
-    '<div style="margin-top:10px"><div style="font-size:10px;color:var(--t3);margin-bottom:6px">RENEWAL CHECKLIST</div>' +
-    (res.renewal_checklist||[]).map(function(c){return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px"><span style="color:'+(c.done?'var(--green)':'var(--t3)')+';">'+(c.done?'✓':'○')+'</span><span style="color:'+(c.done?'var(--t2)':'var(--t1)')+'">'+c.task+'</span><span style="color:var(--t3);margin-left:auto;font-size:10px">-'+c.due_weeks_before_expiry+'w</span></div>';}).join('') +
-    '</div>';
-}
-
-async function loadSBOMView() {
-  const el = document.getElementById('sbom-view-content');
-  if (el) el.innerHTML = '<div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>';
-  const res = await api('/api/p4/sbom/view-db');
-  if (!res || !el) return;
-  const rows = (res.components||[]).slice(0,20).map(function(c){
-    return '<tr><td style="font-family:monospace;font-size:11px">'+c.name+'</td><td style="font-size:11px">'+c.version+'</td><td style="font-size:11px">'+c.type+'</td><td style="font-size:11px">'+c.license+'</td>' +
-    '<td style="text-align:center;font-size:11px;color:'+(c.cves>0?(c.severity==='CRITICAL'?'var(--red)':'var(--amber)'):'var(--green)')+'">'+( c.cves>0?c.cves+' '+c.severity:'✓')+'</td>' +
-    '<td style="text-align:center;font-size:11px;color:'+(c.ntia_compliant?'var(--green)':'var(--red)')+'">'+( c.ntia_compliant?'✓':'✗')+'</td></tr>';
-  }).join('');
-  // Store globally for filtering
-  window._sbomData = res;
-  renderSBOMTable(res, '', 'all');
-}
-
-function renderSBOMTable(res, search, filter) {
-  const el = document.getElementById('sbom-view-content');
-  if (!el) return;
-  let comps = (res.components||[]);
-  if (search) comps = comps.filter(c => (c.name||'').toLowerCase().includes(search.toLowerCase()) || (c.license||'').toLowerCase().includes(search.toLowerCase()));
-  if (filter === 'vuln') comps = comps.filter(c => c.cves > 0);
-  if (filter === 'clean') comps = comps.filter(c => !c.cves || c.cves === 0);
-  const rows = comps.slice(0,50).map(function(c){
-    const hasCVE = c.cves > 0;
-    const sevLabel = c.severity || (hasCVE ? 'MEDIUM' : '');
-    const sevColor = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[sevLabel] || 'var(--t3)';
-    return '<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="openSBOMDetail('+JSON.stringify(c).replace(/"/g,'&quot;')+')">' +
-      '<td style="font-family:monospace;font-size:11px;padding:6px 8px;color:var(--t1)">' + (c.name||'') + '</td>' +
-      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.version||'') + '</td>' +
-      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.type||'') + '</td>' +
-      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.license||'') + '</td>' +
-      '<td style="text-align:center;padding:6px 8px">' + (hasCVE ?
-        '<span style="color:'+sevColor+';font-weight:700;font-size:11px">' + c.cves + ' ' + sevLabel + '</span>' :
-        '<span style="color:var(--green)">✓</span>') + '</td>' +
-      '<td style="text-align:center;padding:6px 8px;color:'+(c.ntia_compliant?'var(--green)':'var(--red)')+';">' + (c.ntia_compliant?'✓':'✗') + '</td>' +
-      '</tr>';
-  }).join('');
-
-  el.innerHTML =
-    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">' +
-    ['<div style="color:var(--cyan);font-size:22px;font-weight:700">'+res.total_components+'</div><div style="font-size:9px;color:var(--t3)">TOTAL</div>',
-     '<div style="color:var(--red);font-size:22px;font-weight:700">'+res.critical+'</div><div style="font-size:9px;color:var(--t3)">CRITICAL</div>',
-     '<div style="color:var(--amber);font-size:22px;font-weight:700">'+res.high+'</div><div style="font-size:9px;color:var(--t3)">HIGH</div>',
-     '<div style="color:var(--green);font-size:22px;font-weight:700">'+res.clean+'</div><div style="font-size:9px;color:var(--t3)">CLEAN</div>',
-     '<div style="color:var(--green);font-size:22px;font-weight:700">'+Math.round(res.ntia_compliance_pct)+'%</div><div style="font-size:9px;color:var(--t3)">NTIA</div>'
-    ].map(function(c){return '<div style="background:var(--bg2);border-radius:6px;padding:10px;text-align:center">'+c+'</div>';}).join('') +
-    '</div>' +
-    (res.policy_violations&&res.policy_violations.length?'<div style="margin-bottom:10px;padding:8px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;font-size:11px;color:var(--amber)">⚠ '+res.policy_violations.join(' | ')+'</div>':'') +
-    '<div style="font-size:10px;color:var(--t3);margin-bottom:8px">'+res.frameworks.join(' · ')+'</div>' +
-    '<table style="width:100%;border-collapse:collapse"><thead><tr style="color:var(--t3);font-size:10px">' +
-    '<th style="text-align:left;padding:4px 8px">Component</th><th style="padding:4px">Version</th><th style="padding:4px">Type</th><th style="padding:4px">License</th><th style="text-align:center;padding:4px">CVEs</th><th style="text-align:center;padding:4px">NTIA</th></tr></thead>' +
-    '<tbody>'+rows+'</tbody></table>' +
-    '<div style="font-size:10px;color:var(--t3);margin-top:8px">Showing '+Math.min(50,comps.length)+' of '+res.total_components+' components · Last scan: '+new Date(res.last_scan).toLocaleDateString()+'</div>';
-}
-
-function openSBOMDetail(c) {
-  const sevColor = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[c.severity]||'var(--green)';
-  const modal = document.getElementById('sbom-detail-modal');
-  const body = document.getElementById('sbom-detail-body');
-  if (!modal || !body) return;
-  body.innerHTML =
-    '<div class="detail-row"><div class="detail-key">Component</div><div class="detail-val" style="font-family:monospace;font-weight:600">'+c.name+'</div></div>'+
-    '<div class="detail-row"><div class="detail-key">Version</div><div class="detail-val">'+c.version+'</div></div>'+
-    '<div class="detail-row"><div class="detail-key">Type</div><div class="detail-val">'+c.type+'</div></div>'+
-    '<div class="detail-row"><div class="detail-key">License</div><div class="detail-val"><span style="background:rgba(139,92,246,.15);color:var(--purple);padding:1px 6px;border-radius:4px;font-size:10px">'+c.license+'</span></div></div>'+
-    '<div class="detail-row"><div class="detail-key">CVEs</div><div class="detail-val">'+(c.cves>0?'<span style="color:'+sevColor+';font-weight:700">'+c.cves+' '+c.severity+'</span>':'<span style="color:var(--green)">✓ No CVEs</span>')+'</div></div>'+
-    '<div class="detail-row"><div class="detail-key">NTIA Compliant</div><div class="detail-val">'+(c.ntia_compliant?'<span style="color:var(--green)">✓ Compliant</span>':'<span style="color:var(--red)">✗ Non-compliant</span>')+'</div></div>'+
-    (c.cves>0?'<div style="margin-top:14px;padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:6px;font-size:11px;color:var(--amber)">⚠ Remediation required within 30 days · Update '+c.name+' to latest version</div>':'');
-  document.getElementById('sbom-detail-title').textContent = c.name + ' v' + c.version;
-  modal.classList.add('open');
-}
-
-
-let aiHistory = [];
-let aiContext = null;
-
-function openAIAdvisor(context) {
-  aiContext = context;
-  aiHistory = [];
-  const modal = document.getElementById('ai-advisor-modal');
-  if (!modal) return;
-  modal.classList.add('open');
-  document.getElementById('ai-chat-messages').innerHTML = '';
-  document.getElementById('ai-context-label').textContent = context ? ('Analyzing: ' + (context.weakness||context.title||'P4 Compliance')) : 'P4 AI Advisor';
   const prompt = context
     ? 'Analyze this compliance finding and provide specific remediation steps:\n\nItem: ' + (context.id||'') + '\nWeakness: ' + (context.weakness||'') + '\nControl: ' + (context.control||'') + '\nSeverity: ' + (context.severity||'') + '\nMitigation: ' + (context.mitigation||'') + '\n\nProvide: 1) Root cause, 2) Step-by-step remediation, 3) Evidence needed, 4) Estimated effort, 5) NIST control reference.'
     : 'Analyze the VSP P4 compliance posture (P4 100%, FedRAMP 92%, CMMC 87%, ATO authorized) and provide top 3 priority recommendations to improve score.';
