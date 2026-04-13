@@ -322,7 +322,7 @@ function esc(s) {
     .replace(/'/g, '&#39;');
 }
 
-const API = 'http://127.0.0.1:8921';
+const API = window.location.origin;
 
 function toast(msg) {
   const t = document.getElementById('toast');
