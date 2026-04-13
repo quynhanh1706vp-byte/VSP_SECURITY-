@@ -259,3 +259,119 @@ func buildCycloneDX(run *store.Run, findings []store.Finding) cycloneDX {
 	}
 	return bom
 }
+
+// GET /api/v1/sbom/{rid}/diff?compare={rid2}
+// Compare two SBOM runs — show new/fixed/changed findings
+func (h *SBOM) Diff(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	rid1 := chi.URLParam(r, "rid")
+	rid2 := r.URL.Query().Get("compare")
+	if rid2 == "" {
+		// Auto-compare with previous run
+		jsonError(w, "compare parameter required (e.g. ?compare=RID_xxx)", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	run1, err := h.DB.GetRunByRID(ctx, claims.TenantID, rid1)
+	if err != nil || run1 == nil {
+		jsonError(w, "run1 not found", http.StatusNotFound)
+		return
+	}
+	run2, err := h.DB.GetRunByRID(ctx, claims.TenantID, rid2)
+	if err != nil || run2 == nil {
+		jsonError(w, "run2 not found", http.StatusNotFound)
+		return
+	}
+
+	// Get findings for both runs
+	getFindings := func(runID string) map[string]store.Finding {
+		findings, _, _ := h.DB.ListFindings(ctx, claims.TenantID,
+			store.FindingFilter{Limit: 5000})
+		m := make(map[string]store.Finding)
+		for _, f := range findings {
+			if f.RunID == runID {
+				key := f.Tool + "|" + f.RuleID + "|" + f.Path + "|" + fmt.Sprint(f.LineNum)
+				m[key] = f
+			}
+		}
+		return m
+	}
+
+	f1 := getFindings(run1.ID)
+	f2 := getFindings(run2.ID)
+
+	type DiffItem struct {
+		Key      string `json:"key"`
+		Status   string `json:"status"` // new | fixed | persisted
+		Tool     string `json:"tool"`
+		RuleID   string `json:"rule_id"`
+		Severity string `json:"severity"`
+		Path     string `json:"path"`
+		Message  string `json:"message"`
+	}
+
+	var newItems, fixedItems, persistedItems []DiffItem
+
+	// New in run1 (not in run2 = baseline)
+	for k, f := range f1 {
+		if _, exists := f2[k]; !exists {
+			newItems = append(newItems, DiffItem{
+				Key: k, Status: "new",
+				Tool: f.Tool, RuleID: f.RuleID,
+				Severity: f.Severity, Path: f.Path, Message: f.Message,
+			})
+		} else {
+			persistedItems = append(persistedItems, DiffItem{
+				Key: k, Status: "persisted",
+				Tool: f.Tool, RuleID: f.RuleID,
+				Severity: f.Severity, Path: f.Path, Message: f.Message,
+			})
+		}
+	}
+
+	// Fixed (in run2 but not in run1)
+	for k, f := range f2 {
+		if _, exists := f1[k]; !exists {
+			fixedItems = append(fixedItems, DiffItem{
+				Key: k, Status: "fixed",
+				Tool: f.Tool, RuleID: f.RuleID,
+				Severity: f.Severity, Path: f.Path, Message: f.Message,
+			})
+		}
+	}
+
+	// Count by severity
+	countBySev := func(items []DiffItem) map[string]int {
+		m := map[string]int{"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+		for _, i := range items {
+			m[i.Severity]++
+		}
+		return m
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"run1": map[string]interface{}{
+			"rid": rid1, "mode": run1.Mode,
+			"gate": run1.Gate, "created_at": run1.CreatedAt,
+			"total_findings": len(f1),
+		},
+		"run2": map[string]interface{}{
+			"rid": rid2, "mode": run2.Mode,
+			"gate": run2.Gate, "created_at": run2.CreatedAt,
+			"total_findings": len(f2),
+		},
+		"diff": map[string]interface{}{
+			"new_count":       len(newItems),
+			"fixed_count":     len(fixedItems),
+			"persisted_count": len(persistedItems),
+			"new_by_sev":      countBySev(newItems),
+			"fixed_by_sev":    countBySev(fixedItems),
+			"trend":           map[bool]string{true: "improving", false: map[bool]string{true: "degraded", false: "stable"}[len(newItems) > len(fixedItems)]}[len(fixedItems) > len(newItems)],
+		},
+		"new":       newItems,
+		"fixed":     fixedItems,
+		"persisted": persistedItems,
+	})
+}

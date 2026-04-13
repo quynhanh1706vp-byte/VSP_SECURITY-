@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/rs/zerolog/log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -16,7 +17,8 @@ func (h *Remediation) List(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	list, err := h.DB.ListRemediations(r.Context(), claims.TenantID, status)
 	if err != nil {
-		jsonError(w, "db error", http.StatusInternalServerError)
+		log.Error().Err(err).Str("tenant", claims.TenantID).Msg("ListRemediations failed")
+		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if list == nil {

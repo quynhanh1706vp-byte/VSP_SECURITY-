@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+:root{--bg:#080c14;--bg2:#0c1220;--surface:#111827;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#f0f4ff;--t2:#8899bb;--t3:#4a5568;--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--blue:#3b82f6;--font-mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'DM Sans',system-ui,sans-serif;font-size:13px;padding:16px}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.hdr h2{font-size:15px;font-weight:700;letter-spacing:-.02em}
+.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.run-select{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:16px}
+.select-box{background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px}
+.select-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+select.form-ctrl{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--t1);padding:6px 8px;font-size:11px;font-family:var(--font-mono)}
+.vs-badge{text-align:center;font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.btn{font-size:11px;font-weight:500;padding:5px 14px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer}
+.btn-primary{background:var(--cyan2);border-color:rgba(6,182,212,.3);color:var(--cyan)}
+.btn:hover{opacity:.8}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center}
+.kpi-val{font-size:22px;font-weight:700;font-family:var(--font-mono);margin-bottom:2px}
+.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em}
+.tabs{display:flex;gap:2px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.tab{padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--t3);background:none;border-top:none;border-left:none;border-right:none}
+.tab.active{color:var(--t1);border-bottom-color:var(--cyan)}
+.tab-content{display:none}.tab-content.active{display:block}
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)}
+td{padding:7px 8px;border-bottom:1px solid var(--border);font-size:11px;vertical-align:top}
+tr:hover td{background:var(--surface)}
+.pill{display:inline-block;font-size:9px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600}
+.pill-new{background:var(--red2);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.pill-fixed{background:var(--green2);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.pill-persisted{background:var(--amber2);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+.pill-crit{background:rgba(239,68,68,.15);color:#ff6b6b}
+.pill-high{background:rgba(245,158,11,.15);color:var(--amber)}
+.pill-med{background:rgba(59,130,246,.15);color:var(--blue)}
+.pill-low{background:rgba(34,197,94,.15);color:var(--green)}
+.empty{color:var(--t3);font-size:12px;padding:24px;text-align:center}
+.run-meta{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+.loading{color:var(--t3);font-size:12px;padding:32px;text-align:center}
+.trend-up{color:var(--red)}
+.trend-down{color:var(--green)}
+.trend-same{color:var(--amber)}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div><h2>SBOM Diff</h2><p>Visual comparison · new / fixed / persisted findings per run</p></div>
+  <button class="btn btn-primary" onclick="runDiff()" id="diff-btn">Compare ↗</button>
+</div>
+
+<div class="run-select">
+  <div class="select-box">
+    <div class="select-lbl">New run (target)</div>
+    <select class="form-ctrl" id="rid1"><option value="">— select run —</option></select>
+    <div class="run-meta" id="meta1"></div>
+  </div>
+  <div class="vs-badge">VS</div>
+  <div class="select-box">
+    <div class="select-lbl">Baseline run</div>
+    <select class="form-ctrl" id="rid2"><option value="">— select run —</option></select>
+    <div class="run-meta" id="meta2"></div>
+  </div>
+</div>
+
+<div class="kpi-row" id="kpi-row" style="display:none">
+  <div class="kpi"><div class="kpi-val trend-up" id="k-new">0</div><div class="kpi-lbl">🔴 New</div></div>
+  <div class="kpi"><div class="kpi-val trend-down" id="k-fixed">0</div><div class="kpi-lbl">✅ Fixed</div></div>
+  <div class="kpi"><div class="kpi-val trend-same" id="k-persisted">0</div><div class="kpi-lbl">⚠ Persisted</div></div>
+  <div class="kpi"><div class="kpi-val" id="k-trend" style="font-size:16px">—</div><div class="kpi-lbl">Trend</div></div>
+</div>
+
+<div class="tabs" id="tabs" style="display:none">
+  <button class="tab active" onclick="switchTab('new',this)">🔴 New (<span id="tc-new">0</span>)</button>
+  <button class="tab" onclick="switchTab('fixed',this)">✅ Fixed (<span id="tc-fixed">0</span>)</button>
+  <button class="tab" onclick="switchTab('persisted',this)">⚠ Persisted (<span id="tc-persisted">0</span>)</button>
+</div>
+
+<div id="tab-new" class="tab-content active">
+  <table><thead><tr><th>Sev</th><th>Tool</th><th>Rule</th><th>Path</th><th>Message</th></tr></thead>
+  <tbody id="tbl-new"><tr><td colspan="5" class="empty">Select two runs and click Compare</td></tr></tbody></table>
+</div>
+<div id="tab-fixed" class="tab-content">
+  <table><thead><tr><th>Sev</th><th>Tool</th><th>Rule</th><th>Path</th><th>Message</th></tr></thead>
+  <tbody id="tbl-fixed"></tbody></table>
+</div>
+<div id="tab-persisted" class="tab-content">
+  <table><thead><tr><th>Sev</th><th>Tool</th><th>Rule</th><th>Path</th><th>Message</th></tr></thead>
+  <tbody id="tbl-persisted"></tbody></table>
+</div>
+
+<script>
+var TOKEN='', API='';
+var RUNS=[];
+
+function sevPill(s){
+  var m={CRITICAL:'pill-crit',HIGH:'pill-high',MEDIUM:'pill-med',LOW:'pill-low',INFO:'pill-low'};
+  return '<span class="pill '+(m[s]||'')+'">'+s+'</span>';
+}
+
+function renderRows(items, tbodyId){
+  var el=document.getElementById(tbodyId);
+  if(!items||!items.length){el.innerHTML='<tr><td colspan="5" class="empty">No items</td></tr>';return;}
+  el.innerHTML=items.map(function(i){
+    var path=i.path||'';if(path.length>40)path='…'+path.slice(-38);
+    var msg=i.message||'';if(msg.length>60)msg=msg.slice(0,58)+'…';
+    return '<tr>'
+      +'<td>'+sevPill(i.severity)+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">'+i.tool+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">'+i.rule_id+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:var(--t2)">'+path+'</td>'
+      +'<td style="font-size:11px;color:var(--t2)">'+msg+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function switchTab(name, btn){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
+  document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active')});
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+async function loadRuns(){
+  if(!TOKEN)return;
+  try{
+    var r=await fetch(API+'/api/v1/vsp/runs/index',{headers:{Authorization:'Bearer '+TOKEN}});
+    var d=await r.json();
+    RUNS=(d.runs||[]).slice(0,50);
+    var opts=RUNS.map(function(r){
+      var dt=r.started_at?new Date(r.started_at).toLocaleDateString('en-GB'):'';
+      return '<option value="'+r.rid+'">'+r.rid.slice(-20)+' · '+r.mode+' · '+r.gate+' · '+dt+'</option>';
+    }).join('');
+    document.getElementById('rid1').innerHTML='<option value="">— select run —</option>'+opts;
+    document.getElementById('rid2').innerHTML='<option value="">— select baseline —</option>'+opts;
+    // Auto-select latest 2
+    if(RUNS.length>=2){
+      document.getElementById('rid1').value=RUNS[0].rid;
+      document.getElementById('rid2').value=RUNS[1].rid;
+      updateMeta();
+    }
+  }catch(e){console.error('loadRuns',e);}
+}
+
+function updateMeta(){
+  ['rid1','rid2'].forEach(function(id,i){
+    var val=document.getElementById(id).value;
+    var run=RUNS.find(function(r){return r.rid===val;});
+    var metaEl=document.getElementById('meta'+(i+1));
+    if(run&&metaEl){
+      metaEl.textContent=run.mode+' · '+run.gate+' · '+(run.total_findings||0)+' findings';
+    }
+  });
+}
+
+document.getElementById('rid1').addEventListener('change',updateMeta);
+document.getElementById('rid2').addEventListener('change',updateMeta);
+
+async function runDiff(){
+  var rid1=document.getElementById('rid1').value;
+  var rid2=document.getElementById('rid2').value;
+  if(!rid1||!rid2){alert('Select two runs');return;}
+  if(rid1===rid2){alert('Select different runs');return;}
+  var btn=document.getElementById('diff-btn');
+  btn.textContent='Loading…';btn.disabled=true;
+  try{
+    var r=await fetch(API+'/api/v1/sbom/'+rid1+'/diff?compare='+rid2,
+      {headers:{Authorization:'Bearer '+TOKEN}});
+    if(!r.ok){throw new Error('HTTP '+r.status);}
+    var d=await r.json();
+    var newItems=d.new||[];
+    var fixedItems=d.fixed||[];
+    var persistedItems=d.persisted||[];
+    var total=newItems.length+fixedItems.length+persistedItems.length;
+    // KPIs
+    document.getElementById('k-new').textContent=newItems.length;
+    document.getElementById('k-fixed').textContent=fixedItems.length;
+    document.getElementById('k-persisted').textContent=persistedItems.length;
+    // Trend
+    var trendEl=document.getElementById('k-trend');
+    if(newItems.length>fixedItems.length){
+      trendEl.textContent='↑ Worse';trendEl.className='kpi-val trend-up';
+    }else if(fixedItems.length>newItems.length){
+      trendEl.textContent='↓ Better';trendEl.className='kpi-val trend-down';
+    }else{
+      trendEl.textContent='→ Stable';trendEl.className='kpi-val trend-same';
+    }
+    // Tab counts
+    document.getElementById('tc-new').textContent=newItems.length;
+    document.getElementById('tc-fixed').textContent=fixedItems.length;
+    document.getElementById('tc-persisted').textContent=persistedItems.length;
+    // Tables
+    renderRows(newItems,'tbl-new');
+    renderRows(fixedItems,'tbl-fixed');
+    renderRows(persistedItems,'tbl-persisted');
+    // Show
+    document.getElementById('kpi-row').style.display='';
+    document.getElementById('tabs').style.display='';
+  }catch(e){
+    alert('Diff failed: '+e.message);
+  }finally{
+    btn.textContent='Compare ↗';btn.disabled=false;
+  }
+}
+
+// Token from parent iframe
+function _init(tk){
+  TOKEN=tk;
+  API=window.location.origin==='null'?'':window.location.origin;
+  loadRuns();
+}
+window.addEventListener('message',function(e){
+  if(e.data&&e.data.type==='vsp:token')_init(e.data.token);
+});
+if(window.parent!==window){
+  window.parent.postMessage({type:'vsp:request_token'},'*');
+}else{
+  // Standalone dev — try localStorage
+  var tk=localStorage.getItem('vsp_token')||'';
+  if(tk)_init(tk);
+}
+</script>
+</body>
+</html>

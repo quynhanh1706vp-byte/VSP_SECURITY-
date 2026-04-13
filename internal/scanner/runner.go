@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -26,6 +27,14 @@ var severityRank = map[Severity]int{
 	SevLow:      3,
 	SevInfo:     2,
 	SevTrace:    1,
+}
+
+// dastToolPath returns the executable path from env or falls back to PATH lookup.
+func dastToolPath(envKey, binary string) string {
+	if p := os.Getenv(envKey); p != "" {
+		return p
+	}
+	return binary // relies on $PATH
 }
 
 func (s Severity) Rank() int {

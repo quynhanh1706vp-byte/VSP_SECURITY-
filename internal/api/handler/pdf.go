@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -131,6 +132,26 @@ func buildReportData(run *store.Run, rf []store.Finding) reportData {
 		case "LOW":
 			data.Summary.Low++
 		}
+	}
+	// Extract score from run summary JSON
+	var sm map[string]interface{}
+	if run.Summary != nil {
+		_ = json.Unmarshal(run.Summary, &sm)
+	}
+	if sm != nil {
+		if v, ok := sm["SCORE"]; ok {
+			if s, ok2 := v.(float64); ok2 {
+				data.Score = int(s)
+			}
+		}
+		if v, ok := sm["score"]; ok && data.Score == 0 {
+			if s, ok2 := v.(float64); ok2 {
+				data.Score = int(s)
+			}
+		}
+	}
+	if data.Posture == "" {
+		data.Posture = run.Posture
 	}
 	return data
 }
