@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>OWASP SAMM 2.0</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;font-size:13px}
+.top{padding:16px 20px;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top h1{font-size:16px;font-weight:600;color:#f1f5f9}
+.top .sub{font-size:11px;color:#64748b}
+.score-badge{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600}
+.score-badge span{color:#60a5fa}
+.content{padding:16px 20px}
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.kpi{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center}
+.kpi-val{font-size:22px;font-weight:700;margin-bottom:4px}
+.kpi-lbl{font-size:10px;color:#64748b}
+.kpi-sub{font-size:10px;margin-top:2px}
+.domains{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.domain{background:#1e293b;border:1px solid #334155;border-radius:10px;overflow:hidden}
+.domain-head{padding:10px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px}
+.domain-head .icon{font-size:14px}
+.domain-score{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px}
+.practice{padding:8px 12px;border-top:1px solid #0f172a}
+.practice-name{font-size:11px;font-weight:500;color:#cbd5e1;margin-bottom:6px}
+.maturity-bar{display:flex;gap:3px;margin-bottom:4px}
+.ml{flex:1;height:6px;border-radius:2px;background:#0f172a;cursor:pointer;transition:all .2s}
+.ml.active{background:#3b82f6}
+.ml.l2.active{background:#8b5cf6}
+.ml.l3.active{background:#10b981}
+.ml-score{font-size:10px;color:#64748b;text-align:right}
+.activities{margin-top:6px}
+.activity{font-size:10px;color:#94a3b8;padding:3px 0;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:6px;cursor:pointer}
+.activity:last-child{border-bottom:none}
+.activity input[type=checkbox]{accent-color:#3b82f6;width:12px;height:12px;cursor:pointer;flex-shrink:0}
+.activity.done{color:#64748b;text-decoration:line-through}
+.btn{background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:500}
+.btn:hover{background:#1d4ed8}
+.btn-ghost{background:transparent;border:1px solid #334155;color:#94a3b8}
+.btn-ghost:hover{border-color:#64748b;color:#e2e8f0}
+.progress-ring{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;font-size:11px;font-weight:700;margin-right:6px}
+.footer{padding:12px 20px;border-top:1px solid #1e293b;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tag{font-size:10px;padding:2px 8px;border-radius:3px;background:#1e293b;color:#64748b;border:1px solid #334155}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div>
+    <h1>OWASP SAMM 2.0 — Security Assessment</h1>
+    <div class="sub">Software Assurance Maturity Model · 5 domains · 15 practices · 30 activities</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <div class="score-badge">Overall: <span id="overall-score">0.0</span>/3.0</div>
+    <button class="btn btn-ghost" onclick="resetAll()">↺ Reset</button>
+    <button class="btn" onclick="exportReport()">↓ Export</button>
+  </div>
+</div>
+
+<div class="content">
+  <div class="kpi-row" id="kpi-row"></div>
+  <div class="domains" id="domains-grid"></div>
+</div>
+
+<div class="footer">
+  <span class="tag">SAMM v2.0.1</span>
+  <span class="tag">VSP Platform v0.10</span>
+  <span class="tag" id="last-updated">—</span>
+  <span style="margin-left:auto;font-size:11px;color:#475569">Click maturity levels to set score · Check activities to track completion</span>
+</div>
+
+<script>
+const SAMM = [
+  { id:'gov', name:'Governance', icon:'🏛', color:'#3b82f6', color2:'#1d4ed8',
+    practices:[
+      { name:'Strategy & Metrics', acts:[
+        'Define security objectives aligned to business goals',
+        'Assign security roles and responsibilities org-wide',
+        'Track security KPIs and publish metrics quarterly',
+        'Integrate security into enterprise risk management'
+      ]},
+      { name:'Policy & Compliance', acts:[
+        'Define security policies covering all key areas',
+        'Map policies to regulatory requirements (TT13, ISO)',
+        'Automate compliance checks in CI/CD pipeline',
+        'Conduct annual policy review and gap analysis'
+      ]},
+      { name:'Education & Guidance', acts:[
+        'Provide security awareness training to all staff',
+        'Define secure coding guidelines per language/stack',
+        'Run role-based security training (devs, ops, mgmt)',
+        'Build internal security champions program'
+      ]}
+    ]
+  },
+  { id:'des', name:'Design', icon:'🎯', color:'#8b5cf6', color2:'#6d28d9',
+    practices:[
+      { name:'Threat Assessment', acts:[
+        'Perform threat modeling on all new features',
+        'Maintain threat model library by asset type',
+        'Integrate STRIDE/PASTA into design review process',
+        'Track threats to findings via JIRA/VSP linking'
+      ]},
+      { name:'Security Requirements', acts:[
+        'Define security requirements from user stories',
+        'Map OWASP ASVS to project requirements',
+        'Validate requirements coverage before sprint start',
+        'Include abuse cases in acceptance criteria'
+      ]},
+      { name:'Security Architecture', acts:[
+        'Define reference security architecture patterns',
+        'Review new components against security baselines',
+        'Document trust boundaries and data flows',
+        'Enforce least privilege in all service designs'
+      ]}
+    ]
+  },
+  { id:'imp', name:'Implementation', icon:'⚙️', color:'#f59e0b', color2:'#d97706',
+    practices:[
+      { name:'Secure Build', acts:[
+        'Integrate SAST into CI pipeline (VSP/Semgrep)',
+        'Enforce dependency scanning on every build (Trivy)',
+        'Block builds on critical/high severity findings',
+        'Sign and verify all build artifacts'
+      ]},
+      { name:'Secure Deployment', acts:[
+        'Use secrets management (no hardcoded credentials)',
+        'Scan container images before production push',
+        'Enforce IaC security scanning (KICS/Checkov)',
+        'Implement blue/green with security gate checks'
+      ]},
+      { name:'Defect Management', acts:[
+        'Track all security findings in VSP remediation',
+        'Define SLA per severity (Crit:24h, High:7d)',
+        'Run weekly security bug triage meetings',
+        'Measure and report defect density over time'
+      ]}
+    ]
+  },
+  { id:'ver', name:'Verification', icon:'🔍', color:'#10b981', color2:'#059669',
+    practices:[
+      { name:'Architecture Assessment', acts:[
+        'Review architecture against security principles',
+        'Validate threat model accuracy vs implementation',
+        'Check data flow diagrams vs network captures',
+        'Conduct annual architecture security review'
+      ]},
+      { name:'Requirements-driven Testing', acts:[
+        'Map test cases to security requirements',
+        'Run DAST against all API endpoints (Nuclei/Nikto)',
+        'Test all OWASP Top 10 categories per release',
+        'Automate regression testing for fixed vulns'
+      ]},
+      { name:'Security Testing', acts:[
+        'Run full VSP scan (FULL profile) per sprint',
+        'Conduct annual penetration testing by 3rd party',
+        'Perform red team exercises for critical systems',
+        'Track CVE exposure via SCA (Trivy/Grype)'
+      ]}
+    ]
+  },
+  { id:'ops', name:'Operations', icon:'🛡', color:'#ef4444', color2:'#dc2626',
+    practices:[
+      { name:'Incident Management', acts:[
+        'Define incident response playbooks in VSP SOAR',
+        'Test incident response via tabletop exercises',
+        'Measure MTTD and MTTR per incident class',
+        'Integrate VSP SIEM alerts with on-call system'
+      ]},
+      { name:'Environment Management', acts:[
+        'Enforce configuration baselines via IaC',
+        'Monitor EOL software with VSP SW Risk agent',
+        'Patch critical CVEs within SLA (24h for CVSS≥9)',
+        'Run quarterly vulnerability assessment scans'
+      ]},
+      { name:'Operational Management', acts:[
+        'Maintain asset inventory in VSP (CMDB)',
+        'Review access rights quarterly (VSP Users)',
+        'Enable audit logging for all admin actions',
+        'Conduct annual SAMM re-assessment'
+      ]}
+    ]
+  }
+];
+
+let state = {};
+try{ state=JSON.parse(localStorage.getItem('vsp_samm')||'{}'); }catch(e){}
+
+function saveState(){ try{localStorage.setItem('vsp_samm',JSON.stringify(state));}catch(e){} }
+
+function getMaturity(domId, pIdx){
+  return (state[domId] && state[domId]['m_'+pIdx]) || 0;
+}
+function setMaturity(domId, pIdx, level){
+  if(!state[domId]) state[domId]={};
+  const cur=getMaturity(domId,pIdx);
+  state[domId]['m_'+pIdx] = (cur===level)?level-1:level;
+  render(); saveState();
+}
+function getActivity(domId, pIdx, aIdx){
+  return !!(state[domId] && state[domId]['a_'+pIdx+'_'+aIdx]);
+}
+function toggleActivity(domId, pIdx, aIdx){
+  if(!state[domId]) state[domId]={};
+  state[domId]['a_'+pIdx+'_'+aIdx]=!getActivity(domId,pIdx,aIdx);
+  render(); saveState();
+}
+
+function calcDomainScore(dom){
+  let total=0;
+  dom.practices.forEach((_,pi)=>{ total+=getMaturity(dom.id,pi); });
+  return (total/(dom.practices.length*3)*3).toFixed(1);
+}
+
+function calcOverall(){
+  let total=0;
+  SAMM.forEach(d=>{ total+=parseFloat(calcDomainScore(d)); });
+  return (total/SAMM.length).toFixed(1);
+}
+
+function scoreColor(s){
+  const n=parseFloat(s);
+  if(n>=2.5) return '#10b981';
+  if(n>=1.5) return '#f59e0b';
+  if(n>=0.5) return '#ef4444';
+  return '#475569';
+}
+
+function render(){
+  // KPI
+  const kpiRow=document.getElementById('kpi-row');
+  kpiRow.innerHTML=SAMM.map(d=>{
+    const s=calcDomainScore(d);
+    const pct=Math.round(parseFloat(s)/3*100);
+    return `<div class="kpi">
+      <div class="kpi-val" style="color:${d.color}">${s}</div>
+      <div class="kpi-lbl">${d.icon} ${d.name}</div>
+      <div class="kpi-sub" style="color:${scoreColor(s)}">${pct}% maturity</div>
+    </div>`;
+  }).join('');
+
+  // Overall
+  const ov=calcOverall();
+  document.getElementById('overall-score').textContent=ov;
+  document.getElementById('overall-score').style.color=scoreColor(ov);
+  document.getElementById('last-updated').textContent='Last updated: '+new Date().toLocaleString('vi-VN');
+
+  // Domains grid
+  const grid=document.getElementById('domains-grid');
+  grid.innerHTML=SAMM.map(d=>{
+    const ds=calcDomainScore(d);
+    return `<div class="domain">
+      <div class="domain-head" style="background:${d.color}18;border-bottom:1px solid ${d.color}33">
+        <span class="icon">${d.icon}</span>
+        <span style="color:${d.color}">${d.name}</span>
+        <span class="domain-score" style="background:${d.color}22;color:${d.color}">${ds}/3.0</span>
+      </div>
+      ${d.practices.map((p,pi)=>{
+        const m=getMaturity(d.id,pi);
+        const doneActs=p.acts.filter((_,ai)=>getActivity(d.id,pi,ai)).length;
+        return `<div class="practice">
+          <div class="practice-name">${p.name} <span style="color:#475569;font-size:10px">(${doneActs}/${p.acts.length} activities)</span></div>
+          <div class="maturity-bar">
+            ${[1,2,3].map(l=>`<div class="ml ${l===2?'l2':l===3?'l3':''} ${m>=l?'active':''}"
+              onclick="setMaturity('${d.id}',${pi},${l})"
+              title="Level ${l}: ${l===1?'Initial':l===2?'Managed':'Optimizing'}"></div>`).join('')}
+          </div>
+          <div class="ml-score" style="color:${scoreColor(m)}">${m===0?'Not started':m===1?'L1 Initial':m===2?'L2 Managed':'L3 Optimizing'}</div>
+          <div class="activities">
+            ${p.acts.map((a,ai)=>{
+              const done=getActivity(d.id,pi,ai);
+              return `<div class="activity ${done?'done':''}" onclick="toggleActivity('${d.id}',${pi},${ai})">
+                <input type="checkbox" ${done?'checked':''} onclick="event.stopPropagation();toggleActivity('${d.id}',${pi},${ai})">
+                ${a}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function resetAll(){
+  if(!confirm('Reset tất cả đánh giá SAMM?')) return;
+  state={};
+  saveState();
+  render();
+}
+
+function exportReport(){
+  const ov=calcOverall();
+  let txt=`OWASP SAMM 2.0 Assessment Report\nVSP Platform v0.10 — ${new Date().toLocaleString('vi-VN')}\nOverall Score: ${ov}/3.0\n\n`;
+  SAMM.forEach(d=>{
+    txt+=`${d.icon} ${d.name.toUpperCase()} — ${calcDomainScore(d)}/3.0\n`;
+    d.practices.forEach((p,pi)=>{
+      const m=getMaturity(d.id,pi);
+      const doneActs=p.acts.filter((_,ai)=>getActivity(d.id,pi,ai)).length;
+      txt+=`  ${p.name}: L${m} — ${doneActs}/${p.acts.length} activities\n`;
+    });
+    txt+='\n';
+  });
+  const blob=new Blob([txt],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`vsp-samm-${Date.now()}.txt`;
+  a.click();
+}
+
+render();
+</script>
+</body>
+</html>

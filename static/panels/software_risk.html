@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>VSP Software Risk</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--purple:#8b5cf6;--font-mono:"JetBrains Mono",monospace;--font-ui:"Inter",sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5;padding:16px}
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px;cursor:pointer;transition:border-color .15s}
+.kpi:hover{border-color:var(--border2)}
+.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.kpi-val{font-size:22px;font-weight:700;font-family:var(--font-mono)}
+.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:12px;font-weight:600}
+.card-sub{font-size:11px;color:var(--t3)}
+.card-body{padding:12px 14px}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:10px;color:var(--t3);text-transform:uppercase;padding:6px 10px;border-bottom:1px solid var(--border);font-family:var(--font-mono)}
+.tbl td{padding:7px 10px;border-bottom:1px solid var(--border);font-size:11px;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr{cursor:pointer;transition:background .1s}
+.tbl tr:hover td{background:var(--surface)}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 7px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.p-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}
+.p-amb{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}
+.p-grn{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}
+.p-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}
+.p-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}
+.risk-bar-wrap{width:60px;height:4px;background:var(--border);border-radius:2px;display:inline-block;vertical-align:middle}
+.risk-bar{height:4px;border-radius:2px}
+.heatmap{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.hm-cell{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;cursor:pointer;transition:all .15s}
+.hm-cell:hover{transform:scale(1.02);border-color:var(--border2)}
+.hm-name{font-size:10px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-score{font-size:16px;font-weight:700;font-family:var(--font-mono)}
+.hm-detail{font-size:9px;color:var(--t3);margin-top:2px}
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filter-select,.filter-input{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-size:11px;padding:5px 9px;outline:none;cursor:pointer}
+.filter-input{cursor:text;width:180px}
+.filter-input:focus,.filter-select:focus{border-color:var(--blue)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--surface)}
+.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}
+.btn-sm{padding:3px 8px;font-size:10px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(760px,95vw);margin-bottom:40px}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:3px}
+.modal-sub{font-size:11px;color:var(--t3)}
+.modal-body{padding:16px 20px;max-height:70vh;overflow-y:auto}
+.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px}
+.finding-item{background:var(--surface);border-radius:7px;padding:10px 12px;margin-bottom:6px;border-left:3px solid var(--border2)}
+.finding-item.crack{border-left-color:var(--red)}
+.finding-item.eol{border-left-color:var(--amber)}
+.finding-item.unsigned{border-left-color:var(--blue)}
+.finding-name{font-size:12px;font-weight:600;margin-bottom:2px}
+.finding-meta{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
+.finding-reason{font-size:11px;color:var(--t2);margin-top:4px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-size:16px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}
+.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.stat-badge{display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;font-family:var(--font-mono)}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-grn{background:var(--green)}
+.tabs{display:flex;gap:2px;margin-bottom:14px;background:var(--surface);border-radius:8px;padding:3px}
+.tab{flex:1;padding:6px;text-align:center;font-size:11px;font-weight:500;border-radius:6px;cursor:pointer;color:var(--t3);transition:all .15s}
+.tab.active{background:var(--bg2);color:var(--t1);border:1px solid var(--border)}
+.compliance-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.comp-badge{display:inline-flex;align-items:center;font-size:9px;font-family:var(--font-mono);padding:2px 7px;border-radius:3px;border:1px solid var(--border2);color:var(--t3)}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h2>Software Risk</h2>
+    <p>Inventory &middot; EOL detection &middot; Crack detection &middot; License compliance</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="stat-badge"><div class="dot dot-grn"></div><span id="last-scan-lbl">Scanning...</span></div>
+    <button class="btn btn-sm" onclick="loadData()">&#8635; Refresh</button>
+    <button class="btn btn-sm btn-primary" onclick="openAddAgent()">+ Add agent</button>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi" onclick="filterAssets('all')"><div class="kpi-lbl">Total assets</div><div class="kpi-val" id="k-total" style="color:var(--cyan)">—</div><div class="kpi-sub">endpoints with agent</div></div>
+  <div class="kpi" onclick="filterAssets('crack')"><div class="kpi-lbl">Crack detected</div><div class="kpi-val" id="k-crack" style="color:var(--red)">—</div><div class="kpi-sub">unlicensed / tampered</div></div>
+  <div class="kpi" onclick="filterAssets('eol')"><div class="kpi-lbl">EOL software</div><div class="kpi-val" id="k-eol" style="color:var(--amber)">—</div><div class="kpi-sub">end-of-life packages</div></div>
+  <div class="kpi" onclick="filterAssets('critical')"><div class="kpi-lbl">High risk hosts</div><div class="kpi-val" id="k-highrisk" style="color:var(--red)">—</div><div class="kpi-sub">risk score &ge; 70</div></div>
+  <div class="kpi" onclick="filterAssets('clean')"><div class="kpi-lbl">Clean hosts</div><div class="kpi-val" id="k-clean" style="color:var(--green)">—</div><div class="kpi-sub">no issues detected</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('heatmap',this)">Heatmap</div>
+  <div class="tab" onclick="switchTab('list',this)">Asset list</div>
+  <div class="tab" onclick="switchTab('findings',this)">All findings</div>
+  <div class="tab" onclick="switchTab('eol',this)">EOL database</div>
+</div>
+
+<div id="tab-heatmap">
+  <div class="card">
+    <div class="card-head"><div><div class="card-title">Risk heatmap</div><div class="card-sub">click to drill-down</div></div></div>
+    <div class="card-body"><div class="heatmap" id="heatmap-grid"><div style="color:var(--t3);padding:20px;text-align:center;grid-column:1/-1">Loading...</div></div></div>
+  </div>
+</div>
+
+<div id="tab-list" style="display:none">
+  <div class="filters">
+    <input class="filter-input" id="search-host" placeholder="Search hostname..." oninput="renderAssetTable()">
+    <select class="filter-select" id="filter-os" onchange="renderAssetTable()">
+      <option value="">All OS</option><option value="windows">Windows</option><option value="linux">Linux</option>
+    </select>
+    <select class="filter-select" id="filter-risk" onchange="renderAssetTable()">
+      <option value="">All risk</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="clean">Clean</option>
+    </select>
+    <span id="asset-count" style="font-size:10px;color:var(--t3);margin-left:auto"></span>
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table class="tbl">
+        <thead><tr><th>Hostname</th><th>OS</th><th>Software</th><th>Crack</th><th>EOL</th><th>Risk</th><th>Last seen</th></tr></thead>
+        <tbody id="asset-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="tab-findings" style="display:none">
+  <div class="filters">
+    <input class="filter-input" id="search-finding" placeholder="Search findings..." oninput="renderFindings()">
+    <span id="findings-count" style="font-size:10px;color:var(--t3);margin-left:auto"></span>
+  </div>
+  <div id="findings-list"></div>
+</div>
+
+<div id="tab-eol" style="display:none">
+  <div class="filters">
+    <input class="filter-input" id="search-eol" placeholder="Search product..." oninput="renderEOL()">
+    <select class="filter-select" id="filter-eol-status" onchange="renderEOL()">
+      <option value="">All</option><option value="eol">EOL</option><option value="lts">LTS</option>
+    </select>
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table class="tbl">
+        <thead><tr><th>Product</th><th>Vendor</th><th>Version</th><th>EOL date</th><th>Status</th><th>Source</th></tr></thead>
+        <tbody id="eol-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="asset-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title" id="amod-hostname">Host</div><div class="modal-sub" id="amod-meta"></div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="amod-risk-badge"></span>
+        <button class="modal-close" onclick="closeModal('asset-modal')">&#x2715;</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="amod-kpis"></div>
+      <div class="compliance-row" style="margin-bottom:14px">
+        <span class="comp-badge">OWASP A06</span><span class="comp-badge">OWASP A08</span>
+        <span class="comp-badge">ISO A.8.8</span><span class="comp-badge">ISO A.8.19</span>
+        <span class="comp-badge">NIST ID.AM-2</span><span class="comp-badge">TT13/2023 &#272;.12</span>
+      </div>
+      <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:var(--t2)">Suspicious software</div>
+      <div id="amod-findings"><div style="color:var(--t3);padding:12px 0">Loading...</div></div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="closeModal('asset-modal')">Close</button>
+      <button class="btn btn-sm btn-primary" id="amod-export-btn">Export report</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="agent-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <div><div class="modal-title">Deploy VSP agent</div><div class="modal-sub">Windows &amp; Linux</div></div>
+      <button class="modal-close" onclick="closeModal('agent-modal')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Agent token</label>
+        <div style="display:flex;gap:8px">
+          <input class="filter-input" id="agent-token-display" style="flex:1;width:auto;font-family:var(--font-mono);font-size:10px" readonly value="Generating...">
+          <button class="btn btn-sm" onclick="copyToken()">Copy</button>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px">Install commands</div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Windows (PowerShell)</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:var(--font-mono);font-size:10px;color:var(--cyan);white-space:pre-wrap" id="cmd-win"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Linux (bash)</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:var(--font-mono);font-size:10px;color:var(--cyan);white-space:pre-wrap" id="cmd-linux"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var TOKEN='',API='',_assets=[],_eolData=[],_activeFilter='all';
+
+async function loadData(){
+  if(!TOKEN) return;
+  var h={Authorization:'Bearer '+TOKEN};
+  try{
+    var sRes=await fetch(API+'/api/v1/software-inventory/stats',{headers:h}).then(r=>r.json()).catch(()=>({}));
+    var aRes=await fetch(API+'/api/v1/software-inventory',{headers:h}).then(r=>r.json()).catch(()=>({assets:[]}));
+    _assets=aRes.assets||[];
+    document.getElementById('k-total').textContent=sRes.total_assets||_assets.length||0;
+    document.getElementById('k-crack').textContent=sRes.total_crack||0;
+    document.getElementById('k-eol').textContent=sRes.total_eol||0;
+    document.getElementById('k-highrisk').textContent=sRes.critical_assets||0;
+    document.getElementById('k-clean').textContent=sRes.clean_assets||_assets.filter(function(a){return a.risk_level==='clean';}).length;
+    document.getElementById('last-scan-lbl').textContent='Updated '+new Date().toLocaleTimeString();
+    renderHeatmap();
+    renderAssetTable();
+    renderFindings();
+    var eRes=await fetch(API+'/api/v1/software-inventory/eol-database',{headers:h}).then(r=>r.ok?r.json():null).catch(()=>null);
+    if(eRes&&eRes.entries) _eolData=eRes.entries;
+    renderEOL();
+  }catch(e){console.error(e);}
+}
+
+function renderHeatmap(){
+  var g=document.getElementById('heatmap-grid');
+  if(!_assets.length){
+    g.innerHTML='<div style="color:var(--t3);padding:30px;text-align:center;grid-column:1/-1">No agents connected. Click "+ Add agent".</div>';
+    return;
+  }
+  var s=[].concat(_assets).sort(function(a,b){return b.risk_score-a.risk_score;});
+  g.innerHTML=s.map(function(a){
+    var col=riskColor(a.risk_score);
+    var bg=riskBg(a.risk_score);
+    return '<div class="hm-cell" style="background:'+bg+';border-color:'+col+'40" onclick="openAssetModal(\''+a.hostname+'\')">'
+      +'<div class="hm-name" style="color:'+col+'">'+a.hostname+'</div>'
+      +'<div class="hm-score" style="color:'+col+'">'+a.risk_score+'</div>'
+      +'<div class="hm-detail">'+(a.crack_count||0)+' crack &middot; '+(a.eol_count||0)+' EOL</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderAssetTable(){
+  var q=(document.getElementById('search-host').value||'').toLowerCase();
+  var os=document.getElementById('filter-os').value;
+  var risk=document.getElementById('filter-risk').value;
+  var list=_assets.filter(function(a){
+    if(q&&!a.hostname.toLowerCase().includes(q)) return false;
+    if(os&&!(a.os||'').toLowerCase().includes(os)) return false;
+    if(risk&&a.risk_level!==risk) return false;
+    if(_activeFilter==='crack'&&(a.crack_count||0)===0) return false;
+    if(_activeFilter==='eol'&&(a.eol_count||0)===0) return false;
+    if(_activeFilter==='critical'&&a.risk_score<70) return false;
+    if(_activeFilter==='clean'&&a.risk_level!=='clean') return false;
+    return true;
+  });
+  document.getElementById('asset-count').textContent=list.length+' assets';
+  document.getElementById('asset-tbody').innerHTML=list.map(function(a){
+    return '<tr onclick="openAssetModal(\''+a.hostname+'\')">'
+      +'<td style="font-family:var(--font-mono);color:var(--cyan)">'+a.hostname+'</td>'
+      +'<td>'+osBadge(a.os)+'</td>'
+      +'<td style="font-family:var(--font-mono)">'+(a.total_software||0)+'</td>'
+      +'<td style="color:var(--red);font-weight:700">'+(a.crack_count||0)+'</td>'
+      +'<td style="color:var(--amber);font-weight:700">'+(a.eol_count||0)+'</td>'
+      +'<td><div style="display:flex;align-items:center;gap:6px"><div class="risk-bar-wrap"><div class="risk-bar" style="width:'+a.risk_score+'%;background:'+riskColor(a.risk_score)+'"></div></div><span style="font-size:10px;color:'+riskColor(a.risk_score)+'">'+a.risk_score+'</span>'+riskBadge(a.risk_level)+'</div></td>'
+      +'<td style="font-size:10px;color:var(--t3)">'+timeAgo(a.last_seen)+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+async function openAssetModal(hn){
+  document.getElementById('amod-hostname').textContent=hn;
+  document.getElementById('amod-meta').textContent='Loading...';
+  document.getElementById('amod-findings').innerHTML='<div style="color:var(--t3);padding:12px 0">Loading...</div>';
+  document.getElementById('asset-modal').classList.add('open');
+  if(!TOKEN) return;
+  try{
+    var d=await fetch(API+'/api/v1/software-inventory/'+encodeURIComponent(hn),{headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json());
+    var a=d.asset||{};
+    var fi=d.findings||[];
+    document.getElementById('amod-hostname').textContent=a.hostname||hn;
+    document.getElementById('amod-meta').textContent=(a.os||'?')+' &middot; '+(a.os_version||'?')+' &middot; agent v'+(a.agent_version||'?');
+    document.getElementById('amod-risk-badge').innerHTML=riskBadge(a.risk_level);
+    document.getElementById('amod-kpis').innerHTML=[
+      {l:'Risk score',v:(a.risk_score||0)+'/100',c:riskColor(a.risk_score||0)},
+      {l:'Software',v:a.total_software||0,c:'var(--t1)'},
+      {l:'Crack',v:a.crack_count||0,c:'var(--red)'},
+      {l:'EOL',v:a.eol_count||0,c:'var(--amber)'}
+    ].map(function(k){
+      return '<div style="background:var(--surface);border-radius:7px;padding:10px 12px">'
+        +'<div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:3px">'+k.l+'</div>'
+        +'<div style="font-size:18px;font-weight:700;color:'+k.c+';font-family:var(--font-mono)">'+k.v+'</div>'
+        +'</div>';
+    }).join('');
+    if(!fi.length){
+      document.getElementById('amod-findings').innerHTML='<div style="color:var(--green);font-size:11px;padding:8px 0">&#x2713; No suspicious software detected</div>';
+    } else {
+      document.getElementById('amod-findings').innerHTML=fi.map(function(f){
+        var cls=f.susp_reason&&(f.susp_reason.includes('crack')||f.susp_reason.includes('keyword'))?'crack':f.susp_reason&&f.susp_reason.includes('EOL')?'eol':'unsigned';
+        return '<div class="finding-item '+cls+'">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+          +'<span class="pill '+(cls==='crack'?'p-red':cls==='eol'?'p-amb':'p-blue')+'">'+cls.toUpperCase()+'</span>'
+          +'<span class="finding-name">'+esc(f.name)+'</span>'
+          +'<span style="font-size:10px;color:var(--t3);margin-left:auto">'+esc(f.version||'')+'</span>'
+          +'</div>'
+          +'<div class="finding-meta">'+esc(f.publisher||'No publisher')+' &middot; '+esc(f.source||'?')+'</div>'
+          +'<div class="finding-reason">'+esc(f.susp_reason||'')+'</div>'
+          +'</div>';
+      }).join('');
+    }
+    document.getElementById('amod-export-btn').onclick=function(){exportHostReport(hn,a,fi);};
+  }catch(e){
+    document.getElementById('amod-meta').textContent='Error loading data';
+  }
+}
+
+function renderFindings(){
+  var q=(document.getElementById('search-finding').value||'').toLowerCase();
+  var all=[];
+  _assets.forEach(function(a){
+    if((a.crack_count||0)>0) all.push({hostname:a.hostname,type:'crack',count:a.crack_count,risk:a.risk_level});
+    if((a.eol_count||0)>0) all.push({hostname:a.hostname,type:'eol',count:a.eol_count,risk:a.risk_level});
+  });
+  var list=all.filter(function(f){return !q||f.hostname.toLowerCase().includes(q);});
+  document.getElementById('findings-count').textContent=list.length+' findings';
+  var c=document.getElementById('findings-list');
+  if(!list.length){
+    c.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3);font-size:11px">No findings</div>';
+    return;
+  }
+  c.innerHTML=list.map(function(f){
+    return '<div class="finding-item '+f.type+'" style="cursor:pointer" onclick="openAssetModal(\''+f.hostname+'\')">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span class="pill '+(f.type==='crack'?'p-red':'p-amb')+'">'+f.type.toUpperCase()+'</span>'
+      +'<span style="font-size:12px;font-weight:600;color:var(--cyan);font-family:var(--font-mono)">'+f.hostname+'</span>'
+      +'<span style="font-size:11px;color:var(--t2)">'+f.count+' pkg</span>'
+      +'<span style="margin-left:auto">'+riskBadge(f.risk)+'</span>'
+      +'</div></div>';
+  }).join('');
+}
+
+function renderEOL(){
+  var q=(document.getElementById('search-eol').value||'').toLowerCase();
+  var st=document.getElementById('filter-eol-status').value;
+  var src=_eolData.length?_eolData:STATIC_EOL;
+  var list=src.filter(function(e){
+    if(q&&!(e.product_name||e.name||'').toLowerCase().includes(q)) return false;
+    if(st&&e.status!==st) return false;
+    return true;
+  });
+  document.getElementById('eol-tbody').innerHTML=list.map(function(e){
+    var eolPast=e.eol_date&&new Date(e.eol_date)<new Date();
+    return '<tr>'
+      +'<td style="font-weight:500">'+esc(e.product_name||e.name)+'</td>'
+      +'<td style="color:var(--t2)">'+esc(e.vendor||'—')+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px">'+esc(e.version_pattern||e.version||'—')+'</td>'
+      +'<td style="font-family:var(--font-mono);font-size:10px;color:'+(eolPast?'var(--red)':'var(--t2)')+'">'+esc(e.eol_date||'—')+'</td>'
+      +'<td>'+statusBadge(e.status||'eol')+'</td>'
+      +'<td style="font-size:10px;color:var(--t3)">'+esc(e.source||'manual')+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function openAddAgent(){
+  var tok='VSP-AGENT-'+Math.random().toString(36).slice(2,10).toUpperCase()+'-'+Math.random().toString(36).slice(2,10).toUpperCase();
+  document.getElementById('agent-token-display').value=tok;
+  var sb=API||window.location.origin;
+  document.getElementById('cmd-win').textContent='Invoke-WebRequest -Uri "'+sb+'/download/vsp-agent-windows-amd64.exe" -OutFile vsp-agent.exe\nvsp-agent.exe -server "'+sb+'" -token "'+tok+'" -once';
+  document.getElementById('cmd-linux').textContent='curl -sL "'+sb+'/download/vsp-agent-linux-amd64" -o /usr/local/bin/vsp-agent\nchmod +x /usr/local/bin/vsp-agent\n/usr/local/bin/vsp-agent -server '+sb+' -token '+tok+' -interval 6h';
+  document.getElementById('agent-modal').classList.add('open');
+}
+
+function copyToken(){
+  navigator.clipboard.writeText(document.getElementById('agent-token-display').value).then(function(){
+    var b=event.target;b.textContent='Copied &#x2713;';setTimeout(function(){b.textContent='Copy';},2000);
+  });
+}
+
+function exportHostReport(hn,a,fi){
+  var l=['VSP Software Risk Report','Generated: '+new Date().toLocaleString(),'Framework: OWASP A06/A08, ISO 27001 A.8.8/A.8.19, NIST ID.AM-2, TT13/2023','','=== HOST ===','Hostname: '+hn,'OS: '+(a.os_version||a.os||'?'),'Risk: '+(a.risk_score||0)+'/100','','=== FINDINGS ==='];
+  fi.forEach(function(f){l.push('['+(f.susp_reason&&f.susp_reason.includes('crack')?'CRACK':f.susp_reason&&f.susp_reason.includes('EOL')?'EOL':'UNSIGNED')+'] '+f.name+' '+(f.version||''));l.push('  Reason: '+(f.susp_reason||'?'));});
+  var blob=new Blob([l.join('\n')],{type:'text/plain'});
+  var el=document.createElement('a');el.href=URL.createObjectURL(blob);el.download='vsp-sw-risk-'+hn+'.txt';el.click();
+}
+
+function filterAssets(f){_activeFilter=f;switchTab('list',document.querySelectorAll('.tab')[1]);}
+function switchTab(n,el){document.querySelectorAll('[id^="tab-"]').forEach(function(t){t.style.display='none';});document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});document.getElementById('tab-'+n).style.display='block';el.classList.add('active');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function riskColor(s){return s>=70?'var(--red)':s>=40?'var(--amber)':s>=20?'var(--blue)':'var(--green)';}
+function riskBg(s){return s>=70?'var(--red2)':s>=40?'var(--amber2)':s>=20?'var(--blue2)':'var(--green2)';}
+function riskBadge(l){var m={critical:'p-red',high:'p-red',medium:'p-amb',low:'p-blue',clean:'p-grn'};return '<span class="pill '+(m[l]||'p-gray')+'">'+(l||'?').toUpperCase()+'</span>';}
+function statusBadge(s){var m={eol:'p-red',lts:'p-grn',active:'p-blue',unknown:'p-gray'};return '<span class="pill '+(m[s]||'p-gray')+'">'+s.toUpperCase()+'</span>';}
+function osBadge(os){var o=(os||'').toLowerCase();var c=o.includes('win')?'var(--blue)':o.includes('linux')?'var(--green)':o.includes('darwin')?'var(--purple)':'var(--t2)';return '<span style="font-size:10px;color:'+c+'">'+(os||'?')+'</span>';}
+function timeAgo(ts){if(!ts)return '—';var d=new Date(ts),n=new Date();var df=Math.floor((n-d)/1000);if(df<60)return 'just now';if(df<3600)return Math.floor(df/60)+'m ago';if(df<86400)return Math.floor(df/3600)+'h ago';return Math.floor(df/86400)+'d ago';}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+var STATIC_EOL=[
+  {name:'Windows XP',vendor:'Microsoft',version:'XP',eol_date:'2014-04-08',status:'eol',source:'manual'},
+  {name:'Windows 7',vendor:'Microsoft',version:'7',eol_date:'2020-01-14',status:'eol',source:'manual'},
+  {name:'Windows 8.1',vendor:'Microsoft',version:'8.1',eol_date:'2023-01-10',status:'eol',source:'manual'},
+  {name:'Office 2010',vendor:'Microsoft',version:'2010',eol_date:'2020-10-13',status:'eol',source:'manual'},
+  {name:'Office 2013',vendor:'Microsoft',version:'2013',eol_date:'2023-04-11',status:'eol',source:'manual'},
+  {name:'Internet Explorer',vendor:'Microsoft',version:'all',eol_date:'2022-06-15',status:'eol',source:'manual'},
+  {name:'Adobe Flash Player',vendor:'Adobe',version:'all',eol_date:'2020-12-31',status:'eol',source:'manual'},
+  {name:'Java SE 6',vendor:'Oracle',version:'6',eol_date:'2013-04-01',status:'eol',source:'manual'},
+  {name:'Java SE 7',vendor:'Oracle',version:'7',eol_date:'2015-04-01',status:'eol',source:'manual'},
+  {name:'PHP 7.4',vendor:'PHP Group',version:'7.4',eol_date:'2022-11-28',status:'eol',source:'endoflife.date'},
+  {name:'PHP 8.0',vendor:'PHP Group',version:'8.0',eol_date:'2023-11-26',status:'eol',source:'endoflife.date'},
+  {name:'Node.js 16',vendor:'OpenJS',version:'16',eol_date:'2023-09-11',status:'eol',source:'endoflife.date'},
+  {name:'Python 2',vendor:'PSF',version:'2.x',eol_date:'2020-01-01',status:'eol',source:'endoflife.date'},
+  {name:'MySQL 5.7',vendor:'Oracle',version:'5.7',eol_date:'2023-10-31',status:'eol',source:'endoflife.date'},
+  {name:'OpenSSL 1.1',vendor:'OpenSSL',version:'1.1',eol_date:'2023-09-11',status:'eol',source:'endoflife.date'},
+  {name:'MISA SME.NET 2019',vendor:'MISA',version:'2019',eol_date:'2022-12-31',status:'eol',source:'manual'},
+  {name:'Fast Accounting 11',vendor:'Fast',version:'11',eol_date:'2021-06-01',status:'eol',source:'manual'},
+  {name:'BKAV Pro 2018',vendor:'BKAV',version:'2018',eol_date:'2020-12-31',status:'eol',source:'manual'}
+];
+
+window.addEventListener('message',function(e){
+  if(!e.data) return;
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){
+    TOKEN=e.data.token;
+    API=window.location.origin==='null'?'':window.location.origin;
+    loadData();
+  }
+  if(e.data.type==='vsp:theme'&&e.data.theme==='light'){
+    var r=document.documentElement;
+    r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');
+    r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--t1','#1a1d24');
+    r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');
+  }
+});
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'},'*');
+renderEOL();
+</script>
+</body>
+</html>

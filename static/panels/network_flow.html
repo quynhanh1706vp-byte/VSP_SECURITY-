@@ -105,8 +105,63 @@ var TOKEN='',API='',_showSusOnly=false,_selectedNode=null;
 
 async function loadNetworkFlow(){
   if(!TOKEN)return;
+  var h={Authorization:'Bearer '+TOKEN};
   try{
-    var d=await fetch(API+'/api/v1/logs/network-flow', {credentials:'same-origin'}).then(r=>r.json());
+    var d=null;
+    try{
+      var nr=await fetch(API+'/api/v1/logs/network-flow',{headers:h});
+      if(nr.ok) d=await nr.json();
+    }catch(e){}
+
+    if(!d){
+      // Fallback: build from log_events
+      var hunt=await fetch(API+'/api/v1/logs/hunt?limit=500&hours=24',{headers:h})
+        .then(r=>r.json()).catch(()=>({events:[],total:0}));
+      var evts=hunt.events||[];
+      var ipCount={};
+      evts.forEach(function(e){
+        var ip=e.source_ip;
+        if(ip&&ip.length>3&&ip!=='—'){
+          if(!ipCount[ip]) ipCount[ip]={ip,count:0,severity:'LOW'};
+          ipCount[ip].count++;
+          var sev=(e.severity||'').toUpperCase();
+          if(sev==='CRITICAL') ipCount[ip].severity='CRITICAL';
+          else if(sev==='HIGH'&&ipCount[ip].severity!=='CRITICAL') ipCount[ip].severity='HIGH';
+        }
+      });
+      var topHosts=Object.values(ipCount).sort(function(a,b){return b.count-a.count;}).slice(0,8);
+      var sus=topHosts.filter(function(h){return h.severity==='CRITICAL'||h.severity==='HIGH';}).length;
+
+      // Update KPIs
+      var kf=document.getElementById('k-flows');
+      if(kf) kf.textContent=(hunt.total||evts.length).toLocaleString();
+      var kc=document.getElementById('k-conns');
+      if(kc) kc.textContent=Object.keys(ipCount).length;
+      var ks=document.getElementById('k-sus');
+      if(ks) ks.textContent=sus;
+
+      // Update top talkers table
+      var tt=document.getElementById('top-talkers');
+      if(tt&&topHosts.length){
+        tt.innerHTML=topHosts.map(function(h){
+          var col=h.severity==='CRITICAL'?'var(--red)':h.severity==='HIGH'?'var(--amber)':'var(--t2)';
+          return '<tr><td style="font-family:var(--font-mono);font-size:11px;color:'+col+'">'+h.ip+'</td>'
+            +'<td style="font-family:var(--font-mono);font-size:11px">'+h.count+' events</td>'
+            +'<td><span class="pill '+(h.severity==='CRITICAL'?'pill-red':h.severity==='HIGH'?'pill-amber':'pill-gray')+'">'+h.severity+'</span></td></tr>';
+        }).join('');
+      }
+
+      // Update suspicious nodes with real IPs
+      var suspIPs=topHosts.filter(function(h){return h.severity==='CRITICAL'||h.severity==='HIGH';});
+      suspIPs.slice(0,2).forEach(function(h,i){
+        var n=NODES.find(function(n){return n.id===(i===0?'ext1':'ext2');});
+        if(n) n.label=h.ip;
+      });
+      if(typeof drawGraph==='function') drawGraph();
+      return;
+    }
+
+    // Real network-flow data:
     if(d.flows_per_min!==undefined)
       document.getElementById('k-flows').textContent=(d.flows_per_min||0).toLocaleString();
     if(d.suspicious!==undefined)

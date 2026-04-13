@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head><script>
+// Set API base to port 8921 (gateway API)
+window.VSP_API_BASE = window.location.protocol + '//' + window.location.hostname + ':8921';
+
 // Auto-get token từ parent window hoặc localStorage
 (function() {
   var tok = '';
@@ -242,6 +245,71 @@ body::after {
   opacity: .6;
 }
 /* ── End Premium Upgrade ─────────────────────────────── */
+
+
+/* ── VSP Enhanced Status Badges ── */
+.ctrl-pass, td .ctrl-pass, [class*="status-pass"] { background:rgba(0,255,163,.15)!important; color:#00ffa3!important; border:1px solid rgba(0,255,163,.3)!important; border-radius:4px!important; padding:3px 9px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; }
+.ctrl-warn, td .ctrl-warn { background:rgba(255,184,0,.15)!important; color:#ffb800!important; border:1px solid rgba(255,184,0,.3)!important; border-radius:4px!important; padding:3px 9px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; }
+.ctrl-fail, td .ctrl-fail { background:rgba(255,69,69,.15)!important; color:#ff4545!important; border:1px solid rgba(255,69,69,.3)!important; border-radius:4px!important; padding:3px 9px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; }
+
+/* Badge trong table hiện tại */
+#fedramp-controls-body td:last-child span,
+#cmmc-controls-body td:last-child span,
+.controls-table td:last-child,
+table tbody td .badge,
+table tbody td span[class] {
+  border-radius: 4px !important;
+  padding: 3px 9px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  font-family: monospace !important;
+}
+
+
+/* ── VSP Badge Override v2 ── */
+.ts-pass { background:rgba(0,255,163,.15)!important; color:#00ffa3!important; border:1px solid rgba(0,255,163,.3)!important; border-radius:4px!important; padding:3px 10px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; letter-spacing:.04em; }
+.ts-fail { background:rgba(255,69,69,.15)!important;  color:#ff4545!important; border:1px solid rgba(255,69,69,.3)!important;  border-radius:4px!important; padding:3px 10px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; letter-spacing:.04em; }
+.ts-warn { background:rgba(255,184,0,.15)!important;  color:#ffb800!important; border:1px solid rgba(255,184,0,.3)!important;  border-radius:4px!important; padding:3px 10px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; letter-spacing:.04em; }
+.ts-skip { background:rgba(255,255,255,.05)!important; color:#484e61!important; border:1px solid rgba(255,255,255,.1)!important; border-radius:4px!important; padding:3px 10px!important; font-size:10px!important; font-weight:700!important; font-family:monospace!important; }
+
+/* FedRAMP/CMMC table status column */
+table tbody tr td:last-child {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+/* Inline status badges hiện tại trong controls table */
+table tbody td span {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+/* Auto-color dựa trên text content via attribute hack */
+table tbody tr:has(td:last-child:-webkit-any(:contains("PASS"))) td:last-child { color: #00ffa3 !important; }
+table tbody tr:has(td:last-child:-webkit-any(:contains("FAIL"))) td:last-child { color: #ff4545 !important; }
+table tbody tr:has(td:last-child:-webkit-any(:contains("WARN"))) td:last-child { color: #ffb800 !important; }
+
+/* Search + pagination toolbar */
+#ctrl-toolbar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.06); flex-wrap:wrap; }
+#ctrl-search { flex:1; min-width:160px; background:#0b0c0f; border:1px solid rgba(255,255,255,.1); border-radius:6px; color:#f0f2f8; font-family:monospace; font-size:11px; padding:6px 10px; outline:none; }
+#ctrl-search:focus { border-color:#00e5ff; }
+.ctrl-filter-btn { font-family:monospace; font-size:11px; padding:5px 11px; border-radius:5px; cursor:pointer; border:1px solid rgba(255,255,255,.1); background:transparent; color:#8a90a2; transition:all .15s; }
+.ctrl-filter-btn.f-pass.active { background:rgba(0,255,163,.12); border-color:rgba(0,255,163,.35); color:#00ffa3; }
+.ctrl-filter-btn.f-warn.active { background:rgba(255,184,0,.12); border-color:rgba(255,184,0,.35); color:#ffb800; }
+.ctrl-filter-btn.f-fail.active { background:rgba(255,69,69,.12); border-color:rgba(255,69,69,.35); color:#ff4545; }
+.ctrl-filter-btn.f-all.active  { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2); color:#f0f2f8; }
+#ctrl-pagination { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:1px solid rgba(255,255,255,.06); font-size:11px; color:#484e61; font-family:monospace; }
+.ctrl-page-btn { font-family:monospace; font-size:11px; padding:4px 9px; border-radius:5px; cursor:pointer; border:1px solid rgba(255,255,255,.1); background:transparent; color:#8a90a2; transition:all .12s; min-width:30px; }
+.ctrl-page-btn:hover { background:rgba(255,255,255,.06); color:#f0f2f8; }
+.ctrl-page-btn.active { background:rgba(0,229,255,.12); color:#00e5ff; border-color:rgba(0,229,255,.35); }
+.ctrl-page-btn:disabled { opacity:.3; cursor:default; }
 
 </style>
 <script>
@@ -1707,5 +1775,6 @@ function switchTenant(id) {
 }
 
 </script>
+<script src="/panels/vsp_compliance_table_patch.js"></script>
 </body>
 </html>

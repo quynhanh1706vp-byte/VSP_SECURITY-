@@ -209,7 +209,7 @@ var SOURCES = [
 ];
 var SPARK_DATA = [12,18,9,24,31,19,14,28,44,38,21,17];
 
-function sevBadge(s){var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};return '<span class="pill '+(m[s]||'pill-gray')+'">'+s.charAt(0)+s.slice(1).toLowerCase()+'</span>'}
+function sevBadge(s){s=(s||'MEDIUM').toUpperCase();var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};return '<span class="pill '+(m[s]||'pill-gray')+'">'+s.charAt(0)+s.slice(1).toLowerCase()+'</span>'}
 
 function renderRules(){
   var f=document.getElementById('rule-filter').value;

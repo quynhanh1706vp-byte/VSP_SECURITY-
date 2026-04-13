@@ -22,12 +22,52 @@
   const _prev = window.showPanel;
   window.showPanel = function(name, btn) {
     if (_prev) _prev(name, btn);
+    const panelFrameMap = {
+      correlation: '#panel-correlation iframe',
+      soar:        '#panel-soar iframe',
+      logsources:  '#panel-logsources iframe',
+      threatintel: '#panel-threatintel iframe',
+      ueba:        '#panel-ueba iframe',
+      assets:      '#panel-assets iframe',
+      threathunt:  '#threathunt-frame',
+      netflow:     '#panel-netflow iframe',
+      ai_analyst:  '#panel-ai_analyst iframe',
+      vulnmgmt:    '#panel-vulnmgmt iframe',
+      scheduler:   '#panel-scheduler iframe',
+      users:       '#panel-users iframe',
+      swrisk:      '#panel-swrisk iframe',
+    };
     const loaders = {
       correlation: loadCorrelation,
       soar:        loadSOAR,
       logsources:  loadLogSources,
       threatintel: loadThreatIntel,
+      ueba:        loadUEBA,
+      assets:      loadAssets,
     };
+    // Load iframe src từ data-src nếu chưa load
+    const sel = panelFrameMap[name];
+    if (sel) {
+      const frame = document.querySelector(sel);
+      if (frame) {
+        const ds = frame.getAttribute('data-src');
+        if (ds && (!frame.src || frame.src.endsWith('/'))) {
+          frame.src = ds;
+          frame.addEventListener('load', function onLoad() {
+            frame.removeEventListener('load', onLoad);
+            // Inject token
+            const tk = window.TOKEN || '';
+            if (tk) {
+              try { frame.contentWindow.postMessage({type:'vsp:token', token:tk}, '*'); } catch(e) {}
+            }
+            // Load data sau 400ms
+            if (loaders[name]) setTimeout(loaders[name], 400);
+          });
+          return;
+        }
+      }
+    }
+    // Frame đã load — chỉ cần inject token + data
     if (loaders[name]) setTimeout(loaders[name], 300);
   };
 })();
@@ -163,6 +203,25 @@ async function loadThreatIntel() {
     try { frame.contentWindow.postMessage({ type: 'vsp:data', iocs, feeds, matches }, '*'); } catch(e) {}
   }
 }
+
+async function loadUEBA() {
+  if (!await ensureToken()) return;
+  const frame = document.querySelector('#panel-ueba iframe');
+  if (!frame) return;
+  try {
+    frame.contentWindow.postMessage({ type: 'vsp:token', token: window.TOKEN }, '*');
+  } catch(e) {}
+}
+
+async function loadAssets() {
+  if (!await ensureToken()) return;
+  const frame = document.querySelector('#panel-assets iframe');
+  if (!frame) return;
+  try {
+    frame.contentWindow.postMessage({ type: 'vsp:token', token: window.TOKEN }, '*');
+  } catch(e) {}
+}
+
 
 // 6. Auto-trigger SOAR từ SSE
 window._siemAutoTrigger = async function(msg) {

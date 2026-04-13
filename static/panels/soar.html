@@ -658,7 +658,22 @@ function createPB(){
 }
 
 // ── Token + data ───────────────────────────────────────────
-function _onTokenReady(){}
+function _onTokenReady(){
+  if(!TOKEN) return;
+  var h={Authorization:'Bearer '+TOKEN};
+  Promise.all([
+    fetch(API+'/api/v1/soar/playbooks',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch(API+'/api/v1/soar/runs?limit=20',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+  ]).then(function(res){
+    if(res[0]&&res[0].playbooks&&res[0].playbooks.length){
+      PLAYBOOKS=res[0].playbooks.map(function(p){
+        return Object.assign({},p,{steps:p.steps||[],runs:p.runs||p.RunCount||0,success:p.success||p.SuccessCount||0,last:'—'});
+      });
+      renderList();
+    }
+    if(res[1]&&res[1].runs) loadRunHistory();
+  });
+}
 function _onData(d){
   if(d.playbooks&&d.playbooks.playbooks&&d.playbooks.playbooks.length){
     PLAYBOOKS=d.playbooks.playbooks.map(function(p){
