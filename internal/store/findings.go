@@ -43,22 +43,22 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 		f.Limit = 2000
 	} // hard cap tại store layer
 
-	where := []string{"tenant_id = $1"}
+	where := []string{"f.tenant_id = $1"}
 	args := []any{tenantID}
 	i := 2
 
 	if f.RunID != "" {
-		where = append(where, fmt.Sprintf("run_id = $%d", i))
+		where = append(where, fmt.Sprintf("f.run_id = $%d", i))
 		args = append(args, f.RunID)
 		i++
 	}
 	if f.Severity != "" {
-		where = append(where, fmt.Sprintf("severity = $%d", i))
+		where = append(where, fmt.Sprintf("f.severity = $%d", i))
 		args = append(args, strings.ToUpper(f.Severity))
 		i++
 	}
 	if f.Tool != "" {
-		where = append(where, fmt.Sprintf("tool = $%d", i))
+		where = append(where, fmt.Sprintf("f.tool = $%d", i))
 		args = append(args, f.Tool)
 		i++
 	}
@@ -70,7 +70,7 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 		}
 		// Use GIN index via to_tsvector for performance on large datasets
 		// Fallback to ILIKE for exact substring matching (covered by idx_findings_search)
-		where = append(where, fmt.Sprintf("(message ILIKE $%d OR rule_id ILIKE $%d OR path ILIKE $%d)", i, i, i))
+		where = append(where, fmt.Sprintf("(f.message ILIKE $%d OR f.rule_id ILIKE $%d OR f.path ILIKE $%d)", i, i, i))
 		args = append(args, "%"+s+"%")
 		i++
 	}
@@ -79,7 +79,7 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 
 	var total int64
 	// whereSQL chỉ chứa $N placeholders — không có user input trực tiếp
-	db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM findings WHERE "+whereSQL, args...).Scan(&total) //nolint:errcheck
+	db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM findings f LEFT JOIN remediations r ON r.finding_id=f.id AND r.tenant_id=f.tenant_id WHERE "+whereSQL, args...).Scan(&total) //nolint:errcheck
 
 	args = append(args, f.Limit, f.Offset)
 	rows, err := db.pool.Query(ctx,
