@@ -335,7 +335,22 @@ function loadFromAPI(){
     fetch('/api/v1/correlation/incidents',{headers:h}).then(function(r){return r.json()}).catch(function(){return null}),
   ]).then(function(res){
     if(res[0]&&res[0].rules&&res[0].rules.length){RULES=res[0].rules;renderRules()}
-    if(res[1]&&res[1].incidents&&res[1].incidents.length){INCIDENTS=res[1].incidents;renderIncidents()}
+    if(res[1]&&res[1].incidents&&res[1].incidents.length){
+      INCIDENTS=res[1].incidents.map(function(i){
+        var sr=i.source_refs;
+        if(typeof sr==='string'){try{sr=JSON.parse(sr)}catch(e){sr={}}}
+        return {
+          id:      i.id||'INC-???',
+          title:   i.title||'Untitled',
+          sev:     i.severity||i.sev||'MEDIUM',
+          status:  i.status||'open',
+          desc:    i.description||(sr&&sr.rule_id?'Rule: '+sr.rule_id:'No description'),
+          sources: (sr&&sr.sources)||i.sources||[],
+          time:    i.created_at?new Date(i.created_at).toLocaleString():'',
+        };
+      });
+      renderIncidents();
+    }
   });
 }
 
