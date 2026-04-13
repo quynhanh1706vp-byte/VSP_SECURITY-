@@ -447,3 +447,31 @@ func handleVNStandardUpdate(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": req.ID})
 }
+
+// handleMarkControlPass allows marking a control as passed
+func handleMarkControlPass(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	var req struct {
+		ControlID string `json:"control_id"`
+		Evidence  string `json:"evidence"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	if p4SQLDB != nil {
+		// Store override in DB
+		p4SQLDB.Exec(`
+			INSERT INTO p4_control_overrides (control_id, status, evidence, updated_at)
+			VALUES ($1, 'pass', $2, NOW())
+			ON CONFLICT (control_id) DO UPDATE SET
+				status=EXCLUDED.status, evidence=EXCLUDED.evidence, updated_at=NOW()`,
+			req.ControlID, req.Evidence)
+	}
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "control_id": req.ControlID})
+}

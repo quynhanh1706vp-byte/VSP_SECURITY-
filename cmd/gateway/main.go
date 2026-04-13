@@ -352,6 +352,7 @@ func main() {
 	r.Post("/api/p4/email/send", p4AuthMiddleware(handleSendEmail))
 	r.Get("/api/p4/vn-standards", p4AuthMiddleware(handleVNStandards))
 	r.Post("/api/p4/vn-standards/update", p4AuthMiddleware(handleVNStandardUpdate))
+	r.Post("/api/p4/control/pass", p4AuthMiddleware(handleMarkControlPass))
 	r.Get("/api/p4/sbom/view-db", p4AuthMiddleware(handleSBOMViewDB))
 	r.Get("/api/p4/email/config", p4AuthMiddleware(handleEmailConfig))
 	r.Post("/api/p4/email/config", p4AuthMiddleware(handleEmailConfig))
