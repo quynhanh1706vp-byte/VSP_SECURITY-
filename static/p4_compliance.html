@@ -1828,6 +1828,37 @@ function renderVNMatrix(standards) {
 }
 
 // Data-attribute based dropdown handlers (no inline quote issues)
+function vnBuildCardMenu(sid, s) {
+  const name = (s && s.name || '').replace(/\\/g,'').replace(/'/g,'');
+  const fw = (s && s.framework || '');
+  return '<div class="dropdown-item vn-act" data-act="passed" data-sid="' + sid + '">✓ Đánh dấu ĐẠT</div>' +
+         '<div class="dropdown-item vn-act" data-act="partial" data-sid="' + sid + '">⚠ Đánh dấu CHỜ</div>' +
+         '<div class="dropdown-item vn-act" data-act="failed" data-sid="' + sid + '" style="color:var(--red)">✗ Không ĐẠT</div>' +
+         '<div style="border-top:1px solid var(--border);margin:4px 0"></div>' +
+         '<div class="dropdown-item vn-det" data-sid="' + sid + '">📋 Xem chi tiết</div>' +
+         '<div class="dropdown-item vn-ai" data-sid="' + sid + '" data-name="' + name + '" data-fw="' + fw + '">🤖 AI Advisor</div>';
+}
+
+// Event delegation for VN dropdown items
+document.addEventListener('click', function(e) {
+  const el = e.target.closest('.vn-act, .vn-det, .vn-ai');
+  if (el) {
+    e.stopPropagation();
+    const sid = el.dataset.sid;
+    if (el.classList.contains('vn-act')) updateVNStatus(sid, el.dataset.act);
+    if (el.classList.contains('vn-det')) openVNDetail(sid);
+    if (el.classList.contains('vn-ai')) {
+      const s = _vnStandards.find(function(x){return x.id===sid;});
+      openAIAdvisor({id:sid, weakness:el.dataset.name, control:el.dataset.fw, severity:'MEDIUM', mitigation:''});
+    }
+    return;
+  }
+  // Close all dropdowns on outside click
+  if (!e.target.closest('.dropdown-menu') && !e.target.closest('.vn-dd-btn')) {
+    document.querySelectorAll('.vn-dd-card-menu, .vn-dd-menu').forEach(function(d){ d.style.display='none'; });
+  }
+});
+
 function vnCardDD(btn) {
   const sid = btn.getAttribute('data-sid');
   const s = _vnStandards.find(function(x){return x.id===sid;});
@@ -1838,13 +1869,7 @@ function vnCardDD(btn) {
     menu = document.createElement('div');
     menu.className = 'dropdown-menu vn-dd-card-menu';
     menu.style.cssText = 'position:absolute;right:0;top:100%;display:block;z-index:100';
-    menu.innerHTML = 
-      '<div class="dropdown-item" onclick="updateVNStatus(''+sid+'','passed')">✓ Đánh dấu ĐẠT</div>'+
-      '<div class="dropdown-item" onclick="updateVNStatus(''+sid+'','partial')">⚠ Đánh dấu CHỜ</div>'+
-      '<div class="dropdown-item" onclick="updateVNStatus(''+sid+'','failed')" style="color:var(--red)">✗ Không ĐẠT</div>'+
-      '<div style="border-top:1px solid var(--border);margin:4px 0"></div>'+
-      '<div class="dropdown-item" onclick="openVNDetail(''+sid+'')">📋 Xem chi tiết</div>'+
-      '<div class="dropdown-item" onclick="openAIAdvisor({id:''+sid+'',weakness:''+s.name.replace(/'/g,"\'")+'',control:''+s.framework+'',severity:'MEDIUM',mitigation:''})">🤖 AI Advisor</div>';
+    menu.innerHTML = vnBuildCardMenu(sid, s);
     btn.parentElement.style.position = 'relative';
     btn.parentElement.appendChild(menu);
   } else {
