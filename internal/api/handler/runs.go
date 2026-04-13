@@ -180,7 +180,12 @@ func (h *Runs) List(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/vsp/runs/index  (lightweight for polling)
 func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, 50, 0)
+	limit := queryInt(r, "limit", 50)
+	if limit > 500 {
+		limit = 500
+	}
+	offset := queryInt(r, "offset", 0)
+	runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, limit, offset)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
