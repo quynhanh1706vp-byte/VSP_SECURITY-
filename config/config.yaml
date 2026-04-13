@@ -33,6 +33,6 @@ smtp:
   enabled: false
 
 anthropic:
-  api_key: "REDACTED_ANTHROPIC_KEY"
+  api_key: "sk-ant-..."
 
 p4_api_key: "634a9c4ebc792f44d7c50c0eea62da4a3f2a4f9e657048d070b6175187bdb0c2"
