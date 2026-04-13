@@ -242,6 +242,7 @@ function toggleRule(id,e){
 function renderIncidents(){
   var f=document.getElementById('inc-filter').value;
   var list=INCIDENTS.filter(function(i){return !f||i.sev===f});
+  if(!list||!list.length){document.getElementById('incidents-list').innerHTML='<div style="color:var(--t3);padding:16px;font-size:12px">No incidents</div>';return;}
   document.getElementById('inc-sub').textContent=list.length+' incidents';
   document.getElementById('k-inc').textContent=INCIDENTS.length;
   var sevCls={CRITICAL:'crit',HIGH:'high',MEDIUM:'med'};
@@ -249,7 +250,7 @@ function renderIncidents(){
     return '<div class="incident '+(sevCls[i.sev]||'')+'">'
       +'<div class="inc-hdr"><span class="inc-title">'+i.id+' · '+i.title+'</span><span class="inc-time">'+i.time+'</span></div>'
       +'<div class="inc-desc">'+i.desc+'</div>'
-      +'<div class="inc-tags">'+i.sources.map(function(s){return '<span class="pill pill-cyan">'+s+'</span>'}).join('')+'<span class="pill pill-gray">open</span></div>'
+      +'<div class="inc-tags">'+(i.sources||[]).map(function(s){return '<span class="pill pill-cyan">'+s+'</span>'}).join('')+'<span class="pill pill-gray">open</span></div>'
       +'</div>';
   }).join('');
 }
