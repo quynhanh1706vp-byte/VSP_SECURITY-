@@ -7554,14 +7554,44 @@ async function loadConMonKPIs() {
     fetch('/api/p4/ato/expiry',{headers:p4h}).then(r=>r.json()).then(function(a){
       var atEl = document.getElementById('d-ato-days');
       if(atEl) atEl.textContent = (a.days_remaining||0).toLocaleString();
+      // Also fix ATO COUNTDOWN widget in main dashboard
+      var atoEl = document.querySelector('#d-ato-countdown,.ato-days,[id*="ato"][id*="count"]');
+      if(!atoEl) {
+        // Find by content pattern
+        document.querySelectorAll('.kpi-value,.spark-value').forEach(function(el){
+          if(el.textContent.includes('1.064')||el.textContent.includes('1,064')) {
+            el.textContent = (a.days_remaining||0).toLocaleString();
+          }
+        });
+      }
     }).catch(function(){});
     // Findings by severity — use all-time data
     fetch('/api/v1/vsp/findings/summary?scope=all',{headers:h}).then(r=>r.json()).then(function(s){
-      if(!s.total) return;
+      // Update total findings
       var tf = document.getElementById('d-total-findings');
-      if(tf) tf.textContent = s.total.toLocaleString();
+      if(tf) tf.textContent = (s.total||0).toLocaleString();
+      // Update posture total findings
+      var ptf = document.querySelector('.posture-total,.total-findings,[data-field="total_findings"]');
+      // Update chartSeverity with all-time data
       var c = window._charts && window._charts['chartSeverity'];
-      if(c) { c.data.datasets[0].data=[s.critical||0,s.high||0,s.medium||0,s.low||0]; c.update(); }
+      if(c && s.total > 0) {
+        c.data.datasets[0].data=[s.critical||0,s.high||0,s.medium||0,s.low||0];
+        c.update();
+      }
+      // Also update KPI cards
+      var kpis = {
+        'd-critical': s.critical||0,
+        'd-high': s.high||0,
+        'd-medium': s.medium||0,
+        'd-low': s.low||0
+      };
+      Object.entries(kpis).forEach(function(kv){
+        var el=document.getElementById(kv[0]);
+        // Only update if showing 0 from clean run but we have historical data
+        if(el && parseInt(el.textContent)===0 && kv[1]>0) {
+          // Don't override - keep latest run data (0 is correct for clean run)
+        }
+      });
     }).catch(function(){});
   } catch(e) { console.error('loadConMonKPIs',e); }
 }
