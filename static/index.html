@@ -7403,6 +7403,7 @@ var _siemKPIpoll = setInterval(function() {
 
 
 async function loadConMonKPIs() {
+  console.log('[VSP] loadConMonKPIs called');
   if (!window.TOKEN) return;
   var h = {Authorization:'Bearer '+window.TOKEN};
   var P4KEY = window.VSP_P4_API_KEY || '';
