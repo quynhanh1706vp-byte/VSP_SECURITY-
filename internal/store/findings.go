@@ -109,9 +109,10 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 		var ruleID, message, fpath, cwe, fixSignal *string
 		var cvss *float64
 		var lineNum *int
+		var remStatus *string
 		if err := rows.Scan(&fn.ID, &fn.RunID, &fn.TenantID, &fn.Tool,
 			&fn.Severity, &ruleID, &message, &fpath,
-			&lineNum, &cwe, &cvss, &fixSignal, &fn.CreatedAt, &fn.Status); err != nil {
+			&lineNum, &cwe, &cvss, &fixSignal, &fn.CreatedAt, &remStatus); err != nil {
 			return nil, 0, err
 		}
 		if ruleID != nil {
@@ -134,6 +135,11 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 		}
 		if lineNum != nil {
 			fn.LineNum = *lineNum
+		}
+		if remStatus != nil {
+			fn.Status = *remStatus
+		} else {
+			fn.Status = "open"
 		}
 		result = append(result, fn)
 	}
