@@ -359,6 +359,22 @@ func main() {
 	r.Post("/api/p4/vex", p4AuthMiddleware(handleCreateVEX))
 	r.Get("/api/p4/vex", p4AuthMiddleware(handleListVEX))
 
+	// ═══ Milestone 2: OSCAL Extended + SSDF + CISA Attestation ═══
+	// NIST OSCAL 1.1.2 — Catalog, Profile, SSP, Assessment Plan/Results, POA&M
+	// NIST SP 800-218 SSDF v1.1
+	// CISA Secure Software Self-Attestation Common Form (2024)
+	r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
+	r.Get("/api/p4/oscal/profile", p4AuthMiddleware(handleOSCALProfile))
+	r.Get("/api/p4/oscal/ssp/extended", p4AuthMiddleware(handleOSCALSSPExtended))
+	r.Get("/api/p4/oscal/assessment-plan", p4AuthMiddleware(handleOSCALAssessmentPlan))
+	r.Get("/api/p4/oscal/assessment-results", p4AuthMiddleware(handleOSCALAssessmentResults))
+	r.Get("/api/p4/oscal/poam-extended", p4AuthMiddleware(handleOSCALPOAMExtended))
+	r.Get("/api/p4/ssdf/practices", p4AuthMiddleware(handleSSDFPractices))
+	r.Post("/api/p4/ssdf/practice/update", p4AuthMiddleware(handleSSDFUpdate))
+	r.Get("/api/p4/attestation/generate", p4AuthMiddleware(handleAttestationGenerate))
+	r.Post("/api/p4/attestation/sign", p4AuthMiddleware(handleAttestationSign))
+	r.Get("/api/p4/attestation/list", p4AuthMiddleware(handleAttestationList))
+
 	r.Get("/api/p4/ato/expiry", p4AuthMiddleware(handleATOExpiry))
 	r.Get("/api/p4/oscal/ssp", p4AuthMiddleware(handleOSCALExport))
 	r.Get("/api/p4/alerts/config", p4AuthMiddleware(handleAlertConfig))

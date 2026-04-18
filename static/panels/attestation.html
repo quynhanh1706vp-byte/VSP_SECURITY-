@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script>
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500; var waited = 0;
+    while (waited < maxWait) {
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      try { tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || ""; if (tk && tk.length >= 20) { window.TOKEN = tk; try { localStorage.setItem("vsp_token", tk); } catch(e){} return tk; } } catch(e) {}
+      await new Promise(r=>setTimeout(r, 100)); waited += 100;
+    }
+    return "";
+  }
+  window.vspAuthFetch = async function(url, opts){ opts = opts || {}; var tk = await getToken(); if (tk) opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk}); return _origFetch(url, opts); };
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){ if (typeof url==="string" && url.indexOf("/api/")>=0){ if (opts && opts.headers && (opts.headers.Authorization||opts.headers.authorization)) return _origFetch(url,opts); return window.vspAuthFetch(url,opts); } return _origFetch(url,opts); };
+})();
+</script>
+<meta charset="UTF-8">
+<title>CISA Attestation — SSDF</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size:13px;padding:16px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-family:var(--font-display);font-size:18px;font-weight:800}
+.hdr p{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px}
+.kpi-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;font-family:var(--font-mono);margin-bottom:4px}
+.kpi-value{font-family:var(--font-display);font-size:22px;font-weight:800}
+.kpi-sub{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:13px;font-weight:600}
+.card-body{padding:14px}
+
+.btn{padding:7px 14px;font-size:11px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg3);color:var(--t2);cursor:pointer;font-family:var(--font-mono)}
+.btn-primary{background:var(--accent);color:var(--bg1);border-color:var(--accent)}
+.btn:hover{opacity:.9}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.form-row label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-family:var(--font-mono)}
+input, select{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 10px;color:var(--t1);font-family:var(--font-mono);font-size:12px}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:8px 10px;font-size:10px;color:var(--t3);text-transform:uppercase;font-family:var(--font-mono);border-bottom:1px solid var(--border)}
+td{padding:9px 10px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--bg3)}
+
+.badge{display:inline-block;padding:2px 8px;font-size:10px;border-radius:10px;font-family:var(--font-mono);font-weight:600}
+.b-draft{background:rgba(156,163,175,.15);color:#9ca3af}
+.b-signed{background:rgba(34,197,94,.15);color:#22c55e}
+.b-submit{background:rgba(59,130,246,.15);color:#3b82f6}
+.b-pending{background:rgba(250,204,21,.15);color:#facc15}
+
+.banner{padding:12px;border-radius:var(--r-sm);margin-bottom:12px;font-size:12px}
+.banner-info{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);color:#3b82f6}
+.banner-ok{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);color:#22c55e}
+
+.ssdf-list{max-height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r-sm);padding:8px}
+.practice-row{padding:6px 10px;margin-bottom:4px;background:var(--bg1);border-radius:var(--r-sm);font-size:11px;display:flex;justify-content:space-between;align-items:center}
+.practice-id{font-family:var(--font-mono);color:var(--t3);min-width:60px}
+
+.attest-yes{color:#22c55e;font-weight:700}
+.attest-no{color:#facc15;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h2>📝 CISA Secure Software Self-Attestation</h2>
+    <p>OMB M-22-18 / M-23-16 · CISA Common Form (2024) · NIST SSDF v1.1</p>
+  </div>
+  <button class="btn btn-primary" onclick="loadDraft()">⟳ Generate New Draft</button>
+</div>
+
+<div class="banner banner-info">
+  ℹ️ <b>CISA Attestation Form</b> is required for software vendors selling to US Federal agencies. 
+  Form is auto-filled from SSDF practices — CEO or senior executive must review &amp; sign.
+</div>
+
+<!-- KPIs -->
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Attestable</div>
+    <div class="kpi-value" style="color:#22c55e" id="kpi-attest">—</div>
+    <div class="kpi-sub">of 20 SSDF practices</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Attestation %</div>
+    <div class="kpi-value" id="kpi-pct">—%</div>
+    <div class="kpi-sub">auto-calculated</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Forms drafted</div>
+    <div class="kpi-value" id="kpi-total">—</div>
+    <div class="kpi-sub" id="kpi-signed">— signed</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Compliance</div>
+    <div class="kpi-value" style="font-size:14px">EO 14028</div>
+    <div class="kpi-sub">OMB M-22-18</div>
+  </div>
+</div>
+
+<!-- Current Draft -->
+<div class="card">
+  <div class="card-head">
+    <div class="card-title">📋 Current Draft Attestation</div>
+    <div><button class="btn" onclick="downloadDraft()">💾 Download JSON</button></div>
+  </div>
+  <div class="card-body" id="draft-body">Loading…</div>
+</div>
+
+<!-- Sign form -->
+<div class="card">
+  <div class="card-head">
+    <div class="card-title">✍️ Sign Attestation (CEO / Senior Executive)</div>
+  </div>
+  <div class="card-body">
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Executive Name *</label>
+        <input id="sig-name" placeholder="John Smith">
+      </div>
+      <div class="form-row">
+        <label>Title *</label>
+        <select id="sig-title">
+          <option>Chief Executive Officer</option>
+          <option>Chief Technology Officer</option>
+          <option>Chief Information Security Officer</option>
+          <option>Chief Compliance Officer</option>
+          <option>General Counsel</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Email *</label>
+        <input id="sig-email" placeholder="ceo@vsp.local">
+      </div>
+      <div class="form-row">
+        <label>Signature Method</label>
+        <select id="sig-method">
+          <option value="electronic">Electronic (DocuSign, etc.)</option>
+          <option value="digital">Digital (PKI signature)</option>
+          <option value="physical">Physical (wet ink)</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="signAttestation()">🔐 Sign &amp; Submit</button>
+  </div>
+</div>
+
+<!-- All forms -->
+<div class="card">
+  <div class="card-head">
+    <div class="card-title">📂 All Attestation Forms</div>
+    <div class="mono" id="forms-stats"></div>
+  </div>
+  <div class="card-body">
+    <table>
+      <thead><tr>
+        <th>Form UUID</th><th>Product</th><th>Version</th>
+        <th>Status</th><th>Signed by</th><th>Date</th>
+      </tr></thead>
+      <tbody id="forms-tbody"><tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let currentDraft = null;
+
+async function loadDraft() {
+  try {
+    const res = await fetch('/api/p4/attestation/generate');
+    const d = await res.json();
+    currentDraft = d;
+    
+    document.getElementById('kpi-attest').textContent = d.attestation_stats?.can_fully_attest || '—';
+    document.getElementById('kpi-pct').textContent = (d.attestation_stats?.attestation_pct || 0) + '%';
+    
+    const body = document.getElementById('draft-body');
+    const attests = d.ssdf_attestations || {};
+    const practices = Object.entries(attests).sort(([a],[b]) => a.localeCompare(b));
+    
+    body.innerHTML = `
+      <div style="margin-bottom:10px;font-size:12px">
+        <b>Form UUID:</b> <span class="mono" style="color:var(--t3)">${d.form_uuid}</span><br>
+        <b>Product:</b> ${d.product?.name} v${d.product?.version}<br>
+        <b>Form type:</b> ${d.form_type}<br>
+        <b>Reference:</b> ${d.reference}
+      </div>
+      
+      <div style="margin-top:14px;font-size:12px;font-weight:600">
+        SSDF Practice Attestations (${d.attestation_stats?.can_fully_attest}/${d.attestation_stats?.total_practices}):
+      </div>
+      <div class="ssdf-list" style="margin-top:8px">
+        ${practices.map(([id, info]) => {
+          const attest = info.can_attest;
+          return `<div class="practice-row">
+            <div>
+              <span class="practice-id">${id}</span> ${info.name || ''}
+            </div>
+            <div>
+              <span class="${attest?'attest-yes':'attest-no'}">${attest?'✓ CAN ATTEST':'⚠ PARTIAL'}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    `;
+  } catch(e) { alert('Generate error: ' + e.message); }
+}
+
+async function signAttestation() {
+  if (!currentDraft) { alert('Generate a draft first'); return; }
+  const name = document.getElementById('sig-name').value.trim();
+  const email = document.getElementById('sig-email').value.trim();
+  if (!name || !email) { alert('Name and email required'); return; }
+  
+  try {
+    const res = await fetch('/api/p4/attestation/sign', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        form_uuid: currentDraft.form_uuid,
+        signed_by_name: name,
+        signed_by_title: document.getElementById('sig-title').value,
+        signed_by_email: email,
+        signature_method: document.getElementById('sig-method').value
+      })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(JSON.stringify(d));
+    alert('✅ Attestation signed!\n\nForm: ' + d.form_uuid.slice(0, 8) + '…\nSigned by: ' + d.signed_by);
+    loadForms();
+  } catch(e) { alert('Sign error: ' + e.message); }
+}
+
+async function downloadDraft() {
+  if (!currentDraft) return;
+  const blob = new Blob([JSON.stringify(currentDraft, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cisa-attestation-' + currentDraft.form_uuid.slice(0,8) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function loadForms() {
+  try {
+    const res = await fetch('/api/p4/attestation/list');
+    const d = await res.json();
+    document.getElementById('kpi-total').textContent = d.count || 0;
+    document.getElementById('kpi-signed').textContent = (d.by_status?.signed || 0) + ' signed';
+    document.getElementById('forms-stats').textContent = 
+      `${d.count} total · ${d.by_status?.draft||0} draft · ${d.by_status?.signed||0} signed`;
+    
+    const tbody = document.getElementById('forms-tbody');
+    if (!d.forms || d.forms.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No forms yet — generate first draft</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.forms.map(f => {
+      const bc = {draft:'b-draft', signed:'b-signed', submitted:'b-submit', pending_signature:'b-pending'}[f.status] || 'b-draft';
+      return `<tr>
+        <td class="mono" style="font-size:10px">${f.form_uuid.slice(0,8)}…</td>
+        <td>${f.product}</td>
+        <td class="mono">${f.version}</td>
+        <td><span class="badge ${bc}">${f.status}</span></td>
+        <td>${f.signed_by || '—'}${f.title ? '<br><span style="font-size:10px;color:var(--t3)">'+f.title+'</span>' : ''}</td>
+        <td class="mono" style="font-size:10px">${f.signed_at ? new Date(f.signed_at).toLocaleString() : '—'}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+loadDraft();
+loadForms();
+</script>
+</body>
+</html>

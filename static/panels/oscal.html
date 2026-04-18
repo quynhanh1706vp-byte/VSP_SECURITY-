@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script>
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500; var waited = 0;
+    while (waited < maxWait) {
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      try { tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || ""; if (tk && tk.length >= 20) { window.TOKEN = tk; try { localStorage.setItem("vsp_token", tk); } catch(e){} return tk; } } catch(e) {}
+      await new Promise(r=>setTimeout(r, 100)); waited += 100;
+    }
+    return "";
+  }
+  window.vspAuthFetch = async function(url, opts){ opts = opts || {}; var tk = await getToken(); if (tk) opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk}); return _origFetch(url, opts); };
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){ if (typeof url==="string" && url.indexOf("/api/")>=0){ if (opts && opts.headers && (opts.headers.Authorization||opts.headers.authorization)) return _origFetch(url,opts); return window.vspAuthFetch(url,opts); } return _origFetch(url,opts); };
+})();
+</script>
+<meta charset="UTF-8">
+<title>OSCAL Export — FedRAMP 20x</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size:13px;padding:16px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-family:var(--font-display);font-size:18px;font-weight:800}
+.hdr p{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px}
+.kpi-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;font-family:var(--font-mono);margin-bottom:4px}
+.kpi-value{font-family:var(--font-display);font-size:22px;font-weight:800}
+.kpi-sub{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+
+.section-title{font-size:13px;font-weight:700;margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+.grid-models{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.model-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px;transition:all .15s}
+.model-card:hover{border-color:var(--border2)}
+.model-title{font-weight:700;font-size:13px;margin-bottom:4px}
+.model-desc{font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.4}
+.model-mono{font-family:var(--font-mono);font-size:9px;color:var(--t3);margin-bottom:10px}
+.model-actions{display:flex;gap:6px}
+.btn{padding:6px 12px;font-size:11px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg3);color:var(--t2);cursor:pointer;font-family:var(--font-mono)}
+.btn:hover{border-color:var(--border2);color:var(--t1)}
+.btn-primary{background:var(--accent);color:var(--bg1);border-color:var(--accent)}
+.btn-sm{padding:4px 10px;font-size:10px}
+
+.pre-box{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-family:monospace;font-size:10px;color:var(--t2);white-space:pre;max-height:500px;overflow:auto;margin-top:10px}
+
+.ssdf-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.ssdf-group{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px}
+.ssdf-group-hdr{display:flex;justify-content:space-between;margin-bottom:8px}
+.ssdf-group-name{font-weight:700;font-size:12px}
+.ssdf-group-stats{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
+.ssdf-practice{padding:6px 8px;margin-bottom:4px;background:var(--bg1);border-radius:var(--r-sm);font-size:11px;display:flex;justify-content:space-between;align-items:center}
+.ssdf-practice-id{font-family:var(--font-mono);font-size:10px;color:var(--t3);min-width:52px}
+.badge{display:inline-block;padding:2px 7px;font-size:9px;border-radius:8px;font-family:var(--font-mono);font-weight:600}
+.b-impl{background:rgba(34,197,94,.15);color:#22c55e}
+.b-partial{background:rgba(250,204,21,.15);color:#facc15}
+.b-na{background:var(--bg3);color:var(--t3)}
+.b-not-impl{background:rgba(239,68,68,.15);color:#ef4444}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h2>📋 OSCAL Export — FedRAMP 20x</h2>
+    <p>NIST OSCAL 1.1.2 · Machine-readable compliance · NIST SP 800-218 SSDF</p>
+  </div>
+  <button class="btn btn-primary" onclick="loadAll()">⟳ Refresh</button>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">SSDF Practices</div>
+    <div class="kpi-value" id="kpi-ssdf-total">—</div>
+    <div class="kpi-sub">NIST SP 800-218 v1.1</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Implemented</div>
+    <div class="kpi-value" style="color:#22c55e" id="kpi-ssdf-impl">—</div>
+    <div class="kpi-sub" id="kpi-ssdf-pct">—%</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">OSCAL Models</div>
+    <div class="kpi-value" style="color:#3b82f6">6</div>
+    <div class="kpi-sub">Catalog · Profile · SSP · AP · AR · POAM</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Schema version</div>
+    <div class="kpi-value" style="font-size:16px">OSCAL 1.1.2</div>
+    <div class="kpi-sub">NIST latest</div>
+  </div>
+</div>
+
+<!-- OSCAL Models -->
+<div class="section-title">📦 OSCAL Document Models</div>
+
+<div class="grid-models">
+  <div class="model-card">
+    <div class="model-title">📘 Catalog</div>
+    <div class="model-mono">NIST 800-53 Rev.5 subset</div>
+    <div class="model-desc">Security controls definitions. 7 families: AC, AU, CA, CM, RA, SA, SI.</div>
+    <div class="model-actions">
+      <button class="btn btn-sm" onclick="viewModel('catalog')">View</button>
+      <button class="btn btn-sm" onclick="downloadModel('catalog','nist-800-53-rev5.oscal.json')">Download</button>
+    </div>
+  </div>
+  
+  <div class="model-card">
+    <div class="model-title">📗 Profile</div>
+    <div class="model-mono">FedRAMP Moderate Baseline</div>
+    <div class="model-desc">Tailored baseline from Catalog for FedRAMP Mod impact level.</div>
+    <div class="model-actions">
+      <button class="btn btn-sm" onclick="viewModel('profile')">View</button>
+      <button class="btn btn-sm" onclick="downloadModel('profile','fedramp-moderate.oscal.json')">Download</button>
+    </div>
+  </div>
+  
+  <div class="model-card">
+    <div class="model-title">📕 SSP (Extended)</div>
+    <div class="model-mono">System Security Plan</div>
+    <div class="model-desc">VSP SSP enriched with real-time findings, runs, signatures data.</div>
+    <div class="model-actions">
+      <button class="btn btn-sm" onclick="viewModel('ssp/extended')">View</button>
+      <button class="btn btn-sm" onclick="downloadModel('ssp/extended','vsp-ssp.oscal.json')">Download</button>
+    </div>
+  </div>
+  
+  <div class="model-card">
+    <div class="model-title">📙 Assessment Plan</div>
+    <div class="model-mono">NIST SP 800-115 methodology</div>
+    <div class="model-desc">Test plan: SAST, SCA, DAST, Pen test, ConMon tasks.</div>
+    <div class="model-actions">
+      <button class="btn btn-sm" onclick="viewModel('assessment-plan')">View</button>
+      <button class="btn btn-sm" onclick="downloadModel('assessment-plan','vsp-ap.oscal.json')">Download</button>
+    </div>
+  </div>
+  
+  <div class="model-card">
+    <div class="model-title">📓 Assessment Results</div>
+    <div class="model-mono">Real findings from DB</div>
+    <div class="model-desc">Automated assessment results — continuous findings aggregation.</div>
+    <div class="model-actions">
+      <button class="btn btn-sm" onclick="viewModel('assessment-results')">View</button>
+      <button class="btn btn-sm" onclick="downloadModel('assessment-results','vsp-ar.oscal.json')">Download</button>
+    </div>
+  </div>
+  
+  <div class="model-card">
+    <div class="model-title">📔 POA&amp;M (Extended)</div>
+    <div class="model-mono">Plan of Action &amp; Milestones</div>
+    <div class="model-desc">Auto-generated from SSDF partial practices + finding gaps.</div>
+    <div class="model-actions">
+      <button class="btn btn-sm" onclick="viewModel('poam-extended')">View</button>
+      <button class="btn btn-sm" onclick="downloadModel('poam-extended','vsp-poam.oscal.json')">Download</button>
+    </div>
+  </div>
+</div>
+
+<div id="model-viewer"></div>
+
+<!-- SSDF Practices -->
+<div class="section-title">🎯 NIST SSDF v1.1 Practices (20)</div>
+<div class="ssdf-grid" id="ssdf-content">Loading…</div>
+
+<script>
+async function loadKPIs() {
+  try {
+    const res = await fetch('/api/p4/ssdf/practices');
+    const d = await res.json();
+    document.getElementById('kpi-ssdf-total').textContent = d.total || '—';
+    document.getElementById('kpi-ssdf-impl').textContent = d.by_status?.implemented || '0';
+    document.getElementById('kpi-ssdf-pct').textContent = (d.implementation_pct || 0) + '% attestation-ready';
+  } catch(e) { console.error(e); }
+}
+
+async function loadSSDF() {
+  try {
+    const res = await fetch('/api/p4/ssdf/practices');
+    const d = await res.json();
+    const groupsMap = {PO: 'Prepare Organization', PS: 'Protect Software', PW: 'Produce Well-Secured', RV: 'Respond to Vulns'};
+    const byGroup = {};
+    for (const p of d.practices || []) {
+      if (!byGroup[p.group_code]) byGroup[p.group_code] = [];
+      byGroup[p.group_code].push(p);
+    }
+    const container = document.getElementById('ssdf-content');
+    container.innerHTML = '';
+    for (const g of ['PO','PS','PW','RV']) {
+      const prac = byGroup[g] || [];
+      const impl = prac.filter(p => p.status === 'implemented').length;
+      const box = document.createElement('div');
+      box.className = 'ssdf-group';
+      box.innerHTML = `
+        <div class="ssdf-group-hdr">
+          <div class="ssdf-group-name">${g} — ${groupsMap[g]}</div>
+          <div class="ssdf-group-stats">${impl}/${prac.length}</div>
+        </div>
+        ${prac.map(p => {
+          const bc = {implemented:'b-impl', partial:'b-partial', not_applicable:'b-na', not_implemented:'b-not-impl'}[p.status] || 'b-na';
+          return `<div class="ssdf-practice">
+            <div><span class="ssdf-practice-id">${p.practice_id}</span> ${p.name}</div>
+            <span class="badge ${bc}">${p.status.replace('_',' ')}</span>
+          </div>`;
+        }).join('')}
+      `;
+      container.appendChild(box);
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function viewModel(path) {
+  try {
+    const res = await fetch('/api/p4/oscal/' + path);
+    const d = await res.json();
+    document.getElementById('model-viewer').innerHTML = 
+      '<div class="pre-box">' + JSON.stringify(d, null, 2) + '</div>';
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function downloadModel(path, filename) {
+  try {
+    const res = await fetch('/api/p4/oscal/' + path);
+    const d = await res.json();
+    const blob = new Blob([JSON.stringify(d, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+function loadAll() { loadKPIs(); loadSSDF(); }
+loadAll();
+</script>
+</body>
+</html>

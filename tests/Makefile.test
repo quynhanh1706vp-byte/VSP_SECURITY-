@@ -39,3 +39,12 @@ full-with-supply: api data perf supply-chain
 	@echo "═══════════════════════════"
 	@echo "✅ ALL INCL. SUPPLY CHAIN PASSED"
 	@echo "═══════════════════════════"
+
+oscal:
+	@./tests/test_oscal.sh
+
+full-complete: api data perf supply-chain oscal
+	@echo ""
+	@echo "═══════════════════════════"
+	@echo "✅ ALL M1+M2 SUITES PASSED"
+	@echo "═══════════════════════════"

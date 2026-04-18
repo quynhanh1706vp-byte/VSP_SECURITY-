@@ -297,6 +297,8 @@ function updateScanTools() {
       <button class="nav-item" onclick="showPanel('governance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1l7 4v1H1V5L8 1z"/><rect x="2" y="6" width="2" height="7"/><rect x="7" y="6" width="2" height="7"/><rect x="12" y="6" width="2" height="7"/><path d="M1 13h14"/></svg></span> Governance</button>
       <button class="nav-item" onclick="showPanel('compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/><path d="M5 8l2 2 4-4"/></svg></span> FedRAMP</button>
           <button class="nav-item" onclick="showPanel('p4compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/></svg></span> P4 Compliance</button>
+      <button class="nav-item" onclick="showPanel('oscal',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span> OSCAL <span class="nav-badge" style="background:rgba(168,85,247,.2);color:#a855f7;font-size:8px">NEW</span></button>
+      <button class="nav-item" onclick="showPanel('attestation',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v4h3M5 9h6M5 12h4"/></svg></span> Attestation <span class="nav-badge" style="background:rgba(168,85,247,.2);color:#a855f7;font-size:8px">NEW</span></button>
       <button class="nav-item" onclick="showPanel('supplychain',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 016 0v2"/><circle cx="8" cy="10" r="1" fill="currentColor"/></svg></span> Supply Chain <span class="nav-badge" style="background:rgba(168,85,247,.2);color:#a855f7;font-size:8px">NEW</span></button>
       <button class="nav-item" onclick="showPanel('sbom',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 3V2M8 3V2M11 3V2M4 7h2M4 10h2M8 7h4M8 10h3"/></svg></span> SBOM</button>
       <button class="nav-item" onclick="showPanel('sla',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4 8,8 11,10"/></svg></span> SLA</button>
@@ -1247,7 +1249,15 @@ function updateScanTools() {
     <!-- ════════════════════════════════════
          SBOM PANEL
     ════════════════════════════════════ -->
-        <div id="panel-supplychain" class="panel">
+            <div id="panel-oscal" class="panel">
+      <iframe id="iframe-oscal" src="/panels/oscal.html" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
+    </div>
+
+    <div id="panel-attestation" class="panel">
+      <iframe id="iframe-attestation" src="/panels/attestation.html" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
+    </div>
+
+<div id="panel-supplychain" class="panel">
       <iframe id="iframe-supplychain" src="/panels/supply_chain.html" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
     </div>
 
