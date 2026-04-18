@@ -1,0 +1,25 @@
+BIN_SRC  := ./bin/vsp-gateway
+BIN_DEST := /usr/local/bin/vsp-gateway
+
+.PHONY: install verify-install
+
+install:
+	@echo "→ Stopping gateway..."
+	sudo systemctl stop vsp-gateway
+	@echo "→ Backing up current binary..."
+	sudo cp $(BIN_DEST) $(BIN_DEST).bak-$$(date +%Y%m%d-%H%M%S) 2>/dev/null || true
+	@echo "→ Installing new binary..."
+	sudo cp $(BIN_SRC) $(BIN_DEST)
+	sudo setcap cap_net_raw,cap_net_admin+eip $(BIN_DEST)
+	@echo "→ Starting gateway..."
+	sudo systemctl start vsp-gateway
+	@sleep 3
+	@$(MAKE) verify-install
+
+verify-install:
+	@curl -sf http://127.0.0.1:8921/api/p4/health >/dev/null \
+		&& echo "✓ gateway healthy at :8921" \
+		|| (echo "✗ gateway failed — check: sudo journalctl -u vsp-gateway -n 30"; exit 1)
+	@getcap $(BIN_DEST) | grep -q cap_net_raw \
+		&& echo "✓ CAP_NET_RAW set" \
+		|| echo "✗ CAP_NET_RAW missing"

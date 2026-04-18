@@ -65,7 +65,7 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if bearer == "" && !isValidAPIKey {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(map[string]string{"error": "authentication required"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "authentication required"})
 			return
 		}
 		// Validate JWT signature nếu có bearer token
@@ -75,7 +75,7 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			if len(parts) != 3 {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token format"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid token format"})
 				return
 			}
 			// Decode payload
@@ -92,14 +92,14 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token encoding"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid token encoding"})
 				return
 			}
 			var claims map[string]interface{}
 			if err := json.Unmarshal(decoded, &claims); err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token claims"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid token claims"})
 				return
 			}
 			// Check expiry
@@ -107,7 +107,7 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				if time.Now().Unix() > int64(exp) {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(401)
-					json.NewEncoder(w).Encode(map[string]string{"error": "token expired"})
+					_ = json.NewEncoder(w).Encode(map[string]string{"error": "token expired"})
 					return
 				}
 			}
@@ -115,7 +115,7 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			if claims["sub"] == nil && claims["email"] == nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token claims"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid token claims"})
 				return
 			}
 		}
@@ -148,7 +148,7 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func p4Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	fmt.Fprintf(w, `{"status":"ok","module":"VSP-P4","version":"2.0.0","p4_achieved":true}`)
+	_, _ = fmt.Fprintf(w, `{"status":"ok","module":"VSP-P4","version":"2.0.0","p4_achieved":true}`)
 }
 func init() {
 	initZeroTrustState()

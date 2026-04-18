@@ -89,7 +89,7 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 			w.Header().Set("X-RateLimit-Limit", "200")
 			w.Header().Set("X-RateLimit-Window", "60s")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"rate limit exceeded","retry_after":60}`)) //nolint
+			_, _ = w.Write([]byte(`{"error":"rate limit exceeded","retry_after":60}`)) //nolint
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -121,7 +121,7 @@ func (rl *RateLimiter) UserMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"rate limit exceeded","retry_after":60}`)) //nolint
+			_, _ = w.Write([]byte(`{"error":"rate limit exceeded","retry_after":60}`)) //nolint
 			return
 		}
 		next.ServeHTTP(w, r)

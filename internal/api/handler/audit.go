@@ -49,7 +49,7 @@ func (h *Audit) Verify(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnprocessableEntity)
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ok":            false,
 			"checked":       result.Checked,
 			"broken_at_seq": result.BrokenAtSeq,

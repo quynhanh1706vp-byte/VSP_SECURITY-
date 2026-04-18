@@ -169,7 +169,7 @@ func (db *DB) FindingsSummary(ctx context.Context, tenantID, runID string) (*Fin
 	for rows.Next() {
 		var sev string
 		var cnt int
-		rows.Scan(&sev, &cnt)
+		_ = rows.Scan(&sev, &cnt)
 		switch sev {
 		case "CRITICAL":
 			s.Critical = cnt

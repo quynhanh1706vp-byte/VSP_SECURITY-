@@ -243,3 +243,146 @@ func (h *Runs) Cancel(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]string{"rid": rid, "status": "CANCELLED"})
 }
+
+// GET /api/v1/vsp/run/{rid}/log
+func (h *Runs) Log(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	rid := chi.URLParam(r, "rid")
+	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
+	if err != nil || run == nil {
+		jsonError(w, "run not found", http.StatusNotFound)
+		return
+	}
+	// Get findings grouped by tool
+	type toolStat struct {
+		Tool     string `json:"tool"`
+		Total    int    `json:"total"`
+		Critical int    `json:"critical"`
+		High     int    `json:"high"`
+		Medium   int    `json:"medium"`
+		Low      int    `json:"low"`
+	}
+	rows, err := h.DB.Pool().Query(r.Context(), `
+		SELECT tool, COUNT(*),
+		       COUNT(*) FILTER (WHERE severity='CRITICAL'),
+		       COUNT(*) FILTER (WHERE severity='HIGH'),
+		       COUNT(*) FILTER (WHERE severity='MEDIUM'),
+		       COUNT(*) FILTER (WHERE severity='LOW')
+		FROM findings WHERE run_id=$1 AND tenant_id=$2
+		GROUP BY tool ORDER BY COUNT(*) DESC`, run.ID, claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	var tools []toolStat
+	for rows.Next() {
+		var t toolStat
+		_ = rows.Scan(&t.Tool, &t.Total, &t.Critical, &t.High, &t.Medium, &t.Low)
+		tools = append(tools, t)
+	}
+	// Build log lines
+	type logLine struct {
+		TS    string `json:"ts"`
+		Tool  string `json:"tool"`
+		Level string `json:"level"`
+		Msg   string `json:"msg"`
+	}
+	var lines []logLine
+	ts := 0
+	fmtTS := func(s int) string {
+		return fmt.Sprintf("%02d:%02d:%02d", s/3600, (s%3600)/60, s%60)
+	}
+	runAny := run
+	_ = runAny
+	lines = append(lines, logLine{fmtTS(ts), "scanner", "INFO", fmt.Sprintf("Run started: %s", rid)})
+	ts++
+	lines = append(lines, logLine{fmtTS(ts), "scanner", "INFO", fmt.Sprintf("Mode: %s · Total: %d findings", run.Mode, run.TotalFindings)})
+	ts++
+	for _, t := range tools {
+		lines = append(lines, logLine{fmtTS(ts), t.Tool, "INFO", "Starting scan…"})
+		ts++
+		if t.Critical > 0 {
+			lines = append(lines, logLine{fmtTS(ts), t.Tool, "ERROR", fmt.Sprintf("Found %d CRITICAL findings", t.Critical)})
+			ts++
+		}
+		if t.High > 0 {
+			lines = append(lines, logLine{fmtTS(ts), t.Tool, "WARN", fmt.Sprintf("Found %d HIGH findings", t.High)})
+			ts++
+		}
+		if t.Medium > 0 {
+			lines = append(lines, logLine{fmtTS(ts), t.Tool, "WARN", fmt.Sprintf("Found %d MEDIUM findings", t.Medium)})
+			ts++
+		}
+		lines = append(lines, logLine{fmtTS(ts), t.Tool, "DONE", fmt.Sprintf("Completed · %d findings", t.Total)})
+		ts++
+	}
+	gl := "INFO"
+	if run.Gate == "FAIL" {
+		gl = "ERROR"
+	} else if run.Gate == "WARN" {
+		gl = "WARN"
+	}
+	score := 0
+	var _summ map[string]interface{}
+	json.Unmarshal(run.Summary, &_summ)
+	if _summ != nil {
+		if s, ok := _summ["SCORE"]; ok {
+			if v, ok := s.(float64); ok {
+				score = int(v)
+			}
+		}
+	}
+	lines = append(lines, logLine{fmtTS(ts), "gate", gl,
+		fmt.Sprintf("Gate: %s · %d findings · Score: %d/100", run.Gate, run.TotalFindings, score)})
+	jsonOK(w, map[string]any{
+		"rid": rid, "mode": run.Mode, "status": run.Status, "gate": run.Gate,
+		"score": score, "total_findings": run.TotalFindings,
+		"lines": lines, "line_count": len(lines),
+	})
+}
+
+// GET /api/v1/vsp/findings/by-tool?rid=
+func (h *Findings) ByTool(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	rid := r.URL.Query().Get("rid")
+	runID := r.URL.Query().Get("run_id")
+	if rid != "" && runID == "" {
+		var id string
+		h.DB.Pool().QueryRow(r.Context(),
+			`SELECT id::text FROM runs WHERE rid=$1 AND tenant_id=$2 LIMIT 1`,
+			rid, claims.TenantID).Scan(&id)
+		runID = id
+	}
+	if runID == "" {
+		jsonError(w, "run_id or rid required", http.StatusBadRequest)
+		return
+	}
+	rows, err := h.DB.Pool().Query(r.Context(), `
+		SELECT tool, COUNT(*),
+		       COUNT(*) FILTER (WHERE severity='CRITICAL'),
+		       COUNT(*) FILTER (WHERE severity='HIGH'),
+		       COUNT(*) FILTER (WHERE severity='MEDIUM'),
+		       COUNT(*) FILTER (WHERE severity='LOW')
+		FROM findings WHERE run_id=$1::uuid AND tenant_id=$2
+		GROUP BY tool ORDER BY COUNT(*) DESC`, runID, claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	type T struct {
+		Tool                               string `json:"tool"`
+		Total, Critical, High, Medium, Low int
+	}
+	var tools []T
+	for rows.Next() {
+		var t T
+		_ = rows.Scan(&t.Tool, &t.Total, &t.Critical, &t.High, &t.Medium, &t.Low)
+		tools = append(tools, t)
+	}
+	if tools == nil {
+		tools = []T{}
+	}
+	jsonOK(w, map[string]any{"tools": tools})
+}

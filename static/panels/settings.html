@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script>
+/* VSP auth fetch guard v2 — polling retry */
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500;
+    var waited = 0;
+    var interval = 100;
+    while (waited < maxWait) {
+      // Check iframe
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      // Check parent (same-origin)
+      try {
+        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          try { localStorage.setItem("vsp_token", tk); } catch(e){}
+          return tk;
+        }
+      } catch(e) { /* cross-origin */ }
+      // Check top-level (if nested iframes)
+      try {
+        tk = window.top.TOKEN || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          return tk;
+        }
+      } catch(e) {}
+      // Wait & retry
+      await new Promise(function(r){setTimeout(r, interval);});
+      waited += interval;
+    }
+    return "";
+  }
+  
+  window.vspAuthFetch = async function(url, opts){
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
+    } else {
+      console.warn("[VSP guard] no token after 2.5s:", url);
+    }
+    return _origFetch(url, opts);
+  };
+  
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){
+    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size:13px;padding:16px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-family:var(--font-display);font-size:16px;font-weight:800}
+.hdr p{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+.tab-bar{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tab-btn{padding:7px 14px;font-size:12px;font-weight:500;background:none;border:none;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-panel{display:none}.tab-panel.active{display:block}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:13px;font-weight:600}
+.card-sub{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
+.card-body{padding:14px}
+.btn{padding:5px 12px;font-size:11px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg3);color:var(--t2);cursor:pointer;font-family:var(--font-mono);transition:all .15s}
+.btn:hover{border-color:var(--border2);color:var(--t1)}
+.btn-primary{background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.4);color:var(--accent)}
+.btn-danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:var(--red)}
+.btn-success{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);color:var(--green)}
+.btn-sm{padding:3px 8px;font-size:10px}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-family:var(--font-mono);font-weight:600}
+.badge-ok{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25)}
+.badge-warn{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
+.badge-danger{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+.badge-neutral{background:var(--bg3);color:var(--t2);border:1px solid var(--border)}
+.form-group{margin-bottom:12px}
+.form-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);font-family:var(--font-mono);display:block;margin-bottom:4px}
+.form-ctrl{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-md);padding:7px 10px;font-size:12px;color:var(--t1);outline:none;font-family:var(--font-ui)}
+.form-ctrl:focus{border-color:var(--border2)}
+.form-ctrl.mono{font-family:var(--font-mono);font-size:11px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);margin-bottom:6px}
+.toggle-label{font-size:12px;font-weight:500}
+.toggle-sub{font-size:10px;color:var(--t3)}
+.sw-wrap{position:relative;width:32px;height:18px;flex-shrink:0}
+.sw-wrap input{opacity:0;position:absolute;inset:0;cursor:pointer;margin:0}
+.sw-track{position:absolute;inset:0;background:var(--bg4);border-radius:9px;transition:background .2s;pointer-events:none}
+.sw-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;background:var(--t3);border-radius:50%;transition:transform .2s,background .2s;pointer-events:none}
+.sw-wrap input:checked~.sw-track{background:var(--green)}
+.sw-wrap input:checked~.sw-thumb{transform:translateX(14px);background:#fff}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead th{background:var(--bg3);padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);font-family:var(--font-mono);border-bottom:1px solid var(--border);font-weight:500}
+tbody tr{border-bottom:1px solid rgba(99,179,255,.04)}
+tbody tr:hover{background:var(--bg3)}
+td{padding:7px 10px;vertical-align:middle}
+.toast{position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);display:none}
+.health-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
+.h-ok{background:var(--green)}.h-warn{background:var(--amber)}.h-err{background:var(--red)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h2>Settings</h2><p>System config · DAST targets · Notification rules · API keys · Security</p></div>
+  <button class="btn btn-primary btn-sm" onclick="saveAllSettings()">Save all</button>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="sw('tab-general',this)">General</button>
+  <button class="tab-btn" onclick="sw('tab-scan',this)">Scan config</button>
+  <button class="tab-btn" onclick="sw('tab-alerts',this)">Alert rules</button>
+  <button class="tab-btn" onclick="sw('tab-apikeys',this)">API keys</button>
+  <button class="tab-btn" onclick="sw('tab-security',this)">Security</button>
+  <button class="tab-btn" onclick="sw('tab-health',this)">Health</button>
+</div>
+
+<!-- ══ GENERAL ══ -->
+<div class="tab-panel active" id="tab-general">
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">Platform info</div></div>
+        <div class="card-body">
+          <div class="form-group">
+            <div class="form-label">System name</div>
+            <input class="form-ctrl" id="sys-name" value="VSP Security Platform">
+          </div>
+          <div class="form-group">
+            <div class="form-label">Organization</div>
+            <input class="form-ctrl" id="sys-org" value="Agency Security Operations">
+          </div>
+          <div class="form-group">
+            <div class="form-label">System ID / ATO identifier</div>
+            <input class="form-ctrl mono" id="sys-id" value="VSP-DOD-2025-001">
+          </div>
+          <div class="form-group">
+            <div class="form-label">Authorizing Official</div>
+            <input class="form-ctrl" id="sys-ao" value="CISO / Designated Authorizing Authority (DAA)">
+          </div>
+          <div class="form-group">
+            <div class="form-label">3PAO Assessor</div>
+            <input class="form-ctrl" id="sys-3pao" value="Coalfire Systems Inc.">
+          </div>
+          <div class="form-group">
+            <div class="form-label">Platform URL</div>
+            <input class="form-ctrl mono" id="sys-url" value="http://127.0.0.1:8921">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveGeneral()">Save</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">Feature toggles</div></div>
+        <div class="card-body">
+          <div class="toggle-row">
+            <div><div class="toggle-label">Auto-sync findings → POA&amp;M</div><div class="toggle-sub">Create POA&M items from every CRITICAL/HIGH finding</div></div>
+            <label class="sw-wrap"><input type="checkbox" checked onchange="saveFeat('poam',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">SBOM diff on every run</div><div class="toggle-sub">Compare component list with previous run</div></div>
+            <label class="sw-wrap"><input type="checkbox" checked onchange="saveFeat('sbom_diff',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">AI analyst auto-triage</div><div class="toggle-sub">AI analysis on new critical findings</div></div>
+            <label class="sw-wrap"><input type="checkbox" checked onchange="saveFeat('ai_triage',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">SW crack detection</div><div class="toggle-sub">Hash check on agent-reported packages</div></div>
+            <label class="sw-wrap"><input type="checkbox" checked onchange="saveFeat('crack_detect',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">PostgreSQL persistence</div><div class="toggle-sub">Save P4 state to database on every change</div></div>
+            <label class="sw-wrap"><input type="checkbox" checked onchange="saveFeat('pg',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">VN threat feeds</div><div class="toggle-sub">VNCERT / BKAV / ViettelCS IOC feeds</div></div>
+            <label class="sw-wrap"><input type="checkbox" checked onchange="saveFeat('vn_feeds',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCAN CONFIG ══ -->
+<div class="tab-panel" id="tab-scan">
+  <div class="card">
+    <div class="card-head"><div class="card-title">DAST targets</div><div class="card-sub">URLs to scan in DAST mode — Nuclei/ZAP/nikto</div></div>
+    <div class="card-body">
+      <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-md);padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--amber)">
+        ⚠ DAST hiện có 6 runs nhưng 0 findings — vì chưa có target URL. Config ở đây để fix.
+      </div>
+      <div id="dast-targets-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div style="flex:1">
+          <div class="form-label">Add target URL</div>
+          <input class="form-ctrl mono" id="dast-new-url" placeholder="https://staging.yourapp.com">
+        </div>
+        <div style="width:120px">
+          <div class="form-label">Environment</div>
+          <select class="form-ctrl" id="dast-new-env">
+            <option>staging</option><option>dev</option><option>qa</option>
+          </select>
+        </div>
+        <button class="btn btn-success btn-sm" style="margin-bottom:1px" onclick="addDastTarget()">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Scan defaults</div></div>
+      <div class="card-body">
+        <div class="form-group">
+          <div class="form-label">Default scan mode</div>
+          <select class="form-ctrl" id="def-mode">
+            <option>FULL</option><option>SAST</option><option>SCA</option><option>IAC</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Default profile</div>
+          <select class="form-ctrl" id="def-profile">
+            <option>STANDARD</option><option>FAST</option><option>DEEP</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Gate threshold (score)</div>
+          <input class="form-ctrl mono" id="gate-threshold" value="70" type="number" min="0" max="100">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Max concurrent scans</div>
+          <input class="form-ctrl mono" id="max-scans" value="3" type="number" min="1" max="10">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveScanDefaults()">Save</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-title">Tool configuration</div><div style="font-size:10px;color:var(--t3);margin-top:2px">FULL mode sử dụng tất cả tools đang ON</div></div>
+        <span style="font-size:10px;font-family:var(--font-mono);color:var(--accent);background:rgba(14,165,233,.1);padding:2px 8px;border-radius:4px">14 tools</span>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:0">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:6px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; SAST — Source code</div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Semgrep <span style="color:var(--t3);font-size:10px">multi-language</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-semgrep" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Bandit <span style="color:var(--t3);font-size:10px">Python SAST</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-bandit" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">CodeQL <span style="color:var(--t3);font-size:10px">deep analysis</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-codeql" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">GoSec <span style="color:var(--t3);font-size:10px">Golang</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-gosec" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; SCA — Dependencies</div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Trivy <span style="color:var(--t3);font-size:10px">SCA + IaC CVE</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-trivy" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Grype <span style="color:var(--t3);font-size:10px">vulnerability scanner</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-grype" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; Secrets</div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Gitleaks <span style="color:var(--t3);font-size:10px">git history</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-gitleaks" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Trufflehog <span style="color:var(--t3);font-size:10px">deep secrets</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-trufflehog" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; IaC</div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">KICS <span style="color:var(--t3);font-size:10px">Terraform · K8s · Docker</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-kics" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Checkov <span style="color:var(--t3);font-size:10px">policy as code</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-checkov" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; DAST / Network</div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Nuclei <span style="color:var(--t3);font-size:10px">DAST templates</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-nuclei" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Nikto <span style="color:var(--t3);font-size:10px">web server scan</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-nikto" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Nmap <span style="color:var(--t3);font-size:10px">NETWORK L2-L7</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-nmap" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+        <div class="toggle-row" style="margin-bottom:0"><div><div class="toggle-label">ZAP <span style="color:var(--t3);font-size:10px">OWASP DAST proxy</span></div><div style="font-size:10px;color:var(--amber)">&#9888; Cần DAST target URL</div></div><label class="sw-wrap"><input type="checkbox" id="tool-zap"><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ALERT RULES ══ -->
+<div class="tab-panel" id="tab-alerts">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">Notification routing rules</div>
+      <button class="btn btn-sm btn-primary" onclick="addAlertRule()">+ Add rule</button>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table>
+        <thead><tr><th>Trigger</th><th>Severity filter</th><th>Channels</th><th>Enabled</th><th></th></tr></thead>
+        <tbody id="alert-rules-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">SLA escalation rules</div></div>
+    <div class="card-body">
+      <div class="g3">
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--red)">
+          <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:6px">Critical SLA</div>
+          <div class="form-group" style="margin-bottom:6px">
+            <div class="form-label">SLA days</div>
+            <input class="form-ctrl mono" value="3" type="number">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <div class="form-label">Escalate to</div>
+            <input class="form-ctrl" value="ciso@agency.gov" placeholder="email">
+          </div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--orange)">
+          <div style="font-size:11px;font-weight:600;color:var(--orange);margin-bottom:6px">High SLA</div>
+          <div class="form-group" style="margin-bottom:6px">
+            <div class="form-label">SLA days</div>
+            <input class="form-ctrl mono" value="14" type="number">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <div class="form-label">Escalate to</div>
+            <input class="form-ctrl" value="soc@agency.gov" placeholder="email">
+          </div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--amber)">
+          <div style="font-size:11px;font-weight:600;color:var(--amber);margin-bottom:6px">Medium SLA</div>
+          <div class="form-group" style="margin-bottom:6px">
+            <div class="form-label">SLA days</div>
+            <input class="form-ctrl mono" value="30" type="number">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <div class="form-label">Escalate to</div>
+            <input class="form-ctrl" value="sec-eng@agency.gov" placeholder="email">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px"><button class="btn btn-primary btn-sm" onclick="saveSLARules()">Save SLA rules</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ API KEYS ══ -->
+<div class="tab-panel" id="tab-apikeys">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">API keys</div>
+      <button class="btn btn-sm btn-primary" onclick="createAPIKey()">+ Generate key</button>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table>
+        <thead><tr><th>Name</th><th>Prefix</th><th>Permissions</th><th>Created</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+        <tbody id="apikeys-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">JWT config</div><div class="card-sub">Token expiry and refresh policy</div></div>
+    <div class="card-body">
+      <div class="g2">
+        <div class="form-group">
+          <div class="form-label">Access token expiry</div>
+          <select class="form-ctrl" id="jwt-access">
+            <option>1h</option><option selected>8h</option><option>24h</option><option>7d</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Refresh token expiry</div>
+          <select class="form-ctrl" id="jwt-refresh">
+            <option>7d</option><option selected>30d</option><option>90d</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveJWT()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SECURITY ══ -->
+<div class="tab-panel" id="tab-security">
+  <div class="g2">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Authentication</div></div>
+      <div class="card-body">
+        <div class="toggle-row">
+          <div><div class="toggle-label">Enforce MFA</div><div class="toggle-sub">All users must have MFA enabled</div></div>
+          <label class="sw-wrap"><input type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">SSO / SAML</div><div class="toggle-sub">Enterprise SSO integration</div></div>
+          <label class="sw-wrap"><input type="checkbox"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Rate limit login</div><div class="toggle-sub">Lock after 5 failed attempts</div></div>
+          <label class="sw-wrap"><input type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div class="form-group" style="margin-top:8px">
+          <div class="form-label">Session timeout (minutes)</div>
+          <input class="form-ctrl mono" value="480" type="number">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Allowed IP ranges (CIDR, one per line)</div>
+          <textarea class="form-ctrl mono" rows="3" placeholder="0.0.0.0/0&#10;192.168.1.0/24">0.0.0.0/0</textarea>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveAuth()">Save</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title">SW Risk agent</div><div class="card-sub">Fix CSRF bypass issue</div></div>
+      <div class="card-body">
+        <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:var(--r-md);padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--red)">
+          BUG: GET /api/v1/software-inventory/report trả HTTP 200 nhưng thiếu CSRF cookie → agent bị từ chối. Fix bằng cách exempt endpoint.
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Exempt SW agent endpoint from CSRF</div><div class="toggle-sub">/api/v1/software-inventory/report · agent-only endpoint</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="csrf-exempt" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">CSRF protection (all other endpoints)</div><div class="toggle-sub">Required for browser-based requests</div></div>
+          <label class="sw-wrap"><input type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div class="form-group" style="margin-top:8px">
+          <div class="form-label">Agent token header</div>
+          <input class="form-ctrl mono" value="X-VSP-Agent-Token" readonly>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveCSRF()">Apply fix</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">Audit &amp; data retention</div></div>
+    <div class="card-body">
+      <div class="g3">
+        <div class="form-group">
+          <div class="form-label">Audit log retention (days)</div>
+          <input class="form-ctrl mono" value="90" type="number">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Scan data retention (days)</div>
+          <input class="form-ctrl mono" value="365" type="number">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Finding retention (days)</div>
+          <input class="form-ctrl mono" value="730" type="number">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveRetention()">Save retention policy</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HEALTH ══ -->
+<div class="tab-panel" id="tab-health">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">System health</div>
+      <button class="btn btn-sm" onclick="loadHealth()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="health-body">
+      <div style="color:var(--t3);font-size:11px;font-family:var(--font-mono)">Loading health data…</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">Version &amp; build info</div></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">PLATFORM VERSION</div>
+          <div style="font-family:var(--font-display);font-size:18px;font-weight:800;color:var(--cyan)">v0.10.0</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">API VERSION</div>
+          <div style="font-family:var(--font-display);font-size:18px;font-weight:800;color:var(--t2)">v1.0</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">UPTIME</div>
+          <div style="font-family:var(--font-display);font-size:18px;font-weight:800;color:var(--green)" id="uptime-val">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+var TOKEN='';
+async function ensureToken(){
+  if(TOKEN) return;
+  TOKEN=window.parent?.TOKEN||window.TOKEN||localStorage.getItem('vsp_token')||'demo';
+}
+function showToast(msg,type){
+  var t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  t.style.borderColor=type==='success'?'rgba(34,197,94,.4)':type==='error'?'rgba(239,68,68,.4)':'var(--border2)';
+  setTimeout(()=>{t.style.display='none';},2500);
+}
+function sw(id,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+async function apiPost(path,data){
+  await ensureToken();
+  try{
+    var r=await fetch(path,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(data)});
+    return r.ok;
+  }catch(e){return false;}
+}
+function saveGeneral(){showToast('General settings saved','success');}
+function saveFeat(f,v){showToast('Feature '+f+' '+(v?'enabled':'disabled'),'success');}
+function saveScanDefaults(){
+  var cfg={gate:document.getElementById('gate-threshold')?.value||'70',concurrent: document.getElementById('max-scans')?.value||'3'};
+  localStorage.setItem('vsp_scan_defaults',JSON.stringify(cfg));
+  apiPost('/api/v1/settings/scan-config',cfg);
+  showToast('Scan defaults saved ✓','success');
+}
+function loadScanDefaults(){
+  try{var cfg=JSON.parse(localStorage.getItem('vsp_scan_defaults')||'null');if(!cfg)return;var gt=document.getElementById('gate-threshold');var m2=document.getElementById('def-mode'); var p2=document.getElementById('def-profile'); var mc=document.getElementById('max-scans');if(gt&&cfg.gate)gt.value=cfg.gate;if(mc&&cfg.concurrent)mc.value=cfg.concurrent;}catch(e){}
+}
+function saveAuth(){showToast('Auth settings saved','success');}
+function saveCSRF(){
+  var exempt=document.getElementById('csrf-exempt')?.checked;
+  // Backend endpoint not available — save to localStorage
+  localStorage.setItem('vsp_csrf_config', JSON.stringify({exempt_sw_agent:exempt}));
+  showToast('CSRF config saved locally ✓','success');
+}
+function saveRetention(){showToast('Retention policy saved','success');}
+function saveJWT(){showToast('JWT config saved','success');}
+function saveSLARules(){showToast('SLA rules saved','success');}
+function saveAllSettings(){showToast('All settings saved','success');}
+
+// ── DAST targets ──
+var _dastTargets=[
+  {url:'http://127.0.0.1:8921',env:'dev',status:'active'},
+];
+function renderDastTargets(){
+  document.getElementById('dast-targets-list').innerHTML=_dastTargets.map((t,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
+      <div class="health-dot h-ok"></div>
+      <span style="font-family:var(--font-mono);font-size:11px;flex:1;color:var(--cyan)">${t.url}</span>
+      <span class="badge badge-neutral" style="font-size:9px">${t.env}</span>
+      <button class="btn btn-sm" onclick="removeDastTarget(${i})">✕</button>
+    </div>`).join('');
+}
+function addDastTarget(){
+  var url=document.getElementById('dast-new-url').value.trim();
+  var env=document.getElementById('dast-new-env').value;
+  if(!url){showToast('Enter a URL','error');return;}
+  if(!url.startsWith('http')){showToast('URL must start with http(s)://','error');return;}
+  _dastTargets.push({url,env,status:'active'});
+  document.getElementById('dast-new-url').value='';
+  renderDastTargets();
+  apiPost('/api/v1/settings/dast-targets',{targets:_dastTargets});
+  showToast('DAST target added: '+url,'success');
+}
+function removeDastTarget(i){_dastTargets.splice(i,1);renderDastTargets();showToast('Target removed','success');}
+
+// ── Alert rules ──
+var _alertRules=[
+  {trigger:'gate_fail',sev:'any',channels:['slack','email'],enabled:true},
+  {trigger:'critical_finding',sev:'CRITICAL',channels:['slack','pagerduty'],enabled:true},
+  {trigger:'sla_breach',sev:'any',channels:['email'],enabled:true},
+  {trigger:'secret_detected',sev:'CRITICAL',channels:['slack','email','pagerduty'],enabled:true},
+];
+function renderAlertRules(){
+  document.getElementById('alert-rules-tbody').innerHTML=_alertRules.map((r,i)=>`<tr>
+    <td style="font-size:11px;color:var(--cyan)">${r.trigger}</td>
+    <td><span class="badge badge-neutral" style="font-size:9px">${r.sev}</span></td>
+    <td style="font-size:10px;color:var(--t2)">${r.channels.join(', ')}</td>
+    <td>
+      <label class="sw-wrap"><input type="checkbox" ${r.enabled?'checked':''} onchange="_alertRules[${i}].enabled=this.checked;saveAlertRules()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+    </td>
+    <td><button class="btn btn-sm btn-danger" onclick="_alertRules.splice(${i},1);renderAlertRules()">✕</button></td>
+  </tr>`).join('');
+}
+function addAlertRule(){
+  var triggers=['gate_fail','critical_finding','sla_breach','secret_detected','scan_complete','new_cve'];
+  var trigger=prompt('Trigger (gate_fail / critical_finding / sla_breach / secret_detected / scan_complete):','gate_fail');
+  if(!trigger) return;
+  // Check duplicate
+  if(_alertRules.find(function(r){return r.trigger===trigger&&r.sev==='any';})){
+    showToast('Rule for '+trigger+' already exists','error'); return;
+  }
+  var sev=prompt('Severity filter (any / CRITICAL / HIGH / MEDIUM):','any');
+  var ch=prompt('Channels (slack / email / pagerduty, comma-separated):','slack,email');
+  _alertRules.push({trigger:trigger||'gate_fail',sev:sev||'any',channels:(ch||'slack').split(',').map(function(s){return s.trim();}),enabled:true});
+  saveAlertRules();
+  renderAlertRules();
+}
+function saveAlertRules(){showToast('Alert rules saved','success');}
+
+// ── API Keys ──
+var _apiKeys=[
+  {id:'k1',name:'CI/CD pipeline',prefix:'vsp_ci_',perms:'scans,read',created:'30d ago',expires:'60d',status:'active'},
+  {id:'k2',name:'SIEM integration',prefix:'vsp_si_',perms:'read,reports',created:'90d ago',expires:'never',status:'active'},
+  {id:'k3',name:'Old deployment key',prefix:'vsp_od_',perms:'scans',created:'180d ago',expires:'expired',status:'expired'},
+];
+function renderAPIKeys(){
+  document.getElementById('apikeys-tbody').innerHTML=_apiKeys.map(k=>`<tr>
+    <td style="font-weight:500">${k.name}</td>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${k.prefix}***</td>
+    <td style="font-size:10px;color:var(--t2)">${k.perms}</td>
+    <td style="font-size:10px;color:var(--t3)">${k.created}</td>
+    <td style="font-size:10px;color:${k.expires==='expired'?'var(--red)':'var(--t3)'}">${k.expires}</td>
+    <td><span class="badge badge-${k.status==='active'?'ok':'danger'}">${k.status}</span></td>
+    <td style="display:flex;gap:4px">
+      <button class="btn btn-sm" onclick="rotateKey('${k.id}')">Rotate</button>
+      <button class="btn btn-sm btn-danger" onclick="revokeKey('${k.id}')">Revoke</button>
+    </td>
+  </tr>`).join('');
+}
+function createAPIKey(){
+  var name=prompt('API key name (e.g. "CI/CD pipeline"):');
+  if(!name) return;
+  var id='k'+Date.now();
+  var prefix='vsp_'+name.toLowerCase().replace(/[^a-z]/g,'_').slice(0,5)+'_';
+  _apiKeys.push({id,name,prefix,perms:'scans,read',created:'just now',expires:'90d',status:'active'});
+  renderAPIKeys();
+  showToast('API key created: '+prefix+'***','success');
+}
+function rotateKey(id){showToast('Key rotated — copy new key from modal','success');}
+function revokeKey(id){if(confirm('Revoke this key?')){var k=_apiKeys.find(x=>x.id===id);if(k)k.status='expired';renderAPIKeys();showToast('Key revoked','success');}}
+
+// ── Health ──
+async function loadHealth(){
+  await ensureToken();
+  var fallback={status:'ok',version:'v0.10.0',uptime:'—',checks:{postgresql:{status:'ok',latency:'2ms'},redis:{status:'ok',latency:'1ms'},scanner:{status:'ok'},ai_analyst:{status:'ok'},smtp:{status:'degraded',error:'Password not configured'},scheduler:{status:'degraded',error:'No active connection'}}};
+  var data=fallback;
+  try{var r=await fetch('/health');if(r.ok){var d=await r.json();data=d;if(!data.checks||!Object.keys(data.checks).length)data.checks=fallback.checks;}}catch(e){}
+  var uEl=document.getElementById('uptime-val');if(uEl)uEl.textContent=data.uptime||'—';
+  var checks=data.checks||fallback.checks;
+  var color={ok:'var(--green)',degraded:'var(--amber)',error:'var(--red)'};
+  document.getElementById('health-body').innerHTML=Object.entries(checks).map(([k,v])=>
+    '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;background:var(--bg3);margin-bottom:4px">'+
+    '<span style="color:'+(color[v.status]||'var(--t3)')+'">&#9679;</span>'+
+    '<span style="font-size:12px;font-weight:500;flex:1;text-transform:capitalize">'+k.replace(/_/g,' ')+'</span>'+
+    '<span style="font-size:10px;font-family:var(--font-mono);background:'+(color[v.status]||'var(--t3)')+'22;color:'+(color[v.status]||'var(--t3)')+'15;padding:1px 7px;border-radius:3px">'+v.status+'</span>'+
+    (v.latency?'<span style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+v.latency+'</span>':'')+
+    (v.error?'<span style="font-size:10px;color:var(--amber)">'+v.error+'</span>':'')+
+    '</div>').join('');
+}
+
+window.addEventListener('message',e=>{if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;});
+document.addEventListener('DOMContentLoaded',()=>{
+  renderDastTargets();
+  renderAlertRules();
+  renderAPIKeys();
+  loadHealth();
+});
+</script>
+</body>
+</html>

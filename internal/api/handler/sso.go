@@ -143,7 +143,7 @@ func (h *SSO) Callback(w http.ResponseWriter, r *http.Request) {
 	// Không để token trong URL fragment (lộ vào browser history/logs)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`<!DOCTYPE html><html><head><title>SSO Login</title></head><body>
+	_, _ = w.Write([]byte(`<!DOCTYPE html><html><head><title>SSO Login</title></head><body>
 <script>
 try {
   localStorage.setItem('vsp_token', ` + "`" + `"` + token + `"` + "`" + `);

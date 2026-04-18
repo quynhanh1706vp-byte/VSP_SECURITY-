@@ -123,7 +123,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 			// Trả về mfa_required để frontend hiển thị form nhập code
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(mfaRequiredResponse{
+			_ = json.NewEncoder(w).Encode(mfaRequiredResponse{
 				MFARequired: true,
 				Message:     "MFA code required",
 			})

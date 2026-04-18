@@ -89,7 +89,7 @@ func syncFindingsToPOAM(findings []VSPFinding) SyncResult {
 			defer rows.Close()
 			for rows.Next() {
 				var wn, fid string
-				rows.Scan(&wn, &fid)
+				_ = rows.Scan(&wn, &fid)
 				existing[wn] = true
 				if fid != "" {
 					existing[fid] = true
@@ -150,7 +150,7 @@ func fetchRealVSPFindings() []VSPFinding {
 			for rows.Next() {
 				var f VSPFinding
 				var ruleID, path string
-				rows.Scan(&f.ID, &f.Severity, &ruleID, &f.Description, &f.CWE, &f.Service, &path, &f.CreatedAt)
+				_ = rows.Scan(&f.ID, &f.Severity, &ruleID, &f.Description, &f.CWE, &f.Service, &path, &f.CreatedAt)
 				// Dùng message làm title, truncate nếu dài
 				f.Title = f.Description
 				if len(f.Title) > 80 {
@@ -180,7 +180,7 @@ func handleFindingsSync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Vary", "Origin")
 	findings := fetchRealVSPFindings()
 	result := syncFindingsToPOAM(findings)
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "sync": result, "findings": findings, "message": fmt.Sprintf("%d findings → %d new POA&M items", len(findings), result.Created)})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "sync": result, "findings": findings, "message": fmt.Sprintf("%d findings → %d new POA&M items", len(findings), result.Created)})
 	log.Printf("[P4] Findings sync: %d→%d POAM", len(findings), result.Created)
 }
 
@@ -243,7 +243,7 @@ func handleATOExpiry(w http.ResponseWriter, r *http.Request) {
 		{ID: "RC-9", Task: "Respond to AO findings", Done: false, DueWeeks: 2},
 		{ID: "RC-10", Task: "Receive renewed ATO letter", Done: false, DueWeeks: 0},
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"system_id": pkg.SystemID, "ato_status": pkg.ATOStatus, "authorization_date": pkg.AuthorizationDate, "expiration_date": pkg.ExpirationDate, "days_remaining": days, "expiry_level": level, "renewal_required": days < 365, "renewal_checklist": checklist, "conmon_score": pkg.ConMonScore})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"system_id": pkg.SystemID, "ato_status": pkg.ATOStatus, "authorization_date": pkg.AuthorizationDate, "expiration_date": pkg.ExpirationDate, "days_remaining": days, "expiry_level": level, "renewal_required": days < 365, "renewal_checklist": checklist, "conmon_score": pkg.ConMonScore})
 }
 
 type SBOMComp struct {
@@ -287,17 +287,128 @@ func handleSBOMView(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	high := 0
-	for _, c := range comps {
-		if c.Sev == "HIGH" {
-			high++
+
+	// Bug D v2 fix — Enrich CVE count từ findings table (real data, không hardcode)
+	// - Xóa "AND status != 'resolved'" vì column đó không tồn tại trong findings
+	// - Scope filter đúng indent (bên trong if p4SQLDB != nil)
+	// - Match rule_id (CVE-*) và message; aggregate summary cho response
+	totalCritical := 0
+	totalHigh := 0
+	if p4SQLDB != nil {
+		for i := range comps {
+			var total int
+			var maxSev string
+			nameLike := "%" + comps[i].Name + "%"
+			err := p4SQLDB.QueryRow(`
+				SELECT
+				  COUNT(DISTINCT rule_id) FILTER (WHERE severity IN ('CRITICAL','HIGH','MEDIUM','LOW')),
+				  COALESCE(MAX(CASE severity
+				    WHEN 'CRITICAL' THEN '1_CRITICAL'
+				    WHEN 'HIGH'     THEN '2_HIGH'
+				    WHEN 'MEDIUM'   THEN '3_MEDIUM'
+				    WHEN 'LOW'      THEN '4_LOW'
+				    ELSE '9' END), '')
+				FROM findings
+				WHERE rule_id ILIKE 'CVE-%'
+				  AND (message ILIKE $1 OR path ILIKE $1)
+			`, nameLike).Scan(&total, &maxSev)
+			if err != nil {
+				// Query lỗi — log và skip component này (không crash)
+				log.Printf("[SBOM] enrich %s failed: %v", comps[i].Name, err)
+				continue
+			}
+			comps[i].CVEs = total
+			switch {
+			case strings.HasPrefix(maxSev, "1_"):
+				comps[i].Sev = "CRITICAL"
+				totalCritical++
+			case strings.HasPrefix(maxSev, "2_"):
+				comps[i].Sev = "HIGH"
+				totalHigh++
+			case strings.HasPrefix(maxSev, "3_"):
+				comps[i].Sev = "MEDIUM"
+			case strings.HasPrefix(maxSev, "4_"):
+				comps[i].Sev = "LOW"
+			default:
+				// No CVE found in DB — reset severity (tránh libexpat cves=0 sev=HIGH hardcode)
+				comps[i].Sev = ""
+			}
+			// NTIA: chỉ component có CRITICAL/HIGH CVE mở → không compliant
+			if comps[i].Sev == "CRITICAL" || comps[i].Sev == "HIGH" {
+				comps[i].NTIA = false
+			} else {
+				comps[i].NTIA = true
+			}
 		}
 	}
+	// Aggregate summary — tính thật từ components thay vì hardcode
+	critical := 0
+	high := 0
+	medium := 0
+	low := 0
+	clean := 0
+	ntiaCompliant := 0
+	for _, c := range comps {
+		switch c.Sev {
+		case "CRITICAL":
+			critical++
+		case "HIGH":
+			high++
+		case "MEDIUM":
+			medium++
+		case "LOW":
+			low++
+		default:
+			clean++
+		}
+		if c.NTIA {
+			ntiaCompliant++
+		}
+	}
+	// NTIA % tính thật
+	ntiaPct := 100.0
+	if len(comps) > 0 {
+		ntiaPct = float64(ntiaCompliant) / float64(len(comps)) * 100.0
+	}
+	// Clean: component không có vulnerability HIGH+
+	cleanTotal := totalComps - critical - high
+	if cleanTotal < 0 {
+		cleanTotal = 0
+	}
+
 	violations := []string{}
+	if critical > 0 {
+		violations = append(violations, fmt.Sprintf("%d CRITICAL CVEs require immediate remediation", critical))
+	}
 	if high > 0 {
 		violations = append(violations, fmt.Sprintf("%d HIGH CVEs require remediation within 30 days", high))
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"total_components": totalComps, "critical": 0, "high": high, "medium": 0, "clean": 412 - high, "last_scan": time.Now().AddDate(0, 0, -1), "ntia_compliance_pct": 100.0, "components": comps, "frameworks": []string{"CycloneDX 1.4", "SPDX 2.3", "NTIA minimum elements"}, "policy_violations": violations})
+
+	// Summary object — expose cho frontend
+	summary := map[string]interface{}{
+		"total":    totalComps,
+		"critical": critical,
+		"high":     high,
+		"medium":   medium,
+		"low":      low,
+		"clean":    cleanTotal,
+		"ntia_pct": ntiaPct,
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"total_components":    totalComps,
+		"critical":            critical,
+		"high":                high,
+		"medium":              medium,
+		"low":                 low,
+		"clean":               cleanTotal,
+		"last_scan":           time.Now().AddDate(0, 0, -1),
+		"ntia_compliance_pct": ntiaPct,
+		"components":          comps,
+		"summary":             summary,
+		"frameworks":          []string{"CycloneDX 1.4", "SPDX 2.3", "NTIA minimum elements"},
+		"policy_violations":   violations,
+	})
 }
 
 // handleVNStandards returns Vietnamese security standards from DB
@@ -341,14 +452,14 @@ func handleVNStandards(w http.ResponseWriter, r *http.Request) {
 
 	// Fallback nếu DB empty
 	if len(standards) == 0 {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"standards": []interface{}{},
 			"error":     "no data",
 		})
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"standards":    standards,
 		"total":        len(standards),
 		"last_updated": time.Now(),
@@ -398,7 +509,7 @@ func handleSBOMViewDB(w http.ResponseWriter, r *http.Request) {
 	var viols []string
 	json.Unmarshal(violations, &viols)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"total_components":    total,
 		"critical":            critical,
 		"high":                high,
@@ -445,7 +556,7 @@ func handleVNStandardUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": req.ID})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": req.ID})
 }
 
 // handleMarkControlPass allows marking a control as passed
@@ -473,5 +584,5 @@ func handleMarkControlPass(w http.ResponseWriter, r *http.Request) {
 				status=EXCLUDED.status, evidence=EXCLUDED.evidence, updated_at=NOW()`,
 			req.ControlID, req.Evidence)
 	}
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "control_id": req.ControlID})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "control_id": req.ControlID})
 }

@@ -266,7 +266,7 @@ func main() {
 		if overall == "error" {
 			w.WriteHeader(503)
 		}
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status": overall, "version": "0.10.0",
 			"port": viper.GetInt("server.gateway_port"),
 			"tier": "enterprise", "checks": checks,
@@ -443,6 +443,7 @@ func main() {
 		r.Post("/api/v1/vsp/run/{rid}/cancel", runsH.Cancel)
 		r.Get("/api/v1/vsp/run/latest", runsH.Latest)
 		r.Get("/api/v1/vsp/run/{rid}", runsH.Get)
+		r.Get("/api/v1/vsp/run/{rid}/log", runsH.Log)
 		r.Get("/api/v1/vsp/runs", runsH.List)
 		r.Get("/api/v1/vsp/runs/index", runsH.Index)
 		r.With(ca.Middleware("runs-index", 10*time.Second)).Get("/api/v1/vsp/runs/index", runsH.Index)
@@ -454,6 +455,7 @@ func main() {
 		r.Delete("/api/v1/vsp/batch/{batch_id}", batchH.Cancel)
 		r.Get("/api/v1/vsp/findings", findingsH.List)
 		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
+		r.Get("/api/v1/vsp/findings/by-tool", findingsH.ByTool)
 
 		// Gate + Policy
 		r.Get("/api/v1/vsp/gate/latest", gateH.Latest)
@@ -543,7 +545,7 @@ func main() {
 				reply = fmt.Sprintf("Chao ban! Toi la VSP AI Security Analyst.\n\n**Trang thai hien tai**: Gate **%s** | %d findings | %d incidents.\n\nCo the giup: triage incidents, explain CVEs, priority fixes, executive summary, SOAR playbooks, threat hunting.", gate, findings, len(incs))
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"content": []map[string]string{{"type": "text", "text": reply}}, "model": "vsp-mock"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"content": []map[string]string{{"type": "text", "text": reply}}, "model": "vsp-mock"})
 		})
 
 		// ── AI Analyst proxy ──────────────────────────────────── ────────────────────────────────────
@@ -641,21 +643,21 @@ func main() {
 				GROUP BY 1 ORDER BY 1`, claims.TenantID, days)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]any{"trend": []any{}})
+				_ = json.NewEncoder(w).Encode(map[string]any{"trend": []any{}})
 				return
 			}
 			defer rows.Close()
 			var points []TrendPoint
 			for rows.Next() {
 				var p TrendPoint
-				rows.Scan(&p.Date, &p.Critical, &p.High, &p.Medium, &p.Low, &p.Total) //nolint:errcheck
+				_ = rows.Scan(&p.Date, &p.Critical, &p.High, &p.Medium, &p.Low, &p.Total) //nolint:errcheck
 				points = append(points, p)
 			}
 			if points == nil {
 				points = []TrendPoint{}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"trend": points, "days": days}) //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]any{"trend": points, "days": days}) //nolint:errcheck
 		})
 
 		r.Get("/api/v1/vulns/top-cves", func(w http.ResponseWriter, r *http.Request) {
@@ -679,21 +681,21 @@ func main() {
 				  COUNT(*) DESC LIMIT 20`, claims.TenantID)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]any{"cves": []any{}})
+				_ = json.NewEncoder(w).Encode(map[string]any{"cves": []any{}})
 				return
 			}
 			defer rows.Close()
 			var cves []CVERow
 			for rows.Next() {
 				var c CVERow
-				rows.Scan(&c.CVE, &c.Severity, &c.Count, &c.Tools, &c.Fixable) //nolint:errcheck
+				_ = rows.Scan(&c.CVE, &c.Severity, &c.Count, &c.Tools, &c.Fixable) //nolint:errcheck
 				cves = append(cves, c)
 			}
 			if cves == nil {
 				cves = []CVERow{}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"cves": cves, "total": len(cves)}) //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]any{"cves": cves, "total": len(cves)}) //nolint:errcheck
 		})
 
 		r.Get("/api/v1/vulns/by-tool", func(w http.ResponseWriter, r *http.Request) {
@@ -719,21 +721,21 @@ func main() {
 				GROUP BY tool ORDER BY COUNT(*) DESC`, claims.TenantID)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]any{"tools": []any{}})
+				_ = json.NewEncoder(w).Encode(map[string]any{"tools": []any{}})
 				return
 			}
 			defer rows.Close()
 			var tools []ToolRow
 			for rows.Next() {
 				var t ToolRow
-				rows.Scan(&t.Tool, &t.Critical, &t.High, &t.Medium, &t.Low, &t.Total) //nolint:errcheck
+				_ = rows.Scan(&t.Tool, &t.Critical, &t.High, &t.Medium, &t.Low, &t.Total) //nolint:errcheck
 				tools = append(tools, t)
 			}
 			if tools == nil {
 				tools = []ToolRow{}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"tools": tools}) //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]any{"tools": tools}) //nolint:errcheck
 		})
 
 		// ── Threat hunting ─────────────────────────────────────────
@@ -791,7 +793,7 @@ func main() {
 			rows, err := db.Pool().Query(ctx, query, args...)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
 				return
 			}
 			defer rows.Close()
@@ -810,7 +812,7 @@ func main() {
 			for rows.Next() {
 				var e Event
 				var ts interface{}
-				rows.Scan(&e.ID, &ts, &e.Host, &e.Process, &e.Severity,
+				_ = rows.Scan(&e.ID, &ts, &e.Host, &e.Process, &e.Severity,
 					&e.Facility, &e.Message, &e.SourceIP, &e.Format) //nolint:errcheck
 				if t, ok := ts.(interface{ Format(string) string }); ok {
 					e.TS = t.Format("2006-01-02 15:04:05")
@@ -825,11 +827,11 @@ func main() {
 
 			// Stats — dùng toàn bộ where + args (bao gồm time filter)
 			var total int
-			db.Pool().QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM log_events WHERE %s`,
+			_ = db.Pool().QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM log_events WHERE %s`,
 				strings.Join(where, " AND ")), args[:len(args)-1]...).Scan(&total) //nolint:errcheck
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
 				"events": events,
 				"count":  len(events),
 				"total":  total,
@@ -860,7 +862,7 @@ func main() {
 			if rows != nil {
 				for rows.Next() {
 					var h FlowHost
-					rows.Scan(&h.IP, &h.Count, &h.Sev) //nolint:errcheck
+					_ = rows.Scan(&h.IP, &h.Count, &h.Sev) //nolint:errcheck
 					hosts = append(hosts, h)
 				}
 				rows.Close()
@@ -871,7 +873,7 @@ func main() {
 
 			// Stats tổng
 			var totalFlows, suspicious int
-			db.Pool().QueryRow(ctx, `
+			_ = db.Pool().QueryRow(ctx, `
 				SELECT COUNT(*),
 				       SUM(CASE WHEN UPPER(severity) IN ('CRITICAL','HIGH') THEN 1 ELSE 0 END)
 				FROM log_events WHERE tenant_id=$1 AND ts >= NOW()-interval'1 hour'`,
@@ -902,7 +904,7 @@ func main() {
 			}
 
 			w.Header().Set("Content-Type", "application/json") //nolint:errcheck
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"flows_per_min": totalFlows / 60,
 				"total_1h":      totalFlows,
 				"suspicious":    suspicious,
@@ -1005,7 +1007,7 @@ func main() {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
 				"ok": true, "finding_id": fid,
 				"new_status": req.Status, "resolved_at": rem.ResolvedAt,
 			})
@@ -1043,13 +1045,13 @@ func main() {
 				var wh WH
 				var createdAt time.Time
 				var whType, minSev string
-				rows.Scan(&wh.ID, &wh.Name, &wh.URL, &whType, &minSev, &wh.Enabled, &createdAt)
+				_ = rows.Scan(&wh.ID, &wh.Name, &wh.URL, &whType, &minSev, &wh.Enabled, &createdAt)
 				wh.Events = []string{whType, minSev}
 				wh.CreatedAt = createdAt.Format(time.RFC3339)
 				whs = append(whs, wh)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"webhooks": whs, "total": len(whs)})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"webhooks": whs, "total": len(whs)})
 		})
 		r.Post("/api/v1/alerts/webhooks/test", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
@@ -1058,7 +1060,7 @@ func main() {
 				URL  string `json:"url"`
 				Name string `json:"name"`
 			}
-			json.NewDecoder(r.Body).Decode(&req)
+			_ = json.NewDecoder(r.Body).Decode(&req)
 			if req.URL == "" {
 				http.Error(w, `{"error":"url required"}`, 400)
 				return
@@ -1076,12 +1078,12 @@ func main() {
 			resp, err := client.Post(req.URL, "application/json", bytes.NewReader(b))
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": err.Error()})
 				return
 			}
 			defer resp.Body.Close()
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": resp.StatusCode < 300, "status": resp.StatusCode, "message": "Webhook test sent"})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": resp.StatusCode < 300, "status": resp.StatusCode, "message": "Webhook test sent"})
 		})
 		r.Post("/api/v1/alerts/notify", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
@@ -1118,17 +1120,17 @@ func main() {
 			client := &http.Client{Timeout: 10 * time.Second}
 			for rows.Next() {
 				var url, name string
-				rows.Scan(&url, &name)
+				_ = rows.Scan(&url, &name)
 				resp, err := client.Post(url, "application/json", bytes.NewReader(payload))
 				if err == nil && resp.StatusCode < 300 {
 					sent++
 				}
 				if resp != nil {
-					resp.Body.Close()
+					_ = resp.Body.Close()
 				}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"sent": sent, "findings": len(findings), "message": fmt.Sprintf("Notified %d webhooks", sent)})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"sent": sent, "findings": len(findings), "message": fmt.Sprintf("Notified %d webhooks", sent)})
 		})
 
 		r.Get("/api/v1/audit/stats", func(w http.ResponseWriter, r *http.Request) {
@@ -1136,7 +1138,7 @@ func main() {
 			ctx := r.Context()
 			var total, h24, d7, d30, users, actions, archivable int
 			var oldest, newest string
-			db.Pool().QueryRow(ctx,
+			_ = db.Pool().QueryRow(ctx,
 				"SELECT COUNT(*),"+
 					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours'),"+
 					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days'),"+
@@ -1147,7 +1149,7 @@ func main() {
 														" FROM audit_log WHERE tenant_id=$1", claims.TenantID).
 				Scan(&total, &h24, &d7, &d30, &users, &actions, &oldest, &newest, &archivable) //nolint:errcheck
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"total": total, "last_24h": h24, "last_7d": d7, "last_30d": d30,
 				"unique_users": users, "unique_actions": actions,
 				"oldest": oldest, "newest": newest, "archivable": archivable,
@@ -1169,9 +1171,9 @@ func main() {
 			}
 			ctx := r.Context()
 			var archived, remaining int64
-			db.Pool().QueryRow(ctx, "SELECT * FROM rotate_audit_log($1)", keepDays).Scan(&archived, &remaining) //nolint:errcheck
+			_ = db.Pool().QueryRow(ctx, "SELECT * FROM rotate_audit_log($1)", keepDays).Scan(&archived, &remaining) //nolint:errcheck
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"archived": archived, "remaining": remaining, "keep_days": keepDays,
 				"message": fmt.Sprintf("Archived %d entries older than %d days", archived, keepDays),
 			})
@@ -1202,11 +1204,11 @@ func main() {
 			var months []Month
 			for rows.Next() {
 				var m Month
-				rows.Scan(&m.Month, &m.Total, &m.Users, &m.Actions, &m.Scans, &m.Logins) //nolint:errcheck
+				_ = rows.Scan(&m.Month, &m.Total, &m.Users, &m.Actions, &m.Scans, &m.Logins) //nolint:errcheck
 				months = append(months, m)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"months": months, "total": len(months)}) //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"months": months, "total": len(months)}) //nolint:errcheck
 		})
 
 		// ── Auto-remediation engine ──────────────────────────────────────
@@ -1266,7 +1268,7 @@ func main() {
 			var findings []Finding
 			for rows.Next() {
 				var f Finding
-				rows.Scan(&f.ID, &f.Sev, &f.Tool, &f.Rule, &f.Msg, &f.Path, &f.Fix)
+				_ = rows.Scan(&f.ID, &f.Sev, &f.Tool, &f.Rule, &f.Msg, &f.Path, &f.Fix)
 				findings = append(findings, f)
 			}
 
@@ -1299,7 +1301,7 @@ func main() {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"created":   created,
 				"available": len(findings),
 				"severity":  req.Severity,
@@ -1312,7 +1314,7 @@ func main() {
 			claims, _ := auth.FromContext(r.Context())
 			ctx := r.Context()
 			var total, open, inprog, resolved, overdue int
-			db.Pool().QueryRow(ctx, //nolint:errcheck
+			_ = db.Pool().QueryRow(ctx, //nolint:errcheck
 				"SELECT COUNT(*), "+
 					"COUNT(*) FILTER (WHERE status='open'), "+
 					"COUNT(*) FILTER (WHERE status='in_progress'), "+
@@ -1332,7 +1334,7 @@ func main() {
 				for rows.Next() {
 					var sev string
 					var tot, res int
-					rows.Scan(&sev, &tot, &res)
+					_ = rows.Scan(&sev, &tot, &res)
 					bySev = append(bySev, map[string]interface{}{
 						"severity": sev, "total": tot, "resolved": res,
 						"open": tot - res, "pct": func() int {
@@ -1345,7 +1347,7 @@ func main() {
 				}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"total": total, "open": open, "in_progress": inprog,
 				"resolved": resolved, "overdue": overdue,
 				"by_severity": bySev,
@@ -1381,7 +1383,7 @@ func main() {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
 				"ok": true, "rid": rid, "mode": "FULL_SOC",
 				"message": "FULL_SOC queued — SAST+SCA+SECRETS+IAC+DAST+NETWORK",
 			})
@@ -1409,7 +1411,7 @@ func main() {
 			var runs []Row
 			for rows.Next() {
 				var row Row
-				rows.Scan(&row.ID, &row.Status, &row.StartedAt, //nolint:errcheck
+				_ = rows.Scan(&row.ID, &row.Status, &row.StartedAt, //nolint:errcheck
 					&row.TotalFindings, &row.Gate, &row.Score)
 				runs = append(runs, row)
 			}
@@ -1417,7 +1419,7 @@ func main() {
 				runs = []Row{}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"runs": runs, "total": len(runs)}) //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]any{"runs": runs, "total": len(runs)}) //nolint:errcheck
 		})
 		r.Post("/api/v1/scan/all-modes", func(w http.ResponseWriter, r *http.Request) {
 			_, _ = auth.FromContext(r.Context())
@@ -1473,7 +1475,7 @@ func main() {
 				}
 				var runRes map[string]interface{}
 				json.NewDecoder(resp2.Body).Decode(&runRes) //nolint:errcheck
-				resp2.Body.Close()
+				_ = resp2.Body.Close()
 				rid2, _ := runRes["rid"].(string)
 				if rid2 == "" {
 					rid2 = fmt.Sprintf("error-%d", resp2.StatusCode)
@@ -1484,7 +1486,7 @@ func main() {
 				})
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"triggered": triggered, "total": len(triggered),
 			})
 		})
@@ -1507,11 +1509,11 @@ func main() {
 			var findings []frow
 			for rows.Next() {
 				var f frow
-				rows.Scan(&f.id, &f.sev, &f.tool, &f.rule, &f.msg, &f.path)
+				_ = rows.Scan(&f.id, &f.sev, &f.tool, &f.rule, &f.msg, &f.path)
 				findings = append(findings, f)
 			}
 			var maxNum int
-			db.Pool().QueryRow(ctx, "SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM 10) AS INTEGER)),0) FROM p4_poam_items WHERE id LIKE 'POAM-VSP-%'").Scan(&maxNum) //nolint:errcheck
+			_ = db.Pool().QueryRow(ctx, "SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM 10) AS INTEGER)),0) FROM p4_poam_items WHERE id LIKE 'POAM-VSP-%'").Scan(&maxNum) //nolint:errcheck
 			ctrlMap := map[string]string{"semgrep": "SA-11", "bandit": "SA-11", "trivy": "RA-5", "grype": "RA-5", "gitleaks": "IA-5", "kics": "CM-6", "checkov": "CM-6", "nuclei": "CA-2", "nikto": "CA-2", "nmap": "SC-7"}
 			created := 0
 			for i, f := range findings {
@@ -1538,7 +1540,7 @@ func main() {
 				}
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"synced": created, "available": len(findings), "message": fmt.Sprintf("Created %d POA&M items", created)}) //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"synced": created, "available": len(findings), "message": fmt.Sprintf("Created %d POA&M items", created)}) //nolint:errcheck
 		})
 		r.Get("/api/v1/vsp/tt13_report_pdf/{rid}", reportH.TT13PDF)
 		r.Get("/api/v1/reports/conmon_pdf", reportH.ConMonPDF)
@@ -1555,7 +1557,7 @@ func main() {
 		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/import/users", importsH.Users)
 		r.Post("/api/v1/vsp/rbac/session-timeout", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"status":"ok","message":"session timeout updated"}`))
+			_, _ = w.Write([]byte(`{"status":"ok","message":"session timeout updated"}`))
 		})
 		// Export
 		r.Get("/api/v1/export/sarif/{rid}", exportH.SARIF)
@@ -1707,7 +1709,7 @@ func main() {
 		tcpAddr = ":10515"
 	}
 	var tenantID string
-	db.Pool().QueryRow(ctx, `SELECT id FROM tenants WHERE slug='default' LIMIT 1`).Scan(&tenantID) //nolint:errcheck
+	_ = db.Pool().QueryRow(ctx, `SELECT id FROM tenants WHERE slug='default' LIMIT 1`).Scan(&tenantID) //nolint:errcheck
 	if tenantID != "" {
 		receiver := siem.NewSyslogReceiver(udpAddr, tcpAddr, db, tenantID)
 		go func() {
@@ -1731,14 +1733,14 @@ func main() {
 	// Đợi goroutines dừng (tối đa 5s)
 	time.Sleep(500 * time.Millisecond)
 	db.Close()
-	asynqClient.Close()
+	_ = asynqClient.Close()
 	log.Info().Msg("stopped ✓")
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
 	raw := viper.GetString("server.allowed_origins")
 	if raw == "" {
-		raw = "http://localhost:3000,http://localhost:8922,http://127.0.0.1:8922,http://127.0.0.1:8921"
+		raw = "http://localhost:3000,http://localhost:8080,http://127.0.0.1:8080,http://localhost:8910,http://127.0.0.1:8910,http://localhost:8921,http://127.0.0.1:8921,http://localhost:8922,http://127.0.0.1:8922"
 	}
 	allowed := make(map[string]bool)
 	for _, o := range strings.Split(raw, ",") {
@@ -1781,7 +1783,7 @@ func (s *apiKeyStore) ValidateAPIKey(ctx context.Context, rawKey string) (auth.C
 	for rows.Next() {
 		var id, tenantID, hash, role string
 		var expiresAt *time.Time
-		rows.Scan(&id, &tenantID, &hash, &role, &expiresAt) //nolint:errcheck
+		_ = rows.Scan(&id, &tenantID, &hash, &role, &expiresAt) //nolint:errcheck
 		if expiresAt != nil && time.Now().After(*expiresAt) {
 			continue
 		}
@@ -1794,11 +1796,11 @@ func (s *apiKeyStore) ValidateAPIKey(ctx context.Context, rawKey string) (auth.C
 	return auth.Claims{}, fmt.Errorf("invalid api key")
 }
 func ensureDefaultTenant(ctx context.Context, db *store.DB) {
-	db.Pool().Exec(ctx, `INSERT INTO tenants(slug,name,plan) VALUES('default','Default Tenant','enterprise') ON CONFLICT(slug) DO NOTHING`) //nolint:errcheck
+	_, _ = db.Pool().Exec(ctx, `INSERT INTO tenants(slug,name,plan) VALUES('default','Default Tenant','enterprise') ON CONFLICT(slug) DO NOTHING`) //nolint:errcheck
 }
 func getDefaultTenantID(ctx context.Context, db *store.DB) string {
 	var id string
-	db.Pool().QueryRow(ctx, `SELECT id FROM tenants WHERE slug='default' LIMIT 1`).Scan(&id) //nolint:errcheck
+	_ = db.Pool().QueryRow(ctx, `SELECT id FROM tenants WHERE slug='default' LIMIT 1`).Scan(&id) //nolint:errcheck
 	if id == "" {
 		log.Fatal().Msg("default tenant not found")
 	}

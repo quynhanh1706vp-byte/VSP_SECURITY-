@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script>
+/* VSP auth fetch guard v2 — polling retry */
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500;
+    var waited = 0;
+    var interval = 100;
+    while (waited < maxWait) {
+      // Check iframe
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      // Check parent (same-origin)
+      try {
+        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          try { localStorage.setItem("vsp_token", tk); } catch(e){}
+          return tk;
+        }
+      } catch(e) { /* cross-origin */ }
+      // Check top-level (if nested iframes)
+      try {
+        tk = window.top.TOKEN || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          return tk;
+        }
+      } catch(e) {}
+      // Wait & retry
+      await new Promise(function(r){setTimeout(r, interval);});
+      waited += interval;
+    }
+    return "";
+  }
+  
+  window.vspAuthFetch = async function(url, opts){
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
+    } else {
+      console.warn("[VSP guard] no token after 2.5s:", url);
+    }
+    return _origFetch(url, opts);
+  };
+  
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){
+    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VSP — Threat Intel</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--font-mono:'JetBrains Mono','Fira Mono',monospace;--font-ui:'Inter','Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5;padding:16px}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}
+.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}
+.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}
+.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}
+.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.3)}
+.pill-purple{background:var(--purple2);color:var(--purple);border-color:rgba(139,92,246,.3)}
+.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--surface)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:12px;font-weight:600}
+.card-sub{font-size:11px;color:var(--t3);margin-top:1px}
+.card-body{padding:12px 14px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.kpi-val{font-size:20px;font-weight:700;font-family:var(--font-mono)}
+.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.ioc-row{border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:background .15s}
+.ioc-row:hover{background:var(--surface)}
+.ioc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.ioc-val{font-size:11px;font-family:var(--font-mono);flex:1}
+.ioc-meta{font-size:10px;color:var(--t3);display:flex;gap:8px;flex-wrap:wrap}
+.feed-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
+.feed-row:last-child{border-bottom:none}
+.feed-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.feed-name{font-size:12px;font-weight:500;flex:1}
+.enrich-row{padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start}
+.enrich-row:last-child{border-bottom:none}
+.enrich-cve{font-size:11px;font-family:var(--font-mono);color:var(--blue);font-weight:500;flex-shrink:0;width:140px}
+.mini-tag{font-size:10px;padding:1px 5px;border-radius:3px;font-family:var(--font-mono);background:var(--surface);color:var(--t3);border:1px solid var(--border)}
+.ttp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.ttp-cell{padding:6px 4px;border-radius:5px;font-size:9px;text-align:center;cursor:pointer;transition:opacity .15s;font-family:var(--font-mono)}
+.ttp-cell:hover{opacity:.75}
+.match-row{border-left:2px solid var(--red);padding:7px 10px;margin-bottom:7px;background:var(--surface);border-radius:0 6px 6px 0;cursor:pointer}
+.match-row.high{border-left-color:var(--amber)}
+.match-row.med{border-left-color:var(--blue)}
+.match-hdr{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.match-title{font-size:11px;font-weight:500;flex:1}
+.match-desc{font-size:10px;color:var(--t3)}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-size:15px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}
+.hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
+.form-ctrl{background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:4px 8px;border-radius:6px;font-size:11px;font-family:var(--font-ui);outline:none}
+select.form-ctrl option{background:var(--bg2)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h2>Threat intelligence</h2>
+    <p>IOC matching · CVE enrichment · MITRE ATT&amp;CK · feed management</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="pill pill-green" id="sync-badge">&#8635; synced 3m ago</span>
+    <button class="btn" onclick="doSync()">Sync feeds</button>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-lbl">IOC database</div><div class="kpi-val" id="k-ioc">48.2k</div><div class="kpi-sub">indicators loaded</div></div>
+  <div class="kpi"><div class="kpi-lbl">Matches today</div><div class="kpi-val" style="color:var(--red)" id="k-match">7</div><div class="kpi-sub">in current scans</div></div>
+  <div class="kpi"><div class="kpi-lbl">CVEs enriched</div><div class="kpi-val" style="color:var(--blue)" id="k-cve">23</div><div class="kpi-sub">with TI context</div></div>
+  <div class="kpi"><div class="kpi-lbl">Active feeds</div><div class="kpi-val" style="color:var(--green)" id="k-feeds">5</div><div class="kpi-sub">of 6 connected</div></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">IOC matches</div><div class="card-sub">findings matched against TI</div></div>
+      <select id="ioc-filter" class="form-ctrl" onchange="renderIOC()">
+        <option value="">All types</option><option value="cve">CVE</option><option value="hash">Hash</option><option value="ip">IP</option><option value="domain">Domain</option>
+      </select>
+    </div>
+    <div class="card-body" style="padding:8px 10px" id="ioc-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div><div class="card-title">Feed sources</div><div class="card-sub">active threat feeds</div></div></div>
+    <div class="card-body" id="feed-list"></div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="card-head"><div class="card-title">CVE enrichment</div><div class="card-sub">CVSS · EPSS · KEV · TTP</div></div>
+    <div class="card-body" id="enrich-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">MITRE ATT&amp;CK coverage</div><div class="card-sub">tactics mapped from findings</div></div>
+    <div class="ttp-grid card-body" id="mitre-grid"></div>
+    <div style="padding:0 14px 10px;font-size:10px;color:var(--t3)">Color intensity = finding count mapped to tactic</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><div><div class="card-title">TI matches in scan findings</div><div class="card-sub">cross-referenced with NVD · OSV · feeds</div></div><button class="btn" onclick="renderMatches()">&#8635;</button></div>
+  <div class="card-body" style="padding:8px 10px" id="match-list"></div>
+</div>
+
+<script>
+var TOKEN = '';
+var IOCS = [
+  {type:'cve',val:'CVE-2024-45337',sev:'CRITICAL',feed:'NVD',desc:'PublicKeyCallback bypass · golang.org/x/crypto',matched:true},
+  {type:'cve',val:'CVE-2025-22869',sev:'CRITICAL',feed:'NVD',desc:'DoS in golang SSH handshake',matched:true},
+  {type:'cve',val:'CVE-2025-30204',sev:'HIGH',feed:'OSV',desc:'JWT claim confusion · golang-jwt',matched:true},
+  {type:'hash',val:'a3f8c1d9e2b4...',sev:'HIGH',feed:'OTX',desc:'Known malicious build artifact hash',matched:false},
+  {type:'domain',val:'malicious-cdn[.]io',sev:'HIGH',feed:'MISP',desc:'C2 domain in supply chain attacks',matched:false},
+  {type:'ip',val:'185.220.101.47',sev:'MEDIUM',feed:'AbuseIPDB',desc:'Known Tor exit node · scan origin',matched:false},
+];
+var FEEDS = [
+  {name:'NVD / NIST',status:'ok',iocs:'28.4k',last:'5m'},
+  {name:'OSV database',status:'ok',iocs:'11.2k',last:'5m'},
+  {name:'MISP community',status:'ok',iocs:'6.1k',last:'12m'},
+  {name:'AlienVault OTX',status:'ok',iocs:'2.3k',last:'18m'},
+  {name:'AbuseIPDB',status:'warn',iocs:'204',last:'2h'},
+  {name:'STIX / TAXII',status:'err',iocs:'—',last:'offline'},
+];
+var ENRICHED = [
+  {cve:'CVE-2024-45337',cvss:'9.1',epss:'0.72',kev:true,ttp:'T1190',desc:'Exploitable in golang SSH · patch v0.31.0'},
+  {cve:'CVE-2025-22869',cvss:'8.7',epss:'0.41',kev:false,ttp:'T1499',desc:'Denial-of-service · no known exploit'},
+  {cve:'CVE-2025-30204',cvss:'7.5',epss:'0.18',kev:false,ttp:'T1552',desc:'JWT bypass · affects < v5.2.2'},
+];
+var MITRE = [
+  {id:'TA0001',name:'Initial access',count:3},
+  {id:'TA0002',name:'Execution',count:1},
+  {id:'TA0003',name:'Persistence',count:0},
+  {id:'TA0004',name:'Priv esc',count:2},
+  {id:'TA0005',name:'Def evasion',count:0},
+  {id:'TA0006',name:'Cred access',count:4},
+  {id:'TA0007',name:'Discovery',count:1},
+  {id:'TA0008',name:'Lateral mov',count:0},
+  {id:'TA0009',name:'Collection',count:0},
+  {id:'TA0010',name:'Exfiltration',count:0},
+];
+var MATCHES = [
+  {title:'CVE-2024-45337 in trivy finding',sev:'crit',finding:'go.mod · golang.org/x/crypto@v0.28.0',ti:'KEV listed · EPSS 72% · active exploitation'},
+  {title:'API key hash matches known leak DB',sev:'crit',finding:'gitleaks · .env:10 · generic-api-key',ti:'OTX pulse: leaked credential set · 2024-11-07'},
+  {title:'S3 ACL misconfiguration TTP match',sev:'high',finding:'kics · main.tf:3 · 38c5ee0d',ti:'MITRE T1530 · Data from cloud storage'},
+  {title:'CVE-2025-30204 JWT bypass',sev:'med',finding:'trivy · go.mod · golang-jwt/jwt@v5.0.0',ti:'OSV · medium severity · patch: v5.2.2'},
+];
+
+function sevBadge(s){var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};return '<span class="pill '+(m[s]||'pill-gray')+'">'+s+'</span>'}
+function typeBadge(t){var m={cve:'pill-purple',hash:'pill-gray',ip:'pill-cyan',domain:'pill-amber'};return '<span class="pill '+(m[t]||'pill-gray')+'">'+t.toUpperCase()+'</span>'}
+
+function renderIOC(){
+  var f=document.getElementById('ioc-filter').value;
+  var list=IOCS.filter(function(i){return !f||i.type===f});
+  document.getElementById('ioc-list').innerHTML=list.map(function(i){
+    return '<div class="ioc-row">'
+      +'<div class="ioc-hdr">'+typeBadge(i.type)+sevBadge(i.sev)
+      +'<span class="ioc-val">'+i.val+'</span>'
+      +(i.matched?'<span class="pill pill-green">matched</span>':'')
+      +'</div>'
+      +'<div class="ioc-meta"><span>'+i.desc+'</span><span>feed: '+i.feed+'</span></div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderFeeds(){
+  var statusColor={ok:'var(--green)',warn:'var(--amber)',err:'var(--red)'};
+  var statusLbl={ok:'online',warn:'delayed',err:'offline'};
+  var statusPill={ok:'pill-green',warn:'pill-amber',err:'pill-red'};
+  document.getElementById('feed-list').innerHTML=FEEDS.map(function(f){
+    return '<div class="feed-row">'
+      +'<div class="feed-dot" style="background:'+statusColor[f.status]+'"></div>'
+      +'<span class="feed-name">'+f.name+'</span>'
+      +'<span style="font-size:11px;color:var(--t3)">'+f.last+'</span>'
+      +'<span style="font-family:var(--font-mono);font-size:11px;margin:0 8px">'+f.iocs+'</span>'
+      +'<span class="pill '+statusPill[f.status]+'">'+statusLbl[f.status]+'</span>'
+      +'</div>';
+  }).join('');
+}
+
+function renderEnrich(){
+  document.getElementById('enrich-list').innerHTML=ENRICHED.map(function(e){
+    return '<div class="enrich-row">'
+      +'<span class="enrich-cve">'+e.cve+'</span>'
+      +'<div style="flex:1">'
+      +'<div style="font-size:11px;margin-bottom:4px">'+e.desc+'</div>'
+      +'<div style="display:flex;gap:4px;flex-wrap:wrap">'
+      +'<span class="mini-tag">CVSS '+e.cvss+'</span>'
+      +'<span class="mini-tag">EPSS '+e.epss+'</span>'
+      +(e.kev?'<span class="pill pill-red" style="font-size:10px">KEV</span>':'')
+      +'<span class="mini-tag">'+e.ttp+'</span>'
+      +'</div></div></div>';
+  }).join('');
+}
+
+function renderMitre(){
+  var max=Math.max.apply(null,MITRE.map(function(m){return m.count}))||1;
+  document.getElementById('mitre-grid').innerHTML=MITRE.map(function(m){
+    var alpha=m.count>0?0.15+m.count/max*0.7:0;
+    var bg=m.count>0?'rgba(239,68,68,'+alpha.toFixed(2)+')':'var(--surface)';
+    var col=m.count>0?'var(--red)':'var(--t3)';
+    return '<div class="ttp-cell" style="background:'+bg+';color:'+col+'">'
+      +'<div style="font-weight:600;font-size:11px">'+m.count+'</div>'
+      +'<div style="margin-top:2px">'+m.name+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderMatches(){
+  document.getElementById('match-list').innerHTML=MATCHES.map(function(m){
+    return '<div class="match-row '+(m.sev==='high'?'high':m.sev==='med'?'med':'')+'">'
+      +'<div class="match-hdr"><span class="match-title">'+m.title+'</span>'
+      +(m.sev==='crit'?'<span class="pill pill-red">Critical</span>':m.sev==='high'?'<span class="pill pill-amber">High</span>':'<span class="pill pill-blue">Medium</span>')
+      +'</div>'
+      +'<div class="match-desc">Finding: '+m.finding+'</div>'
+      +'<div class="match-desc" style="margin-top:2px">TI: '+m.ti+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function doSync(){
+  document.getElementById('sync-badge').textContent='⏳ Syncing...';
+  setTimeout(function(){
+    document.getElementById('sync-badge').textContent='✓ synced just now';
+    document.getElementById('sync-badge').className='pill pill-green';
+    if(TOKEN)loadFromAPI();
+  },1500);
+}
+
+function loadFromAPI(){
+  if(!TOKEN)return;
+  var h={Authorization:'Bearer '+TOKEN};
+  Promise.all([
+    fetch('/api/v1/ti/iocs?limit=20',{headers:h}).then(function(r){return r.json()}).catch(function(){return null}),
+    fetch('/api/v1/ti/feeds',{headers:h}).then(function(r){return r.json()}).catch(function(){return null}),
+    fetch('/api/v1/ti/matches',{headers:h}).then(function(r){return r.json()}).catch(function(){return null}),
+  ]).then(function(res){
+    if(res[0]&&res[0].iocs&&res[0].iocs.length){IOCS=res[0].iocs;renderIOC()}
+    if(res[1]&&res[1].feeds&&res[1].feeds.length){FEEDS=res[1].feeds;renderFeeds()}
+    if(res[2]&&res[2].matches&&res[2].matches.length){MATCHES=res[2].matches;renderMatches()}
+  });
+}
+
+// Nhận token từ parent
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token){
+    TOKEN=e.data.token;
+    loadFromAPI();
+  }
+  if(e.data.type==='vsp:data'){
+    if(e.data.iocs&&e.data.iocs.iocs){IOCS=e.data.iocs.iocs;renderIOC()}
+    if(e.data.feeds&&e.data.feeds.feeds){FEEDS=e.data.feeds.feeds;renderFeeds()}
+    if(e.data.matches&&e.data.matches.matches){MATCHES=e.data.matches.matches;renderMatches()}
+  }
+});
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
+
+renderIOC();
+renderFeeds();
+renderEnrich();
+renderMitre();
+renderMatches();
+</script>
+</body>
+</html>

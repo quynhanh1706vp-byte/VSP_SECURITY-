@@ -75,11 +75,11 @@ func handleAlertConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	if r.Method == http.MethodPost {
-		json.NewDecoder(r.Body).Decode(alertConfig)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.NewDecoder(r.Body).Decode(alertConfig)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 		return
 	}
-	json.NewEncoder(w).Encode(alertConfig)
+	_ = json.NewEncoder(w).Encode(alertConfig)
 }
 
 func handleAlertHistory(w http.ResponseWriter, r *http.Request) {
@@ -163,10 +163,10 @@ func handleAlertHistory(w http.ResponseWriter, r *http.Request) {
 	alerts = append(alerts, alertHistory...)
 
 	if len(alerts) == 0 {
-		json.NewEncoder(w).Encode([]Alert{})
+		_ = json.NewEncoder(w).Encode([]Alert{})
 		return
 	}
-	json.NewEncoder(w).Encode(alerts)
+	_ = json.NewEncoder(w).Encode(alerts)
 }
 
 func handleAlertTest(w http.ResponseWriter, r *http.Request) {
@@ -189,7 +189,7 @@ func handleAlertTest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	alertHistory = append([]Alert{alert}, alertHistory...)
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "alert": alert})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "alert": alert})
 }
 
 // ── ConMon Report Generator ────────────────────────────────
@@ -379,5 +379,5 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[P4] ConMon report generated — period: %s, P4: %d%%", period, p4Score)
-	json.NewEncoder(w).Encode(report)
+	_ = json.NewEncoder(w).Encode(report)
 }

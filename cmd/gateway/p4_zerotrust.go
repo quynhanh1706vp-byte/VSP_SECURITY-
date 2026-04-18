@@ -298,7 +298,7 @@ func handleZTStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Vary", "Origin")
 	ztState.mu.RLock()
 	defer ztState.mu.RUnlock()
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"pillars": ztState.Pillars, "overall_score": ztState.OverallScore,
 		"p4_readiness": ztState.P4Readiness, "p4_achieved": ztState.P4Achieved,
 		"sbom": ztState.SBOM, "rasp_coverage": ztState.RASPCoverage,
@@ -333,13 +333,13 @@ func handleZTMicroSeg(w http.ResponseWriter, r *http.Request) {
 		id := rule.ID
 		ztState.mu.Unlock()
 		go saveZTStateToDB()
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": id})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": id})
 		return
 	}
 	ztState.mu.RLock()
 	rules := ztState.SegRules
 	ztState.mu.RUnlock()
-	json.NewEncoder(w).Encode(rules)
+	_ = json.NewEncoder(w).Encode(rules)
 }
 
 func handleZTRASP(w http.ResponseWriter, r *http.Request) {
@@ -355,7 +355,7 @@ func handleZTRASP(w http.ResponseWriter, r *http.Request) {
 		if err == nil && len(raspJSON) > 4 {
 			var events []RASPEvent
 			if json.Unmarshal(raspJSON, &events) == nil && len(events) > 0 {
-				json.NewEncoder(w).Encode(events)
+				_ = json.NewEncoder(w).Encode(events)
 				return
 			}
 		}
@@ -365,7 +365,7 @@ func handleZTRASP(w http.ResponseWriter, r *http.Request) {
 	ztState.mu.RLock()
 	events := ztState.RASPEvents
 	ztState.mu.RUnlock()
-	json.NewEncoder(w).Encode(events)
+	_ = json.NewEncoder(w).Encode(events)
 }
 
 func handleZTRASPCoverage(w http.ResponseWriter, r *http.Request) {
@@ -373,7 +373,7 @@ func handleZTRASPCoverage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Vary", "Origin")
 	ztState.mu.RLock()
 	defer ztState.mu.RUnlock()
-	json.NewEncoder(w).Encode(ztState.RASPCoverage)
+	_ = json.NewEncoder(w).Encode(ztState.RASPCoverage)
 }
 
 func handleZTAPIPolicy(w http.ResponseWriter, r *http.Request) {
@@ -391,13 +391,13 @@ func handleZTAPIPolicy(w http.ResponseWriter, r *http.Request) {
 		ztState.APIPolicies = append(ztState.APIPolicies, pol)
 		recalcScoresLocked()
 		ztState.mu.Unlock()
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": pol.ID})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": pol.ID})
 		return
 	}
 	ztState.mu.RLock()
 	policies := ztState.APIPolicies
 	ztState.mu.RUnlock()
-	json.NewEncoder(w).Encode(policies)
+	_ = json.NewEncoder(w).Encode(policies)
 }
 
 func handleZTSBOM(w http.ResponseWriter, r *http.Request) {
@@ -405,5 +405,5 @@ func handleZTSBOM(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Vary", "Origin")
 	ztState.mu.RLock()
 	defer ztState.mu.RUnlock()
-	json.NewEncoder(w).Encode(ztState.SBOM)
+	_ = json.NewEncoder(w).Encode(ztState.SBOM)
 }

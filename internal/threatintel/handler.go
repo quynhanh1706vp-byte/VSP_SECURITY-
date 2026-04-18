@@ -27,11 +27,11 @@ func (h *Handler) Enrich(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(502)
-		json.NewEncoder(w).Encode(map[string]string{"error": "enrichment failed"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "enrichment failed"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(enr)
+	_ = json.NewEncoder(w).Encode(enr)
 }
 
 // POST /api/v1/ti/enrich/batch
@@ -61,7 +61,7 @@ func (h *Handler) EnrichBatch(w http.ResponseWriter, r *http.Request) {
 	req.CVEs = valid
 	results := h.client.EnrichBatch(r.Context(), req.CVEs)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"enrichments": results,
 		"total":       len(results),
 	})

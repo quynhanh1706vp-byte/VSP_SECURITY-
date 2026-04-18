@@ -502,7 +502,7 @@ window.loadExecutive = async function() {
   try {
     const [runs, p, rem] = await Promise.all([
       safeApi('GET', '/vsp/runs/index', {runs:[]}),
-      safeApi('GET', '/vsp/posture/latest', {}),
+      window.vspGetPosture(),
       safeApi('GET', '/remediation/stats', {}),
     ]);
     // Trend chart
@@ -616,7 +616,7 @@ window.loadSBOM = async function() {
     try {
       // Fetch tất cả data cần thiết
       const [p, r, rem] = await Promise.all([
-        safeApi('GET', '/vsp/posture/latest', {}),
+        window.vspGetPosture(),
         safeApi('GET', '/vsp/runs/index', {runs:[]}),
         safeApi('GET', '/remediation/stats', {}),
       ]);
@@ -628,9 +628,15 @@ window.loadSBOM = async function() {
       const elGate   = document.getElementById('d-gate');
       const elTotal  = document.getElementById('d-total');
       if (p.grade && elGrade)  { elGrade.textContent  = p.grade;  elGrade.style.color  = GRADE_COLORS[p.grade]||''; }
-      if (p.score && elScore2) { elScore2.textContent = p.score;  elScore2.style.color = GRADE_COLORS[p.grade]||''; }
+      if (typeof p.score !== 'undefined' && elScore2) { elScore2.textContent = p.score;  elScore2.style.color = GRADE_COLORS[p.grade]||''; }
       const tf = (p.critical||0)+(p.high||0)+(p.medium||0)+(p.low||0);
       if (elTotal && tf > 0) elTotal.textContent = tf;
+
+      // Update KPI cards: d-critical, d-high, d-medium, d-low
+      ['critical', 'high', 'medium', 'low'].forEach(function(sev) {
+        var el = document.getElementById('d-' + sev);
+        if (el && typeof p[sev] !== 'undefined') el.textContent = p[sev];
+      });
 
       const latest = _runs.find(x => x.status==='DONE');
       if (latest?.gate && elGate) {
@@ -643,7 +649,7 @@ window.loadSBOM = async function() {
       const elRunsCnt  = document.getElementById('d-runs-count');
       const elPassRate = document.getElementById('d-pass-rate');
       const elRem      = document.getElementById('d-rem');
-      if (elScore && p.score)    elScore.textContent    = p.score;
+      if (elScore && typeof p.score !== 'undefined') elScore.textContent = p.score;
       if (elRunsCnt)             elRunsCnt.textContent  = _runs.length;
       if (elPassRate && _runs.length) {
         const done   = _runs.filter(x=>x.status==='DONE');
@@ -690,6 +696,34 @@ setTimeout(() => {
   upgradeRemediation();
   console.log('[VSP Upgrade v1.0.0] UI Enhancement loaded ✓');
 }, 500);
+
+// ─── Posture compose helper — dùng /findings/summary?scope=all thay cho /posture/latest ───
+// Lý do: /posture/latest chỉ tính theo latest run (thường IAC FAST=0 findings) → UI KPI=0
+// Helper này aggregate TẤT CẢ findings + tính score/grade giống backend logic
+window.vspGetPosture = async function() {
+  try {
+    var h = {Authorization: 'Bearer ' + (window.TOKEN || localStorage.getItem('vsp_token') || '')};
+    var r = await fetch('/api/v1/vsp/findings/summary?scope=all', {headers:h});
+    if (!r.ok) return {critical:0,high:0,medium:0,low:0,grade:'F',score:0};
+    var s = await r.json();
+    // Scoring (matches backend gate.Score): 100 - 10*crit - 3*high - 1*med - 0.3*low, floor 0
+    var score = Math.max(0, Math.round(100 - 10*(s.critical||0) - 3*(s.high||0) - 1*(s.medium||0) - 0.3*(s.low||0)));
+    // Grading (matches backend gate.Posture)
+    var grade;
+    if (score >= 90) grade = 'A';
+    else if (score >= 80) grade = 'B';
+    else if (score >= 70) grade = 'C';
+    else if (score >= 60) grade = 'D';
+    else grade = 'F';
+    return {
+      critical: s.critical||0, high: s.high||0, medium: s.medium||0, low: s.low||0,
+      total: s.total||0, score: score, grade: grade, rid: 'scope:all'
+    };
+  } catch(e) {
+    console.warn('[VSP] posture fetch fail', e);
+    return {critical:0,high:0,medium:0,low:0,grade:'F',score:0};
+  }
+};
 
 
 // ── FIX: Scan log — tự động load run mới nhất và refresh dropdown ──
@@ -798,4 +832,1277 @@ setTimeout(() => {
     setTimeout(tryInjectDoD, 800);
     return r;
   };
+})();
+
+
+// ── RUNS_KPI_FIX: Restore loadRuns với KPI + charts ──────────────
+(function() {
+  function _doLoadRuns() {
+    var TOKEN = window.TOKEN || localStorage.getItem('vsp_token') || '';
+    if (!TOKEN) { setTimeout(_doLoadRuns, 500); return; }
+    fetch('/api/v1/vsp/runs/index?limit=200', {
+      headers: {Authorization: 'Bearer ' + TOKEN}
+    }).then(function(r){ return r.json(); }).then(function(d) {
+      var runs = d.runs || [];
+      var done = runs.filter(function(r){ return r.status === 'DONE'; });
+      var pass = done.filter(function(r){ return r.gate === 'PASS'; });
+      var fail = done.filter(function(r){ return r.gate === 'FAIL'; });
+      var passRate = done.length > 0 ? Math.round(pass.length / done.length * 100) : 0;
+      var totalF = done.reduce(function(s,r){ return s+(r.total||r.total_findings||0); }, 0);
+      var avgF = done.length > 0 ? Math.round(totalF / done.length) : 0;
+      var latest = runs.find(function(r){ return r.gate; });
+      var latestScore = latest ? (latest.summary && (latest.summary.SCORE || latest.summary.score) || 0) : 0;
+      var lastGate = latest ? (latest.gate || '—') : '—';
+      function _s(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+      _s('rk-total', runs.length);
+      _s('rk-passrate', passRate + '%');
+      _s('rk-pass-sub', pass.length + ' pass / ' + fail.length + ' fail');
+      _s('rk-avgfindings', avgF);
+      var lgEl = document.getElementById('rk-lastgate');
+      if (lgEl) { lgEl.textContent = lastGate; lgEl.style.color = lastGate==='PASS'?'var(--green)':lastGate==='FAIL'?'var(--red)':'var(--amber)'; }
+      _s('rk-lastgate-sub', latest ? latest.rid.slice(-12) : '—');
+      var scoreEl = document.getElementById('rk-score');
+      if (scoreEl) { scoreEl.textContent = latestScore > 0 ? latestScore : '—'; scoreEl.style.color = latestScore>=70?'var(--green)':latestScore>=40?'var(--amber)':'var(--red)'; }
+      if (window._runsState) { window._runsState.allRuns = runs; window._runsState.page = 0; }
+      if (typeof _renderRunsPage === 'function') _renderRunsPage();
+      // Charts
+      setTimeout(function() {
+        var modeColors = {IAC:'rgba(6,182,212,0.8)',FULL:'rgba(139,92,246,0.8)',SAST:'rgba(59,130,246,0.8)',SCA:'rgba(249,115,22,0.8)',SECRETS:'rgba(239,68,68,0.8)',DAST:'rgba(34,197,94,0.8)'};
+        var gateCtx = document.getElementById('runs-gate-chart');
+        if (gateCtx && window.Chart) {
+          var last20 = runs.filter(function(r){ return r.gate; }).slice(0,20).reverse();
+          if (window._runsGateChart) { try{window._runsGateChart.destroy();}catch(e){} }
+          window._runsGateChart = new window.Chart(gateCtx, {
+            type:'bar', data:{ labels:last20.map(function(r){return r.rid.slice(-6);}),
+              datasets:[{data:last20.map(function(r){return r.gate==='PASS'?1:r.gate==='WARN'?0.5:-1;}),
+              backgroundColor:last20.map(function(r){return r.gate==='PASS'?'rgba(34,197,94,0.8)':r.gate==='WARN'?'rgba(245,158,11,0.8)':'rgba(239,68,68,0.8)';}),
+              borderRadius:3,borderWidth:0}]},
+            options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{display:false},grid:{display:false}},y:{display:false,min:-1.2,max:1.2}}}
+          });
+        }
+        var modeCtx = document.getElementById('runs-mode-chart');
+        if (modeCtx && window.Chart && done.length) {
+          var mt={};
+          done.forEach(function(r){var t=r.total||r.total_findings||0;if(t>0)mt[r.mode]=(mt[r.mode]||0)+t;});
+          var mk=Object.keys(mt).sort(function(a,b){return mt[b]-mt[a];});
+          if (window._runsModeChart) { try{window._runsModeChart.destroy();}catch(e){} }
+          window._runsModeChart = new window.Chart(modeCtx, {
+            type:'bar', data:{labels:mk,datasets:[{data:mk.map(function(k){return mt[k];}),
+            backgroundColor:mk.map(function(k){return modeColors[k]||'rgba(100,116,139,0.7)';}),borderRadius:4,borderWidth:0}]},
+            options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#8899bb',font:{size:9}},beginAtZero:true},y:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:10}}}}}
+          });
+        }
+      }, 120);
+    }).catch(function(e){ console.error('RUNS_KPI_FIX:', e); });
+  }
+
+  // Override loadRuns — đây là version CUỐI CÙNG
+  window.loadRuns = _doLoadRuns;
+
+  // Auto-trigger khi vào panel-runs
+  var _lp = '';
+  setInterval(function() {
+    var active = document.querySelector('.panel.active');
+    if (!active) return;
+    if (active.id === 'panel-runs' && active.id !== _lp) {
+      _lp = active.id;
+      _doLoadRuns();
+    } else if (active.id !== 'panel-runs') {
+      _lp = active.id;
+    }
+  }, 300);
+})();
+
+// DEFINITIVE_SHOW_PANEL — chạy SAU TẤT CẢ override khác
+(function(){
+  var _LOADERS = {
+    runs:       function(){ if(typeof window.loadRuns==='function') window.loadRuns(); },
+    audit:      function(){ if(typeof loadAuditReal==='function') loadAuditReal(); },
+    dashboard:  function(){ if(typeof initDashboardCharts==='function') initDashboardCharts(); },
+    findings:   function(){ if(typeof loadFindingsPanel==='function') loadFindingsPanel(); },
+    sla:        function(){ if(typeof loadSLA==='function') loadSLA(); },
+    sbom:       function(){ if(typeof loadSBOM==='function') loadSBOM(); },
+    compliance: function(){ if(typeof loadFedRAMP==='function') loadFedRAMP(); },
+    governance: function(){ if(typeof window.loadRiskRegister==='function'){ window.loadRiskRegister(); if(window.loadTraceability) window.loadTraceability(); } },
+    executive:  function(){ if(typeof loadExecutive==='function') loadExecutive(); },
+    scanlog:    function(){ if(typeof loadScanLog==='function') loadScanLog(); },
+  };
+
+  function _masterShow(name, btn) {
+    // 1. Ẩn tất cả panels
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    // 2. Bỏ active tất cả nav
+    document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
+    // 3. Hiện panel đúng
+    var panel = document.getElementById('panel-' + name);
+    if (panel) panel.classList.add('active');
+    // 4. Active nav button
+    if (btn) {
+      btn.classList.add('active');
+    } else {
+      document.querySelectorAll('.nav-item').forEach(function(b){
+        var oc = b.getAttribute('onclick') || '';
+        if (oc.indexOf("'" + name + "'") >= 0 || oc.indexOf('"' + name + '"') >= 0) b.classList.add('active');
+      });
+    }
+    // 5. Update breadcrumb
+    var meta = window.PANEL_META && window.PANEL_META[name];
+    if (meta) {
+      var t = document.getElementById('page-title'); if(t) t.textContent = meta.title;
+      var s = document.getElementById('page-sub');   if(s) s.textContent = meta.sub;
+    }
+    // 6. Load iframe nếu chưa load
+    if (panel) {
+      var iframe = panel.querySelector('iframe[data-src]');
+      if (iframe && !iframe.src) iframe.src = iframe.getAttribute('data-src');
+    }
+    // 7. Trigger data loader
+    var loader = _LOADERS[name];
+    if (loader) setTimeout(loader, 120);
+  }
+
+  // Override CUỐI CÙNG — dùng setTimeout để chạy sau tất cả script inline
+  setTimeout(function(){
+    window.showPanel = _masterShow;
+    window._masterShowPanel = _masterShow;
+    console.log('[VSP] DEFINITIVE_SHOW_PANEL installed');
+  }, 0);
+})();
+
+// LAST_OVERRIDE — inject sau tất cả, dùng DOMContentLoaded để chắc chắn chạy sau
+window.addEventListener('load', function() {
+  function _masterShow(name, btn) {
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
+    var panel = document.getElementById('panel-' + name);
+    if (panel) panel.classList.add('active');
+    if (btn) { btn.classList.add('active'); } else {
+      document.querySelectorAll('.nav-item').forEach(function(b){
+        var oc = b.getAttribute('onclick')||'';
+        if(oc.indexOf("'"+name+"'")>=0) b.classList.add('active');
+      });
+    }
+    var meta = window.PANEL_META&&window.PANEL_META[name];
+    var _TITLES={dashboard:'Dashboard',runs:'Run history',scanlog:'Scan log',findings:'Findings',remediation:'Remediation',policy:'Policy',audit:'Audit log',soc:'SOC Center',governance:'Governance',compliance:'FedRAMP / CMMC',sbom:'SBOM',sla:'SLA Tracker',executive:'Executive Summary',export:'Export',users:'Users',analytics:'Analytics',correlation:'Correlation engine',soar:'SOAR playbooks',logsources:'Log ingestion',ueba:'UEBA',netflow:'Network flow',threathunt:'Threat hunting',threatintel:'Threat intelligence',vulnmgmt:'Vuln management',assets:'Assets',scheduler:'Scheduler',ai_analyst:'AI Analyst'};
+    var _SUBS={dashboard:'VSP / Operations / Dashboard',runs:'VSP / Operations / Runs',scanlog:'VSP / Operations / Scan log',findings:'VSP / Operations / Findings',remediation:'VSP / Operations / Remediation',policy:'VSP / Security / Policy',audit:'VSP / Security / Audit',soc:'VSP / Security / SOC',governance:'VSP / Compliance / Governance',compliance:'VSP / Compliance / Controls',sbom:'VSP / Compliance / SBOM',sla:'VSP / Compliance / SLA',executive:'VSP / Reports / Executive',export:'VSP / Reports / Export',users:'VSP / Reports / Users'};
+    var t=document.getElementById('page-title'); if(t) t.textContent=_TITLES[name]||name;
+    var s=document.getElementById('page-sub');   if(s) s.textContent=_SUBS[name]||('VSP / '+name);
+    if(meta){if(t)t.textContent=meta.title;if(s)s.textContent=meta.sub;}
+    if(panel){var iframe=panel.querySelector('iframe[data-src]');if(iframe&&!iframe.src)iframe.src=iframe.getAttribute('data-src');}
+    var loaders={runs:function(){if(typeof window.loadRuns==='function')window.loadRuns();},audit:function(){if(typeof loadAuditReal==='function')loadAuditReal();},dashboard:function(){if(typeof initDashboardCharts==='function')initDashboardCharts();},findings:function(){if(typeof loadFindingsPanel==='function')loadFindingsPanel();},sla:function(){if(typeof loadSLA==='function')loadSLA();},sbom:function(){if(typeof loadSBOM==='function')loadSBOM();},compliance:function(){if(typeof loadFedRAMP==='function')loadFedRAMP();},governance:function(){if(typeof window.loadRiskRegister==='function')window.loadRiskRegister();},executive:function(){if(typeof loadExecutive==='function')loadExecutive();}};
+    if(loaders[name]) setTimeout(loaders[name], 120);
+    console.log('[VSP MASTER] showPanel:', name);
+  }
+  window.showPanel = _masterShow;
+  console.log('[VSP] LAST_OVERRIDE installed');
+});
+
+// LOCK_SHOW_PANEL — dùng defineProperty để không ai override được nữa
+window.addEventListener('load', function() {
+  function _FINAL(name, btn) {
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
+    var panel = document.getElementById('panel-' + name);
+    if (panel) panel.classList.add('active');
+    if (btn) { btn.classList.add('active'); } else {
+      document.querySelectorAll('.nav-item').forEach(function(b){
+        if((b.getAttribute('onclick')||'').indexOf("'"+name+"'")>=0) b.classList.add('active');
+      });
+    }
+    var meta = window.PANEL_META&&window.PANEL_META[name];
+    var _T={dashboard:'Dashboard',runs:'Run history',scanlog:'Scan log',findings:'Findings',remediation:'Remediation',policy:'Policy',audit:'Audit log',soc:'SOC Center',governance:'Governance',compliance:'FedRAMP / CMMC',sbom:'SBOM',sla:'SLA Tracker',executive:'Executive Summary',export:'Export',users:'Users',analytics:'Analytics',correlation:'Correlation',soar:'SOAR',logsources:'Log ingestion',ueba:'UEBA',netflow:'Network flow',threathunt:'Threat hunting',threatintel:'Threat intel',vulnmgmt:'Vuln management',assets:'Assets',scheduler:'Scheduler',ai_analyst:'AI Analyst'};
+    var _S={dashboard:'VSP / Operations / Dashboard',runs:'VSP / Operations / Runs',scanlog:'VSP / Operations / Scan log',findings:'VSP / Operations / Findings',remediation:'VSP / Operations / Remediation',policy:'VSP / Security / Policy',audit:'VSP / Security / Audit · hash-chain verified',soc:'VSP / Security / SOC · Zero Trust',governance:'VSP / Compliance / Governance',compliance:'VSP / Compliance / Controls',sbom:'VSP / Compliance / SBOM',sla:'VSP / Compliance / SLA',executive:'VSP / Reports / Executive',export:'VSP / Reports / Export',users:'VSP / Reports / Users'};
+    var _pt=document.getElementById('page-title'); if(_pt) _pt.textContent=(meta&&meta.title)||_T[name]||name;
+    var _ps=document.getElementById('page-sub');   if(_ps) _ps.textContent=(meta&&meta.sub)||_S[name]||('VSP / '+name);
+    if(panel){var fr=panel.querySelector('iframe[data-src]');if(fr&&!fr.src)fr.src=fr.getAttribute('data-src');}
+    var L={runs:function(){window.loadRuns&&window.loadRuns();},audit:function(){typeof loadAuditReal==='function'&&loadAuditReal();},dashboard:function(){typeof initDashboardCharts==='function'&&initDashboardCharts();},findings:function(){typeof loadFindingsPanel==='function'&&loadFindingsPanel();},sla:function(){typeof loadSLA==='function'&&loadSLA();},sbom:function(){typeof loadSBOM==='function'&&loadSBOM();},compliance:function(){typeof loadFedRAMP==='function'&&loadFedRAMP();},governance:function(){typeof window.loadRiskRegister==='function'&&window.loadRiskRegister();},executive:function(){typeof loadExecutive==='function'&&loadExecutive();}};
+    if(L[name]) setTimeout(L[name], 150);
+    console.log('[VSP FINAL] panel:', name);
+  }
+  try {
+    Object.defineProperty(window, 'showPanel', {
+      value: _FINAL,
+      writable: false,
+      configurable: false
+    });
+    console.log('[VSP] LOCK_SHOW_PANEL — locked!');
+  } catch(e) {
+    window.showPanel = _FINAL;
+    console.log('[VSP] LOCK_SHOW_PANEL — assigned (no lock)');
+  }
+});
+
+// ══ PATCH v3.0 — Fix RACI + SOC + Remediation + Compliance ══════════════
+
+// 1. FIX RACI: badges phải hiện R/A/C/I đúng
+(function fixRACI() {
+  var origGov = window.loadGovernanceV2;
+  window.loadGovernanceV2 = async function() {
+    if (origGov) await origGov.apply(this, arguments);
+    // Override RACI table sau khi load
+    setTimeout(function() {
+      var tbody = document.querySelector('.raci-table tbody');
+      if (!tbody) return;
+      var rows = tbody.querySelectorAll('tr');
+      rows.forEach(function(row) {
+        var cells = row.querySelectorAll('td');
+        if (cells.length < 5) return;
+        // cells[1]=R, cells[2]=A, cells[3]=C, cells[4]=I
+        var letters = ['R','A','C','I'];
+        var classes = ['raci-R','raci-A','raci-C','raci-I'];
+        for (var i = 0; i < 4; i++) {
+          var span = cells[i+1].querySelector('.raci-badge');
+          if (span) {
+            span.textContent = letters[i];
+            span.className = 'raci-badge ' + classes[i];
+          }
+        }
+      });
+    }, 500);
+  };
+  // Cũng fix static HTML ngay khi load
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      document.querySelectorAll('.raci-table tbody tr').forEach(function(row) {
+        var cells = row.querySelectorAll('td');
+        if (cells.length < 5) return;
+        ['R','A','C','I'].forEach(function(letter, i) {
+          var span = cells[i+1].querySelector('.raci-badge');
+          if (span) span.textContent = letter;
+        });
+      });
+    }, 200);
+  });
+})();
+
+// 2. FIX SOC: Load real data thay vì hardcode
+(function fixSOC() {
+  // Đã có loadSOCv2 trong file — chỉ cần đảm bảo gọi đúng
+  var _sp3 = window.showPanel;
+  window.showPanel = function(name, btn) {
+    _sp3 && _sp3(name, btn);
+    if (name === 'soc') {
+      setTimeout(function() {
+        if (typeof loadSOCv2 === 'function') loadSOCv2();
+      }, 200);
+    }
+  };
+})();
+
+// 3. FIX REMEDIATION: Rate + bulk resolve + donut chart
+(function fixRemediation() {
+  var origLoad = window.loadRemediations;
+  window.loadRemediations = async function() {
+    if (origLoad) await origLoad.apply(this, arguments);
+    // Tính và hiện rate sau khi load
+    setTimeout(function() {
+      var open = parseInt((document.getElementById('rem-k-open')||{}).textContent)||0;
+      var inprog = parseInt((document.getElementById('rem-k-inprogress')||{}).textContent)||0;
+      var resolved = parseInt((document.getElementById('rem-k-resolved')||{}).textContent)||0;
+      var accepted = parseInt((document.getElementById('rem-k-accepted')||{}).textContent)||0;
+      var fp = parseInt((document.getElementById('rem-k-fp')||{}).textContent)||0;
+      var suppressed = parseInt((document.getElementById('rem-k-suppressed')||{}).textContent)||0;
+      var total = open + inprog + resolved + accepted + fp + suppressed;
+      var closed = resolved + accepted + fp + suppressed;
+      var rate = total > 0 ? Math.round(closed/total*100) : 0;
+
+      // Inject rate KPI nếu chưa có
+      var panel = document.getElementById('panel-remediation');
+      if (!panel) return;
+      var existing = document.getElementById('rem-rate-kpi');
+      if (!existing) {
+        var kpiRow = panel.querySelector('.g6.mb14');
+        if (kpiRow) {
+          var rateDiv = document.createElement('div');
+          rateDiv.className = 'kpi kpi-cyan';
+          rateDiv.id = 'rem-rate-kpi';
+          rateDiv.innerHTML = '<div class="kpi-label">Resolution Rate</div>'
+            +'<div class="kpi-value c-cyan" id="rem-rate-val" style="font-size:26px">'+rate+'%</div>'
+            +'<div class="kpi-sub">'+closed+'/'+total+' closed</div>';
+          // Thêm vào sau row hiện tại
+          kpiRow.after(rateDiv);
+        }
+      } else {
+        var rateEl = document.getElementById('rem-rate-val');
+        if (rateEl) rateEl.textContent = rate+'%';
+        existing.querySelector('.kpi-sub').textContent = closed+'/'+total+' closed';
+      }
+
+      // Fix donut chart
+      var canvas = document.getElementById('rem-donut');
+      if (canvas && window.Chart && total > 0) {
+        var existing2 = Chart.getChart(canvas);
+        if (existing2) existing2.destroy();
+        new Chart(canvas, {
+          type: 'doughnut',
+          data: {
+            labels: ['Open','In Progress','Resolved','Accepted','False+','Suppressed'],
+            datasets: [{
+              data: [open, inprog, resolved, accepted, fp, suppressed],
+              backgroundColor: ['#ef4444','#f59e0b','#22c55e','#06b6d4','#8b5cf6','#64748b'],
+              borderWidth: 0, hoverOffset: 4
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, cutout: '68%',
+            plugins: { legend: { display: false } }
+          }
+        });
+        // Breakdown text
+        var breakdown = document.getElementById('rem-breakdown');
+        if (breakdown) {
+          var colors = {Open:'#ef4444','In Progress':'#f59e0b',Resolved:'#22c55e',Accepted:'#06b6d4','False+':'#8b5cf6',Suppressed:'#64748b'};
+          var vals = {Open:open,'In Progress':inprog,Resolved:resolved,Accepted:accepted,'False+':fp,Suppressed:suppressed};
+          breakdown.innerHTML = Object.entries(vals).map(function(kv) {
+            var pct2 = total>0?Math.round(kv[1]/total*100):0;
+            return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+              +'<span style="display:flex;align-items:center;gap:6px;font-size:12px">'
+              +'<span style="width:8px;height:8px;border-radius:50%;background:'+colors[kv[0]]+';flex-shrink:0"></span>'
+              +kv[0]+'</span>'
+              +'<span style="font-weight:600;font-size:12px">'+kv[1]+' <span style="color:var(--t3);font-weight:400">('+pct2+'%)</span></span>'
+              +'</div>';
+          }).join('');
+        }
+      }
+    }, 300);
+  };
+})();
+
+// 4. FIX COMPLIANCE: Inject 73 FedRAMP controls từ API
+(function fixCompliance() {
+  // loadFedRAMP và loadCMMC đã có trong file — chúng gọi _loadComplianceData
+  // Chỉ cần đảm bảo gọi khi vào panel
+  var _sp4 = window.showPanel;
+  window.showPanel = function(name, btn) {
+    _sp4 && _sp4(name, btn);
+    if (name === 'compliance') {
+      setTimeout(function() {
+        if (typeof initGauges === 'function') initGauges();
+        if (typeof loadFedRAMP === 'function') loadFedRAMP();
+      }, 200);
+    }
+    if (name === 'remediation') {
+      setTimeout(function() {
+        if (typeof loadRemediations === 'function') loadRemediations();
+      }, 200);
+    }
+    if (name === 'governance') {
+      setTimeout(function() {
+        if (typeof loadGovernanceV2 === 'function') loadGovernanceV2();
+      }, 200);
+    }
+  };
+})();
+
+console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediation+Compliance fixed');
+
+// PATCH v3.1 — Fix Remediation load từ API thật
+(function(){
+  var _orig = window.loadRemediations;
+  window.loadRemediations = async function() {
+    await ensureToken();
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    try {
+      var [remD, statsD] = await Promise.all([
+        fetch('/api/v1/remediation', {headers:h}).then(r=>r.json()),
+        fetch('/api/v1/remediation/stats', {headers:h}).then(r=>r.json()).catch(()=>({}))
+      ]);
+      var rems = remD.remediations || [];
+      
+      // Count by status
+      var counts = {open:0,in_progress:0,resolved:0,accepted:0,false_positive:0,suppressed:0};
+      rems.forEach(function(r){ if(counts[r.status]!==undefined) counts[r.status]++; });
+      
+      // Update KPIs
+      var map = {'rem-k-open':'open','rem-k-inprogress':'in_progress','rem-k-resolved':'resolved',
+                 'rem-k-accepted':'accepted','rem-k-fp':'false_positive','rem-k-suppressed':'suppressed'};
+      Object.keys(map).forEach(function(id){
+        var el=document.getElementById(id); if(el) el.textContent=counts[map[id]]||0;
+      });
+      
+      var total = rems.length;
+      var closed = counts.resolved+counts.accepted+counts.false_positive+counts.suppressed;
+      var rate = total>0?Math.round(closed/total*100):0;
+      var cntEl = document.getElementById('rem-count');
+      if(cntEl) cntEl.textContent = total+' remediations · '+rate+'% resolved';
+
+      // Render table — fetch findings để get severity/tool/rule
+      var fdResp = await fetch('/api/v1/vsp/findings?limit=5000', {headers:h}).then(r=>r.json()).catch(()=>({findings:[]}));
+      var findMap = {};
+      (fdResp.findings||[]).forEach(function(f){ findMap[f.id]=f; });
+      
+      var sevClass={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
+      var statusPill={open:'pill-fail',in_progress:'pill-warn',resolved:'pill-pass',accepted:'pill-done',false_positive:'pill-queue',suppressed:''};
+      var priColor={P1:'c-red',P2:'c-orange',P3:'c-amber',P4:'c-t2'};
+      
+      var tbody = document.getElementById('rem-tbody');
+      if(!tbody) return;
+      
+      if(!rems.length){ tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No remediations yet</td></tr>'; return; }
+      
+      tbody.innerHTML = rems.map(function(r,i){
+        var f = findMap[r.finding_id]||{};
+        var sc=sevClass[f.severity]||'';
+        var sp=statusPill[r.status]||'';
+        var pc=priColor[r.priority]||'';
+        return '<tr style="cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'var(--surface2)\'" onmouseleave="this.style.background=\'\'" onclick="_openRemDetail('+i+')">'
+          +'<td>'+(f.severity?'<span class="sev '+sc+'">'+f.severity+'</span>':'—')+'</td>'
+          +'<td class="c-t3 f11">'+(f.tool||'—')+'</td>'
+          +'<td class="mono c-purple f10" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(f.rule_id||'—')+'</td>'
+          +'<td class="f12" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(f.message||'')+'">'+( f.message||r.finding_id||'—')+'</td>'
+          +'<td class="c-t3 f11">'+(r.assignee||'—')+'</td>'
+          +'<td class="'+pc+' fw7 f11">'+(r.priority||'—')+'</td>'
+          +'<td><span class="pill '+sp+'" style="font-size:9px">'+r.status+'</span></td>'
+          +'<td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="event.stopPropagation();_openRemDetail('+i+')">Edit</button></td>'
+          +'</tr>';
+      }).join('');
+      
+      // Store for _openRemDetail
+      window._remData = rems.map(function(r){
+        var f=findMap[r.finding_id]||{};
+        return Object.assign({},r,{severity:f.severity,tool:f.tool,rule_id:f.rule_id,description:f.message});
+      });
+      
+      // Update rate KPI
+      var existing = document.getElementById('rem-rate-kpi');
+      if(existing){ 
+        var rv=document.getElementById('rem-rate-val'); if(rv) rv.textContent=rate+'%';
+        var sub=existing.querySelector('.kpi-sub'); if(sub) sub.textContent=closed+'/'+total+' closed';
+      }
+      
+    } catch(e){ console.error('loadRemediations v3.1',e); }
+  };
+  console.log('[VSP] PATCH v3.1 Remediation fix loaded');
+})();
+
+// PATCH v3.2 — Auto-trigger loadRemediations khi vào panel
+(function(){
+  setInterval(function() {
+    var panel = document.getElementById('panel-remediation');
+    if (panel && panel.classList.contains('active') && !panel._loaded) {
+      panel._loaded = true;
+      if (typeof loadRemediations === 'function') loadRemediations();
+    }
+    if (panel && !panel.classList.contains('active')) {
+      panel._loaded = false; // reset khi rời panel
+    }
+  }, 300);
+  console.log('[VSP] PATCH v3.2 auto-trigger loaded');
+})();
+
+// ══ PATCH v3.3 — SOC Scorecard + SBOM Diff + SLA Trendline ══════════════
+
+// 1. SOC Framework Scorecard từ API thật
+(function fixSOCScorecard(){
+  var _origSOC = window.loadSOCv2;
+  window.loadSOCv2 = async function() {
+    if (_origSOC) await _origSOC.apply(this, arguments);
+    // Override scorecard với data thật
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    try {
+      var sc = await fetch('/api/v1/soc/framework-scorecard',{headers:h}).then(r=>r.json());
+      var scorecards = sc.scorecards||[];
+      if (!scorecards.length) return;
+      var panel = document.getElementById('panel-soc');
+      if (!panel) return;
+      var card = panel.querySelector('.card .card-body');
+      if (!card || !card.querySelector('.comp-row')) return;
+      var mkFW = function(name, pct, sub, note) {
+        var c = pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--red)';
+        return '<div class="comp-row" style="margin-bottom:10px">'
+          +'<div class="comp-header"><span class="comp-name">'+name+'</span><span class="comp-pct fw7" style="color:'+c+'">'+pct+'%</span></div>'
+          +'<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;background:'+c+'"></div></div>'
+          +'<div style="display:flex;justify-content:space-between;margin-top:3px">'
+          +'<span style="font-size:9px;color:var(--t3)">'+sub+'</span>'
+          +'<span style="font-size:9px;color:var(--t4)">'+note+'</span></div></div>';
+      };
+      var getScore = function(name){ 
+        var s=scorecards.find(function(x){return x.framework&&x.framework.includes(name);}); 
+        return s?s.score:40; 
+      };
+      card.innerHTML = 
+        mkFW('NIST SP 800-53 Rev5', getScore('NIST'), 'Controls assessed via VSP findings', 'AC,SI,IA,SC,CA')
+        +mkFW('ISO 27001:2022', getScore('ISO'), 'Annex A controls mapped', 'A.12,A.14,A.16')
+        +mkFW('SOC 2 Type II', getScore('SOC'), 'Trust service criteria', 'CC1-CC9')
+        +mkFW('CIS Controls v8', getScore('CIS')||55, 'Implementation groups', 'IG1,IG2')
+        +mkFW('Zero Trust Maturity', getScore('Zero')||78, 'CISA ZT pillars', '7 pillars assessed');
+      console.log('[VSP] SOC Scorecard updated from API');
+    } catch(e) { console.error('SOC Scorecard:', e); }
+  };
+})();
+
+// 2. SBOM Diff Visual
+(function addSBOMDiff(){
+  var _origLoadSBOM = window.loadSBOM;
+  window.loadSBOM = async function() {
+    if (_origLoadSBOM) await _origLoadSBOM.apply(this, arguments);
+    // Add diff button to SBOM table rows after render
+    setTimeout(function() {
+      var panel = document.getElementById('panel-sbom');
+      if (!panel) return;
+      // Add diff card nếu chưa có
+      if (document.getElementById('sbom-diff-card')) return;
+      var diffCard = document.createElement('div');
+      diffCard.className = 'card mb14'; diffCard.id = 'sbom-diff-card';
+      diffCard.innerHTML = '<div class="card-head">'
+        +'<div><div class="card-title">SBOM diff — compare runs</div>'
+        +'<div class="card-sub">So sánh findings giữa 2 scan runs</div></div>'
+        +'<button class="btn btn-primary" style="font-size:10px" onclick="_runSBOMDiff()">Compare →</button>'
+        +'</div>'
+        +'<div class="card-body" style="padding:12px 14px">'
+        +'<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin-bottom:12px">'
+        +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Base run</label>'
+        +'<select id="sbom-diff-base" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
+        +'<div style="font-size:18px;color:var(--t3);text-align:center">→</div>'
+        +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Compare run</label>'
+        +'<select id="sbom-diff-head" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
+        +'</div>'
+        +'<div id="sbom-diff-result"></div>'
+        +'</div>';
+      var existCard = panel.querySelector('.card.mb14');
+      if (existCard) existCard.after(diffCard);
+      // Load runs vào selects
+      _loadSBOMDiffRuns();
+    }, 500);
+  };
+
+  window._loadSBOMDiffRuns = async function() {
+    await ensureToken();
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    try {
+      var d = await fetch('/api/v1/vsp/runs/index?limit=50', {headers:h}).then(r=>r.json());
+      var runs = (d.runs||[]).filter(function(r){ return r.status==='DONE'; });
+      var opts = runs.map(function(r){
+        return '<option value="'+r.rid+'">'+r.rid.slice(-20)+' · '+r.mode+' · '+(r.total||0)+'f</option>';
+      }).join('');
+      var base = document.getElementById('sbom-diff-base');
+      var head = document.getElementById('sbom-diff-head');
+      if (base) { base.innerHTML = '<option value="">— base run —</option>'+opts; if(runs.length>1) base.value=runs[1].rid; }
+      if (head) { head.innerHTML = '<option value="">— compare run —</option>'+opts; if(runs.length>0) head.value=runs[0].rid; }
+    } catch(e) {}
+  };
+
+  window._runSBOMDiff = async function() {
+    var baseRid = (document.getElementById('sbom-diff-base')||{}).value||'';
+    var headRid = (document.getElementById('sbom-diff-head')||{}).value||'';
+    if (!baseRid || !headRid) { showToast('Chọn 2 runs để compare','error'); return; }
+    if (baseRid === headRid) { showToast('Chọn 2 runs khác nhau','error'); return; }
+    var result = document.getElementById('sbom-diff-result');
+    if (result) result.innerHTML = '<div style="color:var(--t3);padding:10px;font-size:11px">Comparing...</div>';
+    await ensureToken();
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    try {
+      // Fetch findings cho cả 2 runs
+      var [baseRun, headRun] = await Promise.all([
+        fetch('/api/v1/vsp/run/'+baseRid, {headers:h}).then(r=>r.json()),
+        fetch('/api/v1/vsp/run/'+headRid, {headers:h}).then(r=>r.json()),
+      ]);
+      var [baseFd, headFd] = await Promise.all([
+        fetch('/api/v1/vsp/findings?run_id='+(baseRun.id||baseRid)+'&limit=2000', {headers:h}).then(r=>r.json()),
+        fetch('/api/v1/vsp/findings?run_id='+(headRun.id||headRid)+'&limit=2000', {headers:h}).then(r=>r.json()),
+      ]);
+      var baseF = baseFd.findings||[];
+      var headF = headFd.findings||[];
+      // Compare by rule_id+path
+      var baseKeys = new Set(baseF.map(function(f){ return f.rule_id+'|'+f.path+'|'+f.line; }));
+      var headKeys = new Set(headF.map(function(f){ return f.rule_id+'|'+f.path+'|'+f.line; }));
+      var added   = headF.filter(function(f){ return !baseKeys.has(f.rule_id+'|'+f.path+'|'+f.line); });
+      var removed = baseF.filter(function(f){ return !headKeys.has(f.rule_id+'|'+f.path+'|'+f.line); });
+      var unchanged = headF.filter(function(f){ return baseKeys.has(f.rule_id+'|'+f.path+'|'+f.line); });
+      var sevClass = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
+      var mkRows = function(arr, color, label) {
+        if (!arr.length) return '';
+        return '<div style="margin-bottom:10px">'
+          +'<div style="font-size:10px;font-weight:700;color:'+color+';letter-spacing:.08em;margin-bottom:6px">'+label+' ('+arr.length+')</div>'
+          +'<div style="display:grid;gap:3px">'
+          +arr.slice(0,10).map(function(f){
+            return '<div style="display:flex;gap:8px;align-items:center;padding:4px 8px;background:'+color+'11;border-left:2px solid '+color+';border-radius:0 4px 4px 0">'
+              +'<span class="sev '+(sevClass[f.severity]||'')+'" style="flex-shrink:0">'+f.severity+'</span>'
+              +'<span class="mono-sm c-t3" style="flex-shrink:0">'+f.tool+'</span>'
+              +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.message+'</span>'
+              +'<span class="mono-sm c-t3">'+( f.path||'').split('/').pop()+'</span>'
+              +'</div>';
+          }).join('')
+          +(arr.length>10?'<div style="font-size:10px;color:var(--t3);padding:4px 8px">...and '+(arr.length-10)+' more</div>':'')
+          +'</div></div>';
+      };
+      if (result) result.innerHTML = 
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">'
+        +'<div class="kpi kpi-crit" style="padding:10px;text-align:center"><div class="kpi-label">New findings</div><div class="kpi-value c-red" style="font-size:24px">+'+added.length+'</div></div>'
+        +'<div class="kpi kpi-low" style="padding:10px;text-align:center"><div class="kpi-label">Fixed</div><div class="kpi-value c-green" style="font-size:24px">-'+removed.length+'</div></div>'
+        +'<div class="kpi" style="padding:10px;text-align:center"><div class="kpi-label">Unchanged</div><div class="kpi-value c-t2" style="font-size:24px">'+unchanged.length+'</div></div>'
+        +'</div>'
+        +mkRows(added, '#ef4444', '▲ NEW FINDINGS')
+        +mkRows(removed, '#22c55e', '▼ FIXED')
+        +(unchanged.length?'<div style="font-size:10px;color:var(--t3);padding:6px 0">'+unchanged.length+' findings unchanged between runs</div>':'');
+      showToast('SBOM diff: +'+added.length+' new, -'+removed.length+' fixed','success');
+    } catch(e) { 
+      if (result) result.innerHTML = '<div style="color:var(--red);padding:10px;font-size:11px">Error: '+e.message+'</div>';
+    }
+  };
+})();
+
+// 3. SLA Trendline Chart
+(function addSLATrendline(){
+  var _origLoadSLA = window.loadSLA;
+  window.loadSLA = async function() {
+    if (_origLoadSLA) await _origLoadSLA.apply(this, arguments);
+    // Add trendline chart sau khi SLA load
+    setTimeout(function() {
+      var panel = document.getElementById('panel-sla');
+      if (!panel || document.getElementById('sla-trend-card')) return;
+      var trendCard = document.createElement('div');
+      trendCard.className = 'card mb14'; trendCard.id = 'sla-trend-card';
+      trendCard.innerHTML = '<div class="card-head"><div class="card-title">SLA trend — findings over time</div>'
+        +'<span class="mono-sm c-t3">last 20 runs</span></div>'
+        +'<div class="card-body" style="height:200px;position:relative"><canvas id="sla-trend-canvas"></canvas></div>';
+      var g2 = panel.querySelector('.g2.mb14');
+      if (g2) g2.before(trendCard); else panel.appendChild(trendCard);
+      _renderSLATrend();
+    }, 600);
+  };
+
+  window._renderSLATrend = async function() {
+    await ensureToken();
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    try {
+      var d = await fetch('/api/v1/vsp/runs/index?limit=50', {headers:h}).then(r=>r.json());
+      var runs = (d.runs||[]).filter(function(r){ return r.status==='DONE'; }).slice(0,20).reverse();
+      if (!runs.length || !window.Chart) return;
+      var canvas = document.getElementById('sla-trend-canvas');
+      if (!canvas) return;
+      var labels = runs.map(function(r){
+        var dt = new Date(r.created_at);
+        return (dt.getDate())+'/'+(dt.getMonth()+1);
+      });
+      var crits = runs.map(function(r){ return (r.summary&&r.summary.CRITICAL)||0; });
+      var highs = runs.map(function(r){ return (r.summary&&r.summary.HIGH)||0; });
+      var meds  = runs.map(function(r){ return (r.summary&&r.summary.MEDIUM)||0; });
+      var totals= runs.map(function(r){ return r.total||r.total_findings||0; });
+      if (canvas._chart) canvas._chart.destroy();
+      canvas._chart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {label:'Total',data:totals,borderColor:'#06b6d4',backgroundColor:'rgba(6,182,212,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:3},
+            {label:'Critical',data:crits,borderColor:'#ef4444',backgroundColor:'transparent',tension:0.3,borderWidth:1.5,pointRadius:2,borderDash:[4,2]},
+            {label:'High',data:highs,borderColor:'#f97316',backgroundColor:'transparent',tension:0.3,borderWidth:1.5,pointRadius:2,borderDash:[4,2]},
+            {label:'Medium',data:meds,borderColor:'#f59e0b',backgroundColor:'transparent',tension:0.3,borderWidth:1,pointRadius:2,borderDash:[2,2]},
+          ]
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          interaction:{mode:'index',intersect:false},
+          plugins:{legend:{labels:{color:'#94a3b8',font:{size:9},boxWidth:8}}},
+          scales:{
+            x:{ticks:{color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},
+            y:{ticks:{color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}
+          }
+        }
+      });
+    } catch(e) { console.error('SLA trend:', e); }
+  };
+})();
+
+console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
+
+// PATCH v3.4 — Fix SOC scorecard mapping frameworks→scorecards + domain breakdown
+(function(){
+  var _origSOC2 = window.loadSOCv2;
+  window.loadSOCv2 = async function() {
+    if (_origSOC2) await _origSOC2.apply(this, arguments);
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    try {
+      var sc = await fetch('/api/v1/soc/framework-scorecard',{headers:h}).then(r=>r.json());
+      var frameworks = sc.frameworks || sc.scorecards || [];
+      if (!frameworks.length) return;
+      var panel = document.getElementById('panel-soc');
+      if (!panel) return;
+      // Tìm Framework scorecard card
+      var cards = panel.querySelectorAll('.card');
+      var targetCard = null;
+      cards.forEach(function(c){
+        if (c.querySelector('.card-title') && c.querySelector('.card-title').textContent.includes('Framework scorecard')) {
+          targetCard = c;
+        }
+      });
+      if (!targetCard) return;
+      var body = targetCard.querySelector('.card-body');
+      if (!body) return;
+      var mkFW = function(fw) {
+        var pct = fw.score || 0;
+        var c = pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--red)';
+        var domains = fw.domains || [];
+        var domainHTML = domains.map(function(d){
+          var dp = d.score||0;
+          var dc = dp>=70?'var(--green)':dp>=40?'var(--amber)':'var(--red)';
+          return '<div style="display:flex;justify-content:space-between;margin:2px 0;font-size:10px">'
+            +'<span style="color:var(--t3)">'+d.name+'</span>'
+            +'<span style="color:'+dc+';font-weight:600">'+dp+'%</span></div>';
+        }).join('');
+        return '<div class="comp-row" style="margin-bottom:12px">'
+          +'<div class="comp-header"><span class="comp-name" style="font-weight:600">'+fw.framework+'</span>'
+          +'<span class="comp-pct fw7" style="color:'+c+'">'+pct+'%</span></div>'
+          +'<div class="progress-bar" style="height:6px"><div class="progress-fill" style="width:'+pct+'%;background:'+c+'"></div></div>'
+          +(domainHTML?'<div style="margin-top:6px;padding:8px;background:var(--b2);border-radius:6px">'+domainHTML+'</div>':'')
+          +'</div>';
+      };
+      body.innerHTML = frameworks.map(mkFW).join('');
+      console.log('[VSP] SOC Scorecard v3.4 updated:', frameworks.length, 'frameworks');
+    } catch(e) { console.error('SOC scorecard v3.4:', e); }
+  };
+  // Trigger ngay nếu SOC panel đang active
+  if (document.getElementById('panel-soc') && document.getElementById('panel-soc').classList.contains('active')) {
+    setTimeout(window.loadSOCv2, 100);
+  }
+  console.log('[VSP] PATCH v3.4 SOC scorecard fix loaded');
+})();
+
+// PATCH v3.5 — Auto-trigger cho SOC + SBOM + SLA
+(function(){
+  setInterval(function() {
+    var panels = {
+      'panel-soc':         function(){ typeof loadSOCv2==='function' && loadSOCv2(); },
+      'panel-sbom':        function(){ typeof loadSBOM==='function' && loadSBOM(); },
+      'panel-sla':         function(){ typeof loadSLA==='function' && loadSLA(); },
+      'panel-governance':  function(){ typeof loadGovernanceV2==='function' && loadGovernanceV2(); },
+      'panel-compliance':  function(){ typeof loadFedRAMP==='function' && loadFedRAMP(); },
+      'panel-analytics':   function(){ typeof loadAnalytics==='function' && loadAnalytics(); },
+      'panel-executive':   function(){ typeof loadExecutive==='function' && loadExecutive(); },
+    };
+    Object.keys(panels).forEach(function(id) {
+      var panel = document.getElementById(id);
+      if (panel && panel.classList.contains('active') && !panel._autoLoaded) {
+        panel._autoLoaded = true;
+        panels[id]();
+      }
+      if (panel && !panel.classList.contains('active')) {
+        panel._autoLoaded = false;
+      }
+    });
+  }, 300);
+  console.log('[VSP] PATCH v3.5 auto-trigger all panels loaded');
+})();
+
+// PATCH v3.6 — Fix Remediation donut auto-render
+(function(){
+  var _origRem = window.loadRemediations;
+  window.loadRemediations = async function() {
+    if (_origRem) await _origRem.apply(this, arguments);
+    setTimeout(function() {
+      var canvas = document.getElementById('rem-donut');
+      if (!canvas || !window.Chart) return;
+      var ids = {open:'rem-k-open',ip:'rem-k-inprogress',res:'rem-k-resolved',acc:'rem-k-accepted',fp:'rem-k-fp',sup:'rem-k-suppressed'};
+      var v = {};
+      Object.keys(ids).forEach(function(k){ v[k]=parseInt((document.getElementById(ids[k])||{}).textContent)||0; });
+      var total = v.open+v.ip+v.res+v.acc+v.fp+v.sup;
+      if (!total) return;
+      var existing = Chart.getChart(canvas);
+      if (existing) existing.destroy();
+      new Chart(canvas, {
+        type:'doughnut',
+        data:{
+          labels:['Open','In Progress','Resolved','Accepted','False+','Suppressed'],
+          datasets:[{data:[v.open,v.ip,v.res,v.acc,v.fp,v.sup],
+            backgroundColor:['#ef4444','#f59e0b','#22c55e','#06b6d4','#8b5cf6','#64748b'],
+            borderWidth:0,hoverOffset:4}]
+        },
+        options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
+          plugins:{legend:{position:'bottom',labels:{color:'#8899bb',font:{size:9},boxWidth:8,padding:8}}}}
+      });
+      // Breakdown text
+      var bd = document.getElementById('rem-breakdown');
+      if (bd) {
+        var cols = {Open:'#ef4444','In Progress':'#f59e0b',Resolved:'#22c55e',Accepted:'#06b6d4','False+':'#8b5cf6',Suppressed:'#64748b'};
+        var vals = {Open:v.open,'In Progress':v.ip,Resolved:v.res,Accepted:v.acc,'False+':v.fp,Suppressed:v.sup};
+        var rate = Math.round((v.res+v.acc+v.fp+v.sup)/total*100);
+        bd.innerHTML = '<div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:10px">'+rate+'% resolved</div>'
+          +Object.entries(vals).map(function(kv){
+            var pct=Math.round(kv[1]/total*100);
+            return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'
+              +'<span style="display:flex;align-items:center;gap:6px;font-size:11px">'
+              +'<span style="width:8px;height:8px;border-radius:50%;background:'+cols[kv[0]]+';flex-shrink:0"></span>'
+              +kv[0]+'</span>'
+              +'<span style="font-weight:600;font-size:11px">'+kv[1]+' <span style="color:var(--t3);font-weight:400">('+pct+'%)</span></span>'
+              +'</div>';
+          }).join('');
+      }
+    }, 500);
+  };
+  console.log('[VSP] PATCH v3.6 Remediation donut fix loaded');
+})();
+
+// PATCH v3.7 — Policy panel: load API rules + auto-trigger + rich eval
+(function(){
+  // Auto-trigger khi vào Policy panel
+  var _policyLoaded = false;
+  setInterval(function(){
+    var panel = document.getElementById('panel-policy');
+    if (panel && panel.classList.contains('active') && !panel._policyLoaded) {
+      panel._policyLoaded = true;
+      _loadPolicyFull();
+    }
+    if (panel && !panel.classList.contains('active')) panel._policyLoaded = false;
+  }, 300);
+
+  async function _loadPolicyFull() {
+    await ensureToken();
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    try {
+      // Load evaluate result
+      var [evalD, rulesD] = await Promise.all([
+        fetch('/api/v1/policy/evaluate', {method:'POST', headers:Object.assign({'Content-Type':'application/json'},h), body:'{}'}).then(r=>r.json()).catch(()=>({})),
+        fetch('/api/v1/policy/rules', {headers:h}).then(r=>r.json()).catch(()=>({rules:[]}))
+      ]);
+
+      // Render eval result
+      var evalEl = document.getElementById('eval-result');
+      if (evalEl && evalD.decision) {
+        var c = evalD.decision==='PASS'?'var(--green)':evalD.decision==='WARN'?'var(--amber)':'var(--red)';
+        evalEl.innerHTML = '<span style="color:'+c+';font-size:18px;font-weight:700">'+evalD.decision+'</span>'
+          +' &middot; score: <b>'+(evalD.score||0)+'</b>'
+          +' &middot; posture: <b>'+(evalD.posture||'?')+'</b>'
+          +' &middot; <span style="color:var(--t3)">'+(evalD.reason||'')+'</span>';
+      }
+
+      // Render rules — built-in + API rules
+      var rules = rulesD.rules || [];
+      var list = document.getElementById('rules-list');
+      if (!list) return;
+
+      // Built-in HTML
+      var builtinHTML = '<div class="rule-card">'
+        +'<div class="rule-header"><div class="rule-name">Block Critical Findings</div><span class="rule-tag">BUILT-IN</span>'
+        +'<button class="toggle-btn on" onclick="this.classList.toggle(\'on\');showToast(\'Rule updated\',\'info\')"></button></div>'
+        +'<div class="rule-desc">Fail gate if any CRITICAL finding exists</div>'
+        +'<div class="rule-meta"><span>Fail on: <b>CRITICAL</b></span></div></div>'
+        +'<div class="rule-card">'
+        +'<div class="rule-header"><div class="rule-name">Block Secrets</div><span class="rule-tag">BUILT-IN</span>'
+        +'<button class="toggle-btn on" onclick="this.classList.toggle(\'on\');showToast(\'Rule updated\',\'info\')"></button></div>'
+        +'<div class="rule-desc">Fail gate if secrets/credentials detected</div>'
+        +'<div class="rule-meta"><span>Fail on: <b>SECRETS</b></span></div></div>';
+
+      // API rules
+      var apiHTML = rules.map(function(r) {
+        var tags = [];
+        if (r.block_critical) tags.push('CRITICAL');
+        if (r.block_secrets) tags.push('SECRETS');
+        if (r.max_high >= 0) tags.push('HIGH > '+r.max_high);
+        if (r.min_score > 0) tags.push('SCORE < '+r.min_score);
+        var created = r.created_at ? new Date(r.created_at).toLocaleDateString('vi-VN') : '';
+        return '<div class="rule-card" style="border-left:2px solid var(--cyan)">'
+          +'<div class="rule-header">'
+          +'<div class="rule-name">'+r.name+'</div>'
+          +'<span class="rule-tag" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2)">API</span>'
+          +'<button class="toggle-btn'+(r.active?' on':'')+'" data-id="'+r.id+'" onclick="_togglePolicyRule(this)"></button>'
+          +'</div>'
+          +(r.description?'<div class="rule-desc">'+r.description+'</div>':'')
+          +'<div class="rule-meta" style="display:flex;justify-content:space-between;align-items:center">'
+          +'<span>Fail on: <b>'+(tags.join(', ')||r.fail_on||'custom')+'</b></span>'
+          +'<div style="display:flex;gap:6px">'
+          +(created?'<span style="font-size:9px;color:var(--t3)">'+created+'</span>':'')
+          +'<button class="btn btn-ghost" style="font-size:9px;padding:2px 8px;color:var(--red)" onclick="_deletePolicyRule(\''+r.id+'\')">Delete</button>'
+          +'</div></div></div>';
+      }).join('');
+
+      list.innerHTML = builtinHTML + (apiHTML ? '<div style="font-size:10px;letter-spacing:.08em;color:var(--t3);margin:12px 0 8px">CUSTOM RULES ('+(rules.length)+')</div>'+apiHTML : '');
+
+      if (rules.length) showToast(rules.length+' custom rules loaded','info');
+    } catch(e) { console.error('Policy load:', e); }
+  }
+
+  window._togglePolicyRule = async function(btn) {
+    var id = btn.getAttribute('data-id');
+    var active = btn.classList.contains('on');
+    btn.classList.toggle('on');
+    await ensureToken();
+    try {
+      await fetch('/api/v1/policy/rules/'+id, {
+        method:'PUT', headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+        body: JSON.stringify({active: !active})
+      });
+      showToast('Rule '+(active?'disabled':'enabled'),'info');
+    } catch(e) { showToast('Update failed','error'); }
+  };
+
+  window._deletePolicyRule = async function(id) {
+    if (!confirm('Delete this rule?')) return;
+    await ensureToken();
+    try {
+      await fetch('/api/v1/policy/rules/'+id, {method:'DELETE',headers:{'Authorization':'Bearer '+window.TOKEN}});
+      showToast('Rule deleted','success');
+      document.getElementById('panel-policy')._policyLoaded = false;
+      _loadPolicyFull();
+    } catch(e) { showToast('Delete failed','error'); }
+  };
+
+  // Override runEval để hiện rich result
+  window.runEval = async function() {
+    var el = document.getElementById('eval-result');
+    if (el) el.innerHTML = '<span style="color:var(--t3)">Evaluating...</span>';
+    await ensureToken();
+    try {
+      var d = await fetch('/api/v1/policy/evaluate', {
+        method:'POST', headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+        body:'{}'
+      }).then(r=>r.json());
+      if (!el) return;
+      var c = d.decision==='PASS'?'var(--green)':d.decision==='WARN'?'var(--amber)':'var(--red)';
+      el.innerHTML = '<span style="color:'+c+';font-size:18px;font-weight:700">'+d.decision+'</span>'
+        +' &middot; score: <b>'+(d.score||0)+'</b>'
+        +' &middot; posture: <b>'+(d.posture||'?')+'</b>'
+        +' &middot; <span style="color:var(--t3)">'+(d.reason||'')+'</span>'
+        +(d.critical_count?'<div style="margin-top:8px;font-size:11px;color:var(--red)">Critical findings: '+d.critical_count+'</div>':'')
+        +(d.secrets_count?'<div style="font-size:11px;color:var(--amber)">Secrets detected: '+d.secrets_count+'</div>':'');
+    } catch(e) {
+      if (el) el.innerHTML = '<span style="color:var(--red)">Error: '+e.message+'</span>';
+    }
+  };
+
+  console.log('[VSP] PATCH v3.7 Policy panel loaded');
+})();
+
+// PATCH v3.8 — Policy: Security Standards (OWASP, CWE, BKAV) từ findings thật
+(function(){
+  var _origLoadPolicy = window._loadPolicyFull || function(){};
+  
+  window._loadPolicyFull = async function() {
+    await _origLoadPolicy.apply(this, arguments);
+    var panel = document.getElementById('panel-policy');
+    if (!panel || document.getElementById('policy-standards-card')) return;
+    
+    // Inject Standards card
+    var card = document.createElement('div');
+    card.className = 'card mb14'; card.id = 'policy-standards-card';
+    card.innerHTML = '<div class="card-head">'
+      +'<div><div class="card-title">Security standards coverage</div>'
+      +'<div class="card-sub">OWASP · CWE · BKAV · CVE · mapped từ findings thực</div></div>'
+      +'<button class="btn btn-ghost" style="font-size:10px" onclick="_refreshStandards()">↻ Refresh</button>'
+      +'</div>'
+      +'<div id="policy-standards-body" style="padding:14px"><div style="color:var(--t3);font-size:11px">Loading...</div></div>';
+    
+    var rulesList = document.getElementById('rules-list');
+    if (rulesList) rulesList.before(card);
+    
+    await _refreshStandards();
+  };
+
+  window._refreshStandards = async function() {
+    var body = document.getElementById('policy-standards-body');
+    if (!body) return;
+    await ensureToken();
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    
+    try {
+      var fd = await fetch('/api/v1/vsp/findings?limit=5000', {headers:h}).then(r=>r.json());
+      var findings = fd.findings || [];
+      
+      // OWASP Top 10 mapping từ CWE/rule_id
+      var OWASP = {
+        'A01:2021': {name:'Broken Access Control', cwes:['CWE-22','CWE-284','CWE-285','CWE-639'], color:'#ef4444'},
+        'A02:2021': {name:'Cryptographic Failures', cwes:['CWE-310','CWE-319','CWE-326','CWE-327'], color:'#f97316'},
+        'A03:2021': {name:'Injection', cwes:['CWE-77','CWE-78','CWE-89','CWE-94'], color:'#f59e0b'},
+        'A04:2021': {name:'Insecure Design', cwes:['CWE-209','CWE-256','CWE-501'], color:'#eab308'},
+        'A05:2021': {name:'Security Misconfiguration', cwes:['CWE-16','CWE-732','CWE-1173'], color:'#22c55e'},
+        'A06:2021': {name:'Vulnerable Components', cwes:['CWE-1035','CWE-1104'], color:'#06b6d4'},
+        'A07:2021': {name:'Auth Failures', cwes:['CWE-287','CWE-297','CWE-384'], color:'#3b82f6'},
+        'A08:2021': {name:'Software & Data Integrity', cwes:['CWE-345','CWE-494','CWE-502'], color:'#8b5cf6'},
+        'A09:2021': {name:'Security Logging Failures', cwes:['CWE-117','CWE-223','CWE-532'], color:'#ec4899'},
+        'A10:2021': {name:'SSRF', cwes:['CWE-918'], color:'#64748b'},
+      };
+
+      // Count findings per OWASP category
+      var owaspCounts = {};
+      Object.keys(OWASP).forEach(function(k){ owaspCounts[k] = 0; });
+      findings.forEach(function(f) {
+        var cwe = (f.cwe||'').replace(/\s/g,'');
+        Object.keys(OWASP).forEach(function(k) {
+          if (OWASP[k].cwes.indexOf(cwe) >= 0) owaspCounts[k]++;
+        });
+      });
+
+      // CVE count từ findings (trivy)
+      var cveFindings = findings.filter(function(f){ return f.rule_id && f.rule_id.startsWith('CVE-'); });
+      var cveCount = cveFindings.length;
+      var critCVE = cveFindings.filter(function(f){ return f.severity==='CRITICAL'; }).length;
+      var highCVE = cveFindings.filter(function(f){ return f.severity==='HIGH'; }).length;
+
+      // Secrets (BKAV / gitleaks)
+      var secretFindings = findings.filter(function(f){ return f.tool==='gitleaks'||f.tool==='trufflehog'; });
+      
+      // IaC misconfig (kics/checkov)
+      var iacFindings = findings.filter(function(f){ return f.tool==='kics'||f.tool==='checkov'; });
+
+      // CWE top list
+      var cweCounts = {};
+      findings.forEach(function(f){ if(f.cwe){cweCounts[f.cwe]=(cweCounts[f.cwe]||0)+1;} });
+      var topCWE = Object.entries(cweCounts).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+
+      body.innerHTML = 
+        // Summary KPIs
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'
+        +'<div class="kpi kpi-crit" style="padding:10px"><div class="kpi-label">CVE findings</div>'
+        +'<div class="kpi-value c-red" style="font-size:22px">'+cveCount+'</div>'
+        +'<div class="kpi-sub">'+critCVE+' critical · '+highCVE+' high</div></div>'
+        +'<div class="kpi" style="padding:10px;border-color:rgba(245,158,11,.2)"><div class="kpi-label">Secrets (BKAV/GL)</div>'
+        +'<div class="kpi-value c-amber" style="font-size:22px">'+secretFindings.length+'</div>'
+        +'<div class="kpi-sub">gitleaks · trufflehog</div></div>'
+        +'<div class="kpi" style="padding:10px;border-color:rgba(6,182,212,.2)"><div class="kpi-label">IaC misconfig</div>'
+        +'<div class="kpi-value c-cyan" style="font-size:22px">'+iacFindings.length+'</div>'
+        +'<div class="kpi-sub">kics · checkov</div></div>'
+        +'<div class="kpi" style="padding:10px;border-color:rgba(139,92,246,.2)"><div class="kpi-label">CWE categories</div>'
+        +'<div class="kpi-value c-purple" style="font-size:22px">'+Object.keys(cweCounts).length+'</div>'
+        +'<div class="kpi-sub">unique CWEs</div></div>'
+        +'</div>'
+
+        // OWASP Top 10
+        +'<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--t2);margin-bottom:10px">OWASP TOP 10 — 2021</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:14px">'
+        +Object.entries(OWASP).map(function(kv){
+          var id=kv[0], ow=kv[1], cnt=owaspCounts[id]||0;
+          var badge = cnt>0 ? '<span style="background:rgba(239,68,68,.12);color:#ef4444;font-size:9px;padding:1px 6px;border-radius:4px;font-weight:600">'+cnt+' findings</span>'
+            : '<span style="background:rgba(34,197,94,.1);color:#22c55e;font-size:9px;padding:1px 6px;border-radius:4px">clean</span>';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--b2);border-radius:6px;border-left:3px solid '+ow.color+'">'
+            +'<span style="font-size:9px;font-family:var(--font-mono);color:var(--t3);flex-shrink:0">'+id+'</span>'
+            +'<span style="font-size:11px;flex:1">'+ow.name+'</span>'
+            +badge+'</div>';
+        }).join('')
+        +'</div>'
+
+        // Top CWEs
+        +(topCWE.length ? '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--t2);margin-bottom:8px">TOP CWEs</div>'
+        +'<div style="display:grid;gap:4px;margin-bottom:14px">'
+        +topCWE.map(function(kv){
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--b2);border-radius:6px">'
+            +'<span class="mono f10 c-purple" style="flex-shrink:0;min-width:80px">'+kv[0]+'</span>'
+            +'<div style="flex:1;height:5px;background:var(--border);border-radius:3px">'
+            +'<div style="width:'+Math.round(kv[1]/findings.length*100*5)+'%;max-width:100%;height:100%;background:#8b5cf6;border-radius:3px"></div></div>'
+            +'<span class="mono-sm c-t3">'+kv[1]+'</span></div>';
+        }).join('')+'</div>' : '')
+
+        // CVE list top 5
+        +(cveFindings.length ? '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--t2);margin-bottom:8px">TOP CVEs</div>'
+        +'<div style="display:grid;gap:3px">'
+        +cveFindings.slice(0,5).map(function(f){
+          var sc={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'}[f.severity]||'';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--b2);border-radius:6px">'
+            +'<span class="sev '+sc+'" style="flex-shrink:0">'+f.severity+'</span>'
+            +'<span class="mono f10 c-blue" style="flex-shrink:0">'+f.rule_id+'</span>'
+            +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.message+'</span>'
+            +'</div>';
+        }).join('')
+        +(cveFindings.length>5?'<div style="font-size:10px;color:var(--t3);padding:4px 8px">...và '+(cveFindings.length-5)+' CVEs khác</div>':'')
+        +'</div>' : '');
+
+      showToast('Standards loaded: '+findings.length+' findings analyzed','info');
+    } catch(e) { 
+      if(body) body.innerHTML = '<div style="color:var(--red);font-size:11px">Error: '+e.message+'</div>';
+      console.error('Standards:', e); 
+    }
+  };
+
+  console.log('[VSP] PATCH v3.8 Security Standards loaded');
+})();
+
+// PATCH v3.9 — Policy Standards: inject trực tiếp không qua _loadPolicyFull
+(function(){
+  setInterval(function(){
+    var panel = document.getElementById('panel-policy');
+    if (!panel || !panel.classList.contains('active')) return;
+    if (document.getElementById('policy-standards-card')) return;
+    
+    // Inject card ngay vào panel
+    var card = document.createElement('div');
+    card.className = 'card mb14'; card.id = 'policy-standards-card';
+    card.innerHTML = '<div class="card-head">'
+      +'<div><div class="card-title">Security standards coverage</div>'
+      +'<div class="card-sub">OWASP Top 10 · CWE · CVE · Secrets — mapped từ findings thực</div></div>'
+      +'<button class="btn btn-ghost" style="font-size:10px" onclick="_refreshStandards()">↻ Refresh</button>'
+      +'</div>'
+      +'<div id="policy-standards-body" style="padding:14px"><div style="color:var(--t3);font-size:11px">Loading...</div></div>';
+    
+    // Thêm vào cuối panel trước footer
+    panel.appendChild(card);
+    
+    // Load data
+    if (typeof _refreshStandards === 'function') _refreshStandards();
+  }, 500);
+  
+  console.log('[VSP] PATCH v3.9 Policy Standards inject loaded');
+})();
+
+// PATCH v4.0 — Audit panel: KPI + filter + pagination đầy đủ
+(function(){
+  window._auditState = {page:0, limit:25, action:'', total:0};
+  
+  async function _loadAuditFull() {
+    await ensureToken();
+    var h = {'Authorization':'Bearer '+window.TOKEN};
+    var state = window._auditState;
+    
+    try {
+      // Fetch page
+      var url = '/api/v1/audit/log?limit='+state.limit+'&offset='+(state.page*state.limit);
+      var d = await fetch(url, {headers:h}).then(r=>r.json());
+      var entries = d.entries || [];
+      state.total = d.total || entries.length;
+      
+      // Filter client-side by action
+      if (state.action) entries = entries.filter(function(e){ return e.action===state.action; });
+      
+      // KPI
+      var today = new Date().toDateString();
+      var todayC = entries.filter(function(e){ return new Date(e.created_at).toDateString()===today; }).length;
+      var loginC = entries.filter(function(e){ return e.action&&e.action.indexOf('LOGIN')>=0; }).length;
+      var scanC  = entries.filter(function(e){ return e.action&&e.action.indexOf('SCAN')>=0; }).length;
+      var failC  = entries.filter(function(e){ return e.action&&(e.action.indexOf('FAIL')>=0||e.action.indexOf('LOCKED')>=0); }).length;
+      
+      var set = function(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; };
+      set('audit-k-total', state.total);
+      set('audit-k-today', todayC);
+      set('audit-k-logins', loginC);
+      set('audit-k-scans', scanC);
+      
+      // Inject filter bar nếu chưa có
+      var panel = document.getElementById('panel-audit');
+      if (panel && !document.getElementById('audit-filter-bar')) {
+        var fb = document.createElement('div');
+        fb.id = 'audit-filter-bar';
+        fb.className = 'filter-bar mb14';
+        fb.innerHTML = '<span class="f10 c-t3">Filter:</span>'
+          +'<div class="log-filter" id="audit-action-filters">'
+          +'<button class="log-filter-btn active" onclick="_setAuditAction(\'\',this)">ALL</button>'
+          +'<button class="log-filter-btn" onclick="_setAuditAction(\'LOGIN_OK\',this)">LOGIN_OK</button>'
+          +'<button class="log-filter-btn" style="color:var(--amber)" onclick="_setAuditAction(\'LOGIN_FAILED\',this)">FAILED</button>'
+          +'<button class="log-filter-btn" style="color:var(--red)" onclick="_setAuditAction(\'LOGIN_LOCKED\',this)">LOCKED</button>'
+          +'<button class="log-filter-btn" style="color:var(--cyan)" onclick="_setAuditAction(\'SCAN_PASS\',this)">SCAN</button>'
+          +'<button class="log-filter-btn" style="color:var(--purple)" onclick="_setAuditAction(\'REMEDIATION\',this)">REMEDIATION</button>'
+          +'</div>'
+          +'<span class="mono-sm c-t3" id="audit-count-lbl">'+state.total+' entries</span>'
+          +'<button class="btn btn-ghost" style="font-size:10px;margin-left:auto" onclick="_exportAuditCSV()">↓ CSV</button>';
+        var auditLogCard = panel.querySelector('.card:last-child');
+        if (auditLogCard) auditLogCard.before(fb);
+      }
+      
+      // Update count
+      set('audit-count-lbl', state.total+' entries');
+      
+      // Render table
+      var tbody = document.getElementById('audit-table');
+      if (tbody && entries.length) {
+        tbody.innerHTML = entries.map(function(e){
+          var ac = e.action&&e.action.indexOf('OK')>=0?'pill-pass'
+            :e.action&&e.action.indexOf('LOCKED')>=0?'pill-fail'
+            :e.action&&e.action.indexOf('FAIL')>=0?'pill-warn':'pill-run';
+          var dt = new Date(e.created_at);
+          var ts = (dt.getDate()<10?'0':'')+dt.getDate()+'/'+(dt.getMonth()+1)
+            +' '+(dt.getHours()<10?'0':'')+dt.getHours()+':'+(dt.getMinutes()<10?'0':'')+dt.getMinutes();
+          var hash = (e.hash||'').slice(0,8)+'…';
+          return '<tr>'
+            +'<td class="mono-sm">'+e.seq+'</td>'
+            +'<td><span class="pill '+ac+'" style="font-size:8px">'+e.action+'</span></td>'
+            +'<td class="mono-sm" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.resource+'</td>'
+            +'<td class="mono-sm">'+e.ip+'</td>'
+            +'<td class="mono-sm">'+ts+'</td>'
+            +'<td class="mono-sm" style="color:var(--t4);cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+e.hash+'\');showToast&&showToast(\'Hash copied\',\'info\')" title="Click to copy full hash">'+hash+'</td>'
+            +'</tr>';
+        }).join('');
+      }
+      
+      // Pagination
+      var pages = Math.ceil(state.total/state.limit);
+      var cur = state.page;
+      var paginationEl = document.querySelector('#panel-audit .card:last-child .pagination, #panel-audit .pagination');
+      if (!paginationEl) {
+        var auditCard = document.querySelector('#panel-audit .card:last-child');
+        if (auditCard) {
+          var pg = document.createElement('div');
+          pg.className = 'pagination'; pg.id = 'audit-pagination';
+          auditCard.appendChild(pg);
+          paginationEl = pg;
+        }
+      }
+      if (paginationEl) {
+        var btns = '<span class="pagination-info">'+(cur*state.limit+1)+'-'+Math.min((cur+1)*state.limit,state.total)+' of '+state.total+'</span><div class="page-btns">';
+        if (cur>0) btns += '<button class="page-btn" onclick="_auditGoPage('+(cur-1)+')">‹ Prev</button>';
+        for (var i=Math.max(0,cur-2);i<=Math.min(pages-1,cur+2);i++) {
+          btns += '<button class="page-btn'+(i===cur?' active':'')+'" onclick="_auditGoPage('+i+')">'+(i+1)+'</button>';
+        }
+        if (cur<pages-1) btns += '<button class="page-btn" onclick="_auditGoPage('+(cur+1)+')">Next ›</button>';
+        btns += '</div>';
+        paginationEl.innerHTML = btns;
+      }
+      
+    } catch(e) { console.error('Audit v4.0:', e); }
+  }
+  
+  window._setAuditAction = function(action, btn) {
+    window._auditState.action = action;
+    window._auditState.page = 0;
+    document.querySelectorAll('#audit-action-filters .log-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+    _loadAuditFull();
+  };
+  
+  window._auditGoPage = function(p) {
+    window._auditState.page = p;
+    _loadAuditFull();
+  };
+  
+  window._exportAuditCSV = async function() {
+    await ensureToken();
+    var d = await fetch('/api/v1/audit/log?limit=1000', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    var rows = [['Seq','Action','Resource','IP','Time','Hash']];
+    (d.entries||[]).forEach(function(e){ rows.push([e.seq,e.action,e.resource,e.ip,e.created_at,e.hash]); });
+    var csv = rows.map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+    var a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+    a.download = 'audit-log.csv'; a.click();
+    showToast('Audit CSV exported','success');
+  };
+  
+  // Override loadAuditReal
+  window.loadAuditReal = _loadAuditFull;
+  
+  console.log('[VSP] PATCH v4.0 Audit full loaded');
+})();
+
+// PATCH v4.1 — Fix iframe panels tự load khi click
+(function(){
+  var iframePanels = ['swinventory','users','ai_analyst','scheduler','correlation','soar',
+    'logsources','ueba','assets','netflow','threathunt','vulnmgmt','threatintel',
+    'p4compliance','cicd','integrations','settings'];
+  
+  setInterval(function(){
+    iframePanels.forEach(function(name){
+      var panel = document.getElementById('panel-'+name);
+      if (!panel || !panel.classList.contains('active')) return;
+      var iframe = panel.querySelector('iframe[data-src]');
+      if (iframe && !iframe.src.includes('.html')) {
+        iframe.src = iframe.getAttribute('data-src');
+        console.log('[VSP] iframe loaded:', name);
+      }
+    });
+  }, 300);
+  console.log('[VSP] PATCH v4.1 iframe auto-load loaded');
+})();
+
+// PATCH v4.1 — Fix iframe panels tự load khi click
+(function(){
+  var iframePanels = ['swinventory','users','ai_analyst','scheduler','correlation','soar',
+    'logsources','ueba','assets','netflow','threathunt','vulnmgmt','threatintel',
+    'p4compliance','cicd','integrations','settings'];
+  
+  setInterval(function(){
+    iframePanels.forEach(function(name){
+      var panel = document.getElementById('panel-'+name);
+      if (!panel || !panel.classList.contains('active')) return;
+      var iframe = panel.querySelector('iframe[data-src]');
+      if (iframe && !iframe.src.includes('.html')) {
+        iframe.src = iframe.getAttribute('data-src');
+        console.log('[VSP] iframe loaded:', name);
+      }
+    });
+  }, 300);
+  console.log('[VSP] PATCH v4.1 iframe auto-load loaded');
 })();

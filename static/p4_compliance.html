@@ -1,25 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><script>
-// Auto-get token từ parent window hoặc localStorage
-(function() {
-  var tok = '';
-  // Thử lấy từ URL param ?token=
-  var params = new URLSearchParams(window.location.search);
-  tok = params.get('token') || '';
-  // Fallback: lấy từ localStorage
-  if (!tok) tok = localStorage.getItem('vsp_token') || '';
-  // Fallback: lấy từ parent window
-  if (!tok) { try { tok = window.parent.TOKEN || window.parent.localStorage.getItem('vsp_token') || ''; } catch(e) {} }
-  if (tok) {
-    window.TOKEN = tok;
-    localStorage.setItem('vsp_token', tok);
-    console.log('[P4] token bootstrapped, length:', tok.length);
-  }
-  window.VSP_API_BASE = window.location.origin;
-  window.VSP_P4_API_KEY = '634a9c4ebc792f44d7c50c0eea62da4a3f2a4f9e657048d070b6175187bdb0c2';
-})();
-</script>
+<head>
 <style>
 :root {
   --color-background-primary: #0f1218;
@@ -226,38 +207,6 @@ body {
   transition: background .15s !important;
 }
 .poam-row:hover { background: rgba(255,255,255,.02) !important; }
-
-/* ── UI Enhancements ── */
-.detail-modal { min-width:600px; max-width:780px; max-height:80vh; overflow-y:auto; }
-.detail-row { display:flex; gap:8px; padding:8px 0; border-bottom:1px solid var(--border); font-size:11px; }
-.detail-row:last-child { border-bottom:none; }
-.detail-key { width:140px; flex-shrink:0; color:var(--t3); font-family:var(--mono); font-size:10px; text-transform:uppercase; }
-.detail-val { flex:1; color:var(--t1); }
-.expand-btn { background:none; border:none; color:var(--cyan); cursor:pointer; font-size:10px; padding:2px 6px; border-radius:4px; }
-.expand-btn:hover { background:rgba(6,182,212,.1); }
-.expandable { display:none; }
-.expandable.open { display:block; }
-.filter-pills { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
-.filter-pill { padding:3px 10px; border-radius:12px; font-size:10px; cursor:pointer; border:1px solid var(--border2); color:var(--t3); background:transparent; transition:all .15s; }
-.filter-pill:hover { border-color:var(--cyan); color:var(--cyan); }
-.filter-pill.active { background:rgba(6,182,212,.15); border-color:var(--cyan); color:var(--cyan); }
-.sbom-search { background:var(--bg3); border:1px solid var(--border2); border-radius:6px; padding:6px 10px; color:var(--t1); font-size:11px; width:200px; outline:none; }
-.sbom-search:focus { border-color:var(--cyan); }
-.timeline { display:flex; flex-direction:column; gap:0; }
-.timeline-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); position:relative; }
-.timeline-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px; }
-.timeline-line { position:absolute; left:4px; top:22px; bottom:-10px; width:2px; background:var(--border); }
-.progress-ring { transition:stroke-dashoffset .5s ease; }
-.vn-card { cursor:pointer; transition:border-color .15s; }
-.vn-card:hover { border-color:var(--cyan) !important; }
-.vn-item-row { display:flex; justify-content:space-between; align-items:center; font-size:11px; padding:4px 0; border-bottom:1px solid var(--border); cursor:pointer; }
-.vn-item-row:last-child { border-bottom:none; }
-.vn-item-row:hover { background:rgba(255,255,255,.02); }
-.badge-score { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:600; }
-.dropdown-menu { position:absolute; top:100%; right:0; background:var(--bg2); border:1px solid var(--border2); border-radius:8px; padding:6px; min-width:160px; z-index:50; box-shadow:0 8px 24px rgba(0,0,0,.4); }
-.dropdown-item { padding:6px 10px; border-radius:4px; font-size:11px; cursor:pointer; color:var(--t2); }
-.dropdown-item:hover { background:rgba(255,255,255,.06); color:var(--t1); }
-.tab-badge { display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px; border-radius:8px; font-size:9px; font-weight:700; padding:0 4px; margin-left:4px; }
 
 /* AI advisor modal */
 #ai-advisor-modal .modal {
@@ -579,15 +528,6 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
     <button class="nav-btn" onclick="switchTab('poam',this)">
       <div class="nav-dot" style="background:var(--t3)"></div> POA&M
     </button>
-    <button class="nav-btn" onclick="switchTab('ato-expiry',this)">
-      <div class="nav-dot" style="background:var(--amber)"></div> ATO Expiry
-    </button>
-    <button class="nav-btn" onclick="switchTab('sbom-view',this)">
-      <div class="nav-dot" style="background:var(--cyan)"></div> SBOM View
-    </button>
-    <button class="nav-btn" onclick="switchTab('vn-standards',this)">
-      <div class="nav-dot" style="background:var(--red)"></div> VN Standards
-    </button>
     <div class="nav-section" style="margin-top:auto">STATUS</div>
     <div style="padding:10px 14px">
       <div style="font-size:10px;color:var(--t3);margin-bottom:4px">P4 Readiness</div>
@@ -756,14 +696,6 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
 
         <div class="section-hd" style="margin-top:16px"><div class="section-title">SCHEDULES — ConMon</div></div>
         <div id="schedules-list"></div>
-
-        <div class="section-hd" style="margin-top:20px">
-          <div class="section-title">CONMON ACTIVITY TIMELINE — CA-7</div>
-          <button class="btn btn-ghost btn-sm" onclick="loadConMonTimeline()" style="font-size:10px">↺ Refresh</button>
-        </div>
-        <div id="conmon-timeline-wrap">
-          <div style="color:var(--t3);font-size:12px;padding:12px 0"><span class="spinner"></span> Loading...</div>
-        </div>
       </div>
 
       <!-- MICROSEG TAB -->
@@ -781,20 +713,10 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
 
       <!-- RASP TAB -->
       <div id="tab-rasp" class="tab-panel">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div style="font-size:11px;color:var(--t3)">Runtime Application Self-Protection · Live event feed · SI-3 / SI-10 / SI-16</div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <div class="filter-pills">
-              <button class="filter-pill active" onclick="setRASPFilter('all',this)">All</button>
-              <button class="filter-pill" onclick="setRASPFilter('CRITICAL',this)" style="color:var(--red)">CRITICAL</button>
-              <button class="filter-pill" onclick="setRASPFilter('HIGH',this)" style="color:var(--amber)">HIGH</button>
-              <button class="filter-pill" onclick="setRASPFilter('MEDIUM',this)">MEDIUM</button>
-            </div>
-            <button class="btn btn-ghost btn-sm" onclick="exportRASP()">⬇ Export</button>
-            <button class="btn btn-primary btn-sm" onclick="pollRASP()">↺ Poll</button>
-          </div>
+          <button class="btn btn-primary btn-sm" onclick="pollRASP()">↺ Poll</button>
         </div>
-        <div id="rasp-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px"></div>
         <div class="rasp-list" id="rasp-list">
           <div style="color:var(--t3)"><span class="spinner"></span> Loading...</div>
         </div>
@@ -808,292 +730,9 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
         </div>
       </div>
 
-      <!-- ATO EXPIRY TAB -->
-      <div id="tab-ato-expiry" class="tab-panel">
-        <div class="section-hd"><div class="section-title">ATO EXPIRY &amp; RENEWAL TRACKING</div></div>
-        <div id="ato-expiry-content" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px">
-          <div style="color:var(--t3);font-size:11px">Loading ATO expiry data...</div>
-        </div>
-      </div>
-
-      <!-- SBOM VIEW TAB -->
-      <div id="tab-sbom-view" class="tab-panel">
-        <div class="section-hd">
-          <div class="section-title">SOFTWARE BILL OF MATERIALS — SBOM VIEW</div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input id="sbom-search-input" class="sbom-search" placeholder="Search component..." oninput="window._sbomData&&renderSBOMTable(window._sbomData,this.value,window._sbomFilter||'all')">
-            <div class="filter-pills">
-              <button class="filter-pill active" onclick="setSBOMFilter('all',this)">All</button>
-              <button class="filter-pill" onclick="setSBOMFilter('vuln',this)">⚠ Vulnerable</button>
-              <button class="filter-pill" onclick="setSBOMFilter('clean',this)">✓ Clean</button>
-            </div>
-          </div>
-        </div>
-        <div id="sbom-view-content" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px">
-          <div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>
-        </div>
-      </div>
-
-      <!-- VIETNAMESE STANDARDS TAB -->
-      <div id="tab-vn-standards" class="tab-panel">
-        <div class="section-hd"><div class="section-title">VIETNAMESE SECURITY STANDARDS — VNCERT / BKAV / VIETTEL / VNPT</div></div>
-        <div id="vn-standards-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px">
-          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
-            <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:.08em;margin-bottom:8px">🇻🇳 VNCERT/CC — TT17/2017/TT-BTTTT</div>
-            <div style="font-size:10px;color:var(--t3);margin-bottom:10px">Thông tư 17/2017 Bộ TT&TT — An toàn hệ thống thông tin theo cấp độ</div>
-            <div style="display:flex;flex-direction:column;gap:6px">
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Cấp độ 3 — Hệ thống quan trọng</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Kiểm tra ATTT định kỳ hàng năm</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Mã hóa dữ liệu truyền tải (TLS 1.3)</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Nhật ký hệ thống lưu tối thiểu 90 ngày</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Xác thực đa yếu tố (MFA)</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-            </div>
-            <div style="margin-top:10px;padding:6px 10px;background:rgba(0,255,163,.07);border-radius:6px;font-size:10px;color:var(--green)">
-              Tuân thủ TT17/2017 — Cấp độ 3 · 5/5 yêu cầu
-            </div>
-          </div>
-
-          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
-            <div style="font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.08em;margin-bottom:8px">🔒 VNCERT — Tiêu chuẩn ATTT Quốc gia</div>
-            <div style="font-size:10px;color:var(--t3);margin-bottom:10px">TCVN 11943:2017 — Hệ thống quản lý ATTT (tương đương ISO 27001)</div>
-            <div style="display:flex;flex-direction:column;gap:6px">
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>A.9 — Kiểm soát truy cập</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>A.10 — Mã hóa thông tin</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>A.12 — An toàn vận hành</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>A.16 — Quản lý sự cố ATTT</span>
-                <span style="color:var(--amber);font-weight:700">⚠ CHỜ</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>A.18 — Tuân thủ pháp lý</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-            </div>
-            <div style="margin-top:10px;padding:6px 10px;background:rgba(255,184,0,.07);border-radius:6px;font-size:10px;color:var(--amber)">
-              TCVN 11943:2017 — 4/5 đạt · A.16 cần bổ sung quy trình
-            </div>
-          </div>
-
-          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
-            <div style="font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:.08em;margin-bottom:8px">📡 BKAV / VNPT — Tiêu chí kiểm định ATTT</div>
-            <div style="font-size:10px;color:var(--t3);margin-bottom:10px">Tiêu chí đánh giá ATTT theo BKAV SecurityScorecard &amp; VNPT CyberSec</div>
-            <div style="display:flex;flex-direction:column;gap:6px">
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Phát hiện mã độc &amp; APT</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Giám sát lưu lượng mạng (NTA)</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Quét lỗ hổng định kỳ (DAST/SAST)</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Phản ứng sự cố &lt; 4h (IR SLA)</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Báo cáo định kỳ cho VNCERT</span>
-                <span style="color:var(--amber);font-weight:700">⚠ CHỜ</span>
-              </div>
-            </div>
-            <div style="margin-top:10px;padding:6px 10px;background:rgba(6,182,212,.07);border-radius:6px;font-size:10px;color:var(--cyan)">
-              BKAV/VNPT Score: 88/100 · 4/5 tiêu chí đạt
-            </div>
-          </div>
-
-          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
-            <div style="font-size:11px;font-weight:700;color:var(--purple);letter-spacing:.08em;margin-bottom:8px">📶 Viettel CyberSec — SOC Tiêu chuẩn</div>
-            <div style="font-size:10px;color:var(--t3);margin-bottom:10px">Tiêu chuẩn SOC của Viettel Cyber Security — Giám sát &amp; Ứng phó sự cố</div>
-            <div style="display:flex;flex-direction:column;gap:6px">
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>SIEM tích hợp — thu thập log 24/7</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Threat Intelligence tích hợp IOC</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Playbook ứng phó tự động (SOAR)</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Mean Time to Detect &lt; 15 phút</span>
-                <span style="color:var(--green);font-weight:700">✓ ĐẠT</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span>Drill test &amp; Red Team hàng quý</span>
-                <span style="color:var(--amber);font-weight:700">⚠ Q3</span>
-              </div>
-            </div>
-            <div style="margin-top:10px;padding:6px 10px;background:rgba(139,92,246,.07);border-radius:6px;font-size:10px;color:var(--purple)">
-              Viettel CyberSec SOC: 4/5 tiêu chí · Red Team drill Q3 2026
-            </div>
-          </div>
-        </div>
-
-        <!-- Compliance matrix -->
-        <div class="section-hd"><div class="section-title">MA TRẬN TUÂN THỦ — VN + QUỐC TẾ</div></div>
-        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <thead>
-              <tr style="background:rgba(255,255,255,.03)">
-                <th style="padding:8px 12px;text-align:left;color:var(--t3);font-weight:600">Tiêu chuẩn</th>
-                <th style="padding:8px;text-align:center;color:var(--t3)">Phạm vi</th>
-                <th style="padding:8px;text-align:center;color:var(--t3)">Điểm</th>
-                <th style="padding:8px;text-align:center;color:var(--t3)">Trạng thái</th>
-                <th style="padding:8px;text-align:left;color:var(--t3)">Ghi chú</th>
-                <th style="padding:8px;text-align:center;color:var(--t3)">Actions</th>
-                <th style="padding:8px;text-align:center;color:var(--t3)">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="vn-matrix-tbody">
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:8px 12px;font-weight:600;color:var(--cyan)">FedRAMP Moderate</td>
-                <td style="padding:8px;text-align:center;color:var(--t3)">Cloud Gov</td>
-                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">92%</td>
-                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">ATO</span></td>
-                <td style="padding:8px;color:var(--t3)">22/24 controls · Coalfire 3PAO</td>
-              </tr>
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:8px 12px;font-weight:600;color:var(--purple)">CMMC Level 2</td>
-                <td style="padding:8px;text-align:center;color:var(--t3)">DoD CUI</td>
-                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">87%</td>
-                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">PASS</span></td>
-                <td style="padding:8px;color:var(--t3)">13/15 practices · 110 controls</td>
-              </tr>
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:8px 12px;font-weight:600;color:var(--amber)">NIST SP 800-53</td>
-                <td style="padding:8px;text-align:center;color:var(--t3)">Federal</td>
-                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">94%</td>
-                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">PASS</span></td>
-                <td style="padding:8px;color:var(--t3)">Rev 5 MODERATE baseline</td>
-              </tr>
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:8px 12px;font-weight:600;color:var(--red)">TT17/2017/TT-BTTTT</td>
-                <td style="padding:8px;text-align:center;color:var(--t3)">VN Gov</td>
-                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">100%</td>
-                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">ĐẠT</span></td>
-                <td style="padding:8px;color:var(--t3)">Cấp độ 3 · 5/5 yêu cầu</td>
-              </tr>
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:8px 12px;font-weight:600;color:var(--cyan)">TCVN 11943:2017</td>
-                <td style="padding:8px;text-align:center;color:var(--t3)">VN ISO27001</td>
-                <td style="padding:8px;text-align:center;font-weight:700;color:var(--amber)">80%</td>
-                <td style="padding:8px;text-align:center"><span style="background:rgba(255,184,0,.1);color:var(--amber);padding:2px 8px;border-radius:4px;font-size:10px">CHỜ</span></td>
-                <td style="padding:8px;color:var(--t3)">4/5 domains · A.16 cần bổ sung</td>
-              </tr>
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:8px 12px;font-weight:600;color:var(--cyan)">BKAV SecurityScore</td>
-                <td style="padding:8px;text-align:center;color:var(--t3)">VN Private</td>
-                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">88/100</td>
-                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">TỐT</span></td>
-                <td style="padding:8px;color:var(--t3)">4/5 tiêu chí · Báo cáo VNCERT pending</td>
-              </tr>
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:8px 12px;font-weight:600;color:var(--purple)">Viettel SOC Standard</td>
-                <td style="padding:8px;text-align:center;color:var(--t3)">VN SOC</td>
-                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">88/100</td>
-                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">TỐT</span></td>
-                <td style="padding:8px;color:var(--t3)">4/5 · Red Team drill Q3 2026</td>
-              </tr>
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:8px 12px;font-weight:600;color:var(--green)">ISO 27001:2022</td>
-                <td style="padding:8px;text-align:center;color:var(--t3)">International</td>
-                <td style="padding:8px;text-align:center;font-weight:700;color:var(--green)">91%</td>
-                <td style="padding:8px;text-align:center"><span style="background:rgba(0,255,163,.1);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px">PASS</span></td>
-                <td style="padding:8px;color:var(--t3)">93 controls · Annex A mapped</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /shell -->
-
-<!-- Test Detail Modal -->
-<div class="modal-overlay" id="test-detail-modal">
-  <div class="modal detail-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <div id="test-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('test-detail-modal').classList.remove('open')">✕</button>
-    </div>
-    <div id="test-detail-body"></div>
-  </div>
-</div>
-
-<!-- RASP Detail Modal -->
-<div class="modal-overlay" id="rasp-detail-modal">
-  <div class="modal detail-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <div id="rasp-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('rasp-detail-modal').classList.remove('open')">✕</button>
-    </div>
-    <div id="rasp-detail-body"></div>
-  </div>
-</div>
-
-<!-- VN Standard Detail Modal -->
-<div class="modal-overlay" id="vn-detail-modal">
-  <div class="modal detail-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <div id="vn-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('vn-detail-modal').classList.remove('open')">✕</button>
-    </div>
-    <div id="vn-detail-body"></div>
-  </div>
-</div>
-
-<!-- POAM Detail Modal -->
-<div class="modal-overlay" id="poam-detail-modal">
-  <div class="modal detail-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div id="poam-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('poam-detail-modal').classList.remove('open')">✕</button>
-    </div>
-    <div id="poam-detail-body"></div>
-  </div>
-</div>
-
-<!-- SBOM Detail Modal -->
-<div class="modal-overlay" id="sbom-detail-modal">
-  <div class="modal detail-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div id="sbom-detail-title" class="modal-title" style="margin-bottom:0;font-size:13px"></div>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('sbom-detail-modal').classList.remove('open')">✕</button>
-    </div>
-    <div id="sbom-detail-body"></div>
-  </div>
-</div>
 
 <!-- Add Micro-Seg Rule Modal -->
 <div class="modal-overlay" id="seg-modal">
@@ -1165,14 +804,11 @@ function loadTab(name) {
     case 'overview':   loadOverview(); break;
     case 'rmf': setTimeout(loadATOExpiry, 300);        loadRMF(); break;
     case 'zerotrust':  loadZeroTrust(); break;
-    case 'pipeline':   loadPipeline(); loadConMonTimeline(); break;
+    case 'pipeline':   loadPipeline(); break;
     case 'microseg':   loadMicroSeg(); break;
     case 'rasp':       pollRASP(); break;
     case 'sbom-viewer': loadSBOMView(); break;
     case 'poam':       loadPOAM(); break;
-    case 'ato-expiry': loadATOExpiry(); break;
-    case 'sbom-view':  loadSBOMView(); break;
-    case 'vn-standards': loadVNStandards(); break;
   }
 }
 
@@ -1186,21 +822,21 @@ function currentTab() {
 // ---- Fetch helpers ----
 async function api(path) {
   try {
-    const tok = window.TOKEN || '';
-    const p4key = window.VSP_P4_API_KEY || '';
-    const headers = tok ? {'Authorization': 'Bearer ' + tok}
-                  : p4key ? {'X-API-Key': p4key} : {};
-    const r = await fetch(API + path, {headers});
+    const tok = window.TOKEN || (window.parent&&window.parent.TOKEN) || localStorage.getItem('vsp_token') || '';
+    // Guard: không có token thì không gọi (tránh 401 console noise khi trang mount trước login)
+    if (!tok) return null;
+    const r = await fetch(API + path, {headers: {Authorization:'Bearer '+tok}});
     if (!r.ok) return null;
     return await r.json();
-  } catch(e) {
-    return null;
-  }
+  } catch(e) { return null; }
 }
 
 async function post(path, body) {
   try {
-    const r = await fetch(API + path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const tok = window.TOKEN || (window.parent&&window.parent.TOKEN) || localStorage.getItem('vsp_token') || '';
+    if (!tok) return null;
+    const r = await fetch(API + path, {method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer '+tok}, body:JSON.stringify(body)});
+    if (!r.ok) return null;
     return await r.json();
   } catch(e) { return null; }
 }
@@ -1396,8 +1032,8 @@ async function loadZeroTrust() {
 
   // Application capabilities table
   const appPillar = data.pillars['application'];
-  if (appPillar) {
-    document.getElementById('cap-tbody').innerHTML = appPillar.capabilities.map(c => `
+  if (appPillar && Array.isArray(appPillar.capabilities)) {
+    document.getElementById('cap-tbody').innerHTML = (appPillar.capabilities||[]).map(c => `
       <tr>
         <td style="color:var(--purple)">${c.id}</td>
         <td>${c.name}<br><span style="font-size:10px;color:var(--t3)">${c.description||''}</span></td>
@@ -1462,43 +1098,16 @@ function renderPipelineRun(run) {
 
 function renderTests(tests) {
   document.getElementById('tests-list').innerHTML = tests.map(t => `
-    <div class="test-row" style="cursor:pointer" onclick="openTestDetail(${JSON.stringify(t).replace(/"/g,'&quot;')})">
+    <div class="test-row">
       <span class="test-fw">${t.framework}</span>
-      <span class="test-ctrl" style="font-family:var(--mono);color:var(--cyan)">${t.control_id}</span>
-      <span class="test-name" style="flex:1">${t.name}</span>
-      <span style="display:flex;gap:4px"></span>
-      <span class="ctrl-status ctrl-status-${t.status}">${t.status.toUpperCase()}</span>
-      <span class="test-score" style="color:${t.score>=80?'var(--green)':t.score>=50?'var(--amber)':'var(--red)'};font-family:var(--mono)">${t.score}</span>
-      ${t.auto_fix_available ? '<span style="font-size:10px;color:var(--cyan)">⚡</span>' : ''}
+      <span class="test-ctrl">${t.control_id}</span>
+      <span class="test-name">${t.name}</span>
+      <span class="test-status ts-${t.status}">${t.status.toUpperCase()}</span>
+      <span class="test-score" style="color:${t.score>=80?'var(--green)':t.score>=50?'var(--amber)':'var(--red)'}">${t.score}</span>
+      <span class="test-evidence" title="${t.evidence}">${t.evidence}</span>
+      ${t.auto_fix_available ? '<span style="font-size:10px;color:var(--cyan)">⚡ autofix</span>' : ''}
     </div>
   `).join('');
-}
-
-function openTestDetail(t) {
-  const modal = document.getElementById('test-detail-modal');
-  const body = document.getElementById('test-detail-body');
-  if (!modal || !body) return;
-  const col = t.status==='pass'?'var(--green)':t.status==='warn'?'var(--amber)':'var(--red)';
-  const scoreCol = t.score>=80?'var(--green)':t.score>=50?'var(--amber)':'var(--red)';
-  body.innerHTML =
-    '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
-      '<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--cyan)">'+t.control_id+'</span>' +
-      '<span style="padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.05);font-size:10px;color:var(--t3)">'+t.framework+'</span>' +
-      '<span style="padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.05);font-size:10px;color:var(--t3)">'+t.test_type+'</span>' +
-      '<span style="margin-left:auto;font-size:28px;font-weight:700;color:'+scoreCol+'">'+t.score+'</span>' +
-    '</div>' +
-    '<div class="detail-row"><div class="detail-key">Test Name</div><div class="detail-val" style="font-weight:600">'+t.name+'</div></div>' +
-    '<div class="detail-row"><div class="detail-key">Status</div><div class="detail-val"><span class="ctrl-status ctrl-status-'+t.status+'">'+t.status.toUpperCase()+'</span></div></div>' +
-    '<div class="detail-row"><div class="detail-key">Evidence</div><div class="detail-val" style="color:var(--cyan)">'+t.evidence+'</div></div>' +
-    '<div class="detail-row"><div class="detail-key">Duration</div><div class="detail-val">'+(t.duration_ms>0?t.duration_ms+'ms':'manual')+'</div></div>' +
-    '<div class="detail-row"><div class="detail-key">Last Run</div><div class="detail-val">'+new Date(t.last_run).toLocaleString('vi-VN')+'</div></div>' +
-    '<div class="detail-row"><div class="detail-key">Run ID</div><div class="detail-val" style="font-family:var(--mono)">'+t.run_id+'</div></div>' +
-    (t.auto_fix_available?'<div style="margin-top:14px;padding:10px;background:rgba(6,182,212,.07);border:1px solid rgba(6,182,212,.2);border-radius:6px;font-size:11px;color:var(--cyan)">⚡ Auto-fix available for this control</div>':'') +
-    '<div style="display:flex;gap:8px;margin-top:16px">' +
-      '<button class="btn btn-ghost btn-sm" onclick="window._aiTest(this)" data-c="'+t.control_id+'" data-s="'+(t.status==="pass"?"LOW":"HIGH")+'">🤖 AI Advisor</button>' +
-    '</div>';
-  document.getElementById('test-detail-title').textContent = t.control_id + ' — ' + t.framework;
-  modal.classList.add('open');
 }
 
 function filterTests(status) {
@@ -1551,111 +1160,6 @@ async function triggerPipeline() {
   }
 }
 
-// ---- ConMon Timeline ----
-async function loadConMonTimeline() {
-  const wrap = document.getElementById('conmon-timeline-wrap');
-  if (!wrap) return;
-
-  // Fetch live conmon data, fall back to static if unavailable
-  let conmon = {};
-  try { conmon = await api('/api/p4/rmf/conmon') || {}; } catch(e) {}
-
-  const score  = conmon.conmon_score        || 94;
-  const ctrl   = conmon.control_compliance_rate || 97;
-  const patch  = conmon.patch_compliance_pct    || 96;
-  const drift  = conmon.config_drift_events     || 3;
-  const crits  = conmon.vulnerabilities?.critical || 0;
-  const highs  = conmon.vulnerabilities?.high     || 2;
-  const trend  = conmon.trend || 'improving';
-  const audit  = conmon.audit_log_integrity || 'INTACT';
-
-  // Build synthetic timeline from live data
-  const now = Date.now();
-  const events = [
-    { ts: now - 3600e3*1,   type:'scan',  sev:'pass', ctl:'CA-7',  msg:`Compliance scan PASS — ConMon score ${score}/100` },
-    { ts: now - 3600e3*3,   type:'drift', sev: drift>5?'warn':'pass', ctl:'CM-6', msg:`Config drift check — ${drift} events auto-reverted` },
-    { ts: now - 3600e3*8,   type:'patch', sev:'pass', ctl:'SI-2',  msg:`Patch compliance ${patch}% — within SLA` },
-    { ts: now - 3600e3*14,  type:'audit', sev:'pass', ctl:'AU-9',  msg:`Audit log integrity verified — ${audit}` },
-    { ts: now - 86400e3*1,  type:'scan',  sev:'pass', ctl:'CA-2',  msg:`Control compliance ${ctrl}% — FedRAMP MODERATE` },
-    { ts: now - 86400e3*1,  type:'vuln',  sev: highs>0?'warn':'pass', ctl:'RA-5', msg:`Vuln scan — ${crits} CRITICAL · ${highs} HIGH open` },
-    { ts: now - 86400e3*2,  type:'scan',  sev:'pass', ctl:'CA-7',  msg:`SBOM scan — ${crits} critical CVEs · trend: ${trend}` },
-    { ts: now - 86400e3*3,  type:'patch', sev:'action', ctl:'SI-2', msg:'CVE-2024-45337 PATCHED — golang.org/x/crypto updated' },
-    { ts: now - 86400e3*4,  type:'drift', sev:'pass', ctl:'CM-6',  msg:'Zero drift events — config stable 96h' },
-    { ts: now - 86400e3*5,  type:'scan',  sev:'pass', ctl:'CA-7',  msg:'CMMC L2 scan PASS — all 110 practices evaluated' },
-    { ts: now - 86400e3*6,  type:'audit', sev:'pass', ctl:'AU-12', msg:'Audit records generated — all required events captured' },
-    { ts: now - 86400e3*7,  type:'scan',  sev:'pass', ctl:'CA-7',  msg:'Weekly ConMon summary — no conditions on ATO' },
-  ];
-
-  const icon  = { scan:'◉', drift:'⚡', patch:'⬆', vuln:'⚠', audit:'🔒' };
-  const color = { pass:'var(--green)', warn:'var(--amber)', action:'var(--cyan)' };
-  const bg    = { pass:'rgba(0,255,163,.07)', warn:'rgba(255,184,0,.07)', action:'rgba(0,229,255,.07)' };
-  const label = { pass:'PASS', warn:'WARN', action:'ACTION' };
-
-  const fmtAgo = ts => {
-    const d = Date.now() - ts;
-    if (d < 3600e3)    return Math.round(d/60e3)  + 'm ago';
-    if (d < 86400e3)   return Math.round(d/3600e3) + 'h ago';
-    return Math.round(d/86400e3) + 'd ago';
-  };
-
-  wrap.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-
-      <!-- Mini score bar -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
-        ${[
-          ['ConMon', score+'/100', score>=90?'var(--green)':'var(--amber)'],
-          ['Controls', ctrl+'%',  ctrl>=90?'var(--green)':'var(--amber)'],
-          ['Patches',  patch+'%', patch>=90?'var(--green)':'var(--amber)'],
-          ['Drift',    drift+' events', drift<=5?'var(--green)':'var(--amber)'],
-        ].map(([k,v,c]) => `
-          <div style="background:var(--bg3);padding:10px 14px;text-align:center">
-            <div style="font-size:9px;color:var(--t3);font-family:var(--mono);margin-bottom:4px">${k}</div>
-            <div style="font-size:15px;font-weight:700;color:${c}">${v}</div>
-          </div>`).join('')}
-      </div>
-
-      <!-- Legend -->
-      <div style="padding:8px 14px;border-bottom:1px solid var(--border);font-size:10px;color:var(--t3);display:flex;gap:16px;flex-wrap:wrap">
-        <span><span style="color:var(--green)">●</span> PASS</span>
-        <span><span style="color:var(--amber)">●</span> WARN</span>
-        <span><span style="color:var(--cyan)">●</span> ACTION</span>
-        <span style="margin-left:auto;font-family:var(--mono)">Last ${events.length} events · auto-refresh on tab switch</span>
-      </div>
-
-      <!-- Timeline rows -->
-      ${events.map((ev, i) => {
-        const c = color[ev.sev] || 'var(--green)';
-        const b = bg[ev.sev]    || bg.pass;
-        const lbl = label[ev.sev] || 'PASS';
-        const ts  = new Date(ev.ts).toLocaleString('vi-VN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
-        return `
-        <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid var(--border);background:${i%2===0?'transparent':'rgba(255,255,255,.01)'}">
-          <!-- Icon -->
-          <div style="width:30px;height:30px;border-radius:6px;background:${b};border:1px solid ${c}33;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${icon[ev.type]||'◈'}</div>
-          <!-- Content -->
-          <div style="flex:1;min-width:0">
-            <div style="font-size:11px;color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ev.msg}</div>
-            <div style="font-size:10px;color:var(--t3);margin-top:2px;font-family:var(--mono)">${ts} · <span style="color:var(--cyan)">${ev.ctl}</span></div>
-          </div>
-          <!-- Status badge -->
-          <div style="font-size:9px;font-weight:700;font-family:var(--mono);color:${c};background:${b};border:1px solid ${c}33;padding:2px 7px;border-radius:4px;flex-shrink:0">${lbl}</div>
-          <!-- Ago -->
-          <div style="font-size:10px;color:var(--t3);font-family:var(--mono);flex-shrink:0;width:52px;text-align:right">${fmtAgo(ev.ts)}</div>
-          <!-- Dot -->
-          <div style="width:6px;height:6px;border-radius:50%;background:${c};flex-shrink:0"></div>
-        </div>`;
-      }).join('')}
-
-      <!-- Footer -->
-      <div style="padding:8px 14px;font-size:10px;color:var(--t3);text-align:center;font-family:var(--mono)">
-        ATO status: <span style="color:var(--green)">AUTHORIZED</span> · 
-        No conditions · Audit: <span style="color:var(--green)">${audit}</span> · 
-        Trend: <span style="color:var(--green)">${trend} ↑</span>
-      </div>
-    </div>`;
-}
-
 // ---- Micro-Seg ----
 async function loadMicroSeg() {
   const rules = await api('/api/p4/zt/microseg');
@@ -1696,91 +1200,21 @@ async function submitSegRule() {
 }
 
 // ---- RASP ----
-let _raspData = [];
-let _raspFilter = 'all';
-
 async function pollRASP() {
   const events = await api('/api/p4/zt/rasp');
   if (!events) return;
-  _raspData = events;
-  // Stats
-  const stats = document.getElementById('rasp-stats');
-  if (stats) {
-    const total = events.length;
-    const blocked = events.filter(e=>e.action==='blocked').length;
-    const critical = events.filter(e=>e.severity==='CRITICAL').length;
-    const high = events.filter(e=>e.severity==='HIGH').length;
-    stats.innerHTML = [
-      ['TOTAL EVENTS', total, 'var(--cyan)'],
-      ['BLOCKED', blocked, 'var(--green)'],
-      ['CRITICAL', critical, 'var(--red)'],
-      ['HIGH', high, 'var(--amber)']
-    ].map(function(x){
-      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px;text-align:center">' +
-        '<div style="font-size:20px;font-weight:700;color:'+x[2]+'">'+x[1]+'</div>' +
-        '<div style="font-size:9px;color:var(--t3);margin-top:2px">'+x[0]+'</div>' +
-      '</div>';
-    }).join('');
-  }
-  renderRASP(events, _raspFilter);
-}
-
-function setRASPFilter(f, btn) {
-  _raspFilter = f;
-  document.querySelectorAll('.filter-pill').forEach(b=>b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  renderRASP(_raspData, f);
-}
-
-function renderRASP(events, filter) {
-  const filtered = filter==='all' ? events : events.filter(e=>e.severity===filter);
   const colors = { CRITICAL:'sev-crit', HIGH:'sev-high', MEDIUM:'sev-med', LOW:'sev-low' };
-  document.getElementById('rasp-list').innerHTML = filtered.map(e => {
-    return '<div class="rasp-row" style="cursor:pointer" onclick="openRASPDetail('+JSON.stringify(e).replace(/"/g,'&quot;')+')">' +
-      '<span class="rasp-sev '+(colors[e.severity]||'sev-low')+'">'+e.severity+'</span>' +
-      '<span class="rasp-type">'+e.attack_type+'</span>' +
-      '<span class="rasp-svc">'+e.service+' '+e.endpoint+'</span>' +
-      '<span class="rasp-'+(e.action==='blocked'?'action-blk':'action-alrt')+'">'+e.action.toUpperCase()+'</span>' +
-      '<span style="font-size:10px;color:var(--t3)">'+e.source_ip+'</span>' +
-      '<span class="rasp-ts">'+new Date(e.timestamp).toLocaleTimeString('vi-VN')+'</span>' +
-      (e.cve?'<span style="font-size:10px;color:var(--red)">'+e.cve+'</span>':'') +
-    '</div>';
-  }).join('') || '<div style="color:var(--t3);font-size:11px;padding:12px">No events match filter</div>';
-}
-
-function openRASPDetail(e) {
-  const modal = document.getElementById('rasp-detail-modal');
-  const body = document.getElementById('rasp-detail-body');
-  if (!modal || !body) return;
-  const sevCol = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[e.severity]||'var(--t3)';
-  body.innerHTML =
-    '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
-      '<span class="rasp-sev sev-'+(e.severity||'low').toLowerCase()+'">'+e.severity+'</span>' +
-      '<span style="font-size:15px;font-weight:700;color:var(--t1)">'+e.attack_type+'</span>' +
-      '<span class="rasp-'+(e.action==='blocked'?'action-blk':'action-alrt')+'" style="margin-left:auto">'+e.action.toUpperCase()+'</span>' +
-    '</div>' +
-    '<div class="detail-row"><div class="detail-key">Service</div><div class="detail-val" style="font-family:var(--mono)">'+e.service+'</div></div>' +
-    '<div class="detail-row"><div class="detail-key">Endpoint</div><div class="detail-val" style="font-family:var(--mono);color:var(--cyan)">'+e.endpoint+'</div></div>' +
-    '<div class="detail-row"><div class="detail-key">Source IP</div><div class="detail-val" style="font-family:var(--mono)">'+e.source_ip+'</div></div>' +
-    '<div class="detail-row"><div class="detail-key">Timestamp</div><div class="detail-val">'+new Date(e.timestamp).toLocaleString('vi-VN')+'</div></div>' +
-    (e.cve?'<div class="detail-row"><div class="detail-key">CVE</div><div class="detail-val"><a href="https://nvd.nist.gov/vuln/detail/'+e.cve+'" target="_blank" style="color:var(--red)">'+e.cve+'</a></div></div>':'') +
-    '<div style="margin-top:14px;display:flex;gap:8px">' +
-      '<button class="btn btn-ghost btn-sm" onclick="window._aiRasp(this)" data-t="'+e.attack_type+'" data-s="'+e.severity+'">🤖 AI Advisor</button>' +
-    '</div>';
-  document.getElementById('rasp-detail-title').textContent = e.attack_type + ' — ' + e.service;
-  modal.classList.add('open');
-}
-
-function exportRASP() {
-  if (!_raspData.length) { toast('No data to export'); return; }
-  const csv = ['Severity,Type,Service,Endpoint,Action,Source IP,Timestamp,CVE']
-    .concat(_raspData.map(e=>[e.severity,e.attack_type,e.service,e.endpoint,e.action,e.source_ip,new Date(e.timestamp).toISOString(),e.cve||''].join(',')))
-    .join('\n');
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='rasp-events-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
-  URL.revokeObjectURL(url);
-  toast('Exported '+_raspData.length+' RASP events');
+  document.getElementById('rasp-list').innerHTML = events.map(e => `
+    <div class="rasp-row">
+      <span class="rasp-sev ${colors[e.severity]||'sev-low'}">${e.severity}</span>
+      <span class="rasp-type">${e.attack_type}</span>
+      <span class="rasp-svc">${e.service} ${e.endpoint}</span>
+      <span class="rasp-${e.action==='blocked'?'action-blk':'action-alrt'}">${e.action.toUpperCase()}</span>
+      <span style="font-size:10px;color:var(--t3)">${e.source_ip}</span>
+      <span class="rasp-ts">${new Date(e.timestamp).toLocaleTimeString()}</span>
+      ${e.cve?`<span style="font-size:10px;color:var(--red)">${e.cve}</span>`:''}
+    </div>
+  `).join('');
 }
 
 // ---- POA&M ----
@@ -1793,59 +1227,18 @@ async function loadPOAM() {
 function renderPOAMRow(p) {
   const sevColors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
   const stColors = { open:'st-open', in_remediation:'st-rem', closed:'st-closed', risk_accepted:'st-rem' };
-  const due = p.scheduled_completion ? new Date(p.scheduled_completion) : null;
-  const overdue = due && due < new Date() && p.status !== 'closed';
   return `
-    <div class="poam-row" onclick="openPOAMDetail(${JSON.stringify(p).replace(/"/g,'&quot;')})" style="cursor:pointer">
+    <div class="poam-row">
       <div class="poam-header">
         <span class="poam-id">${p.id}</span>
         <span class="poam-ctrl">${p.control_id}</span>
         <span class="poam-name">${p.weakness_name}</span>
         <span class="poam-sev" style="background:${sevColors[p.severity]+'22'};color:${sevColors[p.severity]}">${p.severity}</span>
         <span class="poam-status ${stColors[p.status]||'st-open'}">${p.status.replace('_',' ')}</span>
-        ${overdue ? '<span style="font-size:9px;color:var(--red);font-weight:700;margin-left:4px">OVERDUE</span>' : ''}
-        <span style="margin-left:auto;font-size:10px;color:var(--cyan)">→ Detail</span>
       </div>
       <div class="poam-plan">${p.mitigation_plan}</div>
-      ${due ? `<div style="font-size:10px;color:${overdue?'var(--red)':'var(--t3)'};margin-top:3px">Due: ${due.toLocaleDateString('vi-VN')}</div>` : ''}
+      ${p.scheduled_completion ? `<div style="font-size:10px;color:var(--t3);margin-top:3px">Due: ${new Date(p.scheduled_completion).toLocaleDateString()}</div>` : ''}
     </div>`;
-}
-
-function openPOAMDetail(p) {
-  const sevColors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
-  const stColors = { open:'#22c55e', in_remediation:'#f59e0b', closed:'#6b7280', risk_accepted:'#8b5cf6' };
-  const modal = document.getElementById('poam-detail-modal');
-  const body = document.getElementById('poam-detail-body');
-  if (!modal || !body) return;
-  const due = p.scheduled_completion ? new Date(p.scheduled_completion).toLocaleDateString('vi-VN') : 'N/A';
-  const sev = p.severity || 'MEDIUM';
-  const st = p.status || 'open';
-  body.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <span style="font-size:20px;font-weight:700;color:var(--cyan)">${p.id}</span>
-      <span style="padding:2px 10px;border-radius:4px;background:${(sevColors[sev]||'var(--t3)')+'22'};color:${sevColors[sev]||'var(--t3)'};font-size:11px;font-weight:700">${sev}</span>
-      <span style="padding:2px 10px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--t2);font-size:11px">${st.replace('_',' ')}</span>
-    </div>
-    <div class="detail-row"><div class="detail-key">Weakness</div><div class="detail-val" style="font-weight:600">${p.weakness_name}</div></div>
-    <div class="detail-row"><div class="detail-key">Control ID</div><div class="detail-val"><span style="font-family:var(--mono);color:var(--cyan)">${p.control_id}</span></div></div>
-    <div class="detail-row"><div class="detail-key">Mitigation Plan</div><div class="detail-val">${p.mitigation_plan}</div></div>
-    <div class="detail-row"><div class="detail-key">Due Date</div><div class="detail-val">${due}</div></div>
-    ${p.cwe_id ? `<div class="detail-row"><div class="detail-key">CWE</div><div class="detail-val"><a href="https://cwe.mitre.org/data/definitions/${p.cwe_id.replace('CWE-','')}.html" target="_blank" style="color:var(--cyan)">${p.cwe_id}</a></div></div>` : ''}
-    <div style="margin-top:16px">
-      <div style="font-size:10px;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Actions</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-sm" onclick="updatePOAMStatus('${p.id}','in_remediation')">Mark In Remediation</button>
-        <button class="btn btn-ghost btn-sm" onclick="updatePOAMStatus('${p.id}','closed')" style="color:var(--green);border-color:rgba(16,185,129,.4)">Mark Closed</button>
-        <button class="btn btn-ghost btn-sm" onclick="openAIAdvisor({id:'${p.id}',weakness:'${p.weakness_name}',control:'${p.control_id}',severity:'${sev}',mitigation:'${p.mitigation_plan}'})">🤖 AI Advisor</button>
-      </div>
-    </div>`;
-  document.getElementById('poam-detail-title').textContent = p.id + ' — ' + p.weakness_name;
-  modal.classList.add('open');
-}
-
-async function updatePOAMStatus(id, status) {
-  const res = await post('/api/p4/rmf/task', {step_id:'poam', task_id:id, status});
-  if (res) { toast('POA&M '+id+' → '+status); document.getElementById('poam-detail-modal').classList.remove('open'); loadPOAM(); }
 }
 
 // ---- Utils ----
@@ -1859,272 +1252,6 @@ function toast(msg) {
   t.style.display = 'block';
   setTimeout(() => { t.style.display = 'none'; }, 2500);
 }
-
-// ---- VN Standards ----
-let _vnStandards = [];
-
-async function loadVNStandards() {
-  const res = await api('/api/p4/vn-standards');
-  if (!res || !res.standards) return;
-  _vnStandards = res.standards;
-  renderVNGrid(_vnStandards);
-  renderVNMatrix(_vnStandards);
-}
-
-const _vnIcons = {'TT17-2017':'🇻🇳','TCVN-11943':'🔒','BKAV-SCORE':'📡','VIETTEL-SOC':'📶','LATM-2015':'⚖️','ND13-2023':'🛡️'};
-const _vnColors = {'TT17-2017':'var(--red)','TCVN-11943':'var(--amber)','BKAV-SCORE':'var(--cyan)','VIETTEL-SOC':'var(--purple)','LATM-2015':'var(--green)','ND13-2023':'var(--blue)'};
-const _statusColor = {passed:'var(--green)',partial:'var(--amber)',failed:'var(--red)',pending:'var(--t3)'};
-const _statusLabel = {passed:'ĐẠT',partial:'CHỜ',failed:'KHÔNG ĐẠT',pending:'PENDING'};
-const _fwLabel = {VN_GOV:'VN Gov',VN_ISO27001:'VN ISO27001',VN_PRIVATE:'VN Private',VN_SOC:'VN SOC',VN_LAW:'VN Law'};
-
-function renderVNGrid(standards) {
-  const grid = document.getElementById('vn-standards-grid');
-  if (!grid) return;
-  grid.innerHTML = standards.map(function(s) {
-    const items = Array.isArray(s.items) ? s.items : [];
-    const done = items.filter(function(i){return i.done;}).length;
-    const col = _vnColors[s.id] || 'var(--cyan)';
-    const ic = _vnIcons[s.id] || '📋';
-    const expandId = 'vn-expand-'+s.id;
-    return '<div class="vn-card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px;position:relative">' +
-      // Header row với dropdown
-      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">' +
-        '<div style="font-size:11px;font-weight:700;color:'+col+';letter-spacing:.08em">'+ic+' '+s.name+'</div>' +
-        '<div style="position:relative">' +
-          '<button class="vn-dd-btn" data-sid="'+s.id+'" onclick="vnCardDD(this)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer">⋯</button>' +
-          '<div id="dd-'+s.id+'" class="dropdown-menu" style="display:none;right:0;left:auto">' +
-            '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;passed&apos;)">✓ Đánh dấu ĐẠT</div>' +
-            '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;partial&apos;)">⚠ Đánh dấu CHỜ</div>' +
-            '<div class="dropdown-item" onclick="updateVNStatus(s.id,&apos;failed&apos;)" style="color:var(--red)">✗ Đánh dấu KHÔNG ĐẠT</div>' +
-            '<div style="border-top:1px solid var(--border);margin:4px 0"></div>' +
-            '<div class="dropdown-item vn-det" data-sid="'+s.id+'">📋 Xem chi tiết</div>' +
-            '<div class="dropdown-item vn-ai" data-sid="'+s.id+'" data-name="'+s.name+'" data-fw="'+s.framework+'">🤖 AI Advisor</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="font-size:10px;color:var(--t3);margin-bottom:8px">'+s.scope+'</div>' +
-      // Progress bar
-      '<div style="background:var(--border);border-radius:2px;height:4px;margin-bottom:10px">' +
-        '<div style="background:'+col+';height:4px;border-radius:2px;width:'+s.score+'%;transition:width .5s"></div>' +
-      '</div>' +
-      // Items list (collapsible)
-      '<div style="display:flex;flex-direction:column;gap:4px">' +
-      items.slice(0,3).map(function(item) {
-        return '<div class="vn-item-row">' +
-          '<span style="flex:1">'+item.name+'</span>' +
-          '<span style="color:'+(item.done?'var(--green)':'var(--amber)')+';font-weight:700;font-size:10px">'+(item.done?'✓ ĐẠT':'⚠ CHỜ')+'</span>' +
-          '</div>';
-      }).join('') +
-      (items.length > 3 ? '<div id="'+expandId+'" style="display:none">' +
-        items.slice(3).map(function(item) {
-          return '<div class="vn-item-row">' +
-            '<span style="flex:1">'+item.name+'</span>' +
-            '<span style="color:'+(item.done?'var(--green)':'var(--amber)')+';font-weight:700;font-size:10px">'+(item.done?'✓ ĐẠT':'⚠ CHỜ')+'</span>' +
-            '</div>';
-        }).join('') +
-        '</div>' +
-        '<button onclick="toggleExpand(this.dataset.id,this)" data-id="'+expandId+'" style="background:none;border:none;color:var(--cyan);font-size:10px;cursor:pointer;padding:4px 0;text-align:left">▸ Xem thêm '+(items.length-3)+' tiêu chí</button>' : '') +
-      '</div>' +
-      // Footer badge
-      '<div style="margin-top:10px;padding:5px 10px;background:rgba('+(s.status==='passed'?'0,255,163':'255,184,0')+',.07);border-radius:6px;display:flex;justify-content:space-between;align-items:center">' +
-        '<span style="font-size:10px;color:'+(_statusColor[s.status]||'var(--t3)')+'">'+s.name+' — '+done+'/'+items.length+' đạt</span>' +
-        '<span style="font-size:11px;font-weight:700;color:'+(_statusColor[s.status]||'var(--t3)')+'">'+s.score+'%</span>' +
-      '</div></div>';
-  }).join('');
-}
-
-function renderVNMatrix(standards) {
-  const tbody = document.getElementById('vn-matrix-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = standards.map(function(s) {
-    const col = _statusColor[s.status] || 'var(--t3)';
-    const lbl = _statusLabel[s.status] || s.status;
-    const items = Array.isArray(s.items) ? s.items : [];
-    const done = items.filter(function(i){return i.done;}).length;
-    return '<tr style="border-top:1px solid var(--border);cursor:pointer" data-sid="'+s.id+'" onclick="openVNDetail(this.dataset.sid)">' +
-      '<td style="padding:8px 12px;font-weight:600;color:var(--cyan)">'+s.name+'</td>' +
-      '<td style="padding:8px;text-align:center;color:var(--t3)">'+(_fwLabel[s.framework]||s.framework)+'</td>' +
-      '<td style="padding:8px;text-align:center;font-weight:700;color:'+col+'">'+s.score+'%</td>' +
-      '<td style="padding:8px;text-align:center"><span style="background:rgba('+(s.status==='passed'?'0,255,163':'255,184,0')+',.1);color:'+col+';padding:2px 8px;border-radius:4px;font-size:10px">'+lbl+'</span></td>' +
-      '<td style="padding:8px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí'+(s.notes?' · '+s.notes:'')+'</td>' +
-      '<td style="padding:8px"><div style="position:relative">' +
-        '<button class="vn-dd-btn" data-sid="'+s.id+'" onclick="event.stopPropagation();vnMatrixDD(this)" style="background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:4px;color:var(--t2);font-size:10px;padding:2px 8px;cursor:pointer">⋯</button>' +
-        '<div class="vn-dd-menu dropdown-menu" style="display:none;position:absolute;right:0;top:100%">' +
-          '<div class="dropdown-item vn-dd-pass">✓ ĐẠT</div>' +
-          '<div class="dropdown-item vn-dd-partial">⚠ CHỜ</div>' +
-          '<div class="dropdown-item vn-dd-detail">📋 Chi tiết</div>' +
-        '</div>' +
-      '</div></td>' +
-    '</tr>';
-  }).join('');
-}
-
-// Data-attribute based dropdown handlers (no inline quote issues)
-function vnBuildCardMenu(sid, s) {
-  const name = (s && s.name || '').replace(/"/g, '&quot;');
-  const fw = s && s.framework || '';
-  return [
-    '<div class="dropdown-item vn-act" data-act="passed" data-sid="' + sid + '">✓ Đánh dấu ĐẠT</div>',
-    '<div class="dropdown-item vn-act" data-act="partial" data-sid="' + sid + '">⚠ Đánh dấu CHỜ</div>',
-    '<div class="dropdown-item vn-act" data-act="failed" data-sid="' + sid + '" style="color:var(--red)">✗ Không ĐẠT</div>',
-    '<div style="border-top:1px solid var(--border);margin:4px 0"></div>',
-    '<div class="dropdown-item vn-det" data-sid="' + sid + '">📋 Xem chi tiết</div>',
-    '<div class="dropdown-item vn-ai" data-sid="' + sid + '" data-name="' + name + '" data-fw="' + fw + '">🤖 AI Advisor</div>'
-  ].join('');
-}
-
-// Event delegation for VN menu items
-document.addEventListener('click', function(e) {
-  const item = e.target.closest('.vn-act,.vn-det,.vn-ai');
-  if (item) {
-    e.stopPropagation();
-    const sid = item.dataset.sid;
-    if (item.classList.contains('vn-act')) { updateVNStatus(sid, item.dataset.act); }
-    else if (item.classList.contains('vn-det')) { openVNDetail(sid); }
-    else if (item.classList.contains('vn-ai')) {
-      const s2 = _vnStandards.find(function(x){return x.id===sid;}) || {};
-      openAIAdvisor({id:sid,weakness:s2.name||'',control:s2.framework||'',severity:'MEDIUM',mitigation:''});
-    }
-    return;
-  }
-  if (!e.target.closest('.dropdown-menu') && !e.target.closest('.vn-dd-btn')) {
-    document.querySelectorAll('.vn-dd-card-menu,.vn-dd-menu').forEach(function(d){d.style.display='none';});
-  }
-});
-
-function vnCardDD(btn) {
-  const sid = btn.getAttribute('data-sid');
-  const s = _vnStandards.find(function(x){return x.id===sid;});
-  if (!s) return;
-  // Create/show dropdown next to button
-  let menu = btn.nextElementSibling;
-  if (!menu || !menu.classList.contains('vn-dd-card-menu')) {
-    menu = document.createElement('div');
-    menu.className = 'dropdown-menu vn-dd-card-menu';
-    menu.style.cssText = 'position:absolute;right:0;top:100%;display:block;z-index:100';
-    menu.innerHTML = vnBuildCardMenu(sid, s);
-    btn.parentElement.style.position = 'relative';
-    btn.parentElement.appendChild(menu);
-  } else {
-    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-  }
-  event.stopPropagation();
-}
-
-function vnMatrixDD(btn) {
-  const sid = btn.getAttribute('data-sid');
-  const menu = btn.nextElementSibling;
-  if (!menu) return;
-  // Update menu item handlers
-  const items = menu.querySelectorAll('.dropdown-item');
-  if (items[0]) items[0].onclick = function(e){e.stopPropagation();updateVNStatus(sid,'passed');};
-  if (items[1]) items[1].onclick = function(e){e.stopPropagation();updateVNStatus(sid,'partial');};
-  if (items[2]) items[2].onclick = function(e){e.stopPropagation();openVNDetail(sid);};
-  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-  event.stopPropagation();
-}
-
-function toggleVNDropdown(id) {
-  document.querySelectorAll('.dropdown-menu').forEach(function(d) {
-    if (d.id !== id) d.style.display = 'none';
-  });
-  const el = document.getElementById(id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-function toggleExpand(id, btn) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const open = el.style.display !== 'none';
-  el.style.display = open ? 'none' : 'block';
-  btn.textContent = open ? '▸ Xem thêm' : '▴ Thu gọn';
-}
-
-function openVNDetail(id) {
-  document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
-  const s = _vnStandards.find(function(x){return x.id===id;});
-  if (!s) return;
-  const modal = document.getElementById('vn-detail-modal');
-  const body = document.getElementById('vn-detail-body');
-  if (!modal || !body) return;
-  const items = Array.isArray(s.items) ? s.items : [];
-  const done = items.filter(function(i){return i.done;}).length;
-  const col = _statusColor[s.status] || 'var(--t3)';
-  body.innerHTML =
-    '<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">' +
-      '<span style="font-size:24px">'+(_vnIcons[s.id]||'📋')+'</span>' +
-      '<div>' +
-        '<div style="font-size:13px;font-weight:700;color:'+(_vnColors[s.id]||'var(--cyan)')+'">'+s.name+'</div>' +
-        '<div style="font-size:10px;color:var(--t3)">'+s.scope+' · '+(_fwLabel[s.framework]||s.framework)+'</div>' +
-      '</div>' +
-      '<div style="margin-left:auto;text-align:right">' +
-        '<div style="font-size:28px;font-weight:700;color:'+col+'">'+s.score+'%</div>' +
-        '<div style="font-size:10px;color:var(--t3)">'+done+'/'+items.length+' tiêu chí đạt</div>' +
-      '</div>' +
-    '</div>' +
-    '<div style="background:var(--border);border-radius:2px;height:6px;margin-bottom:16px">' +
-      '<div style="background:'+col+';height:6px;border-radius:2px;width:'+s.score+'%"></div>' +
-    '</div>' +
-    '<div style="display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px">' +
-    items.map(function(item,i) {
-      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:'+(i%2===0?'transparent':'rgba(255,255,255,.01)')+'">' +
-        '<div style="width:20px;height:20px;border-radius:50%;background:'+(item.done?'rgba(0,255,163,.15)':'rgba(255,184,0,.15)')+';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">'+(item.done?'✓':'⚠')+'</div>' +
-        '<div style="flex:1;font-size:11px;color:var(--t1)">'+item.name+'</div>' +
-        (item.note?'<div style="font-size:10px;color:var(--t3);max-width:200px">'+item.note+'</div>':'') +
-        '<span style="font-size:10px;font-weight:700;color:'+(item.done?'var(--green)':'var(--amber)')+';">'+(item.done?'ĐẠT':'CHỜ')+'</span>' +
-        '</div>';
-    }).join('') +
-    '</div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-      '<button class="btn btn-primary btn-sm vn-act" data-act="passed" data-sid="'+s.id+'">✓ Mark ĐẠT</button>' +
-      '<button class="btn btn-ghost btn-sm vn-act" data-act="partial" data-sid="'+s.id+'" style="color:var(--amber);border-color:rgba(245,158,11,.4)">⚠ Mark CHỜ</button>' +
-      '<button class="btn btn-ghost btn-sm vn-ai" data-sid="'+s.id+'" data-name="'+s.name+'" data-fw="'+s.framework+'">🤖 AI Advisor</button>' +
-    '</div>';
-  document.getElementById('vn-detail-title').textContent = s.name;
-  modal.classList.add('open');
-}
-
-async function updateVNStatus(id, status) {
-  document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
-  const s = _vnStandards.find(function(x){return x.id===id;});
-  if (!s) return;
-  const res = await post('/api/p4/vn-standards/update', {id, score: s.score, status, notes: s.notes||''});
-  if (res && res.status === 'ok') {
-    toast(id + ' → ' + status);
-    document.getElementById('vn-detail-modal') && document.getElementById('vn-detail-modal').classList.remove('open');
-    loadVNStandards();
-  }
-}
-
-// Close dropdowns on outside click
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.dropdown-menu') && !e.target.closest('button[onclick*="toggleVNDropdown"]')) {
-    document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
-  }
-});
-
-function setSBOMFilter(f, btn) {
-  window._sbomFilter = f;
-  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  if (window._sbomData) {
-    const search = document.getElementById('sbom-search-input');
-    renderSBOMTable(window._sbomData, search ? search.value : '', f);
-  }
-}
-
-window._aiRasp = function(btn) {
-  openAIAdvisor({id:btn.dataset.t, weakness:btn.dataset.t+' attack', control:'SI-3', severity:btn.dataset.s, mitigation:''});
-};
-window._aiTest = function(btn) {
-  openAIAdvisor({
-    id: btn.dataset.c,
-    weakness: btn.dataset.c,
-    control: btn.dataset.c,
-    severity: btn.dataset.s,
-    mitigation: ''
-  });
-};
 
 // ---- Init ----
 loadOverview();
@@ -2238,101 +1365,34 @@ async function loadATOExpiry() {
   const el = document.getElementById('ato-expiry-content');
   if (!res || !el) return;
   const days = res.days_remaining;
-  const pct = Math.min(100, Math.round((days / 1095) * 100));
   const col = res.expiry_level==='ok'?'var(--green)':res.expiry_level==='warning'?'var(--amber)':'var(--red)';
-  const exp = res.expiration_date ? new Date(res.expiration_date).toLocaleDateString('vi-VN',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
-  const auth = res.authorization_date ? new Date(res.authorization_date).toLocaleDateString('vi-VN',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
+  const exp = res.expiration_date ? new Date(res.expiration_date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
   const done = (res.renewal_checklist||[]).filter(c=>c.done).length;
   const total = (res.renewal_checklist||[]).length;
-  const checklist = res.renewal_checklist || [];
-
   el.innerHTML =
-    // Hero metrics
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
-      '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">' +
-        '<div style="font-size:36px;font-weight:700;color:'+col+'">'+days+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:2px">DAYS REMAINING</div>' +
-        '<div style="background:var(--border);border-radius:2px;height:3px;margin-top:8px">' +
-          '<div style="background:'+col+';height:3px;border-radius:2px;width:'+pct+'%;transition:width .5s"></div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">' +
-        '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-top:4px">'+exp+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:2px">EXPIRATION DATE</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:4px">Auth: '+auth+'</div>' +
-      '</div>' +
-      '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">' +
-        '<div style="font-size:28px;font-weight:700;color:var(--cyan)">'+done+'/'+total+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:2px">RENEWAL TASKS</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:4px">'+Math.round(done/total*100)+'% complete</div>' +
-      '</div>' +
-      '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">' +
-        '<div style="font-size:16px;font-weight:700;color:var(--green);margin-top:4px">'+(res.ato_status||'authorized').toUpperCase().replace(/_/g,' ')+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:2px">ATO STATUS</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:4px">ConMon: '+(res.conmon_score||94)+'/100</div>' +
-      '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:10px">' +
+    '<div style="text-align:center"><div style="font-size:32px;font-weight:700;color:'+col+'">'+days+'</div><div style="font-size:10px;color:var(--t3)">DAYS REMAINING</div></div>' +
+    '<div style="text-align:center"><div style="font-size:13px;font-weight:600;color:var(--t1);margin-top:8px">'+exp+'</div><div style="font-size:10px;color:var(--t3)">EXPIRATION DATE</div></div>' +
+    '<div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--cyan)">'+done+'/'+total+'</div><div style="font-size:10px;color:var(--t3)">RENEWAL TASKS</div></div>' +
     '</div>' +
-    // Status banner
-    '<div style="padding:10px 14px;background:rgba('+(res.expiry_level==='ok'?'0,255,163':'255,184,0')+',.07);border:1px solid rgba('+(res.expiry_level==='ok'?'0,255,163':'255,184,0')+',.2);border-radius:var(--r);font-size:11px;color:'+col+';margin-bottom:16px;display:flex;align-items:center;gap:8px">' +
-      '<span style="font-size:16px">'+(res.expiry_level==='ok'?'✓':res.expiry_level==='warning'?'⚠':'⚡')+'</span>' +
-      '<span>'+(res.expiry_level==='ok'?'ATO valid — no action required for '+days+' days':res.expiry_level==='warning'?'Begin renewal process — under 6 months remaining':'URGENT — ATO renewal required immediately')+'</span>' +
+    '<div style="padding:8px 12px;background:rgba(0,0,0,.2);border-radius:6px;font-size:11px;color:'+col+'">' +
+    (res.expiry_level==='ok'?'✓ ATO valid — no action required':res.expiry_level==='warning'?'⚠ Begin renewal process — under 6 months remaining':'⚡ URGENT — ATO renewal required immediately') +
     '</div>' +
-    // Renewal checklist timeline
-    '<div class="section-hd" style="margin-bottom:10px"><div class="section-title">RENEWAL CHECKLIST TIMELINE</div></div>' +
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">' +
-    checklist.map(function(c,i) {
-      const itemCol = c.done ? 'var(--green)' : 'var(--t3)';
-      const bg = i%2===0 ? 'transparent' : 'rgba(255,255,255,.01)';
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:'+bg+'">' +
-        '<div style="width:24px;height:24px;border-radius:50%;background:rgba('+(c.done?'0,255,163':'255,255,255')+',.07);border:1px solid '+(c.done?'var(--green)':'var(--border2)')+';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;color:'+(c.done?'var(--green)':'var(--t3)')+'">'+( c.done?'✓':String(i+1))+'</div>' +
-        '<div style="flex:1;font-size:11px;color:'+(c.done?'var(--t2)':'var(--t1)')+'">'+c.task+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);font-family:var(--mono)">'+(c.done?'<span style="color:var(--green)">Done</span>':'-'+c.due_weeks_before_expiry+'w before expiry')+'</div>' +
-        '<div style="width:60px;height:4px;background:var(--border);border-radius:2px">' +
-          '<div style="width:'+(c.done?'100':'0')+'%;height:4px;background:'+(c.done?'var(--green)':'var(--border)')+';border-radius:2px"></div>' +
-        '</div>' +
-      '</div>';
-    }).join('') +
+    '<div style="margin-top:10px"><div style="font-size:10px;color:var(--t3);margin-bottom:6px">RENEWAL CHECKLIST</div>' +
+    (res.renewal_checklist||[]).map(function(c){return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px"><span style="color:'+(c.done?'var(--green)':'var(--t3)')+';">'+(c.done?'✓':'○')+'</span><span style="color:'+(c.done?'var(--t2)':'var(--t1)')+'">'+c.task+'</span><span style="color:var(--t3);margin-left:auto;font-size:10px">-'+c.due_weeks_before_expiry+'w</span></div>';}).join('') +
     '</div>';
 }
 
 async function loadSBOMView() {
   const el = document.getElementById('sbom-view-content');
   if (el) el.innerHTML = '<div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>';
-  const res = await api('/api/p4/sbom/view-db');
+  const res = await api('/api/p4/sbom/view');
   if (!res || !el) return;
   const rows = (res.components||[]).slice(0,20).map(function(c){
     return '<tr><td style="font-family:monospace;font-size:11px">'+c.name+'</td><td style="font-size:11px">'+c.version+'</td><td style="font-size:11px">'+c.type+'</td><td style="font-size:11px">'+c.license+'</td>' +
     '<td style="text-align:center;font-size:11px;color:'+(c.cves>0?(c.severity==='CRITICAL'?'var(--red)':'var(--amber)'):'var(--green)')+'">'+( c.cves>0?c.cves+' '+c.severity:'✓')+'</td>' +
     '<td style="text-align:center;font-size:11px;color:'+(c.ntia_compliant?'var(--green)':'var(--red)')+'">'+( c.ntia_compliant?'✓':'✗')+'</td></tr>';
   }).join('');
-  // Store globally for filtering
-  window._sbomData = res;
-  renderSBOMTable(res, '', 'all');
-}
-
-function renderSBOMTable(res, search, filter) {
-  const el = document.getElementById('sbom-view-content');
-  if (!el) return;
-  let comps = (res.components||[]);
-  if (search) comps = comps.filter(c => (c.name||'').toLowerCase().includes(search.toLowerCase()) || (c.license||'').toLowerCase().includes(search.toLowerCase()));
-  if (filter === 'vuln') comps = comps.filter(c => c.cves > 0);
-  if (filter === 'clean') comps = comps.filter(c => !c.cves || c.cves === 0);
-  const rows = comps.slice(0,50).map(function(c){
-    const hasCVE = c.cves > 0;
-    const sevLabel = c.severity || (hasCVE ? 'MEDIUM' : '');
-    const sevColor = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[sevLabel] || 'var(--t3)';
-    return '<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="openSBOMDetail('+JSON.stringify(c).replace(/"/g,'&quot;')+')">' +
-      '<td style="font-family:monospace;font-size:11px;padding:6px 8px;color:var(--t1)">' + (c.name||'') + '</td>' +
-      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.version||'') + '</td>' +
-      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.type||'') + '</td>' +
-      '<td style="font-size:11px;padding:6px 8px;color:var(--t3)">' + (c.license||'') + '</td>' +
-      '<td style="text-align:center;padding:6px 8px">' + (hasCVE ?
-        '<span style="color:'+sevColor+';font-weight:700;font-size:11px">' + c.cves + ' ' + sevLabel + '</span>' :
-        '<span style="color:var(--green)">✓</span>') + '</td>' +
-      '<td style="text-align:center;padding:6px 8px;color:'+(c.ntia_compliant?'var(--green)':'var(--red)')+';">' + (c.ntia_compliant?'✓':'✗') + '</td>' +
-      '</tr>';
-  }).join('');
-
   el.innerHTML =
     '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">' +
     ['<div style="color:var(--cyan);font-size:22px;font-weight:700">'+res.total_components+'</div><div style="font-size:9px;color:var(--t3)">TOTAL</div>',
@@ -2347,24 +1407,7 @@ function renderSBOMTable(res, search, filter) {
     '<table style="width:100%;border-collapse:collapse"><thead><tr style="color:var(--t3);font-size:10px">' +
     '<th style="text-align:left;padding:4px 8px">Component</th><th style="padding:4px">Version</th><th style="padding:4px">Type</th><th style="padding:4px">License</th><th style="text-align:center;padding:4px">CVEs</th><th style="text-align:center;padding:4px">NTIA</th></tr></thead>' +
     '<tbody>'+rows+'</tbody></table>' +
-    '<div style="font-size:10px;color:var(--t3);margin-top:8px">Showing '+Math.min(50,comps.length)+' of '+res.total_components+' components · Last scan: '+new Date(res.last_scan).toLocaleDateString()+'</div>';
-}
-
-function openSBOMDetail(c) {
-  const sevColor = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[c.severity]||'var(--green)';
-  const modal = document.getElementById('sbom-detail-modal');
-  const body = document.getElementById('sbom-detail-body');
-  if (!modal || !body) return;
-  body.innerHTML =
-    '<div class="detail-row"><div class="detail-key">Component</div><div class="detail-val" style="font-family:monospace;font-weight:600">'+c.name+'</div></div>'+
-    '<div class="detail-row"><div class="detail-key">Version</div><div class="detail-val">'+c.version+'</div></div>'+
-    '<div class="detail-row"><div class="detail-key">Type</div><div class="detail-val">'+c.type+'</div></div>'+
-    '<div class="detail-row"><div class="detail-key">License</div><div class="detail-val"><span style="background:rgba(139,92,246,.15);color:var(--purple);padding:1px 6px;border-radius:4px;font-size:10px">'+c.license+'</span></div></div>'+
-    '<div class="detail-row"><div class="detail-key">CVEs</div><div class="detail-val">'+(c.cves>0?'<span style="color:'+sevColor+';font-weight:700">'+c.cves+' '+c.severity+'</span>':'<span style="color:var(--green)">✓ No CVEs</span>')+'</div></div>'+
-    '<div class="detail-row"><div class="detail-key">NTIA Compliant</div><div class="detail-val">'+(c.ntia_compliant?'<span style="color:var(--green)">✓ Compliant</span>':'<span style="color:var(--red)">✗ Non-compliant</span>')+'</div></div>'+
-    (c.cves>0?'<div style="margin-top:14px;padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:6px;font-size:11px;color:var(--amber)">⚠ Remediation required within 30 days · Update '+c.name+' to latest version</div>':'');
-  document.getElementById('sbom-detail-title').textContent = c.name + ' v' + c.version;
-  modal.classList.add('open');
+    '<div style="font-size:10px;color:var(--t3);margin-top:8px">Showing 20 of '+res.total_components+' components · Last scan: '+new Date(res.last_scan).toLocaleDateString()+'</div>';
 }
 
 
@@ -2489,10 +1532,7 @@ async function downloadOSCAL() {
   const btn = document.getElementById('oscal-btn');
   if (btn) { btn.textContent = '⟳ Generating...'; btn.disabled = true; }
   try {
-    const tok = window.TOKEN || '';
-    const p4key = window.VSP_P4_API_KEY || '';
-    const headers = tok ? {'Authorization':'Bearer '+tok} : p4key ? {'X-API-Key':p4key} : {};
-    const resp = await fetch(window.location.origin + '/api/p4/oscal/ssp', {headers});
+    const resp = await fetch(window.location.origin + '/api/p4/oscal/ssp');
     const data = await resp.json();
     const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
     const url = URL.createObjectURL(blob);
@@ -2540,6 +1580,5 @@ function switchTenant(id) {
 }
 
 </script>
-<script src="/panels/vsp_compliance_table_patch.js?v=3"></script>
 </body>
 </html>

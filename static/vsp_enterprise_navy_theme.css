@@ -1,0 +1,517 @@
+/* ════════════════════════════════════════════════════════════════
+   VSP ENTERPRISE NAVY THEME v2 — Polished
+   
+   v1 feedback: "quá flat, quá nhạt, thiếu nhấn nhá"
+   v2 changes:
+   - Tăng contrast cho metric numbers chính (tabular-nums + size 32px)
+   - Accent navy đậm hơn ở KPI chính + active nav
+   - Semantic colors phục hồi cho status scan (critical/high/pass)
+   - Progress bars có màu sắc rõ hơn
+   - Modal header gradient subtle (monochrome only)
+   - Border tăng contrast nhẹ
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces ── */
+  --bg0:  #0A0B0D;
+  --bg1:  #101215;
+  --bg2:  #14181D;
+  --bg3:  #1A1F26;
+  --bg4:  #232830;
+  --bg5:  #2D333C;
+
+  --surface:  var(--bg2);
+  --surface1: var(--bg3);
+  --surface2: var(--bg4);
+
+  /* ── Borders — tăng contrast nhẹ so với v1 ── */
+  --border:   rgba(255,255,255,0.08);   /* was 0.06 */
+  --border2:  rgba(255,255,255,0.14);   /* was 0.10 */
+  --border3:  rgba(255,255,255,0.22);
+
+  /* ── Accent: deep navy ── */
+  --accent:   #2563EB;
+  --accent2:  #3B82F6;
+  --accent3:  #60A5FA;
+  --accent-bg: rgba(37,99,235,0.12);
+  --accent-bg-hover: rgba(37,99,235,0.18);
+
+  /* ── Semantic — PHỤC HỒI để status dễ scan ── */
+  --red:      #EF4444;
+  --red2:     rgba(239,68,68,0.12);
+  --amber:    #F59E0B;
+  --amber2:   #FBBF24;
+  --amber3:   rgba(245,158,11,0.12);
+  --green:    #10B981;
+  --green2:   rgba(16,185,129,0.12);
+  --orange:   #F97316;
+  --orange2:  rgba(249,115,22,0.12);
+
+  /* ── Remap decorative colors: KHÔNG accent nữa, giữ neutral ── */
+  --cyan:     var(--accent3);
+  --cyan2:    var(--accent-bg);
+  --purple:   var(--accent3);
+  --purple2:  var(--accent-bg);
+  --blue:     var(--accent);
+  --blue2:    var(--accent-bg);
+
+  /* ── Text ── */
+  --t1: #F3F4F6;
+  --t2: #9CA3AF;
+  --t3: #6B7280;
+  --t4: #4B5563;
+
+  /* ── Typography ── */
+  --font-display: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --font-ui:      'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', 'IBM Plex Mono', Consolas, monospace;
+
+  /* ── Glow off ── */
+  --glow-accent:  none;
+  --glow-amber:   none;
+  --glow-red:     none;
+  --glow-green:   none;
+
+  /* ── Shadows — cho phép subtle ở modal ── */
+  --shadow-card:  none;
+  --shadow-float: 0 8px 24px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3);
+
+  /* ── Radii ── */
+  --r-sm:  3px;
+  --r-md:  5px;
+  --r-lg:  7px;
+  --r-xl:  10px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Flatten selectively — keep functional shadows
+   ════════════════════════════════════════════════════════════════ */
+
+/* Remove glow on inline styles */
+[style*="box-shadow: 0 0 20px"],
+[style*="box-shadow:0 0 20px"],
+[style*="glow"] {
+  box-shadow: none !important;
+}
+
+/* Gradient backgrounds → flat */
+[style*="linear-gradient(135deg"] {
+  background: var(--bg2) !important;
+}
+
+/* Nav items — enterprise style: background accent nhẹ + border trái mạnh */
+.nav-item.active {
+  background: var(--accent-bg) !important;
+  color: #ffffff !important;
+  border-left: 3px solid var(--accent) !important;
+  border-radius: 0 var(--r-md) var(--r-md) 0 !important;
+  padding-left: calc(1rem - 3px) !important;
+  font-weight: 500 !important;
+}
+
+.nav-item:hover:not(.active) {
+  background: rgba(255,255,255,0.04) !important;
+  color: var(--t1) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Typography polish
+   ════════════════════════════════════════════════════════════════ */
+
+body, .app-shell {
+  font-family: var(--font-ui);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 500 !important;
+  letter-spacing: -0.01em;
+}
+
+/* Tabular numbers cho TẤT CẢ data metric */
+table, .metric, .kpi, .score, .number,
+[class*="score"], [class*="count"], [class*="kpi"],
+.mono, .mono-sm, .fw7 {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section labels enterprise — smaller + bolder letter-spacing */
+.section-title, .panel-title, .slbl {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--t3) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   KPI Cards — Bloomberg style (big numbers, tabular nums)
+   ════════════════════════════════════════════════════════════════ */
+
+/* Bất cứ number nào >= 20px → treat as KPI */
+[style*="font-size:24px"],
+[style*="font-size: 24px"],
+[style*="font-size:28px"],
+[style*="font-size: 28px"],
+[style*="font-size:32px"],
+[style*="font-size: 32px"],
+[style*="font-size:36px"],
+[style*="font-size: 36px"] {
+  font-family: var(--font-ui) !important;
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: -0.02em !important;
+  font-weight: 500 !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Buttons — flat but with clear hierarchy
+   ════════════════════════════════════════════════════════════════ */
+
+button, .btn {
+  transition: background-color 0.1s ease, border-color 0.1s ease !important;
+  font-weight: 500 !important;
+  font-family: var(--font-ui) !important;
+  letter-spacing: 0;
+  border-radius: var(--r-md) !important;
+}
+
+button:hover, .btn:hover {
+  transform: none !important;
+}
+
+.btn-primary {
+  background: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
+  color: #ffffff !important;
+}
+.btn-primary:hover {
+  background: var(--accent2) !important;
+  border-color: var(--accent2) !important;
+}
+
+.btn-ghost, .btn-secondary {
+  background: transparent !important;
+  border: 1px solid var(--border2) !important;
+  color: var(--t2) !important;
+}
+.btn-ghost:hover, .btn-secondary:hover {
+  background: rgba(255,255,255,0.04) !important;
+  color: var(--t1) !important;
+  border-color: var(--border3) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Pills/badges — compact enterprise style
+   ════════════════════════════════════════════════════════════════ */
+
+.pill, .badge, [class*="pill-"] {
+  border-radius: 3px !important;
+  font-weight: 500 !important;
+  font-size: 10px !important;
+  padding: 3px 8px !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase;
+  border: 1px solid transparent !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Pills với text chart 3 states chính */
+.pill-pass, .pill-done, .pill-green,
+[class*="pill-pass"], [class*="pill-done"] {
+  background: var(--green2) !important;
+  color: var(--green) !important;
+  border-color: rgba(16,185,129,0.25) !important;
+}
+
+.pill-fail, .pill-critical, .pill-red,
+[class*="pill-fail"], [class*="pill-critical"] {
+  background: var(--red2) !important;
+  color: var(--red) !important;
+  border-color: rgba(239,68,68,0.25) !important;
+}
+
+.pill-warn, .pill-amber, [class*="pill-warn"] {
+  background: var(--amber3) !important;
+  color: var(--amber2) !important;
+  border-color: rgba(245,158,11,0.25) !important;
+}
+
+.pill-info, .pill-blue, [class*="pill-blue"] {
+  background: var(--accent-bg) !important;
+  color: var(--accent3) !important;
+  border-color: rgba(37,99,235,0.25) !important;
+}
+
+/* Status dot before pill text */
+.pill::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Cards — slight lift for hierarchy
+   ════════════════════════════════════════════════════════════════ */
+
+.card, [class*="-card"]:not([class*="pill"]), .panel {
+  background: var(--bg2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--r-md) !important;
+  box-shadow: none !important;
+}
+
+/* Card header subtle separator */
+.card-header, .panel-header {
+  border-bottom: 1px solid var(--border) !important;
+  padding-bottom: 12px !important;
+  margin-bottom: 12px !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Modal — enterprise polish với subtle shadow
+   ════════════════════════════════════════════════════════════════ */
+
+.modal, .modal-content,
+[class*="-modal"]:not([class*="modal-close"]):not([class*="modal-footer"]):not([class*="modal-overlay"]):not([class*="modal-header"]) {
+  border-radius: var(--r-lg) !important;
+  border: 1px solid var(--border2) !important;
+  box-shadow: var(--shadow-float) !important;
+  background: var(--bg2) !important;
+}
+
+.modal-overlay {
+  backdrop-filter: blur(3px) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  background: rgba(0,0,0,0.65) !important;
+}
+
+.modal-header, .modal-head {
+  border-bottom: 1px solid var(--border) !important;
+  padding: 18px 22px !important;
+}
+
+.modal-footer {
+  border-top: 1px solid var(--border) !important;
+  padding: 14px 22px !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Tables — Bloomberg data table style
+   ════════════════════════════════════════════════════════════════ */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg3) !important;
+  font-weight: 500 !important;
+  font-size: 10px !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  color: var(--t3) !important;
+  padding: 9px 12px !important;
+  border-bottom: 1px solid var(--border2) !important;
+  text-align: left;
+}
+
+table tbody td {
+  padding: 9px 12px !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-size: 12px;
+  color: var(--t1);
+}
+
+table tbody tr {
+  transition: background-color 0.08s ease;
+}
+
+table tbody tr:hover {
+  background: rgba(255,255,255,0.03) !important;
+  cursor: default;
+}
+
+/* Row clickable indicator */
+table tbody tr[onclick]:hover {
+  background: var(--accent-bg) !important;
+  cursor: pointer;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Inputs & Selects
+   ════════════════════════════════════════════════════════════════ */
+
+input, select, textarea {
+  background: var(--bg3) !important;
+  border: 1px solid var(--border2) !important;
+  border-radius: var(--r-md) !important;
+  color: var(--t1) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 13px !important;
+  padding: 8px 11px !important;
+  transition: border-color 0.1s ease, background 0.1s ease !important;
+}
+
+input:hover, select:hover, textarea:hover {
+  border-color: var(--border3) !important;
+  background: var(--bg4) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.20) !important;
+  background: var(--bg3) !important;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%239CA3AF' d='M5 6L0 0h10z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  padding-right: 30px !important;
+  cursor: pointer;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Remove rainbow/gradient text
+   ════════════════════════════════════════════════════════════════ */
+
+[style*="-webkit-background-clip:text"],
+[style*="-webkit-background-clip: text"],
+[style*="-webkit-text-fill-color:transparent"],
+[style*="-webkit-text-fill-color: transparent"] {
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: var(--t1) !important;
+  background-clip: unset !important;
+  background: transparent !important;
+  color: var(--t1) !important;
+}
+
+/* Inline decorative color overrides → neutralize */
+[style*="color:var(--cyan)"],
+[style*="color: var(--cyan)"] {
+  color: var(--accent3) !important;
+}
+[style*="color:var(--purple)"],
+[style*="color: var(--purple)"] {
+  color: var(--accent3) !important;
+}
+
+/* Inline border colors — unify */
+[style*="border-color:rgba(6,182,212"],
+[style*="border-color: rgba(6,182,212"],
+[style*="border-color:rgba(139,92,246"],
+[style*="border-color: rgba(139,92,246"],
+[style*="border-color:rgba(79,209,197"],
+[style*="border-color: rgba(79,209,197"] {
+  border-color: var(--border2) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Progress bars — visible navy
+   ════════════════════════════════════════════════════════════════ */
+
+progress, .progress, [role="progressbar"], [class*="progress"] {
+  background: var(--bg3) !important;
+  border-radius: var(--r-sm) !important;
+  overflow: hidden;
+}
+
+progress::-webkit-progress-bar {
+  background: var(--bg3);
+}
+
+progress::-webkit-progress-value,
+.progress-bar, [class*="progress-fill"] {
+  background: var(--accent) !important;
+  border-radius: var(--r-sm);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Scrollbar — subtle
+   ════════════════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.16);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Animation dampen — no pulsing/flashing
+   ════════════════════════════════════════════════════════════════ */
+
+.pulse, .blink, [class*="pulse"], [class*="live"] {
+  animation: none !important;
+}
+
+/* SSE LIVE dot thay pulse bằng static green dot */
+[class*="sse"] {
+  opacity: 1 !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Sidebar brand area
+   ════════════════════════════════════════════════════════════════ */
+
+/* VSP // P4 brand heading */
+.brand, .sidebar-brand, [class*="brand"] {
+  color: var(--t1) !important;
+  font-family: var(--font-ui) !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Score / Gate — sidebar bottom
+   ════════════════════════════════════════════════════════════════ */
+
+/* GATE FAIL · SCORE 64 badge */
+[class*="gate-"], [class*="score-"] {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   P4 Compliance: Tab pills trong header
+   ════════════════════════════════════════════════════════════════ */
+
+/* P4 ACHIEVED badge đẹp hơn */
+[class*="achieved"], [style*="ACHIEVED"] {
+  background: var(--green2) !important;
+  color: var(--green) !important;
+  border: 1px solid rgba(16,185,129,0.25) !important;
+  border-radius: var(--r-md) !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.04em;
+}
+
+/* End theme v2 */

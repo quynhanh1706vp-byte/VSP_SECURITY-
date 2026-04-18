@@ -1,11 +1,6 @@
-/* ================================================================
-   VSP SIEM INTEGRATION PATCH v2
-   - Fix: truyền JWT token từ parent xuống iframe
-   - Fix: iframe không cần load lại VSP patches
-   - Fix: correlation/soar/logsources/threatintel dùng token của parent
-================================================================ */
+/* VSP SIEM patch — clean rewrite, no token loop */
 
-// 1. Register SIEM panels in PANEL_META
+// 1. PANEL_META
 (function() {
   if (typeof PANEL_META !== 'undefined') {
     Object.assign(PANEL_META, {
@@ -13,339 +8,268 @@
       soar:        { title:'SOAR playbooks',     sub:'VSP / SIEM / Orchestration & automation'   },
       logsources:  { title:'Log ingestion',      sub:'VSP / SIEM / Sources · parsers · stream'   },
       threatintel: { title:'Threat intelligence',sub:'VSP / SIEM / IOC · CVE enrichment · MITRE' },
+      ueba:        { title:'UEBA analytics',     sub:'VSP / SIEM / Behavioral baseline · anomalies' },
+      assets:      { title:'Asset inventory',    sub:'VSP / SIEM / CMDB · risk scoring · findings' },
+      threathunt:  { title:'Threat Hunting',      sub:'VSP / SIEM / Log query · pivot · timeline' },
+      vulnmgmt:    { title:'Vulnerability Mgmt',  sub:'VSP / Security / CVE tracking · trend · SLA' },
     });
   }
 })();
 
-// 2. Hook showPanel
-(function() {
-  const _prev = window.showPanel;
-  window.showPanel = function(name, btn) {
-    if (_prev) _prev(name, btn);
-    const panelFrameMap = {
-      correlation: '#panel-correlation iframe',
-      soar:        '#panel-soar iframe',
-      logsources:  '#panel-logsources iframe',
-      threatintel: '#panel-threatintel iframe',
-      ueba:        '#panel-ueba iframe',
-      assets:      '#panel-assets iframe',
-      threathunt:  '#threathunt-frame',
-      netflow:     '#panel-netflow iframe',
-      ai_analyst:  '#panel-ai_analyst iframe',
-      vulnmgmt:    '#panel-vulnmgmt iframe',
-      scheduler:   '#panel-scheduler iframe',
-      users:       '#panel-users iframe',
-      swrisk:      '#panel-swrisk iframe',
-    };
-    const loaders = {
-      correlation: loadCorrelation,
-      soar:        loadSOAR,
-      logsources:  loadLogSources,
-      threatintel: loadThreatIntel,
-      ueba:        loadUEBA,
-      assets:      loadAssets,
-    };
-    // Load iframe src từ data-src nếu chưa load
-    const sel = panelFrameMap[name];
-    if (sel) {
-      const frame = document.querySelector(sel);
-      if (frame) {
-        const ds = frame.getAttribute('data-src');
-        if (ds && (!frame.src || frame.src.endsWith('/'))) {
-          frame.src = ds;
-          frame.addEventListener('load', function onLoad() {
-            frame.removeEventListener('load', onLoad);
-            // Inject token
-            const tk = window.TOKEN || '';
-            if (tk) {
-              try { frame.contentWindow.postMessage({type:'vsp:token', token:tk}, '*'); } catch(e) {}
-            }
-            // Load data sau 400ms
-            if (loaders[name]) setTimeout(loaders[name], 400);
-          });
-          return;
-        }
-      }
-    }
-    // Frame đã load — chỉ cần inject token + data
-    if (loaders[name]) setTimeout(loaders[name], 300);
-  };
-})();
+// 2. Override showPanel sau khi tất cả patches load xong
+var _siemLoaded = {};
+function _siemShowPanel(name) {
+  var panelMap = {logsources:'panel-logsources', threatintel:'panel-threatintel', ai_analyst:'panel-ai_analyst'};
+  var panelId = panelMap[name] || ('panel-' + name);
+  var frame = document.querySelector('#' + panelId + ' iframe');
+  if (!frame) return;
+  var tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
+  // FIX: bỏ điều kiện length < 50 — token có thể ngắn hơn
+  if (!tk) return;
 
-// 3. Truyền token vào iframe sau khi load
-function _injectTokenToFrame(frameEl) {
-  if (!frameEl) return;
-  const send = () => {
-    try {
-      frameEl.contentWindow.postMessage({
-        type:  'vsp:token',
-        token: window.TOKEN || localStorage.getItem('vsp_token') || '',
-      }, '*');
-    } catch(e) {}
-  };
-  // Gửi ngay nếu đã load, gửi lại khi load xong
-  send();
-  frameEl.addEventListener('load', send);
+  var ds = frame.dataset.src || frame.getAttribute('data-src') || '';
+  if (!ds) return;
+
+  // FIX: kiểm tra đã load chưa bằng cách so sánh với data-src filename
+  var fname = ds.split('?')[0].split('/').pop();
+  var alreadyLoaded = frame.src && frame.src.indexOf(fname) >= 0;
+
+  if (!alreadyLoaded) {
+    // Lazy load
+    frame.src = ds + (ds.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now();
+    frame.onload = function() {
+      var t = window.TOKEN || localStorage.getItem('vsp_token') || '';
+      setTimeout(function() {
+        try { frame.contentWindow.postMessage({type:'vsp:token', token:t}, '*'); } catch(e) {}
+        setTimeout(function() {
+          try { frame.contentWindow.postMessage({type:'vsp:token', token:t}, '*'); } catch(e) {}
+        }, 1000);
+      }, 300);
+      var loaders = {correlation:loadCorrelation,soar:loadSOAR,logsources:loadLogSources,
+                     threatintel:loadThreatIntel,ueba:loadUEBA,assets:loadAssetsPanel};
+      if (loaders[name]) setTimeout(loaders[name], 600);
+    };
+  } else {
+    // Đã load — push token + data
+    try { frame.contentWindow.postMessage({type:'vsp:token', token:tk}, '*'); } catch(e) {}
+    var loaders = {correlation:loadCorrelation,soar:loadSOAR,logsources:loadLogSources,
+                   threatintel:loadThreatIntel,ueba:loadUEBA,assets:loadAssetsPanel};
+    if (loaders[name]) setTimeout(loaders[name], 200);
+  }
 }
 
-// 4. Khi iframe load xong → inject token + data
-function _setupFrame(panelId, dataFn) {
-  const frame = document.querySelector('#' + panelId + ' iframe');
+// Hook vào window.showPanel SAU KHI tất cả load xong
+window.addEventListener('load', function() {
+  var _orig = window.showPanel;
+  window.showPanel = function(name, btn) {
+    if (_orig) _orig(name, btn);
+    // Trigger loader cho TẤT CẢ iframe panels (SIEM + mới)
+    var allIframePanels = [
+      'correlation','soar','logsources','threatintel','ueba','assets',
+      'netflow','scheduler','ai_analyst','users','threathunt','vulnmgmt',
+      'swinventory','p4compliance','cicd','integrations','settings'
+    ];
+    if (allIframePanels.indexOf(name) >= 0) {
+      setTimeout(function(){ _siemShowPanel(name); }, 100);
+    }
+  };
+});
+
+// 3. Helper: gửi token vào 1 frame
+function _sendToken(frame) {
+  var tk = window.TOKEN || '';
+  if (!tk || tk.length < 50) return;
+  try { frame.contentWindow.postMessage({type:'vsp:token', token: tk}, '*'); } catch(e) {}
+}
+
+// 4. Helper: gửi token + data vào frame theo panel id
+function _postFrame(panelId, data) {
+  var frame = document.querySelector('#' + panelId + ' iframe');
   if (!frame) return;
-
-  // Inject token ngay khi frame ready
-  frame.addEventListener('load', function() {
-    // Token
-    try {
-      frame.contentWindow.postMessage({
-        type:  'vsp:token',
-        token: window.TOKEN || localStorage.getItem('vsp_token') || '',
-      }, '*');
-    } catch(e) {}
-    // Data
-    if (typeof dataFn === 'function') {
-      dataFn().then(data => {
-        try {
-          frame.contentWindow.postMessage({ type: 'vsp:data', ...data }, '*');
-        } catch(e) {}
-      }).catch(() => {});
-    }
-  });
-
-  // Nếu frame đã load (cached)
-  try {
-    if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
-      frame.contentWindow.postMessage({
-        type:  'vsp:token',
-        token: window.TOKEN || localStorage.getItem('vsp_token') || '',
-      }, '*');
-    }
-  } catch(e) {}
+  _sendToken(frame);
+  if (data) try { frame.contentWindow.postMessage(data, '*'); } catch(e) {}
 }
 
 // 5. Loaders
 async function loadCorrelation() {
   if (!await ensureToken()) return;
-  const h = { Authorization: 'Bearer ' + window.TOKEN };
-
-  // Inject token vào frame trước
-  const frame = document.querySelector('#panel-correlation iframe');
-  if (frame) {
-    try {
-      frame.contentWindow.postMessage({
-        type: 'vsp:token',
-        token: window.TOKEN,
-      }, '*');
-    } catch(e) {}
-  }
-
-  // Load data
-  const [rules, incidents] = await Promise.all([
-    fetch('/api/v1/correlation/rules',    { headers: h }).then(r => r.json()).catch(() => ({ rules: [] })),
-    fetch('/api/v1/correlation/incidents',{ headers: h }).then(r => r.json()).catch(() => ({ incidents: [] })),
+  var h = {Authorization: 'Bearer ' + window.TOKEN};
+  var [rules, incidents] = await Promise.all([
+    fetch('/api/v1/correlation/rules',    {headers:h}).then(r=>r.json()).catch(()=>({rules:[]})),
+    fetch('/api/v1/correlation/incidents',{headers:h}).then(r=>r.json()).catch(()=>({incidents:[]})),
   ]);
-
-  const badge = document.getElementById('badge-incidents');
-  if (badge) badge.textContent = incidents.total ?? (incidents.incidents || []).length ?? 0;
-
-  if (frame) {
-    try {
-      frame.contentWindow.postMessage({ type: 'vsp:data', rules, incidents }, '*');
-    } catch(e) {}
-  }
+  var badge = document.getElementById('badge-incidents');
+  if (badge) badge.textContent = incidents.total ?? (incidents.incidents||[]).length ?? 0;
+  _postFrame('panel-correlation', {type:'vsp:data', rules, incidents});
 }
 
 async function loadSOAR() {
   if (!await ensureToken()) return;
-  const h = { Authorization: 'Bearer ' + window.TOKEN };
-  const frame = document.querySelector('#panel-soar iframe');
-  if (frame) {
-    try { frame.contentWindow.postMessage({ type: 'vsp:token', token: window.TOKEN }, '*'); } catch(e) {}
-  }
-  const [playbooks, runs] = await Promise.all([
-    fetch('/api/v1/soar/playbooks',    { headers: h }).then(r => r.json()).catch(() => ({ playbooks: [] })),
-    fetch('/api/v1/soar/runs?limit=20',{ headers: h }).then(r => r.json()).catch(() => ({ runs: [] })),
+  var h = {Authorization: 'Bearer ' + window.TOKEN};
+  var [playbooks, runs] = await Promise.all([
+    fetch('/api/v1/soar/playbooks',    {headers:h}).then(r=>r.json()).catch(()=>({playbooks:[]})),
+    fetch('/api/v1/soar/runs?limit=20',{headers:h}).then(r=>r.json()).catch(()=>({runs:[]})),
   ]);
-  if (frame) {
-    try { frame.contentWindow.postMessage({ type: 'vsp:data', playbooks, runs }, '*'); } catch(e) {}
-  }
+  _postFrame('panel-soar', {type:'vsp:data', playbooks, runs});
 }
 
 async function loadLogSources() {
   if (!await ensureToken()) return;
-  const h = { Authorization: 'Bearer ' + window.TOKEN };
-  const frame = document.querySelector('#panel-logsources iframe');
-  if (frame) {
-    try { frame.contentWindow.postMessage({ type: 'vsp:token', token: window.TOKEN }, '*'); } catch(e) {}
-  }
-  const [sources, stats] = await Promise.all([
-    fetch('/api/v1/logs/sources',{ headers: h }).then(r => r.json()).catch(() => ({ sources: [] })),
-    fetch('/api/v1/logs/stats',  { headers: h }).then(r => r.json()).catch(() => ({})),
+  var h = {Authorization: 'Bearer ' + window.TOKEN};
+  var [sources, stats] = await Promise.all([
+    fetch('/api/v1/logs/sources',{headers:h}).then(r=>r.json()).catch(()=>({sources:[]})),
+    fetch('/api/v1/logs/stats',  {headers:h}).then(r=>r.json()).catch(()=>({})),
   ]);
-  if (frame) {
-    try { frame.contentWindow.postMessage({ type: 'vsp:data', sources, stats }, '*'); } catch(e) {}
-  }
+  _postFrame('panel-logsources', {type:'vsp:data', sources, stats});
 }
 
 async function loadThreatIntel() {
   if (!await ensureToken()) return;
-  const h = { Authorization: 'Bearer ' + window.TOKEN };
-  const frame = document.querySelector('#panel-threatintel iframe');
-  if (frame) {
-    try { frame.contentWindow.postMessage({ type: 'vsp:token', token: window.TOKEN }, '*'); } catch(e) {}
-  }
-  const [iocs, feeds, matches] = await Promise.all([
-    fetch('/api/v1/ti/iocs?limit=20',{ headers: h }).then(r => r.json()).catch(() => ({ iocs: [] })),
-    fetch('/api/v1/ti/feeds',        { headers: h }).then(r => r.json()).catch(() => ({ feeds: [] })),
-    fetch('/api/v1/ti/matches',      { headers: h }).then(r => r.json()).catch(() => ({ matches: [] })),
+  var h = {Authorization: 'Bearer ' + window.TOKEN};
+  var [iocs, feeds, matches] = await Promise.all([
+    fetch('/api/v1/ti/iocs?limit=20',{headers:h}).then(r=>r.json()).catch(()=>({iocs:[]})),
+    fetch('/api/v1/ti/feeds',        {headers:h}).then(r=>r.json()).catch(()=>({feeds:[]})),
+    fetch('/api/v1/ti/matches',      {headers:h}).then(r=>r.json()).catch(()=>({matches:[]})),
   ]);
-  if (frame) {
-    try { frame.contentWindow.postMessage({ type: 'vsp:data', iocs, feeds, matches }, '*'); } catch(e) {}
-  }
+  _postFrame('panel-threatintel', {type:'vsp:data', iocs, feeds, matches});
 }
 
 async function loadUEBA() {
   if (!await ensureToken()) return;
-  const frame = document.querySelector('#panel-ueba iframe');
-  if (!frame) return;
-  try {
-    frame.contentWindow.postMessage({ type: 'vsp:token', token: window.TOKEN }, '*');
-  } catch(e) {}
+  _postFrame('panel-ueba', null);
 }
 
-async function loadAssets() {
+async function loadAssetsPanel() {
   if (!await ensureToken()) return;
-  const frame = document.querySelector('#panel-assets iframe');
-  if (!frame) return;
-  try {
-    frame.contentWindow.postMessage({ type: 'vsp:token', token: window.TOKEN }, '*');
-  } catch(e) {}
+  _postFrame('panel-assets', null);
 }
 
+// 6. Parent: lắng nghe iframe xin token — chỉ reply khi có JWT thật
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'vsp:request_token') return;
+  var tk = window.TOKEN || '';
+  if (!tk || tk.length < 50 || tk.split('.').length !== 3) return;
+  // Reply chỉ cho iframe gửi request
+  document.querySelectorAll('iframe').forEach(function(fr) {
+    try { fr.contentWindow.postMessage({type:'vsp:token', token: tk}, '*'); } catch(ex) {}
+  });
+});
 
-// 6. Auto-trigger SOAR từ SSE
+// 7. Sau khi login xong → gọi loader của active panel
+(function() {
+  var _sent = false;
+  var _poll = setInterval(function() {
+    var tk = window.TOKEN || '';
+    if (!tk || tk.length < 50 || tk.split('.').length !== 3) return;
+    if (_sent) { clearInterval(_poll); return; }
+    _sent = true;
+    clearInterval(_poll);
+    // Broadcast token
+    document.querySelectorAll('iframe').forEach(function(fr) {
+      try { fr.contentWindow.postMessage({type:'vsp:token', token: tk}, '*'); } catch(ex) {}
+    });
+    // Gọi loader cho panel đang active
+    var active = document.querySelector('.nav-item.active');
+    if (active) {
+      var onclick = active.getAttribute('onclick') || '';
+      var m = onclick.match(/showPanel\(['"](\w+)['"]/);
+      if (m) {
+        var loaders = {correlation:loadCorrelation,soar:loadSOAR,logsources:loadLogSources,
+                       threatintel:loadThreatIntel,ueba:loadUEBA,assets:loadAssetsPanel};
+        if (loaders[m[1]]) setTimeout(loaders[m[1]], 500);
+      }
+    }
+  }, 500);
+})();
+
+// 8. SSE auto-trigger
 window._siemAutoTrigger = async function(msg) {
-  if (!msg) return;
-  if (msg.type === 'scan_complete' && msg.gate === 'FAIL') {
-    if (!await ensureToken()) return;
-    fetch('/api/v1/soar/trigger', {
-      method:  'POST',
-      headers: { Authorization: 'Bearer ' + window.TOKEN, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        trigger:  'gate_fail',
-        gate:     msg.gate,
-        severity: msg.max_severity || 'HIGH',
-        run_id:   msg.rid,
-        findings: msg.total_findings,
-      }),
-    })
-    .then(r => r.json())
-    .then(d => { if (d.triggered > 0 && typeof showToast === 'function') showToast('SOAR: ' + d.triggered + ' playbook(s) triggered', 'info'); })
-    .catch(() => {});
-  }
+  if (!msg || msg.type !== 'scan_complete' || msg.gate !== 'FAIL') return;
+  if (!await ensureToken()) return;
+  fetch('/api/v1/soar/trigger', {
+    method:'POST',
+    headers:{Authorization:'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+    body: JSON.stringify({trigger:'gate_fail', gate:msg.gate,
+      severity:msg.max_severity||'HIGH', run_id:msg.rid, findings:msg.total_findings}),
+  }).then(r=>r.json()).then(d=>{
+    if (d.triggered>0 && typeof showToast==='function')
+      showToast('SOAR: '+d.triggered+' playbook(s) triggered','info');
+  }).catch(()=>{});
 };
 
-// 7. Quick search
+// 9. Quick search
 (function() {
   if (typeof QS_PANELS === 'undefined') return;
-  const already = QS_PANELS.some(p => p.p === 'correlation');
-  if (already) return;
+  if (QS_PANELS.some(function(p){return p.p==='correlation';})) return;
   QS_PANELS.push(
-    { name:'Correlation engine', icon:'◆', p:'correlation', desc:'Cross-source rules · incidents' },
-    { name:'SOAR playbooks',     icon:'▶', p:'soar',        desc:'Automated response workflows'   },
-    { name:'Log ingestion',      icon:'⊞', p:'logsources',  desc:'Syslog · CEF · agent sources'   },
-    { name:'Threat intelligence',icon:'◈', p:'threatintel', desc:'IOC · CVE enrichment · MITRE'   }
+    {name:'Correlation engine', icon:'◆', p:'correlation', desc:'Cross-source rules · incidents'},
+    {name:'SOAR playbooks',     icon:'▶', p:'soar',        desc:'Automated response workflows'  },
+    {name:'Log ingestion',      icon:'⊞', p:'logsources',  desc:'Syslog · CEF · agent sources'  },
+    {name:'Threat intelligence',icon:'◈', p:'threatintel', desc:'IOC · CVE enrichment · MITRE'  },
+    {name:'UEBA analytics',     icon:'◉', p:'ueba',        desc:'Behavioral baseline · anomalies'},
+    {name:'Asset inventory',    icon:'◫', p:'assets',      desc:'CMDB · risk scoring · coverage' }
   );
 })();
 
-// 8. Broadcast token tới tất cả iframes khi TOKEN thay đổi
-//    (sau login thành công)
+console.log('VSP SIEM patch loaded ✓ — correlation | soar | logsources | threatintel | ueba | assets');
+
+
+// Download SIEM PDF report
+window._downloadSIEMReport = async function() {
+  if (!window.TOKEN) return;
+  var a = document.createElement('a');
+  a.href = '/api/v1/siem/report.pdf';
+  a.download = 'vsp_siem_report_' + new Date().toISOString().slice(0,10) + '.pdf';
+  // Need auth header — use fetch + blob
+  fetch('/api/v1/siem/report.pdf', {
+    headers: {Authorization: 'Bearer ' + window.TOKEN}
+  }).then(r => r.blob()).then(blob => {
+    var url = URL.createObjectURL(blob);
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }).catch(e => console.error('Download failed:', e));
+};
+
+window._downloadSIEMExcel = function() {
+  if (!window.TOKEN) return;
+  fetch('/api/v1/siem/report.xlsx', {
+    headers: {Authorization: 'Bearer ' + window.TOKEN}
+  }).then(r => r.blob()).then(blob => {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'vsp_siem_' + new Date().toISOString().slice(0,10) + '.xlsx';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+  });
+};
+
+// Theme sync — broadcast theme change to all SIEM iframes
 (function() {
-  const _origGovLogin = window.govLoginSubmit;
-  if (!_origGovLogin) return;
-  window.govLoginSubmit = async function() {
-    await _origGovLogin.apply(this, arguments);
-    // Sau login, broadcast token vào tất cả iframes
-    setTimeout(function() {
-      document.querySelectorAll('iframe').forEach(function(f) {
-        try {
-          f.contentWindow.postMessage({
-            type:  'vsp:token',
-            token: window.TOKEN || localStorage.getItem('vsp_token') || '',
-          }, '*');
-        } catch(e) {}
+  function _broadcastTheme() {
+    var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    document.querySelectorAll('iframe').forEach(function(fr) {
+      try { fr.contentWindow.postMessage({type:'vsp:theme', theme:theme}, '*'); } catch(e) {}
+    });
+  }
+  // Observe theme changes
+  var observer = new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      if (m.attributeName === 'data-theme') _broadcastTheme();
+    });
+  });
+  observer.observe(document.documentElement, {attributes: true});
+  // Handle theme requests from iframes
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'vsp:request_theme') {
+      var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+      document.querySelectorAll('iframe').forEach(function(fr) {
+        try { fr.contentWindow.postMessage({type:'vsp:theme', theme:theme}, '*'); } catch(e) {}
       });
-    }, 800);
-  };
+    }
+  });
+  // Initial broadcast after load
+  setTimeout(_broadcastTheme, 1000);
 })();
-
-// 9. Listener trong iframe nhận token từ parent
-//    (chạy trong context của soar.html / log_pipeline.html / etc.)
-if (window.parent !== window) {
-  // Đây là iframe — lắng nghe token từ parent
-  window.addEventListener('message', function(e) {
-    if (!e.data) return;
-
-    // Nhận token
-    if (e.data.type === 'vsp:token' && e.data.token) {
-      window.TOKEN = e.data.token;
-      // Lưu để ensureToken() tìm thấy
-      try { localStorage.setItem('vsp_token', e.data.token); } catch(ex) {}
-    }
-
-    // Nhận data
-    if (e.data.type === 'vsp:data') {
-      // SOAR
-      if (e.data.playbooks && typeof PLAYBOOKS !== 'undefined') {
-        PLAYBOOKS = e.data.playbooks.map(function(p) {
-          return Object.assign({}, p, {
-            steps: (p.steps || []).map(function(s, i) {
-              return Object.assign({}, s, { id: 's' + i, status: 'idle' });
-            })
-          });
-        });
-        if (typeof renderList === 'function') renderList();
-      }
-      // Log sources
-      if (e.data.sources && typeof SOURCES !== 'undefined') {
-        SOURCES = e.data.sources.map(function(s) {
-          return Object.assign({ eps: s.events_per_min || 0, pr: s.parse_rate || 0, last: s.last_event || '?' }, s);
-        });
-        if (typeof renderSources === 'function') renderSources();
-      }
-    }
-  });
-
-  // Yêu cầu token từ parent ngay khi load
-  window.parent.postMessage({ type: 'vsp:request_token' }, '*');
-}
-
-// 10. Parent lắng nghe yêu cầu token từ iframe
-if (window.parent === window) {
-  window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'vsp:request_token') {
-      // Tìm iframe nguồn và reply token
-      document.querySelectorAll('iframe').forEach(function(f) {
-        try {
-          if (f.contentWindow === e.source) {
-            f.contentWindow.postMessage({
-              type:  'vsp:token',
-              token: window.TOKEN || localStorage.getItem('vsp_token') || '',
-            }, '*');
-          }
-        } catch(ex) {}
-      });
-      // Broadcast tới tất cả nếu không xác định được source
-      document.querySelectorAll('iframe').forEach(function(f) {
-        try {
-          f.contentWindow.postMessage({
-            type:  'vsp:token',
-            token: window.TOKEN || localStorage.getItem('vsp_token') || '',
-          }, '*');
-        } catch(ex) {}
-      });
-    }
-  });
-}
-
-console.log('VSP SIEM patch loaded ✓ — correlation | soar | logsources | threatintel');

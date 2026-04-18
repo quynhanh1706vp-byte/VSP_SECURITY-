@@ -56,7 +56,7 @@ func (h *SBOM) Generate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-VSP-SBOM-Signature", sig)
 	w.Header().Set("X-VSP-SBOM-Algorithm", "HMAC-SHA256")
 	w.Header().Set("X-VSP-SBOM-Version", "CycloneDX-1.5")
-	w.Write(b) //nolint:errcheck
+	_, _ = w.Write(b) //nolint:errcheck
 }
 
 // signSBOM computes HMAC-SHA256 of the SBOM bytes.
@@ -150,7 +150,7 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/vnd.cyclonedx+json")
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=sbom-grype-%s.cdx.json", rid))
-	w.Write(out) //nolint:errcheck
+	_, _ = w.Write(out) //nolint:errcheck
 }
 
 type cycloneDX struct {
@@ -351,7 +351,7 @@ func (h *SBOM) Diff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"run1": map[string]interface{}{
 			"rid": rid1, "mode": run1.Mode,
 			"gate": run1.Gate, "created_at": run1.CreatedAt,

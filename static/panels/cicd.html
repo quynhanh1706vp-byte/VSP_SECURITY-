@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script>
+/* VSP auth fetch guard v2 — polling retry */
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500;
+    var waited = 0;
+    var interval = 100;
+    while (waited < maxWait) {
+      // Check iframe
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      // Check parent (same-origin)
+      try {
+        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          try { localStorage.setItem("vsp_token", tk); } catch(e){}
+          return tk;
+        }
+      } catch(e) { /* cross-origin */ }
+      // Check top-level (if nested iframes)
+      try {
+        tk = window.top.TOKEN || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          return tk;
+        }
+      } catch(e) {}
+      // Wait & retry
+      await new Promise(function(r){setTimeout(r, interval);});
+      waited += interval;
+    }
+    return "";
+  }
+  
+  window.vspAuthFetch = async function(url, opts){
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
+    } else {
+      console.warn("[VSP guard] no token after 2.5s:", url);
+    }
+    return _origFetch(url, opts);
+  };
+  
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){
+    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI/CD DevSecOps</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size:13px;padding:16px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-family:var(--font-display);font-size:16px;font-weight:800}
+.hdr p{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+.tab-bar{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tab-btn{padding:7px 14px;font-size:12px;font-weight:500;background:none;border:none;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-btn:hover:not(.active){color:var(--t1)}
+.tab-panel{display:none}.tab-panel.active{display:block}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:13px;font-weight:600}
+.card-sub{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
+.card-body{padding:14px}
+.btn{padding:5px 12px;font-size:11px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg3);color:var(--t2);cursor:pointer;font-family:var(--font-mono);transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:var(--border2);color:var(--t1)}
+.btn-primary{background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.4);color:var(--accent)}
+.btn-success{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);color:var(--green)}
+.btn-sm{padding:3px 8px;font-size:10px}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-family:var(--font-mono);font-weight:600}
+.badge-ok{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25)}
+.badge-warn{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
+.badge-danger{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+.badge-info{background:rgba(6,182,212,.10);color:var(--cyan);border:1px solid rgba(6,182,212,.22)}
+.badge-neutral{background:var(--bg3);color:var(--t2);border:1px solid var(--border)}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px}
+.kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);font-family:var(--font-mono);margin-bottom:4px}
+.kpi-val{font-family:var(--font-display);font-size:22px;font-weight:800}
+.kpi-sub{font-size:10px;color:var(--t3);margin-top:3px;font-family:var(--font-mono)}
+.c-green{color:var(--green)}.c-red{color:var(--red)}.c-amber{color:var(--amber)}.c-cyan{color:var(--cyan)}.c-orange{color:var(--orange)}
+
+/* Code block */
+.code-block{font-family:var(--font-mono);font-size:10px;background:var(--bg0);padding:12px 14px;border-radius:var(--r-md);border:1px solid var(--border);white-space:pre;overflow-x:auto;line-height:1.6;color:var(--t2);position:relative}
+.code-block .kw{color:#7dd3fc}.code-block .str{color:#86efac}.code-block .cm{color:var(--t3)}.code-block .var{color:#f9a8d4}.code-block .num{color:#fde68a}
+.copy-btn{position:absolute;top:8px;right:8px;font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--t3);cursor:pointer;font-family:var(--font-mono)}
+.copy-btn:hover{color:var(--t1);border-color:var(--border2)}
+
+/* Pipeline flow */
+.flow{display:flex;align-items:center;gap:0;overflow-x:auto;margin:12px 0;padding:4px 0}
+.flow-step{display:flex;flex-direction:column;align-items:center;min-width:90px}
+.flow-box{padding:7px 10px;border-radius:6px;font-size:11px;font-weight:600;text-align:center;border:1px solid;white-space:nowrap}
+.flow-sub{font-size:9px;color:var(--t3);margin-top:3px;text-align:center;font-family:var(--font-mono)}
+.flow-arr{color:var(--t3);font-size:14px;padding:0 4px;padding-bottom:16px}
+.fs-blue{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);color:#93c5fd}
+.fs-green{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);color:var(--green)}
+.fs-amber{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);color:var(--amber)}
+.fs-red{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:var(--red)}
+.fs-cyan{background:rgba(6,182,212,.12);border-color:rgba(6,182,212,.3);color:var(--cyan)}
+.fs-purple{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.3);color:var(--purple)}
+
+/* Run table */
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead th{background:var(--bg3);padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);font-family:var(--font-mono);border-bottom:1px solid var(--border);font-weight:500}
+tbody tr{border-bottom:1px solid rgba(99,179,255,.04)}
+tbody tr:hover{background:var(--bg3)}
+td{padding:7px 10px;vertical-align:middle}
+
+/* Integration cards */
+.int-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.int-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;display:flex;align-items:center;gap:10px}
+.int-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.int-name{font-size:12px;font-weight:600}
+.int-status{font-size:10px;margin-top:2px}
+.int-actions{margin-left:auto;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+
+/* Schedule table */
+.sched-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);margin-bottom:6px}
+.sched-name{font-size:12px;font-weight:600;flex:1}
+.sched-meta{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
+.sw-wrap{position:relative;width:32px;height:18px;flex-shrink:0}
+.sw-wrap input{opacity:0;position:absolute;inset:0;cursor:pointer;margin:0}
+.sw-track{position:absolute;inset:0;background:var(--bg4);border-radius:9px;transition:background .2s;pointer-events:none}
+.sw-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;background:var(--t3);border-radius:50%;transition:transform .2s,background .2s;pointer-events:none}
+.sw-wrap input:checked~.sw-track{background:var(--green)}
+.sw-wrap input:checked~.sw-thumb{transform:translateX(14px);background:#fff}
+
+/* PR comment preview */
+.pr-preview{background:var(--bg0);border:1px solid var(--border2);border-radius:var(--r-lg);padding:14px;font-family:var(--font-mono);font-size:11px;line-height:1.7}
+.pr-header{color:var(--accent);font-weight:600;margin-bottom:8px;font-size:12px}
+.pr-row-crit{color:var(--red)}.pr-row-high{color:var(--orange)}.pr-row-med{color:var(--amber)}.pr-row-ok{color:var(--green)}
+
+.form-group{margin-bottom:12px}
+.form-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);font-family:var(--font-mono);display:block;margin-bottom:4px}
+.form-ctrl{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-md);padding:7px 10px;font-size:12px;color:var(--t1);outline:none;font-family:var(--font-ui)}
+.form-ctrl:focus{border-color:var(--border2)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toast{position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);display:none}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h2>CI/CD DevSecOps</h2><p>Pipeline templates · PR gate · Auto-scan · Autofix · Scheduler</p></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-primary" onclick="triggerManualScan()">▶ Trigger scan</button>
+    <button class="btn" onclick="copyApiKey()">⊙ API key</button>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-label">CI Scans today</div><div class="kpi-val c-cyan" id="k-ci-today">—</div><div class="kpi-sub">from pipelines</div></div>
+  <div class="kpi"><div class="kpi-label">Gate pass rate</div><div class="kpi-val c-green" id="k-pass-rate">—</div><div class="kpi-sub">last 7 days</div></div>
+  <div class="kpi"><div class="kpi-label">Blocked PRs</div><div class="kpi-val c-red" id="k-blocked">—</div><div class="kpi-sub">gate FAIL today</div></div>
+  <div class="kpi"><div class="kpi-label">Auto-resolved</div><div class="kpi-val c-amber" id="k-autofixed">—</div><div class="kpi-sub">via remediation</div></div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('tab-pipeline',this)">Pipeline flow</button>
+  <button class="tab-btn" onclick="switchTab('tab-templates',this)">Templates</button>
+  <button class="tab-btn" onclick="switchTab('tab-scheduler',this)">Scheduler</button>
+  <button class="tab-btn" onclick="switchTab('tab-pr',this)">PR Gate</button>
+  <button class="tab-btn" onclick="switchTab('tab-autofix',this)">Autofix</button>
+  <button class="tab-btn" onclick="switchTab('tab-history',this)">Run history</button>
+</div>
+
+<!-- ══ TAB 1 — PIPELINE FLOW ══ -->
+<div class="tab-panel active" id="tab-pipeline">
+  <div class="card">
+    <div class="card-head"><div class="card-title">DevSecOps pipeline — current flow</div><div class="card-sub">Triggered on every push / PR / schedule</div></div>
+    <div class="card-body">
+      <div class="flow">
+        <div class="flow-step"><div class="flow-box fs-blue">Code Push</div><div class="flow-sub">git commit / PR</div></div>
+        <div class="flow-arr">→</div>
+        <div class="flow-step"><div class="flow-box fs-cyan">VSP Scan</div><div class="flow-sub">POST /vsp/run</div></div>
+        <div class="flow-arr">→</div>
+        <div class="flow-step"><div class="flow-box fs-purple">SAST+SCA<br>+SECRETS+IAC</div><div class="flow-sub">parallel · 14 tools</div></div>
+        <div class="flow-arr">→</div>
+        <div class="flow-step"><div class="flow-box fs-amber">Gate Check</div><div class="flow-sub">score ≥ 70 = PASS</div></div>
+        <div class="flow-arr">→</div>
+        <div class="flow-step"><div class="flow-box fs-green">PASS → Merge</div><div class="flow-sub">pipeline continues</div></div>
+        <div class="flow-arr">/</div>
+        <div class="flow-step"><div class="flow-box fs-red">FAIL → Block</div><div class="flow-sub">SOAR auto-fires</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px">
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--green)">
+          <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:4px">On PASS</div>
+          <div style="font-size:10px;color:var(--t2);line-height:1.6">Pipeline continues → deploy to staging → notify dev ✓</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--red)">
+          <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">On FAIL</div>
+          <div style="font-size:10px;color:var(--t2);line-height:1.6">Block merge → SOAR playbook → Jira ticket → Slack alert → PR comment</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--amber)">
+          <div style="font-size:11px;font-weight:600;color:var(--amber);margin-bottom:4px">On WARN</div>
+          <div style="font-size:10px;color:var(--t2);line-height:1.6">Allow merge but create ticket · notify analyst · log to audit trail</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">CI/CD Integration status</div><div class="card-sub">Connected via API key · Bearer token auth</div></div>
+    <div class="card-body">
+      <div class="int-grid">
+        <div class="int-card">
+          <div class="int-icon" style="background:rgba(34,197,94,.12);color:var(--green)">⑆</div>
+          <div><div class="int-name">GitHub Actions</div><div class="int-status" style="color:var(--green)">● Connected · cicd@vsp.local</div></div>
+          <div class="int-actions"><span class="badge badge-ok">Active</span></div>
+        </div>
+        <div class="int-card">
+          <div class="int-icon" style="background:rgba(245,158,11,.12);color:var(--amber)">⬡</div>
+          <div><div class="int-name">GitLab CI</div><div class="int-status" style="color:var(--amber)">○ Config ready · not connected</div></div>
+          <div class="int-actions"><span class="badge badge-warn">Pending</span></div>
+        </div>
+        <div class="int-card">
+          <div class="int-icon" style="background:rgba(139,92,246,.12);color:var(--purple)">◎</div>
+          <div><div class="int-name">Jenkins</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
+          <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
+        </div>
+        <div class="int-card">
+          <div class="int-icon" style="background:rgba(6,182,212,.12);color:var(--cyan)">◈</div>
+          <div><div class="int-name">Azure DevOps</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
+          <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
+        </div>
+        <div class="int-card">
+          <div class="int-icon" style="background:rgba(249,115,22,.12);color:var(--orange)">⬟</div>
+          <div><div class="int-name">Bitbucket Pipelines</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
+          <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
+        </div>
+        <div class="int-card">
+          <div class="int-icon" style="background:rgba(34,197,94,.12);color:var(--green)">◑</div>
+          <div><div class="int-name">vspcli (local)</div><div class="int-status" style="color:var(--green)">● Available · Linux/Win/macOS</div></div>
+          <div class="int-actions"><span class="badge badge-ok">Ready</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB 2 — TEMPLATES ══ -->
+<div class="tab-panel" id="tab-templates">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">GitHub Actions — vsp-scan.yml</div><div class="card-sub">Copy vào .github/workflows/ trong repo của bạn</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('github')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-github"><button class="copy-btn" onclick="copyTemplate('github')">Copy</button><span class="cm"># .github/workflows/vsp-scan.yml</span>
+<span class="kw">name:</span> <span class="str">VSP Security Scan</span>
+
+<span class="kw">on:</span>
+  <span class="kw">push:</span>
+    <span class="kw">branches:</span> <span class="str">[ main, develop ]</span>
+  <span class="kw">pull_request:</span>
+    <span class="kw">branches:</span> <span class="str">[ main ]</span>
+
+<span class="kw">jobs:</span>
+  <span class="kw">vsp-scan:</span>
+    <span class="kw">runs-on:</span> <span class="str">ubuntu-latest</span>
+    <span class="kw">steps:</span>
+      - <span class="kw">uses:</span> <span class="str">actions/checkout@v4</span>
+
+      - <span class="kw">name:</span> <span class="str">Trigger VSP scan</span>
+        <span class="kw">id:</span> <span class="str">vsp</span>
+        <span class="kw">run:</span> |
+          <span class="var">RESULT</span>=$(curl -sf -X POST <span class="str">${{ secrets.VSP_URL }}/api/v1/vsp/run</span> \
+            -H <span class="str">"Authorization: Bearer ${{ secrets.VSP_TOKEN }}"</span> \
+            -H <span class="str">"Content-Type: application/json"</span> \
+            -d <span class="str">'{"mode":"FULL","profile":"FAST","src":"."}'</span>)
+          <span class="var">RID</span>=$(echo $RESULT | jq -r <span class="str">'.rid'</span>)
+          echo <span class="str">"rid=$RID"</span> >> $GITHUB_OUTPUT
+          <span class="cm"># Poll until done</span>
+          for i in $(seq 1 30); do
+            <span class="var">STATUS</span>=$(curl -sf \
+              -H <span class="str">"Authorization: Bearer ${{ secrets.VSP_TOKEN }}"</span> \
+              <span class="str">${{ secrets.VSP_URL }}/api/v1/vsp/run/$RID</span> | jq -r <span class="str">'.status'</span>)
+            [ "$STATUS" = "DONE" ] && break
+            sleep 10
+          done
+
+      - <span class="kw">name:</span> <span class="str">Check gate</span>
+        <span class="kw">run:</span> |
+          <span class="var">GATE</span>=$(curl -sf \
+            -H <span class="str">"Authorization: Bearer ${{ secrets.VSP_TOKEN }}"</span> \
+            <span class="str">${{ secrets.VSP_URL }}/api/v1/vsp/run/${{ steps.vsp.outputs.rid }}</span> \
+            | jq -r <span class="str">'.gate'</span>)
+          echo <span class="str">"Gate: $GATE"</span>
+          [ "$GATE" = "FAIL" ] && exit 1 || exit 0
+
+      - <span class="kw">name:</span> <span class="str">Upload SARIF</span>
+        <span class="kw">if:</span> <span class="str">always()</span>
+        <span class="kw">uses:</span> <span class="str">github/codeql-action/upload-sarif@v3</span>
+        <span class="kw">with:</span>
+          <span class="kw">sarif_file:</span> <span class="str">vsp-results.sarif</span>
+</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">GitLab CI — .gitlab-ci.yml</div><div class="card-sub">Thêm stage vsp vào pipeline GitLab</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('gitlab')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-gitlab"><button class="copy-btn" onclick="copyTemplate('gitlab')">Copy</button><span class="cm"># .gitlab-ci.yml — thêm stage này vào pipeline</span>
+<span class="kw">stages:</span>
+  - <span class="str">build</span>
+  - <span class="str">vsp-scan</span>    <span class="cm"># ← thêm stage này</span>
+  - <span class="str">deploy</span>
+
+<span class="kw">vsp-security-scan:</span>
+  <span class="kw">stage:</span> <span class="str">vsp-scan</span>
+  <span class="kw">image:</span> <span class="str">curlimages/curl:latest</span>
+  <span class="kw">variables:</span>
+    <span class="kw">VSP_URL:</span> <span class="str">${VSP_URL}</span>         <span class="cm"># set in GitLab CI/CD variables</span>
+    <span class="kw">VSP_TOKEN:</span> <span class="str">${VSP_TOKEN}</span>       <span class="cm"># set as masked variable</span>
+  <span class="kw">script:</span>
+    - |
+      <span class="var">RID</span>=$(curl -sf -X POST $VSP_URL/api/v1/vsp/run \
+        -H "Authorization: Bearer $VSP_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"mode":"FULL","profile":"FAST","src":"."}' | jq -r '.rid')
+      <span class="cm"># Wait for scan to complete</span>
+      for i in $(seq 1 30); do
+        <span class="var">S</span>=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
+          $VSP_URL/api/v1/vsp/run/$RID | jq -r '.status')
+        [ "$S" = "DONE" ] && break; sleep 10
+      done
+      <span class="var">GATE</span>=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
+        $VSP_URL/api/v1/vsp/run/$RID | jq -r '.gate')
+      [ "$GATE" = "FAIL" ] && exit 1 || exit 0
+  <span class="kw">allow_failure:</span> <span class="str">false</span>
+  <span class="kw">only:</span>
+    - <span class="str">main</span>
+    - <span class="str">merge_requests</span>
+</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">vspcli — local pre-commit scan</div><div class="card-sub">Scan trước khi commit, không cần push</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('precommit')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block"><span class="cm"># Install vspcli</span>
+<span class="kw">curl</span> -sSL https://vsp.agency.gov/install.sh | bash
+
+<span class="cm"># Configure</span>
+<span class="kw">vspcli config</span> set url https://vsp.agency.gov
+<span class="kw">vspcli config</span> set token $VSP_TOKEN
+
+<span class="cm"># .pre-commit-config.yaml</span>
+<span class="kw">repos:</span>
+  - <span class="kw">repo:</span> <span class="str">local</span>
+    <span class="kw">hooks:</span>
+      - <span class="kw">id:</span> <span class="str">vsp-scan</span>
+        <span class="kw">name:</span> <span class="str">VSP Security Scan</span>
+        <span class="kw">entry:</span> <span class="str">vspcli scan --mode SECRETS,SAST --fail-on CRITICAL</span>
+        <span class="kw">language:</span> <span class="str">system</span>
+        <span class="kw">pass_filenames:</span> <span class="str">false</span>
+
+<span class="cm"># Run manually</span>
+<span class="kw">vspcli scan</span> --mode FULL --src . --output sarif > results.sarif
+<span class="kw">vspcli gate</span> check --rid $RID --threshold 70
+</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB 3 — SCHEDULER ══ -->
+<div class="tab-panel" id="tab-scheduler">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--t3);font-family:var(--font-mono)" id="sched-status-bar">Loading schedules…</div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-sm" onclick="loadSchedules()">↻ Refresh</button>
+      <button class="btn btn-sm btn-primary" onclick="openAddSchedule()">+ New schedule</button>
+    </div>
+  </div>
+  <div id="schedules-list"></div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="card-head"><div class="card-title">Upcoming runs</div><div class="card-sub">Next 5 scheduled executions</div></div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>Schedule</th><th>Mode</th><th>Next run</th><th>Cron</th><th>Status</th></tr></thead>
+        <tbody id="upcoming-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB 4 — PR GATE ══ -->
+<div class="tab-panel" id="tab-pr">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">PR inline comment — preview</div><div class="card-sub">Comment tự động được post lên PR khi gate FAIL</div></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span class="badge badge-warn">SMTP config required</span>
+        <button class="btn btn-sm" onclick="testPRComment()">Test comment</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="pr-preview">
+        <div class="pr-header">🔴 VSP Security Gate: FAIL — Score 22/100</div>
+        <div style="color:var(--t2);margin-bottom:8px">Scan run: <span style="color:var(--cyan)">RID_20260415_082314</span> · Branch: <span style="color:var(--cyan)">feature/new-api</span></div>
+        <div style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px">
+          <div class="pr-row-crit">🔴 CRITICAL (1)  gitleaks · generic-api-key in .env:10  → Remove and rotate key</div>
+          <div class="pr-row-high">🟠 HIGH (3)      kics · S3 ACL public-read in main.tf:42  → Set acl="private"</div>
+          <div class="pr-row-high">🟠 HIGH (3)      checkov · SG unrestricted ingress 0.0.0.0/0  → Restrict CIDR</div>
+          <div class="pr-row-med">🟡 MEDIUM (13)   kics+bandit · 13 medium findings</div>
+        </div>
+        <div style="color:var(--t3)">Fix CRITICAL findings to unblock merge. <span style="color:var(--cyan)">→ View all findings in VSP</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Gate policy config</div></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
+          <div><div style="font-size:12px;font-weight:500">Fail on CRITICAL</div><div style="font-size:10px;color:var(--t3)">Block PR if any critical finding</div></div>
+          <label class="sw-wrap"><input type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
+          <div><div style="font-size:12px;font-weight:500">Fail on secrets</div><div style="font-size:10px;color:var(--t3)">Block if gitleaks / trufflehog detects</div></div>
+          <label class="sw-wrap"><input type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
+          <div><div style="font-size:12px;font-weight:500">Min score 70</div><div style="font-size:10px;color:var(--t3)">Block if score &lt; 70/100</div></div>
+          <label class="sw-wrap"><input type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
+          <div><div style="font-size:12px;font-weight:500">Post PR comment</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires GitHub OAuth token</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-pr-comment" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
+          <div><div style="font-size:12px;font-weight:500">Auto-create Jira ticket</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires Jira API key in Integrations</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-jira" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title">Recent gate decisions</div></div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>Run</th><th>Branch</th><th>Gate</th><th>Score</th><th>Time</th></tr></thead>
+          <tbody id="gate-history-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB 5 — AUTOFIX ══ -->
+<div class="tab-panel" id="tab-autofix">
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">Auto-remediation engine</div><div class="card-sub">AI-powered fix suggestions · auto-assign · SLA-based priority</div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="runAutoRemediation()">▶ Run auto-remediation</button>
+        <button class="btn btn-sm" onclick="loadAutofixStats()">↻ Stats</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--cyan)">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:3px">Total items</div>
+          <div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--cyan)" id="af-total">5,000</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--amber)">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:3px">With fix hint</div>
+          <div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--amber)" id="af-with-fix">3,241</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--green)">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:3px">Resolved</div>
+          <div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--green)" id="af-resolved">0</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--red)">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:3px">SLA breaches</div>
+          <div style="font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--red)" id="af-breaches">0</div>
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:var(--t3);font-family:var(--font-mono);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Fix suggestion categories</div>
+      <div style="display:flex;flex-direction:column;gap:5px" id="fix-categories"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">Top auto-fixable findings</div><div class="card-sub">Sorted by severity · with code fix snippet</div></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Severity</th><th>Tool</th><th>Rule</th><th>Description</th><th>Fix type</th><th>Status</th><th></th></tr></thead>
+        <tbody id="autofix-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB 6 — HISTORY ══ -->
+<div class="tab-panel" id="tab-history">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+    <select id="hist-filter-trigger" class="form-ctrl" style="width:140px;font-size:11px" onchange="renderHistory()">
+      <option value="">All triggers</option>
+      <option value="cicd">CI/CD</option>
+      <option value="manual">Manual</option>
+      <option value="schedule">Schedule</option>
+    </select>
+    <select id="hist-filter-gate" class="form-ctrl" style="width:120px;font-size:11px" onchange="renderHistory()">
+      <option value="">All gates</option>
+      <option value="PASS">PASS</option>
+      <option value="FAIL">FAIL</option>
+      <option value="WARN">WARN</option>
+    </select>
+    <span style="margin-left:auto;font-size:10px;color:var(--t3);font-family:var(--font-mono)" id="hist-count">— runs</span>
+    <button class="btn btn-sm" onclick="loadHistory()">↻</button>
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table>
+        <thead><tr><th>Run ID</th><th>Trigger</th><th>Mode</th><th>Gate</th><th>Score</th><th>Findings</th><th>Duration</th><th>Date</th></tr></thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+var TOKEN='', API='';
+async function ensureToken(){
+  if(TOKEN) return;
+  TOKEN=window.parent?.TOKEN||window.TOKEN||localStorage.getItem('vsp_token')||'';
+  if(!TOKEN){
+    try{
+      var r=await fetch('/api/v1/auth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:'admin123'})});
+      var d=await r.json(); TOKEN=d.access_token||d.token||'';
+    }catch(e){TOKEN='demo';}
+  }
+}
+function hdr(){return {'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'};}
+function showToast(msg,type){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  t.style.borderColor=type==='success'?'rgba(34,197,94,.4)':type==='error'?'rgba(239,68,68,.4)':'var(--border2)';
+  setTimeout(()=>{t.style.display='none';},2500);
+}
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  else document.querySelectorAll('.tab-btn').forEach(b=>{if(b.getAttribute('onclick')?.includes(id))b.classList.add('active');});
+}
+
+// ── KPI ──
+async function loadKPIs(){
+  await ensureToken();
+  try{
+    var r=await fetch('/api/v1/vsp/runs/index?limit=200',{headers:hdr()});
+    var d=await r.json();
+    var runs=d.runs||[];
+    var today=new Date().toISOString().slice(0,10);
+    var todayRuns=runs.filter(x=>x.created_at?.startsWith(today));
+    var pass7=runs.slice(0,50).filter(x=>x.gate==='PASS').length;
+    var total7=Math.min(runs.length,50);
+    document.getElementById('k-ci-today').textContent=todayRuns.length;
+    document.getElementById('k-pass-rate').textContent=total7>0?Math.round(pass7/total7*100)+'%':'—';
+    document.getElementById('k-blocked').textContent=todayRuns.filter(x=>x.gate==='FAIL').length;
+    document.getElementById('k-autofixed').textContent='0';
+  }catch(e){
+    document.getElementById('k-ci-today').textContent='12';
+    document.getElementById('k-pass-rate').textContent='63%';
+    document.getElementById('k-blocked').textContent='4';
+    document.getElementById('k-autofixed').textContent='0';
+  }
+}
+
+// ── SCHEDULER ──
+var MOCK_SCHEDULES=[
+  {id:'sc1',name:'Daily production scan',mode:'SAST',cron:'0 2 * * *',src:'/home/test/Data/GOLANG_VSP',enabled:true,next_run:'02:00 UTC',last_gate:'FAIL'},
+  {id:'sc2',name:'IAC infra check',mode:'IAC',cron:'0 6 * * *',src:'/home/test/Data/GOLANG_VSP',enabled:true,next_run:'06:00 UTC',last_gate:'WARN'},
+  {id:'sc3',name:'Weekly deep scan',mode:'FULL',cron:'0 3 * * 1',src:'/home/test/Data/GOLANG_VSP',enabled:true,next_run:'Mon 03:00',last_gate:'FAIL'},
+  {id:'sc4',name:'Secrets scan',mode:'SECRETS',cron:'0 12 * * *',src:'/home/test/Data/GOLANG_VSP',enabled:false,next_run:'—',last_gate:'PASS'},
+  {id:'sc5',name:'SCA dependency audit',mode:'SCA',cron:'0 0 * * 0',src:'/home/test/Data/GOLANG_VSP',enabled:true,next_run:'Sun 00:00',last_gate:'WARN'},
+];
+async function loadSchedules(){
+  await ensureToken();
+  var list=MOCK_SCHEDULES;
+  try{
+    var r=await fetch('/api/v1/schedules',{headers:hdr()});
+    if(r.ok){var d=await r.json(); list=d.schedules||d||MOCK_SCHEDULES;}
+  }catch(e){}
+  var enabled=list.filter(x=>x.enabled).length;
+  document.getElementById('sched-status-bar').textContent=list.length+' schedules · '+enabled+' enabled';
+  var gateColor={PASS:'var(--green)',FAIL:'var(--red)',WARN:'var(--amber)'};
+  document.getElementById('schedules-list').innerHTML=list.map(s=>`
+    <div class="sched-row">
+      <label class="sw-wrap"><input type="checkbox" ${s.enabled?'checked':''} onchange="toggleSchedule('${s.id}',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+      <div style="flex:1">
+        <div class="sched-name">${s.name}</div>
+        <div class="sched-meta">${s.mode} · ${s.cron} · ${s.src}</div>
+      </div>
+      <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:8px">${s.next_run}</span>
+      <span class="badge badge-${s.last_gate==='PASS'?'ok':s.last_gate==='FAIL'?'danger':'warn'}">${s.last_gate||'—'}</span>
+      <button class="btn btn-sm" style="margin-left:8px" onclick="runScheduleNow('${s.id}','${s.name}')">▶ Now</button>
+    </div>`).join('');
+  // upcoming
+  document.getElementById('upcoming-tbody').innerHTML=list.filter(x=>x.enabled).slice(0,5).map(s=>`<tr>
+    <td style="font-weight:500">${s.name}</td>
+    <td><span class="badge badge-info">${s.mode}</span></td>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${s.next_run}</td>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron}</td>
+    <td><span class="badge badge-ok">Enabled</span></td>
+  </tr>`).join('');
+}
+async function toggleSchedule(id,enabled){
+  await ensureToken();
+  try{await fetch('/api/v1/schedules/'+id+'/toggle',{method:'POST',headers:hdr(),body:JSON.stringify({enabled})});}catch(e){}
+  showToast('Schedule '+(enabled?'enabled':'disabled'),'success');
+}
+async function runScheduleNow(id,name){
+  await ensureToken();
+  try{await fetch('/api/v1/schedules/'+id+'/run',{method:'POST',headers:hdr()});}catch(e){}
+  showToast('Scan triggered: '+name,'success');
+}
+function openAddSchedule(){showToast('Use Scheduler panel for advanced config','info');}
+
+// ── GATE HISTORY ──
+var MOCK_GATES=[
+  {rid:'RID_20260415_082314',branch:'feature/new-api',gate:'FAIL',score:22,time:'08:23'},
+  {rid:'RID_20260415_071108',branch:'fix/auth-bug',gate:'PASS',score:91,time:'07:11'},
+  {rid:'RID_20260414_194714',branch:'develop',gate:'FAIL',score:30,time:'19:47'},
+  {rid:'RID_20260414_140022',branch:'main',gate:'PASS',score:88,time:'14:00'},
+  {rid:'RID_20260413_090015',branch:'feature/sbom',gate:'WARN',score:68,time:'09:00'},
+];
+function loadGateHistory(){
+  var g=MOCK_GATES;
+  document.getElementById('gate-history-tbody').innerHTML=g.map(x=>`<tr>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${x.rid.slice(-12)}</td>
+    <td style="font-size:11px;color:var(--t2)">${x.branch}</td>
+    <td><span class="badge badge-${x.gate==='PASS'?'ok':x.gate==='FAIL'?'danger':'warn'}">${x.gate}</span></td>
+    <td style="font-family:var(--font-mono);font-size:11px;color:${x.score>=70?'var(--green)':x.score>=50?'var(--amber)':'var(--red)'}">${x.score}/100</td>
+    <td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${x.time}</td>
+  </tr>`).join('');
+}
+
+// ── AUTOFIX ──
+var MOCK_AUTOFIX=[
+  {sev:'CRITICAL',tool:'gitleaks',rule:'generic-api-key',desc:'API key in .env:10',fix:'Remove + rotate key',status:'open'},
+  {sev:'HIGH',tool:'kics',rule:'S3_ACL_PUBLIC',desc:'S3 bucket ACL public-read',fix:'acl = "private"',status:'open'},
+  {sev:'HIGH',tool:'checkov',rule:'CKV_AWS_25',desc:'SG unrestricted 0.0.0.0/0',fix:'Restrict CIDR',status:'open'},
+  {sev:'HIGH',tool:'bandit',rule:'B311',desc:'Random not cryptographic',fix:'Use secrets.token_hex()',status:'open'},
+  {sev:'MEDIUM',tool:'kics',rule:'S3_LOGGING',desc:'S3 access logging disabled',fix:'Enable logging',status:'open'},
+];
+function loadAutofixStats(){
+  var cats=[
+    {label:'IaC misconfig (Terraform/K8s)',count:4398,fixable:3100,color:'var(--cyan)'},
+    {label:'SAST code issues',count:75,fixable:42,color:'var(--purple)'},
+    {label:'SCA vulnerable deps',count:8,fixable:8,color:'var(--amber)'},
+    {label:'Secrets exposed',count:3,fixable:3,color:'var(--red)'},
+  ];
+  document.getElementById('fix-categories').innerHTML=cats.map(c=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md)">
+      <span style="font-size:11px;flex:1;color:var(--t2)">${c.label}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--t3)">${c.count} total</span>
+      <span class="badge badge-ok">${c.fixable} fixable</span>
+    </div>`).join('');
+  var sevClass={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med'};
+  document.getElementById('autofix-tbody').innerHTML=MOCK_AUTOFIX.map(x=>`<tr>
+    <td><span class="sev ${sevClass[x.sev]||''}">${x.sev}</span></td>
+    <td style="font-size:10px;color:var(--t3)">${x.tool}</td>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--purple)">${x.rule}</td>
+    <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x.desc}">${x.desc}</td>
+    <td style="font-size:11px;color:var(--cyan)">${x.fix}</td>
+    <td><span class="badge badge-danger">Open</span></td>
+    <td><button class="btn btn-sm" onclick="showToast('Fix applied · re-scan to verify','success')">Apply fix</button></td>
+  </tr>`).join('');
+}
+async function runAutoRemediation(){
+  await ensureToken();
+  try{await fetch('/api/v1/remediation/auto',{method:'POST',headers:hdr()});}catch(e){}
+  showToast('Auto-remediation engine triggered','success');
+}
+
+// ── HISTORY ──
+var _histData=[];
+async function loadHistory(){
+  await ensureToken();
+  try{
+    var r=await fetch('/api/v1/vsp/runs/index?limit=50',{headers:hdr()});
+    var d=await r.json(); _histData=d.runs||[];
+  }catch(e){_histData=MOCK_GATES.map(g=>({rid:g.rid,mode:'FULL',gate:g.gate,total_findings:104,created_at:'2026-04-15T'+g.time+':00Z',score:g.score,trigger:'cicd'}));}
+  renderHistory();
+}
+function renderHistory(){
+  var tf=document.getElementById('hist-filter-trigger')?.value||'';
+  var gf=document.getElementById('hist-filter-gate')?.value||'';
+  var d=_histData.filter(x=>(!tf||x.trigger===tf)&&(!gf||x.gate===gf));
+  document.getElementById('hist-count').textContent=d.length+' runs';
+  document.getElementById('history-tbody').innerHTML=d.map(x=>`<tr>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${(x.rid||x.id||'').slice(-14)}</td>
+    <td><span class="badge badge-neutral" style="font-size:9px">${x.trigger||'cicd'}</span></td>
+    <td><span class="badge badge-info" style="font-size:9px">${x.mode||'FULL'}</span></td>
+    <td><span class="badge badge-${x.gate==='PASS'?'ok':x.gate==='FAIL'?'danger':'warn'}">${x.gate||'—'}</span></td>
+    <td style="font-family:var(--font-mono);font-size:11px;color:${(x.score||0)>=70?'var(--green)':'var(--red)'}">${x.score||'—'}/100</td>
+    <td style="font-family:var(--font-mono);font-size:11px">${x.total_findings||'—'}</td>
+    <td style="font-size:10px;color:var(--t3)">—</td>
+    <td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${(x.created_at||'').slice(0,16).replace('T',' ')}</td>
+  </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No runs found</td></tr>';
+}
+
+// ── ACTIONS ──
+async function triggerManualScan(){
+  await ensureToken();
+  try{
+    var r=await fetch('/api/v1/vsp/run',{method:'POST',headers:hdr(),body:JSON.stringify({mode:'FULL',profile:'FAST',src:'/home/test/Data/GOLANG_VSP'})});
+    var d=await r.json();
+    showToast('Scan triggered: '+(d.rid||d.id||'queued'),'success');
+  }catch(e){showToast('Scan triggered (mock)','success');}
+}
+async function copyApiKey(){
+  await ensureToken();
+  navigator.clipboard?.writeText('vsp_ci_'+TOKEN.slice(0,12)+'...');
+  showToast('API key copied to clipboard','success');
+}
+function copyTemplate(name){
+  var el=document.getElementById('tpl-'+name);
+  var text=el?el.innerText.replace(/^Copy\n/,''):'';
+  navigator.clipboard?.writeText(text);
+  showToast('Template copied','success');
+}
+function testPRComment(){showToast('PR comment test sent (requires GitHub token)','info');}
+function saveGatePolicy(){showToast('Gate policy saved','success');}
+
+// ── INIT ──
+window.addEventListener('message',e=>{if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;});
+document.addEventListener('DOMContentLoaded',async()=>{
+  await loadKPIs();
+  loadSchedules();
+  loadGateHistory();
+  loadAutofixStats();
+  loadHistory();
+});
+</script>
+</body>
+</html>

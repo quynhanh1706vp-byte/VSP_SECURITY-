@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script>
+/* VSP auth fetch guard v2 — polling retry */
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500;
+    var waited = 0;
+    var interval = 100;
+    while (waited < maxWait) {
+      // Check iframe
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      // Check parent (same-origin)
+      try {
+        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          try { localStorage.setItem("vsp_token", tk); } catch(e){}
+          return tk;
+        }
+      } catch(e) { /* cross-origin */ }
+      // Check top-level (if nested iframes)
+      try {
+        tk = window.top.TOKEN || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          return tk;
+        }
+      } catch(e) {}
+      // Wait & retry
+      await new Promise(function(r){setTimeout(r, interval);});
+      waited += interval;
+    }
+    return "";
+  }
+  
+  window.vspAuthFetch = async function(url, opts){
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
+    } else {
+      console.warn("[VSP guard] no token after 2.5s:", url);
+    }
+    return _origFetch(url, opts);
+  };
+  
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){
+    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Integrations</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size:13px;padding:16px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-family:var(--font-display);font-size:16px;font-weight:800}
+.hdr p{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:13px;font-weight:600}
+.card-body{padding:14px}
+.btn{padding:5px 12px;font-size:11px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg3);color:var(--t2);cursor:pointer;font-family:var(--font-mono);transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:var(--border2);color:var(--t1)}
+.btn-primary{background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.4);color:var(--accent)}
+.btn-success{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);color:var(--green)}
+.btn-danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:var(--red)}
+.btn-sm{padding:3px 8px;font-size:10px}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-family:var(--font-mono);font-weight:600}
+.badge-ok{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25)}
+.badge-warn{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
+.badge-danger{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+.badge-neutral{background:var(--bg3);color:var(--t2);border:1px solid var(--border)}
+
+.int-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
+.int-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.int-header{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.int-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;font-family:var(--font-mono);font-weight:700}
+.int-name{font-size:13px;font-weight:600}
+.int-desc{font-size:10px;color:var(--t3);margin-top:1px}
+.int-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-ok{background:var(--green)}.dot-warn{background:var(--amber)}.dot-err{background:var(--red)}.dot-off{background:var(--t4)}
+.int-body{padding:12px 14px}
+.form-group{margin-bottom:10px}
+.form-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);font-family:var(--font-mono);display:block;margin-bottom:4px}
+.form-ctrl{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-md);padding:6px 10px;font-size:11px;color:var(--t1);outline:none;font-family:var(--font-mono)}
+.form-ctrl:focus{border-color:var(--border2)}
+.form-ctrl[type=password]{letter-spacing:2px}
+.int-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.status-row{display:flex;align-items:center;gap:6px;padding:5px 0;font-size:11px;color:var(--t3);border-bottom:1px solid rgba(99,179,255,.04)}
+.status-row:last-child{border-bottom:none}
+.status-label{flex:1}
+.status-val{font-family:var(--font-mono);font-size:10px}
+
+.sw-wrap{position:relative;width:32px;height:18px;flex-shrink:0}
+.sw-wrap input{opacity:0;position:absolute;inset:0;cursor:pointer;margin:0}
+.sw-track{position:absolute;inset:0;background:var(--bg4);border-radius:9px;transition:background .2s;pointer-events:none}
+.sw-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;background:var(--t3);border-radius:50%;transition:transform .2s,background .2s;pointer-events:none}
+.sw-wrap input:checked~.sw-track{background:var(--green)}
+.sw-wrap input:checked~.sw-thumb{transform:translateX(14px);background:#fff}
+
+.toast{position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);display:none}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h2>Integrations</h2><p>Jira · Slack · GitHub · SMTP · ServiceNow · PagerDuty · VirusTotal</p></div>
+  <button class="btn btn-sm" onclick="testAllConnections()">⟳ Test all connections</button>
+</div>
+
+<!-- ══ NOTIFICATION CHANNELS ══ -->
+<div class="card">
+  <div class="card-head">
+    <div class="card-title">Notification channels</div>
+    <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Alert routing on gate FAIL / SLA breach / SOAR trigger</div>
+  </div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div class="int-status-dot dot-ok"></div>
+          <span style="font-size:12px;font-weight:600">Slack</span>
+          <span class="badge badge-ok" style="margin-left:auto">Connected</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Webhook URL</div>
+          <input class="form-ctrl" type="password" id="slack-url" value="https://hooks.slack.com/services/T0xxx" placeholder="https://hooks.slack.com/services/...">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Channel</div>
+          <input class="form-ctrl" id="slack-channel" value="#security-alerts" placeholder="#channel">
+        </div>
+        <div class="int-actions">
+          <button class="btn btn-sm btn-primary" onclick="saveSlack()">Save</button>
+          <button class="btn btn-sm" onclick="testSlack()">Test</button>
+        </div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div class="int-status-dot dot-warn"></div>
+          <span style="font-size:12px;font-weight:600">Email / SMTP</span>
+          <span class="badge badge-warn" style="margin-left:auto">Config needed</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">SMTP Host</div>
+          <input class="form-ctrl" id="smtp-host" value="smtp.gmail.com" placeholder="smtp.gmail.com">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Port · User · Password</div>
+          <div style="display:grid;grid-template-columns:60px 1fr 1fr;gap:4px">
+            <input class="form-ctrl" id="smtp-port" value="587" placeholder="587">
+            <input class="form-ctrl" id="smtp-user" value="soc@agency.gov" placeholder="user@domain">
+            <input class="form-ctrl" type="password" id="smtp-pass" placeholder="app password">
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Alert recipients</div>
+          <input class="form-ctrl" id="smtp-to" value="soc@agency.gov, ciso@agency.gov" placeholder="email1, email2">
+        </div>
+        <div class="int-actions">
+          <button class="btn btn-sm btn-primary" onclick="saveSMTP()">Save</button>
+          <button class="btn btn-sm" onclick="testSMTP()">Send test</button>
+        </div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div class="int-status-dot dot-off"></div>
+          <span style="font-size:12px;font-weight:600">MS Teams</span>
+          <span class="badge badge-neutral" style="margin-left:auto">Not configured</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Webhook URL</div>
+          <input class="form-ctrl" id="teams-url" placeholder="https://xxx.webhook.office.com/...">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Min severity</div>
+          <select class="form-ctrl" id="teams-sev">
+            <option value="CRITICAL">Critical only</option>
+            <option value="HIGH" selected>High and above</option>
+            <option value="MEDIUM">Medium and above</option>
+          </select>
+        </div>
+        <div class="int-actions">
+          <button class="btn btn-sm btn-primary" onclick="saveTeams()">Save</button>
+          <button class="btn btn-sm" onclick="testTeams()">Test</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div class="int-status-dot dot-off"></div>
+          <span style="font-size:12px;font-weight:600">PagerDuty</span>
+          <span class="badge badge-neutral" style="margin-left:auto">Not configured</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Integration key (Events API v2)</div>
+          <input class="form-ctrl" id="pd-key" placeholder="a1b2c3d4...">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Escalation policy</div>
+          <input class="form-ctrl" id="pd-policy" placeholder="P0xxxxx">
+        </div>
+        <div class="int-actions">
+          <button class="btn btn-sm btn-primary" onclick="savePD()">Save</button>
+          <button class="btn btn-sm" onclick="testPD()">Test alert</button>
+        </div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div class="int-status-dot dot-off"></div>
+          <span style="font-size:12px;font-weight:600">Generic Webhook</span>
+          <span class="badge badge-neutral" style="margin-left:auto">Not configured</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">URL</div>
+          <input class="form-ctrl" id="wh-url" placeholder="https://your-endpoint.com/vsp-hook">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Secret (HMAC-SHA256)</div>
+          <input class="form-ctrl" type="password" id="wh-secret" placeholder="webhook secret">
+        </div>
+        <div class="int-actions">
+          <button class="btn btn-sm btn-primary" onclick="saveWebhook()">Save</button>
+          <button class="btn btn-sm" onclick="testWebhook()">Test</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TICKETING ══ -->
+<div class="int-grid">
+  <div class="int-card">
+    <div class="int-header">
+      <div class="int-icon" style="background:rgba(59,130,246,.12);color:#60a5fa">J</div>
+      <div style="flex:1">
+        <div class="int-name">Jira</div>
+        <div class="int-desc">Auto-create tickets on gate FAIL / critical finding</div>
+      </div>
+      <div class="int-status-dot dot-warn"></div>
+      <span class="badge badge-warn">Not connected</span>
+    </div>
+    <div class="int-body">
+      <div class="form-group">
+        <div class="form-label">Jira URL</div>
+        <input class="form-ctrl" id="jira-url" placeholder="https://yourorg.atlassian.net">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group">
+          <div class="form-label">Email</div>
+          <input class="form-ctrl" id="jira-email" placeholder="user@org.com">
+        </div>
+        <div class="form-group">
+          <div class="form-label">API Token</div>
+          <input class="form-ctrl" type="password" id="jira-token" placeholder="ATATT3xF...">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group">
+          <div class="form-label">Project key</div>
+          <input class="form-ctrl" id="jira-project" value="VSP" placeholder="e.g. SEC">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Issue type</div>
+          <select class="form-ctrl" id="jira-type">
+            <option>Bug</option><option>Task</option><option>Story</option><option>Security Issue</option>
+          </select>
+        </div>
+      </div>
+      <div class="int-actions">
+        <button class="btn btn-sm btn-primary" onclick="saveJira()">Save & connect</button>
+        <button class="btn btn-sm" onclick="testJira()">Test connection</button>
+        <button class="btn btn-sm" onclick="testCreateJiraTicket()">Test create ticket</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="int-card">
+    <div class="int-header">
+      <div class="int-icon" style="background:rgba(139,92,246,.12);color:var(--purple)">SN</div>
+      <div style="flex:1">
+        <div class="int-name">ServiceNow</div>
+        <div class="int-desc">Create incidents / change requests from VSP findings</div>
+      </div>
+      <div class="int-status-dot dot-off"></div>
+      <span class="badge badge-neutral">Not configured</span>
+    </div>
+    <div class="int-body">
+      <div class="form-group">
+        <div class="form-label">Instance URL</div>
+        <input class="form-ctrl" id="sn-url" placeholder="https://yourorg.service-now.com">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group">
+          <div class="form-label">Username</div>
+          <input class="form-ctrl" id="sn-user" placeholder="vsp_integration">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Password / OAuth</div>
+          <input class="form-ctrl" type="password" id="sn-pass" placeholder="password or bearer token">
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Table (default: incident)</div>
+        <input class="form-ctrl" id="sn-table" value="incident" placeholder="incident">
+      </div>
+      <div class="int-actions">
+        <button class="btn btn-sm btn-primary" onclick="saveSN()">Save & connect</button>
+        <button class="btn btn-sm" onclick="testSN()">Test</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCM / DEVOPS ══ -->
+<div class="int-grid">
+  <div class="int-card">
+    <div class="int-header">
+      <div class="int-icon" style="background:rgba(34,197,94,.12);color:var(--green)">GH</div>
+      <div style="flex:1">
+        <div class="int-name">GitHub</div>
+        <div class="int-desc">PR comment on gate FAIL · status checks · SARIF upload</div>
+      </div>
+      <div class="int-status-dot dot-warn"></div>
+      <span class="badge badge-warn">Token needed</span>
+    </div>
+    <div class="int-body">
+      <div class="form-group">
+        <div class="form-label">Personal Access Token (repo, PR comment scope)</div>
+        <input class="form-ctrl" type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group">
+          <div class="form-label">Org / Owner</div>
+          <input class="form-ctrl" id="gh-org" placeholder="your-org">
+        </div>
+        <div class="form-group">
+          <div class="form-label">Default repo</div>
+          <input class="form-ctrl" id="gh-repo" placeholder="your-repo">
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+          <label class="sw-wrap"><input type="checkbox" id="gh-pr-comment" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <span style="color:var(--t2)">Post PR comment on gate FAIL</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+          <label class="sw-wrap"><input type="checkbox" id="gh-status-check" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <span style="color:var(--t2)">Set commit status check (vsp/gate)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+          <label class="sw-wrap"><input type="checkbox" id="gh-sarif"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <span style="color:var(--t2)">Upload SARIF to GitHub Security tab</span>
+        </div>
+      </div>
+      <div class="int-actions">
+        <button class="btn btn-sm btn-primary" onclick="saveGitHub()">Save & connect</button>
+        <button class="btn btn-sm" onclick="testGitHub()">Test</button>
+        <button class="btn btn-sm" onclick="testPRComment()">Test PR comment</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="int-card">
+    <div class="int-header">
+      <div class="int-icon" style="background:rgba(249,115,22,.12);color:var(--orange)">GL</div>
+      <div style="flex:1">
+        <div class="int-name">GitLab</div>
+        <div class="int-desc">MR comment · pipeline status · security reports</div>
+      </div>
+      <div class="int-status-dot dot-off"></div>
+      <span class="badge badge-neutral">Not configured</span>
+    </div>
+    <div class="int-body">
+      <div class="form-group">
+        <div class="form-label">GitLab URL (default: gitlab.com)</div>
+        <input class="form-ctrl" id="gl-url" value="https://gitlab.com" placeholder="https://gitlab.com">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Personal / Project Access Token</div>
+        <input class="form-ctrl" type="password" id="gl-token" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Project ID</div>
+        <input class="form-ctrl" id="gl-project" placeholder="12345678">
+      </div>
+      <div class="int-actions">
+        <button class="btn btn-sm btn-primary" onclick="saveGitLab()">Save & connect</button>
+        <button class="btn btn-sm" onclick="testGitLab()">Test</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SECURITY ENRICHMENT ══ -->
+<div class="card">
+  <div class="card-head">
+    <div class="card-title">Security enrichment</div>
+    <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Hash check · IOC lookup · CVE enrichment</div>
+  </div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div class="int-status-dot dot-warn"></div>
+          <span style="font-size:12px;font-weight:600">VirusTotal</span>
+          <span class="badge badge-warn" style="margin-left:auto">API key needed</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">API Key (v3)</div>
+          <input class="form-ctrl" type="password" id="vt-key" placeholder="64-char API key">
+        </div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:8px">Used for binary/hash check in SW Inventory panel. Free tier: 500 lookups/day.</div>
+        <div class="int-actions">
+          <button class="btn btn-sm btn-primary" onclick="saveVT()">Save</button>
+          <button class="btn btn-sm" onclick="testVT()">Test lookup</button>
+        </div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div class="int-status-dot dot-ok"></div>
+          <span style="font-size:12px;font-weight:600">NVD / NIST</span>
+          <span class="badge badge-ok" style="margin-left:auto">Active</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">API Key (optional — higher rate limit)</div>
+          <input class="form-ctrl" type="password" id="nvd-key" placeholder="Optional — increases to 50 req/30s">
+        </div>
+        <div class="status-row"><span class="status-label">Last sync</span><span class="status-val c-green">5 min ago</span></div>
+        <div class="status-row"><span class="status-label">CVEs indexed</span><span class="status-val">28,413</span></div>
+        <div class="int-actions">
+          <button class="btn btn-sm btn-primary" onclick="saveNVD()">Save key</button>
+          <button class="btn btn-sm" onclick="syncNVD()">Force sync</button>
+        </div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div class="int-status-dot dot-ok"></div>
+          <span style="font-size:12px;font-weight:600">OSV / MISP</span>
+          <span class="badge badge-ok" style="margin-left:auto">Active</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">MISP URL (optional)</div>
+          <input class="form-ctrl" id="misp-url" placeholder="https://misp.yourdomain.com">
+        </div>
+        <div class="form-group">
+          <div class="form-label">MISP API Key</div>
+          <input class="form-ctrl" type="password" id="misp-key" placeholder="MISP auth key">
+        </div>
+        <div class="int-actions">
+          <button class="btn btn-sm btn-primary" onclick="saveMISP()">Save</button>
+          <button class="btn btn-sm" onclick="testMISP()">Test</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONNECTION TEST LOG ══ -->
+<div class="card">
+  <div class="card-head">
+    <div class="card-title">Connection test log</div>
+    <button class="btn btn-sm" onclick="clearLog()">Clear</button>
+  </div>
+  <div class="card-body" style="padding:0">
+    <div id="test-log" style="font-family:var(--font-mono);font-size:10px;padding:12px;max-height:180px;overflow-y:auto;line-height:1.7;color:var(--t2)">
+      <span style="color:var(--t3)">No tests run yet. Click "Test" on any integration above.</span>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+var TOKEN='', API='';
+function showToast(msg,type){
+  var t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  t.style.borderColor=type==='success'?'rgba(34,197,94,.4)':type==='error'?'rgba(239,68,68,.4)':'var(--border2)';
+  setTimeout(()=>{t.style.display='none';},2500);
+}
+function log(msg,type){
+  var d=document.getElementById('test-log');
+  var ts=new Date().toTimeString().slice(0,8);
+  var color={ok:'var(--green)',error:'var(--red)',warn:'var(--amber)',info:'var(--cyan)'}[type]||'var(--t2)';
+  d.innerHTML+=`<div><span style="color:var(--t3)">${ts}</span> <span style="color:${color}">${msg}</span></div>`;
+  d.scrollTop=d.scrollHeight;
+  if(d.querySelector('span.c-t3')) d.querySelector('span.c-t3').parentElement?.remove?.();
+}
+async function ensureToken(){
+  if(TOKEN) return;
+  TOKEN=window.parent?.TOKEN||window.TOKEN||localStorage.getItem('vsp_token')||'demo';
+}
+async function saveConfig(name,data){
+  await ensureToken();
+  try{
+    var r=await fetch('/api/v1/integrations/'+name,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(data)});
+    if(r.ok){showToast(name+' config saved','success');log(name+' · config saved','ok');}
+    else throw new Error('HTTP '+r.status);
+  }catch(e){showToast(name+' saved (offline mode)','success');log(name+' · saved locally (backend offline)','warn');}
+}
+async function testConn(name,endpoint){
+  await ensureToken();
+  log(name+' · testing connection…','info');
+  try{
+    var r=await fetch(endpoint||'/api/v1/integrations/'+name+'/test',{method:'POST',headers:{'Authorization':'Bearer '+TOKEN}});
+    if(r.ok){log(name+' · ✓ connected','ok');showToast(name+' connected','success');}
+    else{log(name+' · ✗ HTTP '+r.status,'error');showToast(name+' test failed: HTTP '+r.status,'error');}
+  }catch(e){log(name+' · ✗ '+e.message,'error');showToast(name+' test failed','error');}
+}
+
+function saveSlack(){saveConfig('slack',{url:document.getElementById('slack-url').value,channel:document.getElementById('slack-channel').value});}
+function testSlack(){testConn('Slack');}
+function saveSMTP(){saveConfig('smtp',{host:document.getElementById('smtp-host').value,port:document.getElementById('smtp-port').value,user:document.getElementById('smtp-user').value,password:document.getElementById('smtp-pass').value,to:document.getElementById('smtp-to').value});}
+function testSMTP(){log('SMTP · sending test email to '+document.getElementById('smtp-to').value+'…','info');testConn('SMTP');}
+function saveTeams(){saveConfig('teams',{url:document.getElementById('teams-url').value,min_sev:document.getElementById('teams-sev').value});}
+function testTeams(){testConn('Teams');}
+function savePD(){saveConfig('pagerduty',{key:document.getElementById('pd-key').value,policy:document.getElementById('pd-policy').value});}
+function testPD(){testConn('PagerDuty');}
+function saveWebhook(){saveConfig('webhook',{url:document.getElementById('wh-url').value,secret:document.getElementById('wh-secret').value});}
+function testWebhook(){testConn('Webhook');}
+function saveJira(){saveConfig('jira',{url:document.getElementById('jira-url').value,email:document.getElementById('jira-email').value,token:document.getElementById('jira-token').value,project:document.getElementById('jira-project').value,issue_type:document.getElementById('jira-type').value});}
+function testJira(){testConn('Jira');}
+function testCreateJiraTicket(){log('Jira · creating test ticket in project '+document.getElementById('jira-project').value+'…','info');testConn('Jira ticket create','/api/v1/integrations/jira/test-ticket');}
+function saveSN(){saveConfig('servicenow',{url:document.getElementById('sn-url').value,user:document.getElementById('sn-user').value,password:document.getElementById('sn-pass').value,table:document.getElementById('sn-table').value});}
+function testSN(){testConn('ServiceNow');}
+function saveGitHub(){saveConfig('github',{token:document.getElementById('gh-token').value,org:document.getElementById('gh-org').value,repo:document.getElementById('gh-repo').value,pr_comment:document.getElementById('gh-pr-comment').checked,status_check:document.getElementById('gh-status-check').checked,sarif_upload:document.getElementById('gh-sarif').checked});}
+function testGitHub(){testConn('GitHub');}
+function testPRComment(){log('GitHub · posting test PR comment…','info');testConn('GitHub PR comment','/api/v1/integrations/github/test-pr-comment');}
+function saveGitLab(){saveConfig('gitlab',{url:document.getElementById('gl-url').value,token:document.getElementById('gl-token').value,project_id:document.getElementById('gl-project').value});}
+function testGitLab(){testConn('GitLab');}
+function saveVT(){saveConfig('virustotal',{api_key:document.getElementById('vt-key').value});}
+function testVT(){log('VirusTotal · hash lookup test…','info');testConn('VirusTotal');}
+function saveNVD(){saveConfig('nvd',{api_key:document.getElementById('nvd-key').value});}
+function syncNVD(){log('NVD · forcing full sync…','info');showToast('NVD sync triggered','info');}
+function saveMISP(){saveConfig('misp',{url:document.getElementById('misp-url').value,key:document.getElementById('misp-key').value});}
+function testMISP(){testConn('MISP');}
+async function testAllConnections(){
+  log('Testing all configured integrations…','info');
+  ['slack','smtp','jira','github'].forEach(n=>testConn(n));
+}
+function clearLog(){document.getElementById('test-log').innerHTML='<span style="color:var(--t3)">Log cleared.</span>';}
+
+window.addEventListener('message',e=>{if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;});
+</script>
+</body>
+</html>

@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>.panel{display:none!important}.panel.active{display:block!important}</style>
 <title>VSP Security Platform v2.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<link rel="stylesheet" href="/vsp_enterprise_navy_theme.css">
 
 <!-- ══════════════════════════════════════════════
      HTML STRUCTURE
@@ -83,115 +83,99 @@
 
 <!-- SCAN TRIGGER MODAL -->
 <div class="modal-overlay" id="scan-modal">
-  <div class="modal" style="max-width:580px">
+  <div class="modal" style="max-width:560px;width:100%">
     <div class="modal-head">
       <div>
-        <div class="modal-title">Trigger new scan</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:2px;font-family:var(--font-mono)">VSP Security Platform — Multi-mode scanner</div>
+        <div class="modal-title">New scan</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">8 modes · SAST · SCA · SECRETS · IAC · DAST · NETWORK · FULL · FULL_SOC</div>
       </div>
       <button class="modal-close" onclick="document.getElementById('scan-modal').classList.remove('open')">✕</button>
     </div>
-    <div class="modal-body">
-      <!-- Mode selector -->
-      <div class="form-group mb8">
-        <label class="form-label">Scan mode</label>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px" id="mode-grid">
-          <div class="scan-mode-btn active" data-mode="SAST" onclick="selectMode(this)">
-            <div style="font-size:11px;font-weight:600">SAST</div>
-            <div style="font-size:9px;color:var(--t3);margin-top:2px">Source code</div>
-          </div>
-          <div class="scan-mode-btn" data-mode="SCA" onclick="selectMode(this)">
-            <div style="font-size:11px;font-weight:600">SCA</div>
-            <div style="font-size:9px;color:var(--t3);margin-top:2px">Dependencies</div>
-          </div>
-          <div class="scan-mode-btn" data-mode="SECRETS" onclick="selectMode(this)">
-            <div style="font-size:11px;font-weight:600">SECRETS</div>
-            <div style="font-size:9px;color:var(--t3);margin-top:2px">Credentials</div>
-          </div>
-          <div class="scan-mode-btn" data-mode="IAC" onclick="selectMode(this)">
-            <div style="font-size:11px;font-weight:600">IAC</div>
-            <div style="font-size:9px;color:var(--t3);margin-top:2px">Infra as Code</div>
-          </div>
-          <div class="scan-mode-btn" data-mode="DAST" onclick="selectMode(this)">
-            <div style="font-size:11px;font-weight:600">DAST</div>
-            <div style="font-size:9px;color:var(--t3);margin-top:2px">Web app scan</div>
-          </div>
-          <div class="scan-mode-btn" data-mode="NETWORK" onclick="selectMode(this)">
-            <div style="font-size:11px;font-weight:600">NETWORK</div>
-            <div style="font-size:9px;color:var(--t3);margin-top:2px">L2-L7 scan</div>
-          </div>
-          <div class="scan-mode-btn" data-mode="FULL" onclick="selectMode(this)">
-            <div style="font-size:11px;font-weight:600">FULL</div>
-            <div style="font-size:9px;color:var(--t3);margin-top:2px">All tools</div>
-          </div>
-          <div class="scan-mode-btn" data-mode="FULL_SOC" onclick="selectMode(this)">
-            <div style="font-size:11px;font-weight:600">FULL SOC</div>
-            <div style="font-size:9px;color:var(--t3);margin-top:2px">Max depth</div>
-          </div>
+    <div class="modal-body" style="padding-bottom:4px">
+
+      <!-- Quick Presets -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;font-family:var(--font-mono)">Quick presets</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;border-color:rgba(16,185,129,.4);color:var(--green)" onclick="setScanPreset('FULL','FAST')">⚡ FULL Fast</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;border-color:rgba(139,92,246,.4);color:var(--purple)" onclick="setScanPreset('FULL','THOROUGH')">🔬 FULL Deep</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;border-color:rgba(6,182,212,.4);color:var(--cyan)" onclick="setScanPreset('FULL_SOC','FULL_SOC')">● FULL+SOC</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="setScanPreset('NETWORK','STANDARD')">📡 Network</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="setScanPreset('SAST','FAST')">🔍 SAST</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="setScanPreset('IAC','FAST')">🏗 IaC</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="setScanPreset('SECRETS','FAST')">🔑 Secrets</button>
         </div>
-        <input type="hidden" id="scanMode" value="SAST">
       </div>
 
-      <!-- Mode description -->
-      <div id="mode-desc" style="background:var(--surface);border-radius:6px;padding:8px 10px;font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:12px;min-height:32px">
-        SAST — Semgrep + Bandit · Static code analysis · Detect injection, hardcoded secrets, insecure patterns
-      </div>
-
-      <!-- Profile + Timeout -->
-      <div class="g2 mb12">
-        <div class="form-group">
+      <!-- Mode + Profile -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="form-group mb0">
+          <label class="form-label">Mode</label>
+          <select id="scanMode" class="form-ctrl" onchange="updateScanTools()">
+            <option value="SAST">SAST — Source code</option>
+            <option value="SCA">SCA — Dependencies</option>
+            <option value="SECRETS">SECRETS — Credentials</option>
+            <option value="IAC">IAC — Infrastructure</option>
+            <option value="DAST">DAST — Web app</option>
+            <option value="NETWORK">NETWORK — L2-L7</option>
+            <option value="FULL">FULL — All 16 tools</option>
+            <option value="FULL_SOC">FULL_SOC — SAST+SCA+IAC+DAST+NET</option>
+          </select>
+        </div>
+        <div class="form-group mb0">
           <label class="form-label">Profile</label>
-          <select id="scanProfile" class="form-ctrl" onchange="updateProfileDesc()">
-            <option value="FAST">FAST — 2min · Core tools</option>
-            <option value="EXT">EXT — 6min · All tools</option>
-            <option value="AGGR">AGGR — 10min · Fail on HIGH</option>
-            <option value="PREMIUM">PREMIUM — 15min · Deep scan</option>
-            <option value="FULL">FULL — 20min · All tools</option>
-            <option value="FULL_SOC">FULL SOC — 30min · Max depth</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Compliance framework</label>
-          <select id="scanFramework" class="form-ctrl" onchange="onFrameworkChange(this.value)">
-            <option value="">None</option>
-            <option value="OWASP">OWASP Top 10</option>
-            <option value="ISO27001">ISO 27001:2022</option>
-            <option value="NIST">NIST CSF 2.0</option>
-            <option value="TT13">TT13/2023 (Vietnam)</option>
-            <option value="FEDRAMP">FedRAMP Moderate</option>
-            <option value="CMMC">CMMC Level 2</option>
+          <select id="scanProfile" class="form-ctrl">
+            <option value="FAST">FAST — quick scan</option>
+            <option value="STANDARD" selected>STANDARD — balanced</option>
+            <option value="THOROUGH">THOROUGH — deep</option>
+            <option value="FULL_SOC">FULL_SOC — all tools</option>
           </select>
         </div>
       </div>
 
-      <!-- Source / Target -->
-      <div class="form-group mb8" id="src-group">
+      <!-- Source path -->
+      <div class="form-group" style="margin-bottom:10px">
         <label class="form-label">Source path <span style="color:var(--red)">*</span></label>
-        <input id="scanSrc" class="form-ctrl" placeholder="/home/user/project or https://github.com/org/repo">
-        <div style="font-size:9px;color:var(--t3);margin-top:3px">Local path or Git URL · SAST/SCA/IAC/SECRETS</div>
-      </div>
-      <div class="form-group mb8" id="url-group" style="display:none">
-        <label class="form-label">Target URL <span style="color:var(--red)">*</span></label>
-        <input id="scanUrl" class="form-ctrl" placeholder="https://app.example.com or 192.168.1.0/24">
-        <div style="font-size:9px;color:var(--t3);margin-top:3px">Web URL (DAST) · IP/CIDR (NETWORK)</div>
+        <input id="scanSrc" class="form-ctrl" placeholder="/home/test/Data/GOLANG_VSP" value="/home/test/Data/GOLANG_VSP">
+        <div style="font-size:9px;color:var(--t3);margin-top:3px">Local path · Git URL · empty = dùng đường dẫn mặc định</div>
       </div>
 
       <!-- Tools preview -->
-      <div id="tools-preview" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
-        <span style="font-size:9px;color:var(--t3);margin-right:4px;align-self:center">Tools:</span>
-        <span class="pill p-blue" style="font-size:9px">semgrep</span>
-        <span class="pill p-blue" style="font-size:9px">bandit</span>
-        <span class="pill p-gray" style="font-size:9px">gitleaks</span>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:4px">
+        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Tools: <span id="scan-tools-preview" style="color:var(--t2);text-transform:none">semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap (16 tools)</span></div>
       </div>
 
       <div id="scanMsg" style="margin-top:8px;font-size:11px;font-family:var(--font-mono)"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="document.getElementById('scan-modal').classList.remove('open')">Cancel</button>
-      <button class="btn btn-primary" onclick="triggerScan()">&#9654; Execute scan</button>
+      <button class="btn btn-primary" onclick="triggerScan()">▶ Execute scan →</button>
     </div>
   </div>
 </div>
+
+<script>
+function setScanPreset(mode, profile) {
+  document.getElementById('scanMode').value = mode;
+  document.getElementById('scanProfile').value = profile;
+  updateScanTools();
+}
+function updateScanTools() {
+  var mode = document.getElementById('scanMode').value;
+  var toolMap = {
+    'SAST':     'semgrep · gosec · bandit · codeql',
+    'SCA':      'trivy · grype · govulncheck',
+    'SECRETS':  'gitleaks · trufflehog',
+    'IAC':      'kics · checkov · hadolint',
+    'DAST':     'nuclei · nikto · sslscan',
+    'NETWORK':  'nmap · sslscan · netcap',
+    'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap (16 tools)',
+    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap + SIEM (16 tools max)',
+  };
+  var el = document.getElementById('scan-tools-preview');
+  if (el) el.textContent = toolMap[mode] || mode;
+}
+</script>
 
 <!-- GOV PATCH: Classification Banner -->
 <div class="classif-banner unclass" id="classif-banner-top">
@@ -313,8 +297,6 @@
       <button class="nav-item" onclick="showPanel('governance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1l7 4v1H1V5L8 1z"/><rect x="2" y="6" width="2" height="7"/><rect x="7" y="6" width="2" height="7"/><rect x="12" y="6" width="2" height="7"/><path d="M1 13h14"/></svg></span> Governance</button>
       <button class="nav-item" onclick="showPanel('compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/><path d="M5 8l2 2 4-4"/></svg></span> FedRAMP</button>
           <button class="nav-item" onclick="showPanel('p4compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/></svg></span> P4 Compliance</button>
-      <button class="nav-item" onclick="showPanel('samm',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 1L2 4v4c0 3.5 2.5 6 6 7 3.5-1 6-3.5 6-7V4L8 1z"/><path d="M5 7l2 2 4-4"/><circle cx="8" cy="8" r="2" fill="none"/></svg></span> SAMM 2.0</button>
-      <button class="nav-item" onclick="showPanel('cmmc',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="1" y="3" width="14" height="10" rx="2"/><path d="M5 8l2 2 4-4"/></svg></span> CMMC L2</button>
       <button class="nav-item" onclick="showPanel('sbom',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 3V2M8 3V2M11 3V2M4 7h2M4 10h2M8 7h4M8 10h3"/></svg></span> SBOM</button>
       <button class="nav-item" onclick="showPanel('sla',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4 8,8 11,10"/></svg></span> SLA</button>
     </div>
@@ -325,6 +307,19 @@
       <button class="nav-item" onclick="showPanel('executive',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1l1.8 3.6L14 5.3l-3 2.9.7 4.1L8 10.4l-3.7 1.9.7-4.1-3-2.9 4.2-.7z"/></svg></span> Executive</button>
       <button class="nav-item" onclick="showPanel('export',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1v9M4.5 6.5L8 10l3.5-3.5"/><path d="M3 11v2.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V11"/></svg></span> Export</button>
       <button class="nav-item" onclick="showPanel('users',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="3"/><path d="M1 14c0-3 2-5 5-5s5 2 5 5"/><path d="M11 3a3 3 0 010 4M15 14c0-2.5-1.5-4-3.5-4.5"/></svg></span> Users</button>
+      <button class="nav-item" onclick="showPanel('cicd',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 4h2m2 0h0M12 6v2m0 2v0M4 6v5a2 2 0 002 2h2"/></svg></span>
+        CI/CD
+        <span style="font-size:9px;background:rgba(6,182,212,.15);color:var(--cyan);padding:1px 5px;border-radius:3px;margin-left:auto;font-family:var(--font-mono)">NEW</span>
+      </button>
+      <button class="nav-item" onclick="showPanel('integrations',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="5" width="4" height="6" rx="1"/><rect x="11" y="5" width="4" height="6" rx="1"/><path d="M5 8h6"/></svg></span>
+        Integrations
+      </button>
+      <button class="nav-item" onclick="showPanel('settings',this)">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.2 3.2l1.4 1.4M11.4 11.4l1.4 1.4M3.2 12.8l1.4-1.4M11.4 4.6l1.4-1.4"/></svg></span>
+        Settings
+      </button>
     
     <div class="nav-section">
       <div class="nav-section-label" style="display:flex;align-items:center;justify-content:space-between">
@@ -366,6 +361,10 @@
         <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 3V2M8 3V2M11 3V2M4 7h2M4 10h2M8 7h4M8 10h3"/></svg></span>
         Assets
       </button>
+      <button class="nav-item" onclick="showPanel('swinventory',this)" title="Software Inventory — crack/EOL detection">
+        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="11" rx="1.5"/><path d="M5 5h6M5 8h4M5 11h2"/><circle cx="13" cy="13" r="2.5"/><path d="M12 14.5l1-1"/></svg></span>
+        SW Inventory
+      </button>
       <button class="nav-item" onclick="showPanel('netflow',this)">
         <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8h14M8 1l4 7-4 7"/><circle cx="4" cy="8" r="1.5"/><circle cx="12" cy="8" r="1.5"/></svg></span>
         Network flow
@@ -379,10 +378,6 @@
       <button class="nav-item" onclick="showPanel('threatintel',this)">
         <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/><path d="M5.5 7l2 2L11 5.5"/></svg></span>
         Threat intel
-      </button>
-      <button class="nav-item" onclick="showPanel('swrisk',this)">
-        <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 7h6M5 10h4"/><circle cx="13" cy="3" r="2" fill="currentColor" stroke="none"/></svg></span>
-        SW Risk
       </button>
     </div>
     </div>
@@ -555,6 +550,14 @@
   </header>
 
   <!-- CONTENT -->
+  <div id="panel-swinventory" class="panel" style="display:none;height:100%;padding:0">
+    <iframe id="sw-inventory-frame"
+      src="/sw_inventory.html"
+      style="width:100%;height:calc(100vh - 48px);border:none;display:block"
+      onload="this.contentWindow.TOKEN=window.TOKEN; this.contentWindow.localStorage.setItem('vsp_token',window.TOKEN||localStorage.getItem('vsp_token')||'')">
+    </iframe>
+  </div>
+
   <div class="content" id="content">
 
     <!-- ════════════════════════════════════
@@ -620,29 +623,6 @@
           <div class="kpi-value c-amber" id="siem-anomalies" style="font-size:20px;font-weight:700;font-family:var(--font-mono)">—</div>
           <div class="kpi-sub" style="font-size:10px;color:var(--t3);margin-top:2px">detected</div>
           <canvas id="spark-anomalies" width="80" height="20" style="margin-top:4px;opacity:.6"></canvas>
-        </div>
-      </div>
-      <!-- ConMon KPI row -->
-      <div class="g4 mb14" id="conmon-kpi-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-        <div class="card" style="cursor:pointer" onclick="showPanel('compliance',this)">
-          <div class="kpi-label" style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">ConMon Score →</div>
-          <div class="kpi-value" id="d-conmon-score" style="font-size:26px;font-weight:700;color:var(--green)">—</div>
-          <div style="font-size:10px;color:var(--t3);margin-top:2px">FedRAMP continuous</div>
-        </div>
-        <div class="card" style="cursor:pointer" onclick="showPanel('p4compliance',this)">
-          <div class="kpi-label" style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Open POA&M →</div>
-          <div class="kpi-value" id="d-poam-open" style="font-size:26px;font-weight:700;color:var(--red)">—</div>
-          <div style="font-size:10px;color:var(--t3);margin-top:2px" id="d-poam-sub">critical + high</div>
-        </div>
-        <div class="card" style="cursor:pointer" onclick="showPanel('governance',this)">
-          <div class="kpi-label" style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">FedRAMP % →</div>
-          <div class="kpi-value" id="d-fedramp-pct" style="font-size:26px;font-weight:700;color:var(--blue)">—</div>
-          <div style="font-size:10px;color:var(--t3);margin-top:2px">controls pass rate</div>
-        </div>
-        <div class="card" style="cursor:pointer" onclick="showPanel('audit',this)">
-          <div class="kpi-label" style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Audit Entries →</div>
-          <div class="kpi-value" id="d-audit-total" style="font-size:26px;font-weight:700;color:var(--cyan)">—</div>
-          <div style="font-size:10px;color:var(--t3);margin-top:2px" id="d-audit-sub">last 24h: —</div>
         </div>
       </div>
       <!-- Charts row -->
@@ -721,28 +701,6 @@
         </div>
       </div>
 
-      <!-- Score Trend + Severity Trend -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">Score trend</span>
-            <span style="font-size:10px;color:var(--t3);font-family:monospace">last 10 runs</span>
-          </div>
-          <div class="card-body" style="height:180px;position:relative">
-            <canvas id="chartScoreTrend"></canvas>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">Findings by severity trend</span>
-            <span style="font-size:10px;color:var(--t3);font-family:monospace">stacked per run</span>
-          </div>
-          <div class="card-body" style="height:180px;position:relative">
-            <canvas id="chartSevTrend"></canvas>
-          </div>
-        </div>
-      </div>
-      
       <!-- Recent runs table -->
       <div class="card mb14">
         <div class="card-head">
@@ -877,14 +835,14 @@
       <div class="runs-chart-row">
         <div class="runs-chart-card">
           <div class="runs-chart-title">Gate decisions — last 20 runs</div>
-          <div style="position:relative;height:120px;min-height:120px">
-            <canvas id="runs-gate-chart" style="display:block;width:100%;height:120px"></canvas>
+          <div style="position:relative;height:120px">
+            <canvas id="runs-gate-chart"></canvas>
           </div>
         </div>
         <div class="runs-chart-card">
           <div class="runs-chart-title">Findings by mode</div>
-          <div style="position:relative;height:120px;min-height:120px">
-            <canvas id="runs-mode-chart" style="display:block;width:100%;height:120px"></canvas>
+          <div style="position:relative;height:120px">
+            <canvas id="runs-mode-chart"></canvas>
           </div>
         </div>
       </div>
@@ -896,7 +854,7 @@
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>Run ID</th><th>Mode</th><th>Profile</th><th>Status</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Score</th><th>Created</th><th>Report</th></tr></thead>
+            <thead><tr><th>Run ID</th><th>Mode</th><th>Profile</th><th>Status</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Score</th><th>Created</th></tr></thead>
             <tbody id="runs-table">
               <tr><td class="mono" style="font-size:10px">RID_SCHED_20260329_194714_0</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">104</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 19:47</td></tr>
               <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_171611</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-orange fw7">49</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 17:16</td></tr>
@@ -1223,47 +1181,6 @@
           </div>
         </div>
       </div>
-    
-      <div class="card" style="margin-top:14px">
-        <div class="card-head">
-          <div><div class="card-title">POA&amp;M Editor</div><div class="mono-sm c-t3" id="poam-summary-lbl">Loading…</div></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-ghost" style="font-size:10px" onclick="_exportPoamCSV()">&#8595; CSV</button>
-            <button class="btn btn-ghost" style="font-size:10px" onclick="_loadPoam()">&#8635;</button>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">TOTAL</div><div style="font-size:18px;font-weight:700;color:var(--t1)" id="poam-k-total">—</div></div>
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">OPEN</div><div style="font-size:18px;font-weight:700;color:var(--red)" id="poam-k-open">—</div></div>
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">REMEDIATION</div><div style="font-size:18px;font-weight:700;color:var(--amber)" id="poam-k-remediation">—</div></div>
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">CLOSED</div><div style="font-size:18px;font-weight:700;color:var(--green)" id="poam-k-closed">—</div></div>
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">CRIT/HIGH</div><div style="font-size:18px;font-weight:700;color:var(--red)" id="poam-k-crit">—</div></div>
-        </div>
-        <div class="filter-bar" style="padding:8px 14px;border-bottom:1px solid var(--border)">
-          <input class="filter-input" id="poam-search" placeholder="Search ID, weakness, control…" style="flex:1;min-width:160px" oninput="_renderPoamTable()">
-          <select class="filter-select" id="poam-status-filter" onchange="_renderPoamTable()">
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="in_remediation">In remediation</option>
-            <option value="closed">Closed</option>
-          </select>
-          <select class="filter-select" id="poam-sev-filter" onchange="_renderPoamTable()">
-            <option value="">All severities</option>
-            <option value="CRITICAL">Critical</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </select>
-          <span class="mono-sm c-t3" id="poam-count"></span>
-        </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>Weakness</th><th>Control</th><th>Severity</th><th>Status</th><th>Mitigation</th><th>Due</th></tr></thead>
-            <tbody id="poam-tbody"></tbody>
-          </table>
-        </div>
-        <div id="poam-pagination" style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px"></div>
-      </div>
     </div>
 
     <!-- ════════════════════════════════════
@@ -1282,7 +1199,7 @@
           <div class="card-body">
             <div class="gauge-wrap"><canvas id="gauge-cmmc" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-amber" id="gv-cmmc">54%</div><div class="gauge-unit">coverage</div></div></div>
             <div class="f12 fw7 c-t2 mb8">CMMC Level 2</div>
-            <div class="mono-sm">99 / 99 practices</div>
+            <div class="mono-sm">59 / 110 practices</div>
           </div>
         </div>
         <div class="card" style="text-align:center">
@@ -1294,16 +1211,6 @@
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <div class="card" style="padding:12px">
-          <div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:10px;letter-spacing:.08em">CONTROL FAMILY BREAKDOWN</div>
-          <div id="comp-domain-breakdown"><div style="color:var(--t3);font-size:11px">Load FedRAMP to see breakdown</div></div>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:10px;letter-spacing:.08em">CMMC DOMAIN COVERAGE</div>
-          <div id="cmmc-domain-breakdown"><div style="color:var(--t3);font-size:11px">Load CMMC Level 2 to see breakdown</div></div>
-        </div>
-      </div>
       <div class="flex gap8 mb14">
         <button class="btn btn-primary" id="btn-fedramp" onclick="loadFedRAMP()">FedRAMP Moderate</button>
         <button class="btn btn-ghost" id="btn-cmmc" onclick="loadCMMC()">CMMC Level 2</button>
@@ -1488,8 +1395,6 @@
         <div class="flex gap8">
           <button class="btn btn-ghost" onclick="loadExecutive()">↻ Refresh</button>
           <button class="btn btn-primary" onclick="downloadExecutivePDF()">↓ PDF Report</button>
-        <button class="btn btn-ghost" onclick="(function(){fetch('/api/v1/reports/conmon_pdf',{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.blob()).then(b=>{var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download='conmon-'+new Date().toISOString().slice(0,7)+'.pdf';a.click();})})()" style="margin-left:8px">↓ ConMon PDF</button>
-        <button class="btn btn-ghost" onclick="window.open('/api/v1/audit/stats','_blank')" style="margin-left:4px">📊 Audit Stats</button>
         </div>
       </div>
 
@@ -1670,14 +1575,17 @@
         allowtransparency="true">
       </iframe>
     </div>
-    <div id="panel-cmmc" class="panel" style="padding:0;height:calc(100vh - 56px)">
-      <iframe id="iframe-cmmc" style="width:100%;height:100%;border:none" src=""></iframe>
+    <div id="panel-cicd" class="panel">
+      <iframe src="" data-src="/panels/cicd.html" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
     </div>
-    <div id="panel-samm" class="panel" style="padding:0;height:calc(100vh - 56px)">
-      <iframe id="iframe-samm" style="width:100%;height:100%;border:none" src=""></iframe>
+    <div id="panel-integrations" class="panel">
+      <iframe src="" data-src="/panels/integrations.html" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
     </div>
-    <div id="panel-swrisk" class="panel">
-      <iframe src="" data-src="/panels/software_risk.html" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
+    <div id="panel-settings" class="panel">
+      <iframe src="" data-src="/panels/settings.html" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
+    </div>
+    <div id="panel-p4compliance" class="panel">
+      <iframe id="iframe-p4compliance" src="/panels/p4_compliance.html" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
     </div>
   </div><!-- /content -->
 </div><!-- /main -->
@@ -1729,35 +1637,12 @@
    - Keyboard shortcuts
 ══════════════════════════════════════════════ */
 
-// ─── Safe JWT payload decoder (handles base64url encoding) ───────────────────
-function decodeJwt(token) {
-  try {
-    var parts = (token || '').split('.');
-    if (parts.length !== 3) return null;
-    // base64url → base64: replace -_ with +/, add padding
-    var b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    return JSON.parse(atob(b64));
-  } catch(e) { return null; }
-}
-
-// ─── XSS escape helper ───────────────────────────────────────────────────────
-function esc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 const API = '/api/v1';
 let TOKEN = (function(){
   var t = localStorage.getItem('vsp_token') || '';
   if (!t) return '';
   try {
-    var p = decodeJwt(t);
-    if (!p) { localStorage.removeItem('vsp_token'); return ''; }
+    var p = JSON.parse(atob(t.split('.')[1]));
     if (p.exp && p.exp * 1000 < Date.now()) {
       localStorage.removeItem('vsp_token');
       return '';
@@ -1786,7 +1671,6 @@ async function api(method, path, body, noAuth) {
   }
   return r.json();
 }
-window.api = api;
 
 /* ─── Toast ─── */
 function showToast(msg, type='info') {
@@ -1831,32 +1715,6 @@ function showPanel(name, btn) {
   const panel = document.getElementById('panel-' + name);
   if (panel) panel.classList.add('active');
   if (btn) btn.classList.add('active');
-  // Auto-load data when switching panels
-  if (name==='runs' && typeof loadRuns==='function') {
-    setTimeout(function(){
-      loadRuns();
-      // Force chart resize after panel visible
-      setTimeout(function(){
-        if(window._runsGateChart) window._runsGateChart.resize();
-        if(window._runsModeChart) window._runsModeChart.resize();
-      }, 300);
-    }, 50);
-  }
-  if (name==='cmmc') {
-    var ci=document.getElementById('iframe-cmmc');
-    if(ci && !ci.src.includes('cmmc.html')) ci.src='/panels/cmmc.html';
-  }
-  if (name==='samm') {
-    var si=document.getElementById('iframe-samm');
-    if(si && !si.src.includes('samm.html')) si.src='/panels/samm.html';
-  }
-  if (name==='p4compliance') {
-    setTimeout(function(){
-      var f=document.querySelector('#panel-p4compliance iframe');
-      if(f && window.TOKEN) f.contentWindow.postMessage({type:'vsp:token',token:window.TOKEN},'*');
-    },300);
-  }
-  if (name==='swrisk' && typeof loadData==='function') setTimeout(function(){ var f=document.querySelector('#panel-swrisk iframe'); if(f) f.contentWindow.postMessage({type:'vsp:token',token:window.TOKEN},'*'); },100);
   else {
     document.querySelectorAll('.nav-item').forEach(b => {
       if (b.getAttribute('onclick')?.includes(`'${name}'`)) b.classList.add('active');
@@ -1876,31 +1734,9 @@ function showPanel(name, btn) {
     if (name === 'sbom') setTimeout(loadSBOM, 200);
     if (name === 'analytics') setTimeout(loadAnalytics, 300);
     if (name === 'sla') setTimeout(loadSLA, 200);
-    if (name === 'findings') {
-      loadFindings(0);
-      // Fetch full breakdown data once
-      if (!window._findingsBreakdownLoaded && window.TOKEN) {
-        window._findingsBreakdownLoaded = true;
-        setTimeout(function() {
-          fetch('/api/v1/vsp/findings?limit=500', {headers:{Authorization:'Bearer '+window.TOKEN}})
-            .then(function(r){return r.json();})
-            .then(function(d){
-              if(window._renderFindingsToolBreakdown)
-                window._renderFindingsToolBreakdown(d.findings||[], d.total||0);
-            }).catch(function(){window._findingsBreakdownLoaded=false;});
-        }, 1000);
-      }
-    }
+    if (name === 'findings') loadFindings(0);
     if (name === 'export') setTimeout(loadExportRuns, 200);
     if (name === 'remediation') loadRemediations();
-    if (name === 'vulnmgmt') {
-      var _vf = document.querySelector('iframe[data-src="/panels/vuln_mgmt.html"]');
-      if (_vf && !_vf.src.includes('vuln_mgmt')) {
-        _vf.src = '/panels/vuln_mgmt.html?v=' + Date.now();
-      } else if (_vf) {
-        _vf.contentWindow && _vf.contentWindow.postMessage({type:'vsp:token',token:window.TOKEN},'*');
-      }
-    }
     if (name === 'soc')         drawSocRadar();
     if (name === 'executive')   { initExecutiveRing(); setTimeout(loadExecutive, 300); }
   }, 100);
@@ -1916,7 +1752,7 @@ function loadCurrentPanel() {
   if (panel === 'export')      { loadExportRuns(); showToast('Refreshed','success'); return; }
   if (panel === 'sbom')        { loadSBOM(); showToast('Refreshed','success'); return; }
   if (panel === 'sla')         { loadSLA(); showToast('Refreshed','success'); return; }
-  if (panel === 'vulnmgmt')    { var _vf=document.querySelector('iframe[data-src="/panels/vuln_mgmt.html"]'); if(_vf&&!_vf.src.includes('vuln_mgmt')) _vf.src='/panels/vuln_mgmt.html?v='+Date.now(); showToast('Refreshed','success'); return; }
+  if (panel === 'vulnmgmt')    { showPanel('vulnmgmt',null); showToast('Refreshed','success'); return; }
   if (panel === 'compliance')  { loadFedRAMP(); showToast('Refreshed','success'); return; }
   if (panel === 'governance')  { loadGovernanceV2(); showToast('Refreshed','success'); return; }
   showPanel(panel, null);
@@ -2045,108 +1881,10 @@ async function initDashboardCharts() {
         scales:{ x:{grid:{display:false},ticks:{color:'#8899bb',font:{size:10}}},
           y:{ticks:{color:'#445577',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'},beginAtZero:true} } }
     });
-
-    // ── Score trend line chart ──────────────────────────────
-    var trendEl = document.getElementById('chartScoreTrend');
-    if (trendEl && doneRuns.length > 1) {
-      var trendLabels = doneRuns.map(function(r){
-        var d = new Date(r.started_at||r.created_at||Date.now());
-        return (d.getMonth()+1)+'/'+(d.getDate())+' '+(d.getHours())+':'+String(d.getMinutes()).padStart(2,'0');
-      });
-      var trendScores = doneRuns.map(function(r){return (r.summary&&r.summary.SCORE)||0;});
-      var trendFindings = doneRuns.map(function(r){return (r.summary&&r.summary.TOTAL)||0;});
-      destroyChart('chartScoreTrend');
-      _charts['chartScoreTrend'] = new Chart(trendEl, {
-        type:'line',
-        data:{
-          labels: trendLabels,
-          datasets:[
-            {label:'Score',data:trendScores,borderColor:'#06b6d4',backgroundColor:'rgba(6,182,212,.08)',
-             tension:.4,fill:true,pointRadius:3,pointBackgroundColor:'#06b6d4',yAxisID:'y'},
-            {label:'Findings',data:trendFindings,borderColor:'#f59e0b',backgroundColor:'transparent',
-             tension:.4,fill:false,pointRadius:3,pointBackgroundColor:'#f59e0b',borderDash:[4,3],yAxisID:'y1'}
-          ]
-        },
-        options:{
-          responsive:true,maintainAspectRatio:false,
-          interaction:{mode:'index',intersect:false},
-          plugins:{legend:{labels:{color:'#8899bb',font:{size:10},boxWidth:12}}},
-          scales:{
-            x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8899bb',font:{size:9},maxRotation:45}},
-            y:{position:'left',grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8899bb',font:{size:9}},
-               title:{display:true,text:'Score',color:'#06b6d4',font:{size:9}}},
-            y1:{position:'right',grid:{display:false},ticks:{color:'#8899bb',font:{size:9}},
-                title:{display:true,text:'Findings',color:'#f59e0b',font:{size:9}}}
-          }
-        }
-      });
-    }
-
-    // ── Severity trend (stacked bar per run) ───────────────
-    var sevTrendEl = document.getElementById('chartSevTrend');
-    if (sevTrendEl && doneRuns.length > 1) {
-      var stLabels = doneRuns.map(function(r,i){return '#'+(i+1);});
-      destroyChart('chartSevTrend');
-      _charts['chartSevTrend'] = new Chart(sevTrendEl, {
-        type:'bar',
-        data:{
-          labels:stLabels,
-          datasets:[
-            {label:'Critical',data:doneRuns.map(function(r){return (r.summary&&r.summary.CRITICAL)||0;}),backgroundColor:'rgba(239,68,68,.8)',stack:'s'},
-            {label:'High',    data:doneRuns.map(function(r){return (r.summary&&r.summary.HIGH)||0;}),    backgroundColor:'rgba(249,115,22,.8)',stack:'s'},
-            {label:'Medium',  data:doneRuns.map(function(r){return (r.summary&&r.summary.MEDIUM)||0;}),  backgroundColor:'rgba(245,158,11,.8)',stack:'s'},
-            {label:'Low',     data:doneRuns.map(function(r){return (r.summary&&r.summary.LOW)||0;}),     backgroundColor:'rgba(34,197,94,.5)', stack:'s'},
-          ]
-        },
-        options:{
-          responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{labels:{color:'#8899bb',font:{size:9},boxWidth:10}}},
-          scales:{
-            x:{stacked:true,grid:{display:false},ticks:{color:'#8899bb',font:{size:9}}},
-            y:{stacked:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8899bb',font:{size:9}}}
-          }
-        }
-      });
-    }
-
-    // ── Update KPI summary bar ──────────────────────────────
-    var kpiBar = document.getElementById('dash-kpi-summary');
-    if (!kpiBar) {
-      var dashPanel = document.getElementById('panel-dashboard');
-      if (dashPanel) {
-        kpiBar = document.createElement('div');
-        kpiBar.id = 'dash-kpi-summary';
-        kpiBar.style.cssText = 'display:flex;gap:20px;align-items:center;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;flex-wrap:wrap;margin-bottom:12px';
-        dashPanel.insertBefore(kpiBar, dashPanel.firstChild);
-      }
-    }
-    if (kpiBar) {
-      var latestRun = allRuns[0]||{};
-      var gateColor = {PASS:'#00ffa3',WARN:'#ffb800',FAIL:'#ff4545'}[latestRun.gate||'FAIL']||'#ff4545';
-      kpiBar.innerHTML = '<span style="color:var(--t3);font-family:monospace">LATEST RUN</span>'
-        +'<span style="font-family:monospace;font-weight:700;color:#06b6d4">'+(score||0)+'/100</span>'
-        +'<span style="font-family:monospace;font-weight:700;color:'+gateColor+'">GATE '+(latestRun.gate||'—')+'</span>'
-        +'<span style="color:var(--t3);font-family:monospace">|</span>'
-        +'<span style="color:#ff4545;font-family:monospace">CRIT '+(summ.CRITICAL||0)+'</span>'
-        +'<span style="color:#f97316;font-family:monospace">HIGH '+(summ.HIGH||0)+'</span>'
-        +'<span style="color:#ffb800;font-family:monospace">MED '+(summ.MEDIUM||0)+'</span>'
-        +'<span style="color:var(--t3);font-family:monospace;margin-left:auto">'+allRuns.length+' total runs · auto-refresh 30s</span>';
-    }
-
   } catch(e) {
     console.error('initDashboardCharts', e);
     drawScoreRing('score-ring', 22, '#ef4444');
   }
-}
-
-// ── Auto-refresh dashboard every 30s ─────────────────────
-if (!window._dashRefreshInterval) {
-  window._dashRefreshInterval = setInterval(function() {
-    if (document.getElementById('panel-dashboard') &&
-        document.getElementById('panel-dashboard').classList.contains('active')) {
-      initDashboardCharts();
-    }
-  }, 30000);
 }
 
 async function initGauges() {
@@ -2492,11 +2230,7 @@ function _showCompDetail(ctrl) {
 var _compData = [];
 var _compType = 'fedramp';
 
-var _compPage = 1;
-var _compPageSize = 20;
-var _compFiltered = [];
-function _renderCompTable(filter, statusFilter, page) {
-  _compPage = page || 1;
+function _renderCompTable(filter, statusFilter) {
   var rows = _compData.filter(function(c) {
     var q = (filter||'').toLowerCase();
     var matchQ = !q || (c.id||'').toLowerCase().includes(q)
@@ -2505,77 +2239,24 @@ function _renderCompTable(filter, statusFilter, page) {
     var matchS = !statusFilter || c.status === statusFilter;
     return matchQ && matchS;
   });
-  _compFiltered = rows;
-  // Summary bar
-  var pass = rows.filter(function(c){var s=(c.status||'').toLowerCase();return s==='pass'||s==='assessed';}).length;
-  var fail = rows.filter(function(c){return (c.status||'').toLowerCase()==='fail';}).length;
-  var warn = rows.filter(function(c){return (c.status||'').toLowerCase()==='warn';}).length;
-  var sb = document.getElementById('comp-summary-bar');
-  if (sb) {
-    sb.innerHTML = '<span style="color:#00ffa3;font-weight:700;font-family:monospace">✓ '+pass+' PASS</span>'
-      +'<span style="color:#ffb800;font-weight:700;font-family:monospace;margin-left:16px">⚠ '+warn+' WARN</span>'
-      +'<span style="color:#ff4545;font-weight:700;font-family:monospace;margin-left:16px">✗ '+fail+' FAIL</span>'
-      +'<span style="color:var(--t3);font-family:monospace;margin-left:16px">'+rows.length+' total</span>';
-  }
-  // Pagination
-  var totalPages = Math.max(1, Math.ceil(rows.length / _compPageSize));
-  _compPage = Math.min(_compPage, totalPages);
-  var start = (_compPage-1)*_compPageSize;
-  var slice = rows.slice(start, start+_compPageSize);
   var tbody = document.getElementById('comp-tbody');
   if (!tbody) return;
-  if (!slice.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:20px">No results</td></tr>'; _renderCompPagination(0,0,filter,statusFilter); return; }
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:20px">No results</td></tr>'; return; }
   window._compRows = rows;
-  tbody.innerHTML = slice.map(function(c, i) {
-    var st = (c.status||'').toLowerCase();
-    var sp = st==='pass' ? 'pill-pass' : st==='fail' ? 'pill-fail' : st==='warn' ? 'pill-warn' : st==='assessed' ? 'pill-pass' : 'pill-queue';
-    var icon = st==='pass'||st==='assessed' ? '✓ ' : st==='fail' ? '✗ ' : st==='warn' ? '⚠ ' : '';
-    var label = st==='assessed' ? 'PASS' : (c.status||'—').toUpperCase();
-    var _tools = c.tool||c.tools||'—';
-    var toolArr = Array.isArray(_tools) ? _tools : (typeof _tools==='string' && _tools!=='—' ? _tools.split(',') : []);
-    var toolsHtml = toolArr.length ? toolArr.map(function(t){ return '<span style="font-family:monospace;font-size:10px;background:rgba(157,111,255,.1);color:#9d6fff;border:1px solid rgba(157,111,255,.2);padding:1px 5px;border-radius:3px;margin-right:3px">'+t.trim()+'</span>'; }).join('') : '<span style="color:var(--t3)">—</span>';
+  tbody.innerHTML = rows.map(function(c, i) {
+    var sp = c.status==='assessed' ? 'pill-pass' : 'pill-queue';
     return '<tr class="comp-row" data-ci="'+i+'" style="cursor:pointer;transition:background .15s">'
-      +'<td class="mono f10 c-blue" style="white-space:nowrap">'+c.id+'</td>'
-      +'<td class="mono-sm c-t3">'+( c.family||c.domain||'—')+'</td>'
+      +'<td class="mono f10 c-blue">'+c.id+'</td>'
+      +'<td class="mono-sm c-t3">'+(c.family||c.domain||'—')+'</td>'
       +'<td class="f12">'+( c.control||c.practice||c.title||'')+'</td>'
-      +'<td>'+toolsHtml+'</td>'
-      +'<td><span class="pill '+sp+'" style="font-weight:700;letter-spacing:.04em;font-family:monospace">'+icon+label+'</span></td>'
+      +'<td class="mono-sm">'+(c.tool||c.tools||'—')+'</td>'
+      +'<td><span class="pill '+sp+'">'+c.status+'</span></td>'
       +'</tr>';
   }).join('');
   tbody.querySelectorAll('.comp-row').forEach(function(row) {
     row.onmouseenter = function(){ this.style.background='var(--surface2)'; };
     row.onmouseleave = function(){ this.style.background=''; };
-    row.onclick = function(){
-      var idx = parseInt(this.getAttribute('data-ci'));
-      _showCompDetail(window._compRows[start + idx]);
-    };
-  });
-  _renderCompPagination(totalPages, _compPage, filter, statusFilter);
-}
-function _renderCompPagination(totalPages, currentPage, filter, statusFilter) {
-  var el = document.getElementById('comp-pagination');
-  if (!el) return;
-  if (totalPages <= 1) { el.innerHTML = ''; return; }
-  var btns = '';
-  for (var p = 1; p <= totalPages; p++) {
-    if (p===1||p===totalPages||(p>=currentPage-2&&p<=currentPage+2)) {
-      var active = p===currentPage;
-      btns += '<button data-page="'+p+'" class="cpg-btn" style="font-family:monospace;font-size:11px;padding:4px 9px;border-radius:5px;cursor:pointer;border:1px solid '+(active?'rgba(0,229,255,.35)':'rgba(255,255,255,.1)')+';background:'+(active?'rgba(0,229,255,.12)':'transparent')+';color:'+(active?'#00e5ff':'#8a90a2')+';min-width:30px;margin:0 2px">'+p+'</button>';
-    } else if (p===currentPage-3||p===currentPage+3) {
-      btns += '<span style="color:var(--t3);padding:0 4px">…</span>';
-    }
-  }
-  var start2 = (currentPage-1)*_compPageSize+1;
-  var end2 = Math.min(currentPage*_compPageSize, _compFiltered.length);
-  el.innerHTML = '<span style="font-family:monospace;font-size:11px;color:var(--t3)">'+start2+'–'+end2+' of '+_compFiltered.length+'</span>'
-    +'<div style="display:flex;align-items:center;gap:2px">'+btns+'</div>';
-  el.querySelectorAll('.cpg-btn').forEach(function(btn) {
-    btn.onclick = function() {
-      var pg = parseInt(this.getAttribute('data-page'));
-      var q = (document.getElementById('comp-search')||{value:''}).value||'';
-      var sf = (document.getElementById('comp-status-filter')||{value:''}).value||'';
-      _renderCompTable(q, sf, pg);
-    };
+    row.onclick = function(){ _showCompDetail(window._compRows[parseInt(this.getAttribute('data-ci'))]); };
   });
 }
 
@@ -2591,30 +2272,13 @@ function _setupCompFilters() {
   fb.innerHTML = '<input class="filter-input" id="comp-search" placeholder="Search ID, family, control…" style="flex:1;max-width:300px" oninput="_renderCompTable(this.value, document.getElementById(\'comp-status-filter\').value)">'
     +'<select class="filter-select" id="comp-status-filter" onchange="_renderCompTable(document.getElementById(\'comp-search\').value, this.value)">'
     +'<option value="">All statuses</option>'
-    +'<option value="pass">✓ PASS</option>'
-    +'<option value="assessed">✓ PASS (assessed)</option>'
-    +'<option value="warn">⚠ WARN</option>'
-    +'<option value="fail">✗ FAIL</option>'
+    +'<option value="assessed">Assessed</option>'
     +'<option value="not_assessed">Not assessed</option>'
     +'</select>'
     +'<button class="btn btn-ghost" style="font-size:10px" onclick="_exportCompCSV()">↓ CSV</button>'
     +'<span class="mono-sm c-t3" id="comp-filter-count"></span>';
   var tblWrap = card.querySelector('.tbl-wrap');
   if (tblWrap) card.insertBefore(fb, tblWrap);
-  // Summary bar
-  if (!document.getElementById('comp-summary-bar')) {
-    var sb = document.createElement('div');
-    sb.id = 'comp-summary-bar';
-    sb.style.cssText = 'padding:8px 14px;border-bottom:1px solid var(--border);display:flex;gap:4px;align-items:center;font-size:11px;flex-wrap:wrap';
-    card.insertBefore(sb, tblWrap);
-  }
-  // Pagination
-  if (!document.getElementById('comp-pagination')) {
-    var pg = document.createElement('div');
-    pg.id = 'comp-pagination';
-    pg.style.cssText = 'padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px';
-    card.appendChild(pg);
-  }
 }
 
 function _exportCompCSV() {
@@ -2674,289 +2338,29 @@ function loadCMMC() {
 }
 
 /* ─── Scan trigger ─── */
-// ── Mode descriptions ──────────────────────────────────────────────────────
-var MODE_INFO = {
-  SAST:     {desc:'Semgrep + Bandit · Static code analysis · Detect injection, secrets, insecure patterns', tools:['semgrep','bandit','gitleaks'], src:true},
-  SCA:      {desc:'Trivy + Grype · Dependency vulnerability scan · CVE detection in packages', tools:['trivy','grype','license'], src:true},
-  SECRETS:  {desc:'Gitleaks + SecretCheck · Credential scan · API keys, passwords, tokens in code/git', tools:['gitleaks','secretcheck'], src:true},
-  IAC:      {desc:'KICS + Checkov + Hadolint · Infrastructure as Code · Terraform, K8s, Dockerfile misconfig', tools:['kics','checkov','hadolint'], src:true},
-  DAST:     {desc:'Nuclei + Nikto + SSLScan · Web app scan · OWASP Top 10, CVE exploits, TLS check', tools:['nuclei','nikto','sslscan','nmap'], src:false},
-  NETWORK:  {desc:'Nmap + NetCap · L2-L7 network scan · Port scan, service detection, ARP/DNS/TLS analysis', tools:['nmap','netcap'], src:false},
-  FULL:     {desc:'All tools · SAST + SCA + SECRETS + IAC + DAST + NETWORK · Full security assessment 20min', tools:['semgrep','trivy','gitleaks','nuclei','nmap','checkov'], src:true},
-  FULL_SOC: {desc:'Max depth · All tools + deep analysis + correlation · SOC-grade assessment 30min', tools:['semgrep','trivy','gitleaks','nuclei','nmap','checkov','bandit','grype'], src:true},
-};
-
-
-function vspOpenReport(btn, type, rid) {
-  var base = '/api/v1/vsp/';
-  var url;
-  if(type==='tt13') url = base + 'tt13_report/' + rid;
-  else if(type==='pdf') url = base + 'tt13_report_pdf/' + rid;
-  else url = base + 'run_report_html/' + rid;
-  window.open(url, '_blank');
-}
-function selectMode(el){
-  document.querySelectorAll('.scan-mode-btn').forEach(function(b){
-    b.style.background='';b.style.border='';b.style.color='';
-  });
-  el.style.background='rgba(59,130,246,.25)';
-  el.style.border='2px solid #3b82f6';
-  el.style.color='#3b82f6';
-  var mode=el.dataset.mode;
-  var mi=document.getElementById('scanMode');if(mi)mi.value=mode;
-  var D={
-    SAST:{d:'Semgrep + Bandit — Static analysis — Detect injection, secrets, insecure patterns',t:['semgrep','bandit','gitleaks'],u:false},
-    SCA:{d:'Trivy + Grype — Dependency scan — CVE detection in packages',t:['trivy','grype','license'],u:false},
-    SECRETS:{d:'Gitleaks + SecretCheck — Credential scan — API keys, passwords, tokens',t:['gitleaks','secretcheck'],u:false},
-    IAC:{d:'KICS + Checkov + Hadolint — Infrastructure as Code — Terraform, K8s, Dockerfile',t:['kics','checkov','hadolint'],u:false},
-    DAST:{d:'Nuclei + Nikto + SSLScan — Web app scan — OWASP Top 10, CVE exploits, TLS',t:['nuclei','nikto','sslscan','nmap'],u:true},
-    NETWORK:{d:'Nmap + NetCap — L2-L7 network scan — Port scan, ARP/DNS/TLS analysis (min 6min)',t:['nmap','netcap'],u:true},
-    FULL:{d:'All tools — SAST+SCA+SECRETS+IAC+DAST+NETWORK — Full assessment 20min',t:['semgrep','trivy','gitleaks','nuclei','nmap','checkov'],u:false},
-    FULL_SOC:{d:'Max depth — All tools + correlation — SOC-grade 30min',t:['semgrep','trivy','gitleaks','nuclei','nmap','checkov','bandit','grype'],u:false}
-  };
-  var info=D[mode]||{};
-  var md=document.getElementById('mode-desc');if(md)md.textContent=info.d||'';
-  var needUrl=info.u||false;
-  var sg=document.getElementById('src-group');var ug=document.getElementById('url-group');
-  if(sg)sg.style.display=needUrl?'none':'block';
-  if(ug)ug.style.display=needUrl?'block':'none';
-  var C={semgrep:'p-blue',trivy:'p-grn',gitleaks:'p-amb',nuclei:'p-red',nmap:'p-red',checkov:'p-blue',bandit:'p-amb',grype:'p-grn',netcap:'p-blue',kics:'p-gray',hadolint:'p-gray',nikto:'p-red',sslscan:'p-blue',secretcheck:'p-amb',license:'p-gray'};
-  var tp=document.getElementById('tools-preview');
-  if(tp)tp.innerHTML='<span style="font-size:9px;color:var(--t3);margin-right:4px">Tools:</span>'+(info.t||[]).map(function(t){return '<span class="pill '+(C[t]||'p-gray')+'" style="font-size:9px">'+t+'</span>';}).join('');
-  // Only auto-upgrade profile if no framework overriding
-  var _fw=document.getElementById('scanFramework')?.value||'';
-  var _mode=document.getElementById('scanMode')?.value||'SAST';
-  var _psel=document.getElementById('scanProfile');
-  if(_psel){
-    var _modeMin=MODE_MIN_PROFILE[_mode]||'FAST';
-    var _fwMin=_fw&&FW_MATRIX[_fw]?FW_MATRIX[_fw].minProfile:'FAST';
-    var _target=PROFILE_RANK[_modeMin]>=PROFILE_RANK[_fwMin]?_modeMin:_fwMin;
-    if(PROFILE_RANK[_psel.value]<PROFILE_RANK[_target]){
-      _psel.value=_target;
-    }
-  }
-  syncScanModal('validate');
-}
-
-// ── 3-way sync: Mode ↔ Profile ↔ Framework ──────────────────────────────────
-var SYNC_LOCK=false; // prevent infinite loop
-
-// Matrix: framework → {minMode, minProfile, recommended}
-var FW_MATRIX={
-  OWASP:   {modes:['DAST','FULL','FULL_SOC'],         minProfile:'EXT',      recMode:'DAST',     recProfile:'EXT',
-             desc:'OWASP Top 10 — requires DAST (Nuclei web scan) minimum'},
-  ISO27001:{modes:['FULL','FULL_SOC'],                minProfile:'FULL',     recMode:'FULL',     recProfile:'FULL',
-             desc:'ISO 27001:2022 — requires full coverage across all control domains'},
-  NIST:    {modes:['FULL','FULL_SOC'],                minProfile:'FULL',     recMode:'FULL',     recProfile:'FULL',
-             desc:'NIST CSF 2.0 — requires comprehensive scan DE.CM + ID.RA'},
-  TT13:    {modes:['FULL','FULL_SOC'],                minProfile:'FULL',     recMode:'FULL',     recProfile:'FULL',
-             desc:'TT13/2023 — yêu cầu quét đầy đủ bao gồm mạng (Điều 9-15)'},
-  FEDRAMP: {modes:['FULL_SOC'],                       minProfile:'FULL_SOC', recMode:'FULL_SOC', recProfile:'FULL_SOC',
-             desc:'FedRAMP Moderate — requires maximum depth SOC-grade scan'},
-  CMMC:    {modes:['FULL_SOC'],                       minProfile:'FULL_SOC', recMode:'FULL_SOC', recProfile:'FULL_SOC',
-             desc:'CMMC Level 2 — requires full SOC assessment + evidence'}
-};
-
-// Matrix: mode → min profile
-var MODE_MIN_PROFILE={
-  SAST:'FAST', SCA:'FAST', SECRETS:'FAST', IAC:'FAST',
-  DAST:'EXT',  NETWORK:'EXT',
-  FULL:'FULL', FULL_SOC:'FULL_SOC'
-};
-
-var PROFILE_RANK={FAST:1,EXT:2,AGGR:3,PREMIUM:4,FULL:5,FULL_SOC:6};
-
-function syncScanModal(changed){
-  if(SYNC_LOCK) return;
-  SYNC_LOCK=true;
-  try{
-    var mode    = document.getElementById('scanMode')?.value||'SAST';
-    var profile = document.getElementById('scanProfile')?.value||'FAST';
-    var fw      = document.getElementById('scanFramework')?.value||'';
-    var msg     = document.getElementById('scanMsg');
-    var warnings= [];
-
-    if(changed==='framework' && fw){
-      var fwm=FW_MATRIX[fw];
-      if(fwm){
-        // Auto-select recommended mode
-        var btn=document.querySelector('.scan-mode-btn[data-mode="'+fwm.recMode+'"]');
-        if(btn){
-          document.querySelectorAll('.scan-mode-btn').forEach(function(b){
-            b.style.background='';b.style.border='';b.style.color='';
-          });
-          btn.style.background='rgba(59,130,246,.25)';
-          btn.style.border='2px solid #3b82f6';
-          btn.style.color='#3b82f6';
-          document.getElementById('scanMode').value=fwm.recMode;
-          mode=fwm.recMode;
-          // Update src/url visibility
-          var needUrl=mode==='DAST'||mode==='NETWORK';
-          var sg=document.getElementById('src-group');
-          var ug=document.getElementById('url-group');
-          if(sg) sg.style.display=needUrl?'none':'block';
-          if(ug) ug.style.display=needUrl?'block':'none';
-          // Update tools preview
-          _updateToolsPreview(mode);
-          // Update desc
-          var md=document.getElementById('mode-desc');
-          if(md) md.textContent=fwm.desc;
-        }
-        // Auto-select recommended profile (always set for framework)
-        var psel=document.getElementById('scanProfile');
-        if(psel){ psel.value=fwm.recProfile; profile=fwm.recProfile; }
-      }
-    }
-
-    if(changed==='mode'){
-      // Auto-suggest min profile for mode
-      // But if framework is set, use MAX(modeMin, fwMin) 
-      var psel=document.getElementById('scanProfile');
-      var modeMinP=MODE_MIN_PROFILE[mode]||'FAST';
-      var fwMinP=fw&&FW_MATRIX[fw]?FW_MATRIX[fw].minProfile:'FAST';
-      var targetP=PROFILE_RANK[modeMinP]>=PROFILE_RANK[fwMinP]?modeMinP:fwMinP;
-      if(psel && PROFILE_RANK[psel.value]<PROFILE_RANK[targetP]){
-        psel.value=targetP; profile=targetP;
-      }
-    }
-
-    if(changed==='profile'||changed==='validate'){
-      // Just re-validate, no auto-change
-    }
-
-    // Cross-validate all 3
-    if(fw){
-      var fwm=FW_MATRIX[fw];
-      if(fwm){
-        // Rule B: Check mode coverage
-        if(fwm.modes.indexOf(mode)===-1){
-          var recM=fwm.recMode;
-          warnings.push('Mode '+mode+' không đáp ứng '+fw+' → cần '+recM+' hoặc FULL_SOC');
-        }
-        // Rule C: Check profile rank
-        if(PROFILE_RANK[profile]<PROFILE_RANK[fwm.minProfile]){
-          warnings.push('Profile '+profile+' quá thấp cho '+fw+' → cần tối thiểu '+fwm.minProfile);
-        }
-      }
-    }
-
-    // Rule A: Check mode vs profile
-    var modeMinP=MODE_MIN_PROFILE[mode]||'FAST';
-    if(PROFILE_RANK[profile]<PROFILE_RANK[modeMinP]){
-      warnings.push('Mode '+mode+' yêu cầu profile tối thiểu '+modeMinP+' (hiện tại: '+profile+')');
-    }
-
-    // Show result
-    if(msg){
-      if(warnings.length>0){
-        msg.style.color='var(--color-text-warning,#f59e0b)';
-        msg.innerHTML='⚠ '+warnings.join('<br>⚠ ');
-      } else if(fw){
-        msg.style.color='var(--color-text-success,#22c55e)';
-        msg.textContent='✓ '+mode+' + '+profile+' đáp ứng yêu cầu '+fw;
-      } else {
-        msg.style.color='var(--color-text-secondary)';
-        msg.textContent='Mode: '+mode+' · Profile: '+profile+' · Timeout: '+
-          ({FAST:'2min',EXT:'6min',AGGR:'10min',PREMIUM:'15min',FULL:'20min',FULL_SOC:'30min'}[profile]||'?');
-      }
-    }
-  }finally{
-    SYNC_LOCK=false;
-  }
-}
-
-function _updateToolsPreview(mode){
-  var D={
-    SAST:{t:['semgrep','bandit','gitleaks']},
-    SCA:{t:['trivy','grype','license']},
-    SECRETS:{t:['gitleaks','secretcheck']},
-    IAC:{t:['kics','checkov','hadolint']},
-    DAST:{t:['nuclei','nikto','sslscan','nmap']},
-    NETWORK:{t:['nmap','netcap']},
-    FULL:{t:['semgrep','trivy','gitleaks','nuclei','nmap','checkov']},
-    FULL_SOC:{t:['semgrep','trivy','gitleaks','nuclei','nmap','checkov','bandit','grype']}
-  };
-  var C={semgrep:'p-blue',trivy:'p-grn',gitleaks:'p-amb',nuclei:'p-red',nmap:'p-red',
-         checkov:'p-blue',bandit:'p-amb',grype:'p-grn',netcap:'p-blue',kics:'p-gray',
-         hadolint:'p-gray',nikto:'p-red',sslscan:'p-blue',secretcheck:'p-amb',license:'p-gray'};
-  var tp=document.getElementById('tools-preview');
-  var info=D[mode]||{t:[]};
-  if(tp) tp.innerHTML='<span style="font-size:9px;color:var(--t3);margin-right:4px">Tools:</span>'+
-    info.t.map(function(t){return '<span class="pill '+(C[t]||'p-gray')+'" style="font-size:9px">'+t+'</span>';}).join('');
-}
-
-function onFrameworkChange(fw){ syncScanModal('framework'); }
-function updateProfileDesc(){ syncScanModal('profile'); }
-
-
-
-function updateProfileDesc(){
-  var profile=document.getElementById('scanProfile').value;
-  var mode=document.getElementById('scanMode').value;
-  var fw=document.getElementById('scanFramework').value;
-  var msg=document.getElementById('scanMsg');
-  if(!msg) return;
-  // Warn if profile too weak for framework
-  var fwMinProfile={
-    OWASP:'EXT', ISO27001:'FULL', NIST:'PREMIUM',
-    TT13:'FULL', FEDRAMP:'FULL_SOC', CMMC:'FULL_SOC'
-  };
-  var profileRank={FAST:1,EXT:2,AGGR:3,PREMIUM:4,FULL:5,FULL_SOC:6};
-  var minP=fwMinProfile[fw];
-  if(minP && profileRank[profile]<profileRank[minP]){
-    msg.style.color='var(--amber)';
-    msg.textContent='⚠ '+fw+' requires minimum profile '+minP+' — current profile may miss controls';
-  } else if(fw) {
-    msg.style.color='var(--t3)';
-    msg.textContent='✓ Profile '+profile+' meets '+fw+' requirements';
-  } else {
-    msg.style.color='var(--t3)';
-    msg.textContent='';
-  }
-}
-
 async function triggerScan() {
-  var mode    = document.getElementById('scanMode').value;
-  var profile = document.getElementById('scanProfile').value;
-  var framework = document.getElementById('scanFramework')?.value||'';
-  var needUrl = mode==='DAST'||mode==='NETWORK';
-  var src     = needUrl ? document.getElementById('scanUrl').value
-                        : document.getElementById('scanSrc').value;
-  var msg     = document.getElementById('scanMsg');
-
-  if (!src) {
-    msg.style.color='var(--red)';
-    msg.textContent='⚠ '+(needUrl?'Target URL':'Source path')+' is required';
-    return;
-  }
-
-  // Profile value mapping
-  var profileMap={FAST:'FAST',EXT:'EXT',AGGR:'AGGR',PREMIUM:'PREMIUM',FULL:'FULL',FULL_SOC:'FULL_SOC'};
-  var profileVal = profileMap[profile]||profile;
-
-  msg.style.color='var(--t3)';
-  msg.textContent='⏳ Triggering '+mode+' scan ['+profileVal+']…';
-
-  var payload = {mode, profile:profileVal, src};
-  if(needUrl) payload.url = src;
-  if(framework) payload.framework = framework;
-
+  const mode    = document.getElementById('scanMode').value;
+  const profile = document.getElementById('scanProfile').value;
+  const src     = document.getElementById('scanSrc').value;
+  const msg     = document.getElementById('scanMsg');
+  if (!src) { msg.style.color='var(--red)'; msg.textContent='⚠ Source path is required'; return; }
+  msg.style.color='var(--t3)'; msg.textContent='⏳ Triggering scan…';
   try {
-    if (window.TOKEN) {
-      const r = await api('POST', '/vsp/run', payload);
+    if (TOKEN) {
+      // /vsp/run đã handle FULL_SOC mode đúng (có worker thật).
+      // /vsp/run/full-soc chỉ insert DB stuck QUEUED — không dùng.
+      const r = await api('POST', '/vsp/run', {mode, profile, src});
+      const isFullSOC = (mode === 'FULL_SOC' || profile === 'FULL_SOC');
+      const label = isFullSOC ? '🚀 FULL_SOC triggered' : '✓';
       msg.style.color='var(--green)';
-      msg.textContent='✓ '+r.rid+' · '+mode+' ['+profileVal+'] · '+( r.message||'queued');
-      // Show in scan log
-      if(typeof initScanLogSSE==='function') setTimeout(initScanLogSSE, 500);
+      msg.textContent = label + ' · ' + (r.rid||'') + ' · ' + (r.message || 'queued');
     } else {
-      msg.style.color='var(--green)';
-      msg.textContent='✓ Scan triggered · Mode: '+mode+' · Profile: '+profileVal;
+      msg.style.color='var(--green)'; msg.textContent='✓ Scan triggered (offline mode) · Mode: ' + mode;
     }
-    setTimeout(()=>document.getElementById('scan-modal').classList.remove('open'), 2500);
+    setTimeout(() => document.getElementById('scan-modal').classList.remove('open'), 2000);
   } catch(e) {
-    msg.style.color='var(--amber)';
-    msg.textContent='ℹ Scan queued · Mode: '+mode+' ['+profileVal+']';
-    setTimeout(()=>document.getElementById('scan-modal').classList.remove('open'), 2500);
+    msg.style.color='var(--amber)'; msg.textContent='ℹ Scan queued (offline mode)';
+    setTimeout(() => document.getElementById('scan-modal').classList.remove('open'), 2000);
   }
 }
 
@@ -3202,7 +2606,7 @@ function updateTicker() {
         var eg=document.getElementById('exec-grade-static'); if(eg){eg.textContent=posture;eg.className='exec-grade '+sc;}
         // KPI cards
         var summ=d.summary||{};
-        var kpis={'d-critical':summ.CRITICAL||0,'d-high':summ.HIGH||0,'d-medium':summ.MEDIUM||0,'d-total':d.total_findings||0};
+        var kpis={'d-critical':summ.CRITICAL||summ.critical||0,'d-high':summ.HIGH||summ.high||0,'d-medium':summ.MEDIUM||summ.medium||0,'d-total':summ.total||d.total_findings||0};
         Object.entries(kpis).forEach(function(kv){
           var el=document.getElementById(kv[0]); if(el) el.textContent=kv[1];
         });
@@ -3329,7 +2733,6 @@ setTimeout(function() {
 document.addEventListener('DOMContentLoaded', () => {
   // Init dashboard charts immediately
   setTimeout(initDashboardCharts, 300);
-  setTimeout(function(){ if(typeof loadConMonKPIs==='function') loadConMonKPIs(); }, 2000);
   if (TOKEN) setTimeout(loadLatestLog, 500);
 
   // Try connecting to API if token exists
@@ -3338,8 +2741,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.TOKEN) {
       // Validate JWT chưa expired trước khi gọi
       try {
-        var _p = decodeJwt(window.TOKEN);
-        if (_p && _p.exp && _p.exp * 1000 > Date.now()) {
+        var _p = JSON.parse(atob(window.TOKEN.split('.')[1]));
+        if (_p.exp && _p.exp * 1000 > Date.now()) {
           updateTicker();
           setInterval(updateTicker, 30000);
         } else {
@@ -3399,8 +2802,9 @@ async function ensureToken() {
   if (stored) {
     // Validate JWT expiry
     try {
-      var payload = decodeJwt(stored);
-      if (payload) {
+      var parts = stored.split('.');
+      if (parts.length === 3) {
+        var payload = JSON.parse(atob(parts[1]));
         if (payload.exp && payload.exp * 1000 > Date.now()) {
           window.TOKEN = stored;
           return true;
@@ -3526,6 +2930,11 @@ async function govLoginSubmit() {
     // Boot the app
     showPanel('dashboard', null);
     setTimeout(loadCurrentPanel, 300);
+    // Trigger KPI update ngay sau login
+    setTimeout(function() {
+      if (typeof updateTicker === 'function') updateTicker();
+      setInterval(updateTicker, 30000);
+    }, 500);
 
     showToast('Authenticated — welcome, ' + (data.email||'user'), 'success');
 
@@ -3551,8 +2960,9 @@ document.addEventListener('DOMContentLoaded', function() {
   if (stored) {
     // Quick validate: decode JWT expiry
     try {
-      var payload = decodeJwt(stored);
-      if (payload) {
+      var parts = stored.split('.');
+      if (parts.length === 3) {
+        var payload = JSON.parse(atob(parts[1]));
         if (payload.exp && payload.exp * 1000 > Date.now()) {
           window.TOKEN = stored;
           var overlay = document.getElementById('gov-login-overlay');
@@ -3588,30 +2998,6 @@ async function initSSE() {
         if (typeof showToast === 'function') showToast('Scan: ' + msg.gate, msg.gate==='PASS'?'success':'error');
         if (typeof updateTicker === 'function') updateTicker();
         if (typeof loadDashboard === 'function') setTimeout(loadDashboard, 500);
-        // Load ConMon KPIs
-        setTimeout(function(){
-          if(!window.TOKEN) return;
-          fetch('/api/p4/rmf/conmon',{headers:{'Authorization':'Bearer '+window.TOKEN}})
-            .then(function(r){return r.json();})
-            .then(function(d){
-              var sc=document.getElementById('d-conmon-score');
-              var po=document.getElementById('d-poam-open');
-              var fp=document.getElementById('d-fedramp-pct');
-              if(sc){sc.textContent=d.conmon_score||'—';sc.style.color=d.conmon_score>=80?'var(--green)':d.conmon_score>=60?'var(--amber)':'var(--red)';}
-              if(po){po.textContent=d.open_poam_items||'0';po.style.color=d.open_poam_items>50?'var(--red)':d.open_poam_items>10?'var(--amber)':'var(--green)';}
-              if(fp){fp.textContent=Math.round(d.frameworks&&d.frameworks.FedRAMP||0)+'%';}
-              var ps=document.getElementById('d-poam-sub');
-              if(ps&&d.vulnerabilities){ps.textContent='crit:'+d.vulnerabilities.critical+' high:'+d.vulnerabilities.high;}
-            }).catch(function(){});
-          fetch('/api/v1/audit/stats',{headers:{'Authorization':'Bearer '+window.TOKEN}})
-            .then(function(r){return r.json();})
-            .then(function(d){
-              var at=document.getElementById('d-audit-total');
-              var as=document.getElementById('d-audit-sub');
-              if(at) at.textContent=d.total||'—';
-              if(as) as.textContent='last 24h: '+(d.last_24h||0);
-            }).catch(function(){});
-        }, 800);
       }
     } catch(e2) {}
   };
@@ -3771,15 +3157,59 @@ window.downloadExecutivePDF = async function() {
   }
 };
 
-// ── updateTicker dùng token thật ──────────────────────────────────────────
+// ── updateTicker — full KPI update ───────────────────────────────────────
 window.updateTicker = async function() {
   if (!window.TOKEN || window.TOKEN === '') return;
+  const hdr = {'Authorization':'Bearer '+window.TOKEN};
   try {
-    const r = await fetch('/api/v1/vsp/run/latest',{headers:{'Authorization':'Bearer '+window.TOKEN}});
-    if (!r.ok) return;
-    const d = await r.json();
-    const el = document.getElementById('ticker-content');
-    if (el) el.textContent = (d.rid||'').slice(-24)+' · '+(d.mode||'')+' · '+(d.status||'')+(d.gate?' · '+d.gate:'')+(d.total_findings?' · '+d.total_findings+' findings':'');
+    // 1. Latest run → score, gate, KPIs, ticker
+    const r1 = await fetch('/api/v1/vsp/run/latest', {headers: hdr});
+    if (r1.ok) {
+      const d = await r1.json();
+      const score = (d.summary && d.summary.SCORE) || d.score || 0;
+      const sc = score >= 70 ? 'c-green' : score >= 40 ? 'c-amber' : 'c-red';
+      const summ = d.summary || {};
+      const gate = d.gate || '';
+      // Ticker bar
+      const el = document.getElementById('ticker-content');
+      if (el) el.textContent = (d.rid||'').slice(-24)+' · '+(d.mode||'')+' · '+(d.status||'')+(gate?' · '+gate:'')+(d.total_findings?' · '+d.total_findings+' findings':'');
+      // Score KPIs
+      ['d-score','d-score2'].forEach(function(id){
+        var e=document.getElementById(id); if(e){e.textContent=score;e.className=(id==='d-score'?'spark-value ':'score-num ')+sc;}
+      });
+      // Grade
+      var grade=score>=90?'A+':score>=80?'A':score>=70?'B':score>=60?'C':score>=40?'D':'F';
+      var gr=document.getElementById('d-grade'); if(gr){gr.textContent=d.posture||grade;gr.className='exec-stat-val '+sc;}
+      // Gate badge
+      var gEl=document.getElementById('d-gate');
+      if(gEl&&gate){gEl.textContent=gate;gEl.className='pill pill-'+(gate==='PASS'?'pass':gate==='WARN'?'warn':'fail');}
+      // Gate score
+      var gs=document.getElementById('d-gate-score'); if(gs) gs.textContent='score: '+score;
+      // Score ring
+      var ringColor=gate==='PASS'?'#22c55e':gate==='WARN'?'#f59e0b':'#ef4444';
+      if(typeof drawScoreRing==='function') drawScoreRing('score-ring', score, ringColor);
+      // Severity KPIs
+      var kpis={'d-critical':summ.CRITICAL||summ.critical||0,'d-high':summ.HIGH||summ.high||0,'d-medium':summ.MEDIUM||summ.medium||0,'d-low':summ.LOW||summ.low||0,'d-total':summ.total||d.total_findings||0};
+      Object.entries(kpis).forEach(function(kv){var e=document.getElementById(kv[0]);if(e)e.textContent=kv[1];});
+    }
+  } catch(e) {}
+  try {
+    // 2. Runs count
+    const r2 = await fetch('/api/v1/vsp/runs/index?limit=200', {headers: hdr});
+    if (r2.ok) {
+      const d = await r2.json();
+      var total = d.total || (d.runs && d.runs.length) || 0;
+      var el = document.getElementById('d-runs-count'); if(el && total) el.textContent = total;
+    }
+  } catch(e) {}
+  try {
+    // 3. Remediation open count
+    const r3 = await fetch('/api/v1/remediation/stats', {headers: hdr});
+    if (r3.ok) {
+      const d = await r3.json();
+      var open = d.open || 0;
+      var el = document.getElementById('d-rem'); if(el) el.textContent = open.toLocaleString();
+    }
   } catch(e) {}
 };
 
@@ -3805,25 +3235,1469 @@ if (document.readyState !== 'loading') {
 </script>
 
 
+<script>
+// ── PATCH v2.2 — Scan log fix: tools by mode + load runs dropdown ──────────
+
+const TOOLS_BY_MODE = {
+  IAC:     ['kics','checkov'],
+  SAST:    ['bandit','semgrep','codeql'],
+  SCA:     ['trivy','grype'],
+  SECRETS: ['gitleaks','trufflehog'],
+  DAST:    ['nuclei','zap'],
+  FULL:    ['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+};
+const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
+
+// Load runs vào dropdown
+async function loadRunsDropdown() {
+  if (!await ensureToken()) return;
+  try {
+    const r = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const d = await r.json();
+    const runs = d.runs || [];
+    const sel = document.getElementById('log-run-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— select run —</option>' +
+      runs.map(r => `<option value="${r.rid}">${r.rid} · ${r.mode} · ${r.status} · ${r.total||0} findings</option>`).join('');
+    // Auto-select latest
+    if (runs.length > 0) {
+      sel.value = runs[0].rid;
+      loadRunLog(runs[0].rid);
+    }
+  } catch(e) { console.error('loadRunsDropdown', e); }
+}
+
+// Load log + tools cho 1 run
+async function loadRunLog(rid) {
+  if (!rid) return;
+  await ensureToken();
+  try {
+    // Lấy thông tin run
+    const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const run = await r.json();
+    const mode = run.mode || 'FULL';
+    const tools = TOOLS_BY_MODE[mode] || ALL_TOOLS;
+    const summary = run.summary || {};
+
+    // Cập nhật tool cells
+    renderToolCells(tools, summary, run);
+
+    // Cập nhật log info
+    const infoEl = document.getElementById('log-run-info');
+    if (infoEl) infoEl.textContent = run.status + ' · ' + (run.total_findings||0) + ' findings · ' + tools.length + ' tools';
+
+    // Lấy findings để tạo log lines
+    const f = await fetch('/api/v1/vsp/findings?rid='+rid+'&limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const fd = await f.json();
+    const findings = fd.findings || [];
+
+    // Build log từ findings
+    buildLogFromFindings(run, tools, findings, summary);
+
+  } catch(e) {
+    console.error('loadRunLog', e);
+    showToast && showToast('Error loading run log', 'error');
+  }
+}
+
+function renderToolCells(tools, summary, run) {
+  const grid = document.querySelector('.log-tool-grid');
+  if (!grid) return;
+
+  // Group findings by tool từ summary (nếu có)
+  // summary: {CRITICAL:1, HIGH:80, ...} — không có per-tool, dùng ước tính
+  grid.innerHTML = tools.map(tool => {
+    const done = run.status === 'DONE';
+    const cls = done ? 'done' : run.status === 'RUNNING' ? 'running' : '';
+    // Tìm findings count cho tool này từ cache nếu có
+    const cnt = window._findingsCache ? 
+      window._findingsCache.filter(f => f.tool === tool).length : '—';
+    const cntLabel = done ? (cnt !== '—' ? cnt + ' findings' : '✓ done') : (run.status === 'RUNNING' ? 'running…' : '—');
+    const cntColor = done ? 'var(--green)' : run.status === 'RUNNING' ? 'var(--amber)' : 'var(--t4)';
+    return `<div class="log-tool-cell ${cls}">
+      <div class="log-tool-name">${tool}</div>
+      <div class="log-tool-status f10 fmono" style="color:${cntColor}">${cntLabel}</div>
+    </div>`;
+  }).join('');
+}
+
+function buildLogFromFindings(run, tools, findings, summary) {
+  const stream = document.getElementById('log-stream');
+  if (!stream) return;
+
+  const lines = [];
+  let t = 0;
+
+  const pad = n => String(n).padStart(2,'0');
+  const ts = s => `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`;
+
+  // Header
+  lines.push({ts:ts(t++), tool:'scanner', level:'INFO', msg:'Run started: '+run.rid});
+  lines.push({ts:ts(t++), tool:'scanner', level:'INFO', msg:'Mode: '+run.mode+' · Profile: '+run.profile+' · Source: '+(run.src||'—')+' · Source: '+run.src});
+
+  // Per-tool log từ findings
+  const byTool = {};
+  findings.forEach(f => { if (!byTool[f.tool]) byTool[f.tool] = []; byTool[f.tool].push(f); });
+
+  tools.forEach(tool => {
+    const tFindings = byTool[tool] || [];
+    lines.push({ts:ts(t++), tool, level:'INFO', msg:'Starting scan…'});
+    if (tFindings.length > 0) {
+      const crits = tFindings.filter(f=>f.severity==='CRITICAL');
+      const highs = tFindings.filter(f=>f.severity==='HIGH');
+      if (crits.length) {
+        const ids = crits.slice(0,3).map(f=>f.rule_id).join(', ');
+        lines.push({ts:ts(t++), tool, level:'ERROR', msg:`Found ${crits.length} CRITICAL findings (${ids})`});
+      }
+      if (highs.length) lines.push({ts:ts(t++), tool, level:'WARN', msg:`Found ${highs.length} HIGH findings`});
+      lines.push({ts:ts(t++), tool, level:'DONE', msg:`Completed · ${tFindings.length} findings`});
+    } else {
+      lines.push({ts:ts(t++), tool, level:'DONE', msg:'Completed · 0 findings'});
+    }
+  });
+
+  // Gate
+  const gateColor = run.gate==='PASS'?'DONE':run.gate==='WARN'?'WARN':'ERROR';
+  lines.push({ts:ts(t++), tool:'gate', level:gateColor, 
+    msg:`Gate decision: ${run.gate} · Total: ${run.total_findings} findings · Score: ${summary.SCORE||0}/100`});
+
+  window._allLogs = lines;
+  filterLogs && filterLogs();
+
+  const cnt = document.getElementById('log-count');
+  if (cnt) cnt.textContent = lines.length + ' lines';
+}
+
+// Override showPanel để load runs dropdown khi vào Scan log
+const _sp22 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp22 && _sp22(name, btn);
+  if (name === 'scanlog') setTimeout(loadRunsDropdown, 200);
+};
+
+// Override loadLatestLog
+window.loadLatestLog = async function() {
+  await loadRunsDropdown();
+};
+
+// Override loadRunLog global
+window.loadRunLog = loadRunLog;
+
+console.log('VSP Patch v2.2 loaded ✓');
+</script>
+
+
+<script>
+// ── PATCH v2.3 — Fix tools by actual findings + gate line + source ─────────
+
+// Override TOOLS_BY_MODE — dùng tools thật từ findings thay vì hardcode
+const TOOLS_BY_MODE_V2 = {
+  IAC:     ['kics','checkov','trivy','gitleaks'],
+  SAST:    ['bandit','semgrep','codeql'],
+  SCA:     ['trivy','grype'],
+  SECRETS: ['gitleaks','trufflehog'],
+  DAST:    ['nuclei','zap'],
+  FULL:    ['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+};
+
+async function loadRunLog(rid) {
+  if (!rid) return;
+  await ensureToken();
+  try {
+    const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const run = await r.json();
+    const mode = run.mode || 'FULL';
+
+    // Load findings để biết tools thực sự có data
+    const f = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const fd = await f.json();
+    const findings = fd.findings || [];
+    window._findingsCache = findings;
+
+    // Tools thực sự xuất hiện trong findings
+    const toolsInFindings = [...new Set(findings.map(f=>f.tool).filter(Boolean))];
+    // Merge với tools expected cho mode
+    const expectedTools = TOOLS_BY_MODE_V2[mode] || ['kics','checkov','trivy','gitleaks'];
+    // Union: tools từ findings + tools expected, loại trùng
+    const allTools = [...new Set([...toolsInFindings, ...expectedTools])];
+
+    // Update info bar
+    const infoEl = document.getElementById('log-run-info');
+    if (infoEl) infoEl.textContent = run.status+' · '+(run.total_findings||0)+' findings · '+allTools.length+' tools';
+
+    // Render tool cells
+    const grid = document.querySelector('.log-tool-grid');
+    if (grid) {
+      const byTool = {};
+      findings.forEach(f => { if(!byTool[f.tool])byTool[f.tool]=[]; byTool[f.tool].push(f); });
+      
+      grid.innerHTML = allTools.map(tool => {
+        const tFindings = byTool[tool] || [];
+        const hasFinding = tFindings.length > 0;
+        const cls = hasFinding ? 'done' : (run.status==='RUNNING'?'running':'');
+        const cntLabel = hasFinding ? tFindings.length+' findings' : (run.status==='DONE'?'0 findings':'—');
+        const cntColor = hasFinding ? 'var(--green)' : run.status==='DONE'?'var(--t3)':'var(--t4)';
+        return `<div class="log-tool-cell ${cls}">
+          <div class="log-tool-name">${tool}</div>
+          <div class="log-tool-status f10 fmono" style="color:${cntColor}">${cntLabel}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Build log lines
+    const lines = [];
+    let t = 0;
+    const pad = n => String(n).padStart(2,'0');
+    const ts = s => `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`;
+    const summary = run.summary || {};
+    const byTool2 = {};
+    findings.forEach(f => { if(!byTool2[f.tool])byTool2[f.tool]=[]; byTool2[f.tool].push(f); });
+
+    lines.push({ts:ts(t++),tool:'scanner',level:'INFO',msg:'Run started: '+run.rid});
+    lines.push({ts:ts(t++),tool:'scanner',level:'INFO',msg:'Mode: '+run.mode+' · Profile: '+run.profile+' · Source: '+(run.src||'—')+' · Source: '+(run.src||'—')});
+    lines.push({ts:ts(t++),tool:'scanner',level:'INFO',msg:'Pipeline starting · tools='+allTools.length});
+
+    allTools.forEach(tool => {
+      const tF = byTool2[tool] || [];
+      lines.push({ts:ts(t++),tool,level:'INFO',msg:'Starting scan…'});
+      if (tF.length > 0) {
+        const crits = tF.filter(f=>f.severity==='CRITICAL');
+        const highs = tF.filter(f=>f.severity==='HIGH');
+        const meds  = tF.filter(f=>f.severity==='MEDIUM');
+        if (crits.length) {
+          const ids = crits.slice(0,3).map(f=>f.rule_id).filter(Boolean).join(', ');
+          lines.push({ts:ts(t++),tool,level:'ERROR',msg:`Found ${crits.length} CRITICAL findings`+(ids?' ('+ids+')':'')});
+        }
+        if (highs.length) lines.push({ts:ts(t++),tool,level:'WARN',msg:`Found ${highs.length} HIGH findings`});
+        if (meds.length && !crits.length && !highs.length) lines.push({ts:ts(t++),tool,level:'WARN',msg:`Found ${meds.length} MEDIUM findings`});
+        lines.push({ts:ts(t++),tool,level:'DONE',msg:`Completed · ${tF.length} findings`});
+      } else {
+        lines.push({ts:ts(t++),tool,level:'DONE',msg:'Completed · 0 findings'});
+      }
+    });
+
+    // Gate line — quan trọng!
+    const gateLevel = run.gate==='PASS'?'DONE':run.gate==='WARN'?'WARN':'ERROR';
+    lines.push({ts:ts(t++),tool:'gate',level:gateLevel,
+      msg:`Gate decision: ${run.gate} · Total: ${run.total_findings} findings · Score: ${summary.SCORE||0}/100 · Posture: ${run.posture||'?'}`});
+
+    window._allLogs = lines;
+    if (typeof filterLogs==='function') filterLogs();
+
+    const cnt = document.getElementById('log-count');
+    if (cnt) cnt.textContent = lines.length + ' lines';
+
+  } catch(e) {
+    console.error('loadRunLog v2.3', e);
+    if (typeof showToast==='function') showToast('Error: '+e.message,'error');
+  }
+}
+window.loadRunLog = loadRunLog;
+
+console.log('VSP Patch v2.3 loaded ✓');
+</script>
+
+
+<script>
+// ── PATCH v2.4 — Fix tool cells N/A + gate line + log chỉ dùng findings thật ──
+async function loadRunLog(rid) {
+  if (!rid) return;
+  await ensureToken();
+  try {
+    const run = await fetch('/api/v1/vsp/run/'+rid, {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const mode = run.mode || 'FULL';
+    const TOOLS_BY_MODE = {
+      IAC:['kics','checkov'], SAST:['bandit','semgrep','codeql'],
+      SCA:['trivy','grype'], SECRETS:['gitleaks','trufflehog'],
+      DAST:['nuclei','zap'],
+      FULL:['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+    };
+    const expectedTools = TOOLS_BY_MODE[mode] || ['kics','checkov'];
+
+    // Findings đúng run_id
+    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const findings = fd.findings || [];
+    window._findingsCache = findings;
+
+    // Group by tool
+    const byTool = {};
+    findings.forEach(f => { if(!byTool[f.tool])byTool[f.tool]=[]; byTool[f.tool].push(f); });
+
+    // Tools thực sự có findings + expected tools
+    const toolsWithData = [...new Set([...Object.keys(byTool), ...expectedTools])];
+
+    // Info bar
+    const infoEl = document.getElementById('log-run-info');
+    if (infoEl) infoEl.textContent = run.status+' · '+run.total_findings+' findings · '+expectedTools.length+' tools';
+
+    // Tool cells
+    const grid = document.querySelector('.log-tool-grid');
+    if (grid) {
+      grid.innerHTML = expectedTools.map(tool => {
+        const tF = byTool[tool] || [];
+        const hasData = tF.length > 0;
+        const cls = hasData ? 'done' : '';
+        const label = hasData ? tF.length+' findings' : 'N/A';
+        const color = hasData ? 'var(--green)' : 'var(--t4)';
+        return `<div class="log-tool-cell ${cls}">
+          <div class="log-tool-name">${tool}</div>
+          <div class="log-tool-status f10 fmono" style="color:${color}">${label}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Build log — chỉ dùng tools expected + findings thật
+    const lines = [];
+    let t = 0;
+    const pad = n => String(n).padStart(2,'0');
+    const ts  = s => `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`;
+    const summary = run.summary || {};
+
+    lines.push({ts:ts(t++),tool:'scanner',level:'INFO',msg:'Run started: '+run.rid});
+    lines.push({ts:ts(t++),tool:'scanner',level:'INFO',msg:'Mode: '+run.mode+' · Profile: '+run.profile+' · Source: '+(run.src||'—')});
+    lines.push({ts:ts(t++),tool:'scanner',level:'INFO',msg:'Pipeline starting · tools='+expectedTools.length});
+
+    expectedTools.forEach(tool => {
+      const tF = byTool[tool] || [];
+      lines.push({ts:ts(t++),tool,level:'INFO',msg:'Starting scan…'});
+      if (tF.length > 0) {
+        const crits = tF.filter(f=>f.severity==='CRITICAL');
+        const highs = tF.filter(f=>f.severity==='HIGH');
+        const meds  = tF.filter(f=>f.severity==='MEDIUM');
+        if (crits.length) {
+          const ids = crits.slice(0,3).map(f=>f.rule_id).filter(Boolean).join(', ');
+          lines.push({ts:ts(t++),tool,level:'ERROR',msg:'Found '+crits.length+' CRITICAL findings'+(ids?' ('+ids+')':'')});
+        }
+        if (highs.length) lines.push({ts:ts(t++),tool,level:'WARN',msg:'Found '+highs.length+' HIGH findings'});
+        if (meds.length && !crits.length && !highs.length) lines.push({ts:ts(t++),tool,level:'WARN',msg:'Found '+meds.length+' MEDIUM findings'});
+        lines.push({ts:ts(t++),tool,level:'DONE',msg:'Completed · '+tF.length+' findings'});
+      } else {
+        lines.push({ts:ts(t++),tool,level:'DONE',msg:'Completed · 0 findings'});
+      }
+    });
+
+    // Gate line
+    const gL = run.gate==='PASS'?'DONE':run.gate==='WARN'?'WARN':'ERROR';
+    lines.push({ts:ts(t++),tool:'gate',level:gL,
+      msg:'Gate decision: '+run.gate+' · Total: '+run.total_findings+' findings · Score: '+(summary.SCORE||0)+'/100 · Posture: '+(run.posture||'?')});
+
+    window._allLogs = lines;
+    if (typeof filterLogs==='function') filterLogs();
+    const cnt = document.getElementById('log-count');
+    if (cnt) cnt.textContent = lines.length+' lines';
+
+  } catch(e) { console.error('loadRunLog v2.4',e); }
+}
+window.loadRunLog = loadRunLog;
+console.log('VSP Patch v2.4 loaded ✓');
+</script>
+
+
+<script>
+// ── PATCH v2.5 — Runs tab load API thật ──────────────────────────────────
+async function loadRuns() {
+  await ensureToken();
+  try {
+    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const runs = d.runs || [];
+    const tbody = document.getElementById('runs-table');
+    if (!tbody) return;
+
+    const modeColor = {IAC:'pill-run',FULL:'pill-full',SAST:'pill-sast',SCA:'pill-sca',SECRETS:'pill-sec',DAST:'pill-dast'};
+    const modeStyle = {
+      IAC:'background:var(--cyan2);color:var(--cyan);border:1px solid rgba(6,182,212,.25)',
+      FULL:'background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)',
+      SAST:'background:var(--blue2);color:var(--blue);border:1px solid rgba(59,130,246,.25)',
+      SCA:'background:var(--orange2);color:var(--orange);border:1px solid rgba(249,115,22,.25)',
+      SECRETS:'background:var(--red2);color:var(--red);border:1px solid rgba(239,68,68,.25)',
+    };
+    const gateClass = {PASS:'pill-pass',FAIL:'pill-fail',WARN:'pill-warn'};
+    const statusClass = {DONE:'pill-done',RUNNING:'pill-run',FAILED:'pill-fail',QUEUED:'pill-queue'};
+
+    tbody.innerHTML = runs.map(r => {
+      const dt = new Date(r.created_at);
+      const dateStr = dt.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+      const mStyle = modeStyle[r.mode] || modeStyle.IAC;
+      const gClass = r.gate ? (gateClass[r.gate]||'pill-done') : '';
+      const sClass = statusClass[r.status] || 'pill-done';
+      const score = r.summary?.SCORE || 0;
+      const scoreColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)';
+      const findColor = r.total > 0 ? (r.summary?.CRITICAL > 0 ? 'c-red' : r.summary?.HIGH > 0 ? 'c-orange' : 'c-amber') : 'c-green';
+
+      return `<tr style="cursor:pointer" onclick="viewRunLog('${r.rid}')">
+        <td class="mono" style="font-size:10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.rid}">${r.rid}</td>
+        <td><span class="pill" style="${mStyle}">${r.mode}</span></td>
+        <td class="mono-sm">${r.profile||'FAST'}</td>
+        <td><span class="pill ${sClass}">${r.status}</span></td>
+        <td>${r.gate ? '<span class="pill '+gClass+'">'+r.gate+'</span>' : '<span class="c-t3">—</span>'}</td>
+        <td class="fw7 ${findColor}">${r.total||0}</td>
+        <td class="mono-sm">${r.tools_done||0}/${r.tools_total||0}</td>
+        <td class="mono" style="font-size:11px;color:${scoreColor}">${score===0?'0':score||'—'}</td>
+        <td class="mono-sm">${dateStr}</td>
+      </tr>`;
+    }).join('');
+
+    // Update header nếu chưa có cột Score
+    const thead = tbody.closest('table')?.querySelector('thead tr');
+    if (thead && thead.children.length === 8) {
+      // already correct
+    } else if (thead && thead.children.length === 7) {
+      const th = document.createElement('th');
+      th.textContent = 'Score';
+      thead.insertBefore(th, thead.children[7]);
+    }
+
+    showToast && showToast(runs.length + ' runs loaded', 'info');
+  } catch(e) {
+    console.error('loadRuns', e);
+    showToast && showToast('Error loading runs: '+e.message, 'error');
+  }
+}
+
+// Click run → view scan log
+window.viewRunLog = function(rid) {
+  showPanel && showPanel('scanlog', null);
+  setTimeout(async () => {
+    await loadRunsDropdown();
+    const sel = document.getElementById('log-run-select');
+    if (sel) { sel.value = rid; loadRunLog(rid); }
+  }, 400);
+};
+
+// Fix scan modal: default source path
+document.addEventListener('DOMContentLoaded', () => {
+  const srcInput = document.getElementById('scanSrc');
+  if (srcInput && !srcInput.value) srcInput.placeholder = '/tmp/iac_test';
+});
+if (document.readyState !== 'loading') {
+  const srcInput = document.getElementById('scanSrc');
+  if (srcInput) srcInput.placeholder = '/tmp/iac_test';
+}
+
+// Override showPanel
+const _sp25 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp25 && _sp25(name, btn);
+  if (name === 'runs') setTimeout(loadRuns, 200);
+};
+
+window.loadRuns = loadRuns;
+console.log('VSP Patch v2.5 loaded ✓');
+</script>
+
+
+<script>
+// ── PATCH v2.6 — Runs KPI + chart ─────────────────────────────────────────
+const _loadRuns25 = window.loadRuns;
+window.loadRuns = async function() {
+  await ensureToken();
+  try {
+    const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const runs = d.runs || [];
+
+    // ── KPI calc
+    const done   = runs.filter(r=>r.status==='DONE');
+    const passed = done.filter(r=>r.gate==='PASS');
+    const failed = done.filter(r=>r.gate==='FAIL');
+    const warned = done.filter(r=>r.gate==='WARN');
+    const scores = done.filter(r=>r.summary?.SCORE>0).map(r=>r.summary.SCORE);
+    const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    const passRate = done.length ? Math.round(passed.length/done.length*100) : 0;
+
+    // ── Inject KPI row trước table nếu chưa có
+    const panel = document.getElementById('panel-runs');
+    if (panel && !panel.querySelector('.runs-kpi-row')) {
+      const kpiDiv = document.createElement('div');
+      kpiDiv.className = 'runs-kpi-row g4 mb14';
+      panel.querySelector('.card').before(kpiDiv);
+    }
+    const kpiRow = panel?.querySelector('.runs-kpi-row');
+    if (kpiRow) {
+      const scoreColor = avgScore>=70?'c-green':avgScore>=40?'c-amber':'c-red';
+      kpiRow.innerHTML = `
+        <div class="spark-card">
+          <div class="spark-label">Total Runs</div>
+          <div class="spark-value c-cyan">${runs.length}</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-runs-total" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Pass Rate</div>
+          <div class="spark-value c-green">${passRate}%</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-runs-pass" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Avg Score</div>
+          <div class="spark-value ${scoreColor}">${avgScore}</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-runs-score" height="40"></canvas></div>
+        </div>
+        <div class="spark-card">
+          <div class="spark-label">Gate Fail</div>
+          <div class="spark-value c-red">${failed.length}</div>
+          <div class="spark-canvas-wrap"><canvas id="sp-runs-fail" height="40"></canvas></div>
+        </div>`;
+
+      // Sparklines — dùng 10 runs gần nhất
+      const last10 = [...done].reverse().slice(0,10);
+      setTimeout(() => {
+        if (typeof drawSparkline === 'function') {
+          drawSparkline('sp-runs-total', last10.map((_,i)=>i+1), '#06b6d4');
+          drawSparkline('sp-runs-pass',  last10.map(r=>r.gate==='PASS'?100:0), '#22c55e');
+          drawSparkline('sp-runs-score', last10.map(r=>r.summary?.SCORE||0), '#f59e0b');
+          drawSparkline('sp-runs-fail',  last10.map(r=>r.gate==='FAIL'?1:0), '#ef4444');
+        }
+      }, 200);
+    }
+
+    // ── Table
+    const tbody = document.getElementById('runs-table');
+    if (!tbody) return;
+    const modeStyle = {
+      IAC:'background:var(--cyan2);color:var(--cyan);border:1px solid rgba(6,182,212,.25)',
+      FULL:'background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)',
+      SAST:'background:var(--blue2);color:var(--blue);border:1px solid rgba(59,130,246,.25)',
+      SCA:'background:var(--orange2);color:var(--orange);border:1px solid rgba(249,115,22,.25)',
+      SECRETS:'background:var(--red2);color:var(--red);border:1px solid rgba(239,68,68,.25)',
+    };
+    const gateClass={PASS:'pill-pass',FAIL:'pill-fail',WARN:'pill-warn'};
+    const statusClass={DONE:'pill-done',RUNNING:'pill-run',FAILED:'pill-fail',QUEUED:'pill-queue'};
+
+    tbody.innerHTML = runs.map(r => {
+      const dt = new Date(r.created_at);
+      const dateStr = dt.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+      const mStyle = modeStyle[r.mode] || modeStyle.IAC;
+      const gClass = r.gate ? (gateClass[r.gate]||'') : '';
+      const sClass = statusClass[r.status] || 'pill-done';
+      const score = r.summary?.SCORE || 0;
+      const scoreColor = score>=70?'var(--green)':score>=40?'var(--amber)':score>0?'var(--red)':'var(--t4)';
+      const findColor = r.total>0?(r.summary?.CRITICAL>0?'c-red':r.summary?.HIGH>0?'c-orange':'c-amber'):'c-green';
+      return `<tr style="cursor:pointer" onclick="viewRunLog('${r.rid}')" title="Click để xem scan log">
+        <td class="mono" style="font-size:10px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.rid}</td>
+        <td><span class="pill" style="${mStyle}">${r.mode}</span></td>
+        <td class="mono-sm">${r.profile||'FAST'}</td>
+        <td><span class="pill ${sClass}">${r.status}</span></td>
+        <td>${r.gate?'<span class="pill '+gClass+'">'+r.gate+'</span>':'<span class="c-t3">—</span>'}</td>
+        <td class="fw7 ${findColor}">${r.total||0}</td>
+        <td class="mono-sm">${r.tools_done||0}/${r.tools_total||0}</td>
+        <td class="mono fw7" style="color:${scoreColor}">${score===0?'0':score||'—'}</td>
+        <td class="mono-sm">${dateStr}</td>
+      </tr>`;
+    }).join('');
+
+    showToast && showToast(runs.length+' runs loaded','info');
+  } catch(e) { console.error('loadRuns v2.6',e); }
+};
+console.log('VSP Patch v2.6 loaded ✓');
+</script>
 
 
 
 
+<script>
+// ── PATCH v2.7b — Fix SyntaxError + Score + SARIF ─────────────────────────
+window.viewRunLog = async function(rid) {
+  await ensureToken();
+  window._rdmRid = rid;
+  try {
+    const run = await fetch('/api/v1/vsp/run/'+rid,{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    window._rdmRun = run;
+    const fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
+    const findings = fd.findings || [];
+    const byTool = {};
+    const bySev = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0,INFO:0};
+    findings.forEach(function(f) {
+      if (!byTool[f.tool]) byTool[f.tool]={CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0,total:0};
+      byTool[f.tool][f.severity] = (byTool[f.tool][f.severity]||0)+1;
+      byTool[f.tool].total++;
+      if (bySev[f.severity]!==undefined) bySev[f.severity]++;
+    });
+    const summary = run.summary || {};
+    const postureScore = {A:95,B:75,C:55,D:35,F:15};
+    const score = summary.SCORE > 0 ? summary.SCORE : (postureScore[run.posture] || 0);
+    const scoreColor = score>=70?'var(--green)':score>=40?'var(--amber)':score>0?'var(--red)':'var(--t3)';
+    const gateClass = run.gate==='PASS'?'pill-pass':run.gate==='WARN'?'pill-warn':'pill-fail';
+    document.getElementById('rdm-title').textContent = run.mode+' - '+run.gate+' - '+run.total_findings+' findings';
+    document.getElementById('rdm-rid').textContent = rid;
 
+    var sevRows = '';
+    ['CRITICAL','HIGH','MEDIUM','LOW','INFO'].forEach(function(s) {
+      var cnt = bySev[s]||0, total = run.total_findings||1, pct = Math.round(cnt/total*100);
+      var c = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--amber)',LOW:'var(--green)',INFO:'var(--t3)'}[s];
+      sevRows += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        + '<span class="sev sev-'+s.toLowerCase()+'" style="width:64px">'+s+'</span>'
+        + '<div class="progress-bar" style="flex:1;height:5px"><div class="progress-fill" style="width:'+pct+'%;background:'+c+'"></div></div>'
+        + '<span class="mono-sm" style="width:28px;text-align:right">'+cnt+'</span></div>';
+    });
 
+    var toolRows = '';
+    Object.keys(byTool).sort(function(a,b){return byTool[b].total-byTool[a].total;}).forEach(function(tool) {
+      var cnt = byTool[tool];
+      toolRows += '<tr><td class="mono-sm fw7">'+tool+'</td>'
+        +'<td class="c-red fw7">'+(cnt.CRITICAL||0)+'</td>'
+        +'<td class="c-orange fw7">'+(cnt.HIGH||0)+'</td>'
+        +'<td class="c-amber">'+(cnt.MEDIUM||0)+'</td>'
+        +'<td class="c-green">'+(cnt.LOW||0)+'</td>'
+        +'<td class="fw7">'+cnt.total+'</td></tr>';
+    });
 
+    var topRows = '';
+    findings.slice(0,10).forEach(function(f) {
+      topRows += '<tr>'
+        +'<td><span class="sev sev-'+(f.severity||'').toLowerCase()+'">'+f.severity+'</span></td>'
+        +'<td class="mono-sm">'+f.tool+'</td>'
+        +'<td class="mono c-blue" style="font-size:9px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(f.rule_id||'').slice(0,20)+'</td>'
+        +'<td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(f.message||'—')+'</td>'
+        +'<td class="mono-sm" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(f.path||'—')+'</td></tr>';
+    });
 
+    var modeStyle = 'background:var(--cyan2);color:var(--cyan);border:1px solid rgba(6,182,212,.25)';
+    document.getElementById('rdm-body').innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">'
+      +'<div class="kpi kpi-cyan" style="padding:12px"><div class="kpi-label">Score</div><div class="kpi-value" style="font-size:28px;color:'+scoreColor+'">'+score+'</div><div class="kpi-sub">posture: '+(run.posture||'?')+'</div></div>'
+      +'<div class="kpi" style="padding:12px"><div class="kpi-label">Gate</div><div style="margin-top:8px"><span class="pill '+gateClass+'" style="font-size:13px;padding:4px 12px">'+(run.gate||'—')+'</span></div></div>'
+      +'<div class="kpi kpi-crit" style="padding:12px"><div class="kpi-label">Critical</div><div class="kpi-value c-red" style="font-size:28px">'+bySev.CRITICAL+'</div></div>'
+      +'<div class="kpi kpi-high" style="padding:12px"><div class="kpi-label">High</div><div class="kpi-value c-orange" style="font-size:28px">'+bySev.HIGH+'</div></div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+      +'<div class="card" style="padding:12px 14px"><div style="font-size:11px;font-weight:700;margin-bottom:10px">Run info</div>'
+      +'<div class="exec-stat"><span class="exec-stat-lbl">Mode</span><span class="pill" style="'+modeStyle+'">'+run.mode+'</span></div>'
+      +'<div class="exec-stat"><span class="exec-stat-lbl">Profile</span><span class="mono-sm">'+run.profile+'</span></div>'
+      +'<div class="exec-stat"><span class="exec-stat-lbl">Source</span><span class="mono-sm">'+run.src+'</span></div>'
+      +'<div class="exec-stat"><span class="exec-stat-lbl">Tools</span><span class="mono-sm">'+run.tools_done+'/'+run.tools_total+'</span></div>'
+      +'<div class="exec-stat"><span class="exec-stat-lbl">Started</span><span class="mono-sm">'+new Date(run.started_at).toLocaleString('vi-VN')+'</span></div>'
+      +'<div class="exec-stat"><span class="exec-stat-lbl">Finished</span><span class="mono-sm">'+(run.finished_at?new Date(run.finished_at).toLocaleString('vi-VN'):'—')+'</span></div>'
+      +'</div>'
+      +'<div class="card" style="padding:12px 14px"><div style="font-size:11px;font-weight:700;margin-bottom:10px">Severity breakdown</div>'+sevRows+'</div>'
+      +'</div>'
+      +'<div class="card" style="margin-bottom:14px"><div class="card-head"><div style="font-size:12px;font-weight:700">Findings by tool</div><span class="mono-sm">'+findings.length+' total</span></div>'
+      +'<div class="tbl-wrap"><table><thead><tr><th>Tool</th><th>Critical</th><th>High</th><th>Medium</th><th>Low</th><th>Total</th></tr></thead><tbody>'+toolRows+'</tbody></table></div></div>'
+      +'<div class="card"><div class="card-head"><div style="font-size:12px;font-weight:700">Top findings</div><span class="mono-sm">showing '+Math.min(findings.length,10)+' of '+findings.length+'</span></div>'
+      +'<div class="tbl-wrap"><table><thead><tr><th>Sev</th><th>Tool</th><th>Rule</th><th>Message</th><th>Path</th></tr></thead><tbody>'+topRows+'</tbody></table></div></div>';
 
+    document.getElementById('run-detail-modal').classList.add('open');
+  } catch(e) { console.error('viewRunLog v2.7b', e); showToast&&showToast('Error: '+e.message,'error'); }
+};
 
+window.downloadRunReport = async function(fmt) {
+  var run = window._rdmRun;
+  if (!run) return;
+  await ensureToken();
+  var h = {'Authorization':'Bearer '+window.TOKEN};
+  if (fmt==='json') {
+    var fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:h}).then(function(r){return r.json();});
+    var out = {run_id:run.rid,mode:run.mode,gate:run.gate,posture:run.posture,total:run.total_findings,findings:fd.findings};
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)],{type:'application/json'}));
+    a.download='vsp-'+run.rid+'.json'; a.click();
+    showToast&&showToast('JSON downloaded','success');
+  } else if (fmt==='csv') {
+    var fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:h}).then(function(r){return r.json();});
+    var rows=[['severity','tool','rule_id','message','path','line','cwe']];
+    (fd.findings||[]).forEach(function(f){rows.push([f.severity,f.tool,f.rule_id,f.message,f.path,f.line,f.cwe].map(function(v){return '"'+(v||'').toString().replace(/"/g,'""')+'"';}));});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([rows.map(function(r){return r.join(',');}).join('\n')],{type:'text/csv'}));
+    a.download='vsp-'+run.rid+'.csv'; a.click();
+    showToast&&showToast('CSV downloaded','success');
+  } else if (fmt==='sarif') {
+    var fd = await fetch('/api/v1/vsp/findings?run_id='+run.id+'&limit=2000',{headers:h}).then(function(r){return r.json();});
+    var sarif={version:'2.1.0',runs:[{tool:{driver:{name:'VSP Security Platform',version:'0.10.0'}},results:(fd.findings||[]).map(function(f){return {ruleId:f.rule_id||'unknown',level:f.severity==='CRITICAL'||f.severity==='HIGH'?'error':f.severity==='MEDIUM'?'warning':'note',message:{text:f.message||''},locations:[{physicalLocation:{artifactLocation:{uri:f.path||''},region:{startLine:f.line||1}}}]};})}]};
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(sarif,null,2)],{type:'application/json'}));
+    a.download='vsp-'+run.rid+'.sarif.json'; a.click();
+    showToast&&showToast('SARIF generated','success');
+  }
+};
+console.log('VSP Patch v2.7b loaded OK');
+</script>
 
+<script>
+// ── PATCH v2.8 — Findings tab full upgrade ────────────────────────────────
 
+// Finding detail modal
+if (!document.getElementById('finding-detail-modal')) {
+  var fdiv = document.createElement('div');
+  fdiv.innerHTML = '<div class="modal-overlay" id="finding-detail-modal"><div class="modal" style="width:min(640px,95vw);max-height:90vh;overflow-y:auto"><div class="modal-head"><div><div class="modal-title" id="fdm-title">Finding detail</div><div id="fdm-id" style="font-size:9px;color:var(--t3);font-family:var(--font-mono);margin-top:2px"></div></div><button class="modal-close" onclick="document.getElementById(\'finding-detail-modal\').classList.remove(\'open\')">&#10005;</button></div><div class="modal-body" id="fdm-body" style="padding:16px"></div></div></div>';
+  document.body.appendChild(fdiv.firstChild);
+}
 
+// State
+window._findingsState = {
+  runId: '',
+  runUUID: '',
+  severity: '',
+  tool: '',
+  q: '',
+  page: 0,
+  limit: 50,
+  total: 0,
+  tools: []
+};
 
+// Load runs vào findings run-selector
+async function loadFindingsRunSelector() {
+  await ensureToken();
+  var sel = document.getElementById('findings-run-sel');
+  if (!sel) return;
+  try {
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var runs = d.runs || [];
+    sel.innerHTML = '<option value="">All runs</option>' +
+      runs.map(function(r) {
+        return '<option value="'+r.rid+'|'+(r.id||'')+'">'+r.rid.slice(-24)+' · '+r.mode+' · '+(r.gate||r.status)+'</option>';
+      }).join('');
+  } catch(e) {}
+}
 
+// Main findings loader
+async function loadFindingsPanel() {
+  await ensureToken();
+  var state = window._findingsState;
+  var params = new URLSearchParams();
+  params.set('limit', state.limit);
+  params.set('offset', state.page * state.limit);
+  if (state.runUUID) params.set('run_id', state.runUUID);
+  if (state.severity) params.set('severity', state.severity);
+  if (state.tool) params.set('tool', state.tool);
+  if (state.q) params.set('q', state.q);
 
+  try {
+    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var d = await r.json();
+    var findings = d.findings || [];
+    window._findingsCache = findings;
+    state.total = d.total || findings.length;
 
+    // Update counter
+    var cnt = document.getElementById('findings-total-cnt');
+    if (cnt) cnt.textContent = state.total + ' findings';
 
+    // Update badge
+    var badge = document.getElementById('badge-findings');
+    if (badge) badge.textContent = state.total;
 
+    // Group by tool for tabs
+    var byTool = {}; (window._findingsCache||[]).forEach(function(f){ if(f.tool) byTool[f.tool]=(byTool[f.tool]||0)+1; });
+    findings.forEach(function(f) {
+      if (!byTool[f.tool]) byTool[f.tool] = 0;
+      byTool[f.tool]++;
+    });
+    state.tools = Object.keys(byTool);
+
+    // Render tool tabs
+    var tabsEl = document.getElementById('findings-tool-tabs');
+    if (tabsEl) {
+      tabsEl.innerHTML = '<button class="log-filter-btn'+(state.tool===''?' active':'')+'" onclick="setFindingsTool(\'\',this)">ALL ('+state.total+')</button>' +
+        state.tools.map(function(t) {
+          return '<button class="log-filter-btn'+(state.tool===t?' active':'')+'" onclick="setFindingsTool(\''+t+'\',this)">'+t+' ('+byTool[t]+')</button>';
+        }).join('');
+    }
+
+    // Render table
+    renderFindingsTable(findings, state.total);
+
+    // Render pagination
+    renderFindingsPagination(state.total, state.page, state.limit);
+
+  } catch(e) {
+    console.error('loadFindingsPanel', e);
+    showToast && showToast('Error: '+e.message, 'error');
+  }
+}
+
+function renderFindingsTable(findings, total) {
+  var tbody = document.getElementById('findings-table');
+  if (!tbody) return;
+
+  if (!findings.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--t3)">No findings match current filter</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = findings.map(function(f, i) {
+    var sev = (f.severity||'').toLowerCase();
+    var sevClass = 'sev-'+sev;
+    return '<tr style="cursor:pointer" onclick="showFindingDetail('+i+')" title="Click for detail">'
+      +'<td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
+      +'<td><span class="sev '+sevClass+'">'+f.severity+'</span></td>'
+      +'<td class="c-t3 f11">'+f.tool+'</td>'
+      +'<td class="mono c-blue overflow-ellipsis" style="max-width:110px;font-size:9px" title="'+(f.rule_id||'')+'">'+((f.rule_id||'').slice(0,18)||'—')+'</td>'
+      +'<td class="overflow-ellipsis" style="max-width:260px;font-size:12px" title="'+(f.message||'').replace(/"/g,'')+'">'+((f.message||'—').slice(0,80))+'</td>'
+      +'<td class="mono-sm overflow-ellipsis" style="max-width:160px" title="'+(f.path||'')+'">'+((f.path||'—').split('/').slice(-2).join('/'))+'</td>'
+      +'<td class="mono-sm">'+(f.line||'—')+'</td>'
+      +'<td class="f10" style="color:var(--purple)">'+(f.cwe||'—')+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function renderFindingsPagination(total, page, limit) {
+  var pages = Math.ceil(total / limit);
+  var cur = page + 1;
+  var el = document.querySelector('#panel-findings .pagination');
+  if (!el) return;
+  var btns = '';
+  if (cur > 1) btns += '<button class="page-btn" onclick="setFindingsPage('+(page-1)+')">&#8249; Prev</button>';
+  var start = Math.max(0, page-2), end = Math.min(pages-1, page+2);
+  for (var i=start; i<=end; i++) {
+    btns += '<button class="page-btn'+(i===page?' active':'')+'" onclick="setFindingsPage('+i+')">'+(i+1)+'</button>';
+  }
+  if (cur < pages) btns += '<button class="page-btn" onclick="setFindingsPage('+(page+1)+')">Next &#8250;</button>';
+  var offset = page*limit+1;
+  var offsetEnd = Math.min(total, (page+1)*limit);
+  el.innerHTML = '<span class="pagination-info">'+offset+'-'+offsetEnd+' of '+total+'</span><div class="page-btns">'+btns+'</div>';
+}
+
+// Show finding detail modal
+window.showFindingDetail = function(idx) {
+  var f = (window._findingsCache || [])[idx];
+  if (!f) return;
+  document.getElementById('fdm-title').textContent = f.severity+' - '+f.tool+' - '+(f.rule_id||'').slice(0,20);
+  document.getElementById('fdm-id').textContent = 'ID: '+(f.id||'—');
+  var sevClass = 'sev-'+(f.severity||'').toLowerCase();
+  document.getElementById('fdm-body').innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
+    +'<div class="kpi kpi-'+(f.severity==='CRITICAL'?'crit':f.severity==='HIGH'?'high':f.severity==='MEDIUM'?'med':'low')+'" style="padding:12px">'
+    +'<div class="kpi-label">Severity</div>'
+    +'<div style="margin-top:6px"><span class="sev '+sevClass+'">'+f.severity+'</span></div></div>'
+    +'<div class="kpi" style="padding:12px"><div class="kpi-label">Tool</div>'
+    +'<div class="mono fw7" style="margin-top:6px;font-size:14px">'+f.tool+'</div></div></div>'
+    +'<div class="card" style="margin-bottom:10px;padding:14px">'
+    +'<div style="font-size:11px;font-weight:700;margin-bottom:10px;color:var(--t1)">Finding info</div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">Rule ID</span><span class="mono c-blue" style="font-size:10px">'+(f.rule_id||'—')+'</span></div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">CWE</span><span class="mono c-purple" style="font-size:10px">'+(f.cwe||'—')+'</span></div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">Message</span><span class="f12" style="max-width:320px;word-break:break-word">'+(f.message||'—')+'</span></div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">Path</span><span class="mono-sm" style="word-break:break-all">'+(f.path||'—')+'</span></div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">Line</span><span class="mono-sm">'+(f.line||'—')+'</span></div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">Fix signal</span><span class="f12 c-cyan">'+(f.fix_signal||'—')+'</span></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn btn-primary" onclick="openRemModal(\''+(f.id||'')+'_rem\',\''+((f.message||'').slice(0,40).replace(/\'/g,''))+'\',\''+f.severity+'\');document.getElementById(\'finding-detail-modal\').classList.remove(\'open\')">Assign remediation &#8594;</button>'
+    +(f.cwe?'<button class="btn btn-ghost" onclick="window.open(\'https://cwe.mitre.org/data/definitions/'+f.cwe.replace(/[^0-9]/g,'')+'.html\')">CWE ref &#8599;</button>':'')
+    +'</div>';
+  document.getElementById('finding-detail-modal').classList.add('open');
+};
+
+// Filter controls
+window.setFindingsTool = function(tool, btn) {
+  window._findingsState.tool = tool;
+  window._findingsState.page = 0;
+  document.querySelectorAll('#findings-tool-tabs .log-filter-btn').forEach(function(b){b.classList.remove('active');});
+  if (btn) btn.classList.add('active');
+  loadFindingsPanel();
+};
+
+window.setFindingsPage = function(page) {
+  window._findingsState.page = page;
+  loadFindingsPanel();
+};
+
+window.applyFindingsFilter = function() {
+  var sel = document.getElementById('findings-run-sel');
+  if (sel && sel.value) {
+    var parts = sel.value.split('|');
+    window._findingsState.runId = parts[0]||'';
+    window._findingsState.runUUID = parts[1]||'';
+  } else {
+    window._findingsState.runId = '';
+    window._findingsState.runUUID = '';
+  }
+  window._findingsState.severity = document.getElementById('filter-severity')?.value || '';
+  window._findingsState.tool = '';
+  window._findingsState.q = document.getElementById('filter-search')?.value || '';
+  window._findingsState.page = 0;
+  loadFindingsPanel();
+};
+
+// Export findings
+window.exportFindingsCSV = function() {
+  var findings = window._findingsCache || [];
+  if (!findings.length) { showToast&&showToast('No findings to export','warn'); return; }
+  var rows = [['severity','tool','rule_id','message','path','line','cwe','fix_signal']];
+  findings.forEach(function(f) {
+    rows.push([f.severity,f.tool,f.rule_id,f.message,f.path,f.line,f.cwe,f.fix_signal].map(function(v){
+      return '"'+(v||'').toString().replace(/"/g,'""')+'"';
+    }));
+  });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rows.map(function(r){return r.join(',');}).join('\n')],{type:'text/csv'}));
+  a.download = 'vsp-findings-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  showToast&&showToast('CSV exported ('+findings.length+' findings)','success');
+};
+
+// Patch showPanel
+var _sp28 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp28 && _sp28(name, btn);
+  if (name === 'findings') {
+    setTimeout(function() {
+      loadFindingsRunSelector();
+      loadFindingsPanel();
+      injectFindingsUI();
+    }, 200);
+  }
+};
+
+// Inject UI enhancements vào findings panel
+function injectFindingsUI() {
+  return; // disabled - replaced by loadFindings()
+  var panel = document.getElementById('panel-findings');
+  if (!panel || panel.querySelector('#findings-tool-tabs')) return;
+
+  // Thêm run selector vào filter bar
+  var filterBar = panel.querySelector('.filter-bar');
+  if (filterBar && !filterBar.querySelector('#findings-run-sel')) {
+    var sel = document.createElement('select');
+    sel.id = 'findings-run-sel';
+    sel.className = 'filter-select';
+    sel.style.maxWidth = '280px';
+    sel.innerHTML = '<option value="">All runs</option>';
+    filterBar.insertBefore(sel, filterBar.firstChild);
+    loadFindingsRunSelector();
+  }
+
+  // Thêm tool tabs
+  var toolTabsDiv = document.createElement('div');
+  toolTabsDiv.id = 'findings-tool-tabs';
+  toolTabsDiv.className = 'log-filter';
+  toolTabsDiv.style.marginBottom = '10px';
+  var card = panel.querySelector('.card');
+  if (card) card.before(toolTabsDiv);
+}
+
+console.log('VSP Patch v2.8 loaded OK');
+</script>
+
+<script>
+// ── PATCH v2.9 — Findings KPI + dedup + chart ─────────────────────────────
+
+var _origLoadFindings = window.loadFindingsPanel;
+window.loadFindingsPanel = async function() { if(typeof loadFindings==='function'){await loadFindings(0);return;}
+  await ensureToken();
+  var state = window._findingsState;
+  var params = new URLSearchParams();
+  params.set('limit', state.limit);
+  params.set('offset', state.page * state.limit);
+  if (state.runUUID) params.set('run_id', state.runUUID);
+  if (state.severity) params.set('severity', state.severity);
+  if (state.tool) params.set('tool', state.tool);
+  if (state.q) params.set('q', state.q);
+
+  try {
+    var r = await fetch('/api/v1/vsp/findings?' + params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var d = await r.json();
+    var findings = d.findings || [];
+    window._findingsCache = findings;
+    state.total = d.total || findings.length;
+
+    // KPI
+    var bySev = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0,INFO:0};
+    findings.forEach(function(f){ if(bySev[f.severity]!==undefined) bySev[f.severity]++; });
+
+    injectFindingsKPI(bySev, state.total, findings);
+
+    // Counter + badge
+    var cnt = document.getElementById('findings-total-cnt');
+    if (cnt) cnt.textContent = state.total + ' findings';
+    var badge = document.getElementById('badge-findings');
+    if (badge) badge.textContent = state.total > 999 ? (Math.floor(state.total/100)/10)+'k' : state.total;
+
+    // Tool tabs
+    var byTool = {}; (window._findingsCache||[]).forEach(function(f){ if(f.tool) byTool[f.tool]=(byTool[f.tool]||0)+1; });
+    findings.forEach(function(f){ byTool[f.tool]=(byTool[f.tool]||0)+1; });
+    state.tools = Object.keys(byTool);
+    var tabsEl = document.getElementById('findings-tool-tabs');
+    if (tabsEl) {
+      tabsEl.innerHTML = '<button class="log-filter-btn'+(state.tool===''?' active':'')+'" onclick="setFindingsTool(\'\',this)">ALL</button>' +
+        Object.keys(byTool).map(function(t){
+          return '<button class="log-filter-btn'+(state.tool===t?' active':'')+'" onclick="setFindingsTool(\''+t+'\',this)">'+t+' ('+byTool[t]+')</button>';
+        }).join('');
+    }
+
+    renderFindingsTable(findings, state.total);
+    renderFindingsPagination(state.total, state.page, state.limit);
+
+  } catch(e) { console.error('loadFindingsPanel v2.9', e); }
+};
+
+function injectFindingsKPI(bySev, total, findings) {
+  var panel = document.getElementById('panel-findings');
+  if (!panel) return;
+
+  var existing = panel.querySelector('.findings-kpi-row');
+  if (!existing) {
+    var div = document.createElement('div');
+    div.className = 'findings-kpi-row g4 mb14';
+    var filterBar = panel.querySelector('.filter-bar');
+    if (filterBar) filterBar.before(div);
+    else panel.insertBefore(div, panel.firstChild);
+    existing = div;
+  }
+
+  var topTool = '';
+  var topCount = 0;
+  var byTool = {}; (window._findingsCache||[]).forEach(function(f){ if(f.tool) byTool[f.tool]=(byTool[f.tool]||0)+1; });
+  findings.forEach(function(f){ byTool[f.tool]=(byTool[f.tool]||0)+1; });
+  Object.keys(byTool).forEach(function(t){ if(byTool[t]>topCount){topCount=byTool[t];topTool=t;} });
+
+  existing.innerHTML =
+    '<div class="kpi kpi-crit" style="padding:12px 14px">'
+    +'<div class="kpi-label">Critical</div>'
+    +'<div class="kpi-value c-red" style="font-size:28px">'+bySev.CRITICAL+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+
+    +'<div class="kpi kpi-high" style="padding:12px 14px">'
+    +'<div class="kpi-label">High</div>'
+    +'<div class="kpi-value c-orange" style="font-size:28px">'+bySev.HIGH+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+
+    +'<div class="kpi kpi-med" style="padding:12px 14px">'
+    +'<div class="kpi-label">Medium</div>'
+    +'<div class="kpi-value c-amber" style="font-size:28px">'+bySev.MEDIUM+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+
+    +'<div class="kpi kpi-cyan" style="padding:12px 14px">'
+    +'<div class="kpi-label">Top tool</div>'
+    +'<div class="kpi-value c-cyan" style="font-size:20px;margin-top:6px">'+(topTool||'—')+'</div>'
+    +'<div class="kpi-sub">'+topCount+' findings</div></div>';
+}
+
+console.log('VSP Patch v2.9 loaded OK');
+</script>
+
+<script>
+// ── PATCH v2.10 — Fix default run + KPI từ summary thật ──────────────────
+var _origLoadFindingsRunSel = window.loadFindingsRunSelector;
+window.loadFindingsRunSelector = async function() {
+  await ensureToken();
+  var sel = document.getElementById('findings-run-sel');
+  if (!sel) return;
+  try {
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total>0;});
+    sel.innerHTML = '<option value="">All runs</option>' +
+      runs.map(function(r){
+        return '<option value="'+r.rid+'|'+(r.id||'')+'">'+r.rid.slice(-28)+' · '+r.mode+' · '+(r.gate||'')+'</option>';
+      }).join('');
+    // Auto-select run mới nhất có findings
+    if (runs.length > 0 && !window._findingsState.runUUID) {
+      var latest = runs[0];
+      sel.value = latest.rid+'|'+(latest.id||'');
+      window._findingsState.runId = latest.rid;
+      window._findingsState.runUUID = latest.id||'';
+      // Update KPI từ summary của run
+      updateFindingsKPIFromSummary(latest.summary||{}, latest);
+    }
+  } catch(e) { console.error('loadFindingsRunSelector', e); }
+};
+
+function updateFindingsKPIFromSummary(summary, run) {
+  var panel = document.getElementById('panel-findings');
+  if (!panel) return;
+  var existing = panel.querySelector('.findings-kpi-row');
+  if (!existing) return;
+  var s = summary;
+  var scoreColor = (run.gate==='PASS')?'var(--green)':(run.gate==='WARN')?'var(--amber)':'var(--red)';
+  existing.innerHTML =
+    '<div class="kpi kpi-crit" style="padding:12px 14px">'
+    +'<div class="kpi-label">Critical</div>'
+    +'<div class="kpi-value c-red" style="font-size:28px">'+(s.CRITICAL||0)+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi kpi-high" style="padding:12px 14px">'
+    +'<div class="kpi-label">High</div>'
+    +'<div class="kpi-value c-orange" style="font-size:28px">'+(s.HIGH||0)+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi kpi-med" style="padding:12px 14px">'
+    +'<div class="kpi-label">Medium</div>'
+    +'<div class="kpi-value c-amber" style="font-size:28px">'+(s.MEDIUM||0)+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi" style="padding:12px 14px;--kpi-color:'+scoreColor+'">'
+    +'<div class="kpi-label">Gate</div>'
+    +'<div style="margin-top:6px"><span class="pill '+(run.gate==='PASS'?'pill-pass':run.gate==='WARN'?'pill-warn':'pill-fail')+'" style="font-size:14px;padding:4px 12px">'+(run.gate||'—')+'</span></div>'
+    +'<div class="kpi-sub" style="margin-top:6px">'+(run.rid||'').slice(-16)+'</div></div>';
+}
+
+// Patch applyFindingsFilter để update KPI từ selected run
+var _origApply = window.applyFindingsFilter;
+window.applyFindingsFilter = function() {
+  var sel = document.getElementById('findings-run-sel');
+  if (sel && sel.value) {
+    var parts = sel.value.split('|');
+    window._findingsState.runId = parts[0]||'';
+    window._findingsState.runUUID = parts[1]||'';
+  } else {
+    window._findingsState.runId = '';
+    window._findingsState.runUUID = '';
+  }
+  window._findingsState.severity = (document.getElementById('filter-severity')||{}).value||'';
+  window._findingsState.tool = '';
+  window._findingsState.q = (document.getElementById('filter-search')||{}).value||'';
+  window._findingsState.page = 0;
+  window.loadFindingsPanel();
+};
+
+// Re-inject showPanel override
+var _sp210 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp210 && _sp210(name, btn);
+  if (name === 'findings') {
+    setTimeout(function() {
+      injectFindingsUI && injectFindingsUI();
+      window.loadFindingsRunSelector().then(function() {
+        window.loadFindingsPanel();
+      });
+    }, 200);
+  }
+};
+
+console.log('VSP Patch v2.10 loaded OK');
+</script>
+
+<script>
+// ── PATCH v2.11 — Fix findings filter dùng rid trực tiếp ─────────────────
+// runs/index không có UUID → dùng /vsp/runs có đầy đủ id
+
+window.loadFindingsRunSelector = async function() {
+  await ensureToken();
+  var sel = document.getElementById('findings-run-sel');
+  if (!sel) return;
+  try {
+    var d = await fetch('/api/v1/vsp/runs', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total_findings>0;});
+    sel.innerHTML = '<option value="">All runs</option>' +
+      runs.map(function(r){
+        return '<option value="'+r.id+'">'+r.rid.slice(-28)+' · '+r.mode+' · '+(r.gate||'')+'</option>';
+      }).join('');
+
+    // Auto-select run mới nhất
+    if (runs.length > 0 && !window._findingsState.runUUID) {
+      var latest = runs[0];
+      sel.value = latest.id;
+      window._findingsState.runUUID = latest.id;
+      window._findingsState.runId = latest.rid;
+      updateFindingsKPIFromRun(latest);
+    }
+  } catch(e) { console.error('loadFindingsRunSelector v2.11', e); }
+};
+
+function updateFindingsKPIFromRun(run) {
+  var panel = document.getElementById('panel-findings');
+  if (!panel) return;
+  var el = panel.querySelector('.findings-kpi-row');
+  if (!el) return;
+  var s = run.summary || {};
+  var gClass = run.gate==='PASS'?'pill-pass':run.gate==='WARN'?'pill-warn':'pill-fail';
+  el.innerHTML =
+    '<div class="kpi kpi-crit" style="padding:12px 14px"><div class="kpi-label">Critical</div><div class="kpi-value c-red" style="font-size:28px">'+(s.CRITICAL||0)+'</div><div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi kpi-high" style="padding:12px 14px"><div class="kpi-label">High</div><div class="kpi-value c-orange" style="font-size:28px">'+(s.HIGH||0)+'</div><div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi kpi-med" style="padding:12px 14px"><div class="kpi-label">Medium</div><div class="kpi-value c-amber" style="font-size:28px">'+(s.MEDIUM||0)+'</div><div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi" style="padding:12px 14px"><div class="kpi-label">Gate / Total</div><div style="margin-top:6px"><span class="pill '+gClass+'">'+(run.gate||'—')+'</span></div><div class="kpi-sub" style="margin-top:4px">'+(run.total_findings||0)+' findings</div></div>';
+}
+
+window.applyFindingsFilter = function() {
+  var sel = document.getElementById('findings-run-sel');
+  window._findingsState.runUUID = (sel && sel.value) ? sel.value : '';
+  window._findingsState.severity = (document.getElementById('filter-severity')||{}).value||'';
+  window._findingsState.tool = '';
+  window._findingsState.q = (document.getElementById('filter-search')||{}).value||'';
+  window._findingsState.page = 0;
+
+  // Update KPI nếu chọn run cụ thể
+  if (sel && sel.value) {
+    var opt = sel.options[sel.selectedIndex];
+    fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {headers:{'Authorization':'Bearer '+window.TOKEN}})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var panel = document.getElementById('panel-findings');
+        var el = panel && panel.querySelector('.findings-kpi-row');
+        if (!el) return;
+        var s = d;
+        el.innerHTML =
+          '<div class="kpi kpi-crit" style="padding:12px 14px"><div class="kpi-label">Critical</div><div class="kpi-value c-red" style="font-size:28px">'+(s.CRITICAL||0)+'</div><div class="kpi-sub">findings</div></div>'
+          +'<div class="kpi kpi-high" style="padding:12px 14px"><div class="kpi-label">High</div><div class="kpi-value c-orange" style="font-size:28px">'+(s.HIGH||0)+'</div><div class="kpi-sub">findings</div></div>'
+          +'<div class="kpi kpi-med" style="padding:12px 14px"><div class="kpi-label">Medium</div><div class="kpi-value c-amber" style="font-size:28px">'+(s.MEDIUM||0)+'</div><div class="kpi-sub">findings</div></div>'
+          +'<div class="kpi kpi-low" style="padding:12px 14px"><div class="kpi-label">Low</div><div class="kpi-value c-green" style="font-size:28px">'+(s.LOW||0)+'</div><div class="kpi-sub">findings</div></div>';
+      }).catch(function(){});
+  }
+
+  window.loadFindingsPanel();
+};
+
+var _sp211 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp211 && _sp211(name, btn);
+  if (name === 'findings') {
+    setTimeout(function() {
+      injectFindingsUI && injectFindingsUI();
+      window.loadFindingsRunSelector().then(function() {
+        window.loadFindingsPanel();
+      });
+    }, 200);
+  }
+};
+
+console.log('VSP Patch v2.11 loaded OK');
+</script>
+
+<script>
+// ── PATCH v2.12 — Fix dropdown onchange + auto-select latest run ──────────
+
+// Patch dropdown để trigger filter khi đổi
+function patchFindingsDropdown() {
+  var sel = document.getElementById('findings-run-sel');
+  if (!sel || sel._patched) return;
+  sel._patched = true;
+  sel.addEventListener('change', function() {
+    window._findingsState.runUUID = sel.value || '';
+    window._findingsState.page = 0;
+    window._findingsState.tool = '';
+
+    // Update KPI từ summary API
+    if (sel.value) {
+      fetch('/api/v1/vsp/findings/summary?run_id='+sel.value, {headers:{'Authorization':'Bearer '+window.TOKEN}})
+        .then(function(r){return r.json();})
+        .then(function(s) {
+          var panel = document.getElementById('panel-findings');
+          var el = panel && panel.querySelector('.findings-kpi-row');
+          if (!el) return;
+          el.innerHTML =
+            '<div class="kpi kpi-crit" style="padding:12px 14px"><div class="kpi-label">Critical</div><div class="kpi-value c-red" style="font-size:28px">'+(s.CRITICAL||0)+'</div><div class="kpi-sub">findings</div></div>'
+            +'<div class="kpi kpi-high" style="padding:12px 14px"><div class="kpi-label">High</div><div class="kpi-value c-orange" style="font-size:28px">'+(s.HIGH||0)+'</div><div class="kpi-sub">findings</div></div>'
+            +'<div class="kpi kpi-med" style="padding:12px 14px"><div class="kpi-label">Medium</div><div class="kpi-value c-amber" style="font-size:28px">'+(s.MEDIUM||0)+'</div><div class="kpi-sub">findings</div></div>'
+            +'<div class="kpi kpi-low" style="padding:12px 14px"><div class="kpi-label">Low</div><div class="kpi-value c-green" style="font-size:28px">'+(s.LOW||0)+'</div><div class="kpi-sub">findings</div></div>';
+        }).catch(function(){});
+    }
+    window.loadFindingsPanel();
+  });
+}
+
+// Override loadFindingsRunSelector — auto-select run mới nhất có findings
+window.loadFindingsRunSelector = async function() {
+  await ensureToken();
+  var sel = document.getElementById('findings-run-sel');
+  if (!sel) return;
+  try {
+    var d = await fetch('/api/v1/vsp/runs?limit=50', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+    var runs = (d.runs||[]).filter(function(r){return r.status==='DONE' && r.total_findings>0;});
+    sel.innerHTML = '<option value="">All runs</option>' +
+      runs.map(function(r){
+        var dt = new Date(r.created_at);
+        var label = r.rid.slice(-20)+' · '+r.mode+' · '+(r.gate||'')+' · '+r.total_findings+'f';
+        return '<option value="'+r.id+'">'+label+'</option>';
+      }).join('');
+
+    // Auto-select run mới nhất
+    if (runs.length > 0) {
+      var latest = runs[0];
+      sel.value = latest.id;
+      window._findingsState.runUUID = latest.id;
+      window._findingsState.runId = latest.rid;
+
+      // Update KPI từ summary
+      var s = latest.summary || {};
+      var panel = document.getElementById('panel-findings');
+      var el = panel && panel.querySelector('.findings-kpi-row');
+      if (el) {
+        var gClass = latest.gate==='PASS'?'pill-pass':latest.gate==='WARN'?'pill-warn':'pill-fail';
+        el.innerHTML =
+          '<div class="kpi kpi-crit" style="padding:12px 14px"><div class="kpi-label">Critical</div><div class="kpi-value c-red" style="font-size:28px">'+(s.CRITICAL||0)+'</div><div class="kpi-sub">findings</div></div>'
+          +'<div class="kpi kpi-high" style="padding:12px 14px"><div class="kpi-label">High</div><div class="kpi-value c-orange" style="font-size:28px">'+(s.HIGH||0)+'</div><div class="kpi-sub">findings</div></div>'
+          +'<div class="kpi kpi-med" style="padding:12px 14px"><div class="kpi-label">Medium</div><div class="kpi-value c-amber" style="font-size:28px">'+(s.MEDIUM||0)+'</div><div class="kpi-sub">findings</div></div>'
+          +'<div class="kpi" style="padding:12px 14px"><div class="kpi-label">Gate</div><div style="margin-top:6px"><span class="pill '+gClass+'">'+(latest.gate||'—')+'</span></div><div class="kpi-sub" style="margin-top:4px">'+(latest.total_findings||0)+' total</div></div>';
+      }
+    }
+    // Patch event listener
+    patchFindingsDropdown();
+  } catch(e) { console.error('loadFindingsRunSelector v2.12', e); }
+};
+
+// Override showPanel
+var _sp212 = window.showPanel;
+window.showPanel = function(name, btn) {
+  _sp212 && _sp212(name, btn);
+  if (name === 'findings') {
+    setTimeout(function() {
+      injectFindingsUI && injectFindingsUI();
+      window.loadFindingsRunSelector().then(function() {
+        window.loadFindingsPanel();
+      });
+    }, 200);
+  }
+};
+
+console.log('VSP Patch v2.12 loaded OK');
+</script>
+
+<script>
+// ── PATCH v2.13 — Better findings display + group same rule ──────────────
+
+var _origRenderFindingsTable = window.renderFindingsTable;
+window.renderFindingsTable = function(findings, total) {
+  var tbody = document.getElementById('findings-table');
+  if (!tbody) return;
+  if (!findings.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--t3)">No findings</td></tr>';
+    return;
+  }
+
+  // Count rule occurrences để hiện badge
+  var ruleCnt = {};
+  findings.forEach(function(f){ ruleCnt[f.rule_id]=(ruleCnt[f.rule_id]||0)+1; });
+
+  tbody.innerHTML = findings.map(function(f, i) {
+    var sev = (f.severity||'').toLowerCase();
+    var cnt = ruleCnt[f.rule_id]||1;
+    var cntBadge = cnt > 1 ? '<span style="background:rgba(255,255,255,0.08);border-radius:3px;padding:1px 5px;font-size:8px;margin-left:4px;color:var(--t3)">x'+cnt+'</span>' : '';
+
+    // Path — hiện 2 levels + line
+    var pathParts = (f.path||'').split('/');
+    var shortPath = pathParts.slice(-2).join('/');
+    var lineStr = f.line ? ':'+f.line : '';
+
+    return '<tr style="cursor:pointer" onclick="showFindingDetail('+i+')" title="Click for detail">'
+      +'<td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
+      +'<td><span class="sev sev-'+sev+'">'+f.severity+'</span></td>'
+      +'<td class="c-t3 f11">'+f.tool+'</td>'
+      +'<td class="mono c-blue" style="font-size:9px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(f.rule_id||'')+'">'
+        +((f.rule_id||'').slice(0,8))+cntBadge+'</td>'
+      +'<td style="font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(f.message||'').replace(/"/g,'')+'">'+((f.message||'—').slice(0,60))+'</td>'
+      +'<td class="mono-sm" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)" title="'+(f.path||'')+'">'+shortPath+lineStr+'</td>'
+      +'<td class="mono-sm">'+(f.line||'—')+'</td>'
+      +'<td class="f10" style="color:var(--purple)">'+(f.cwe||'—')+'</td>'
+      +'</tr>';
+  }).join('');
+};
+
+// Better finding detail modal
+window.showFindingDetail = function(idx) {
+  var f = (window._findingsCache||[])[idx];
+  if (!f) return;
+  var modal = document.getElementById('finding-detail-modal');
+  if (!modal) return;
+
+  var sevClass = 'sev-'+(f.severity||'').toLowerCase();
+  var kpiClass = f.severity==='CRITICAL'?'kpi-crit':f.severity==='HIGH'?'kpi-high':f.severity==='MEDIUM'?'kpi-med':'kpi-low';
+
+  document.getElementById('fdm-title').textContent = (f.rule_id||'').slice(0,24)+' — '+f.tool;
+  document.getElementById('fdm-id').textContent = f.id||'';
+
+  var cweLink = f.cwe ? '<a href="https://cwe.mitre.org/data/definitions/'+f.cwe.replace(/[^0-9]/g,'')+'.html" target="_blank" style="color:var(--cyan)">'+f.cwe+' ↗</a>' : '—';
+
+  document.getElementById('fdm-body').innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">'
+    +'<div class="kpi '+kpiClass+'" style="padding:10px"><div class="kpi-label">Severity</div><div style="margin-top:4px"><span class="sev '+sevClass+'">'+f.severity+'</span></div></div>'
+    +'<div class="kpi" style="padding:10px"><div class="kpi-label">Tool</div><div class="mono fw7" style="margin-top:4px;font-size:13px">'+f.tool+'</div></div>'
+    +'<div class="kpi" style="padding:10px"><div class="kpi-label">CWE</div><div class="mono" style="margin-top:4px;font-size:11px">'+cweLink+'</div></div>'
+    +'</div>'
+    +'<div class="card" style="padding:14px;margin-bottom:10px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--t1);margin-bottom:10px;letter-spacing:.04em">FINDING DETAIL</div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">Rule ID</span><span class="mono c-blue" style="font-size:10px;word-break:break-all">'+(f.rule_id||'—')+'</span></div>'
+    +'<div class="exec-stat" style="align-items:flex-start"><span class="exec-stat-lbl" style="flex-shrink:0">Message</span><span class="f12" style="text-align:right;word-break:break-word;max-width:320px">'+(f.message||'—')+'</span></div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">File</span><span class="mono-sm" style="word-break:break-all;text-align:right;max-width:320px">'+(f.path||'—')+'</span></div>'
+    +'<div class="exec-stat"><span class="exec-stat-lbl">Line</span><span class="mono-sm">'+(f.line||'—')+'</span></div>'
+    +'</div>'
+    +(f.fix_signal ? '<div class="card" style="padding:14px;margin-bottom:10px;border-color:rgba(34,197,94,0.2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;letter-spacing:.04em">FIX SIGNAL</div>'
+    +'<div class="f12" style="color:var(--t2);line-height:1.6">'+f.fix_signal+'</div></div>' : '')
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="btn btn-primary" onclick="openRemModal(\''+(f.id||'')+'_r\',\''+((f.message||'').slice(0,50).replace(/\'/g,'\\\''))+'\',\''+f.severity+'\');document.getElementById(\'finding-detail-modal\').classList.remove(\'open\')">Assign remediation &#8594;</button>'
+    +(f.cwe?'<button class="btn btn-ghost" onclick="window.open(\'https://cwe.mitre.org/data/definitions/'+f.cwe.replace(/[^0-9]/g,'')+'.html\')">CWE ref &#8599;</button>':'')
+    +'<button class="btn btn-ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+f.rule_id+'\');showToast&&showToast(\'Rule ID copied\',\'info\')">Copy rule ID</button>'
+    +'</div>';
+
+  modal.classList.add('open');
+};
+
+console.log('VSP Patch v2.13 loaded OK');
+</script>
+
+<script>
+// ── PATCH v2.14 — Fix KPI spinner + badge ────────────────────────────────
+var _origLoadFP = window.loadFindingsPanel;
+window.loadFindingsPanel = async function() { if(typeof loadFindings==='function'){await loadFindings(0);return;}
+  await ensureToken();
+  var state = window._findingsState;
+  var params = new URLSearchParams();
+  params.set('limit', state.limit);
+  params.set('offset', state.page * state.limit);
+  if (state.runUUID) params.set('run_id', state.runUUID);
+  if (state.severity) params.set('severity', state.severity);
+  if (state.tool) params.set('tool', state.tool);
+  if (state.q) params.set('q', state.q);
+
+  try {
+    var r = await fetch('/api/v1/vsp/findings?'+params.toString(), {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var d = await r.json();
+    var findings = d.findings || [];
+    window._findingsCache = findings;
+    state.total = d.total || findings.length;
+
+    // Tool tabs
+    var byTool = {}; (window._findingsCache||[]).forEach(function(f){ if(f.tool) byTool[f.tool]=(byTool[f.tool]||0)+1; });
+    findings.forEach(function(f){ byTool[f.tool]=(byTool[f.tool]||0)+1; });
+    state.tools = Object.keys(byTool);
+    var tabsEl = document.getElementById('findings-tool-tabs');
+    if (tabsEl) {
+      tabsEl.innerHTML = '<button class="log-filter-btn'+(state.tool===''?' active':'')+'" onclick="setFindingsTool(\'\',this)">ALL ('+state.total+')</button>' +
+        Object.keys(byTool).map(function(t){
+          return '<button class="log-filter-btn'+(state.tool===t?' active':'')+'" onclick="setFindingsTool(\''+t+'\',this)">'+t+' ('+byTool[t]+')</button>';
+        }).join('');
+    }
+
+    // KPI từ findings thật (không spinner)
+    var bySev = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0};
+    findings.forEach(function(f){ if(bySev[f.severity]!==undefined) bySev[f.severity]++; });
+    
+    // Nếu có run cụ thể thì lấy summary từ API để có tổng đúng
+    if (state.runUUID) {
+      try {
+        var s = await fetch('/api/v1/vsp/findings/summary?run_id='+state.runUUID, {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(function(r){return r.json();});
+        updateFindingsKPIDirect(s.CRITICAL||0, s.HIGH||0, s.MEDIUM||0, s.LOW||0, state.total);
+      } catch(e) {
+        updateFindingsKPIDirect(bySev.CRITICAL, bySev.HIGH, bySev.MEDIUM, bySev.LOW, state.total);
+      }
+    } else {
+      updateFindingsKPIDirect(bySev.CRITICAL, bySev.HIGH, bySev.MEDIUM, bySev.LOW, state.total);
+    }
+
+    // Badge sidebar
+    var badge = document.getElementById('badge-findings');
+    if (badge) badge.textContent = state.total > 999 ? Math.round(state.total/100)/10+'k' : state.total;
+
+    // Counter
+    var cnt = document.getElementById('findings-total-cnt');
+    if (cnt) cnt.textContent = state.total + ' findings';
+
+    renderFindingsTable(findings, state.total);
+    renderFindingsPagination(state.total, state.page, state.limit);
+
+  } catch(e) { console.error('loadFindingsPanel v2.14', e); }
+};
+
+function updateFindingsKPIDirect(crit, high, med, low, total) {
+  var panel = document.getElementById('panel-findings');
+  if (!panel) return;
+  var el = panel.querySelector('.findings-kpi-row');
+  if (!el) return;
+  el.innerHTML =
+    '<div class="kpi kpi-crit" style="padding:12px 14px">'
+    +'<div class="kpi-label">Critical</div>'
+    +'<div class="kpi-value c-red" style="font-size:28px">'+crit+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi kpi-high" style="padding:12px 14px">'
+    +'<div class="kpi-label">High</div>'
+    +'<div class="kpi-value c-orange" style="font-size:28px">'+high+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi kpi-med" style="padding:12px 14px">'
+    +'<div class="kpi-label">Medium</div>'
+    +'<div class="kpi-value c-amber" style="font-size:28px">'+med+'</div>'
+    +'<div class="kpi-sub">findings</div></div>'
+    +'<div class="kpi kpi-low" style="padding:12px 14px">'
+    +'<div class="kpi-label">Low</div>'
+    +'<div class="kpi-value c-green" style="font-size:28px">'+low+'</div>'
+    +'<div class="kpi-sub">of '+total+' total</div></div>';
+}
+
+console.log('VSP Patch v2.14 loaded OK');
+</script>
 
 
 <script>
@@ -3946,7 +4820,7 @@ window.deleteRuleAPI = async function(btn) {
   if (!confirm('Delete this rule?')) return;
   await ensureToken();
   try {
-    await fetch('/api/v1/policy/rules'+id, {method:'DELETE',headers:{'Authorization':'Bearer '+window.TOKEN}});
+    await fetch('/api/v1/policy/rules/'+id, {method:'DELETE',headers:{'Authorization':'Bearer '+window.TOKEN}});
     showToast && showToast('Rule deleted','success');
     loadRulesFromAPI();
   } catch(e) { showToast && showToast('Error: '+e.message,'error'); }
@@ -4136,7 +5010,7 @@ async function loadSOCv2() {
   try {
     var [runsD, summaryD, remD] = await Promise.all([
       fetch('/api/v1/vsp/runs/index?limit=100',{headers:h}).then(r=>r.json()),
-      fetch('/api/v1/vsp/findings/summary',{headers:h}).then(r=>r.json()),
+      fetch('/api/v1/vsp/findings/summary?scope=all',{headers:h}).then(r=>r.json()),
       fetch('/api/v1/remediation/stats',{headers:h}).then(r=>r.json()),
     ]);
 
@@ -4867,8 +5741,6 @@ function sbomRender() {
     SCA:  'background:var(--cyan2);color:var(--cyan);border:1px solid rgba(6,182,212,.25)',
     DAST: 'background:var(--amber3);color:var(--amber);border:1px solid rgba(245,158,11,.25)',
     SECRETS: 'background:var(--red2);color:var(--red);border:1px solid rgba(239,68,68,.25)',
-    NETWORK: 'background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)',
-    FULL_SOC:'background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.35)'
   };
   var gateClass = {PASS:'pill-pass', FAIL:'pill-fail', WARN:'pill-warn'};
   var findColor = function(n) { return n>=10?'c-red':n>=1?'c-orange':'c-green'; };
@@ -5215,72 +6087,11 @@ async function loadFindings(offset) {
     _renderFindingsPagination();
     var lbl = document.getElementById('findings-total-lbl');
     if (lbl) lbl.textContent = _findingsTotal + ' findings';
-    // Populate tool breakdown
-    if(window._renderFindingsToolBreakdown) window._renderFindingsToolBreakdown(d.findings||[], _findingsTotal);
   } catch(e) { console.error('loadFindings', e); }
 }
 
-window._renderFindingsToolBreakdown = function(findings, total) {
-  var breakdown = document.getElementById('findings-tool-breakdown');
-  var lbl = document.getElementById('findings-tool-total-lbl');
-  if (!breakdown) return;
-  if (lbl) lbl.textContent = total + ' total findings';
-
-  var byTool = {};
-  findings.forEach(function(f) {
-    var t = f.tool || 'unknown';
-    if (!byTool[t]) byTool[t] = {total:0,crit:0,high:0,med:0,low:0};
-    byTool[t].total++;
-    if (f.severity==='CRITICAL') byTool[t].crit++;
-    else if (f.severity==='HIGH') byTool[t].high++;
-    else if (f.severity==='MEDIUM') byTool[t].med++;
-    else byTool[t].low++;
-  });
-  var tools = Object.keys(byTool).sort(function(a,b){return byTool[b].total-byTool[a].total;});
-  var maxVal = tools.length ? byTool[tools[0]].total : 1;
-  breakdown.innerHTML = tools.map(function(tool) {
-    var b = byTool[tool];
-    var pct = Math.round(b.total/maxVal*100);
-    return '<div style="margin-bottom:10px">'
-      +'<div style="display:flex;justify-content:space-between;margin-bottom:4px">'
-      +'<span style="font-size:10px;font-weight:700;font-family:var(--font-mono);color:var(--t2)">'+tool+'</span>'
-      +'<div style="display:flex;gap:5px;align-items:center">'
-      +(b.crit?'<span style="font-size:9px;color:var(--red)">'+b.crit+'C</span>':'')
-      +(b.high?'<span style="font-size:9px;color:var(--amber)">'+b.high+'H</span>':'')
-      +(b.med?'<span style="font-size:9px;color:var(--orange)">'+b.med+'M</span>':'')
-      +(b.low?'<span style="font-size:9px;color:var(--t3)">'+b.low+'L</span>':'')
-      +'<span style="font-size:11px;font-weight:700;color:var(--t1);min-width:28px;text-align:right">'+b.total+'</span>'
-      +'</div></div>'
-      +'<div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">'
-      +'<div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:3px"></div>'
-      +'</div></div>';
-  }).join('');
-};
-
 function _renderFindings(findings) {
-  // Inject summary bar
-  var panel = document.getElementById('panel-findings');
-  if (panel && !document.getElementById('findings-summary-bar')) {
-    var tblWrap = panel.querySelector('.tbl-wrap');
-    if (tblWrap) {
-      var sb = document.createElement('div');
-      sb.id = 'findings-summary-bar';
-      sb.style.cssText = 'display:flex;gap:16px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);font-size:11px;flex-wrap:wrap';
-      tblWrap.parentNode.insertBefore(sb, tblWrap);
-    }
-  }
-  var sb2 = document.getElementById('findings-summary-bar');
-  if (sb2) {
-    var cnt = function(s){ return findings.filter(function(f){return f.severity===s;}).length; };
-    sb2.innerHTML = '<span style="color:#ff4545;font-weight:700;font-family:monospace">CRIT '+cnt('CRITICAL')+'</span>'
-      +'<span style="color:#f97316;font-weight:700;font-family:monospace">HIGH '+cnt('HIGH')+'</span>'
-      +'<span style="color:#ffb800;font-weight:700;font-family:monospace">MED '+cnt('MEDIUM')+'</span>'
-      +'<span style="color:#00ffa3;font-weight:700;font-family:monospace">LOW '+cnt('LOW')+'</span>'
-      +'<span style="color:var(--t3);font-family:monospace;margin-left:auto">'+findings.length+' shown / '+(_findingsTotal||findings.length)+' total</span>';
-  }
-  var sevBg    = {CRITICAL:'rgba(255,69,69,.15)',HIGH:'rgba(249,115,22,.15)',MEDIUM:'rgba(255,184,0,.15)',LOW:'rgba(0,255,163,.15)'};
-  var sevColor = {CRITICAL:'#ff4545',HIGH:'#f97316',MEDIUM:'#ffb800',LOW:'#00ffa3'};
-  var sevBorder= {CRITICAL:'rgba(255,69,69,.3)',HIGH:'rgba(249,115,22,.3)',MEDIUM:'rgba(255,184,0,.3)',LOW:'rgba(0,255,163,.3)'};
+  var sevClass = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
   var tbody = document.getElementById('findings-table');
   if (!tbody) return;
   if (!findings.length) {
@@ -5288,26 +6099,19 @@ function _renderFindings(findings) {
     return;
   }
   tbody.innerHTML = findings.map(function(f, i) {
-    var sev = f.severity||'LOW';
-    var sevBadge = '<span style="font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+(sevBg[sev]||'rgba(255,255,255,.05)')+';color:'+(sevColor[sev]||'#8a90a2')+';border:1px solid '+(sevBorder[sev]||'rgba(255,255,255,.1)')+'">'+sev+'</span>';
-    var safeTool    = esc(f.tool);
-    var safeRuleId  = esc(f.rule_id);
-    var safeMessage = esc(f.message);
-    var safePath    = esc(f.path);
-    var safeCwe     = esc(f.cwe);
-    var toolBadge = safeTool ? '<span style="font-family:monospace;font-size:9px;background:rgba(157,111,255,.1);color:#9d6fff;border:1px solid rgba(157,111,255,.2);padding:1px 6px;border-radius:3px">'+safeTool+'</span>' : '—';
-    return '<tr style="cursor:pointer;transition:background .1s"'
-      +' onmouseenter=\"this.style.background=\'var(--surface2)\'\"'
-      +' onmouseleave=\"this.style.background=\'\'\"'
-      +' onclick="showFindingDetail('+i+')">'
+    var sc = sevClass[f.severity]||'';
+    return '<tr style="cursor:pointer;transition:background .15s"'
+      +' onmouseenter="this.style.background=\'var(--surface2)\'"'
+      +' onmouseleave="this.style.background=\'\'"'
+      +' onclick="showFindingDetail('+(_findingsOffset+i)+')">'
       +'<td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
-      +'<td>'+sevBadge+'</td>'
-      +'<td>'+toolBadge+'</td>'
-      +'<td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px" title="'+safeRuleId+'">'+safeRuleId+'</td>'
-      +'<td class="overflow-ellipsis" style="max-width:260px;font-size:12px" title="'+safeMessage+'">'+safeMessage+'</td>'
-      +'<td class="mono-sm overflow-ellipsis" style="max-width:180px;color:var(--t3)" title="'+safePath+'">'+safePath+'</td>'
-      +'<td class="mono-sm" style="color:var(--t3)">'+(f.line||'—')+'</td>'
-      +'<td style="font-size:10px;color:var(--purple)">'+(safeCwe||'—')+'</td>'
+      +'<td><span class="sev '+sc+'">'+f.severity+'</span></td>'
+      +'<td class="c-t3 f11">'+f.tool+'</td>'
+      +'<td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px" title="'+f.rule_id+'">'+f.rule_id+'</td>'
+      +'<td class="overflow-ellipsis" style="max-width:260px" title="'+f.message+'">'+f.message+'</td>'
+      +'<td class="mono-sm overflow-ellipsis" style="max-width:180px" title="'+f.path+'">'+f.path+'</td>'
+      +'<td class="mono-sm">'+(f.line||'—')+'</td>'
+      +'<td class="f10" style="color:var(--purple)">'+(f.cwe||'—')+'</td>'
       +'</tr>';
   }).join('');
 }
@@ -5424,8 +6228,6 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 // ── Remediation Panel ─────────────────────────────────────────────────────
 var _remData = [];
-var _remPage = 1;
-var _remFiltered = [];
 
 async function loadRemediations() {
   await ensureToken();
@@ -5469,124 +6271,36 @@ async function loadRemediations() {
   } catch(e) { console.error('loadRemediations', e); }
 }
 
-function _renderRemTable(list, page) {
-  _remPage = page || 1;
-  var q = ((document.getElementById('rem-search')||{}).value||'').toLowerCase();
-  var sevf = (document.getElementById('rem-filter-sev')||{}).value||'';
-
-  // Inject toolbar nếu chưa có
-  var panel = document.getElementById('panel-remediation');
-  if (panel && !document.getElementById('rem-toolbar')) {
-    var tblWrap = panel.querySelector('.tbl-wrap');
-    if (tblWrap) {
-      var tb = document.createElement('div');
-      tb.id = 'rem-toolbar';
-      tb.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap';
-      tb.innerHTML = '<input id="rem-search" placeholder="Search description, tool, assignee…" style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-family:monospace;font-size:11px;padding:6px 10px;outline:none" oninput="_renderRemTable(_remData)">'
-        +'<select id="rem-filter-sev" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--t2);font-family:monospace;font-size:11px;padding:5px 8px;outline:none" onchange="_renderRemTable(_remData)">'
-        +'<option value="">All Severity</option><option value="CRITICAL">CRITICAL</option><option value="HIGH">HIGH</option><option value="MEDIUM">MEDIUM</option><option value="LOW">LOW</option>'
-        +'</select>';
-      tblWrap.parentNode.insertBefore(tb, tblWrap);
-      var sb = document.createElement('div');
-      sb.id = 'rem-summary-bar';
-      sb.style.cssText = 'display:flex;gap:16px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);font-size:11px;flex-wrap:wrap';
-      tblWrap.parentNode.insertBefore(sb, tblWrap);
-      var pg = document.createElement('div');
-      pg.id = 'rem-pagination';
-      pg.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px';
-      tblWrap.parentNode.appendChild(pg);
-    }
-  }
-
-  var sf = (document.getElementById('rem-filter-status')||{}).value||'';
-  var rows = list.filter(function(r) {
-    var matchQ = !q || (r.description||'').toLowerCase().includes(q)
-      || (r.tool||'').toLowerCase().includes(q)
-      || (r.assignee||'').toLowerCase().includes(q)
-      || (r.rule_id||'').toLowerCase().includes(q);
-    var matchS = !sf || r.status === sf;
-    var matchSev = !sevf || r.severity === sevf;
-    return matchQ && matchS && matchSev;
-  });
-  _remFiltered = rows;
-
-  var sb2 = document.getElementById('rem-summary-bar');
-  if (sb2) {
-    var cnt = function(s){ return rows.filter(function(r){return r.status===s;}).length; };
-    var crit = rows.filter(function(r){return r.severity==='CRITICAL';}).length;
-    var high = rows.filter(function(r){return r.severity==='HIGH';}).length;
-    sb2.innerHTML = '<span style="color:#ff4545;font-weight:700;font-family:monospace">CRIT '+crit+'</span>'
-      +'<span style="color:#f97316;font-weight:700;font-family:monospace">HIGH '+high+'</span>'
-      +'<span style="color:var(--t3);font-family:monospace">|</span>'
-      +'<span style="color:#ff4545;font-family:monospace">open '+cnt('open')+'</span>'
-      +'<span style="color:#ffb800;font-family:monospace">in_progress '+cnt('in_progress')+'</span>'
-      +'<span style="color:#00ffa3;font-family:monospace">resolved '+cnt('resolved')+'</span>'
-      +'<span style="color:var(--t3);font-family:monospace;margin-left:auto">'+rows.length+' shown</span>';
-  }
-
-  var _remPageSize = 20;
-  var totalPages = Math.max(1, Math.ceil(rows.length / _remPageSize));
-  _remPage = Math.min(_remPage, totalPages);
-  var start = (_remPage-1)*_remPageSize;
-  var slice = rows.slice(start, start+_remPageSize);
-
+function _renderRemTable(list) {
   var sevClass = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
-  var priColor = {P1:'#ff4545',P2:'#f97316',P3:'#ffb800',P4:'#8a90a2'};
-  var priBg    = {P1:'rgba(255,69,69,.12)',P2:'rgba(249,115,22,.12)',P3:'rgba(255,184,0,.12)',P4:'rgba(255,255,255,.05)'};
-  var stIcon   = {open:'✗',in_progress:'⟳',resolved:'✓',accepted:'○',false_positive:'/',suppressed:'–'};
-  var stColor  = {open:'#ff4545',in_progress:'#ffb800',resolved:'#00ffa3',accepted:'#8a90a2',false_positive:'#8a90a2',suppressed:'#484e61'};
-  var stBg     = {open:'rgba(255,69,69,.12)',in_progress:'rgba(255,184,0,.12)',resolved:'rgba(0,255,163,.12)',accepted:'rgba(255,255,255,.05)',false_positive:'rgba(255,255,255,.05)',suppressed:'rgba(255,255,255,.03)'};
-
+  var priColor = {P1:'c-red',P2:'c-orange',P3:'c-amber',P4:'c-t2'};
+  var statusPill = {open:'pill-open',in_progress:'pill-warn',resolved:'pill-pass',
+                    accepted:'pill-done',false_positive:'pill-queue',suppressed:''};
   var tbody = document.getElementById('rem-tbody');
   if (!tbody) return;
-  if (!slice.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--t3)">No remediations found</td></tr>';
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No remediations found</td></tr>';
     return;
   }
-  tbody.innerHTML = slice.map(function(r, i) {
-    var sc  = sevClass[r.severity]||'';
-    var st  = r.status||'open';
-    var pri = r.priority||'P3';
-    var toolRaw = r.tool||'';
-    var toolArr = Array.isArray(toolRaw) ? toolRaw : (toolRaw ? toolRaw.split(',') : []);
-    var toolsHtml = toolArr.length ? toolArr.map(function(t){
-      return '<span style="font-family:monospace;font-size:9px;background:rgba(157,111,255,.1);color:#9d6fff;border:1px solid rgba(157,111,255,.2);padding:1px 5px;border-radius:3px;margin-right:2px">'+t.trim()+'</span>';
-    }).join('') : '<span style="color:var(--t3);font-size:11px">—</span>';
-    return '<tr style="cursor:pointer;transition:background .1s" onmouseenter="this.style.background=\'var(--surface2)\'" onmouseleave="this.style.background=\'\'" onclick="_openRemDetail('+(start+i)+')">'
-      +'<td><span class="sev '+sc+'">'+(r.severity||'—')+'</span></td>'
-      +'<td>'+toolsHtml+'</td>'
-      +'<td class="mono c-purple" style="font-size:9px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(r.rule_id||'')+'">'+((r.rule_id||'').slice(0,12)||'—')+'</td>'
-      +'<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="'+(r.description||'')+'">'+( r.description||'—')+'</td>'
-      +'<td style="font-size:10px;color:var(--t3)">'+( r.assignee||'—')+'</td>'
-      +'<td><span style="font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+(priBg[pri]||'')+';color:'+(priColor[pri]||'')+'">'+pri+'</span></td>'
-      +'<td><span style="font-family:monospace;font-size:10px;font-weight:700;padding:2px 9px;border-radius:4px;background:'+(stBg[st]||'')+';color:'+(stColor[st]||'')+'">'+(stIcon[st]||'')+' '+(st.replace(/_/g,' ').toUpperCase())+'</span></td>'
+  tbody.innerHTML = list.map(function(r, i) {
+    var sc = sevClass[r.severity]||'';
+    var pc = priColor[r.priority]||'';
+    var sp = statusPill[r.status]||'';
+    return '<tr style="cursor:pointer;transition:background .15s"'
+      +' onmouseenter="this.style.background=\'var(--surface2)\'"'
+      +' onmouseleave="this.style.background=\'\'"'
+      +' onclick="_openRemDetail('+i+')">'
+      +'<td><span class="sev '+sc+'">'+r.severity+'</span></td>'
+      +'<td class="c-t3 f11">'+(r.tool||'—')+'</td>'
+      +'<td class="mono c-purple f10" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(r.rule_id||'')+'">'+((r.rule_id||'').slice(0,8)||'—')+'</td>'
+      +'<td class="overflow-ellipsis" style="max-width:220px;font-size:12px" title="'+(r.description||'')+'">'+( r.description||'—')+'</td>'
+      +'<td class="c-t3 f11">'+(r.assignee||'—')+'</td>'
+      +'<td class="'+pc+' fw7 f11">'+(r.priority||'—')+'</td>'
+      +'<td><span class="pill '+sp+'" style="font-size:9px">'+r.status+'</span></td>'
+      +'<td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="event.stopPropagation();_openRemDetail('+i+')">Edit</button></td>'
       +'</tr>';
   }).join('');
-
-  // Pagination
-  var el = document.getElementById('rem-pagination');
-  if (el) {
-    if (totalPages <= 1) { el.innerHTML = ''; }
-    else {
-      var btns = '';
-      for (var p = 1; p <= totalPages; p++) {
-        if (p===1||p===totalPages||(p>=_remPage-2&&p<=_remPage+2)) {
-          var active = p===_remPage;
-          btns += '<button data-rpage="'+p+'" class="rpg-btn" style="font-family:monospace;font-size:11px;padding:4px 9px;border-radius:5px;cursor:pointer;border:1px solid '+(active?'rgba(0,229,255,.35)':'rgba(255,255,255,.1)')+';background:'+(active?'rgba(0,229,255,.12)':'transparent')+';color:'+(active?'#00e5ff':'#8a90a2')+';min-width:30px;margin:0 2px">'+p+'</button>';
-        } else if (p===_remPage-3||p===_remPage+3) {
-          btns += '<span style="color:var(--t3);padding:0 4px">…</span>';
-        }
-      }
-      var s1=((_remPage-1)*_remPageSize)+1, e1=Math.min(_remPage*_remPageSize,rows.length);
-      el.innerHTML = '<span style="font-family:monospace;font-size:11px;color:var(--t3)">'+s1+'–'+e1+' of '+rows.length+'</span><div style="display:flex;align-items:center;gap:2px">'+btns+'</div>';
-      el.querySelectorAll('.rpg-btn').forEach(function(btn){
-        btn.onclick = function(){ _renderRemTable(_remData, parseInt(this.getAttribute('data-rpage'))); };
-      });
-    }
-  }
 }
-var _remPage = 1;
-var _remFiltered = [];
 
 function _openRemDetail(idx) {
   var r = _remData[idx];
@@ -5758,7 +6472,7 @@ async function exportOSCAL(type) {
   await ensureToken();
   showToast('Generating OSCAL '+type.toUpperCase()+'…','info');
   try {
-    var url = '/api/v1/compliance/oscal/ar'+type+(_exportRID?'?run_id='+_exportRID:'');
+    var url = '/api/v1/compliance/oscal/'+type+(_exportRID?'?run_id='+_exportRID:'');
     var resp = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();
@@ -5825,7 +6539,7 @@ async function _deleteUser(id, email) {
   if (!confirm('Delete user '+email+'?')) return;
   window.TOKEN = null; await ensureToken();
   try {
-    var r = await fetch('/api/v1/admin/users'+id, {
+    var r = await fetch('/api/v1/admin/users/'+id, {
       method:'DELETE',
       headers:{'Authorization':'Bearer '+window.TOKEN}
     });
@@ -5928,14 +6642,6 @@ var _origOnSSEMsg = null;
     setTimeout(function() {
       if (name === 'findings')    loadFindings(0);
       if (name === 'remediation') loadRemediations();
-    if (name === 'vulnmgmt') {
-      var _vf = document.querySelector('iframe[data-src="/panels/vuln_mgmt.html"]');
-      if (_vf && !_vf.src.includes('vuln_mgmt')) {
-        _vf.src = '/panels/vuln_mgmt.html?v=' + Date.now();
-      } else if (_vf) {
-        _vf.contentWindow && _vf.contentWindow.postMessage({type:'vsp:token',token:window.TOKEN},'*');
-      }
-    }
       if (name === 'governance')  loadGovernanceV2();
       if (name === 'sbom')        loadSBOM();
       if (name === 'sla')         loadSLA();
@@ -6039,11 +6745,13 @@ async function loadAnalytics() {
     var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:h}).then(function(r){return r.json();});
     var allRuns = (d.runs||[]).filter(function(r){return r.status==='DONE';});
 
-    // Filter by days
+    // Filter by days - include all runs with findings OR within period
     var cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     var runs = allRuns.filter(function(r){
-      return r.created_at && new Date(r.created_at) >= cutoff;
+      var inPeriod = r.created_at && new Date(r.created_at) >= cutoff;
+      var hasFindings = (r.total_findings||r.total||0) > 0;
+      return inPeriod || hasFindings;
     });
 
     if (!runs.length) {
@@ -6057,7 +6765,7 @@ async function loadAnalytics() {
     // KPIs
     var passCount = runs.filter(function(r){return r.gate==='PASS';}).length;
     var passRate  = Math.round(passCount/runs.length*100);
-    var avgFindings = Math.round(runs.reduce(function(s,r){return s+(r.total||0);},0)/runs.length);
+    var avgFindings = Math.round(runs.reduce(function(s,r){return s+(r.total_findings||r.total||0);},0)/runs.length);
     var runsWithScore = runs.filter(function(r){return r.summary&&r.summary.SCORE!==undefined;});
     var avgScore = runsWithScore.length ? Math.round(runsWithScore.reduce(function(s,r){return s+(r.summary.SCORE||0);},0)/runsWithScore.length) : '—';
 
@@ -6128,7 +6836,7 @@ async function loadAnalytics() {
 
     // 4. Total findings per run chart
     _destroyChart('an-dur-chart');
-    var totals = runs.map(function(r){ return r.total||0; });
+    var totals = runs.map(function(r){ return r.total_findings||r.total||0; });
     _anCharts['an-dur-chart'] = new Chart(document.getElementById('an-dur-chart'), {
       type:'bar',
       data:{labels:labels,datasets:[{
@@ -6656,7 +7364,7 @@ async function profileSubmitPassword() {
     }
 
     if (uid) {
-      var r2 = await fetch('/api/v1/admin/users'+uid+'/password', {
+      var r2 = await fetch('/api/v1/admin/users/'+uid+'/password', {
         method: 'PUT',
         headers: {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
         body: JSON.stringify({password: newpw})
@@ -6887,7 +7595,7 @@ async function _submitNewRule() {
 // ── GOV PATCH v1.6: Runs KPI + Charts ────────────────────────────────────
 
 // Normalize summary object (handles both uppercase and lowercase keys)
-window._normSummary = function _normSummary(s) {
+function _normSummary(s) {
   if (!s) return {};
   if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return {}; } }
   var out = {};
@@ -6896,7 +7604,157 @@ window._normSummary = function _normSummary(s) {
 }
 
 // Override loadRuns to also populate KPI row + charts
-// [v1.6b loadRuns removed — v1.7 active]
+var _origLoadRuns = window.loadRuns;
+window.loadRuns = async function() {
+  if (!await ensureToken()) return;
+  try {
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {
+      headers: {'Authorization': 'Bearer ' + window.TOKEN}
+    }).then(function(r){ return r.json(); });
+    var runs = d.runs || [];
+
+    // ── Fix table rendering: use total_findings not total ──
+    var tbody = document.getElementById('runs-table');
+    if (tbody) {
+      var modeStyle = {
+        IAC:    'background:var(--cyan2);color:var(--cyan);border:1px solid rgba(6,182,212,.25)',
+        FULL:   'background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)',
+        SAST:   'background:var(--blue2);color:var(--blue);border:1px solid rgba(59,130,246,.25)',
+        SCA:    'background:var(--orange2);color:var(--orange);border:1px solid rgba(249,115,22,.25)',
+        SECRETS:'background:var(--red2);color:var(--red);border:1px solid rgba(239,68,68,.25)',
+        DAST:   'background:var(--green2);color:var(--green);border:1px solid rgba(34,197,94,.25)',
+      };
+      var gateClass = {PASS:'pill-pass', FAIL:'pill-fail', WARN:'pill-warn'};
+      var statusClass = {DONE:'pill-done', RUNNING:'pill-run', FAILED:'pill-fail', QUEUED:'pill-queue'};
+
+      tbody.innerHTML = runs.map(function(r) {
+        var sm      = _normSummary(r.summary);
+        var score   = sm.SCORE || sm.score || 0;
+        var total   = r.total_findings || r.total || 0;
+        var scoreColor = score > 70 ? 'var(--green)' : score > 40 ? 'var(--amber)' : score > 0 ? 'var(--red)' : 'var(--t3)';
+        var findColor  = total > 0 ? (sm.CRITICAL > 0 ? 'c-red' : sm.HIGH > 0 ? 'c-orange' : 'c-amber') : 'c-green';
+        var mStyle  = modeStyle[r.mode] || modeStyle.IAC;
+        var gClass  = r.gate ? (gateClass[r.gate] || 'pill-done') : '';
+        var sClass  = statusClass[r.status] || 'pill-done';
+        var dt      = new Date(r.created_at);
+        var dateStr = (dt.getDate()<10?'0':'')+dt.getDate()+'/'+(dt.getMonth()<9?'0':'')+(dt.getMonth()+1)
+                    + ' ' + (dt.getHours()<10?'0':'')+dt.getHours()+':'+(dt.getMinutes()<10?'0':'')+dt.getMinutes();
+
+        return '<tr style="cursor:pointer" onclick="viewRunLog(\'' + r.rid + '\')">'
+          + '<td class="mono" style="font-size:10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.rid+'">'+r.rid+'</td>'
+          + '<td><span class="pill" style="'+mStyle+'">'+r.mode+'</span></td>'
+          + '<td class="mono-sm">'+(r.profile||'FAST')+'</td>'
+          + '<td><span class="pill '+sClass+'">'+r.status+'</span></td>'
+          + '<td>'+(r.gate ? '<span class="pill '+gClass+'">'+r.gate+'</span>' : '<span class="c-t3">—</span>')+'</td>'
+          + '<td class="fw7 '+findColor+'">'+total+'</td>'
+          + '<td class="mono-sm">'+(r.tools_done||0)+'/'+(r.tools_total||0)+'</td>'
+          + '<td class="mono" style="font-size:11px;color:'+scoreColor+'">'+(score===0?'0':score||'—')+'</td>'
+          + '<td class="mono-sm">'+dateStr+'</td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    // ── KPI calculations ──
+    var done = runs.filter(function(r){ return r.status === 'DONE'; });
+    var pass = done.filter(function(r){ return r.gate === 'PASS'; });
+    var fail = done.filter(function(r){ return r.gate === 'FAIL'; });
+    var passRate = done.length > 0 ? Math.round(pass.length / done.length * 100) : 0;
+    var totalFindings = done.reduce(function(s,r){ return s + (r.total_findings||r.total||0); }, 0);
+    var avgFindings = done.length > 0 ? Math.round(totalFindings / done.length) : 0;
+    var latest = runs[0];
+    var latestSm = latest ? _normSummary(latest.summary) : {};
+    var latestScore = latestSm.SCORE || latestSm.score || 0;
+    var lastGate = latest ? (latest.gate || '—') : '—';
+    var lastGateColor = lastGate === 'PASS' ? 'var(--green)' : lastGate === 'FAIL' ? 'var(--red)' : lastGate === 'WARN' ? 'var(--amber)' : 'var(--t3)';
+
+    function _setEl(id, val) { var e = document.getElementById(id); if(e) e.textContent = val; }
+    _setEl('rk-total', runs.length);
+    _setEl('rk-passrate', passRate + '%');
+    _setEl('rk-pass-sub', pass.length + ' pass / ' + fail.length + ' fail');
+    _setEl('rk-avgfindings', avgFindings);
+    var lgEl = document.getElementById('rk-lastgate');
+    if (lgEl) { lgEl.textContent = lastGate; lgEl.style.color = lastGateColor; }
+    _setEl('rk-lastgate-sub', latest ? latest.rid.slice(-12) : '—');
+    var scoreEl = document.getElementById('rk-score');
+    if (scoreEl) {
+      scoreEl.textContent = latestScore > 0 ? latestScore : 'N/A';
+      scoreEl.style.color = latestScore >= 70 ? 'var(--green)' : latestScore >= 40 ? 'var(--amber)' : 'var(--red)';
+    }
+
+    // ── Gate trend chart ──
+    var last20 = runs.slice(0, 20).reverse();
+    var gateCtx = document.getElementById('runs-gate-chart');
+    if (gateCtx && window.Chart) {
+      if (window._runsGateChart) window._runsGateChart.destroy();
+      window._runsGateChart = new Chart(gateCtx, {
+        type: 'bar',
+        data: {
+          labels: last20.map(function(r){ return r.rid.slice(-8); }),
+          datasets: [{
+            data: last20.map(function(r){
+              return r.gate === 'PASS' ? 1 : r.gate === 'WARN' ? 0.5 : r.gate === 'FAIL' ? -1 : 0;
+            }),
+            backgroundColor: last20.map(function(r){
+              return r.gate === 'PASS' ? 'rgba(34,197,94,0.7)'
+                   : r.gate === 'WARN' ? 'rgba(251,191,36,0.7)'
+                   : r.gate === 'FAIL' ? 'rgba(239,68,68,0.7)'
+                   : 'rgba(100,116,139,0.4)';
+            }),
+            borderRadius: 3,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { display: false }, grid: { display: false } },
+            y: { display: false, min: -1.2, max: 1.2 }
+          }
+        }
+      });
+    }
+
+    // ── Findings by mode doughnut ──
+    var modeCtx = document.getElementById('runs-mode-chart');
+    if (modeCtx && window.Chart) {
+      var modeTotals = {};
+      done.forEach(function(r){
+        var t = r.total || r.total_findings || 0;
+        modeTotals[r.mode] = (modeTotals[r.mode]||0) + t;
+      });
+      var modeKeys = Object.keys(modeTotals).filter(function(k){ return modeTotals[k] > 0; });
+      var modeColors = {
+        IAC:'rgba(6,182,212,0.8)', FULL:'rgba(139,92,246,0.8)',
+        SAST:'rgba(59,130,246,0.8)', SCA:'rgba(249,115,22,0.8)',
+        SECRETS:'rgba(239,68,68,0.8)', DAST:'rgba(34,197,94,0.8)'
+      };
+      if (window._runsModeChart) window._runsModeChart.destroy();
+      window._runsModeChart = new Chart(modeCtx, {
+        type: 'bar',
+        data: {
+          labels: modeKeys,
+          datasets: [{ data: modeKeys.map(function(k){ return modeTotals[k]; }),
+            backgroundColor: modeKeys.map(function(k){ return modeColors[k]||'rgba(100,116,139,0.6)'; }),
+            borderRadius: 4, borderWidth: 0 }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'var(--t3)', font: { size: 9 } },
+                 beginAtZero: true },
+            y: { grid: { display: false }, ticks: { color: 'var(--t2)', font: { size: 10, family: 'JetBrains Mono' } } }
+          }
+        }
+      });
+    }
+
+  } catch(e) {
+    console.error('loadRuns patch:', e);
+  }
+};
+
 // ── GOV PATCH v1.6: Findings KPI cards ───────────────────────────────────
 
 function setFindingsFilter(sev) {
@@ -6922,7 +7780,7 @@ window.loadFindings = async function(offset) {
 async function _updateFindingsKPI() {
   try {
     await ensureToken();
-    var r = await fetch('/api/v1/vsp/findings/summary', {
+    var r = await fetch('/api/v1/vsp/findings/summary?scope=all', {
       headers: {'Authorization': 'Bearer ' + window.TOKEN}
     });
     if (!r.ok) return;
@@ -7034,7 +7892,6 @@ function _renderRunsPage() {
       + '<td class="mono-sm">'+(r.tools_done||0)+'/'+(r.tools_total||0)+'</td>'
       + '<td class="mono" style="font-size:11px;color:'+scoreColor+'">'+(score===0?'0':score||'—')+'</td>'
       + '<td class="mono-sm">'+dateStr+'</td>'
-      + '<td style="white-space:nowrap"><button class="btn btn-sm" style="font-size:9px;padding:2px 6px" onclick="event.stopPropagation();vspOpenReport(this,\'tt13\',\''+r.rid+'\')">TT13</button> <button class="btn btn-sm" style="font-size:9px;padding:2px 6px" onclick="event.stopPropagation();vspOpenReport(this,\'pdf\',\''+r.rid+'\')">PDF</button></td>'
       + '</tr>';
   }).join('');
 
@@ -7345,7 +8202,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.showPanel = function(name, btn) {
     if (_lastShowPanel) _lastShowPanel(name, btn);
     if (name === 'audit') setTimeout(_tryLoadAudit, 150);
-    if (name === 'governance') setTimeout(_loadPoam, 400);
   };
 })();
 </script>
@@ -7355,6 +8211,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var _lastPanel = '';
   setInterval(function() {
     var active = document.querySelector('.panel.active');
+    if (!active) return;
     var id = active.id;
     if (id === 'panel-audit' && id !== _lastPanel) {
       _lastPanel = id;
@@ -7365,6 +8222,8 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 300);
 })();
 </script>
+
+<script src="/panels/vsp_siem_patch.js"></script>
 
 <script>
 // Load SIEM KPIs cho dashboard
@@ -7391,21 +8250,13 @@ async function loadSIEMKPIs() {
 // Gọi sau khi login
 var _siemKPIpoll = setInterval(function() {
   if (!window.TOKEN || window.TOKEN.length < 50 || window.TOKEN.split('.').length !== 3) return;
-  try { var p=decodeJwt(window.TOKEN); if(!p||(p.exp&&p.exp*1000<Date.now())){localStorage.removeItem('vsp_token');window.TOKEN='';return;} } catch(e){return;}
+  try { var p=JSON.parse(atob(window.TOKEN.split('.')[1])); if(p.exp&&p.exp*1000<Date.now()){localStorage.removeItem('vsp_token');window.TOKEN='';return;} } catch(e){return;}
   clearInterval(_siemKPIpoll);
   loadSIEMKPIs();
   setInterval(loadSIEMKPIs, 60000);
 }, 1000);
 </script>
-<script src="/vsp_consolidated.js?v=20260412b"></script>
-<script src="/vsp_upgrade_v100.js?v=20260412b"></script>
-<script src="/vsp_upgrade_v101.js?v=20260412b">
-
-
-
-</script>
-<script src="/panels/vsp_siem_patch.js?v=20260412d"></script>
-<script>
+<script src="/vsp_upgrade_v100.js">
 // ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
 (function() {
   // Giảm polling: chỉ refresh dashboard mỗi 30s thay vì 3s
@@ -7494,138 +8345,7 @@ var _siemKPIpoll = setInterval(function() {
   });
 
   // Expose để debug
-
-async function loadConMonKPIs() {
-  console.log('[VSP] loadConMonKPIs called');
-  if (!window.TOKEN) return;
-  var h = {Authorization:'Bearer '+window.TOKEN};
-  var P4KEY = window.VSP_P4_API_KEY || '';
-  var p4h = P4KEY ? {'X-API-Key':P4KEY} : h;
-  try {
-    var [conmon, audit, fedramp] = await Promise.all([
-      fetch('/api/p4/rmf/conmon',{headers:P4KEY?p4h:h}).then(r=>r.json()).catch(()=>({})),
-      fetch('/api/v1/audit/stats',{headers:h}).then(r=>r.json()).catch(()=>({})),
-      fetch('/api/v1/compliance/fedramp',{headers:h}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
-    ]);
-    // ConMon score — update both d- and dod- IDs
-    var cscore = conmon.conmon_score;
-    var ccolor = cscore>=80?'var(--green)':cscore>=60?'var(--amber)':'var(--red)';
-    ['d-conmon-score','dod-conmon-score'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el && cscore!=null){el.textContent=cscore+(id.startsWith('dod')?'/100':'');el.style.color=ccolor;}
-    });
-    var cbar=document.getElementById('dod-conmon-bar');
-    if(cbar) {cbar.style.width=cscore+'%';cbar.style.background=ccolor;}
-    // POAM open — update both
-    var openPoam = conmon.open_poam_items;
-    var pcolor = openPoam>50?'var(--red)':openPoam>10?'var(--amber)':'var(--green)';
-    ['d-poam-open','dod-poam-open'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el && openPoam!=null){el.textContent=openPoam;el.style.color=pcolor;}
-    });
-    var ps=document.getElementById('d-poam-sub');
-    if(ps && openPoam!=null) ps.textContent=openPoam+' critical + high';
-    // FedRAMP % — update both
-    var fpct = Math.round(fedramp.coverage_pct||0);
-    var el=document.getElementById('d-fedramp-pct');
-    if(el) el.textContent=fpct+'%';
-    // Audit entries — update both
-    var atotal = audit.total||0;
-    var a24h = audit.last_24h||0;
-    var at=document.getElementById('d-audit-total');
-    var as2=document.getElementById('d-audit-sub');
-    if(at) at.textContent=atotal.toLocaleString();
-    if(as2) as2.textContent='last 24h: '+a24h;
-    // Also update CONMON SCORE sparkline widget
-    var cscoreEl=document.getElementById('d-conmon-score');
-    if(cscoreEl && cscore) {
-      var parentCard=cscoreEl.closest('.kpi-card,.card,[class*="kpi"]');
-    }
-    // Gate widget bottom-left
-    fetch('/api/v1/vsp/gate/latest',{headers:h}).then(r=>r.json()).then(function(g){
-      var gw = document.getElementById('gate-widget');
-      var gl = gw && gw.querySelector('.gate-label');
-      var gs = document.getElementById('d-gate-score');
-      if(gl) { gl.textContent='GATE '+g.gate; }
-      if(gs) gs.textContent='score: '+(g.score||'—');
-      if(gw) gw.className='gate-status gate-'+(g.gate==='PASS'?'pass':g.gate==='WARN'?'warn':'fail');
-    }).catch(function(){});
-    // ATO countdown format
-    fetch('/api/p4/ato/expiry',{headers:p4h}).then(r=>r.json()).then(function(a){
-      var atEl = document.getElementById('d-ato-days');
-      if(atEl) atEl.textContent = (a.days_remaining||0).toLocaleString();
-      // Also fix ATO COUNTDOWN widget in main dashboard
-      var atoEl = document.querySelector('#d-ato-countdown,.ato-days,[id*="ato"][id*="count"]');
-      if(!atoEl) {
-        // Find by content pattern
-        document.querySelectorAll('.kpi-value,.spark-value').forEach(function(el){
-          if(el.textContent.includes('1.064')||el.textContent.includes('1,064')) {
-            el.textContent = (a.days_remaining||0).toLocaleString();
-          }
-        });
-      }
-      // Also fix ATO COUNTDOWN widget in main dashboard
-      var atoEl = document.querySelector('#d-ato-countdown,.ato-days,[id*="ato"][id*="count"]');
-      if(!atoEl) {
-        // Find by content pattern
-        document.querySelectorAll('.kpi-value,.spark-value').forEach(function(el){
-          if(el.textContent.includes('1.064')||el.textContent.includes('1,064')) {
-            el.textContent = (a.days_remaining||0).toLocaleString();
-          }
-        });
-      }
-      // Also fix ATO COUNTDOWN widget in main dashboard
-      var atoEl = document.querySelector('#d-ato-countdown,.ato-days,[id*="ato"][id*="count"]');
-      if(!atoEl) {
-        // Find by content pattern
-        document.querySelectorAll('.kpi-value,.spark-value').forEach(function(el){
-          if(el.textContent.includes('1.064')||el.textContent.includes('1,064')) {
-            el.textContent = (a.days_remaining||0).toLocaleString();
-          }
-        });
-      }
-    }).catch(function(){});
-    // Findings by severity — use all-time data
-    fetch('/api/v1/vsp/findings/summary?scope=all',{headers:h}).then(r=>r.json()).then(function(s){
-      // Update total findings
-      var tf = document.getElementById('d-total-findings');
-      if(tf) tf.textContent = (s.total||0).toLocaleString();
-      // Update posture total findings
-      var ptf = document.querySelector('.posture-total,.total-findings,[data-field="total_findings"]');
-      // Update chartSeverity with all-time data
-      var c = window._charts && window._charts['chartSeverity'];
-      if(c && s.total > 0) {
-        c.data.datasets[0].data=[s.critical||0,s.high||0,s.medium||0,s.low||0];
-        c.update();
-      }
-      // Also update KPI cards
-      var kpis = {
-        'd-critical': s.critical||0,
-        'd-high': s.high||0,
-        'd-medium': s.medium||0,
-        'd-low': s.low||0
-      };
-      Object.entries(kpis).forEach(function(kv){
-        var el=document.getElementById(kv[0]);
-        // Only update if showing 0 from clean run but we have historical data
-        if(el && parseInt(el.textContent)===0 && kv[1]>0) {
-          // Don't override - keep latest run data (0 is correct for clean run)
-        }
-      });
-    }).catch(function(){});
-  } catch(e) { console.error('loadConMonKPIs',e); }
-}
-
   window._vsp = { refreshDashboard, startSmartPoll };
-  // Load KPI widgets after all scripts
-  setTimeout(function(){
-    if(typeof loadConMonKPIs==='function') {
-      console.log('[VSP] Calling loadConMonKPIs from smart poll init');
-      loadConMonKPIs();
-    } else {
-      console.warn('[VSP] loadConMonKPIs not found at smart poll init');
-    }
-  }, 1500);
 
   console.log('[VSP] Smart polling loaded — interval: 30s, SSE-driven refresh: enabled');
 })();
@@ -7796,8 +8516,5 @@ window.addEventListener('message', async function(e) {
 });
 </script>
 
-<script src="/vsp_poam.js"></script>
-<script src="/vsp_ui_patch_v3.js?v=20260412e"></script>
-<script src="/vsp_mode_patch_v26.js?v=20260412b"></script>
 </body>
 </html>

@@ -1320,3 +1320,7 @@ iframe { display: block; }
 }
 [data-theme="light"] .classif-banner.unclass { background: rgba(239,68,68,0.04); }
 [data-theme="light"] .card, [data-theme="light"] .spark-card, [data-theme="light"] .kpi { box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+/* PANEL VISIBILITY FIX */
+.panel { display: none !important; }
+.panel.active { display: block !important; }

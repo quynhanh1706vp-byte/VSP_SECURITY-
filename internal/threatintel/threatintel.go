@@ -304,38 +304,22 @@ func (c *Client) fetchEPSS(ctx context.Context, cveID string, enr *CVEEnrichment
 	return nil
 }
 
-// LoadKEV loads KEV list from CISA or a mirror
+// LoadKEV loads KEV list from CISA or a mirror.
+// Fix 2026-04-17: set UA (bypass Akamai 403), check HTTP status,
+// use working GitHub mirror, avoid defer-in-loop leak.
 func (c *Client) LoadKEV(ctx context.Context) error {
-	// Try multiple sources
+	// Primary: CISA direct. Fallback: cisagov/kev-data GitHub mirror.
+	// (The old cisagov/known-exploited-vulnerabilities repo returns 404.)
 	urls := []string{
 		"https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
-		"https://raw.githubusercontent.com/cisagov/known-exploited-vulnerabilities/main/catalog/known_exploited_vulnerabilities.json",
+		"https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json",
 	}
 
 	for _, url := range urls {
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err := c.http.Do(req)
-		if err != nil {
+		if err := c.loadKEVFromURL(ctx, url); err != nil {
+			log.Warn().Str("url", url).Err(err).Msg("ti: KEV source failed, trying next")
 			continue
 		}
-		defer resp.Body.Close()
-
-		var kev struct {
-			Vulnerabilities []struct {
-				CVEID string `json:"cveID"`
-			} `json:"vulnerabilities"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&kev); err != nil {
-			continue
-		}
-
-		c.kevMu.Lock()
-		c.kevSet = make(map[string]bool, len(kev.Vulnerabilities))
-		for _, v := range kev.Vulnerabilities {
-			c.kevSet[v.CVEID] = true
-		}
-		c.kevMu.Unlock()
-		log.Info().Int("count", len(kev.Vulnerabilities)).Msg("ti: KEV loaded")
 		return nil
 	}
 
@@ -349,6 +333,49 @@ func (c *Client) LoadKEV(ctx context.Context) error {
 	}
 	c.kevMu.Unlock()
 	log.Warn().Msg("ti: KEV remote failed, using hardcoded fallback")
+	return nil
+}
+
+// loadKEVFromURL fetches one KEV source and populates c.kevSet on success.
+// Extracted so defer resp.Body.Close() runs per-request (no loop leak).
+func (c *Client) loadKEVFromURL(ctx context.Context, url string) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+	// CISA Akamai blocks default Go UA -> must set a browser-ish UA.
+	req.Header.Set("User-Agent", "VSP-Platform/1.0 (+https://vsp.local; threat-intel)")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("http status %d", resp.StatusCode)
+	}
+
+	var kev struct {
+		Vulnerabilities []struct {
+			CVEID string `json:"cveID"`
+		} `json:"vulnerabilities"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&kev); err != nil {
+		return fmt.Errorf("decode: %w", err)
+	}
+	if len(kev.Vulnerabilities) == 0 {
+		return fmt.Errorf("empty catalog")
+	}
+
+	c.kevMu.Lock()
+	c.kevSet = make(map[string]bool, len(kev.Vulnerabilities))
+	for _, v := range kev.Vulnerabilities {
+		c.kevSet[v.CVEID] = true
+	}
+	c.kevMu.Unlock()
+	log.Info().Str("source", url).Int("count", len(kev.Vulnerabilities)).Msg("ti: KEV loaded")
 	return nil
 }
 

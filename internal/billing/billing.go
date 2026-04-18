@@ -122,7 +122,7 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"url": s.URL})
+	_ = json.NewEncoder(w).Encode(map[string]string{"url": s.URL})
 }
 
 // GET /api/v1/billing/status — billing status của tenant hiện tại
@@ -162,7 +162,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // POST /api/v1/billing/webhook — Stripe webhook events

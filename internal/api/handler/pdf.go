@@ -110,7 +110,7 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=vsp-%s.pdf", rid))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
-	w.Write(pdfBytes) //nolint:errcheck
+	_, _ = w.Write(pdfBytes) //nolint:errcheck
 }
 
 func fileExists(path string) bool {

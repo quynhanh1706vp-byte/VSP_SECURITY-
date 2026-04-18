@@ -540,7 +540,7 @@ func (h *Report) TT13PDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf(`attachment; filename="vsp-tt13-%s.pdf"`, rid))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
-	w.Write(pdfBytes) //nolint:errcheck
+	_, _ = w.Write(pdfBytes) //nolint:errcheck
 }
 
 // ── ConMon PDF Report ─────────────────────────────────────────────────────────
@@ -996,5 +996,5 @@ func (h *Report) ConMonPDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fname))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
-	w.Write(pdfBytes) //nolint:errcheck
+	_, _ = w.Write(pdfBytes) //nolint:errcheck
 }

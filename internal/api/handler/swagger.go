@@ -24,7 +24,7 @@ var cachedAt time.Time
 func SwaggerJSON(w http.ResponseWriter, r *http.Request) {
 	if cachedSpec != nil && time.Since(cachedAt) < time.Hour {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(cachedSpec)
+		_, _ = w.Write(cachedSpec)
 		return
 	}
 
@@ -34,7 +34,7 @@ func SwaggerJSON(w http.ResponseWriter, r *http.Request) {
 	cachedAt = time.Now()
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(b)
+	_, _ = w.Write(b)
 }
 
 // GET /api/docs  — Swagger UI HTML (chỉ cho localhost và internal)
@@ -57,7 +57,7 @@ func SwaggerUI(w http.ResponseWriter, r *http.Request) {
 	}
 	host := r.Host
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(`<!DOCTYPE html>
+	_, _ = w.Write([]byte(`<!DOCTYPE html>
 <html>
 <head>
   <title>VSP API — Swagger UI</title>

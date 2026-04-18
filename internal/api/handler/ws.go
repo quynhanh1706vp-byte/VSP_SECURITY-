@@ -67,7 +67,7 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 	defer Hub.unregister(ch)
 
 	// Send initial ping
-	w.Write([]byte("data: {\"type\":\"connected\"}\n\n")) //nolint
+	_, _ = w.Write([]byte("data: {\"type\":\"connected\"}\n\n")) //nolint
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
@@ -82,12 +82,12 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-ticker.C:
 			// keepalive ping
-			w.Write([]byte(": ping\n\n")) //nolint
+			_, _ = w.Write([]byte(": ping\n\n")) //nolint
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
 		case msg := <-ch:
-			w.Write(append([]byte("data: "), append(msg, '\n', '\n')...)) //nolint
+			_, _ = w.Write(append([]byte("data: "), append(msg, '\n', '\n')...)) //nolint
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}

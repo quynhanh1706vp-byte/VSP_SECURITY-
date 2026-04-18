@@ -118,7 +118,7 @@ func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]
 	var list []Remediation
 	for rows.Next() {
 		var r Remediation
-		rows.Scan(&r.ID, &r.FindingID, &r.TenantID, &r.Status,
+		_ = rows.Scan(&r.ID, &r.FindingID, &r.TenantID, &r.Status,
 			&r.Assignee, &r.Priority, &r.DueDate, &r.Notes,
 			&r.TicketURL, &r.ResolvedAt, &r.CreatedAt, &r.UpdatedAt,
 			&r.Title, &r.Severity, &r.Tool, &r.RuleID) //nolint

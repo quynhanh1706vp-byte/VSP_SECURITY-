@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>.panel{display:none!important}.panel.active{display:block!important}</style>
 <title>VSP Security Platform v2.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="/vsp_enterprise_ui.css">
@@ -239,9 +238,6 @@
       <button class="nav-item" onclick="showPanel('compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/><path d="M5 8l2 2 4-4"/></svg></span> FedRAMP</button>
           <button class="nav-item" onclick="showPanel('p4compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/></svg></span> P4 Compliance</button>
       <button class="nav-item" onclick="showPanel('sbom',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 3V2M8 3V2M11 3V2M4 7h2M4 10h2M8 7h4M8 10h3"/></svg></span> SBOM</button>
-      <button class="nav-item" onclick="showPanel('sbom-diff',this)">
-        <span class="nav-icon">⊟</span><span class="nav-label">SBOM Diff</span>
-      </button>
       <button class="nav-item" onclick="showPanel('sla',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4 8,8 11,10"/></svg></span> SLA</button>
     </div>
 
@@ -976,45 +972,97 @@
          AUDIT PANEL
     ════════════════════════════════════ -->
     <div id="panel-audit" class="panel">
-      <div class="g4 mb14">
+
+      <!-- ── Brute-force alert banner (hidden by default) ── -->
+      <div id="audit-brute-banner" style="display:none;margin-bottom:14px;padding:10px 16px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-radius:8px;display:none;align-items:flex-start;gap:10px">
+        <span style="color:var(--red);font-size:14px;margin-top:1px">⚠</span>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:3px">Brute-force detected</div>
+          <div id="audit-brute-detail" style="font-size:11px;color:var(--t2);font-family:var(--font-mono)"></div>
+        </div>
+      </div>
+
+      <!-- ── KPI row — 6 cards, numbers từ API stats ── -->
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">
         <div class="kpi kpi-cyan"><div class="kpi-label">Total Events</div><div class="kpi-value c-cyan" id="audit-k-total">—</div></div>
         <div class="kpi"><div class="kpi-label">Today</div><div class="kpi-value" id="audit-k-today">—</div></div>
-        <div class="kpi kpi-med"><div class="kpi-label">Logins</div><div class="kpi-value c-amber" id="audit-k-logins">—</div></div>
-        <div class="kpi kpi-low"><div class="kpi-label">Scan Triggers</div><div class="kpi-value c-green" id="audit-k-scans">—</div></div>
+        <div class="kpi kpi-low"><div class="kpi-label">Login OK</div><div class="kpi-value c-green" id="audit-k-ok">—</div></div>
+        <div class="kpi kpi-med"><div class="kpi-label">Login Failed</div><div class="kpi-value c-amber" id="audit-k-fail">—</div></div>
+        <div class="kpi kpi-crit"><div class="kpi-label">Locked</div><div class="kpi-value c-red" id="audit-k-locked">—</div></div>
+        <div class="kpi"><div class="kpi-label">Scans</div><div class="kpi-value c-cyan" id="audit-k-scans">—</div></div>
       </div>
 
-      <div class="card mb14">
-        <div class="card-head"><div class="card-title">Recent activity</div></div>
-        <div class="timeline">
-          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · IAC · FAIL</div><div class="tl-meta">RID_SCHED_20260329_194714_0 · 104 findings · 19:47:14 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · FULL · FAIL</div><div class="tl-meta">RID_VSPGO_RUN_20260329_171611 · 49 findings · 17:16:11 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--amber3);border:1px solid rgba(245,158,11,.25);color:var(--amber)">⚠</div><div class="tl-content"><div class="tl-title">SCAN · IAC · WARN</div><div class="tl-meta">RID_VSPGO_RUN_20260329_165946 · 43 findings · 16:59:46 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--green2);border:1px solid rgba(34,197,94,.25);color:var(--green)">✓</div><div class="tl-content"><div class="tl-title">SCAN · IAC · PASS</div><div class="tl-meta">RID_VSPGO_RUN_20260329_164947 · 8 findings · 16:49:47 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · FULL · FAIL</div><div class="tl-meta">RID_VSPGO_RUN_20260329_163409 · 14 findings · 16:34:09 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--cyan2);border:1px solid rgba(6,182,212,.25);color:var(--cyan)">→</div><div class="tl-content"><div class="tl-title">LOGIN · admin@vsp.local</div><div class="tl-meta">192.168.1.1 · 29/3/2026 09:15:00</div></div></div>
+      <!-- ── Top row: timeline + hash chain ── -->
+      <div style="display:grid;grid-template-columns:1fr 360px;gap:12px;margin-bottom:14px">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Recent activity</div><span class="mono-sm c-t3" id="audit-tl-sub">last 10 events</span></div>
+          <div class="timeline" id="audit-timeline">
+            <div style="padding:16px;color:var(--t3);font-size:10px;font-family:var(--font-mono)">Loading…</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Hash chain</div>
+            <button class="btn btn-primary" style="font-size:10px;padding:3px 10px" onclick="verifyAudit()">Verify →</button>
+          </div>
+          <div class="card-body">
+            <div id="verify-result" class="mono f11 c-t3" style="line-height:1.7">Click verify to check integrity of all audit entries.</div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding:10px 14px">
+            <div style="font-size:10px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Chain stats</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="audit-chain-stats">
+              <div style="font-size:11px;color:var(--t2)">Entries: <span class="mono" id="cs-total" style="color:var(--t1)">—</span></div>
+              <div style="font-size:11px;color:var(--t2)">Seq range: <span class="mono" id="cs-range" style="color:var(--t1)">—</span></div>
+              <div style="font-size:11px;color:var(--t2)">Status: <span class="mono" id="cs-status" style="color:var(--t3)">—</span></div>
+              <div style="font-size:11px;color:var(--t2)">Export: <button class="btn btn-ghost" style="font-size:9px;padding:1px 7px;display:inline" onclick="exportAuditLog()">CSV ↓</button></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card mb14">
-        <div class="card-head">
-          <div class="card-title">Hash chain integrity</div>
-          <button class="btn btn-primary" onclick="verifyAudit()">Verify chain →</button>
-        </div>
-        <div class="card-body"><div id="verify-result" class="mono f11 c-t3">Click verify to check audit log hash chain integrity.</div></div>
-      </div>
-
+      <!-- ── Full audit log table với filter + pagination ── -->
       <div class="card">
-        <div class="card-head"><div class="card-title">Audit log</div></div>
+        <div class="card-head" style="flex-wrap:wrap;gap:8px">
+          <div><div class="card-title">Audit log</div><div class="card-sub" id="audit-tbl-sub">932 entries · page 1</div></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap">
+            <!-- Filter buttons -->
+            <div style="display:flex;gap:4px" id="audit-filter-btns">
+              <button class="log-filter-btn active" onclick="auditSetFilter('',this)">ALL</button>
+              <button class="log-filter-btn" onclick="auditSetFilter('LOGIN_OK',this)">LOGIN_OK</button>
+              <button class="log-filter-btn" onclick="auditSetFilter('LOGIN_FAILED',this)" style="color:var(--amber)">FAILED</button>
+              <button class="log-filter-btn" onclick="auditSetFilter('LOGIN_LOCKED',this)" style="color:var(--red)">LOCKED</button>
+              <button class="log-filter-btn" onclick="auditSetFilter('SCAN',this)">SCAN</button>
+              <button class="log-filter-btn" onclick="auditSetFilter('REMEDIATION',this)">REMEDIATION</button>
+            </div>
+            <button class="btn btn-ghost" style="font-size:10px" onclick="auditReload()">↻</button>
+          </div>
+        </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>Seq</th><th>Action</th><th>Resource</th><th>IP</th><th>Time</th><th>Hash</th></tr></thead>
+            <thead><tr><th>Seq</th><th>Action</th><th>Resource</th><th>IP</th><th>Time</th><th style="min-width:80px">Hash</th></tr></thead>
             <tbody id="audit-table">
-              <tr><td class="mono-sm">1</td><td><span class="pill pill-run" style="font-size:8px">LOGIN</span></td><td class="mono-sm overflow-ellipsis" style="max-width:180px">admin@vsp.local</td><td class="mono-sm">127.0.0.1</td><td class="mono-sm">29/3 09:15</td><td class="mono-sm" style="color:var(--t4)">a3f7c9d1…</td></tr>
-              <tr><td class="mono-sm">2</td><td><span class="pill pill-done" style="font-size:8px;background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.25)">SCAN</span></td><td class="mono-sm overflow-ellipsis" style="max-width:180px">RID_SCHED_194714_0</td><td class="mono-sm">127.0.0.1</td><td class="mono-sm">29/3 19:47</td><td class="mono-sm" style="color:var(--t4)">b8e2a4f0…</td></tr>
+              <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--t3);font-size:11px">Loading audit log…</td></tr>
             </tbody>
           </table>
         </div>
+        <!-- Pagination footer -->
+        <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">
+          <span class="mono-sm c-t3" id="audit-page-info">—</span>
+          <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
+            <button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" id="audit-btn-first" onclick="auditGoPage(0)">«</button>
+            <button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" id="audit-btn-prev"  onclick="auditGoPage(_auditPage-1)">‹ Prev</button>
+            <span id="audit-page-pills" style="display:flex;gap:3px"></span>
+            <button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" id="audit-btn-next"  onclick="auditGoPage(_auditPage+1)">Next ›</button>
+            <button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" id="audit-btn-last"  onclick="auditGoPage(_auditPageCount-1)">»</button>
+          </div>
+          <select id="audit-per-page" class="filter-select" style="font-size:10px;padding:2px 6px;margin-left:8px" onchange="auditSetLimit(+this.value)">
+            <option value="25" selected>25/page</option>
+            <option value="50">50/page</option>
+            <option value="100">100/page</option>
+          </select>
+        </div>
       </div>
+
     </div>
 
     <!-- ════════════════════════════════════
@@ -1100,47 +1148,6 @@
           </div>
         </div>
       </div>
-    
-      <div class="card" style="margin-top:14px">
-        <div class="card-head">
-          <div><div class="card-title">POA&amp;M Editor</div><div class="mono-sm c-t3" id="poam-summary-lbl">Loading…</div></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-ghost" style="font-size:10px" onclick="_exportPoamCSV()">&#8595; CSV</button>
-            <button class="btn btn-ghost" style="font-size:10px" onclick="_loadPoam()">&#8635;</button>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">TOTAL</div><div style="font-size:18px;font-weight:700;color:var(--t1)" id="poam-k-total">—</div></div>
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">OPEN</div><div style="font-size:18px;font-weight:700;color:var(--red)" id="poam-k-open">—</div></div>
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">REMEDIATION</div><div style="font-size:18px;font-weight:700;color:var(--amber)" id="poam-k-remediation">—</div></div>
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">CLOSED</div><div style="font-size:18px;font-weight:700;color:var(--green)" id="poam-k-closed">—</div></div>
-          <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">CRIT/HIGH</div><div style="font-size:18px;font-weight:700;color:var(--red)" id="poam-k-crit">—</div></div>
-        </div>
-        <div class="filter-bar" style="padding:8px 14px;border-bottom:1px solid var(--border)">
-          <input class="filter-input" id="poam-search" placeholder="Search ID, weakness, control…" style="flex:1;min-width:160px" oninput="_renderPoamTable()">
-          <select class="filter-select" id="poam-status-filter" onchange="_renderPoamTable()">
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="in_remediation">In remediation</option>
-            <option value="closed">Closed</option>
-          </select>
-          <select class="filter-select" id="poam-sev-filter" onchange="_renderPoamTable()">
-            <option value="">All severities</option>
-            <option value="CRITICAL">Critical</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </select>
-          <span class="mono-sm c-t3" id="poam-count"></span>
-        </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>Weakness</th><th>Control</th><th>Severity</th><th>Status</th><th>Mitigation</th><th>Due</th></tr></thead>
-            <tbody id="poam-tbody"></tbody>
-          </table>
-        </div>
-        <div id="poam-pagination" style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px"></div>
-      </div>
     </div>
 
     <!-- ════════════════════════════════════
@@ -1159,7 +1166,7 @@
           <div class="card-body">
             <div class="gauge-wrap"><canvas id="gauge-cmmc" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-amber" id="gv-cmmc">54%</div><div class="gauge-unit">coverage</div></div></div>
             <div class="f12 fw7 c-t2 mb8">CMMC Level 2</div>
-            <div class="mono-sm">99 / 99 practices</div>
+            <div class="mono-sm">59 / 110 practices</div>
           </div>
         </div>
         <div class="card" style="text-align:center">
@@ -1171,16 +1178,6 @@
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <div class="card" style="padding:12px">
-          <div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:10px;letter-spacing:.08em">CONTROL FAMILY BREAKDOWN</div>
-          <div id="comp-domain-breakdown"><div style="color:var(--t3);font-size:11px">Load FedRAMP to see breakdown</div></div>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:10px;font-weight:700;color:var(--t3);margin-bottom:10px;letter-spacing:.08em">CMMC DOMAIN COVERAGE</div>
-          <div id="cmmc-domain-breakdown"><div style="color:var(--t3);font-size:11px">Load CMMC Level 2 to see breakdown</div></div>
-        </div>
-      </div>
       <div class="flex gap8 mb14">
         <button class="btn btn-primary" id="btn-fedramp" onclick="loadFedRAMP()">FedRAMP Moderate</button>
         <button class="btn btn-ghost" id="btn-cmmc" onclick="loadCMMC()">CMMC Level 2</button>
@@ -1273,11 +1270,6 @@
     <!-- ════════════════════════════════════
          SLA PANEL
     ════════════════════════════════════ -->
-    <!-- SBOM DIFF PANEL -->
-    <div id="panel-sbom-diff" class="panel">
-      <iframe src="" data-src="/panels/sbom_diff.html?v=1" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
-    </div>
-
     <div id="panel-sla" class="panel">
       <div id="sla-cards-grid" class="sla-grid">
         <div class="sla-card" style="--sla-c:var(--red)"><div class="sla-sev">Critical</div><div class="sla-count" id="sla-c-open-CRITICAL">—</div><div class="sla-detail" id="sla-c-detail-CRITICAL">SLA: 3 days</div><div id="sla-c-status-CRITICAL" class="sla-ok">—</div></div>
@@ -1500,7 +1492,7 @@
       <iframe src="" data-src="/panels/scheduler.html?v=6" style="width:100%;height:calc(100vh - 52px);border:none;background:transparent" allowtransparency="true"></iframe>
     </div>
     <div id="panel-correlation" class="panel">
-      <iframe src="" data-src="/panels/correlation.html?v=3"
+      <iframe src="" data-src="/panels/correlation.html"
         style="width:100%;height:calc(100vh - 52px);border:none;background:transparent"
         allowtransparency="true">
       </iframe>
@@ -1600,35 +1592,12 @@
    - Keyboard shortcuts
 ══════════════════════════════════════════════ */
 
-// ─── Safe JWT payload decoder (handles base64url encoding) ───────────────────
-function decodeJwt(token) {
-  try {
-    var parts = (token || '').split('.');
-    if (parts.length !== 3) return null;
-    // base64url → base64: replace -_ with +/, add padding
-    var b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    return JSON.parse(atob(b64));
-  } catch(e) { return null; }
-}
-
-// ─── XSS escape helper ───────────────────────────────────────────────────────
-function esc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 const API = '/api/v1';
 let TOKEN = (function(){
   var t = localStorage.getItem('vsp_token') || '';
   if (!t) return '';
   try {
-    var p = decodeJwt(t);
-    if (!p) { localStorage.removeItem('vsp_token'); return ''; }
+    var p = JSON.parse(atob(t.split('.')[1]));
     if (p.exp && p.exp * 1000 < Date.now()) {
       localStorage.removeItem('vsp_token');
       return '';
@@ -1657,7 +1626,6 @@ async function api(method, path, body, noAuth) {
   }
   return r.json();
 }
-window.api = api;
 
 /* ─── Toast ─── */
 function showToast(msg, type='info') {
@@ -1721,21 +1689,7 @@ function showPanel(name, btn) {
     if (name === 'sbom') setTimeout(loadSBOM, 200);
     if (name === 'analytics') setTimeout(loadAnalytics, 300);
     if (name === 'sla') setTimeout(loadSLA, 200);
-    if (name === 'findings') {
-      loadFindings(0);
-      // Fetch full breakdown data once
-      if (!window._findingsBreakdownLoaded && window.TOKEN) {
-        window._findingsBreakdownLoaded = true;
-        setTimeout(function() {
-          fetch('/api/v1/vsp/findings?limit=500', {headers:{Authorization:'Bearer '+window.TOKEN}})
-            .then(function(r){return r.json();})
-            .then(function(d){
-              if(window._renderFindingsToolBreakdown)
-                window._renderFindingsToolBreakdown(d.findings||[], d.total||0);
-            }).catch(function(){window._findingsBreakdownLoaded=false;});
-        }, 1000);
-      }
-    }
+    if (name === 'findings') loadFindings(0);
     if (name === 'export') setTimeout(loadExportRuns, 200);
     if (name === 'remediation') loadRemediations();
     if (name === 'soc')         drawSocRadar();
@@ -2737,8 +2691,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.TOKEN) {
       // Validate JWT chưa expired trước khi gọi
       try {
-        var _p = decodeJwt(window.TOKEN);
-        if (_p && _p.exp && _p.exp * 1000 > Date.now()) {
+        var _p = JSON.parse(atob(window.TOKEN.split('.')[1]));
+        if (_p.exp && _p.exp * 1000 > Date.now()) {
           updateTicker();
           setInterval(updateTicker, 30000);
         } else {
@@ -2798,8 +2752,9 @@ async function ensureToken() {
   if (stored) {
     // Validate JWT expiry
     try {
-      var payload = decodeJwt(stored);
-      if (payload) {
+      var parts = stored.split('.');
+      if (parts.length === 3) {
+        var payload = JSON.parse(atob(parts[1]));
         if (payload.exp && payload.exp * 1000 > Date.now()) {
           window.TOKEN = stored;
           return true;
@@ -2950,8 +2905,9 @@ document.addEventListener('DOMContentLoaded', function() {
   if (stored) {
     // Quick validate: decode JWT expiry
     try {
-      var payload = decodeJwt(stored);
-      if (payload) {
+      var parts = stored.split('.');
+      if (parts.length === 3) {
+        var payload = JSON.parse(atob(parts[1]));
         if (payload.exp && payload.exp * 1000 > Date.now()) {
           window.TOKEN = stored;
           var overlay = document.getElementById('gov-login-overlay');
@@ -6032,47 +5988,8 @@ async function loadFindings(offset) {
     _renderFindingsPagination();
     var lbl = document.getElementById('findings-total-lbl');
     if (lbl) lbl.textContent = _findingsTotal + ' findings';
-    // Populate tool breakdown
-    if(window._renderFindingsToolBreakdown) window._renderFindingsToolBreakdown(d.findings||[], _findingsTotal);
   } catch(e) { console.error('loadFindings', e); }
 }
-
-window._renderFindingsToolBreakdown = function(findings, total) {
-  var breakdown = document.getElementById('findings-tool-breakdown');
-  var lbl = document.getElementById('findings-tool-total-lbl');
-  if (!breakdown) return;
-  if (lbl) lbl.textContent = total + ' total findings';
-
-  var byTool = {};
-  findings.forEach(function(f) {
-    var t = f.tool || 'unknown';
-    if (!byTool[t]) byTool[t] = {total:0,crit:0,high:0,med:0,low:0};
-    byTool[t].total++;
-    if (f.severity==='CRITICAL') byTool[t].crit++;
-    else if (f.severity==='HIGH') byTool[t].high++;
-    else if (f.severity==='MEDIUM') byTool[t].med++;
-    else byTool[t].low++;
-  });
-  var tools = Object.keys(byTool).sort(function(a,b){return byTool[b].total-byTool[a].total;});
-  var maxVal = tools.length ? byTool[tools[0]].total : 1;
-  breakdown.innerHTML = tools.map(function(tool) {
-    var b = byTool[tool];
-    var pct = Math.round(b.total/maxVal*100);
-    return '<div style="margin-bottom:10px">'
-      +'<div style="display:flex;justify-content:space-between;margin-bottom:4px">'
-      +'<span style="font-size:10px;font-weight:700;font-family:var(--font-mono);color:var(--t2)">'+tool+'</span>'
-      +'<div style="display:flex;gap:5px;align-items:center">'
-      +(b.crit?'<span style="font-size:9px;color:var(--red)">'+b.crit+'C</span>':'')
-      +(b.high?'<span style="font-size:9px;color:var(--amber)">'+b.high+'H</span>':'')
-      +(b.med?'<span style="font-size:9px;color:var(--orange)">'+b.med+'M</span>':'')
-      +(b.low?'<span style="font-size:9px;color:var(--t3)">'+b.low+'L</span>':'')
-      +'<span style="font-size:11px;font-weight:700;color:var(--t1);min-width:28px;text-align:right">'+b.total+'</span>'
-      +'</div></div>'
-      +'<div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">'
-      +'<div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:3px"></div>'
-      +'</div></div>';
-  }).join('');
-};
 
 function _renderFindings(findings) {
   var sevClass = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
@@ -6084,23 +6001,18 @@ function _renderFindings(findings) {
   }
   tbody.innerHTML = findings.map(function(f, i) {
     var sc = sevClass[f.severity]||'';
-    var safeTool    = esc(f.tool);
-    var safeRuleId  = esc(f.rule_id);
-    var safeMessage = esc(f.message);
-    var safePath    = esc(f.path);
-    var safeCwe     = esc(f.cwe);
     return '<tr style="cursor:pointer;transition:background .15s"'
       +' onmouseenter="this.style.background=\'var(--surface2)\'"'
       +' onmouseleave="this.style.background=\'\'"'
-      +' onclick="showFindingDetail('+i+')">'
+      +' onclick="showFindingDetail('+(_findingsOffset+i)+')">'
       +'<td><input type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
-      +'<td><span class="sev '+sc+'">'+esc(f.severity)+'</span></td>'
-      +'<td class="c-t3 f11">'+safeTool+'</td>'
-      +'<td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px" title="'+safeRuleId+'">'+safeRuleId+'</td>'
-      +'<td class="overflow-ellipsis" style="max-width:260px" title="'+safeMessage+'">'+safeMessage+'</td>'
-      +'<td class="mono-sm overflow-ellipsis" style="max-width:180px" title="'+safePath+'">'+safePath+'</td>'
+      +'<td><span class="sev '+sc+'">'+f.severity+'</span></td>'
+      +'<td class="c-t3 f11">'+f.tool+'</td>'
+      +'<td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px" title="'+f.rule_id+'">'+f.rule_id+'</td>'
+      +'<td class="overflow-ellipsis" style="max-width:260px" title="'+f.message+'">'+f.message+'</td>'
+      +'<td class="mono-sm overflow-ellipsis" style="max-width:180px" title="'+f.path+'">'+f.path+'</td>'
       +'<td class="mono-sm">'+(f.line||'—')+'</td>'
-      +'<td class="f10" style="color:var(--purple)">'+(safeCwe||'—')+'</td>'
+      +'<td class="f10" style="color:var(--purple)">'+(f.cwe||'—')+'</td>'
       +'</tr>';
   }).join('');
 }
@@ -8026,84 +7938,332 @@ window.loadRuns = async function() {
 <script>
 // ── GOV PATCH v1.8: Audit real data + Notifications real API ─────────────
 
-// ── Audit Panel ───────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// AUDIT ENGINE v2.0
+// - Pagination offset-based (25/50/100 per page)
+// - Filter by action prefix (LOGIN_OK, LOGIN_FAILED, LOCKED, SCAN, REMEDIATION)
+// - KPI stats: total/today/ok/failed/locked/scans — tính đúng từ total count API
+// - Brute-force detection: ≥5 LOGIN_FAILED trong 10 phút từ cùng IP
+// - Timeline: 10 entries gần nhất, màu đúng theo action
+// - Export CSV toàn bộ log
+// ════════════════════════════════════════════════════════════════
+var _auditPage      = 0;
+var _auditLimit     = 25;
+var _auditFilter    = '';
+var _auditTotal     = 0;
+var _auditPageCount = 1;
+var _auditLoading   = false;
+
+function _auditSet(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
+// ── Action → pill style ─────────────────────────────────────────
+function _auditPillClass(action) {
+  if (!action) return 'pill-done';
+  if (action === 'LOGIN_OK')     return 'pill-pass';
+  if (action === 'LOGIN_FAILED') return 'pill-warn';
+  if (action === 'LOGIN_LOCKED') return 'pill-fail';
+  if (action.indexOf('FAIL') >= 0 || action.indexOf('ERR') >= 0) return 'pill-fail';
+  if (action.indexOf('PASS') >= 0) return 'pill-pass';
+  if (action.indexOf('WARN') >= 0) return 'pill-warn';
+  if (action.indexOf('SCAN') >= 0) return 'pill-done';
+  if (action.indexOf('LOGIN') >= 0) return 'pill-run';
+  if (action.indexOf('REMEDIATION') >= 0) return 'pill-queue';
+  return 'pill-done';
+}
+
+// ── Action → timeline dot style ────────────────────────────────
+function _auditDotStyle(action) {
+  if (!action) return {s:'background:var(--b2);color:var(--t3)', i:'·'};
+  if (action === 'LOGIN_OK')                                   return {s:'background:var(--green2);border:1px solid rgba(34,197,94,.25);color:var(--green)',   i:'✓'};
+  if (action === 'LOGIN_FAILED')                               return {s:'background:var(--amber3);border:1px solid rgba(245,158,11,.25);color:var(--amber)', i:'!'};
+  if (action === 'LOGIN_LOCKED')                               return {s:'background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)',       i:'✗'};
+  if (action.indexOf('FAIL') >= 0 || action.indexOf('ERR') >= 0) return {s:'background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)',    i:'✗'};
+  if (action.indexOf('PASS') >= 0)                             return {s:'background:var(--green2);border:1px solid rgba(34,197,94,.25);color:var(--green)',   i:'✓'};
+  if (action.indexOf('WARN') >= 0)                             return {s:'background:var(--amber3);border:1px solid rgba(245,158,11,.25);color:var(--amber)', i:'⚠'};
+  if (action.indexOf('LOGIN') >= 0)                            return {s:'background:var(--cyan2);border:1px solid rgba(6,182,212,.25);color:var(--cyan)',     i:'→'};
+  return {s:'background:var(--b2);color:var(--t3)', i:'·'};
+}
+
+function _auditFmtDt(iso) {
+  var dt = new Date(iso);
+  return (dt.getDate()<10?'0':'')+dt.getDate()+'/'+(dt.getMonth()+1)
+    +' '+(dt.getHours()<10?'0':'')+dt.getHours()+':'+(dt.getMinutes()<10?'0':'')+dt.getMinutes();
+}
+
+// ── Brute-force detection: ≥5 FAILED in 10 min from same IP ────
+function _auditCheckBrute(entries) {
+  var banner = document.getElementById('audit-brute-banner');
+  var detail = document.getElementById('audit-brute-detail');
+  if (!banner || !entries) return;
+  // Group FAILED/LOCKED by IP in last 10 min window
+  var now = Date.now();
+  var window10 = 10 * 60 * 1000;
+  var ipMap = {};
+  entries.forEach(function(e) {
+    if (!e.action) return;
+    if (e.action !== 'LOGIN_FAILED' && e.action !== 'LOGIN_LOCKED') return;
+    var ts = new Date(e.created_at).getTime();
+    if (now - ts > window10) return;
+    var ip = (e.ip || '').replace(/:\d+$/, ''); // strip port
+    ipMap[ip] = (ipMap[ip] || 0) + 1;
+  });
+  // Also scan all entries for historical brute-force pattern
+  var ipMapAll = {};
+  entries.forEach(function(e) {
+    if (!e.action) return;
+    if (e.action !== 'LOGIN_FAILED' && e.action !== 'LOGIN_LOCKED') return;
+    var ip = (e.ip || '').replace(/:\d+$/, '');
+    ipMapAll[ip] = (ipMapAll[ip] || 0) + 1;
+  });
+  var alerts = [];
+  Object.keys(ipMapAll).forEach(function(ip) {
+    if (ipMapAll[ip] >= 5) {
+      alerts.push(ip + ' · ' + ipMapAll[ip] + ' attempts');
+    }
+  });
+  if (alerts.length > 0) {
+    banner.style.display = 'flex';
+    detail.textContent = alerts.join('  |  ');
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── Fetch KPI stats từ audit/stats nếu có, fallback fetch 500 entries ─
+async function _auditLoadKPIs(h) {
+  try {
+    var d = await fetch('/api/v1/audit/stats', {headers: h}).then(function(r){ return r.ok ? r.json() : null; });
+    if (d) {
+      _auditSet('audit-k-total',  d.total    || '—');
+      _auditSet('audit-k-today',  d.today    || '—');
+      _auditSet('audit-k-ok',     d.login_ok || '—');
+      _auditSet('audit-k-fail',   d.login_failed || '—');
+      _auditSet('audit-k-locked', d.login_locked || '—');
+      _auditSet('audit-k-scans',  d.scan     || '—');
+      return;
+    }
+  } catch(e) {}
+  // Fallback: tính từ large batch (limit 500)
+  try {
+    var d2 = await fetch('/api/v1/audit/log?limit=500&offset=0', {headers: h}).then(function(r){ return r.json(); });
+    var entries = d2.entries || [];
+    var total   = d2.total || entries.length;
+    var today   = new Date().toDateString();
+    var todayC  = 0, okC = 0, failC = 0, lockC = 0, scanC = 0;
+    entries.forEach(function(e) {
+      if (!e.action) return;
+      if (new Date(e.created_at).toDateString() === today) todayC++;
+      if (e.action === 'LOGIN_OK')     okC++;
+      if (e.action === 'LOGIN_FAILED') failC++;
+      if (e.action === 'LOGIN_LOCKED') lockC++;
+      if (e.action.indexOf('SCAN') >= 0) scanC++;
+    });
+    _auditSet('audit-k-total',  total);
+    _auditSet('audit-k-today',  todayC);
+    _auditSet('audit-k-ok',     okC);
+    _auditSet('audit-k-fail',   failC);
+    _auditSet('audit-k-locked', lockC);
+    _auditSet('audit-k-scans',  scanC);
+    // Brute-force check trên 500 entries
+    _auditCheckBrute(entries);
+  } catch(e2) { console.error('auditKPI fallback:', e2); }
+}
+
+// ── Render timeline (recent 10) ─────────────────────────────────
+function _auditRenderTimeline(entries) {
+  var tl = document.getElementById('audit-timeline');
+  if (!tl) return;
+  var recent = entries.slice(0, 10);
+  if (!recent.length) {
+    tl.innerHTML = '<div style="padding:16px;color:var(--t3);font-size:10px;font-family:var(--font-mono)">No entries</div>';
+    return;
+  }
+  tl.innerHTML = recent.map(function(e) {
+    var d = _auditDotStyle(e.action);
+    var dt = _auditFmtDt(e.created_at);
+    return '<div class="tl-item">'
+      + '<div class="tl-dot" style="'+d.s+'">'+d.i+'</div>'
+      + '<div class="tl-content">'
+      + '<div class="tl-title">'+e.action+(e.resource?' · '+e.resource.slice(0,60):'')+'</div>'
+      + '<div class="tl-meta">'+(e.ip||'—')+' · seq:'+e.seq+' · '+dt+'</div>'
+      + '</div></div>';
+  }).join('');
+}
+
+// ── Render table ────────────────────────────────────────────────
+function _auditRenderTable(entries, total, offset, limit) {
+  var tbody = document.getElementById('audit-table');
+  if (!tbody) return;
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--t3);font-size:11px">No entries match filter</td></tr>';
+    return;
+  }
+  tbody.innerHTML = entries.map(function(e) {
+    var pc  = _auditPillClass(e.action);
+    var dt  = _auditFmtDt(e.created_at);
+    var res = (e.resource || '—').slice(0, 55);
+    var hashFull = e.hash || '';
+    var hashShort = hashFull.slice(0,8) + '…';
+    // Highlight row nếu là FAIL/LOCKED
+    var rowStyle = '';
+    if (e.action === 'LOGIN_LOCKED') rowStyle = 'background:rgba(239,68,68,.04)';
+    if (e.action === 'LOGIN_FAILED') rowStyle = 'background:rgba(245,158,11,.04)';
+    return '<tr style="'+rowStyle+'" title="'+hashFull+'">'
+      + '<td class="mono-sm">'+e.seq+'</td>'
+      + '<td><span class="pill '+pc+'" style="font-size:8px">'+e.action+'</span></td>'
+      + '<td class="mono-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(e.resource||'')+'">'+res+'</td>'
+      + '<td class="mono-sm">'+(e.ip||'—')+'</td>'
+      + '<td class="mono-sm">'+dt+'</td>'
+      + '<td class="mono-sm" style="color:var(--t4);cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+hashFull+'\')" title="Click to copy full hash">'+hashShort+'</td>'
+      + '</tr>';
+  }).join('');
+  // Sub text
+  var page = Math.floor(offset / limit) + 1;
+  var pages = Math.ceil(total / limit);
+  var from = offset + 1, to = Math.min(offset + entries.length, total);
+  _auditSet('audit-tbl-sub', total + ' entries · showing ' + from + '–' + to + ' · page ' + page + '/' + pages);
+  _auditSet('audit-page-info', from + '–' + to + ' of ' + total);
+}
+
+// ── Render pagination pills ─────────────────────────────────────
+function _auditRenderPager() {
+  var pills = document.getElementById('audit-page-pills');
+  if (!pills) return;
+  var pages = _auditPageCount;
+  var cur   = _auditPage;
+  var btns  = '';
+  var start = Math.max(0, cur - 2);
+  var end   = Math.min(pages - 1, cur + 2);
+  if (start > 0) btns += '<span class="mono-sm c-t3" style="padding:0 3px">…</span>';
+  for (var i = start; i <= end; i++) {
+    var active = i === cur ? 'style="background:var(--bg5);color:var(--accent2);border-color:var(--accent)"' : '';
+    btns += '<button class="btn btn-ghost" style="font-size:9px;padding:2px 7px;min-width:24px" '+active+' onclick="auditGoPage('+i+')">'+(i+1)+'</button>';
+  }
+  if (end < pages - 1) btns += '<span class="mono-sm c-t3" style="padding:0 3px">…</span>';
+  pills.innerHTML = btns;
+  // Enable/disable first/last/prev/next
+  var btnFirst = document.getElementById('audit-btn-first');
+  var btnPrev  = document.getElementById('audit-btn-prev');
+  var btnNext  = document.getElementById('audit-btn-next');
+  var btnLast  = document.getElementById('audit-btn-last');
+  if (btnFirst) btnFirst.disabled = cur === 0;
+  if (btnPrev)  btnPrev.disabled  = cur === 0;
+  if (btnNext)  btnNext.disabled  = cur >= pages - 1;
+  if (btnLast)  btnLast.disabled  = cur >= pages - 1;
+}
+
+// ── Core fetch + render ─────────────────────────────────────────
+async function _auditFetchPage(page, limit, filter) {
+  if (_auditLoading) return;
+  _auditLoading = true;
+  await ensureToken();
+  var h = {'Authorization': 'Bearer ' + window.TOKEN};
+  var offset = page * limit;
+  var url = '/api/v1/audit/log?limit=' + limit + '&offset=' + offset;
+  if (filter) url += '&action=' + encodeURIComponent(filter);
+  try {
+    var d = await fetch(url, {headers: h}).then(function(r){ return r.json(); });
+    var entries = d.entries || [];
+    var total   = d.total   || entries.length;
+    _auditTotal     = total;
+    _auditPageCount = Math.max(1, Math.ceil(total / limit));
+
+    // Render timeline từ page 0 khi không filter
+    if (page === 0 && !filter) _auditRenderTimeline(entries);
+
+    // Chain stats
+    if (entries.length) {
+      _auditSet('cs-total', total);
+      var seqMin = entries[entries.length-1].seq;
+      var seqMax = entries[0].seq;
+      _auditSet('cs-range', seqMin + '–' + seqMax);
+    }
+
+    _auditRenderTable(entries, total, offset, limit);
+    _auditRenderPager();
+
+    // Brute-force check trên page hiện tại
+    _auditCheckBrute(entries);
+
+  } catch(err) {
+    console.error('auditFetchPage:', err);
+    var tbody = document.getElementById('audit-table');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--red);font-size:11px">Error loading audit log: '+err.message+'</td></tr>';
+  } finally {
+    _auditLoading = false;
+  }
+}
+
+// ── Public API ─────────────────────────────────────────────────
 async function loadAuditReal() {
   await ensureToken();
   var h = {'Authorization': 'Bearer ' + window.TOKEN};
+  // Load KPIs và page đầu song song
+  _auditLoadKPIs(h);
+  await _auditFetchPage(0, _auditLimit, _auditFilter);
+}
 
+function auditGoPage(p) {
+  if (p < 0 || p >= _auditPageCount) return;
+  _auditPage = p;
+  _auditFetchPage(p, _auditLimit, _auditFilter);
+}
+
+function auditSetFilter(f, btn) {
+  _auditFilter = f;
+  _auditPage   = 0;
+  // Toggle active button style
+  document.querySelectorAll('#audit-filter-btns .log-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  _auditFetchPage(0, _auditLimit, f);
+}
+
+function auditSetLimit(n) {
+  _auditLimit = n;
+  _auditPage  = 0;
+  _auditFetchPage(0, n, _auditFilter);
+}
+
+function auditReload() {
+  _auditPage = 0;
+  loadAuditReal();
+}
+
+// ── Export CSV toàn bộ log ──────────────────────────────────────
+async function exportAuditLog() {
+  await ensureToken();
+  var h = {'Authorization': 'Bearer ' + window.TOKEN};
+  var _a = document.getElementById('cs-status');
+  if (_a) { _a.textContent = 'Exporting…'; _a.style.color = 'var(--cyan)'; }
   try {
-    // Fetch audit log
-    var d = await fetch('/api/v1/audit/log?limit=50', {headers: h}).then(function(r){ return r.json(); });
-    var entries = d.entries || [];
-    var total   = d.total || entries.length;
-
-    // KPI counts
-    var today = new Date().toDateString();
-    var todayCount  = entries.filter(function(e){ return new Date(e.created_at).toDateString() === today; }).length;
-    var loginCount  = entries.filter(function(e){ return e.action && e.action.indexOf('LOGIN') >= 0; }).length;
-    var scanCount   = entries.filter(function(e){ return e.action && e.action.indexOf('SCAN') >= 0; }).length;
-
-    // Update KPI elements
-    // use IDs
-    var _a=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}; _a('audit-k-total',total);
-    _a('audit-k-today',todayCount);
-    _a('audit-k-logins',loginCount);
-    _a('audit-k-scans',scanCount);
-
-    // Timeline (recent 10)
-    var tl = document.querySelector('#panel-audit .timeline');
-    if (tl && entries.length > 0) {
-      var recent = entries.slice(0, 10);
-      tl.innerHTML = recent.map(function(e) {
-        var isOk   = e.action && (e.action.indexOf('PASS') >= 0 || e.action.indexOf('OK') >= 0);
-        var isFail = e.action && (e.action.indexOf('FAIL') >= 0 || e.action.indexOf('ERR') >= 0);
-        var isWarn = e.action && e.action.indexOf('WARN') >= 0;
-        var isLogin= e.action && e.action.indexOf('LOGIN') >= 0;
-        var dotStyle, dotIcon;
-        if (isOk)    { dotStyle='background:var(--green2);border:1px solid rgba(34,197,94,.25);color:var(--green)';   dotIcon='✓'; }
-        else if (isFail) { dotStyle='background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)';   dotIcon='✗'; }
-        else if (isWarn) { dotStyle='background:var(--amber3);border:1px solid rgba(245,158,11,.25);color:var(--amber)'; dotIcon='⚠'; }
-        else if (isLogin){ dotStyle='background:var(--cyan2);border:1px solid rgba(6,182,212,.25);color:var(--cyan)'; dotIcon='→'; }
-        else             { dotStyle='background:var(--b2);color:var(--t3)';                                           dotIcon='·'; }
-
-        var dt = new Date(e.created_at);
-        var dtStr = (dt.getDate()<10?'0':'')+dt.getDate()+'/'+(dt.getMonth()+1)
-          +' '+dt.getHours()+':'+(dt.getMinutes()<10?'0':'')+dt.getMinutes();
-
-        return '<div class="tl-item">'
-          + '<div class="tl-dot" style="'+dotStyle+'">'+dotIcon+'</div>'
-          + '<div class="tl-content">'
-          + '<div class="tl-title">'+e.action+(e.resource?' · '+e.resource:'')+'</div>'
-          + '<div class="tl-meta">'+e.ip+' · seq:'+e.seq+' · '+dtStr+'</div>'
-          + '</div></div>';
-      }).join('');
-    } else if (tl) {
-      tl.innerHTML = '<div style="padding:16px;color:var(--t3);font-size:10px;font-family:var(--font-mono)">No audit entries yet — actions will appear here</div>';
+    // Fetch all entries (max 1000 để tránh timeout)
+    var total = _auditTotal || 1000;
+    var batchSize = 500;
+    var allEntries = [];
+    for (var offset = 0; offset < Math.min(total, 1000); offset += batchSize) {
+      var d = await fetch('/api/v1/audit/log?limit='+batchSize+'&offset='+offset, {headers: h}).then(function(r){ return r.json(); });
+      allEntries = allEntries.concat(d.entries || []);
+      if ((d.entries||[]).length < batchSize) break;
     }
-
-    // Audit table
-    var tbody = document.getElementById('audit-table');
-    if (tbody && entries.length > 0) {
-      tbody.innerHTML = entries.map(function(e) {
-        var actionClass = e.action && e.action.indexOf('LOGIN') >= 0 ? 'pill-run'
-          : e.action && e.action.indexOf('FAIL') >= 0 ? 'pill-fail'
-          : e.action && e.action.indexOf('PASS') >= 0 ? 'pill-pass' : 'pill-done';
-        var dt = new Date(e.created_at);
-        var dtStr = (dt.getDate()<10?'0':'')+dt.getDate()+'/'+(dt.getMonth()+1)
-          +' '+(dt.getHours()<10?'0':'')+dt.getHours()+':'+(dt.getMinutes()<10?'0':'')+dt.getMinutes();
-        return '<tr>'
-          + '<td class="mono-sm">'+e.seq+'</td>'
-          + '<td><span class="pill '+actionClass+'" style="font-size:8px">'+e.action+'</span></td>'
-          + '<td class="mono-sm" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.resource+'</td>'
-          + '<td class="mono-sm">'+e.ip+'</td>'
-          + '<td class="mono-sm">'+dtStr+'</td>'
-          + '<td class="mono-sm" style="color:var(--t4)">'+e.hash.slice(0,8)+'…</td>'
-          + '</tr>';
-      }).join('');
-    }
-
+    var lines = ['seq,action,resource,ip,created_at,hash,prev_hash'];
+    allEntries.forEach(function(e) {
+      var res = (e.resource || '').replace(/,/g,'|').replace(/"/g,"'");
+      var ip  = (e.ip || '').replace(/,/g,'|');
+      lines.push([e.seq, e.action||'', '"'+res+'"', ip, e.created_at||'', e.hash||'', e.prev_hash||''].join(','));
+    });
+    var blob = new Blob([lines.join('\n')], {type:'text/csv'});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href   = url;
+    a.download = 'vsp_audit_log_' + new Date().toISOString().slice(0,10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (_a) { _a.textContent = allEntries.length + ' rows'; _a.style.color = 'var(--green)'; }
   } catch(err) {
-    console.error('loadAuditReal:', err);
+    if (_a) { _a.textContent = 'Export failed'; _a.style.color = 'var(--red)'; }
+    console.error('exportAuditLog:', err);
   }
 }
 
@@ -8189,7 +8349,6 @@ document.addEventListener('DOMContentLoaded', function() {
   window.showPanel = function(name, btn) {
     if (_lastShowPanel) _lastShowPanel(name, btn);
     if (name === 'audit') setTimeout(_tryLoadAudit, 150);
-    if (name === 'governance') setTimeout(_loadPoam, 400);
   };
 })();
 </script>
@@ -8237,7 +8396,7 @@ async function loadSIEMKPIs() {
 // Gọi sau khi login
 var _siemKPIpoll = setInterval(function() {
   if (!window.TOKEN || window.TOKEN.length < 50 || window.TOKEN.split('.').length !== 3) return;
-  try { var p=decodeJwt(window.TOKEN); if(!p||(p.exp&&p.exp*1000<Date.now())){localStorage.removeItem('vsp_token');window.TOKEN='';return;} } catch(e){return;}
+  try { var p=JSON.parse(atob(window.TOKEN.split('.')[1])); if(p.exp&&p.exp*1000<Date.now()){localStorage.removeItem('vsp_token');window.TOKEN='';return;} } catch(e){return;}
   clearInterval(_siemKPIpoll);
   loadSIEMKPIs();
   setInterval(loadSIEMKPIs, 60000);
@@ -8503,6 +8662,5 @@ window.addEventListener('message', async function(e) {
 });
 </script>
 
-<script src="/vsp_poam.js"></script>
 </body>
 </html>

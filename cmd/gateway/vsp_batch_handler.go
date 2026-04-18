@@ -463,7 +463,7 @@ func (h *batchHandler) loadFromDB(ctx context.Context, tenantID, batchID string)
 
 	for rows.Next() {
 		var j batchJobStatus
-		rows.Scan(
+		_ = rows.Scan(
 			&j.Index, &j.RID, &j.Mode, &j.Profile, &j.Src, &j.Label,
 			&j.Status, &j.Gate, &j.Findings, &j.Error,
 			&j.StartedAt, &j.DoneAt,
@@ -626,11 +626,11 @@ func (h *batchHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 
 func jsonOK(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(v) //nolint:errcheck
+	_ = json.NewEncoder(w).Encode(v) //nolint:errcheck
 }
 
 func jsonErr(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg}) //nolint:errcheck
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg}) //nolint:errcheck
 }

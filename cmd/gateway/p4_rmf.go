@@ -179,7 +179,7 @@ func handleRMFGet(w http.ResponseWriter, r *http.Request) {
 		rmfStore.packages["VSP-DOD-2025-001"] = pkg
 		rmfStore.mu.Unlock()
 	}
-	json.NewEncoder(w).Encode(pkg)
+	_ = json.NewEncoder(w).Encode(pkg)
 }
 
 func handleRMFTaskUpdate(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +222,7 @@ func handleRMFTaskUpdate(w http.ResponseWriter, r *http.Request) {
 		pkg.UpdatedAt = time.Now()
 	}
 	rmfStore.mu.Unlock()
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func handleGenerateATOLetter(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +248,7 @@ func handleGenerateATOLetter(w http.ResponseWriter, r *http.Request) {
 			closedPOAM++
 		}
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"document_type": "AUTHORITY TO OPERATE (ATO)", "classification": "UNCLASSIFIED // FOR OFFICIAL USE ONLY",
 		"system_name": pkg.SystemName, "system_id": pkg.SystemID, "categorization": pkg.CategorizationLevel,
 		"ao": pkg.AuthorizingOfficial, "rmf_steps_complete": fmt.Sprintf("%d/%d", completed, total),
@@ -319,7 +319,7 @@ func handleRMFConMon(w http.ResponseWriter, r *http.Request) {
 	if failCount > 0 {
 		patchCompliance = int(float64(passCount) / float64(totalCount) * 100)
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"control_compliance_rate": controlComplianceRate,
 		"controls_total":          totalCount, "controls_effective": passCount,
 		"pipeline_score": math.Round(pipelineScore*100) / 100,

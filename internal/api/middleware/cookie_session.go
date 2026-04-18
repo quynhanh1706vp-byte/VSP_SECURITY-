@@ -94,7 +94,7 @@ func AuthCheckHandler(jwtSecret string, keyStore auth.APIKeyStore) http.HandlerF
 			claims, _ := auth.FromContext(r.Context())
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"authenticated":true,"role":"` + claims.Role + `","tenant_id":"` + claims.TenantID + `"}`))
+			_, _ = w.Write([]byte(`{"authenticated":true,"role":"` + claims.Role + `","tenant_id":"` + claims.TenantID + `"}`))
 		})).ServeHTTP(w, r)
 
 		if !called {

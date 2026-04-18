@@ -1,6 +1,67 @@
 <!DOCTYPE html>
 <html lang="vi" data-theme="dark">
 <head>
+<script>
+/* VSP auth fetch guard v2 — polling retry */
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500;
+    var waited = 0;
+    var interval = 100;
+    while (waited < maxWait) {
+      // Check iframe
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      // Check parent (same-origin)
+      try {
+        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          try { localStorage.setItem("vsp_token", tk); } catch(e){}
+          return tk;
+        }
+      } catch(e) { /* cross-origin */ }
+      // Check top-level (if nested iframes)
+      try {
+        tk = window.top.TOKEN || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          return tk;
+        }
+      } catch(e) {}
+      // Wait & retry
+      await new Promise(function(r){setTimeout(r, interval);});
+      waited += interval;
+    }
+    return "";
+  }
+  
+  window.vspAuthFetch = async function(url, opts){
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
+    } else {
+      console.warn("[VSP guard] no token after 2.5s:", url);
+    }
+    return _origFetch(url, opts);
+  };
+  
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){
+    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+})();
+</script>
 <meta charset="UTF-8">
 <title>VSP Software Risk</title>
 <style>

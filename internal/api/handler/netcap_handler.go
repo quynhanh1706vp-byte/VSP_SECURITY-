@@ -225,7 +225,7 @@ func (h *NetCapHandler) ExportFlowsCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -240,7 +240,7 @@ func (h *NetCapHandler) ExportAnomaliesJSON(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -284,10 +284,10 @@ func (h *NetCapHandler) Stream(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
 		case <-heartbeat.C:
-			fmt.Fprintf(w, ": heartbeat\n\n")
+			_, _ = fmt.Fprintf(w, ": heartbeat\n\n")
 			flusher.Flush()
 		}
 	}
@@ -321,7 +321,7 @@ func (h *NetCapHandler) Full(w http.ResponseWriter, r *http.Request) {
 
 func sendSSE(w http.ResponseWriter, f http.Flusher, event string, data interface{}) {
 	b, _ := json.Marshal(map[string]interface{}{"event": event, "data": data})
-	fmt.Fprintf(w, "data: %s\n\n", b)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", b)
 	f.Flush()
 }
 

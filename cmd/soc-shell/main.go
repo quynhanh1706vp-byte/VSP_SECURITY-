@@ -97,7 +97,7 @@ func main() {
 	})
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ok","service":"soc-shell","port":%d}`, shellPort)
+		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"soc-shell","port":%d}`, shellPort)
 	})
 	// P4 Compliance panel — serve directly with permissive CSP
 	mux.HandleFunc("/billing", func(w http.ResponseWriter, r *http.Request) {
@@ -162,7 +162,7 @@ func main() {
 				tokenJSON, _ := json.Marshal(token)
 				inject := "<script>window.TOKEN=" + string(tokenJSON) + ";</script>"
 				html = strings.Replace(html, "<head>", "<head>"+inject, 1)
-				w.Write([]byte(html)) //nolint:errcheck
+				_, _ = w.Write([]byte(html)) //nolint:errcheck
 				return
 			}
 		}

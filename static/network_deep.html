@@ -321,7 +321,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
           <div>
             <div class="f11 fw7 c-t2 mb8">Decoded request</div>
             <div class="decode-block l-alert mb8">
-              <div class="mb8"><span class="pill pill-blue">GET</span> <span class="mono c-t1">/api/v1/admin/users/../../etc/passwd</span></div>
+              <div class="mb8"><span class="pill pill-blue">GET</span> <span class="mono c-t1">/api/v1/users/../../etc/passwd</span></div>
               <div class="field-row"><div class="field-key">Host</div><div class="field-val">10.0.1.10:8080</div></div>
               <div class="field-row"><div class="field-key">User-Agent</div><div class="field-val bad">sqlmap/1.7.8</div></div>
               <div class="field-row"><div class="field-key">X-Forwarded-For</div><div class="field-val warn">185.220.101.47</div></div>
@@ -590,18 +590,18 @@ var TCP_STREAMS=[
   {id:'stream-0003',src:'10.0.1.10:43821',dst:'10.0.1.20:5432',state:'ESTABLISHED',pkts:14211,risk:'ok',proto:'PostgreSQL'},
 ];
 var HTTP=[
-  {ts:'16:26:01',m:'GET',uri:'/api/v1/admin/users/../../etc/passwd',s:403,sz:'0B',rtt:'42ms',f:'path-traversal'},
+  {ts:'16:26:01',m:'GET',uri:'/api/v1/users/../../etc/passwd',s:403,sz:'0B',rtt:'42ms',f:'path-traversal'},
   {ts:'16:26:03',m:'POST',uri:'/api/v1/auth/login',s:400,sz:'128B',rtt:'8ms',f:'sqli-body'},
   {ts:'16:26:04',m:'GET',uri:'/api/v1/health',s:200,sz:'48B',rtt:'2ms',f:null},
-  {ts:'16:26:05',m:'GET',uri:'/api/v1/admin/users?limit=50&org=acme',s:200,sz:'4.2KB',rtt:'24ms',f:null},
+  {ts:'16:26:05',m:'GET',uri:'/api/v1/users?limit=50&org=acme',s:200,sz:'4.2KB',rtt:'24ms',f:null},
   {ts:'16:26:06',m:'DELETE',uri:'/api/v1/admin/users/1',s:403,sz:'64B',rtt:'3ms',f:'priv-esc'},
   {ts:'16:26:07',m:'GET',uri:'/wp-admin/admin-ajax.php',s:404,sz:'0B',rtt:'1ms',f:'probe'},
   {ts:'16:26:08',m:'POST',uri:'/api/v1/upload',s:413,sz:'0B',rtt:'1ms',f:'oversize'},
   {ts:'16:26:09',m:'GET',uri:'/api/v1/metrics',s:200,sz:'12KB',rtt:'18ms',f:null},
-  {ts:'16:26:11',m:'PUT',uri:"/api/v1/admin/users/1;DROP TABLE users;--",s:400,sz:'0B',rtt:'2ms',f:'sqli-uri'},
+  {ts:'16:26:11',m:'PUT',uri:"/api/v1/users/1;DROP TABLE users;--",s:400,sz:'0B',rtt:'2ms',f:'sqli-uri'},
 ];
 var TOP_URIS=[
-  {u:'/api/v1/health',n:8421,p:100,c:'var(--green)'},{u:'/api/v1/admin/users',n:4211,p:50,c:'var(--blue)'},
+  {u:'/api/v1/health',n:8421,p:100,c:'var(--green)'},{u:'/api/v1/users',n:4211,p:50,c:'var(--blue)'},
   {u:'/api/v1/auth/token',n:2847,p:34,c:'var(--cyan)'},{u:'/wp-admin/*',n:847,p:10,c:'var(--red)'},
 ];
 var DNS=[
@@ -643,7 +643,7 @@ var ANOMALIES=[
   {sev:'critical',layer:'L7',type:'SQL Injection',src:'10.0.1.11',detail:'SQLi tautology in PostgreSQL wire: OR 1=1. Application returned ErrorResponse.',mitre:'T1190',ts:'2m ago'},
   {sev:'critical',layer:'L7',type:'JA3 Match: Cobalt Strike',src:'185.220.101.47',detail:'TLS ClientHello matches Cobalt Strike/Metasploit fingerprint. 847 known malicious sessions.',mitre:'T1071.001',ts:'3m ago'},
   {sev:'high',layer:'L7',type:'DNS Tunneling',src:'10.0.1.10',detail:'TXT queries Shannon entropy 7.84 (threshold 6.0). Base64 in subdomain. 847 q/min × 22m.',mitre:'T1071.004',ts:'5m ago'},
-  {sev:'high',layer:'L7',type:'Path Traversal',src:'185.220.101.47',detail:'GET /api/v1/admin/users/../../etc/passwd. WAF blocked 403. UA: sqlmap/1.7.8.',mitre:'T1083',ts:'6m ago'},
+  {sev:'high',layer:'L7',type:'Path Traversal',src:'185.220.101.47',detail:'GET /api/v1/users/../../etc/passwd. WAF blocked 403. UA: sqlmap/1.7.8.',mitre:'T1083',ts:'6m ago'},
   {sev:'high',layer:'L4',type:'SSH Brute Force',src:'45.142.212.100',detail:'124 failed SSH auth in 45s. Rate: 2.8/sec. Country: Netherlands AS4242.',mitre:'T1110',ts:'8m ago'},
   {sev:'medium',layer:'L7',type:'Sensitive SQL Query',src:'10.0.1.10',detail:"SELECT * FROM secrets WHERE env='prod' — plaintext secrets table from app server.",mitre:'T1552',ts:'10m ago'},
   {sev:'medium',layer:'L3',type:'TTL Anomaly',src:'45.142.212.100',detail:'TTL=51 from NL IP. Expected Linux=64 or Windows=128. Possible OS spoofing.',mitre:'T1001',ts:'12m ago'},

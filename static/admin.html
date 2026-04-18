@@ -333,7 +333,8 @@ function toast(msg) {
 
 async function api(path) {
   try {
-    const r = await fetch(API + path);
+    const tok = window.TOKEN || (window.parent&&window.parent.TOKEN) || localStorage.getItem('vsp_token') || '';
+    const r = await fetch(API + path, {headers: tok ? {Authorization:'Bearer '+tok} : {}});
     if (!r.ok) return null;
     return r.json();
   } catch(e) { return null; }

@@ -148,7 +148,7 @@ func loadP4StateFromDB() {
 			}
 			for rows.Next() {
 				var item POAMItem
-				rows.Scan(&item.ID, &item.WeaknessName, &item.ControlID, &item.Severity, &item.Status, &item.MitigationPlan, &item.FindingID, &item.ScheduledCompletion, &item.ClosedDate)
+				_ = rows.Scan(&item.ID, &item.WeaknessName, &item.ControlID, &item.Severity, &item.Status, &item.MitigationPlan, &item.FindingID, &item.ScheduledCompletion, &item.ClosedDate)
 				if !existing[item.ID] {
 					pkg.POAMItems = append(pkg.POAMItems, item)
 					existing[item.ID] = true

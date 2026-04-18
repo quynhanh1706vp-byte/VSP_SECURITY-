@@ -1,6 +1,67 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<script>
+/* VSP auth fetch guard v2 — polling retry */
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500;
+    var waited = 0;
+    var interval = 100;
+    while (waited < maxWait) {
+      // Check iframe
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      // Check parent (same-origin)
+      try {
+        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          try { localStorage.setItem("vsp_token", tk); } catch(e){}
+          return tk;
+        }
+      } catch(e) { /* cross-origin */ }
+      // Check top-level (if nested iframes)
+      try {
+        tk = window.top.TOKEN || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          return tk;
+        }
+      } catch(e) {}
+      // Wait & retry
+      await new Promise(function(r){setTimeout(r, interval);});
+      waited += interval;
+    }
+    return "";
+  }
+  
+  window.vspAuthFetch = async function(url, opts){
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
+    } else {
+      console.warn("[VSP guard] no token after 2.5s:", url);
+    }
+    return _origFetch(url, opts);
+  };
+  
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){
+    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+})();
+</script>
 <meta charset="UTF-8">
 <title>VSP — Assets</title>
 <style>
@@ -21,7 +82,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 .finding{padding:8px 10px;margin-bottom:6px;background:var(--surface);border-radius:7px;border-left:3px solid var(--border2);cursor:pointer;transition:all .15s}.finding:hover{transform:translateX(2px)}.finding.crit{border-left-color:var(--red)}.finding.high{border-left-color:var(--amber)}.finding.med{border-left-color:var(--blue)}.finding.low{border-left-color:var(--green)}
 .f-hdr{display:flex;align-items:center;gap:7px;margin-bottom:4px}.f-id{font-size:9px;font-family:var(--font-mono);color:var(--t3);flex-shrink:0}.f-title{font-size:11px;font-weight:500;flex:1}.f-ts{font-size:10px;color:var(--t3);flex-shrink:0}.f-file{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:4px}.f-tags{display:flex;gap:4px;flex-wrap:wrap}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;padding-top:32px;overflow-y:auto}.modal-overlay.open{display:flex}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(780px,95vw);margin-bottom:32px}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(680px,95vw);margin-bottom:32px}
 .modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}.modal-title{font-size:15px;font-weight:700;margin-bottom:3px}.modal-sub{font-size:11px;color:var(--t3)}.modal-body{padding:16px 20px}.modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px}
 .detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}.detail-card{background:var(--surface);border-radius:8px;padding:10px 12px}.detail-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}.detail-val{font-size:14px;font-weight:700}
 .slbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-mono);margin:14px 0 8px;padding-bottom:3px;border-bottom:1px solid var(--border)}
@@ -115,7 +176,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
       <div class="slbl" style="margin-top:0">&#9656; Description</div>
       <div id="fmod-desc" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:12px"></div>
       <div class="slbl">&#9656; Location</div>
-      <div class="code-block" id="fmod-location" style="white-space:pre;margin-bottom:12px"></div>
+  document.getElementById('fmod-location').textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
       <div class="slbl">&#9656; Remediation</div>
       <div id="fmod-rem" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:8px"></div>
       <div class="slbl">&#9656; References</div>
@@ -123,29 +184,11 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('finding-modal')">Close</button>
-      <button class="btn btn-primary btn-sm" onclick="
-  var f=ALL_FINDINGS.find(function(x){return x.id===document.getElementById('finding-modal').dataset.fid;});
-  if(!f)return;
-  var body='Finding: '+f.title+'\nSeverity: '+f.severity+'\nFile: '+f.file+':'+f.line+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'')+(f.cvss?'\nCVSS: '+f.cvss:'');
-  navigator.clipboard.writeText(body).then(function(){
-    var btn=event.target;btn.textContent='Copied ✓';btn.style.color='var(--green)';
-    setTimeout(function(){btn.textContent='Create ticket →';btn.style.color='';},2000);
-  });
-">Create ticket &#8594;</button>
+      <button class="btn btn-primary btn-sm">Create ticket &#8594;</button>
     </div>
   </div>
 </div>
 <script>
-// ─── XSS escape helper ────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 var TOKEN='',API='',_assetFilter='',_activeAsset=null;
 var ASSETS=[
   {id:'a1',name:'API Gateway',type:'service',env:'prod',tool:'kics',critical:7,high:12,medium:8,low:3,risk_score:94,status:'critical',findings_count:30},
@@ -213,8 +256,8 @@ function renderAssets(){
   document.getElementById('asset-count-sub').textContent=list.length+' assets';
   document.getElementById('asset-tbody').innerHTML=list.map(function(a){
     var sc=a.risk_score||0,rc=riskColor(sc);
-    return '<tr data-id="'+esc(a.id)+'" onclick="openAssetModal(this.dataset.id)">'
-      +'<td><div class="asset-name">'+esc(a.name)+'</div><div class="asset-type">'+esc(a.type)+' · '+esc(a.tool)+'</div></td>'
+    return '<tr data-id="'+a.id+'" onclick="openAssetModal(this.dataset.id)">'
+      +'<td><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+' · '+a.tool+'</div></td>'
       +'<td>'+envBadge(a.env)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--red);font-weight:700">'+(a.critical||0)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--amber);font-weight:700">'+(a.high||0)+'</td>'
@@ -238,33 +281,38 @@ function renderFindings(){
   document.getElementById('findings-sub').textContent=list.length+' findings';
   document.getElementById('findings-list').innerHTML=!list.length?'<div style="text-align:center;padding:16px;color:var(--t3);font-size:11px">No findings match filter</div>':list.map(function(f){
     var sc=sevClass((f.severity||'').toUpperCase());
-    return '<div class="finding '+sc+'" data-id="'+esc(f.id)+'" onclick="openFindingModal(this.dataset.id)">'
-      +'<div class="f-hdr"><span class="f-id">'+esc(f.id.slice(0,8))+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+esc(f.title)+'</span><span class="f-ts">'+esc(f.asset)+'</span></div>'
-      +'<div class="f-file">'+esc(f.tool)+' · '+esc(f.file)+':'+esc(String(f.line||''))+'</div>'
-      +'<div class="f-tags"><span class="pill pill-gray">'+esc(f.rule)+'</span>'+(f.cwe?'<span class="pill pill-gray">'+esc(f.cwe)+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+esc(String(f.cvss))+'</span>':'')+'</div>'
+    return '<div class="finding '+sc+'" data-id="'+f.id+'" onclick="openFindingModal(this.dataset.id)">'
+      +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+f.title+'</span><span class="f-ts">'+f.asset+'</span></div>'
+      +'<div class="f-file">'+f.tool+' · '+f.file+':'+f.line+'</div>'
+      +'<div class="f-tags"><span class="pill pill-gray">'+f.rule+'</span>'+(f.cwe?'<span class="pill pill-gray">'+f.cwe+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+f.cvss+'</span>':'')+'</div>'
       +'</div>';
   }).join('');
 }
 async function openAssetModal(id){
   var a=ASSETS.find(function(x){return x.id===id;});if(!a)return;
-  // Fetch real findings từ API
+  // Fetch real findings từ API — chỉ dùng UUID thật
   if(TOKEN){
-    try{
-      var d=await fetch(API+'/api/v1/assets/'+id+'/findings',
-        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
-      if(d.findings&&d.findings.length){
-        a._api_findings=d.findings;
-        // Update counts from real data
-        a.critical=(d.findings.filter(function(f){return f.severity==='CRITICAL';}).length)||a.critical||0;
-        a.high=(d.findings.filter(function(f){return f.severity==='HIGH';}).length)||a.high||0;
-        a.medium=(d.findings.filter(function(f){return f.severity==='MEDIUM';}).length)||a.medium||0;
-        a.low=(d.findings.filter(function(f){return f.severity==='LOW';}).length)||a.low||0;
-        a.findings_count=d.findings.length;
-      }
-    }catch(e){}
+    var isUUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if(isUUID){
+      try{
+        var resp=await fetch(API+'/api/v1/assets/'+id+'/findings',
+          {headers:{Authorization:'Bearer '+TOKEN}});
+        if(resp.ok){
+          var d=await resp.json();
+          if(d.findings&&d.findings.length){
+            a._api_findings=d.findings;
+            a.critical=(d.findings.filter(function(f){return f.severity==='CRITICAL';}).length)||a.critical||0;
+            a.high=(d.findings.filter(function(f){return f.severity==='HIGH';}).length)||a.high||0;
+            a.medium=(d.findings.filter(function(f){return f.severity==='MEDIUM';}).length)||a.medium||0;
+            a.low=(d.findings.filter(function(f){return f.severity==='LOW';}).length)||a.low||0;
+            a.findings_count=d.findings.length;
+          }
+        }
+      }catch(e){}
+    }
   }
   document.getElementById('amod-name').textContent=a.name;
-  document.getElementById('amod-sub').textContent=a.type+' · '+a.tool+' · '+a.findings_count+' findings';
+  document.getElementById('amod-sub').textContent=a.type+(a.ip?' · '+a.ip:'')+' · '+(a.findings_count||0)+' findings';
   document.getElementById('amod-env').innerHTML=envBadge(a.env);
   document.getElementById('amod-risk-badge').innerHTML=statusBadge(a.status);
   document.getElementById('amod-kpis').innerHTML=[
@@ -281,9 +329,9 @@ async function openAssetModal(id){
   }).join('');
   var af=(a._api_findings||ALL_FINDINGS.filter(function(f){return f.asset_id===a.id;})).slice(0,4);
   document.getElementById('amod-findings').innerHTML=af.length?af.map(function(f){
-    return '<div class="finding '+sevClass((f.severity||'').toUpperCase())+'" data-fid="'+esc(f.id)+'" onclick="openFindingModal(this.dataset.fid)">'
-      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+esc(f.title)+'</span></div>'
-      +'<div class="f-file">'+esc(f.file)+':'+esc(String(f.line||''))+' · '+esc(f.rule)+'</div></div>';
+    return '<div class="finding '+sevClass((f.severity||'').toUpperCase())+'" data-fid="'+f.id+'" onclick="openFindingModal(this.dataset.fid)">'
+      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+f.title+'</span></div>'
+      +'<div class="f-file">'+f.file+':'+f.line+' · '+f.rule+'</div></div>';
   }).join(''):'<div style="color:var(--t3);font-size:11px">No findings for this asset</div>';
   document.getElementById('amod-all-btn').onclick=function(){closeModal('asset-modal');_activeAsset=a;renderFindings();};
   document.getElementById('asset-modal').classList.add('open');
@@ -295,78 +343,27 @@ function openFindingModal(id){
   document.getElementById('fmod-sub').textContent=f.id.slice(0,8)+' · '+f.tool+' · '+f.rule;
   document.getElementById('fmod-sev').innerHTML=sevBadge(sev);
   document.getElementById('fmod-kpis').innerHTML=[
-    {lbl:'Severity',val:esc(sev),color:sevColor(sev)},
-    {lbl:'CVSS',val:esc(String(f.cvss||'—')),color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
-    {lbl:'Fix signal',val:(function(f){
-  if(f.fix_signal&&f.fix_signal!=='none') return f.fix_signal.toUpperCase();
-  var cv=parseFloat(f.cvss||0);
-  return cv>=9?'CRITICAL':cv>=7?'HIGH':cv>=4?'MEDIUM':cv>0?'LOW':'—';
-})(f),color:(function(f){
-  var cv=parseFloat(f.cvss||0);
-  return cv>=9?'var(--red)':cv>=7?'var(--amber)':cv>=4?'var(--blue)':'var(--t3)';
-})(f)},
-    {lbl:'Status',val:esc(f.status||'open'),color:f.status==='resolved'?'var(--green)':'var(--amber)'},
+    {lbl:'Severity',val:sev,color:sevColor(sev)},{lbl:'CVSS',val:f.cvss||'—',color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
+    {lbl:'EPSS',val:f.epss||'—',color:'var(--t1)'},{lbl:'Status',val:f.status||'open',color:f.status==='resolved'?'var(--green)':'var(--amber)'},
   ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
   document.getElementById('fmod-desc').textContent=f.desc||'';
-  var fmodLoc=document.getElementById('fmod-location');
-  if(fmodLoc) fmodLoc.textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
-  var remText=f.remediation||'';
-  if(!remText){
-    if(f.rule_id&&f.rule_id.startsWith('CVE-')) remText='Update affected package to patched version. Check vendor advisory for '+f.rule_id+'.';
-    else if(f.cwe==='CWE-798'||f.cwe==='CWE-259') remText='Remove hardcoded credential. Use environment variables or secrets manager. Rotate immediately.';
-    else if(f.cwe==='CWE-284'||f.cwe==='CWE-732') remText='Review and restrict access controls. Apply principle of least privilege.';
-    else if(f.cwe==='CWE-89') remText='Use parameterized queries or prepared statements. Never concatenate user input into SQL.';
-    else if(f.cwe==='CWE-287') remText='Strengthen authentication logic. Add multi-factor authentication where possible.';
-    else remText='Review finding details and apply vendor-recommended fix. Test in staging before production deployment.';
-  }
-  document.getElementById('fmod-rem').textContent=remText;
-  document.getElementById('fmod-refs').innerHTML=(f.refs||[]).map(function(r){
-    var safeUrl=esc(r);
-    var isHttp=/^https?:\/\//.test(r);
-    return isHttp
-      ? '<div>· <a href="'+safeUrl+'" target="_blank" rel="noopener noreferrer" style="color:var(--cyan)">'+safeUrl+'</a></div>'
-      : '<div>· '+safeUrl+'</div>';
-  }).join('');
-  document.getElementById('finding-modal').dataset.fid=id;document.getElementById('finding-modal').classList.add('open');
+  document.getElementById('fmod-location').textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
+
+
+
+
+  document.getElementById('fmod-rem').textContent=f.remediation||'';
+  document.getElementById('fmod-refs').innerHTML=(f.refs||[]).map(function(r){return '<div>· '+r+'</div>';}).join('');
+  document.getElementById('finding-modal').classList.add('open');
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 async function loadAssets(){
   if(!TOKEN)return;
   var h={Authorization:'Bearer '+TOKEN};
   try{
-    var [assetRes,findingsRes]=await Promise.all([
-      fetch(API+'/api/v1/assets',{headers:h}).then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch(API+'/api/v1/vsp/findings?limit=500',{headers:h}).then(r=>r.json()).catch(()=>({findings:[]})),
-    ]);
-    var apiFindings=findingsRes.findings||[];
-    if(assetRes&&assetRes.assets&&assetRes.assets.length){
-      ASSETS=assetRes.assets.map(function(a){
-        var rs=a.risk_score||Math.round((a.critical||0)*20+(a.high||0)*8+(a.medium||0)*3+(a.low||0));
-        return Object.assign({},a,{risk_score:Math.min(rs,100),status:a.critical>0?'critical':a.high>0?'high':a.medium>0?'medium':'clean'});
-      });
-    } else if(apiFindings.length){
-      var byAsset={};
-      apiFindings.forEach(function(f){
-        var asset=(f.path||'').split('/')[1]||f.tool||'system';
-        if(!byAsset[asset]) byAsset[asset]={name:asset,type:'service',env:'prod',tool:f.tool||'?',critical:0,high:0,medium:0,low:0};
-        var sev=(f.severity||'').toUpperCase();
-        if(sev==='CRITICAL') byAsset[asset].critical++;
-        else if(sev==='HIGH') byAsset[asset].high++;
-        else if(sev==='MEDIUM') byAsset[asset].medium++;
-        else byAsset[asset].low++;
-      });
-      ASSETS=Object.values(byAsset).map(function(a,i){
-        var rs=Math.min(a.critical*20+a.high*8+a.medium*3+a.low,100);
-        return Object.assign(a,{id:'a'+i,risk_score:rs,findings_count:a.critical+a.high+a.medium+a.low,status:a.critical>0?'critical':a.high>0?'high':a.medium>0?'medium':'clean'});
-      }).sort(function(a,b){return b.risk_score-a.risk_score;});
-    }
-    if(apiFindings.length){
-      ALL_FINDINGS=apiFindings.map(function(f){
-        return {id:f.id||Math.random().toString(36).slice(2),title:f.message||f.rule_id||'Finding',severity:(f.severity||'MEDIUM').toUpperCase(),status:f.status||'open',tool:f.tool||'?',rule:f.rule_id||'?',file:f.path||'?',line:f.line||0,asset_id:'a0',asset:(f.path||'').split('/')[1]||f.tool||'system',cwe:f.cwe||'',cvss:f.cvss||null,epss:f.epss||null,desc:f.message||'',remediation:'',refs:f.cwe?[f.cwe]:[]};
-      });
-    }
-    updateKPIs();renderHeatmap();renderAssets();
-  }catch(e){console.error('loadAssets',e);}
+    var r=await fetch(API+'/api/v1/assets',{headers:h});
+    if(r.ok){var d=await r.json();if(d.assets&&d.assets.length){ASSETS=d.assets.map(function(a){return Object.assign({},a,{tool:a.tool||'scanner',findings_count:a.total_findings||a.findings_count||0,risk_score:a.risk_score||Math.round((a.critical||0)*20+(a.high||0)*8+(a.medium||0)*3+(a.low||0)),status:a.critical>0?'critical':a.high>0?'high':a.medium>0?'medium':'clean'});});updateKPIs();renderHeatmap();renderAssets();}}
+  }catch(e){}
 }
 function _onTokenReady(){}
 window.addEventListener('message',function(e){

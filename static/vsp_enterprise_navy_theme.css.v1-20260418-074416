@@ -1,0 +1,343 @@
+/* ════════════════════════════════════════════════════════════════
+   VSP ENTERPRISE NAVY THEME — Override layer
+   Load AFTER vsp_enterprise_ui.css to override default cyan/glowy style.
+   Toggle: remove <link> tag to revert to original theme.
+   
+   Principles:
+   - Monochrome gray scale (90% of UI)
+   - Single accent: deep navy (#2563EB) for primary actions + active states
+   - Functional colors preserved: red=critical, amber=warn, green=success
+   - Flat: no shadows, no glows, no gradients
+   - Enterprise dense: smaller padding, tighter line-heights
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces — near-black neutrals (no blue tint) ── */
+  --bg0:  #0A0B0D;   /* app bg — was #080c14 */
+  --bg1:  #101215;   /* sidebar/topbar — was #0d1421 */
+  --bg2:  #14181D;   /* cards — was #111928 */
+  --bg3:  #1A1F26;   /* table header, inputs — was #162035 */
+  --bg4:  #232830;   /* hover */
+  --bg5:  #2D333C;   /* active/selected */
+
+  --surface:  var(--bg2);
+  --surface1: var(--bg3);
+  --surface2: var(--bg4);
+
+  /* ── Borders — subtle neutral, no cyan tint ── */
+  --border:   rgba(255,255,255,0.06);
+  --border2:  rgba(255,255,255,0.10);
+  --border3:  rgba(255,255,255,0.16);
+
+  /* ── Single accent: deep navy (Bloomberg) ── */
+  --accent:   #2563EB;    /* primary blue */
+  --accent2:  #3B82F6;    /* hover state */
+  --accent3:  #60A5FA;    /* light variant for text on dark */
+
+  /* ── Remap decorative colors to accent (Enterprise: 1 color max) ── */
+  --cyan:     var(--accent3);
+  --cyan2:    rgba(37,99,235,0.12);
+  --purple:   var(--accent3);
+  --purple2:  rgba(37,99,235,0.12);
+  --blue:     var(--accent);
+  --blue2:    rgba(37,99,235,0.12);
+
+  /* ── Semantic colors — kept, muted ── */
+  --red:      #DC2626;
+  --red2:     rgba(220,38,38,0.10);
+  --amber:    #D97706;
+  --amber2:   #F59E0B;
+  --amber3:   rgba(217,119,6,0.10);
+  --green:    #059669;
+  --green2:   rgba(5,150,105,0.10);
+  --orange:   #D97706;    /* remap orange to amber */
+  --orange2:  rgba(217,119,6,0.10);
+
+  /* ── Text — high-contrast monochrome ── */
+  --t1: #F1F3F5;      /* primary */
+  --t2: #9CA3AF;      /* secondary */
+  --t3: #6B7280;      /* tertiary/muted */
+  --t4: #4B5563;      /* disabled */
+
+  /* ── Typography — switch to Inter (industry standard enterprise) ── */
+  --font-display: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --font-ui:      'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', 'IBM Plex Mono', Consolas, monospace;
+
+  /* ── Kill glow effects ── */
+  --glow-accent:  none;
+  --glow-amber:   none;
+  --glow-red:     none;
+  --glow-green:   none;
+
+  /* ── Flatten shadows ── */
+  --shadow-card:  none;
+  --shadow-float: 0 4px 16px rgba(0,0,0,0.4);  /* keep subtle for modals only */
+
+  /* ── Tighter radii — enterprise prefers sharp corners ── */
+  --r-sm:  3px;
+  --r-md:  4px;
+  --r-lg:  6px;
+  --r-xl:  8px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Flatten global effects — remove shadows, gradients, glows
+   ════════════════════════════════════════════════════════════════ */
+
+/* Remove glow shadows everywhere */
+[style*="glow"],
+.glow,
+.glow-accent,
+.glow-amber,
+.glow-red,
+.glow-green {
+  box-shadow: none !important;
+}
+
+/* Kill gradient backgrounds on cards — flatten to solid */
+[style*="linear-gradient"][class*="card"],
+[style*="linear-gradient"][class*="panel"] {
+  background: var(--bg2) !important;
+}
+
+/* Nav items — use flat accent instead of gradient */
+.nav-item.active {
+  background: rgba(37,99,235,0.10) !important;
+  color: var(--accent3) !important;
+  border-left: 2px solid var(--accent) !important;
+  border-radius: 0 var(--r-md) var(--r-md) 0 !important;
+}
+
+.nav-item:hover {
+  background: rgba(255,255,255,0.03) !important;
+  color: var(--t1) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Typography refinements
+   ════════════════════════════════════════════════════════════════ */
+
+body, .app-shell {
+  font-family: var(--font-ui);
+  font-feature-settings: 'cv11', 'ss01';  /* Inter stylistic set */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular nums for all data tables and metrics */
+table, .metric, .kpi, [class*="score"], [class*="count"],
+.mono, .mono-sm {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Headings: medium weight, never 700 (too heavy) */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 500 !important;
+  letter-spacing: -0.01em;
+}
+
+/* Section labels: uppercase small caps feel */
+.section-title, .panel-title, .slbl, [class*="label"] {
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Components — polish without structural change
+   ════════════════════════════════════════════════════════════════ */
+
+/* Buttons — flat outline style */
+button, .btn {
+  transition: background-color 0.1s ease !important;
+  font-weight: 500 !important;
+  letter-spacing: 0;
+}
+
+button:hover, .btn:hover {
+  transform: none !important;
+}
+
+.btn-primary {
+  background: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
+  color: #ffffff !important;
+}
+
+.btn-primary:hover {
+  background: var(--accent2) !important;
+  border-color: var(--accent2) !important;
+}
+
+.btn-ghost, .btn-secondary {
+  background: transparent !important;
+  border: 1px solid var(--border2) !important;
+  color: var(--t2) !important;
+}
+
+.btn-ghost:hover, .btn-secondary:hover {
+  background: rgba(255,255,255,0.03) !important;
+  color: var(--t1) !important;
+  border-color: var(--border3) !important;
+}
+
+/* Pills/badges — tighter, more refined */
+.pill, .badge, [class*="pill-"] {
+  border-radius: 3px !important;
+  font-weight: 500 !important;
+  font-size: 10px !important;
+  padding: 2px 7px !important;
+  letter-spacing: 0.3px !important;
+  text-transform: uppercase;
+}
+
+.pill-pass, .pill-done { background: var(--green2) !important; color: #10B981 !important; }
+.pill-fail, .pill-critical { background: var(--red2) !important; color: #EF4444 !important; }
+.pill-warn { background: var(--amber3) !important; color: var(--amber2) !important; }
+
+/* Cards — flat, no shadow */
+.card, [class*="-card"], .panel {
+  box-shadow: none !important;
+  background: var(--bg2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--r-md) !important;
+}
+
+/* Modal polish */
+.modal, [class*="modal"]:not([class*="modal-close"]):not([class*="modal-footer"]) {
+  border-radius: var(--r-lg) !important;
+  border: 1px solid var(--border2) !important;
+}
+
+.modal-overlay {
+  backdrop-filter: blur(2px) !important;
+  background: rgba(10,11,13,0.75) !important;
+}
+
+/* Tables — sticky header, hover rows */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg3) !important;
+  font-weight: 500 !important;
+  font-size: 10px !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase;
+  color: var(--t3) !important;
+  padding: 8px 12px !important;
+  border-bottom: 1px solid var(--border2) !important;
+}
+
+table td {
+  padding: 8px 12px !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-size: 12px;
+}
+
+table tbody tr:hover {
+  background: rgba(255,255,255,0.02) !important;
+}
+
+/* Inputs — flat, single border */
+input, select, textarea {
+  background: var(--bg3) !important;
+  border: 1px solid var(--border2) !important;
+  border-radius: var(--r-md) !important;
+  color: var(--t1) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 13px !important;
+  padding: 7px 10px !important;
+  transition: border-color 0.1s ease !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.15) !important;
+}
+
+/* Select dropdown — minimal arrow */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236B7280' d='M5 6L0 0h10z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  padding-right: 28px !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Remove cyan/purple accents scattered across UI
+   ════════════════════════════════════════════════════════════════ */
+
+/* Anywhere cyan was used decoratively — normalize to accent or neutral */
+[style*="color:var(--cyan)"],
+[style*="color: var(--cyan)"] {
+  color: var(--accent3) !important;
+}
+
+[style*="color:var(--purple)"],
+[style*="color: var(--purple)"] {
+  color: var(--accent3) !important;
+}
+
+/* Rainbow border classes — unify to accent */
+[style*="border-color:rgba(6,182,212"],
+[style*="border-color:rgba(139,92,246"],
+[style*="border-color:rgba(79,209,197"] {
+  border-color: var(--border2) !important;
+}
+
+/* Kill text gradients (AI Analyst "rainbow" text) */
+[style*="-webkit-background-clip:text"],
+[style*="-webkit-text-fill-color:transparent"] {
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: var(--t1) !important;
+  background: transparent !important;
+  color: var(--t1) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Scrollbar — subtle, fits the theme
+   ════════════════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Small details — status dots instead of pills in some places
+   ════════════════════════════════════════════════════════════════ */
+
+/* Sidebar "SSE LIVE" badge — make more subtle */
+[class*="live"], [class*="pulse"] {
+  animation: none !important;
+}
+
+/* Score big-number display — tabular + tighter */
+[style*="font-size:20px"], [style*="font-size:22px"],
+[style*="font-size:24px"], [style*="font-size:28px"] {
+  font-family: var(--font-ui) !important;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em !important;
+}
+
+/* End of theme */

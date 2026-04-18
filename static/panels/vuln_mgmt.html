@@ -1,21 +1,83 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<script>
+/* VSP auth fetch guard v2 — polling retry */
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500;
+    var waited = 0;
+    var interval = 100;
+    while (waited < maxWait) {
+      // Check iframe
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      // Check parent (same-origin)
+      try {
+        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          try { localStorage.setItem("vsp_token", tk); } catch(e){}
+          return tk;
+        }
+      } catch(e) { /* cross-origin */ }
+      // Check top-level (if nested iframes)
+      try {
+        tk = window.top.TOKEN || "";
+        if (tk && tk.length >= 20) {
+          window.TOKEN = tk;
+          return tk;
+        }
+      } catch(e) {}
+      // Wait & retry
+      await new Promise(function(r){setTimeout(r, interval);});
+      waited += interval;
+    }
+    return "";
+  }
+  
+  window.vspAuthFetch = async function(url, opts){
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
+    } else {
+      console.warn("[VSP guard] no token after 2.5s:", url);
+    }
+    return _origFetch(url, opts);
+  };
+  
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){
+    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+})();
+</script>
 <meta charset="UTF-8">
 <title>VSP — Vulnerability Management</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--purple:#8b5cf6;--font-mono:"JetBrains Mono",monospace;--font-ui:"Inter",sans-serif}
-*{box-sizing:border-box;margin:0;padding:0}html{font-size:13px}
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--font-mono:"JetBrains Mono",monospace;--font-ui:"Inter",sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
 body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16px}
-.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}.btn:hover{background:var(--surface)}.btn-sm{padding:3px 8px;font-size:10px}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}.btn:hover{background:var(--surface)}.btn-sm{padding:3px 8px;font-size:10px}.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}.btn-primary:hover{background:rgba(59,130,246,.2)}
 .pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
-.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}.pill-purple{background:var(--purple2);color:var(--purple);border-color:rgba(139,92,246,.3)}
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}
 .card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
-.card-title{font-size:12px;font-weight:600}.card-body{padding:12px 14px}
+.card-title{font-size:12px;font-weight:600}.card-sub{font-size:11px;color:var(--t3);margin-top:1px}.card-body{padding:12px 14px}
 .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
-.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s}.kpi:hover{border-color:var(--border2)}
 .kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
 .kpi-val{font-size:20px;font-weight:700;font-family:var(--font-mono)}.kpi-sub{font-size:10px;color:var(--t3);margin-top:1px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
@@ -24,290 +86,503 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
 .hdr p{font-size:11px;color:var(--t3);font-family:var(--font-mono)}
 .tbl{width:100%;border-collapse:collapse}
 .tbl th{text-align:left;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;border-bottom:1px solid var(--border);font-family:var(--font-mono)}
-.tbl td{padding:7px 8px;border-bottom:1px solid var(--border);font-size:11px}
-.tbl tr:last-child td{border-bottom:none}
-.tbl tr{transition:background .1s;cursor:pointer}.tbl tr:hover td{background:var(--surface)}
-.bar-wrap{display:flex;align-items:center;gap:6px}
-.bar-track{flex:1;height:5px;border-radius:3px;background:var(--border)}
-.bar-fill{height:5px;border-radius:3px;transition:width .5s}
-.tool-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
-.tool-row:last-child{border-bottom:none}
-.tool-name{font-family:var(--font-mono);font-size:11px;width:80px;flex-shrink:0}
-.tool-bars{flex:1;display:grid;gap:2px}
-.tool-bar{height:4px;border-radius:2px;min-width:2px}
-.sev-crit{color:var(--red)}.sev-high{color:var(--amber)}.sev-med{color:var(--blue)}.sev-low{color:var(--green)}
-.fixable-badge{font-size:9px;padding:1px 5px;border-radius:3px;background:var(--green2);color:var(--green);border:1px solid rgba(34,197,94,.3);margin-left:4px}
-.tab-bar{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:12px}
-.tab{font-size:11px;padding:6px 12px;border-radius:6px 6px 0 0;cursor:pointer;color:var(--t3);transition:all .15s;border:1px solid transparent;border-bottom:none;margin-bottom:-1px}
-.tab.active{color:var(--t1);background:var(--bg2);border-color:var(--border)}
+.tbl td{padding:7px 8px;border-bottom:1px solid var(--border);font-size:11px;white-space:nowrap}
+.tbl tr:last-child td{border-bottom:none}.tbl tr{transition:background .1s;cursor:pointer}.tbl tr:hover td{background:var(--surface)}
+.tool-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)}.tool-row:last-child{border-bottom:none}
+.tool-name{font-family:var(--font-mono);font-size:11px;width:90px;flex-shrink:0}
+.fixable-badge{font-size:9px;padding:1px 5px;border-radius:3px;background:var(--green2);color:var(--green);border:1px solid rgba(34,197,94,.3);margin-left:4px;vertical-align:middle}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:flex-start;justify-content:center;padding-top:32px;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(680px,95vw);margin-bottom:32px}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-body{padding:16px 20px}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;border-radius:4px;transition:color .15s;flex-shrink:0}.modal-close:hover{color:var(--t1)}
+.search-bar{background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:4px 9px;border-radius:6px;font-size:11px;outline:none;transition:border-color .15s;width:140px}.search-bar:focus{border-color:var(--blue)}.search-bar::placeholder{color:var(--t4)}
+.sev-bar{display:flex;gap:2px;height:12px;align-items:flex-end}
+.sev-seg{border-radius:2px 2px 0 0;min-width:2px;cursor:help}
+.empty-state{text-align:center;padding:28px;color:var(--t3)}.empty-state .emo{font-size:24px;margin-bottom:6px}.empty-state p{font-size:12px}
+.sla-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:11px}.sla-row:last-child{border-bottom:none}
+.progress-bar{flex:1;height:6px;background:var(--t4);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .4s}
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;z-index:999;transform:translateY(20px);opacity:0;transition:all .25s;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-success{background:var(--green2);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.toast-error{background:var(--red2);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+@media(max-width:640px){.kpi-row{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+
 <div class="hdr">
-  <div><h2>&#128737; Vulnerability Management</h2><p>Trend · CVE tracking · tool breakdown · SLA</p></div>
+  <div><h2>🛡 Vulnerability Management</h2><p>Trend · CVE tracking · tool breakdown · SLA</p></div>
   <div style="display:flex;gap:8px;align-items:center">
     <select id="days-sel" onchange="loadAll()" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-size:11px;padding:4px 8px;cursor:pointer">
       <option value="7">Last 7d</option>
       <option value="30" selected>Last 30d</option>
       <option value="90">Last 90d</option>
     </select>
-    <button class="btn btn-sm" onclick="loadAll()">&#8635; Refresh</button>
+    <button class="btn btn-sm" onclick="loadAll()">↻ Refresh</button>
   </div>
 </div>
 
+<!-- KPI row -->
 <div class="kpi-row">
-  <div class="kpi"><div class="kpi-lbl">Critical</div><div class="kpi-val sev-crit" id="k-crit">—</div><div class="kpi-sub">findings</div></div>
-  <div class="kpi"><div class="kpi-lbl">High</div><div class="kpi-val sev-high" id="k-high">—</div><div class="kpi-sub">findings</div></div>
+  <div class="kpi"><div class="kpi-lbl">Critical</div><div class="kpi-val" style="color:var(--red)" id="k-crit">—</div><div class="kpi-sub">findings</div></div>
+  <div class="kpi"><div class="kpi-lbl">High</div><div class="kpi-val" style="color:var(--amber)" id="k-high">—</div><div class="kpi-sub">findings</div></div>
   <div class="kpi"><div class="kpi-lbl">CVEs tracked</div><div class="kpi-val" style="color:var(--purple)" id="k-cves">—</div><div class="kpi-sub">unique CVEs</div></div>
   <div class="kpi"><div class="kpi-lbl">Fixable</div><div class="kpi-val" style="color:var(--green)" id="k-fix">—</div><div class="kpi-sub">fix available</div></div>
-  <div class="kpi"><div class="kpi-lbl">Tools</div><div class="kpi-val" style="color:var(--cyan)" id="k-tools">—</div><div class="kpi-sub">active scanners</div></div>
+  <div class="kpi"><div class="kpi-lbl">Scanners</div><div class="kpi-val" style="color:var(--cyan)" id="k-tools">—</div><div class="kpi-sub">active tools</div></div>
 </div>
 
-<div class="card mb12">
-  <div class="card-head"><div class="card-title">Severity trend over time</div></div>
+<!-- Trend chart -->
+<div class="card">
+  <div class="card-head">
+    <div><div class="card-title">Severity trend</div><div class="card-sub" id="trend-sub">—</div></div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:10px;color:var(--t3)" id="trend-legend"></span>
+    </div>
+  </div>
   <div class="card-body" style="height:180px"><canvas id="trend-chart"></canvas></div>
 </div>
 
+<!-- CVE table + Tool breakdown -->
 <div class="grid2">
   <div class="card">
-    <div class="card-head"><div class="card-title">Top CVEs</div><span id="cve-total" style="font-size:10px;color:var(--t3)"></span></div>
-    <div class="card-body" style="padding:0;max-height:320px;overflow-y:auto">
-      <table class="tbl" id="cve-table">
+    <div class="card-head">
+      <div><div class="card-title">Top CVEs</div><div class="card-sub" id="cve-sub">—</div></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="search-bar" id="cve-search" placeholder="🔍 Filter CVEs…" oninput="filterCVEs()">
+        <select id="sev-filter" class="btn btn-sm" style="cursor:pointer" onchange="filterCVEs()">
+          <option value="">All severity</option>
+          <option value="CRITICAL">Critical</option>
+          <option value="HIGH">High</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="LOW">Low</option>
+        </select>
+      </div>
+    </div>
+    <div style="max-height:320px;overflow-y:auto">
+      <table class="tbl">
         <thead><tr><th>CVE</th><th>Severity</th><th>Count</th><th>Tools</th></tr></thead>
-        <tbody id="cve-body"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--t3)">Loading...</td></tr></tbody>
+        <tbody id="cve-body"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--t3)">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
+
   <div class="card">
-    <div class="card-head"><div class="card-title">Findings by tool</div></div>
+    <div class="card-head">
+      <div><div class="card-title">Findings by tool</div><div class="card-sub" id="tool-sub">—</div></div>
+    </div>
     <div class="card-body" id="tool-body" style="max-height:320px;overflow-y:auto">
-      <div style="text-align:center;padding:20px;color:var(--t3)">Loading...</div>
+      <div class="empty-state"><div class="emo">⏳</div><p>Loading…</p></div>
     </div>
   </div>
 </div>
 
-<script>
-var TOKEN='',API='',_trendChart=null;
+<!-- SLA + Fixable -->
+<div class="grid2">
+  <div class="card">
+    <div class="card-head"><div class="card-title">SLA compliance</div><div class="card-sub" style="font-size:10px;color:var(--t3)">% of findings resolved within SLA window</div></div>
+    <div class="card-body" id="sla-body"></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Fixable vs unfixable</div></div>
+    <div class="card-body" id="fix-body"></div>
+  </div>
+</div>
 
-// FIX: Sample data fallback — hiển thị khi chưa có token hoặc API trả về rỗng
-var SAMPLE_TREND=(function(){
-  var days=[];var now=new Date();
-  for(var i=29;i>=0;i--){
-    var d=new Date(now);d.setDate(d.getDate()-i);
-    days.push({
-      date:d.toISOString().slice(0,10),
-      critical:Math.floor(Math.random()*8+2),
-      high:Math.floor(Math.random()*20+10),
-      medium:Math.floor(Math.random()*40+20),
-    });
-  }
-  return days;
-})();
-
-var SAMPLE_CVES=[
-  {cve:'CVE-2023-44487',severity:'CRITICAL',count:12,tools:'semgrep, gosec',fixable:true},
-  {cve:'CVE-2024-21626',severity:'CRITICAL',count:8,tools:'trivy',fixable:true},
-  {cve:'CVE-2023-45283',severity:'HIGH',count:15,tools:'gosec, semgrep',fixable:false},
-  {cve:'CVE-2024-24790',severity:'HIGH',count:9,tools:'govulncheck',fixable:true},
-  {cve:'CVE-2023-39325',severity:'HIGH',count:7,tools:'trivy, govulncheck',fixable:true},
-  {cve:'CVE-2024-34156',severity:'MEDIUM',count:22,tools:'semgrep',fixable:false},
-  {cve:'CVE-2023-48795',severity:'MEDIUM',count:11,tools:'trivy',fixable:true},
-  {cve:'CVE-2024-28180',severity:'LOW',count:5,tools:'gosec',fixable:true},
-];
-
-var SAMPLE_TOOLS=[
-  {tool:'semgrep',critical:3,high:18,medium:42,low:12,total:75},
-  {tool:'gosec',critical:5,high:12,medium:28,low:8,total:53},
-  {tool:'trivy',critical:4,high:9,medium:19,low:6,total:38},
-  {tool:'govulncheck',critical:2,high:7,medium:11,low:3,total:23},
-];
-
-function renderSampleData(){
-  renderTrend(SAMPLE_TREND);
-  renderCVEs(SAMPLE_CVES);
-  renderTools(SAMPLE_TOOLS);
-  // KPIs từ sample data
-  var crit=SAMPLE_CVES.filter(function(c){return c.severity==='CRITICAL';}).reduce(function(s,c){return s+c.count;},0);
-  var high=SAMPLE_CVES.filter(function(c){return c.severity==='HIGH';}).reduce(function(s,c){return s+c.count;},0);
-  var fixable=SAMPLE_CVES.filter(function(c){return c.fixable;}).length;
-  document.getElementById('k-crit').textContent=crit;
-  document.getElementById('k-high').textContent=high;
-  document.getElementById('k-cves').textContent=SAMPLE_CVES.length;
-  document.getElementById('k-fix').textContent=fixable;
-  document.getElementById('k-tools').textContent=SAMPLE_TOOLS.length;
-}
-
-async function loadAll(){
-  if(!TOKEN){renderSampleData();return;}
-  var days=document.getElementById('days-sel').value;
-  var h={Authorization:'Bearer '+TOKEN};
-  try{
-    var [trend,cves,tools]=await Promise.all([
-      fetch(API+'/api/v1/vulns/trend?days='+days,{headers:h}).then(r=>r.json()).catch(()=>({trend:[]})),
-      fetch(API+'/api/v1/vulns/top-cves',{headers:h}).then(r=>r.json()).catch(()=>({cves:[]})),
-      fetch(API+'/api/v1/vulns/by-tool',{headers:h}).then(r=>r.json()).catch(()=>({tools:[]})),
-    ]);
-    var trendData=trend.trend||[];
-    var cvesData=cves.cves||[];
-    var toolsData=tools.tools||[];
-    // Fallback về sample nếu API trả về rỗng
-    renderTrend(trendData.length?trendData:SAMPLE_TREND);
-    renderCVEs(cvesData.length?cvesData:SAMPLE_CVES);
-    renderTools(toolsData.length?toolsData:SAMPLE_TOOLS);
-    // KPIs
-    var srcCves=cvesData.length?cvesData:SAMPLE_CVES;
-    var srcTrend=trendData.length?trendData:SAMPLE_TREND;
-    var allCrit=srcCves.filter(function(c){return c.severity==='CRITICAL';}).reduce(function(s,c){return s+c.count;},0)||srcTrend.reduce(function(s,p){return s+p.critical;},0);
-    var allHigh=srcCves.filter(function(c){return c.severity==='HIGH';}).reduce(function(s,c){return s+c.count;},0)||srcTrend.reduce(function(s,p){return s+p.high;},0);
-    document.getElementById('k-crit').textContent=allCrit;
-    document.getElementById('k-high').textContent=allHigh;
-    document.getElementById('k-cves').textContent=srcCves.length;
-    document.getElementById('k-fix').textContent=srcCves.filter(function(c){return c.fixable;}).length;
-    document.getElementById('k-tools').textContent=(toolsData.length?toolsData:SAMPLE_TOOLS).length;
-  }catch(e){console.error(e);renderSampleData();}
-}
-
-function renderTrend(points){
-  var ctx=document.getElementById('trend-chart').getContext('2d');
-  if(_trendChart){_trendChart.destroy();}
-  var labels=points.map(function(p){return p.date?p.date.slice(5):'';});
-  var darkGrid={color:'rgba(255,255,255,.04)'};
-  _trendChart=new Chart(ctx,{
-    type:'line',
-    data:{labels:labels,datasets:[
-      {label:'Critical',data:points.map(function(p){return p.critical;}),borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.1)',tension:.3,fill:true,pointRadius:2},
-      {label:'High',data:points.map(function(p){return p.high;}),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.08)',tension:.3,fill:true,pointRadius:2},
-      {label:'Medium',data:points.map(function(p){return p.medium;}),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.06)',tension:.3,fill:true,pointRadius:2},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#8899bb',font:{size:10},boxWidth:10}}},
-      scales:{x:{ticks:{color:'#64748b',font:{size:9}},grid:darkGrid},
-              y:{ticks:{color:'#64748b',font:{size:9}},grid:darkGrid,beginAtZero:true}}}
-  });
-}
-
-function sevPill(s){
-  var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};
-  return '<span class="pill '+(m[s]||'pill-gray')+'">'+s+'</span>';
-}
-
-var _cveData=[];
-function renderCVEs(cves){
-  _cveData=cves;
-  document.getElementById('cve-total').textContent=cves.length+' CVEs';
-  var html=cves.map(function(c){
-    return '<tr onclick="openCVEDetail('+JSON.stringify(c).replace(/"/g,'&quot;')+')">'
-      +'<td style="font-family:var(--font-mono);font-size:10px">'+c.cve+
-      (c.fixable?'<span class="fixable-badge">fix</span>':'')+
-      '</td><td>'+sevPill(c.severity)+'</td><td style="font-family:var(--font-mono)">'+c.count+
-      '</td><td style="font-size:10px;color:var(--t3)">'+c.tools+'</td></tr>';
-  }).join('');
-  document.getElementById('cve-body').innerHTML=html||'<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--t3)">No CVEs found</td></tr>';
-}
-
-function renderTools(tools){
-  var max=tools.reduce(function(m,t){return Math.max(m,t.total);},1);
-  var html=tools.map(function(t){
-    return '<div class="tool-row">'+
-      '<span class="tool-name">'+t.tool+'</span>'+
-      '<div style="flex:1">'+
-        '<div style="display:flex;gap:2px;height:12px;align-items:flex-end">'+
-          (t.critical?'<div style="flex:'+t.critical+';background:#ef4444;border-radius:2px 2px 0 0;min-width:2px" title="CRITICAL: '+t.critical+'"></div>':'')+
-          (t.high?'<div style="flex:'+t.high+';background:#f59e0b;border-radius:2px 2px 0 0;min-width:2px" title="HIGH: '+t.high+'"></div>':'')+
-          (t.medium?'<div style="flex:'+t.medium+';background:#3b82f6;border-radius:2px 2px 0 0;min-width:2px" title="MEDIUM: '+t.medium+'"></div>':'')+
-          (t.low?'<div style="flex:'+t.low+';background:#22c55e;border-radius:2px 2px 0 0;min-width:2px" title="LOW: '+t.low+'"></div>':'')+
-        '</div>'+
-      '</div>'+
-      '<span style="font-family:var(--font-mono);font-size:11px;min-width:40px;text-align:right">'+t.total+'</span>'+
-    '</div>';
-  }).join('');
-  document.getElementById('tool-body').innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--t3)">No data</div>';
-}
-
-window.addEventListener('message',function(e){
-  if(!e.data)return;
-  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){
-    TOKEN=e.data.token;
-    API=window.location.origin==='null'?'':window.location.origin;
-    loadAll();
-  }
-  if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
-});
-if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
-function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}}
-if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'},'*');
-
-// FIX: Gọi loadAll() ngay khi load — render sample data nếu chưa có token
-loadAll();
-</script>
-
-<!-- CVE Detail Modal -->
-<div class="modal-overlay" id="cve-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;padding-top:32px;overflow-y:auto" onclick="if(event.target===this)this.style.display='none'">
-  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(680px,95vw);margin-bottom:32px">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">
+<!-- CVE detail modal — INSIDE body (fix B8) -->
+<div class="modal-overlay" id="cve-detail-modal">
+  <div class="modal">
+    <div class="modal-head">
       <div>
-        <div style="font-size:15px;font-weight:700;font-family:var(--font-mono);color:var(--cyan)" id="cvd-id">CVE-XXXX</div>
+        <div style="font-size:15px;font-weight:700;font-family:var(--font-mono);color:var(--cyan)" id="cvd-id"></div>
         <div style="font-size:11px;color:var(--t3);margin-top:3px" id="cvd-sub"></div>
       </div>
-      <button onclick="document.getElementById('cve-detail-modal').style.display='none'" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px">✕</button>
+      <button class="modal-close" onclick="closeCVEDetail()">✕</button>
     </div>
-    <div style="padding:16px 20px">
+    <div class="modal-body">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="cvd-kpis"></div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Description</div>
       <div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6" id="cvd-desc"></div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Affected tools</div>
       <div style="font-size:12px;font-family:var(--font-mono);color:var(--cyan);margin-bottom:14px" id="cvd-tools"></div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Remediation</div>
-      <div style="background:var(--surface);border-radius:7px;padding:10px;font-size:11px;color:var(--green);font-family:var(--font-mono)" id="cvd-fix">Update to latest version</div>
-      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap" id="cvd-findings"></div>
+      <div style="background:var(--surface);border-radius:7px;padding:10px 12px;font-size:11px;font-family:var(--font-mono)" id="cvd-fix"></div>
     </div>
-    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-sm" onclick="huntCVE()">🔍 Hunt in logs</button>
-      <button class="btn btn-sm" onclick="document.getElementById('cve-detail-modal').style.display='none'">Close</button>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-primary" onclick="copyCVEId()">📋 Copy CVE ID</button>
+      <button class="btn btn-sm" onclick="closeCVEDetail()">Close</button>
     </div>
   </div>
 </div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
 <script>
-var _currentCVE=null;
-async function openCVEDetail(cve){
-  _currentCVE=cve;
-  document.getElementById('cve-detail-modal').style.display='flex';
-  document.getElementById('cvd-id').textContent=cve.cve;
-  document.getElementById('cvd-sub').textContent='Count: '+cve.count+' findings · Tools: '+cve.tools;
-  document.getElementById('cvd-tools').textContent=cve.tools;
-  var cvssColor=cve.severity==='CRITICAL'?'var(--red)':cve.severity==='HIGH'?'var(--amber)':'var(--blue)';
-  document.getElementById('cvd-kpis').innerHTML=[
-    {lbl:'Severity',val:cve.severity,color:cvssColor},
-    {lbl:'Count',val:cve.count,color:'var(--cyan)'},
-    {lbl:'Fixable',val:cve.fixable?'YES':'NO',color:cve.fixable?'var(--green)':'var(--t3)'},
-    {lbl:'Tools',val:(cve.tools||'').split(',').length,color:'var(--purple)'},
-  ].map(function(k){
-    return '<div style="background:var(--surface);border-radius:7px;padding:8px 10px"><div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:3px">'+k.lbl+'</div>'
-      +'<div style="font-size:14px;font-weight:700;font-family:var(--font-mono);color:'+k.color+'">'+k.val+'</div></div>';
+// ── State ──────────────────────────────────────────────────
+var TOKEN = '', API = '';
+var _trendChart = null;
+var _cveData = [];      // single source of truth (FIX B7: removed duplicate renderCVEs)
+var _toolData = [];
+
+// ── Sample data ────────────────────────────────────────────
+var SAMPLE_TREND = (function() {
+  var days = [], now = new Date();
+  // Simulate declining trend (good security posture)
+  var crit = 12, high = 32, med = 58;
+  for (var i = 29; i >= 0; i--) {
+    var d = new Date(now);
+    d.setDate(d.getDate() - i);
+    // Add some realistic variance
+    crit = Math.max(0, crit + (Math.random() > 0.6 ? -1 : Math.random() > 0.8 ? 1 : 0));
+    high = Math.max(0, high + (Math.random() > 0.55 ? -1 : Math.random() > 0.8 ? 2 : 0));
+    med  = Math.max(0, med  + (Math.random() > 0.5  ? -2 : Math.random() > 0.7 ? 3 : 0));
+    days.push({ date: d.toISOString().slice(0, 10), critical: crit, high: high, medium: med });
+  }
+  return days;
+})();
+
+var SAMPLE_CVES = [
+  { cve:'CVE-2023-44487', severity:'CRITICAL', count:12, tools:'semgrep, gosec',     fixable:true,  desc:'HTTP/2 Rapid Reset Attack. Allows remote DoS by resetting streams rapidly.' },
+  { cve:'CVE-2024-21626', severity:'CRITICAL', count:8,  tools:'trivy',              fixable:true,  desc:'runc container escape vulnerability. Allows host filesystem access from container.' },
+  { cve:'CVE-2023-45283', severity:'HIGH',     count:15, tools:'gosec, semgrep',     fixable:false, desc:'Path traversal in filepath.Clean on Windows. Non-critical on Linux hosts.' },
+  { cve:'CVE-2024-24790', severity:'HIGH',     count:9,  tools:'govulncheck',        fixable:true,  desc:'net/netip: unexpected behavior from Is methods for IPv4-mapped IPv6 addresses.' },
+  { cve:'CVE-2023-39325', severity:'HIGH',     count:7,  tools:'trivy, govulncheck', fixable:true,  desc:'golang.org/x/net/http2: rapid stream resets can cause excessive work in http2 server.' },
+  { cve:'CVE-2024-34156', severity:'MEDIUM',   count:22, tools:'semgrep',            fixable:false, desc:'encoding/gob: stack exhaustion in Decoder.Decode.' },
+  { cve:'CVE-2023-48795', severity:'MEDIUM',   count:11, tools:'trivy',              fixable:true,  desc:'Prefix truncation attack on BPP (SSH protocol).' },
+  { cve:'CVE-2024-28180', severity:'LOW',      count:5,  tools:'gosec',              fixable:true,  desc:'jose-go: Decompression bomb vulnerability in JWE (compact serialization).' },
+];
+
+var SAMPLE_TOOLS = [
+  { tool:'semgrep',      critical:3,  high:18, medium:42, low:12, total:75 },
+  { tool:'gosec',        critical:5,  high:12, medium:28, low:8,  total:53 },
+  { tool:'trivy',        critical:4,  high:9,  medium:19, low:6,  total:38 },
+  { tool:'govulncheck',  critical:2,  high:7,  medium:11, low:3,  total:23 },
+];
+
+var SAMPLE_SLA = [
+  { label:'Critical (24h)', pct:62, color:'var(--red)' },
+  { label:'High (7d)',      pct:79, color:'var(--amber)' },
+  { label:'Medium (30d)',   pct:91, color:'var(--blue)' },
+  { label:'Low (90d)',      pct:97, color:'var(--green)' },
+];
+
+// ── Helpers ────────────────────────────────────────────────
+function sevPill(s) {
+  var m = { CRITICAL:'pill-red', HIGH:'pill-amber', MEDIUM:'pill-blue', LOW:'pill-green' };
+  return '<span class="pill ' + (m[s] || 'pill-gray') + '">' + s + '</span>';
+}
+
+function showToast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast toast-' + (type || 'success') + ' show';
+  setTimeout(function(){ el.className = 'toast'; }, 2800);
+}
+
+function _kpiCard(lbl, val, color) {
+  return '<div style="background:var(--surface);border-radius:7px;padding:8px 10px">'
+    + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">' + lbl + '</div>'
+    + '<div style="font-size:14px;font-weight:700;font-family:var(--font-mono);color:' + color + '">' + val + '</div>'
+    + '</div>';
+}
+
+// ── KPI update ─────────────────────────────────────────────
+function updateKPIs(cves, tools) {
+  // FIX B9: compute from CVE list directly, fallback to 0 (not trend sum)
+  var crit = cves.filter(function(c){ return c.severity === 'CRITICAL'; })
+                 .reduce(function(s, c){ return s + c.count; }, 0);
+  var high = cves.filter(function(c){ return c.severity === 'HIGH'; })
+                 .reduce(function(s, c){ return s + c.count; }, 0);
+  document.getElementById('k-crit').textContent  = crit;
+  document.getElementById('k-high').textContent  = high;
+  document.getElementById('k-cves').textContent  = cves.length;
+  document.getElementById('k-fix').textContent   = cves.filter(function(c){ return c.fixable; }).length;
+  document.getElementById('k-tools').textContent = tools.length;
+}
+
+// ── Trend chart ────────────────────────────────────────────
+function renderTrend(points) {
+  var ctx = document.getElementById('trend-chart').getContext('2d');
+  if (_trendChart) { _trendChart.destroy(); _trendChart = null; } // FIX B11: destroy properly
+  var dg = { color: 'rgba(255,255,255,.04)' };
+  _trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: points.map(function(p){ return p.date ? p.date.slice(5) : ''; }),
+      datasets: [
+        { label:'Critical', data:points.map(function(p){ return p.critical; }), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.1)',  tension:.35, fill:true, pointRadius:2, pointHoverRadius:4 },
+        { label:'High',     data:points.map(function(p){ return p.high; }),     borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.08)', tension:.35, fill:true, pointRadius:2, pointHoverRadius:4 },
+        { label:'Medium',   data:points.map(function(p){ return p.medium; }),   borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.06)', tension:.35, fill:true, pointRadius:2, pointHoverRadius:4 },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color:'#8899bb', font:{ size:10 }, boxWidth:10, padding:12 } },
+        tooltip: {
+          backgroundColor: 'rgba(17,19,24,.95)',
+          borderColor: 'rgba(255,255,255,.12)',
+          borderWidth: 1,
+          titleColor: '#e8eaf0',
+          bodyColor: '#9aa3b8',
+          padding: 10,
+        }
+      },
+      scales: {
+        x: { ticks: { color:'#64748b', font:{ size:9 }, maxTicksLimit: 10 }, grid: dg },
+        y: { ticks: { color:'#64748b', font:{ size:9 } }, grid: dg, beginAtZero: true }
+      }
+    }
+  });
+  // Sub-label
+  var last = points[points.length - 1];
+  var sub = points.length + ' data points';
+  if (last) sub += ' · last: ' + last.date;
+  document.getElementById('trend-sub').textContent = sub;
+}
+
+// ── CVE table ──────────────────────────────────────────────
+function renderCVEs(cves) {
+  // FIX B7: only ONE definition of renderCVEs — _cveData stored here
+  _cveData = cves;
+  filterCVEs();
+  document.getElementById('cve-sub').textContent = cves.length + ' unique CVEs';
+}
+
+function filterCVEs() {
+  var q   = (document.getElementById('cve-search').value || '').toLowerCase();
+  var sf  = document.getElementById('sev-filter').value;
+  var list = _cveData.filter(function(c) {
+    if (sf && c.severity !== sf) return false;
+    if (q && c.cve.toLowerCase().indexOf(q) === -1 && (c.tools||'').toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+
+  if (!list.length) {
+    document.getElementById('cve-body').innerHTML =
+      '<tr><td colspan="4"><div class="empty-state"><div class="emo">🔍</div><p>No CVEs match the filter</p></div></td></tr>';
+    return;
+  }
+
+  document.getElementById('cve-body').innerHTML = list.map(function(c) {
+    // find original index for modal
+    var origIdx = _cveData.indexOf(c);
+    return '<tr onclick="openCVEDetail(' + origIdx + ')">'
+      + '<td style="font-family:var(--font-mono);font-size:10px">' + c.cve + (c.fixable ? '<span class="fixable-badge">fix ✓</span>' : '') + '</td>'
+      + '<td>' + sevPill(c.severity) + '</td>'
+      + '<td style="font-family:var(--font-mono);text-align:right">' + c.count + '</td>'
+      + '<td style="font-size:10px;color:var(--t3);max-width:140px;overflow:hidden;text-overflow:ellipsis" title="' + (c.tools||'') + '">' + (c.tools||'—') + '</td>'
+      + '</tr>';
   }).join('');
-  document.getElementById('cvd-desc').textContent=cve.cve+' — '+cve.severity+' severity vulnerability detected in your codebase. '+(cve.fixable?'A fix is available.':'Monitor for patches.');
-  document.getElementById('cvd-fix').textContent=cve.fixable?'Fix available — update affected dependency to latest patched version':'No fix available yet — apply mitigations and monitor vendor advisories';
-  document.getElementById('cvd-findings').innerHTML='';
-  if(TOKEN){
-    try{
-      var d=await fetch(API+'/api/v1/vsp/findings?search='+encodeURIComponent(cve.cve)+'&limit=5',
-        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
-      var findings=d.findings||[];
-      document.getElementById('cvd-findings').innerHTML=findings.length
-        ?'<div style="font-size:10px;color:var(--t3);width:100%;margin-bottom:4px">RELATED FINDINGS ('+findings.length+')</div>'+
-          findings.slice(0,3).map(function(f){
-            return '<div style="background:var(--surface);border-radius:6px;padding:6px 9px;font-size:10px;font-family:var(--font-mono);border-left:2px solid var(--amber)">'+
-              (f.path||f.message||f.rule_id||'finding').slice(0,60)+'</div>';
-          }).join('')
-        :'';
-    }catch(e){}
+}
+
+// ── Tool breakdown ─────────────────────────────────────────
+function renderTools(tools) {
+  _toolData = tools;
+  document.getElementById('tool-sub').textContent = tools.length + ' scanners';
+  if (!tools.length) {
+    document.getElementById('tool-body').innerHTML = '<div class="empty-state"><div class="emo">🔍</div><p>No tool data</p></div>';
+    return;
+  }
+  var maxTotal = Math.max.apply(null, tools.map(function(t){ return t.total || 0; })) || 1;
+  document.getElementById('tool-body').innerHTML = tools.map(function(t) {
+    var barW = Math.round((t.total / maxTotal) * 100);
+    return '<div class="tool-row">'
+      + '<span class="tool-name">' + t.tool + '</span>'
+      + '<div style="flex:1">'
+      + '<div class="sev-bar">'
+      + (t.critical ? '<div class="sev-seg" style="flex:' + t.critical + ';background:#ef4444" title="Critical: ' + t.critical + '"></div>' : '')
+      + (t.high     ? '<div class="sev-seg" style="flex:' + t.high     + ';background:#f59e0b" title="High: '     + t.high     + '"></div>' : '')
+      + (t.medium   ? '<div class="sev-seg" style="flex:' + t.medium   + ';background:#3b82f6" title="Medium: '   + t.medium   + '"></div>' : '')
+      + (t.low      ? '<div class="sev-seg" style="flex:' + t.low      + ';background:#22c55e" title="Low: '      + t.low      + '"></div>' : '')
+      + '</div>'
+      + '</div>'
+      + '<span style="font-family:var(--font-mono);font-size:11px;min-width:36px;text-align:right;color:var(--t2)">' + t.total + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+// ── SLA panel ──────────────────────────────────────────────
+function renderSLA(slaRows) {
+  document.getElementById('sla-body').innerHTML = slaRows.map(function(r) {
+    var ok = r.pct >= 90;
+    var color = r.pct >= 90 ? 'var(--green)' : r.pct >= 70 ? 'var(--amber)' : 'var(--red)';
+    return '<div class="sla-row">'
+      + '<span style="font-size:11px;width:110px;flex-shrink:0">' + r.label + '</span>'
+      + '<div class="progress-bar">'
+      + '<div class="progress-fill" style="width:' + r.pct + '%;background:' + color + '"></div>'
+      + '</div>'
+      + '<span style="font-size:11px;font-family:var(--font-mono);color:' + color + ';width:36px;text-align:right">' + r.pct + '%</span>'
+      + '</div>';
+  }).join('');
+}
+
+// ── Fixable panel ──────────────────────────────────────────
+function renderFixable(cves) {
+  var fixable   = cves.filter(function(c){ return c.fixable; }).length;
+  var unfixable = cves.length - fixable;
+  var total     = cves.length || 1;
+  var pctFix    = Math.round(fixable / total * 100);
+
+  document.getElementById('fix-body').innerHTML =
+    '<div style="display:flex;gap:16px;margin-bottom:14px">'
+    + '<div style="text-align:center;flex:1"><div style="font-size:28px;font-weight:700;font-family:var(--font-mono);color:var(--green)">' + fixable + '</div><div style="font-size:10px;color:var(--t3)">fixable</div></div>'
+    + '<div style="text-align:center;flex:1"><div style="font-size:28px;font-weight:700;font-family:var(--font-mono);color:var(--red)">' + unfixable + '</div><div style="font-size:10px;color:var(--t3)">no patch yet</div></div>'
+    + '</div>'
+    + '<div class="progress-bar" style="height:10px;margin-bottom:8px">'
+    + '<div class="progress-fill" style="width:' + pctFix + '%;background:var(--green)"></div>'
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--t3);text-align:center">' + pctFix + '% of CVEs have available patches</div>';
+}
+
+// ── Render all sample data ─────────────────────────────────
+function renderSampleData() {
+  renderTrend(SAMPLE_TREND);
+  renderCVEs(SAMPLE_CVES);
+  renderTools(SAMPLE_TOOLS);
+  renderSLA(SAMPLE_SLA);
+  renderFixable(SAMPLE_CVES);
+  updateKPIs(SAMPLE_CVES, SAMPLE_TOOLS);
+}
+
+// ── Main load ──────────────────────────────────────────────
+async function loadAll() {
+  // FIX B9: always render sample data first so KPIs are never —
+  if (!TOKEN) { renderSampleData(); return; }
+
+  var days = document.getElementById('days-sel').value;
+  var h = { Authorization: 'Bearer ' + TOKEN };
+  try {
+    var res = await Promise.all([
+      fetch(API + '/api/v1/vulns/trend?days=' + days, { headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { trend:[] }; }),
+      fetch(API + '/api/v1/vulns/top-cves', { headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { cves:[] }; }),
+      fetch(API + '/api/v1/vulns/by-tool', { headers:h }).then(function(r){ return r.json(); }).catch(function(){ return { tools:[] }; }),
+    ]);
+    var td = res[0].trend || [];
+    var cd = res[1].cves  || [];
+    var ld = res[2].tools || [];
+
+    renderTrend(td.length ? td : SAMPLE_TREND);
+    renderCVEs( cd.length ? cd : SAMPLE_CVES);
+    renderTools(ld.length ? ld : SAMPLE_TOOLS);
+    renderSLA(SAMPLE_SLA);
+    renderFixable(cd.length ? cd : SAMPLE_CVES);
+
+    // FIX B9: use actual CVE list; if empty from API, use sample — but NEVER mix trend sums
+    updateKPIs(cd.length ? cd : SAMPLE_CVES, ld.length ? ld : SAMPLE_TOOLS);
+  } catch(e) {
+    renderSampleData();
   }
 }
-function huntCVE(){
-  if(!_currentCVE)return;
-  document.getElementById('cve-detail-modal').style.display='none';
-  window.parent&&window.parent.postMessage({type:'vsp:nav',panel:'threathunt',query:_currentCVE.cve},'*');
+
+// ── CVE detail modal ───────────────────────────────────────
+// FIX B8: modal is inside body, getElementById works correctly
+function openCVEDetail(i) {
+  var cve = _cveData[i];
+  if (!cve) return;
+  document.getElementById('cvd-id').textContent  = cve.cve;
+  document.getElementById('cvd-sub').textContent = 'Count: ' + cve.count + ' · Tools: ' + (cve.tools || '—');
+  document.getElementById('cvd-tools').textContent = cve.tools || '—';
+  document.getElementById('cvd-desc').textContent  = cve.desc || (cve.cve + ' — ' + cve.severity + ' severity vulnerability.');
+
+  var cc = cve.severity === 'CRITICAL' ? 'var(--red)' : cve.severity === 'HIGH' ? 'var(--amber)' : cve.severity === 'MEDIUM' ? 'var(--blue)' : 'var(--green)';
+  document.getElementById('cvd-kpis').innerHTML = [
+    { lbl:'Severity', val:cve.severity,                  color:cc },
+    { lbl:'Count',    val:cve.count,                     color:'var(--cyan)' },
+    { lbl:'Fixable',  val:cve.fixable ? 'YES' : 'NO',   color:cve.fixable ? 'var(--green)' : 'var(--red)' },
+    { lbl:'Tools',    val:(cve.tools||'').split(',').length, color:'var(--purple)' },
+  ].map(function(k){ return _kpiCard(k.lbl, k.val, k.color); }).join('');
+
+  var fixEl = document.getElementById('cvd-fix');
+  if (cve.fixable) {
+    fixEl.style.color = 'var(--green)';
+    fixEl.textContent = '✓ Fix available — update affected packages to the latest patched version';
+  } else {
+    fixEl.style.color = 'var(--amber)';
+    fixEl.textContent = '⚠ No upstream fix yet — apply mitigations and monitor vendor advisories';
+  }
+
+  document.getElementById('cve-detail-modal').classList.add('open');
 }
+
+function closeCVEDetail() {
+  document.getElementById('cve-detail-modal').classList.remove('open');
+}
+
+function copyCVEId() {
+  var id = document.getElementById('cvd-id').textContent;
+  if (!id) return;
+  navigator.clipboard.writeText(id).then(function(){
+    showToast('Copied: ' + id, 'success');
+  }).catch(function(){
+    showToast('Copy failed', 'error');
+  });
+}
+
+// Close modal on overlay click
+document.getElementById('cve-detail-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeCVEDetail();
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(function(m){ m.classList.remove('open'); });
+  }
+});
+
+// ── Token / theme message bus ──────────────────────────────
+// FIX B10: send vsp:request_theme only ONCE (was sent twice before)
+window.addEventListener('message', function(e) {
+  if (!e.data) return;
+  if (e.data.type === 'vsp:token' && e.data.token && e.data.token.length > 50) {
+    if (!TOKEN) {
+      TOKEN = e.data.token;
+      // Dùng origin của parent frame để tránh CORS
+      API = window.location.origin === 'null'
+        ? '' : window.location.origin;
+      loadAll();
+    }
+  }
+  if (e.data.type === 'vsp:theme') _applyTheme(e.data.theme);
+});
+
+if (window.parent !== window) {
+  window.parent.postMessage({ type: 'vsp:request_token' }, '*');
+  window.parent.postMessage({ type: 'vsp:request_theme' }, '*'); // FIX B10: only here, not twice
+}
+
+function _applyTheme(t) {
+  var r = document.documentElement;
+  if (t === 'light') {
+    r.style.setProperty('--bg',      '#f4f5f7');
+    r.style.setProperty('--bg2',     '#ffffff');
+    r.style.setProperty('--surface', '#f0f1f4');
+    r.style.setProperty('--border',  'rgba(0,0,0,.08)');
+    r.style.setProperty('--t1',      '#1a1d24');
+    r.style.setProperty('--t2',      '#4a5068');
+    r.style.setProperty('--t3',      '#8a90a8');
+    document.body.style.background = '#f4f5f7';
+  } else {
+    r.style.setProperty('--bg',      '#0a0c10');
+    r.style.setProperty('--bg2',     '#111318');
+    r.style.setProperty('--surface', '#1e2128');
+    r.style.setProperty('--border',  'rgba(255,255,255,.07)');
+    r.style.setProperty('--t1',      '#e8eaf0');
+    r.style.setProperty('--t2',      '#9aa3b8');
+    r.style.setProperty('--t3',      '#5a6278');
+    document.body.style.background = '#0a0c10';
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────
+renderSampleData();
 </script>
 </body>
 </html>

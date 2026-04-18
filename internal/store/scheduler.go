@@ -61,7 +61,7 @@ func (db *DB) ListStoreSchedules(ctx context.Context, tenantID ...string) ([]Sto
 	var list []StoreSchedule
 	for rows.Next() {
 		var s StoreSchedule
-		rows.Scan(&s.ID, &s.TenantID, &s.Name, &s.Mode, &s.Profile,
+		_ = rows.Scan(&s.ID, &s.TenantID, &s.Name, &s.Mode, &s.Profile,
 			&s.Src, &s.URL, &s.CronExpr, &s.Enabled,
 			&s.LastRunAt, &s.NextRunAt, &s.CreatedAt) //nolint
 		list = append(list, s)
@@ -121,7 +121,7 @@ func (db *DB) ListStoreDriftEvents(ctx context.Context, tenantID string, limit i
 	var list []StoreDriftEvent
 	for rows.Next() {
 		var d StoreDriftEvent
-		rows.Scan(&d.ID, &d.TenantID, &d.ScheduleID, &d.PrevPosture, &d.NewPosture,
+		_ = rows.Scan(&d.ID, &d.TenantID, &d.ScheduleID, &d.PrevPosture, &d.NewPosture,
 			&d.PrevScore, &d.NewScore, &d.Delta, &d.RID, &d.DetectedAt) //nolint
 		list = append(list, d)
 	}

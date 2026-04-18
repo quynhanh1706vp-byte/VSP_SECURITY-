@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VSP — SOAR</title>
+<style>
+:root{--bg:#0a0c10;--bg2:#111318;--surface:#1e2128;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--t1:#e8eaf0;--t2:#9aa3b8;--t3:#5a6278;--t4:#3a3f52;--red:#ef4444;--red2:rgba(239,68,68,.12);--amber:#f59e0b;--amber2:rgba(245,158,11,.12);--green:#22c55e;--green2:rgba(34,197,94,.12);--blue:#3b82f6;--blue2:rgba(59,130,246,.12);--cyan:#06b6d4;--cyan2:rgba(6,182,212,.12);--purple:#8b5cf6;--purple2:rgba(139,92,246,.12);--orange:#f97316;--orange2:rgba(249,115,22,.12);--font-mono:'JetBrains Mono','Fira Mono',monospace;--font-ui:'Inter','Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height:1.5}
+.app{display:grid;grid-template-columns:280px 1fr;height:100vh;overflow:hidden}
+.sidebar{border-right:1px solid var(--border);background:var(--bg2);overflow-y:auto;padding:10px 8px}
+.content{overflow-y:auto;background:var(--bg)}
+.topbar{border-bottom:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;padding:0 16px;height:48px;gap:10px}
+.topbar-title{font-size:14px;font-weight:700;letter-spacing:-.02em}
+.topbar-sub{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
+.topbar-right{margin-left:auto;display:flex;gap:7px;align-items:center}
+.pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid transparent}
+.pill-red{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3)}
+.pill-amber{background:var(--amber2);color:var(--amber);border-color:rgba(245,158,11,.3)}
+.pill-green{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3)}
+.pill-blue{background:var(--blue2);color:var(--blue);border-color:rgba(59,130,246,.3)}
+.pill-cyan{background:var(--cyan2);color:var(--cyan);border-color:rgba(6,182,212,.3)}
+.pill-gray{background:rgba(255,255,255,.06);color:var(--t2);border-color:var(--border2)}
+.pill-purple{background:var(--purple2);color:var(--purple);border-color:rgba(139,92,246,.3)}
+.btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--surface)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--blue2);border-color:rgba(59,130,246,.4);color:var(--blue)}
+.btn-primary:hover{background:rgba(59,130,246,.2)}
+.btn-run{background:var(--purple2);border-color:rgba(139,92,246,.4);color:var(--purple)}
+.btn-run:hover{background:rgba(139,92,246,.2)}
+.btn-sm{padding:3px 8px;font-size:10px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:12px;font-weight:600}
+.card-sub{font-size:11px;color:var(--t3);margin-top:1px}
+.pb-item{padding:9px 10px;border-radius:8px;margin-bottom:5px;border:1.5px solid transparent;cursor:pointer;transition:all .15s;position:relative}
+.pb-item:hover{background:var(--surface);border-color:var(--border)}
+.pb-item.active{background:var(--surface);border-color:var(--blue)}
+.pb-item.running{border-color:var(--purple);background:var(--purple2)}
+.pb-name{font-size:12px;font-weight:600;margin-bottom:2px}
+.pb-desc{font-size:10px;color:var(--t3);margin-bottom:5px;line-height:1.4}
+.pb-meta{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.pb-dot{width:6px;height:6px;border-radius:50%;position:absolute;top:10px;right:10px}
+/* Steps */
+.step-wrap{position:relative;padding-left:24px;margin-bottom:5px}
+.step-connector{position:absolute;left:8px;top:24px;bottom:-5px;width:1px;background:var(--border)}
+.step-num{position:absolute;left:3px;top:8px;width:11px;height:11px;border-radius:50%;border:1.5px solid var(--border2);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--t3);transition:all .3s}
+.step-num.done{border-color:var(--green);background:var(--green2);color:var(--green)}
+.step-num.running{border-color:var(--blue);background:var(--blue2);color:var(--blue)}
+.step-num.failed{border-color:var(--red);background:var(--red2);color:var(--red)}
+.step-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;transition:all .2s}
+.step-card.running{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue2)}
+.step-card.done{border-color:rgba(34,197,94,.3)}
+.step-card.failed{border-color:rgba(239,68,68,.3)}
+.step-card.skip{opacity:.35}
+.step-hdr{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.step-type{font-size:9px;font-family:var(--font-mono);padding:1px 5px;border-radius:3px}
+.step-name{font-size:11px;font-weight:600;flex:1}
+.step-status-icon{font-size:12px;flex-shrink:0}
+.step-desc{font-size:10px;color:var(--t3);margin-bottom:4px}
+.step-config{font-size:10px;font-family:var(--font-mono);color:var(--t3);background:var(--bg);padding:5px 7px;border-radius:4px;border:1px solid var(--border);white-space:pre-wrap;word-break:break-all}
+.step-out{font-size:10px;font-family:var(--font-mono);background:var(--bg);padding:5px 7px;border-radius:4px;margin-top:5px;white-space:pre-wrap;word-break:break-all;display:none}
+.step-out.show{display:block}
+.step-out.success{color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.step-out.error{color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.step-out.warn{color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+/* Progress bar */
+.progress-wrap{height:4px;background:var(--border);border-radius:2px;margin:8px 0;overflow:hidden}
+.progress-fill{height:4px;border-radius:2px;transition:width .4s ease;background:linear-gradient(90deg,var(--blue),var(--purple))}
+/* Live log */
+.live-log{font-size:10px;font-family:var(--font-mono);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;height:180px;overflow-y:auto;scrollbar-width:thin}
+.ll{display:flex;gap:8px;line-height:1.7}
+.ll-ts{color:var(--t4);flex-shrink:0;user-select:none}
+.ll-lv{flex-shrink:0;font-weight:700;width:40px}
+.ll-INFO{color:var(--cyan)}.ll-DONE{color:var(--green)}.ll-ERROR{color:var(--red)}.ll-WARN{color:var(--amber)}.ll-SKIP{color:var(--t4)}.ll-START{color:var(--purple)}
+.ll-msg{color:var(--t2)}
+/* Run history */
+.run-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;cursor:pointer;transition:background .12s}
+.run-item:hover{background:var(--surface)}
+.run-item:last-child{border-bottom:none}
+.run-id{font-family:var(--font-mono);color:var(--t3);font-size:10px;flex-shrink:0;width:74px}
+.run-pb{flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-ts{font-family:var(--font-mono);font-size:10px;color:var(--t3);flex-shrink:0}
+.run-dur{font-family:var(--font-mono);font-size:10px;color:var(--t3);width:36px;text-align:right;flex-shrink:0}
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 16px}
+.kpi{background:var(--surface);border-radius:8px;padding:10px 12px}
+.kpi-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.kpi-val{font-size:18px;font-weight:700;font-family:var(--font-mono)}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;padding-top:32px;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(600px,95vw);margin-bottom:32px}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:14px;font-weight:700}
+.modal-body{padding:16px 18px}
+.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.modal-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px}
+.form-group{margin-bottom:10px}
+.form-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:block}
+.form-ctrl{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;font-family:var(--font-ui);outline:none}
+.form-ctrl:focus{border-color:var(--blue)}
+select.form-ctrl option{background:var(--bg2)}
+textarea.form-ctrl{font-family:var(--font-mono);font-size:10px;resize:vertical}
+.spinner{width:12px;height:12px;border-radius:50%;border:2px solid var(--border2);border-top-color:var(--blue);animation:spin .6s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.slbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-mono);margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--border)}
+.run-detail-step{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.run-detail-step:last-child{border-bottom:none}
+.rds-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div style="padding:10px 4px 6px;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:8px">
+    Playbooks
+    <button class="btn btn-sm btn-primary" style="float:right;margin-top:-2px" onclick="openNewPB()">+ New</button>
+  </div>
+  <div id="pb-list"></div>
+</aside>
+
+<div style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">SOAR — Playbook engine</div>
+      <div class="topbar-sub">Security orchestration · automation · response</div>
+    </div>
+    <div class="topbar-right">
+      <span class="pill pill-green" id="engine-badge">&#9679; Engine live</span>
+    </div>
+  </div>
+
+  <div style="overflow-y:auto;flex:1;padding:14px 16px">
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+      <div class="kpi"><div class="kpi-lbl">Total</div><div class="kpi-val" id="k-total">0</div></div>
+      <div class="kpi"><div class="kpi-lbl">Runs today</div><div class="kpi-val" style="color:var(--cyan)" id="k-runs">0</div></div>
+      <div class="kpi"><div class="kpi-lbl">Success rate</div><div class="kpi-val" style="color:var(--green)" id="k-rate">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">Avg response</div><div class="kpi-val" style="color:var(--amber)" id="k-mtr">—</div></div>
+    </div>
+
+    <!-- Selected playbook detail -->
+    <div id="detail-area">
+      <div style="text-align:center;padding:40px;color:var(--t3);font-size:12px">&#8592; Select a playbook</div>
+    </div>
+
+    <!-- Run history -->
+    <div class="card" id="history-card">
+      <div class="card-head">
+        <div><div class="card-title">Run history</div><div class="card-sub" id="history-sub">—</div></div>
+        <button class="btn btn-sm" onclick="loadRunHistory()">&#8635;</button>
+      </div>
+      <div id="run-history"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Run detail modal -->
+<div class="modal-overlay" id="run-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="rmod-title">Run playbook</div>
+      <button class="modal-close" onclick="closeModal('run-modal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="slbl" style="margin-top:0">Context (JSON)</div>
+      <textarea class="form-ctrl" id="run-ctx" rows="3" style="font-family:var(--font-mono);font-size:10px">{"trigger":"manual","severity":"HIGH","gate":"FAIL"}</textarea>
+
+      <!-- Progress -->
+      <div id="run-progress-wrap" style="display:none;margin-top:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:11px;font-weight:600" id="run-progress-lbl">Running…</span>
+          <span style="font-size:10px;font-family:var(--font-mono);color:var(--t3)" id="run-progress-pct">0%</span>
+        </div>
+        <div class="progress-wrap"><div class="progress-fill" id="run-progress-bar" style="width:0%"></div></div>
+
+        <!-- Live log -->
+        <div class="slbl">Execution log</div>
+        <div class="live-log" id="run-live-log"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('run-modal')">Close</button>
+      <button class="btn btn-run" id="run-exec-btn" onclick="execPlaybook()">&#9654; Execute</button>
+    </div>
+  </div>
+</div>
+
+<!-- Run history detail modal -->
+<div class="modal-overlay" id="hist-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="hmod-title">Run details</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px" id="hmod-sub"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="hmod-status"></span>
+        <button class="modal-close" onclick="closeModal('hist-modal')">&#10005;</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px" id="hmod-kpis"></div>
+      <div class="slbl" style="margin-top:0">Step results</div>
+      <div id="hmod-steps"></div>
+      <div class="slbl">Execution log</div>
+      <div class="live-log" id="hmod-log" style="height:140px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('hist-modal')">Close</button>
+      <button class="btn btn-run btn-sm" id="hmod-rerun-btn">&#8635; Re-run</button>
+    </div>
+  </div>
+</div>
+
+<!-- New playbook modal -->
+<div class="modal-overlay" id="new-pb-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">New playbook</div>
+      <button class="modal-close" onclick="closeModal('new-pb-modal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Name</label><input class="form-ctrl" id="np-name" placeholder="e.g. Gate FAIL auto-response"></div>
+      <div class="form-group"><label class="form-label">Description</label><input class="form-ctrl" id="np-desc" placeholder="What does this playbook do?"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group"><label class="form-label">Trigger event</label>
+          <select class="form-ctrl" id="np-trigger">
+            <option value="gate_fail">Gate FAIL</option>
+            <option value="critical_finding">Critical finding</option>
+            <option value="sla_breach">SLA breach</option>
+            <option value="secret_detected">Secret detected</option>
+            <option value="manual">Manual only</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Severity filter</label>
+          <select class="form-ctrl" id="np-sev">
+            <option value="any">Any</option>
+            <option value="CRITICAL">Critical only</option>
+            <option value="HIGH">High and above</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Template</label>
+        <select class="form-ctrl" id="np-tpl">
+          <option value="notify">Notify (Slack + email)</option>
+          <option value="ticket">Create Jira ticket</option>
+          <option value="block">Block CI pipeline</option>
+          <option value="full">Full response</option>
+          <option value="custom">Custom (empty)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('new-pb-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createPB()">Create &#8594;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var TOKEN='', API='';
+var PLAYBOOKS=[], RUN_HISTORY=[], activePB=null, isRunning=false;
+
+var STEP_TYPES={
+  condition:{label:'Condition',color:'var(--amber)',bg:'var(--amber2)'},
+  notify:   {label:'Notify',  color:'var(--cyan)', bg:'var(--cyan2)'},
+  ticket:   {label:'Ticket',  color:'var(--purple)',bg:'var(--purple2)'},
+  webhook:  {label:'Webhook', color:'var(--blue)',  bg:'var(--blue2)'},
+  block:    {label:'Block CI',color:'var(--red)',   bg:'var(--red2)'},
+  enrich:   {label:'Enrich',  color:'var(--green)', bg:'var(--green2)'},
+  wait:     {label:'Wait',    color:'var(--t3)',    bg:'rgba(255,255,255,.05)'},
+  remediate:{label:'Remediate',color:'var(--orange)',bg:'var(--orange2)'},
+};
+
+var STEP_OUTS={
+  condition:'PASS — condition met',
+  notify:'SENT — delivery confirmed',
+  ticket:'CREATED — VSP-SEC-'+Math.floor(Math.random()*900+100),
+  webhook:'HTTP 200 — {"status":"ok"}',
+  block:'BLOCKED — pipeline set to failure',
+  enrich:'ENRICHED — CVSS 9.1 · EPSS 0.72 · KEV: YES',
+  wait:'WAITED — delay complete',
+  remediate:'ASSIGNED — findings → security-oncall',
+};
+
+var TPLS={
+  notify:[
+    {Type:'condition',Name:'Check severity',Desc:'Proceed if severity ≥ HIGH',Config:'severity IN [CRITICAL,HIGH]'},
+    {Type:'notify',Name:'Slack alert',Desc:'Post to #security-alerts',Config:'channel: #security-alerts\nmsg: "{{severity}} — {{run_id}}"'},
+    {Type:'notify',Name:'Email SOC',Desc:'Send email to SOC',Config:'to: soc@agency.gov\nsubject: "[VSP] {{severity}}"'},
+  ],
+  ticket:[
+    {Type:'condition',Name:'Check ticket exists',Desc:'Skip if already open',Config:'existing_ticket = null'},
+    {Type:'enrich',Name:'Fetch CVE details',Desc:'Pull CVSS, EPSS from NVD',Config:'source: NVD\nfields: [cvss,epss,kev]'},
+    {Type:'ticket',Name:'Create Jira ticket',Desc:'Open in VSP-SECURITY',Config:'project: VSP-SECURITY\npriority: P1'},
+  ],
+  block:[
+    {Type:'condition',Name:'Gate is FAIL',Desc:'Only block on FAIL',Config:'gate = FAIL'},
+    {Type:'block',Name:'Block CI pipeline',Desc:'Set pipeline to failed',Config:'provider: github\nstatus: failure\ncontext: vsp/gate'},
+    {Type:'notify',Name:'Notify developer',Desc:'Comment on PR',Config:'target: pr_comment\nbody: "Gate FAIL — findings detected"'},
+  ],
+  full:[
+    {Type:'condition',Name:'Check gate + severity',Desc:'FAIL with CRITICAL/HIGH',Config:'gate=FAIL AND severity IN [CRITICAL,HIGH]'},
+    {Type:'enrich',Name:'Enrich findings',Desc:'Add CVE context, EPSS',Config:'source: NVD,OSV\nfields: [cvss,epss,kev]'},
+    {Type:'block',Name:'Block CI pipeline',Desc:'Fail the pipeline check',Config:'provider: github\nstatus: failure'},
+    {Type:'ticket',Name:'Create Jira ticket',Desc:'Open P1 ticket',Config:'project: VSP-SECURITY\npriority: P1'},
+    {Type:'notify',Name:'Slack — critical',Desc:'Alert #security-alerts',Config:'channel: #security-alerts\nping: @security-oncall'},
+    {Type:'notify',Name:'Email CISO',Desc:'Send executive summary',Config:'to: ciso@agency.gov\ntemplate: executive_summary'},
+    {Type:'remediate',Name:'Auto-assign findings',Desc:'Assign to on-call',Config:'assignee: security-oncall\npriority: P1'},
+  ],
+  custom:[],
+};
+
+var DEF_PB=[
+  {id:'pb-001',name:'Gate FAIL auto-response',enabled:true,trigger:'gate_fail',sev:'any',desc:'Full: block CI, Jira, notify',steps:TPLS.full,runs:47,success:44,last:'2m ago'},
+  {id:'pb-002',name:'Critical finding notify',enabled:true,trigger:'critical_finding',sev:'CRITICAL',desc:'Slack + email on critical',steps:TPLS.notify,runs:12,success:12,last:'18m ago'},
+  {id:'pb-003',name:'SLA breach escalation',enabled:true,trigger:'sla_breach',sev:'any',desc:'Escalate to leadership',steps:TPLS.ticket,runs:3,success:3,last:'2h ago'},
+  {id:'pb-004',name:'Secret detection lockdown',enabled:true,trigger:'secret_detected',sev:'CRITICAL',desc:'Block CI + P0 ticket + page',steps:TPLS.block,runs:2,success:2,last:'3h ago'},
+  {id:'pb-005',name:'Score drop alert',enabled:false,trigger:'gate_fail',sev:'any',desc:'Alert when score drops >20',steps:TPLS.notify,runs:0,success:0,last:'never'},
+];
+PLAYBOOKS=DEF_PB;
+
+var DEF_RUNS=[
+  {id:'RUN-0048',pb:'Gate FAIL auto-response',pbId:'pb-001',status:'success',ts:'19:47:32',dur:'12s',trigger:'gate_fail',
+   steps:[
+     {name:'Check gate + severity',type:'condition',status:'done',output:'PASS — gate=FAIL AND severity=CRITICAL'},
+     {name:'Enrich findings',type:'enrich',status:'done',output:'ENRICHED — CVSS 9.1 · EPSS 0.72 · KEV: YES'},
+     {name:'Block CI pipeline',type:'block',status:'done',output:'BLOCKED — pipeline set to failure'},
+     {name:'Create Jira ticket',type:'ticket',status:'done',output:'CREATED — VSP-SEC-247'},
+     {name:'Slack — critical',type:'notify',status:'done',output:'SENT — #security-alerts notified'},
+   ],
+   log:[
+     {ts:'19:47:20',lv:'START',msg:'Playbook started: Gate FAIL auto-response [RUN-0048]'},
+     {ts:'19:47:20',lv:'INFO',msg:'Step 1/5: Check gate + severity'},
+     {ts:'19:47:21',lv:'DONE',msg:'Condition met → gate=FAIL severity=CRITICAL'},
+     {ts:'19:47:21',lv:'INFO',msg:'Step 2/5: Enrich findings'},
+     {ts:'19:47:23',lv:'DONE',msg:'CVSS 9.1 · EPSS 0.72 · KEV listed'},
+     {ts:'19:47:23',lv:'INFO',msg:'Step 3/5: Block CI pipeline'},
+     {ts:'19:47:24',lv:'DONE',msg:'GitHub status set to failure · context: vsp/gate'},
+     {ts:'19:47:24',lv:'INFO',msg:'Step 4/5: Create Jira ticket'},
+     {ts:'19:47:26',lv:'DONE',msg:'Jira ticket created: VSP-SEC-247 (P1)'},
+     {ts:'19:47:26',lv:'INFO',msg:'Step 5/5: Slack alert'},
+     {ts:'19:47:27',lv:'DONE',msg:'Slack message sent to #security-alerts'},
+     {ts:'19:47:27',lv:'DONE',msg:'Playbook complete — 5/5 steps succeeded · 12s'},
+   ]},
+  {id:'RUN-0047',pb:'Critical finding notify',pbId:'pb-002',status:'success',ts:'19:31:14',dur:'4s',trigger:'critical_finding',
+   steps:[
+     {name:'Check severity',type:'condition',status:'done',output:'PASS'},
+     {name:'Slack alert',type:'notify',status:'done',output:'SENT'},
+     {name:'Email SOC',type:'notify',status:'done',output:'SENT'},
+   ],
+   log:[
+     {ts:'19:31:10',lv:'START',msg:'Playbook started [RUN-0047]'},
+     {ts:'19:31:11',lv:'DONE',msg:'Condition met'},
+     {ts:'19:31:12',lv:'DONE',msg:'Slack sent'},
+     {ts:'19:31:14',lv:'DONE',msg:'Email sent · complete'},
+   ]},
+  {id:'RUN-0046',pb:'Gate FAIL auto-response',pbId:'pb-001',status:'failed',ts:'16:34:22',dur:'31s',trigger:'gate_fail',
+   steps:[
+     {name:'Check gate + severity',type:'condition',status:'done',output:'PASS'},
+     {name:'Enrich findings',type:'enrich',status:'done',output:'ENRICHED'},
+     {name:'Block CI pipeline',type:'block',status:'failed',output:'ERROR — GitHub API timeout after 30s'},
+     {name:'Create Jira ticket',type:'ticket',status:'skip',output:'Skipped due to failure'},
+     {name:'Slack — critical',type:'notify',status:'skip',output:'Skipped due to failure'},
+   ],
+   log:[
+     {ts:'16:33:51',lv:'START',msg:'Playbook started [RUN-0046]'},
+     {ts:'16:33:52',lv:'DONE',msg:'Condition met'},
+     {ts:'16:33:53',lv:'DONE',msg:'Enriched'},
+     {ts:'16:34:22',lv:'ERROR',msg:'GitHub API timeout after 30s · Retried 3x'},
+     {ts:'16:34:22',lv:'WARN',msg:'Playbook failed at step 3/5 · 2 steps skipped'},
+   ]},
+];
+RUN_HISTORY=DEF_RUNS;
+
+// ── Render sidebar list ────────────────────────────────────
+function renderList(){
+  var enabled=PLAYBOOKS.filter(function(p){return p.enabled;}).length;
+  document.getElementById('k-total').textContent=PLAYBOOKS.length;
+  document.getElementById('k-runs').textContent=RUN_HISTORY.length;
+  var succ=RUN_HISTORY.filter(function(r){return r.status==='success';}).length;
+  document.getElementById('k-rate').textContent=RUN_HISTORY.length>0?Math.round(succ/RUN_HISTORY.length*100)+'%':'—';
+  document.getElementById('k-mtr').textContent='38s';
+
+  document.getElementById('pb-list').innerHTML=PLAYBOOKS.map(function(pb){
+    var isActive=activePB&&activePB.id===pb.id;
+    var isRun=isRunning&&isActive;
+    return '<div class="pb-item '+(isActive?'active':'')+(isRun?' running':'')+'" onclick="selectPB(\''+pb.id+'\')">'
+      +'<div class="pb-dot" style="background:'+(pb.enabled?'var(--green)':'var(--t4)')+'"></div>'
+      +'<div class="pb-name">'+pb.name+'</div>'
+      +'<div class="pb-desc">'+pb.desc+'</div>'
+      +'<div class="pb-meta">'
+      +'<span class="pill '+(pb.enabled?'pill-green':'pill-gray')+'">'+(pb.enabled?'enabled':'off')+'</span>'
+      +'<span class="pill pill-gray">'+trigLabel(pb.trigger)+'</span>'
+      +'<span class="pill pill-cyan">'+pb.runs+' runs</span>'
+      +'</div></div>';
+  }).join('');
+}
+
+function trigLabel(t){return {gate_fail:'Gate FAIL',critical_finding:'Critical',sla_breach:'SLA breach',secret_detected:'Secret',manual:'Manual'}[t]||t;}
+
+function selectPB(id){
+  activePB=PLAYBOOKS.find(function(p){return p.id===id;});
+  renderList();
+  renderDetail();
+}
+
+// ── Render detail ──────────────────────────────────────────
+function renderDetail(){
+  var pb=activePB;if(!pb)return;
+  var rate=pb.runs>0?Math.round(pb.success/pb.runs*100):0;
+  var rateColor=rate>=90?'var(--green)':rate>=70?'var(--amber)':'var(--red)';
+  document.getElementById('detail-area').innerHTML=
+    '<div class="card" style="margin-bottom:0">'
+    +'<div class="card-head">'
+    +'<div><div class="card-title" style="font-size:14px;margin-bottom:2px">'+pb.name+'</div>'
+    +'<div style="font-size:11px;color:var(--t3)">'+pb.desc+'</div></div>'
+    +'<div style="display:flex;gap:7px;align-items:center">'
+    +'<button class="btn btn-sm" onclick="togglePB(\''+pb.id+'\')">'+( pb.enabled?'Disable':'Enable')+'</button>'
+    +'<button class="btn btn-run btn-sm" onclick="openRunModal(\''+pb.id+'\')">&#9654; Run now</button>'
+    +'</div></div>'
+    +'<div class="card-body">'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
+    +'<div style="background:var(--surface);border-radius:7px;padding:8px 10px"><div style="font-size:10px;color:var(--t3)">Trigger</div><div style="font-size:12px;font-weight:600;color:var(--amber)">'+trigLabel(pb.trigger)+'</div></div>'
+    +'<div style="background:var(--surface);border-radius:7px;padding:8px 10px"><div style="font-size:10px;color:var(--t3)">Sev filter</div><div style="font-size:12px;font-weight:600">'+pb.sev+'</div></div>'
+    +'<div style="background:var(--surface);border-radius:7px;padding:8px 10px"><div style="font-size:10px;color:var(--t3)">Total runs</div><div style="font-size:12px;font-weight:600;color:var(--cyan)">'+pb.runs+'</div></div>'
+    +'<div style="background:var(--surface);border-radius:7px;padding:8px 10px"><div style="font-size:10px;color:var(--t3)">Success rate</div><div style="font-size:12px;font-weight:600;color:'+rateColor+'">'+rate+'%</div></div>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-family:var(--font-mono)">Steps ('+pb.steps.length+')</div>'
+    +renderSteps(pb,'idle')
+    +'</div></div>';
+}
+
+function renderSteps(pb,runStatus,stepStatuses,stepOutputs){
+  return (pb.steps||[]).map(function(s,i){
+    var st=STEP_TYPES[s.Type||s.type]||STEP_TYPES.webhook;
+    var status=(stepStatuses&&stepStatuses[i])||runStatus||'idle';
+    var out=(stepOutputs&&stepOutputs[i])||'';
+    var outClass=status==='done'?'success':status==='failed'?'error':'';
+    return '<div class="step-wrap">'
+      +(i<pb.steps.length-1?'<div class="step-connector"></div>':'')
+      +'<div class="step-num '+status+'">'+(i+1)+'</div>'
+      +'<div class="step-card '+status+'">'
+      +'<div class="step-hdr">'
+      +'<span class="step-type" style="background:'+st.bg+';color:'+st.color+'">'+st.label+'</span>'
+      +'<span class="step-name">'+(s.Name||s.name)+'</span>'
+      +(status==='running'?'<div class="spinner"></div>':'')
+      +(status==='done'?'<span style="color:var(--green)">✓</span>':'')
+      +(status==='failed'?'<span style="color:var(--red)">✗</span>':'')
+      +(status==='skip'?'<span style="color:var(--t4)">→</span>':'')
+      +'</div>'
+      +'<div class="step-desc">'+(s.Desc||s.desc)+'</div>'
+      +'<div class="step-config">'+(s.Config||s.config||'')+'</div>'
+      +(out?'<div class="step-out '+outClass+' show">'+out+'</div>':'')
+      +'</div></div>';
+  }).join('');
+}
+
+function togglePB(id){
+  var pb=PLAYBOOKS.find(function(p){return p.id===id;});
+  if(pb){pb.enabled=!pb.enabled;}
+  renderList();renderDetail();
+  if(TOKEN) fetch(API+'/api/v1/soar/playbooks/'+id+'/toggle',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+}
+
+// ── Run modal ──────────────────────────────────────────────
+function openRunModal(id){
+  activePB=PLAYBOOKS.find(function(p){return p.id===id;});
+  document.getElementById('rmod-title').textContent='Run: '+activePB.name;
+  document.getElementById('run-progress-wrap').style.display='none';
+  document.getElementById('run-live-log').innerHTML='';
+  document.getElementById('run-progress-bar').style.width='0%';
+  document.getElementById('run-exec-btn').disabled=false;
+  document.getElementById('run-exec-btn').textContent='▶ Execute';
+  document.getElementById('run-modal').classList.add('open');
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+var delay=function(ms){return new Promise(function(r){setTimeout(r,ms);});};
+
+function logLine(el,lv,msg){
+  var ts=new Date().toLocaleTimeString('en-GB',{hour12:false});
+  el.innerHTML+='<div class="ll"><span class="ll-ts">'+ts+'</span><span class="ll-lv ll-'+lv+'">'+lv+'</span><span class="ll-msg">'+msg+'</span></div>';
+  el.scrollTop=el.scrollHeight;
+}
+
+async function execPlaybook(){
+  if(isRunning||!activePB) return;
+  isRunning=true;
+  var pb=activePB;
+  var btn=document.getElementById('run-exec-btn');
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner"></div> Running…';
+  var wrap=document.getElementById('run-progress-wrap');
+  wrap.style.display='block';
+  var logEl=document.getElementById('run-live-log');
+  var barEl=document.getElementById('run-progress-bar');
+  var pctEl=document.getElementById('run-progress-pct');
+  var lblEl=document.getElementById('run-progress-lbl');
+  logEl.innerHTML='';
+  var runId='RUN-'+String(Math.floor(Math.random()*9000)+1000);
+  logLine(logEl,'START','Playbook: '+pb.name+' ['+runId+']');
+  await delay(300);
+
+  var stepStatuses=pb.steps.map(function(){return 'idle';});
+  var stepOutputs=pb.steps.map(function(){return '';});
+  var allOK=true;
+
+  for(var i=0;i<pb.steps.length;i++){
+    var s=pb.steps[i];
+    var pct=Math.round((i/pb.steps.length)*100);
+    barEl.style.width=pct+'%';
+    pctEl.textContent=pct+'%';
+    lblEl.textContent='Step '+(i+1)+'/'+pb.steps.length+': '+(s.Name||s.name);
+    stepStatuses[i]='running';
+    if(activePB.id===pb.id) renderDetailWithStatus(pb,stepStatuses,stepOutputs);
+    logLine(logEl,'INFO','Step '+(i+1)+': '+(s.Name||s.name));
+    await delay(600+Math.random()*600);
+
+    if(Math.random()<0.05){
+      stepStatuses[i]='failed';
+      stepOutputs[i]='ERROR — connection timeout after 30s';
+      logLine(logEl,'ERROR','Step failed: '+(s.Name||s.name));
+      for(var j=i+1;j<pb.steps.length;j++){
+        stepStatuses[j]='skip';
+        logLine(logEl,'SKIP','Skipping: '+(pb.steps[j].Name||pb.steps[j].name));
+      }
+      allOK=false;
+      break;
+    }
+    stepStatuses[i]='done';
+    stepOutputs[i]=STEP_OUTS[s.Type||s.type]||'OK';
+    logLine(logEl,'DONE',(s.Name||s.name)+' → '+stepOutputs[i]);
+    if(activePB.id===pb.id) renderDetailWithStatus(pb,stepStatuses,stepOutputs);
+    await delay(150);
+  }
+  barEl.style.width='100%';pctEl.textContent='100%';
+  lblEl.textContent=allOK?'Complete ✓':'Failed ✗';
+  lblEl.style.color=allOK?'var(--green)':'var(--red)';
+  logLine(logEl,allOK?'DONE':'WARN',allOK?'All '+pb.steps.length+' steps succeeded · '+runId:'Finished with errors');
+  pb.runs++;if(allOK)pb.success++;pb.last='just now';
+
+  // Add to history
+  var newRun={id:runId,pb:pb.name,pbId:pb.id,status:allOK?'success':'failed',
+    ts:new Date().toLocaleTimeString('en-GB',{hour12:false}),dur:'—',trigger:'manual',
+    steps:pb.steps.map(function(s,i){return {name:s.Name||s.name,type:s.Type||s.type,status:stepStatuses[i],output:stepOutputs[i]};}),
+    log:[]};
+  RUN_HISTORY.unshift(newRun);
+  btn.disabled=false;btn.textContent='▶ Execute';isRunning=false;
+  renderList();loadRunHistory();
+  if(TOKEN) fetch(API+'/api/v1/soar/playbooks/'+pb.id+'/run',{
+    method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+    body:document.getElementById('run-ctx').value,
+  }).catch(function(){});
+}
+
+function renderDetailWithStatus(pb,statuses,outputs){
+  var el=document.getElementById('detail-area');
+  if(!el) return;
+  var stepsHtml=renderSteps(pb,'idle',statuses,outputs);
+  var stepsWrap=el.querySelector('.card-body');
+  if(stepsWrap){
+    var lbl=stepsWrap.querySelector('[style*="Steps"]');
+    if(lbl) lbl.nextSibling&&(lbl.nextSibling.innerHTML=stepsHtml);
+  }
+}
+
+// ── Run history ────────────────────────────────────────────
+function loadRunHistory(){
+  document.getElementById('history-sub').textContent=RUN_HISTORY.length+' runs';
+  document.getElementById('run-history').innerHTML=RUN_HISTORY.map(function(r){
+    var sc=r.status==='success'?'pill-green':'pill-red';
+    return '<div class="run-item" onclick="openRunDetail(\''+r.id+'\')">'
+      +'<span class="run-id">'+r.id+'</span>'
+      +'<span class="run-pb">'+r.pb+'</span>'
+      +'<span class="pill '+sc+'">'+r.status+'</span>'
+      +'<span class="pill pill-gray" style="font-size:9px">'+trigLabel(r.trigger)+'</span>'
+      +'<span class="run-ts">'+r.ts+'</span>'
+      +'<span class="run-dur">'+r.dur+'</span>'
+      +'</div>';
+  }).join('');
+  if(TOKEN) fetch(API+'/api/v1/soar/runs?limit=20',{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.runs&&d.runs.length){
+        d.runs.forEach(function(r){
+          if(!RUN_HISTORY.find(function(x){return x.id===r.id;})){
+            RUN_HISTORY.push({id:r.id.slice(0,8).toUpperCase(),pb:r.pb||r.PlaybookName||'—',
+              pbId:'',status:r.status,ts:(r.ts||r.StartedAt||'').slice(11,19),
+              dur:'—',trigger:r.trigger||'manual',steps:[],log:[]});
+          }
+        });
+        loadRunHistory();
+      }
+    }).catch(function(){});
+}
+
+// ── Run detail modal ───────────────────────────────────────
+function openRunDetail(id){
+  var run=RUN_HISTORY.find(function(r){return r.id===id;});
+  if(!run) return;
+  document.getElementById('hmod-title').textContent=run.id+' — '+run.pb;
+  document.getElementById('hmod-sub').textContent='Trigger: '+trigLabel(run.trigger)+' · '+run.ts;
+  document.getElementById('hmod-status').innerHTML='<span class="pill '+(run.status==='success'?'pill-green':'pill-red')+'">'+run.status+'</span>';
+  // KPIs
+  document.getElementById('hmod-kpis').innerHTML=[
+    {lbl:'Status',val:run.status,color:run.status==='success'?'var(--green)':'var(--red)'},
+    {lbl:'Steps',val:(run.steps||[]).length,color:'var(--t1)'},
+    {lbl:'Duration',val:run.dur,color:'var(--amber)'},
+  ].map(function(k){
+    return '<div style="background:var(--surface);border-radius:7px;padding:9px 11px">'
+      +'<div style="font-size:10px;color:var(--t3);margin-bottom:3px">'+k.lbl+'</div>'
+      +'<div style="font-size:14px;font-weight:700;color:'+k.color+'">'+k.val+'</div></div>';
+  }).join('');
+  // Steps
+  document.getElementById('hmod-steps').innerHTML=(run.steps||[]).map(function(s,i){
+    var st=STEP_TYPES[s.type]||STEP_TYPES.webhook;
+    var sc={done:'var(--green)',failed:'var(--red)',skip:'var(--t4)'}[s.status]||'var(--t3)';
+    return '<div class="run-detail-step">'
+      +'<div class="rds-icon" style="background:'+st.bg+';color:'+st.color+'">'+(i+1)+'</div>'
+      +'<div style="flex:1"><div style="font-size:11px;font-weight:600">'+s.name+'</div>'
+      +'<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+s.output+'</div></div>'
+      +'<span class="pill '+(s.status==='done'?'pill-green':s.status==='failed'?'pill-red':'pill-gray')+'">'+s.status+'</span>'
+      +'</div>';
+  }).join('');
+  // Log
+  var logEl=document.getElementById('hmod-log');
+  logEl.innerHTML=(run.log||[]).map(function(l){
+    return '<div class="ll"><span class="ll-ts">'+l.ts+'</span><span class="ll-lv ll-'+l.lv+'">'+l.lv+'</span><span class="ll-msg">'+l.msg+'</span></div>';
+  }).join('');
+  if(!run.log||!run.log.length) logEl.innerHTML='<span style="color:var(--t3);font-size:11px">No log available</span>';
+  // Re-run
+  document.getElementById('hmod-rerun-btn').onclick=function(){
+    closeModal('hist-modal');
+    var pb=PLAYBOOKS.find(function(p){return p.id===run.pbId;});
+    if(pb){activePB=pb;openRunModal(pb.id);}
+  };
+  document.getElementById('hist-modal').classList.add('open');
+}
+
+// ── New playbook ───────────────────────────────────────────
+function openNewPB(){document.getElementById('new-pb-modal').classList.add('open');}
+function createPB(){
+  var name=document.getElementById('np-name').value.trim();
+  if(!name) return;
+  var tpl=document.getElementById('np-tpl').value;
+  var steps=(TPLS[tpl]||[]).map(function(s){return Object.assign({},s);});
+  var newPB={id:'pb-'+Date.now(),name:name,desc:document.getElementById('np-desc').value.trim()||'Custom playbook',
+    trigger:document.getElementById('np-trigger').value,sev:document.getElementById('np-sev').value,
+    enabled:true,steps:steps,runs:0,success:0,last:'never'};
+  PLAYBOOKS.unshift(newPB);
+  closeModal('new-pb-modal');
+  renderList();selectPB(newPB.id);
+  if(TOKEN) fetch(API+'/api/v1/soar/playbooks',{method:'POST',
+    headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+    body:JSON.stringify({name:newPB.name,description:newPB.desc,trigger:newPB.trigger,sev_filter:newPB.sev,enabled:true}),
+  }).catch(function(){});
+}
+
+// ── Token + data ───────────────────────────────────────────
+function _onTokenReady(){}
+function _onData(d){
+  if(d.playbooks&&d.playbooks.playbooks&&d.playbooks.playbooks.length){
+    PLAYBOOKS=d.playbooks.playbooks.map(function(p){
+      return Object.assign({},p,{steps:p.steps||[],runs:p.runs||p.RunCount||0,success:p.success||p.SuccessCount||0,last:'—'});
+    });
+    renderList();if(activePB)renderDetail();
+  }
+  if(d.runs&&d.runs.runs) loadRunHistory();
+}
+window.addEventListener('message',function(e){
+  if(!e.data) return;
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN)TOKEN=e.data.token;}
+  if(e.data.type==='vsp:data') _onData(e.data);
+  if(e.data.type==='vsp:theme') _applyTheme(e.data.theme);
+});
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
+
+// ── Theme ──────────────────────────────────────────────────
+function _applyTheme(theme){
+  var r=document.documentElement;
+  if(theme==='light'){
+    r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');
+    r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');
+    r.style.setProperty('--border2','rgba(0,0,0,.15)');r.style.setProperty('--t1','#1a1d24');
+    r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');
+  } else {
+    r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');
+    r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');
+    r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');
+  }
+}
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'},'*');
+
+// ── Init ───────────────────────────────────────────────────
+renderList();
+selectPB('pb-001');
+loadRunHistory();
+</script>
+</body>
+</html>

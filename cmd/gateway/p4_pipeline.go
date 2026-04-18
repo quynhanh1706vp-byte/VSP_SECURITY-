@@ -258,7 +258,7 @@ func handlePipelineLatest(w http.ResponseWriter, r *http.Request) {
 				Tests: tests, Summary: summary,
 			}
 			_ = now
-			json.NewEncoder(w).Encode(run)
+			_ = json.NewEncoder(w).Encode(run)
 			return
 		}
 	}
@@ -267,10 +267,10 @@ func handlePipelineLatest(w http.ResponseWriter, r *http.Request) {
 	pipeStore.mu.RLock()
 	defer pipeStore.mu.RUnlock()
 	if len(pipeStore.Runs) == 0 {
-		json.NewEncoder(w).Encode(map[string]string{"status": "no_runs"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "no_runs"})
 		return
 	}
-	json.NewEncoder(w).Encode(pipeStore.Runs[0])
+	_ = json.NewEncoder(w).Encode(pipeStore.Runs[0])
 }
 
 func handlePipelineHistory(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +278,7 @@ func handlePipelineHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Vary", "Origin")
 	pipeStore.mu.RLock()
 	defer pipeStore.mu.RUnlock()
-	json.NewEncoder(w).Encode(pipeStore.Runs)
+	_ = json.NewEncoder(w).Encode(pipeStore.Runs)
 }
 
 func handlePipelineTrigger(w http.ResponseWriter, r *http.Request) {
@@ -298,7 +298,7 @@ func handlePipelineTrigger(w http.ResponseWriter, r *http.Request) {
 		} // cap at 100
 		pipeStore.mu.Unlock()
 	}()
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": "queued", "run_id": runID, "message": "Triggered. Results in ~3s."})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "queued", "run_id": runID, "message": "Triggered. Results in ~3s."})
 }
 
 func handlePipelineDrift(w http.ResponseWriter, r *http.Request) {
@@ -320,7 +320,7 @@ func handlePipelineDrift(w http.ResponseWriter, r *http.Request) {
 				var runID string
 				var startedAt time.Time
 				var testsJSON []byte
-				rows.Scan(&runID, &startedAt, &testsJSON)
+				_ = rows.Scan(&runID, &startedAt, &testsJSON)
 				if len(testsJSON) < 4 {
 					continue
 				}
@@ -354,7 +354,7 @@ func handlePipelineDrift(w http.ResponseWriter, r *http.Request) {
 		pipeStore.mu.RUnlock()
 	}
 
-	json.NewEncoder(w).Encode(driftLog)
+	_ = json.NewEncoder(w).Encode(driftLog)
 }
 
 func handlePipelineSchedules(w http.ResponseWriter, r *http.Request) {
@@ -362,5 +362,5 @@ func handlePipelineSchedules(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Vary", "Origin")
 	pipeStore.mu.RLock()
 	defer pipeStore.mu.RUnlock()
-	json.NewEncoder(w).Encode(pipeStore.Schedules)
+	_ = json.NewEncoder(w).Encode(pipeStore.Schedules)
 }

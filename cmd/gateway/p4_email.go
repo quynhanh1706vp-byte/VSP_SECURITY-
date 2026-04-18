@@ -177,7 +177,7 @@ func handleSendEmail(w http.ResponseWriter, r *http.Request) {
 	if err := sendSMTP(req.To, subject, body); err != nil {
 		log.Printf("[EMAIL] Error: %v", err)
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "ok", "to": req.To, "subject": subject,
 		"smtp_enabled": emailCfg.Enabled,
 	})
@@ -186,9 +186,9 @@ func handleSendEmail(w http.ResponseWriter, r *http.Request) {
 func handleEmailConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method == http.MethodPost {
-		json.NewDecoder(r.Body).Decode(emailCfg)
+		_ = json.NewDecoder(r.Body).Decode(emailCfg)
 		emailCfg.Enabled = emailCfg.SMTPUser != "" && emailCfg.SMTPPassword != ""
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 		return
 	}
 	safe := map[string]interface{}{
@@ -196,7 +196,7 @@ func handleEmailConfig(w http.ResponseWriter, r *http.Request) {
 		"smtp_user": emailCfg.SMTPUser, "from_email": emailCfg.FromEmail,
 		"enabled": emailCfg.Enabled,
 	}
-	json.NewEncoder(w).Encode(safe)
+	_ = json.NewEncoder(w).Encode(safe)
 }
 
 func init() {

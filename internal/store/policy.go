@@ -36,7 +36,7 @@ func (db *DB) ListPolicyRules(ctx context.Context, tenantID string) ([]PolicyRul
 	var rules []PolicyRule
 	for rows.Next() {
 		var r PolicyRule
-		rows.Scan(&r.ID, &r.TenantID, &r.Name, &r.RepoPattern, &r.FailOn,
+		_ = rows.Scan(&r.ID, &r.TenantID, &r.Name, &r.RepoPattern, &r.FailOn,
 			&r.MinScore, &r.MaxHigh, &r.BlockSecrets, &r.BlockCritical,
 			&r.Active, &r.CreatedAt)
 		rules = append(rules, r)
