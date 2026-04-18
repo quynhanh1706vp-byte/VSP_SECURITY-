@@ -51,3 +51,26 @@ dump.rdb
 *.rdb
 .auth_patch_backup_*
 *.env
+
+# Binaries (build artifacts)
+bin/
+vsp-gateway
+vsp_gateway*
+vsp_server
+gateway*.old
+gateway_latest
+gateway_v*
+
+# Downloads (release artifacts)
+static/download/
+
+# Screenshots / temp
+Ảnh được dán*.png
+*.png.tmp
+
+# Typo files
+/0
+/10
+/20
+/3
+/=
