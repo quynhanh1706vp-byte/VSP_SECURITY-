@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script>
+/* VSP auth fetch guard v2 — polling retry */
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500; var waited = 0; var interval = 100;
+    while (waited < maxWait) {
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      try {
+        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
+        if (tk && tk.length >= 20) { window.TOKEN = tk; try { localStorage.setItem("vsp_token", tk); } catch(e){} return tk; }
+      } catch(e) {}
+      try { tk = window.top.TOKEN || ""; if (tk && tk.length >= 20) { window.TOKEN = tk; return tk; } } catch(e) {}
+      await new Promise(function(r){setTimeout(r, interval);}); waited += interval;
+    }
+    return "";
+  }
+  window.vspAuthFetch = async function(url, opts){
+    opts = opts || {}; var tk = await getToken();
+    if (tk) { opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk}); }
+    return _origFetch(url, opts);
+  };
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts){
+    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) return _origFetch(url, opts);
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supply Chain Integrity</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size:13px;padding:16px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hdr h2{font-family:var(--font-display);font-size:18px;font-weight:800}
+.hdr p{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px}
+.kpi-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;font-family:var(--font-mono);margin-bottom:4px}
+.kpi-value{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--t1)}
+.kpi-sub{font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tab{padding:7px 14px;font-size:12px;background:none;border:none;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-title{font-size:13px;font-weight:600}
+.card-body{padding:14px}
+
+.btn{padding:6px 14px;font-size:11px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg3);color:var(--t2);cursor:pointer;font-family:var(--font-mono)}
+.btn:hover{border-color:var(--border2);color:var(--t1)}
+.btn-primary{background:var(--accent);color:var(--bg1);border-color:var(--accent)}
+.btn-primary:hover{opacity:.9}
+.btn-sm{padding:4px 10px;font-size:10px}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-row{display:flex;flex-direction:column;gap:4px}
+.form-row label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-family:var(--font-mono)}
+input, select, textarea{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 10px;color:var(--t1);font-family:var(--font-mono);font-size:12px}
+input:focus, select:focus, textarea:focus{outline:none;border-color:var(--accent)}
+textarea{min-height:60px;resize:vertical;font-family:monospace}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:8px 10px;font-size:10px;color:var(--t3);text-transform:uppercase;font-family:var(--font-mono);border-bottom:1px solid var(--border);font-weight:600}
+td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--t2)}
+tr:hover td{background:var(--bg3)}
+
+.badge{display:inline-block;padding:2px 8px;font-size:10px;border-radius:10px;font-family:var(--font-mono);font-weight:600}
+.badge-ok{background:rgba(34,197,94,.15);color:#22c55e}
+.badge-warn{background:rgba(250,204,21,.15);color:#facc15}
+.badge-bad{background:rgba(239,68,68,.15);color:#ef4444}
+.badge-info{background:rgba(59,130,246,.15);color:#3b82f6}
+.badge-neutral{background:var(--bg3);color:var(--t3)}
+
+.status-ok{color:#22c55e}
+.status-warn{color:#facc15}
+.status-bad{color:#ef4444}
+
+.mono{font-family:var(--font-mono);font-size:11px;color:var(--t3)}
+.digest{font-family:monospace;font-size:11px;color:var(--t3);word-break:break-all}
+.pre-box{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-family:monospace;font-size:11px;color:var(--t2);white-space:pre-wrap;max-height:300px;overflow-y:auto}
+
+.slsa-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;font-family:var(--font-mono)}
+.slsa-L1{background:rgba(156,163,175,.15);color:#9ca3af}
+.slsa-L2{background:rgba(59,130,246,.15);color:#3b82f6}
+.slsa-L3{background:rgba(168,85,247,.15);color:#a855f7}
+.slsa-L4{background:rgba(251,191,36,.15);color:#fbbf24}
+
+.empty{text-align:center;padding:20px;color:var(--t3);font-style:italic}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h2>🔐 Supply Chain Integrity</h2>
+    <p>Sigstore Cosign · SLSA Build Provenance · CycloneDX VEX · NIST SP 800-218 PS</p>
+  </div>
+  <button class="btn btn-primary" onclick="refreshAll()">⟳ Refresh</button>
+</div>
+
+<!-- ══════ KPIs ══════ -->
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Signed artifacts</div>
+    <div class="kpi-value" id="kpi-sigs">—</div>
+    <div class="kpi-sub">ECDSA P-256 signatures</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">SLSA provenance</div>
+    <div class="kpi-value" id="kpi-prov">—</div>
+    <div class="kpi-sub">in-toto attestations</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">VEX statements</div>
+    <div class="kpi-value" id="kpi-vex">—</div>
+    <div class="kpi-sub">CycloneDX VEX 1.4</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Active signing key</div>
+    <div class="kpi-value" id="kpi-key" style="font-size:14px;font-family:var(--font-mono)">—</div>
+    <div class="kpi-sub" id="kpi-algo">—</div>
+  </div>
+</div>
+
+<!-- ══════ Tabs ══════ -->
+<div class="tabs">
+  <button class="tab active" data-tab="sign">Sign & Verify</button>
+  <button class="tab" data-tab="signatures">Signatures</button>
+  <button class="tab" data-tab="provenance">SLSA Provenance</button>
+  <button class="tab" data-tab="vex">VEX Statements</button>
+  <button class="tab" data-tab="key">Public Key</button>
+</div>
+
+<!-- ══════ Tab: Sign ══════ -->
+<div class="tab-panel active" id="tab-sign">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">🖊️ Sign Artifact</div>
+      <div class="mono">POST /api/v1/supply-chain/sign</div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Artifact name *</label>
+          <input id="sign-name" placeholder="vsp-gateway:v1.0" value="vsp-gateway:v1.0">
+        </div>
+        <div class="form-row">
+          <label>Artifact digest (sha256) *</label>
+          <input id="sign-digest" placeholder="sha256:abc..." value="sha256:06f22db4a8c5e9c7f2b1a3d4e5f6c7b8a9e0f1d2c3b4a5968775849302817263">
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <label>Payload (JSON)</label>
+        <textarea id="sign-payload">{"build_id":"vsp-build-001","builder":"local","commit":"06f22db"}</textarea>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <label>Signed by</label>
+        <input id="sign-by" value="admin@vsp.local">
+      </div>
+      <button class="btn btn-primary" onclick="signArtifact()">🔏 Sign</button>
+    </div>
+  </div>
+
+  <div class="card" id="sign-result" style="display:none">
+    <div class="card-head">
+      <div class="card-title">✅ Signed Bundle</div>
+      <div><button class="btn btn-sm" onclick="copyBundle()">📋 Copy</button></div>
+    </div>
+    <div class="card-body">
+      <div class="pre-box" id="sign-bundle-out"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">🔎 Verify Signature</div>
+      <div class="mono">POST /api/v1/supply-chain/verify</div>
+    </div>
+    <div class="card-body">
+      <div class="form-row" style="margin-bottom:10px">
+        <label>Bundle JSON (paste from sign output)</label>
+        <textarea id="verify-bundle" style="min-height:120px" placeholder='{"base64Signature":"...","payload":"...","publicKey":"..."}'></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="verifyBundle()">✔ Verify</button>
+      <div id="verify-result" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ Tab: Signatures list ══════ -->
+<div class="tab-panel" id="tab-signatures">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">All signed artifacts</div>
+      <div class="mono" id="sig-count">—</div>
+    </div>
+    <div class="card-body">
+      <table>
+        <thead><tr>
+          <th>Artifact</th><th>Digest</th><th>Signed by</th><th>Algorithm</th><th>Signed at</th>
+        </tr></thead>
+        <tbody id="sig-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ Tab: Provenance ══════ -->
+<div class="tab-panel" id="tab-provenance">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">🏗️ Generate SLSA Provenance</div>
+      <div class="mono">POST /api/v1/supply-chain/provenance</div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Artifact name</label>
+          <input id="prov-name" value="vsp-gateway:v1.0">
+        </div>
+        <div class="form-row">
+          <label>Artifact digest</label>
+          <input id="prov-digest" value="sha256:06f22db...">
+        </div>
+        <div class="form-row">
+          <label>Source URI</label>
+          <input id="prov-source" value="git+https://github.com/vsp/platform">
+        </div>
+        <div class="form-row">
+          <label>Source commit</label>
+          <input id="prov-commit" value="06f22db">
+        </div>
+        <div class="form-row">
+          <label>Builder ID</label>
+          <input id="prov-builder" value="vsp-gateway-builder/v1.0">
+        </div>
+        <div class="form-row">
+          <label>SLSA Level</label>
+          <select id="prov-level">
+            <option value="1">Level 1 — documented</option>
+            <option value="2" selected>Level 2 — signed provenance</option>
+            <option value="3">Level 3 — hardened builder</option>
+            <option value="4">Level 4 — reproducible</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="generateProvenance()">📦 Generate Provenance</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">SLSA Provenance history</div>
+      <div class="mono" id="prov-count">—</div>
+    </div>
+    <div class="card-body">
+      <table>
+        <thead><tr>
+          <th>Artifact</th><th>Level</th><th>Builder</th><th>Source commit</th><th>Created</th>
+        </tr></thead>
+        <tbody id="prov-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ Tab: VEX ══════ -->
+<div class="tab-panel" id="tab-vex">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">📋 Create VEX Statement</div>
+      <div class="mono">POST /api/p4/vex — CycloneDX VEX 1.4</div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Product name</label>
+          <input id="vex-prod" value="vsp-gateway">
+        </div>
+        <div class="form-row">
+          <label>Product version</label>
+          <input id="vex-prodver" value="1.0">
+        </div>
+        <div class="form-row">
+          <label>Component name *</label>
+          <input id="vex-comp" placeholder="libexpat">
+        </div>
+        <div class="form-row">
+          <label>Component version</label>
+          <input id="vex-compver" placeholder="2.6.2">
+        </div>
+        <div class="form-row">
+          <label>CVE ID</label>
+          <input id="vex-cve" placeholder="CVE-2024-28757">
+        </div>
+        <div class="form-row">
+          <label>Status *</label>
+          <select id="vex-status">
+            <option value="not_affected">not_affected</option>
+            <option value="affected">affected</option>
+            <option value="fixed">fixed</option>
+            <option value="under_investigation">under_investigation</option>
+            <option value="exploitable">exploitable</option>
+            <option value="not_exploitable">not_exploitable</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Justification</label>
+          <select id="vex-just">
+            <option value="">—</option>
+            <option value="code_not_present">code_not_present</option>
+            <option value="code_not_reachable">code_not_reachable</option>
+            <option value="requires_configuration">requires_configuration</option>
+            <option value="requires_dependency">requires_dependency</option>
+            <option value="requires_environment">requires_environment</option>
+            <option value="protected_by_compiler">protected_by_compiler</option>
+            <option value="protected_at_runtime">protected_at_runtime</option>
+            <option value="protected_at_perimeter">protected_at_perimeter</option>
+            <option value="protected_by_mitigating_control">protected_by_mitigating_control</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Author</label>
+          <input id="vex-author" value="security@vsp.local">
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <label>Detail / explanation</label>
+        <textarea id="vex-detail" placeholder="Description of why this vulnerability does not affect the product..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="createVEX()">📝 Create VEX</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">VEX Statements</div>
+      <div class="mono" id="vex-stats">—</div>
+    </div>
+    <div class="card-body">
+      <table>
+        <thead><tr>
+          <th>CVE</th><th>Component</th><th>Status</th><th>Justification</th><th>Author</th><th>Analyzed</th>
+        </tr></thead>
+        <tbody id="vex-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ Tab: Public Key ══════ -->
+<div class="tab-panel" id="tab-key">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">🔑 VSP Signing Public Key</div>
+      <div><button class="btn btn-sm" onclick="copyPubKey()">📋 Copy PEM</button></div>
+    </div>
+    <div class="card-body">
+      <div style="margin-bottom:12px">
+        <div class="mono" style="margin-bottom:4px">Key ID</div>
+        <div id="key-id" class="digest">—</div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div class="mono" style="margin-bottom:4px">Algorithm</div>
+        <div id="key-algo">—</div>
+      </div>
+      <div>
+        <div class="mono" style="margin-bottom:4px">Public Key (PEM)</div>
+        <div class="pre-box" id="key-pem">—</div>
+      </div>
+      <div style="margin-top:12px;padding:10px;background:var(--bg1);border-radius:var(--r-sm);font-size:11px;color:var(--t3)">
+        💡 <b>External verification</b>: Save this key to <code>vsp-signing.pub</code> and run:<br>
+        <code style="font-family:monospace">cosign verify-blob --key vsp-signing.pub --signature sig.b64 payload.json</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ Tab switching ═══
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-' + t.dataset.tab).classList.add('active');
+    if (t.dataset.tab === 'signatures') loadSignatures();
+    if (t.dataset.tab === 'provenance') loadProvenance();
+    if (t.dataset.tab === 'vex') loadVEX();
+    if (t.dataset.tab === 'key') loadPublicKey();
+  };
+});
+
+let currentBundle = null;
+let currentPubKey = null;
+
+// ═══ KPI load ═══
+async function loadKPIs() {
+  try {
+    const [sigs, prov, vex, key] = await Promise.all([
+      fetch('/api/v1/supply-chain/signatures').then(r => r.json()),
+      fetch('/api/v1/supply-chain/provenance').then(r => r.json()),
+      fetch('/api/p4/vex').then(r => r.json()),
+      fetch('/api/v1/supply-chain/public-key').then(r => r.json())
+    ]);
+    document.getElementById('kpi-sigs').textContent = sigs.count || 0;
+    document.getElementById('kpi-prov').textContent = prov.count || 0;
+    document.getElementById('kpi-vex').textContent = vex.count || 0;
+    document.getElementById('kpi-key').textContent = (key.key_id || '—').slice(0, 18) + '…';
+    document.getElementById('kpi-algo').textContent = key.algorithm || '—';
+  } catch(e) { console.error('KPIs:', e); }
+}
+
+// ═══ Sign ═══
+async function signArtifact() {
+  const body = {
+    artifact_name: document.getElementById('sign-name').value,
+    artifact_digest: document.getElementById('sign-digest').value,
+    payload: JSON.parse(document.getElementById('sign-payload').value || '{}'),
+    signed_by: document.getElementById('sign-by').value
+  };
+  try {
+    const res = await fetch('/api/v1/supply-chain/sign', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'sign failed');
+    currentBundle = data.bundle;
+    document.getElementById('sign-result').style.display = 'block';
+    document.getElementById('sign-bundle-out').textContent = JSON.stringify(data.bundle, null, 2);
+    document.getElementById('verify-bundle').value = JSON.stringify(data.bundle, null, 2);
+    loadKPIs();
+    alert('✅ Artifact signed! Bundle loaded into Verify tab.');
+  } catch(e) { alert('❌ Sign error: ' + e.message); }
+}
+
+function copyBundle() {
+  if (!currentBundle) return;
+  navigator.clipboard.writeText(JSON.stringify(currentBundle, null, 2));
+  alert('✓ Bundle copied to clipboard');
+}
+
+// ═══ Verify ═══
+async function verifyBundle() {
+  let bundle;
+  try {
+    bundle = JSON.parse(document.getElementById('verify-bundle').value);
+  } catch(e) { alert('Invalid JSON: ' + e.message); return; }
+  try {
+    const res = await fetch('/api/v1/supply-chain/verify', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({bundle: bundle})
+    });
+    const data = await res.json();
+    const resultEl = document.getElementById('verify-result');
+    if (data.valid) {
+      resultEl.innerHTML = '<div class="badge badge-ok" style="padding:8px 14px;font-size:12px">✅ VALID SIGNATURE</div>' +
+        '<div class="mono" style="margin-top:8px">Algorithm: ' + (data.algorithm || '?') + '</div>' +
+        '<div class="pre-box" style="margin-top:8px">' + JSON.stringify(data.payload || {}, null, 2) + '</div>';
+    } else {
+      resultEl.innerHTML = '<div class="badge badge-bad" style="padding:8px 14px;font-size:12px">❌ INVALID SIGNATURE</div>';
+    }
+  } catch(e) { alert('Verify error: ' + e.message); }
+}
+
+// ═══ Signatures list ═══
+async function loadSignatures() {
+  try {
+    const res = await fetch('/api/v1/supply-chain/signatures');
+    const data = await res.json();
+    const tbody = document.getElementById('sig-tbody');
+    document.getElementById('sig-count').textContent = (data.count || 0) + ' signatures';
+    if (!data.signatures || data.signatures.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No signatures yet. Sign an artifact first.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.signatures.map(s => `
+      <tr>
+        <td><b>${s.artifact_name}</b></td>
+        <td class="digest">${(s.artifact_digest || '').slice(0,24)}…</td>
+        <td>${s.signed_by}</td>
+        <td class="mono">${s.algorithm}</td>
+        <td class="mono">${new Date(s.signed_at).toLocaleString()}</td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error('Sigs:', e); }
+}
+
+// ═══ Provenance ═══
+async function generateProvenance() {
+  const body = {
+    artifact_name: document.getElementById('prov-name').value,
+    artifact_digest: document.getElementById('prov-digest').value,
+    source_uri: document.getElementById('prov-source').value,
+    source_commit: document.getElementById('prov-commit').value,
+    builder_id: document.getElementById('prov-builder').value,
+    slsa_level: parseInt(document.getElementById('prov-level').value),
+    dependencies: []
+  };
+  try {
+    const res = await fetch('/api/v1/supply-chain/provenance', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error('provenance failed');
+    alert('✅ SLSA Level ' + data.slsa_level + ' provenance generated!');
+    loadProvenance(); loadKPIs();
+  } catch(e) { alert('Provenance error: ' + e.message); }
+}
+
+async function loadProvenance() {
+  try {
+    const res = await fetch('/api/v1/supply-chain/provenance');
+    const data = await res.json();
+    const tbody = document.getElementById('prov-tbody');
+    document.getElementById('prov-count').textContent = (data.count || 0) + ' attestations';
+    if (!data.provenance || data.provenance.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No provenance generated yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.provenance.map(p => `
+      <tr>
+        <td><b>${p.artifact_name}</b></td>
+        <td><span class="slsa-badge slsa-L${p.slsa_level}">SLSA L${p.slsa_level}</span></td>
+        <td class="mono">${p.builder_id}</td>
+        <td class="digest">${(p.source_commit || '—').slice(0,12)}</td>
+        <td class="mono">${new Date(p.created_at).toLocaleString()}</td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error('Prov:', e); }
+}
+
+// ═══ VEX ═══
+async function createVEX() {
+  const body = {
+    product_name: document.getElementById('vex-prod').value,
+    product_version: document.getElementById('vex-prodver').value,
+    component_name: document.getElementById('vex-comp').value,
+    component_version: document.getElementById('vex-compver').value,
+    cve_id: document.getElementById('vex-cve').value,
+    status: document.getElementById('vex-status').value,
+    justification: document.getElementById('vex-just').value,
+    detail: document.getElementById('vex-detail').value,
+    author: document.getElementById('vex-author').value
+  };
+  if (!body.component_name || !body.status) {
+    alert('Component name and status are required'); return;
+  }
+  try {
+    const res = await fetch('/api/p4/vex', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('VEX creation failed');
+    alert('✅ VEX statement created!');
+    loadVEX(); loadKPIs();
+  } catch(e) { alert('VEX error: ' + e.message); }
+}
+
+async function loadVEX() {
+  try {
+    const res = await fetch('/api/p4/vex');
+    const data = await res.json();
+    const tbody = document.getElementById('vex-tbody');
+    const s = data.statistics || {};
+    document.getElementById('vex-stats').textContent = 
+      `${data.count || 0} total · ${s.affected || 0} affected · ${s.not_affected || 0} not_affected · ${s.fixed || 0} fixed`;
+    if (!data.vex || data.vex.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No VEX statements yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.vex.map(v => {
+      const sc = {affected:'badge-bad', not_affected:'badge-ok', fixed:'badge-info', under_investigation:'badge-warn'}[v.status] || 'badge-neutral';
+      return `
+        <tr>
+          <td class="mono"><b>${v.cve_id || '—'}</b></td>
+          <td>${v.component} ${v.component_version ? '<span class="mono">@' + v.component_version + '</span>' : ''}</td>
+          <td><span class="badge ${sc}">${v.status}</span></td>
+          <td class="mono">${v.justification || '—'}</td>
+          <td class="mono">${v.author}</td>
+          <td class="mono">${new Date(v.analysis_date).toLocaleDateString()}</td>
+        </tr>`;
+    }).join('');
+  } catch(e) { console.error('VEX:', e); }
+}
+
+// ═══ Public Key ═══
+async function loadPublicKey() {
+  try {
+    const res = await fetch('/api/v1/supply-chain/public-key');
+    const data = await res.json();
+    currentPubKey = data.public_key;
+    document.getElementById('key-id').textContent = data.key_id || '—';
+    document.getElementById('key-algo').textContent = data.algorithm || '—';
+    document.getElementById('key-pem').textContent = data.public_key || '—';
+  } catch(e) { console.error('Key:', e); }
+}
+
+function copyPubKey() {
+  if (!currentPubKey) return;
+  navigator.clipboard.writeText(currentPubKey);
+  alert('✓ Public key copied');
+}
+
+// ═══ Init ═══
+function refreshAll() {
+  loadKPIs();
+  loadSignatures();
+}
+
+loadKPIs();
+loadSignatures();
+</script>
+</body>
+</html>

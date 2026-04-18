@@ -1,0 +1,41 @@
+# VSP Test Makefile
+# Usage: make -f tests/Makefile.test <target>
+
+.PHONY: all api data perf full help
+
+all: help
+
+help:
+	@echo "VSP Test Suite"
+	@echo ""
+	@echo "  make -f tests/Makefile.test api    → Quick API smoke test"
+	@echo "  make -f tests/Makefile.test data   → Validate data quality"
+	@echo "  make -f tests/Makefile.test perf   → Check API latency"
+	@echo "  make -f tests/Makefile.test full   → All tests"
+
+api:
+	@echo "═══ API Smoke Test ═══"
+	@./tests/test_api.sh
+
+data:
+	@echo "═══ Data Quality ═══"
+	@./tests/test_data.sh
+
+perf:
+	@echo "═══ Performance ═══"
+	@./tests/test_perf.sh
+
+full: api data perf
+	@echo ""
+	@echo "═══════════════════════════"
+	@echo "✅ ALL TEST SUITES PASSED"
+	@echo "═══════════════════════════"
+
+supply-chain:
+	@./tests/test_supply_chain.sh
+
+full-with-supply: api data perf supply-chain
+	@echo ""
+	@echo "═══════════════════════════"
+	@echo "✅ ALL INCL. SUPPLY CHAIN PASSED"
+	@echo "═══════════════════════════"

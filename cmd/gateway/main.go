@@ -108,6 +108,10 @@ func main() {
 	// P4 Persistence — open dedicated sql.DB for P4 tables
 	p4DB, _ := sql.Open("pgx", viper.GetString("database.url"))
 	initP4DB(p4DB)
+
+	if skErr := initOrLoadSigningKey(p4SQLDB); skErr != nil {
+		log.Printf("[main] WARN: supply chain signing key init failed: %v", skErr)
+	}
 	defaultTID := getDefaultTenantID(ctx, db)
 
 	jwtSecret := viper.GetString("auth.jwt_secret")
@@ -343,6 +347,18 @@ func main() {
 	r.Get("/api/p4/findings/sync", p4AuthMiddleware(handleFindingsSync))
 	r.Post("/api/p4/findings/sync", p4AuthMiddleware(handleFindingsSync))
 	r.Get("/api/p4/sbom/view", p4AuthMiddleware(handleSBOMView))
+
+	// ═══ Supply Chain Integrity (Milestone 1) ═══
+	// Sigstore-compatible artifact signing + SLSA provenance + CycloneDX VEX
+	r.Post("/api/v1/supply-chain/sign", p4AuthMiddleware(handleSignArtifact))
+	r.Post("/api/v1/supply-chain/verify", p4AuthMiddleware(handleVerifyArtifact))
+	r.Get("/api/v1/supply-chain/signatures", p4AuthMiddleware(handleListSignatures))
+	r.Get("/api/v1/supply-chain/public-key", handlePublicKey) // public — no auth
+	r.Post("/api/v1/supply-chain/provenance", p4AuthMiddleware(handleGenProvenance))
+	r.Get("/api/v1/supply-chain/provenance", p4AuthMiddleware(handleListProvenance))
+	r.Post("/api/p4/vex", p4AuthMiddleware(handleCreateVEX))
+	r.Get("/api/p4/vex", p4AuthMiddleware(handleListVEX))
+
 	r.Get("/api/p4/ato/expiry", p4AuthMiddleware(handleATOExpiry))
 	r.Get("/api/p4/oscal/ssp", p4AuthMiddleware(handleOSCALExport))
 	r.Get("/api/p4/alerts/config", p4AuthMiddleware(handleAlertConfig))
