@@ -1,0 +1,33 @@
+# .dockerignore - mirror .gitignore patterns to prevent shipping untracked files
+
+# JS patches - block all, whitelist specific files actually loaded
+static/vsp_*.js
+static/panels/vsp_*.js
+!static/vsp_upgrade_v100.js
+!static/panels/vsp_siem_patch.js
+!static/panels/vsp_compliance_table_patch.js
+
+# Backup HTML versions
+static/*_v[0-9]*.html
+static/*_old*.html
+static/**/*backup*
+
+# Build artifacts
+.git/
+.github/
+*.md
+*.log
+coverage.*
+
+# Test files - not needed in production image
+*_test.go
+tests/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editor/OS files
+.vscode/
+.DS_Store
