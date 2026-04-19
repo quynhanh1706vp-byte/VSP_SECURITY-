@@ -77,3 +77,5 @@ static/download/
 .env
 .env.production
 .env.*
+platform
+deep_test_v3.js
