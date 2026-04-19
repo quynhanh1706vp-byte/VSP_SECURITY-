@@ -5,9 +5,6 @@ static/vsp_*.js
 static/panels/vsp_*.js
 !static/vsp_upgrade_v100.js
 !static/panels/vsp_siem_patch.js
-!static/vsp_netdeep_patch.js
-!static/vsp_netdeep_patch.js
-!static/vsp_netdeep_patch.js
 !static/panels/vsp_compliance_table_patch.js
 
 # Backup HTML versions
