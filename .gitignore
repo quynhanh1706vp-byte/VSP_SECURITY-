@@ -74,17 +74,18 @@ static/download/
 /20
 /3
 /=
-.env
 .env.production
 .env.*
 platform
 deep_test_v3.js
+*.bak
+# Explicit allow for VSP shared JS (don't treat as build artifact)
+!static/js/vsp_iframe_bootstrap.js
+!static/js/vsp_sprint2_quickwins.js
+!scripts/*.sh
 
 # Python cache
 __pycache__/
 *.pyc
-
 # Python cache
-__pycache__/
-*.pyc
 .deadcode/

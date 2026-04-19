@@ -1,27 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-/* VSP iframe token bootstrap v1 — synchronous, runs before async guards */
-(function(){
-  var tok = "";
-  try {
-    var params = new URLSearchParams(window.location.search);
-    tok = params.get("token") || "";
-  } catch(e) {}
-  if (!tok) tok = localStorage.getItem("vsp_token") || "";
-  if (!tok) { try { tok = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || ""; } catch(e) {} }
-  if (!tok) { try { tok = window.top.TOKEN || window.top.localStorage.getItem("vsp_token") || ""; } catch(e) {} }
-  if (tok && tok.length >= 20) {
-    window.TOKEN = tok;
-    try { localStorage.setItem("vsp_token", tok); } catch(e) {}
-    console.log("[VSP iframe] token bootstrapped, length:", tok.length);
-  } else {
-    console.warn("[VSP iframe] no token available at bootstrap");
-  }
-})();
-</script>
-
+<script src="/static/js/vsp_iframe_bootstrap.js"></script>
 <script>
 /* VSP auth fetch guard v2 — polling retry */
 (function(){
