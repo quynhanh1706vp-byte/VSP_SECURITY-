@@ -432,7 +432,7 @@ jobs:
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             docker compose up -d --no-deps gateway
             sleep 5
-            curl -sf http://localhost:8921/health || \
+            curl -sf http://localhost:8080/health || \
               (docker compose logs gateway --tail=50 && exit 1)
             echo "✓ Staging deployment successful"
 
