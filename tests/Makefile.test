@@ -48,3 +48,12 @@ full-complete: api data perf supply-chain oscal
 	@echo "═══════════════════════════"
 	@echo "✅ ALL M1+M2 SUITES PASSED"
 	@echo "═══════════════════════════"
+
+ir:
+	@./tests/test_incident_response.sh
+
+full-all: api data perf supply-chain oscal ir
+	@echo ""
+	@echo "═══════════════════════════"
+	@echo "✅ ALL M1+M2+M3 SUITES PASSED"
+	@echo "═══════════════════════════"

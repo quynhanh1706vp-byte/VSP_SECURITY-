@@ -375,6 +375,28 @@ func main() {
 	r.Post("/api/p4/attestation/sign", p4AuthMiddleware(handleAttestationSign))
 	r.Get("/api/p4/attestation/list", p4AuthMiddleware(handleAttestationList))
 
+	// ═══ Milestone 3: Incident Response + CIRCIA + Forensics ═══
+	// NIST SP 800-61 Rev.3 (April 2025) IR lifecycle
+	// CIRCIA 2022 — 72h substantial / 24h ransomware reporting
+	// NIST SP 800-86 Forensics with chain of custody
+	r.Get("/api/p4/ir/incidents", p4AuthMiddleware(handleIRIncidentsList))
+	r.Post("/api/p4/ir/incident", p4AuthMiddleware(handleIRIncidentCreate))
+	r.Post("/api/p4/ir/incident/transition", p4AuthMiddleware(handleIRIncidentTransition))
+	r.Post("/api/p4/circia/generate", p4AuthMiddleware(handleCIRCIAGenerate))
+	r.Post("/api/p4/circia/submit", p4AuthMiddleware(handleCIRCIASubmit))
+	r.Get("/api/p4/circia/reports", p4AuthMiddleware(handleCIRCIAList))
+	r.Post("/api/p4/forensics/evidence", p4AuthMiddleware(handleForensicsCreate))
+	r.Get("/api/p4/forensics/evidence", p4AuthMiddleware(handleForensicsList))
+	r.Post("/api/p4/forensics/custody", p4AuthMiddleware(handleForensicsCustody))
+	r.Get("/api/p4/ir/playbooks", p4AuthMiddleware(handleIRPlaybooksList))
+
+	// ═══ Milestone 3 Extended: Detail view + Edit + Ransom payment ═══
+	r.Get("/api/p4/ir/incident/detail", p4AuthMiddleware(handleIRIncidentDetail))
+	r.Post("/api/p4/ir/incident/update", p4AuthMiddleware(handleIRIncidentUpdate))
+	r.Post("/api/p4/ir/incident/ransom-payment", p4AuthMiddleware(handleIRRansomPayment))
+	r.Post("/api/p4/ir/incident/lessons", p4AuthMiddleware(handleIRIncidentLessons))
+	r.Get("/api/p4/circia/report/detail", p4AuthMiddleware(handleCIRCIAReportDetail))
+
 	r.Get("/api/p4/ato/expiry", p4AuthMiddleware(handleATOExpiry))
 	r.Get("/api/p4/oscal/ssp", p4AuthMiddleware(handleOSCALExport))
 	r.Get("/api/p4/alerts/config", p4AuthMiddleware(handleAlertConfig))
