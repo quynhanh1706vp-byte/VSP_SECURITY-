@@ -1,4 +1,4 @@
 server:
-  gateway_port: 8921
+  gateway_port: 8080
 database:
   url: "postgres://vsp:vsp@localhost:5432/vsp_go?sslmode=disable"
