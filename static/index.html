@@ -390,8 +390,8 @@ function updateScanTools() {
   <!-- Bottom -->
   <div class="sidebar-bottom">
     <div class="gate-status" id="gate-widget">
-      <span class="gate-icon">✗</span>
-      <span class="gate-label">GATE FAIL</span>
+      <span class="gate-icon" id="d-gate-icon">—</span>
+      <span class="gate-label" id="d-gate-label">GATE —</span>
       <span class="gate-detail" id="d-gate-score">score: —</span>
     </div>
     <div class="user-row">
@@ -8277,6 +8277,7 @@ var _siemKPIpoll = setInterval(function() {
 }, 1000);
 </script>
 <script src="/vsp_upgrade_v100.js">
+<script src="/static/js/vsp_gate_widget.js"></script>
 // ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
 (function() {
   // Giảm polling: chỉ refresh dashboard mỗi 30s thay vì 3s

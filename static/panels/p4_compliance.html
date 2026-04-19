@@ -2832,7 +2832,7 @@ function switchTenant(id) {
   }
 
   console.log('[P4] loadSBOMView + loadVNStandards overridden');
-  console.log('[P4] api() override active — mock for vn-standards + sbom/view-db');
+  if(window.VSP_DEBUG)console.log('[P4] api() override active — mock for vn-standards + sbom/view-db');
 })();
 </script>
 </body>

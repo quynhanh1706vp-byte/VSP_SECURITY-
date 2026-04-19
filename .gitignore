@@ -79,3 +79,12 @@ static/download/
 .env.*
 platform
 deep_test_v3.js
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Python cache
+__pycache__/
+*.pyc
+.deadcode/
