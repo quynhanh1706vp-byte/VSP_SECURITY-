@@ -83,9 +83,9 @@ deep_test_v3.js
 !static/js/vsp_iframe_bootstrap.js
 !static/js/vsp_sprint2_quickwins.js
 !scripts/*.sh
-
 # Python cache
 __pycache__/
 *.pyc
 # Python cache
 .deadcode/
+!scripts/build-gateway.sh
