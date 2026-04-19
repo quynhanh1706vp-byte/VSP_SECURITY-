@@ -297,6 +297,11 @@ func main() {
 	// SSE — cookie-based auth (no ?token= in URL — prevents log leakage)
 	r.With(authMw).Get("/api/v1/events", handler.SSEHandler)
 
+	// Root route — serve main UI (index.html)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/index.html")
+	})
+
 	// Serve P4 static panel directly (bypasses Python proxy)
 	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
 		// Override CSP for P4 panel — allow inline styles/scripts
