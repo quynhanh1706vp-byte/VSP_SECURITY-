@@ -694,7 +694,7 @@ setTimeout(() => {
   upgradeDashboard();
   upgradeFindings();
   upgradeRemediation();
-  console.log('[VSP Upgrade v1.0.0] UI Enhancement loaded ✓');
+  if(window.VSP_DEBUG)console.log('[VSP Upgrade v1.0.0] UI Enhancement loaded ✓');
 }, 500);
 
 // ─── Posture compose helper — dùng /findings/summary?scope=all thay cho /posture/latest ───
@@ -965,7 +965,7 @@ window.vspGetPosture = async function() {
   setTimeout(function(){
     window.showPanel = _masterShow;
     window._masterShowPanel = _masterShow;
-    console.log('[VSP] DEFINITIVE_SHOW_PANEL installed');
+    if(window.VSP_DEBUG)console.log('[VSP] DEFINITIVE_SHOW_PANEL installed');
   }, 0);
 })();
 
@@ -994,7 +994,7 @@ window.addEventListener('load', function() {
     console.log('[VSP MASTER] showPanel:', name);
   }
   window.showPanel = _masterShow;
-  console.log('[VSP] LAST_OVERRIDE installed');
+  if(window.VSP_DEBUG)console.log('[VSP] LAST_OVERRIDE installed');
 });
 
 // LOCK_SHOW_PANEL — dùng defineProperty để không ai override được nữa
@@ -1017,7 +1017,7 @@ window.addEventListener('load', function() {
     if(panel){var fr=panel.querySelector('iframe[data-src]');if(fr&&!fr.src)fr.src=fr.getAttribute('data-src');}
     var L={runs:function(){window.loadRuns&&window.loadRuns();},audit:function(){typeof loadAuditReal==='function'&&loadAuditReal();},dashboard:function(){typeof initDashboardCharts==='function'&&initDashboardCharts();},findings:function(){typeof loadFindingsPanel==='function'&&loadFindingsPanel();},sla:function(){typeof loadSLA==='function'&&loadSLA();},sbom:function(){typeof loadSBOM==='function'&&loadSBOM();},compliance:function(){typeof loadFedRAMP==='function'&&loadFedRAMP();},governance:function(){typeof window.loadRiskRegister==='function'&&window.loadRiskRegister();},executive:function(){typeof loadExecutive==='function'&&loadExecutive();}};
     if(L[name]) setTimeout(L[name], 150);
-    console.log('[VSP FINAL] panel:', name);
+    if(window.VSP_DEBUG)console.log('[VSP FINAL] panel:', name);
   }
   try {
     Object.defineProperty(window, 'showPanel', {
@@ -1194,7 +1194,7 @@ window.addEventListener('load', function() {
   };
 })();
 
-console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediation+Compliance fixed');
+if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediation+Compliance fixed');
 
 // PATCH v3.1 — Fix Remediation load từ API thật
 (function(){
@@ -1272,7 +1272,7 @@ console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediation+Compliance fixed')
       
     } catch(e){ console.error('loadRemediations v3.1',e); }
   };
-  console.log('[VSP] PATCH v3.1 Remediation fix loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.1 Remediation fix loaded');
 })();
 
 // PATCH v3.2 — Auto-trigger loadRemediations khi vào panel
@@ -1287,7 +1287,7 @@ console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediation+Compliance fixed')
       panel._loaded = false; // reset khi rời panel
     }
   }, 300);
-  console.log('[VSP] PATCH v3.2 auto-trigger loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.2 auto-trigger loaded');
 })();
 
 // ══ PATCH v3.3 — SOC Scorecard + SBOM Diff + SLA Trendline ══════════════
@@ -1505,7 +1505,7 @@ console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediation+Compliance fixed')
   };
 })();
 
-console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
+if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
 
 // PATCH v3.4 — Fix SOC scorecard mapping frameworks→scorecards + domain breakdown
 (function(){
@@ -1556,7 +1556,7 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
   if (document.getElementById('panel-soc') && document.getElementById('panel-soc').classList.contains('active')) {
     setTimeout(window.loadSOCv2, 100);
   }
-  console.log('[VSP] PATCH v3.4 SOC scorecard fix loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.4 SOC scorecard fix loaded');
 })();
 
 // PATCH v3.5 — Auto-trigger cho SOC + SBOM + SLA
@@ -1582,7 +1582,7 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       }
     });
   }, 300);
-  console.log('[VSP] PATCH v3.5 auto-trigger all panels loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.5 auto-trigger all panels loaded');
 })();
 
 // PATCH v3.6 — Fix Remediation donut auto-render
@@ -1630,7 +1630,7 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       }
     }, 500);
   };
-  console.log('[VSP] PATCH v3.6 Remediation donut fix loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.6 Remediation donut fix loaded');
 })();
 
 // PATCH v3.7 — Policy panel: load API rules + auto-trigger + rich eval
@@ -1760,7 +1760,7 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     }
   };
 
-  console.log('[VSP] PATCH v3.7 Policy panel loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.7 Policy panel loaded');
 })();
 
 // PATCH v3.8 — Policy: Security Standards (OWASP, CWE, BKAV) từ findings thật
@@ -1902,7 +1902,7 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     }
   };
 
-  console.log('[VSP] PATCH v3.8 Security Standards loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.8 Security Standards loaded');
 })();
 
 // PATCH v3.9 — Policy Standards: inject trực tiếp không qua _loadPolicyFull
@@ -1929,7 +1929,7 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     if (typeof _refreshStandards === 'function') _refreshStandards();
   }, 500);
   
-  console.log('[VSP] PATCH v3.9 Policy Standards inject loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.9 Policy Standards inject loaded');
 })();
 
 // PATCH v4.0 — Audit panel: KPI + filter + pagination đầy đủ
@@ -2064,7 +2064,7 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
   // Override loadAuditReal
   window.loadAuditReal = _loadAuditFull;
   
-  console.log('[VSP] PATCH v4.0 Audit full loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v4.0 Audit full loaded');
 })();
 
 // PATCH v4.1 — Fix iframe panels tự load khi click
@@ -2084,7 +2084,7 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       }
     });
   }, 300);
-  console.log('[VSP] PATCH v4.1 iframe auto-load loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v4.1 iframe auto-load loaded');
 })();
 
 // PATCH v4.1 — Fix iframe panels tự load khi click
@@ -2104,5 +2104,5 @@ console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       }
     });
   }, 300);
-  console.log('[VSP] PATCH v4.1 iframe auto-load loaded');
+  if(window.VSP_DEBUG)console.log('[VSP] PATCH v4.1 iframe auto-load loaded');
 })();
