@@ -306,15 +306,6 @@ func main() {
 		rw := &p4ResponseWriter{ResponseWriter: w, cspSet: false}
 		http.StripPrefix("/static/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(rw, r)
 	})
-	// Serve P4 static panel directly (bypasses Python proxy)
-	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
-		// Override CSP for P4 panel — allow inline styles/scripts
-		w.Header().Del("Content-Security-Policy")
-		w.Header().Del("X-Frame-Options")
-		// Wrap to set CSP after middleware
-		rw := &p4ResponseWriter{ResponseWriter: w, cspSet: false}
-		http.StripPrefix("/static/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(rw, r)
-	})
 	// Serve panels/ with relaxed CSP for iframes
 	r.Get("/panels/*", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Del("Content-Security-Policy")
