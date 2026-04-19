@@ -1212,7 +1212,7 @@ func main() {
 		r.Post("/api/v1/audit/rotate", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
 			if claims.Role != "admin" {
-				http.Error(w, "{\"error\":\"admin only\"}", 403)
+				http.Error(w, "{\"error\":\"admin only\"}", http.StatusForbidden)
 				return
 			}
 			keepDays := 90

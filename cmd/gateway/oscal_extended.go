@@ -575,7 +575,7 @@ func handleSSDFPractices(w http.ResponseWriter, r *http.Request) {
 func handleSSDFUpdate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -723,7 +723,7 @@ func handleAttestationGenerate(w http.ResponseWriter, r *http.Request) {
 func handleAttestationSign(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 

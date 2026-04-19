@@ -529,7 +529,7 @@ func handleSBOMViewDB(w http.ResponseWriter, r *http.Request) {
 func handleVNStandardUpdate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "method not allowed", 405)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -563,7 +563,7 @@ func handleVNStandardUpdate(w http.ResponseWriter, r *http.Request) {
 func handleMarkControlPass(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "method not allowed", 405)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	var req struct {

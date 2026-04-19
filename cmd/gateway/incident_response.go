@@ -128,7 +128,7 @@ func handleIRIncidentsList(w http.ResponseWriter, r *http.Request) {
 func handleIRIncidentCreate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -220,7 +220,7 @@ func handleIRIncidentCreate(w http.ResponseWriter, r *http.Request) {
 func handleIRIncidentTransition(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -299,7 +299,7 @@ func handleIRIncidentTransition(w http.ResponseWriter, r *http.Request) {
 func handleCIRCIAGenerate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -426,7 +426,7 @@ func handleCIRCIAGenerate(w http.ResponseWriter, r *http.Request) {
 func handleCIRCIASubmit(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -554,7 +554,7 @@ func handleCIRCIAList(w http.ResponseWriter, r *http.Request) {
 func handleForensicsCreate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -702,7 +702,7 @@ func handleForensicsList(w http.ResponseWriter, r *http.Request) {
 func handleForensicsCustody(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -940,7 +940,7 @@ func handleIRIncidentDetail(w http.ResponseWriter, r *http.Request) {
 func handleIRIncidentUpdate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 	var req struct {
@@ -983,7 +983,7 @@ func handleIRIncidentUpdate(w http.ResponseWriter, r *http.Request) {
 func handleIRRansomPayment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 	var req struct {
@@ -1024,7 +1024,7 @@ func handleIRRansomPayment(w http.ResponseWriter, r *http.Request) {
 func handleIRIncidentLessons(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 	var req struct {

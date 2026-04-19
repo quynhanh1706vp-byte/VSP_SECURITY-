@@ -278,7 +278,7 @@ func publicKeyPEM() (string, error) {
 func handleSignArtifact(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -447,7 +447,7 @@ func handleListSignatures(w http.ResponseWriter, r *http.Request) {
 func handleGenProvenance(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -594,7 +594,7 @@ func handleListProvenance(w http.ResponseWriter, r *http.Request) {
 func handleCreateVEX(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "POST" {
-		http.Error(w, "POST only", 405)
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
 
