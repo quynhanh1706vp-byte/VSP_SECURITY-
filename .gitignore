@@ -74,3 +74,6 @@ static/download/
 /20
 /3
 /=
+.env
+.env.production
+.env.*
