@@ -90,7 +90,7 @@ func (h *SBOM) Grype(w http.ResponseWriter, r *http.Request) {
 	// Nếu target là directory Go source → dùng gomod: prefix
 	if target != "" {
 		// Check nếu là Go project (có go.mod)
-		if _, err := os.Stat(target + "/go.mod"); err == nil { //nolint:gosec // G703: target validated above
+		if _, err := os.Stat(target + "/go.mod"); err == nil { //#nosec G304 G703 -- target validated above
 			target = "dir:" + target
 		}
 	}

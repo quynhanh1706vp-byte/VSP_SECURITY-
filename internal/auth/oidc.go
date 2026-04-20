@@ -29,7 +29,9 @@ type OIDCConfig struct {
 	AdminDomains []string `yaml:"admin_domains"` // e.g. ["company.com"]
 }
 
-// Well-known provider presets
+// Well-known provider presets.
+// #nosec G101 -- these are public OAuth2 endpoint URLs (Google, GitHub, Azure, Okta),
+// not credentials. Gosec flags them due to URL pattern matching heuristic.
 var ProviderPresets = map[string]OIDCConfig{
 	"google": {
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",

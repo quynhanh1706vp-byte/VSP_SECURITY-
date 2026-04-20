@@ -81,7 +81,7 @@ func (h *Report) ExecutivePDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, _ := os.ReadFile(pdfPath) //nolint:gosec // G703: pdfPath uses rid validated by isValidRID()
+	b, _ := os.ReadFile(pdfPath) //#nosec G304 G703 -- pdfPath uses rid validated by isValidRID()
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=vsp-executive-%s.pdf", rid))

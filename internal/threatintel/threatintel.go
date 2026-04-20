@@ -173,10 +173,10 @@ func (c *Client) EnrichBatch(ctx context.Context, cveIDs []string) map[string]*C
 func (c *Client) fetchNVD(ctx context.Context, cveID string, enr *CVEEnrichment) error {
 	//nolint:gosec // G704: base URL is hardcoded constant, cveID validated as alphanumeric
 	url := "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=" + cveID //#nosec G704 -- base URL hardcoded
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)               //nolint:gosec
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)               //#nosec G704 -- url built from hardcoded base + validated cveID
 	req.Header.Set("User-Agent", "VSP-Security-Platform/1.0")
 
-	resp, err := c.http.Do(req)
+	resp, err := c.http.Do(req) //#nosec G704 -- same justification
 	if err != nil {
 		return err
 	}
@@ -279,9 +279,9 @@ func (c *Client) fetchNVD(ctx context.Context, cveID string, enr *CVEEnrichment)
 func (c *Client) fetchEPSS(ctx context.Context, cveID string, enr *CVEEnrichment) error {
 	//nolint:gosec // G704: base URL is hardcoded constant
 	url := "https://api.first.org/data/v1/epss?cve=" + cveID   //#nosec G704 -- base URL hardcoded
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil) //nolint:gosec
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil) //#nosec G704 -- url built from hardcoded base + validated cveID
 
-	resp, err := c.http.Do(req)
+	resp, err := c.http.Do(req) //#nosec G704 -- same justification
 	if err != nil {
 		return err
 	}
@@ -347,7 +347,7 @@ func (c *Client) loadKEVFromURL(ctx context.Context, url string) error {
 	req.Header.Set("User-Agent", "VSP-Platform/1.0 (+https://vsp.local; threat-intel)")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.http.Do(req)
+	resp, err := c.http.Do(req) //#nosec G704 -- URL validated
 	if err != nil {
 		return err
 	}

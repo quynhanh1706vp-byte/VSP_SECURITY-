@@ -74,14 +74,14 @@ func apiKey() string {
 }
 
 func get(path string) (map[string]interface{}, error) {
-	//nolint:gosec // G704: host from VSP_HOST env var, controlled by operator
-	req, err := http.NewRequest("GET", host+path, nil)
+	//#nosec G704 -- host from VSP_HOST env var, controlled by operator
+	req, err := http.NewRequest("GET", host+path, nil) //#nosec G704 -- host from VSP_HOST env var
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("X-API-Key", apiKey())
 	req.Header.Set("Referer", host+"/p4")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //#nosec G704 -- host from VSP_HOST env var, controlled by operator
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func post(path string) (map[string]interface{}, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", apiKey())
 	req.Header.Set("Referer", host+"/p4")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //#nosec G704 -- host from VSP_HOST env var, controlled by operator
 	if err != nil {
 		return nil, err
 	}
