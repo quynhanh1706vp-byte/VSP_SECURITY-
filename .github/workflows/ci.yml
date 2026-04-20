@@ -107,6 +107,12 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    # gitleaks-action needs to list commits on PR to scan incremental diffs.
+    # Default GITHUB_TOKEN permissions don't include pull-requests:read —
+    # without this block gitleaks returns HTTP 403 on PR events.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
 
