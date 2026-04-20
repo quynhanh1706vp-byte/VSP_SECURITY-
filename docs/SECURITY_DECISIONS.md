@@ -163,3 +163,26 @@ Potential risks if binaries were compiled with real env vars:
 
 **Discovery method:** `git cat-file --batch-all-objects --batch-check` 
 filtered for size > 10MB during binary purge verification after PR #22.
+
+## 2026-04-20 — Binary scan follow-up (no secrets found)
+
+Update to previous entry (420MB binaries discovery).
+
+**Scanned:** All 14 binaries >10MB in git history.
+
+**Result:** NO embedded secrets detected.
+- No Anthropic API keys (sk-ant-api03-*)
+- No JWT_SECRET environment values
+- No DB credentials (postgres://user:pass)
+- No AWS access keys
+- "Password" / "key" / "secret" matches are Go function/variable
+  names (compiler metadata), not credential values
+
+**Updated decision: No security incident. Only repo bloat.**
+
+**Recommendation:**
+- DEFER filter-repo cleanup to Sprint 3 or later
+- Binaries do not warrant nuclear option (force-push risk)
+- Accept 420MB git history bloat as technical debt
+- .gitignore already updated to prevent future accidents
+- Item added to Sprint 3 backlog: "Investigate static/download/* as intentional"
