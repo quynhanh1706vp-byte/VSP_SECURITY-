@@ -124,7 +124,7 @@ func main() {
 	// Reverse proxy /api/p4/* → gateway:8921
 	mux.HandleFunc("/api/p4/", func(w http.ResponseWriter, r *http.Request) {
 		target := "http://127.0.0.1:8921" + r.URL.RequestURI()
-		req, err := http.NewRequest(r.Method, target, r.Body)
+		req, err := http.NewRequest(r.Method, target, r.Body) //#nosec G704 -- target hardcoded to 127.0.0.1:8921 (internal reverse proxy)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
@@ -134,7 +134,7 @@ func main() {
 				req.Header.Add(k, v)
 			}
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := http.DefaultClient.Do(req) //#nosec G704 -- target hardcoded to 127.0.0.1:8921 (internal reverse proxy)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
