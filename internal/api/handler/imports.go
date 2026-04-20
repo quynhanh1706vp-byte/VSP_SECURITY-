@@ -37,7 +37,13 @@ func (h *Imports) Policies(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/import/findings — CSV upload (header: severity,tool,rule_id,message,path,line,cwe)
 func (h *Imports) Findings(w http.ResponseWriter, r *http.Request) {
-	r.ParseMultipartForm(10 << 20)
+	const maxUpload = 10 << 20 // 10 MB hard cap on request body
+	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
+	// #nosec G120 -- body already capped by MaxBytesReader above; ParseMultipartForm arg is memory-hint only
+	if err := r.ParseMultipartForm(maxUpload); err != nil {
+		jsonError(w, "upload too large or malformed (max 10 MB)", http.StatusRequestEntityTooLarge)
+		return
+	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
 		jsonError(w, "file required", http.StatusBadRequest)
@@ -89,6 +95,7 @@ func (h *Imports) Findings(w http.ResponseWriter, r *http.Request) {
 		}
 		lineNum := 0
 		if len(row) > 5 {
+			// #nosec G104 -- parse failure intentional: lineNum defaults to 0 for unparseable rows
 			fmt.Sscanf(row[5], "%d", &lineNum)
 		}
 		cwe := ""

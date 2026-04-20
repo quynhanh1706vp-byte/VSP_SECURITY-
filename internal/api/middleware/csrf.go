@@ -28,13 +28,15 @@ func CSRFProtect(next http.Handler) http.Handler {
 			// Issue a CSRF token cookie on GET if not present
 			if _, err := r.Cookie(csrfCookie); err != nil {
 				token := generateCSRFToken()
+				// #nosec G124 -- HttpOnly intentionally false: double-submit CSRF requires JS read access.
+				// SameSite=Strict + Secure (on HTTPS) provide equivalent protection without breaking the pattern.
 				http.SetCookie(w, &http.Cookie{
 					Name:     csrfCookie,
 					Value:    token,
 					Path:     "/",
 					SameSite: http.SameSiteStrictMode,
 					Secure:   isHTTPS(r),
-					HttpOnly: false, // must be readable by JS
+					HttpOnly: false,
 				})
 			}
 			next.ServeHTTP(w, r)
