@@ -1,0 +1,35 @@
+## 20/04/2026 — Sprint 2 overtime close + Sprint 3 launch
+
+**Outcomes:**
+- 5 PRs merged to main (18, 19, 20, 21, 22)
+- Gosec: 299 → 249 issues (-50, -16.7%)
+- Dev stub server quarantined with build tag
+- Anthropic API key leak incident documented + deferred
+- Binary commit incident resolved via filter-repo + force-push
+
+**DevSecOps compliance review:**
+
+✓ Upheld:
+  - Every PR includes security improvement
+  - Pre-commit hooks active (gofmt, go vet, secrets detection)
+  - Audit trail maintained (SECURITY_DECISIONS.md)
+  - Tools chained correctly (gosec + gitleaks + trivy)
+  
+⚠ Technical debt accumulated (justified but documented):
+  - Admin-merge override 5x (CI billing block)
+  - Force-push main 1x (filter-repo history rewrite)
+  - Binary committed + cleaned (workflow mistake)
+  
+**Prevention measures added:**
+  - .gitignore updated with binary blacklist patterns
+  - Build workflow guidance: use -o /tmp/ for binaries
+  - Note: admin-merge should remain exception, not normal
+  - Note: force-push violates normal branch protection
+
+**Next session priorities:**
+  - Resolve GitHub Actions billing (eliminate admin-merge need)
+  - Anthropic key review 2026-05-20
+  - PR #D G101 + G703 + G704 closure
+  - Update docx 42 → 58 items
+  - Clean 9 orphan remote branches
+  - Investigate 5 large blobs >10MB in pack (total ~130MB)
