@@ -218,7 +218,15 @@ func main() {
 		Str("static", "./static").
 		Msg("VSP SOC Shell starting")
 
-	if err := http.ListenAndServe(addr, securityMiddleware(mux)); err != nil {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           securityMiddleware(mux),
+		ReadHeaderTimeout: 10 * time.Second, // slowloris mitigation
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second, // longer for static assets
+		IdleTimeout:       120 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal().Err(err).Msg("shell server failed")
 	}
 }
