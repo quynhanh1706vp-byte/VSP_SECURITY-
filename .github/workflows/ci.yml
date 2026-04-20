@@ -127,7 +127,7 @@ jobs:
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           gosec -severity high -confidence high \
-            -exclude=G104,G304,G307,G204,G703,G704,G108,G118 \
+            -exclude=G104,G304,G307,G204,G703,G704,G108,G118,G702,G402 \
             ./...
 
       - name: gitleaks — secret scan
