@@ -234,3 +234,36 @@ Update to previous entry (420MB binaries discovery).
   forced bypass. Both close out when CI restored.
 
 **Status:** Accepted. Review quarterly (next: 2026-07-20).
+
+---
+
+## SD-0049 — GitHub Actions CI blocked by billing (2026-04-20)
+
+**Date:** 2026-04-20 18:30
+**Incident:** All CI jobs fail with message "The job was not started because
+  recent account payments have failed or your spending limit needs to be
+  increased."
+**Evidence:**
+  - Run 24663611561 (and 8+ prior runs): 5 jobs fail with billing message,
+    4 jobs skipped (dependency of failed).
+  - GitHub API confirms: Actions permissions enabled, workflow state active,
+    YAML valid, runs reach scheduler but not runner allocation.
+**Root cause:** GitHub account spending limit / payment method issue
+  (not code, not config, not YAML).
+**Impact:**
+  - SAST (gosec), SCA (govulncheck), secret scan (gitleaks), unit tests,
+    integration tests, migration tests, DAST (Nuclei), container scan
+    (Trivy), SBOM generation — all blocked.
+  - Cannot verify PR changes automatically.
+  - Forced --admin merges and direct-to-main pushes (SD-0047, SD-0048)
+    are a consequence of this block.
+**Workaround in effect:**
+  - Pre-commit hook runs gofmt + go vet + gitleaks locally (partial coverage).
+  - Manual local verification: go test, golangci-lint run, gitleaks detect.
+**Remediation path (decision pending):**
+  - Option A: Resolve GitHub billing → restore CI (~$15-20/month estimated).
+  - Option B: Self-hosted runner on dev infrastructure (~15 min setup, but
+    runner-in-dev-box has security tradeoffs).
+  - Option C: Migrate to GitLab free tier (400 min/month) or public repo.
+**Status:** OPEN. Block on commercial decision.
+**Related:** SD-0047, SD-0048 (bypass decisions forced by this block).
