@@ -99,3 +99,37 @@ Binary contains dev-stub server with JWT token stub:
 - This decision logged for future audit
 
 **Next review:** If repo goes public, immediately force-rewrite history.
+
+## 2026-04-20 — Binary accidentally committed in commit 089f114
+
+**Incident:** 18.3 MB binary file `dev-stub` committed to main via PR #22.
+Binary was compiled output of `go build ./cmd/dev-stub/` run from repo
+root before files were moved. `go build` writes binary named after
+package directory to CWD (repo root).
+
+**Content analysis:**
+Binary contains dev-stub server with JWT token stub:
+- Payload: {"sub":"admin@vsp.local","role":"admin","exp":99999999999}
+- Signature: literal string "signature" (NOT valid HMAC-SHA256)
+
+Token is cryptographically INVALID — production gateway validates HMAC
+and will reject it.
+
+**Decision: DEFER history rewrite**
+
+**Rationale:**
+- Invalid JWT = zero exploit value
+- Repo PRIVATE = limited blast radius
+- git filter-repo requires force-push invalidating PR refs
+- Operational cost > benefit (18MB disk in git history)
+
+**Mitigations applied:**
+- Binary removed from working tree (commits 7aff67b, 96a8175)
+- .gitignore updated with binary blacklist patterns
+- This incident logged for audit trail
+
+**Next review:** If repo goes public → immediate force-rewrite history.
+
+**Prevention:** Future `go build` usage must use `-o /tmp/binary-name`
+flag or be run inside target directory to prevent binary artifacts
+in repo root.
