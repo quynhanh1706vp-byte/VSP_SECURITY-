@@ -205,11 +205,12 @@ func TestIntegration_Findings_WithData(t *testing.T) {
 	e := setupEnv(t)
 	_, runID := createRun(t, e.db, e.tenantID)
 	ctx := context.Background()
-	for _, sev := range []string{"CRITICAL", "HIGH", "MEDIUM"} {
-		e.db.Pool().Exec(ctx,
-			`INSERT INTO findings(run_id,tenant_id,tool,severity,rule_id,message,path)
-			 VALUES($1,$2,'semgrep',$3,'R1','test','/src/main.go')`,
-			runID, e.tenantID, sev)
+	for i, sev := range []string{"CRITICAL", "HIGH", "MEDIUM"} {
+		_, err := e.db.Pool().Exec(ctx,
+			`INSERT INTO findings(run_id,tenant_id,tool,severity,rule_id,message,path,line_num)
+			 VALUES($1,$2,'semgrep',$3,'R1','test',$4,$5)`,
+			runID, e.tenantID, sev, fmt.Sprintf("/src/main%d.go", i), i+1)
+		require.NoError(t, err)
 	}
 	resp := e.get("/api/v1/vsp/findings?limit=10")
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -222,11 +223,12 @@ func TestIntegration_Findings_SeverityFilter(t *testing.T) {
 	e := setupEnv(t)
 	_, runID := createRun(t, e.db, e.tenantID)
 	ctx := context.Background()
-	for _, sev := range []string{"CRITICAL", "HIGH", "LOW"} {
-		e.db.Pool().Exec(ctx,
-			`INSERT INTO findings(run_id,tenant_id,tool,severity,rule_id,message,path)
-			 VALUES($1,$2,'bandit',$3,'R1','msg','/f.py')`,
-			runID, e.tenantID, sev)
+	for i, sev := range []string{"CRITICAL", "HIGH", "LOW"} {
+		_, err := e.db.Pool().Exec(ctx,
+			`INSERT INTO findings(run_id,tenant_id,tool,severity,rule_id,message,path,line_num)
+			 VALUES($1,$2,'bandit',$3,'R1','msg',$4,$5)`,
+			runID, e.tenantID, sev, fmt.Sprintf("/f%d.py", i), i+1)
+		require.NoError(t, err)
 	}
 	resp := e.get("/api/v1/vsp/findings?severity=CRITICAL")
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
