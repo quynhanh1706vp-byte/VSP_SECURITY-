@@ -65,3 +65,37 @@ Local environment verified equivalent.
 regression surfaces immediately on main branch.
 
 **Owner:** thunt.rsa@gmail.com
+
+## 2026-04-20 — Binary accidentally committed in commit 089f114
+
+**Incident:** 18.3 MB binary file `dev-stub` committed to main branch
+via PR #22 merge. Binary was compiled output of `go build ./cmd/dev-stub/`
+run from repo root before file was moved to proper location.
+
+**Content analysis:**
+Binary contains dev-stub server with JWT token stub:
+- Header: {"alg":"HS256","typ":"JWT"}
+- Payload: {"sub":"admin@vsp.local","role":"admin","exp":99999999999}
+- Signature: literal string "signature" (NOT a valid HMAC-SHA256 hash)
+
+**Risk assessment:**
+- JWT token is cryptographically INVALID — production gateway validates
+  HMAC signature and will reject this token
+- Binary contains no other credentials, secrets, or exploit primitives
+- Risk = repo bloat (+18.3 MB in git history), no security impact
+
+**Decision: DEFER history rewrite**
+
+**Rationale:**
+- Invalid JWT = no exploit value for attacker
+- Repo PRIVATE = limited blast radius
+- `git filter-repo` requires force-push that would invalidate PR refs
+  and require all team members to re-clone
+- Cost of rewrite (operational disruption) > benefit (18MB disk)
+
+**Mitigations applied:**
+- Binary removed from working tree (commits 7aff67b, 96a8175)
+- .gitignore updated to blacklist all compiled binaries
+- This decision logged for future audit
+
+**Next review:** If repo goes public, immediately force-rewrite history.
