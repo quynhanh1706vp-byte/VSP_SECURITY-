@@ -12,6 +12,15 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       SERVER_ENV: production
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8922}
+    # Packet capture (internal/netcap → gopacket/pcap) needs raw socket access.
+    # NET_RAW: AF_PACKET sockets and raw frame reads.
+    # NET_ADMIN: put the interface into promiscuous mode.
+    # Gateway still runs as non-root (UID 65534) — caps are file-scoped via
+    # the kernel, not granted to the user. If the packet-capture feature is
+    # disabled at runtime, these caps are unused and harmless.
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     depends_on:
       postgres:
         condition: service_healthy
