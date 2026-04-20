@@ -42,3 +42,26 @@ commits `aebee892`, `2652198`, `3fb18207` (config/config.yaml).
 - PR #19: gitleaks migration + Trivy sanitize
 - Sprint 3 item #43: Historical secret scan + rotation procedure
 - Sprint 3 item #44: Custom gitleaks rules for Anthropic/OpenAI/AWS formats
+
+## 2026-04-20 — PR #20 + #21 admin-merge override
+
+**Context:** GitHub Actions billing/quota exhausted → all CI jobs blocked
+with "recent account payments failed or spending limit exceeded" error.
+
+**Decision:** Admin-merged PR #20 and #21 without CI validation.
+
+**Justification:**
+- CI failure root-caused to account billing, NOT code issues
+- Local validation comprehensive: go build OK, go vet OK, tests pass,
+  gosec verified G402/G108/G306/G120/G114 closed, gitleaks clean
+- Changes are security-improving (closing gosec findings, not introducing
+  new code paths)
+- Blocking urgency: CI may not recover until 2026-05-01 quota reset
+
+**Risk accepted:** No automated validation that fixes work in CI environment.
+Local environment verified equivalent.
+
+**Mitigation:** Next CI run after quota reset should be monitored; any
+regression surfaces immediately on main branch.
+
+**Owner:** thunt.rsa@gmail.com
