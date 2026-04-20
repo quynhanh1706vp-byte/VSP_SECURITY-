@@ -92,3 +92,11 @@ __pycache__/
 leaks_report.json
 leaks_*.json
 leaks_*.json
+
+# Binaries - never commit
+dev-stub
+/dev-stub
+vsp-gateway
+vsp-agent
+/bin/
+*.exe
