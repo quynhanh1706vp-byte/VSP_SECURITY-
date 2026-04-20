@@ -153,11 +153,22 @@ func main() {
 	}
 
 	data, _ := json.Marshal(report)
+
+	// TLS verification: defaults to strict verify.
+	// Opt-out via VSP_AGENT_ALLOW_INSECURE_TLS=true (dev/self-signed gateway only).
+	allowInsecure := os.Getenv("VSP_AGENT_ALLOW_INSECURE_TLS") == "true"
+	if allowInsecure {
+		fmt.Fprintln(os.Stderr,
+			"WARNING: TLS verification DISABLED via VSP_AGENT_ALLOW_INSECURE_TLS. Not for production.")
+	}
+	// #nosec G402 -- InsecureSkipVerify gated by VSP_AGENT_ALLOW_INSECURE_TLS env var (dev only)
+	tlsConfig := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: allowInsecure,
+	}
 	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+		Timeout:   30 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: tlsConfig},
 	}
 
 	req, _ := http.NewRequest("POST",
