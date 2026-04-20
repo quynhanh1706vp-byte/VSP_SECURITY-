@@ -81,20 +81,34 @@ VSP is a monorepo with 8 binaries, each deployable independently.
    │ Scanner      │   │ Scheduler        │   │ SOC Shell :8922  │
    │ cmd/scanner  │   │ cmd/gateway      │   │ cmd/soc-shell    │
    │              │   │ (embedded)       │   │                  │
-   │ 12+ tools:   │   │                  │   │ Interactive      │
-   │ - gosec      │   │ Cron-based scans │   │ investigator     │
-   │ - trivy      │   │ Next run         │   │ for SOC analysts │
-   │ - semgrep    │   │ persisted in DB  │   │                  │
-   │ - gitleaks   │   └──────────────────┘   └──────────────────┘
-   │ - nuclei     │
-   │ - checkov    │   ┌──────────────────┐   ┌──────────────────┐
-   │ - kics       │   │ SIEM Engine      │   │ Agent            │
-   │ - grype      │   │ (syslog receiver)│   │ cmd/vsp-agent    │
-   │ - bandit     │   │ :10514 UDP       │   │                  │
-   │ - hadolint   │   │ :10515 TCP       │   │ On-premise       │
-   │ - nikto      │   │                  │   │ customer scans   │
-   │ - sslscan    │   │ Playbook engine  │   │                  │
-   └──────────────┘   │ (SOAR)           │   └──────────────────┘
+   │ 19 tools:    │   │                  │   │ Interactive      │
+   │ SAST(5):     │   │ Cron-based scans │   │ investigator     │
+   │  gosec,      │   │ Next run         │   │ for SOC analysts │
+   │  semgrep,    │   │ persisted in DB  │   │                  │
+   │  bandit,     │   └──────────────────┘   └──────────────────┘
+   │  codeql,     │
+   │  hadolint    │   ┌──────────────────┐   ┌──────────────────┐
+   │ SCA(3):      │   │ SIEM Engine      │   │ Agent            │
+   │  trivy,      │   │ (syslog receiver)│   │ cmd/vsp-agent    │
+   │  grype,      │   │ :10514 UDP       │   │                  │
+   │  license     │   │ :10515 TCP       │   │ On-premise       │
+   │ IaC(2):      │   │                  │   │ customer scans   │
+   │  checkov,    │   │ Playbook engine  │   │                  │
+   │  kics        │   │ (SOAR)           │   └──────────────────┘
+   │ DAST(2):     │   │                  │
+   │  nuclei,     │   │ UEBA (7 anomaly  │
+   │  nikto       │   │  types)          │
+   │ Secrets(2):  │   │                  │
+   │  gitleaks,   │   │ Correlator +     │
+   │  secretcheck │   │ Retention        │
+   │ Network(3):  │   └──────────────────┘
+   │  nmap,       │
+   │  sslscan,    │
+   │  netcap      │
+   │ + license,   │
+   │   runner,    │
+   │   enrich     │
+   └──────────────┘
                       └──────────────────┘
                                 │
                     ┌───────────┴───────────┐
@@ -115,6 +129,56 @@ VSP is a monorepo with 8 binaries, each deployable independently.
             │ - p4_state   │       │              │
             └──────────────┘       └──────────────┘
 ```
+
+
+
+### P4 Compliance Automation Module
+
+Not a separate binary — P4 endpoints are registered in `cmd/gateway/main.go:357-400`.
+Provides automation for NIST/FedRAMP/CMMC/CISA compliance workflows.
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                  P4 Compliance Automation                      │
+│                                                                 │
+│   ┌─────────────────┐      ┌─────────────────┐                │
+│   │ OSCAL 1.1.2     │      │ NIST RMF        │                │
+│   │ /api/p4/oscal/* │      │ /api/p4/rmf/*   │                │
+│   │ - Catalog       │      │ - State machine │                │
+│   │ - Profile       │      │ - ATO letter    │                │
+│   │ - SSP (+ext)    │      │ - ConMon        │                │
+│   │ - Assessment    │      └─────────────────┘                │
+│   │ - POA&M         │                                          │
+│   └─────────────────┘      ┌─────────────────┐                │
+│                            │ Zero Trust       │                │
+│   ┌─────────────────┐      │ /api/p4/zt/*     │                │
+│   │ SSDF v1.1       │      │ - Microseg       │                │
+│   │ /api/p4/ssdf/*  │      │ - RASP           │                │
+│   │ 19/20 practices │      │ - SBOM attest    │                │
+│   └─────────────────┘      │ - API policy     │                │
+│                            └─────────────────┘                │
+│   ┌─────────────────┐                                          │
+│   │ CISA            │      ┌─────────────────┐                │
+│   │ Attestation     │      │ NIST SP 800-61r3│                │
+│   │ /api/p4/        │      │ /api/p4/ir/*    │                │
+│   │   attestation/* │      │ - Incidents     │                │
+│   │ - ECDSA-signed  │      │ - State machine │                │
+│   └─────────────────┘      │ - Forensics     │                │
+│                            └─────────────────┘                │
+│   ┌─────────────────┐                                          │
+│   │ CIRCIA          │      ┌─────────────────┐                │
+│   │ /api/p4/circia/*│      │ Governance      │                │
+│   │ - 72h reporting │      │ govH.*          │                │
+│   │ - Federal submit│      │ - RACI          │                │
+│   └─────────────────┘      │ - Risk Register │                │
+│                            │ - Roadmap       │                │
+│                            │ - Traceability  │                │
+│                            │ - Scorecards    │                │
+│                            └─────────────────┘                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+Full endpoint catalog in docs/FEATURE_INVENTORY.md.
 
 ### Binary inventory
 
@@ -152,14 +216,20 @@ VSP is a monorepo with 8 binaries, each deployable independently.
 cmd/gateway/main.go
     │
     ├─ Route registration (chi router)
-    ├─ Middleware stack (order matters):
-    │  1. RecoverMiddleware
-    │  2. RequestID
-    │  3. RateLimiter (internal/api/middleware/ratelimit.go)
-    │  4. CSPNonce (internal/api/middleware/csp.go)
-    │  5. CSRFProtect (internal/api/middleware/csrf.go)
-    │  6. CookieSessionMiddleware (internal/api/middleware/cookie_session.go)
-    │  7. Handler-specific auth (RequireRole, etc.)
+    ├─ Middleware stack (13 layers total, order matters):
+    │  1.  chimw.RequestID         — request correlation
+    │  2.  chimw.RealIP             — X-Forwarded-For handling
+    │  3.  vspMW.CSPNonce           — per-request 16-byte nonce
+    │  4.  vspMW.CSRFProtect        — double-submit cookie
+    │  5.  vspMW.RequestLogger      — structured logging
+    │  6.  chimw.Recoverer          — panic recovery
+    │  7.  chimw.Timeout(60s)       — global timeout
+    │  8.  (custom security headers)
+    │  9.  corsMiddleware           — CORS same-origin + credentials
+    │  10. rl.Middleware            — global rate limiter
+    │  11. authMw (per-route)       — JWT/cookie auth
+    │  12. NewUserRateLimiter(600/min) — per-user rate limit
+    │  13. RequireRole("admin")     — per-route RBAC
     │
     ├─ Handlers (internal/api/handler/):
     │  ├─ auth.go         — login, logout, refresh, MFA
@@ -285,8 +355,10 @@ See [RUNBOOK.md](RUNBOOK.md) for on-call procedures.
 
 ## 7. Change log
 
-- **2026-04-20 v1.0** — Initial C4 documentation, covers current implementation
-  up to commit `11a1b69` (Sprint 3.5 hygiene complete).
+- **2026-04-20 v1.0** — Initial C4 documentation.
+- **2026-04-20 v1.1** — Scanner count corrected (12 → 19), P4 compliance
+  automation module added, middleware stack detail expanded (7 → 13 layers).
+  Source: docs/FEATURE_INVENTORY.md full code audit.
 
 **Next review:** 2026-07-20 (quarterly cadence).
 
