@@ -1,3 +1,6 @@
+//go:build devstub
+// +build devstub
+
 package main
 
 import "strings"
