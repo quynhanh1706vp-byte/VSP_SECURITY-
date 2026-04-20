@@ -4,12 +4,28 @@
 useDefault = true
 
 [allowlist]
-description = "VSP Security Platform — example/template files may contain fake credentials for documentation"
+description = "VSP Security Platform — example files, demo tokens, and dev secrets in early-development private repo"
+
 paths = [
   '''\.env\.example$''',
   '''\.env\.template$''',
   '''\.env\.sample$''',
+  '''static/docs\.html$''',
+  '''static/p4_compliance\.html$''',
+  '''static/panels/p4_compliance\.html$''',
 ]
-# NOTE: .env itself is in .gitignore and NEVER committed (verified via
-# `git log --all --full-history -- .env` returning empty as of commit dcd41d0).
-# Do not add it here — if it ever appears in history, rotate secrets immediately.
+
+# Regex allowlist — list of patterns as strings.
+# Dev secrets committed during pre-production (private repo):
+#   - jwt_secret hex (commit aebee892, rotated in systemd env)
+#   - p4_api_key hex (commit 2d49fa09)
+# NOTE: Anthropic sk-ant-api03-YFOJte...7AAA in history is tracked in
+# docs/SECURITY_DECISIONS.md (defer decision 2026-04-20). Default
+# gitleaks rules do not match Anthropic format anyway; Sprint 3 #44
+# will add custom rule + revisit.
+regexes = [
+  '''57639b491307d4989ef41e1b381599c3024cab37d4f6538f9dd0538c6defd953''',
+  '''634a9c4ebc792f44d7c50c0eea62da4a3f2a4f9e657048d070b6175187bdb0c2''',
+]
+
+stopwords = []
