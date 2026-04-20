@@ -292,7 +292,7 @@ func p4Report(args []string) {
 	// Save to file
 	fname := fmt.Sprintf("vsp-conmon-%s-%s.json", period, time.Now().Format("2006-01-02"))
 	b, _ := json.MarshalIndent(d, "", "  ")
-	os.WriteFile(fname, b, 0644) //#nosec G703 G703 -- CLI tool, fname from timestamp
+	os.WriteFile(fname, b, 0600) //#nosec G703 -- CLI tool, fname from timestamp
 	fmt.Printf("\n  Saved to: %s\n", fname)
 }
 
@@ -305,7 +305,7 @@ func p4OSCAL() {
 	}
 	fname := fmt.Sprintf("vsp-ssp-oscal-%s.json", time.Now().Format("2006-01-02"))
 	b, _ := json.MarshalIndent(d, "", "  ")
-	os.WriteFile(fname, b, 0644)
+	os.WriteFile(fname, b, 0600)
 	fmt.Printf("✅ Saved to: %s\n", fname)
 	if ssp, ok := d["system-security-plan"].(map[string]interface{}); ok {
 		if meta, ok := ssp["metadata"].(map[string]interface{}); ok {
