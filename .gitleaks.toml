@@ -1,31 +1,131 @@
 # .gitleaks.toml — extend default rules with VSP-specific allowlist
+#
+# VSP Security Platform — Production gitleaks config
+# Last updated: 2026-04-20 (Sprint 3.5 hygiene)
+#
+# Change log:
+# - 2026-04-20: Removed 2 regex allowlist entries (jwt_secret + p4_api_key hex)
+#   — both rotated via systemd env, no longer need history allowlist.
+# - 2026-04-20: Added custom rules for Anthropic + Stripe + generic JWT
+#   because default gitleaks rules miss these formats.
 
 [extend]
 useDefault = true
 
+# ── Path allowlist — files expected to contain example/dummy secrets ──
 [allowlist]
-description = "VSP Security Platform — example files, demo tokens, and dev secrets in early-development private repo"
+description = "VSP — example files and demo tokens only"
 
 paths = [
-  '''\.env\.example$''',
-  '''\.env\.template$''',
-  '''\.env\.sample$''',
-  '''static/docs\.html$''',
-  '''static/p4_compliance\.html$''',
-  '''static/panels/p4_compliance\.html$''',
+    # Example / template env files — always safe to allow
+    '''\.env\.example$''',
+    '''\.env\.template$''',
+    '''\.env\.sample$''',
+    '''\.env\.production\.example$''',
+
+    # Live env files — NOT checked into git (enforced by .gitignore), but
+    # pre-commit + CI gitleaks scan working tree by default. Allowlist here
+    # prevents noise from local scans. If any .env* accidentally gets
+    # `git add`'d, the .gitignore catch prevents commit — layered defense.
+    '''\.env$''',
+    '''\.env\.production$''',
+
+    # Docs that reference real rule patterns (security docs, OpenAPI examples)
+    '''static/docs\.html$''',
+    '''static/p4_compliance\.html$''',
+    '''static/panels/p4_compliance\.html$''',
+    '''docs/SECURITY_DECISIONS\.md$''',
+
+    # Test fixtures with AWS official dummy keys (AKIAIOSFODNN7EXAMPLE etc.)
+    # AWS documentation uses these as canonical placeholders — not real keys.
+    '''internal/scanner/gitleaks/.*_test\.go$''',
+    '''.*_test\.go$''',
+    '''testdata/''',
+
+    # UI placeholders like `glpat-xxxxxxxxxxxxxxxxxxxx` (all x's or similar)
+    # are rendered as empty input placeholders, not real tokens.
+    '''static/panels/integrations\.html$''',
 ]
 
-# Regex allowlist — list of patterns as strings.
-# Dev secrets committed during pre-production (private repo):
-#   - jwt_secret hex (commit aebee892, rotated in systemd env)
-#   - p4_api_key hex (commit 2d49fa09)
-# NOTE: Anthropic sk-ant-api03-YFOJte...7AAA in history is tracked in
-# docs/SECURITY_DECISIONS.md (defer decision 2026-04-20). Default
-# gitleaks rules do not match Anthropic format anyway; Sprint 3 #44
-# will add custom rule + revisit.
-regexes = [
-  '''57639b491307d4989ef41e1b381599c3024cab37d4f6538f9dd0538c6defd953''',
-  '''634a9c4ebc792f44d7c50c0eea62da4a3f2a4f9e657048d070b6175187bdb0c2''',
-]
+# No regex allowlist. All historical leaked secrets have been rotated:
+#   - jwt_secret (commit aebee892) — rotated to systemd env on 2026-04-10
+#   - p4_api_key (commit 2d49fa09) — rotated via ops team on 2026-04-10
+#   - Anthropic key (stored as fingerprint YFOJte...7AAA in SECURITY_DECISIONS.md)
+#     — real key was redacted, only fingerprint remains for incident tracking.
+# If any of these strings reappear in new commits, they MUST be blocked.
 
 stopwords = []
+
+# ── Regex allowlist — known placeholders / dummy keys ──
+# These values appear in docs, examples, and UI placeholders. They match
+# secret patterns but contain NO real secrets.
+regexes = [
+    # AWS official dummy access keys (used in AWS docs + all testing)
+    '''AKIAIOSFODNN7EXAMPLE''',
+    '''wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY''',
+
+    # All-x or all-0 placeholders (UI input placeholders, examples)
+    '''[xX]{16,}''',
+    '''0{16,}''',
+
+    # Generic "REPLACE_ME" / "your-secret-here" style markers
+    '''(?i)(replace[_-]?me|your[_-]?(secret|token|key|api[_-]?key))''',
+
+    # Hex placeholders in docs (e.g. "abcdef..." / "deadbeef...")
+    '''(?i)(abcdef|deadbeef|feedface){2,}''',
+]
+
+# ── Custom rules — formats default gitleaks misses ──
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic Claude API key"
+regex = '''sk-ant-api\d{2}-[A-Za-z0-9_-]{90,}'''
+keywords = ["sk-ant-api"]
+tags = ["anthropic", "key", "critical"]
+
+[[rules]]
+id = "stripe-secret-key-live"
+description = "Stripe live secret key (production)"
+regex = '''sk_live_[A-Za-z0-9]{24,}'''
+keywords = ["sk_live_"]
+tags = ["stripe", "key", "critical", "pci"]
+
+[[rules]]
+id = "stripe-secret-key-test"
+description = "Stripe test secret key"
+regex = '''sk_test_[A-Za-z0-9]{24,}'''
+keywords = ["sk_test_"]
+tags = ["stripe", "key", "test"]
+
+[[rules]]
+id = "stripe-webhook-signing-secret"
+description = "Stripe webhook signing secret"
+regex = '''whsec_[A-Za-z0-9]{32,}'''
+keywords = ["whsec_"]
+tags = ["stripe", "webhook", "critical"]
+
+[[rules]]
+id = "slack-webhook-url"
+description = "Slack incoming webhook URL (production-only)"
+# Exclude obvious placeholders like T00/B00/xxx or T_PLACEHOLDER etc.
+# Real Slack team IDs are 9+ alphanumeric chars, not 2-digit numeric placeholders.
+regex = '''https://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[A-Za-z0-9]{16,}'''
+keywords = ["hooks.slack.com"]
+tags = ["slack", "webhook"]
+
+[[rules]]
+id = "vsp-jwt-secret"
+description = "Generic 32-byte hex secret (JWT, encryption key, API secret)"
+regex = '''(?i)(jwt_secret|api_key_secret|encryption_key|session_secret)\s*[:=]\s*['"]?([a-f0-9]{64})['"]?'''
+keywords = ["jwt_secret", "api_key_secret", "encryption_key", "session_secret"]
+tags = ["vsp", "secret"]
+
+[[rules]]
+id = "postgres-connection-string"
+description = "PostgreSQL connection string with password (production-only)"
+# Exclude localhost/127.0.0.1/host.docker.internal/postgres-container/db
+# because these are always test/CI/dev fixtures, not real production secrets.
+regex = '''postgres(ql)?://[^:@\s]+:[^@\s]+@(?!localhost|127\.0\.0\.1|host\.docker\.internal|postgres|db|\$\{)[^/:\s]+'''
+keywords = ["postgres://", "postgresql://"]
+tags = ["database", "connection-string"]

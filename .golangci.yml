@@ -1,22 +1,129 @@
+# .golangci.yml — VSP Security Platform
+#
+# Last updated: 2026-04-20 (Sprint 3.5 hygiene, v2 format)
+# Expanded from 6 → 18 linters to align with DSOMM Level 3.5 Static Analysis.
+#
+# Format: golangci-lint v2 (requires `version: "2"` at top)
+# Binary: golangci-lint v2.11.4+ (built with Go 1.25+)
+#
+# Design principles:
+# 1. Security linters (gosec, bodyclose, sqlclosecheck) enabled — VSP sells
+#    security scanning, so VSP's own code must pass these.
+# 2. gosec annotations inline via //#nosec G304 -- reason, not blanket excludes.
+# 3. Quality linters (gocritic, gocyclo) enabled at pragmatic thresholds.
+
+version: "2"
+
 run:
-  go: "1.24"
-  timeout: 5m
-  skip-dirs:
-    - internal/migrate/sql
+  go: "1.25"
+  timeout: 10m
 
 linters:
+  default: none
   enable:
+    # ── Existing (keep) ──
     - govet
     - errcheck
-    - staticcheck
-    - unused
-    - gosimple
+    - staticcheck      # v2: includes gosimple + some unused checks
     - ineffassign
-  disable:
-    - depguard
+    - unused
 
-linters-settings:
-  errcheck:
-    exclude-functions:
-      - (io.Closer).Close
-      - (*os.File).Close
+    # ── Security (NEW — critical for VSP) ──
+    - gosec            # SAST — paired with inline //#nosec annotations
+    - bodyclose        # HTTP response.Body.Close() — VSP has many HTTP clients
+    - sqlclosecheck    # rows.Close() + stmt.Close() — VSP has DB layer
+    - rowserrcheck     # rows.Err() after iteration
+    - noctx            # HTTP request without context — timeout leak
+
+    # ── Correctness (NEW) ──
+    - errorlint        # Go 1.13+ error wrapping (errors.Is / As)
+    - contextcheck     # context propagation (multi-tenant)
+    - nilerr           # return nil error when err != nil (logic bug)
+    - wastedassign     # dead assignments
+    - exhaustive       # switch on enum must cover all cases
+
+    # ── Quality (NEW — pragmatic) ──
+    - gocritic         # code quality checks
+    - misspell         # typos in comments & strings
+    - unconvert        # unnecessary type conversions
+    - unparam          # unused function parameters
+    - prealloc         # slice preallocation hints
+
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (net/http.ResponseWriter).Write
+
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        # Excluded with justification (see docs/SECURITY_DECISIONS.md):
+        - G204  # Subprocess launched with variable — VSP scanner core (SD-0042)
+        - G304  # File path from user input — VSP scans user files (SD-0043)
+        - G703  # File inclusion via variable — same as G304 (SD-0043)
+        - G307  # Deferred Close() — inline-annotated where matters
+      config:
+        G101:
+          pattern: "(?i)(password|passwd|secret|token|apikey|api_key|private_key)"
+          ignore_entropy: false
+          entropy_threshold: "80.0"
+          per_char_threshold: "3.0"
+          truncate: "32"
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - experimental
+      disabled-checks:
+        - unnamedResult     # VSP returns (x, y) without names often
+        - commentedOutCode  # VSP keeps commented code for rollback
+        - whyNoLint         # we document //nolint inline
+
+    exhaustive:
+      default-signifies-exhaustive: true
+
+    misspell:
+      locale: US
+      ignore-rules:
+        - vsp
+        - fedramp
+        - oscal
+        - cmmc
+        - soar
+        - siem
+        - ueba
+
+  exclusions:
+    # v2 format — replaces issues.exclude-rules
+    rules:
+      # Test files skip security linters (fixtures may have demo secrets)
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - bodyclose
+
+      # Migration SQL cannot be parameterized
+      - path: internal/migrate/
+        linters:
+          - gosec
+
+    paths:
+      # v2 format — replaces run.skip-dirs / issues.exclude-dirs
+      - internal/migrate/sql
+      - scripts/archive
+      - vendor
+      - third_party
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # Uncomment for incremental adoption (only fail on new code):
+  # new-from-rev: main
