@@ -133,3 +133,33 @@ and will reject it.
 **Prevention:** Future `go build` usage must use `-o /tmp/binary-name`
 flag or be run inside target directory to prevent binary artifacts
 in repo root.
+
+## 2026-04-20 — Git history contains 420MB of binaries (discovery)
+
+**Finding:** 14 ELF binaries totaling ~420MB found in git history:
+- 7 gateway binary variants (gateway, gateway.old, vsp-gateway, etc.)
+- scanner, siem-seed, soc-shell, vsp_server binaries
+- 2 .fuse_hidden* files (FUSE artifacts)
+- 2 static/download/vsp-agent-* (may be intentional for downloads)
+
+**Unknown severity — NOT scanned for embedded secrets yet.**
+
+Potential risks if binaries were compiled with real env vars:
+- JWT_SECRET embedded (would allow token forge)
+- DB_URL with password
+- API keys (Anthropic, OpenAI, AWS, etc.)
+
+**Decision: DEFER audit + cleanup to Sprint 3 item #59**
+
+**Prevention applied today:**
+- .gitignore updated with binary patterns (commit 7aff67b)
+- Will prevent future accidents
+
+**Required next session action:**
+1. Scan all 14 binaries for embedded secrets
+2. If secrets found → ROTATE + filter-repo cleanup
+3. If clean → filter-repo for repo size reduction (optional)
+4. Add pre-commit hook to reject binaries >1MB
+
+**Discovery method:** `git cat-file --batch-all-objects --batch-check` 
+filtered for size > 10MB during binary purge verification after PR #22.
