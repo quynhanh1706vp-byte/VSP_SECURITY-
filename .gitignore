@@ -112,3 +112,7 @@ vsp-agent
 /siem-seed
 /soc-shell
 *.exe
+
+# Claude/AI work artifacts — not part of production repo
+patches/
+*.bak_hotfix
