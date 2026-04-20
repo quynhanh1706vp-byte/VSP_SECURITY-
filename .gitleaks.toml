@@ -56,9 +56,10 @@ paths = [
 
 stopwords = []
 
-# ── Regex allowlist — known placeholders / dummy keys ──
-# These values appear in docs, examples, and UI placeholders. They match
-# secret patterns but contain NO real secrets.
+# ── Regex allowlist — known placeholders / dummy keys / test fixtures ──
+# Go RE2 engine (used by gitleaks) does not support lookahead, so we
+# cannot narrow rule regexes with (?!...). Instead, rules match broadly
+# and these allowlist regexes filter out known-safe matches.
 regexes = [
     # AWS official dummy access keys (used in AWS docs + all testing)
     '''AKIAIOSFODNN7EXAMPLE''',
@@ -73,6 +74,20 @@ regexes = [
 
     # Hex placeholders in docs (e.g. "abcdef..." / "deadbeef...")
     '''(?i)(abcdef|deadbeef|feedface){2,}''',
+
+    # Postgres/MySQL connection strings pointing to localhost / test hosts.
+    # These are always test/CI/dev fixtures, never production secrets.
+    '''postgres(ql)?://[^:@\s]+:[^@\s]+@(localhost|127\.0\.0\.1|host\.docker\.internal|postgres|db|postgres-\w+|mysql|\$\{|%\()[:/][^\s"']*''',
+    '''mysql://[^:@\s]+:[^@\s]+@(localhost|127\.0\.0\.1|host\.docker\.internal|mysql|db)[:/][^\s"']*''',
+
+    # Test DB passwords used across VSP test suite
+    '''vsp_test''',
+    '''test_password''',
+    '''password123''',
+
+    # Slack webhook placeholders (T00/B00/xxx formats in docs)
+    '''https://hooks\.slack\.com/services/T0+/B0+/\w*''',
+    '''https://hooks\.slack\.com/services/T[_X]+/B[_X]+/\w*''',
 ]
 
 # ── Custom rules — formats default gitleaks misses ──
@@ -124,8 +139,9 @@ tags = ["vsp", "secret"]
 [[rules]]
 id = "postgres-connection-string"
 description = "PostgreSQL connection string with password (production-only)"
-# Exclude localhost/127.0.0.1/host.docker.internal/postgres-container/db
-# because these are always test/CI/dev fixtures, not real production secrets.
-regex = '''postgres(ql)?://[^:@\s]+:[^@\s]+@(?!localhost|127\.0\.0\.1|host\.docker\.internal|postgres|db|\$\{)[^/:\s]+'''
+# Go's RE2 regex engine does not support lookahead/lookbehind.
+# Use simple regex + allowlist below (regexes array) to exclude
+# localhost / test connections.
+regex = '''postgres(ql)?://[^:@\s]+:[^@\s]+@[a-zA-Z0-9.-]+[:/][^\s"']+'''
 keywords = ["postgres://", "postgresql://"]
 tags = ["database", "connection-string"]
