@@ -113,6 +113,9 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(pdfBytes) //nolint:errcheck
 }
 
+// fileExists checks if file at path exists.
+// Path must already be validated by callers — this is a helper wrapper.
+// #nosec G703 -- path validated by callers (see buildPDFPath with isValidRID)
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
