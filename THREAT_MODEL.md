@@ -54,7 +54,7 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
 | Token in URL | Cookie-based, ?token= blocked (400) | OK |
 | Secrets in repo | pre-commit gitleaks + CI gitleaks | OK |
 | User enumeration | Generic "invalid credentials" message | OK |
-| Tenant data leak | tenant_id on 59/59 queries (audited) | OK |
+| Tenant data leak | tenant_id on 82/92 queries (10 internal-only, SD-0045) | OK |
 
 ### D — Denial of Service
 
@@ -91,3 +91,15 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
 
 - Security issues: soc@agency.gov
 - CVE disclosure: See SECURITY.md
+
+---
+
+## Verification Log
+
+- **2026-04-20**: Claims cross-checked against `internal/api/middleware/*.go`,
+  `internal/store/*.go`, and `cmd/gateway/main.go`. Tenant isolation count
+  updated from 59/59 to 82/92 (actual query count). SSE token claim marked
+  IN_PROGRESS (frontend migration SEC-009 pending). MFA enforcement marked
+  IN_PROGRESS (TOTP available, policy enforcement Sprint 4 PR #B).
+
+**Next verification:** 2026-07-20 (quarterly cadence).

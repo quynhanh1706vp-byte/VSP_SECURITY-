@@ -132,8 +132,10 @@ jobs:
       - name: gosec — SAST (fail on HIGH)
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec -severity high -confidence high \
-            -exclude=G104,G304,G307,G204,G703,G704,G108,G118,G702,G402 \
+          gosec -severity medium -confidence medium \
+            -exclude=G204,G304,G703,G307,G118 \
+            -exclude-dir=cmd/dev-stub \
+            -exclude-dir=internal/migrate/sql
             ./...
 
       - name: gitleaks — secret scan
@@ -150,50 +152,42 @@ jobs:
 
       - name: Check innerHTML XSS — no unescaped API data
         run: |
-          echo "=== Checking for unsafe innerHTML patterns ==="
-          # Check for dangerous patterns (API data directly in innerHTML)
-          UNSAFE=$(python3 - << 'PYEOF'
-          import re, sys
+          python3 << 'PYEOF'
+          import sys
           dangerous_kw = [
-            "f.message","f.title","f.rule_id",".message",".reason",
-            "e.message","ctrl.title","ctrl.id","f.severity","f.tool"
+              "f.message","f.title","f.rule_id",".message",".reason",
+              "e.message","ctrl.title","ctrl.id","f.severity","f.tool"
           ]
           escape_kw = ["_esc","_e6","_escErr","textContent","&amp;"]
           with open("static/index.html") as f:
               lines = f.readlines()
           issues = []
           for i, line in enumerate(lines, 1):
-              if "innerHTML" not in line: continue
-              if line.strip().startswith("//"): continue
-              if any(kw in line for kw in dangerous_kw):
-                  if not any(x in line for x in escape_kw):
-                      issues.append(f"L{i}: {line.strip()[:120]}")
+              if "innerHTML" not in line or line.strip().startswith("//"):
+                  continue
+              if any(kw in line for kw in dangerous_kw) and not any(x in line for x in escape_kw):
+                  issues.append(f"L{i}: {line.strip()[:120]}")
+          allowed = 5  # SEC-006 debt baseline; target Sprint 4 = 0
           for issue in issues:
               print(issue)
-          allowed = 5  # SEC-006 debt, tracked in VSP_42 audit item #5
-
           if len(issues) > allowed:
-
-              print(f"XSS check regression: {len(issues)} > allowed {allowed}")
-
+              print(f"::error::XSS check regression: {len(issues)} > allowed {allowed}")
               sys.exit(1)
-
-          else:
-
-              print(f"XSS check: {len(issues)} known issues (within allowed={allowed})")
-
-              sys.exit(0)
+          print(f"XSS check: {len(issues)} known issues (within allowed={allowed})")
           PYEOF
-          )
-          echo "XSS check passed ✓"
 
-      - name: Check localStorage token — no raw token storage
+      - name: Check localStorage token — ratchet regression gate
         run: |
-          echo "=== Checking localStorage token usage ==="
-          # Ensure comment about httpOnly cookie migration is present
-          grep -n "httpOnly cookie\|cookie handles auth\|localStorage.*bridge\|phase" \
-            static/index.html | head -5
-          echo "Cookie migration check passed ✓"
+          COUNT=$(grep -c "localStorage\.\(get\|set\|remove\)Item('vsp_token'" \
+                  static/index.html || true)
+          BASELINE=22  # baseline 2026-04-20; decreases each sprint toward 0
+          echo "localStorage token sites: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+              echo "::error::localStorage regression: $COUNT > baseline $BASELINE"
+              echo "::error::See docs/ROADMAP.md Sprint 4 for frontend migration"
+              exit 1
+          fi
+          echo "✓ localStorage within baseline"
 
       - name: Check CSP header in middleware
         run: |
