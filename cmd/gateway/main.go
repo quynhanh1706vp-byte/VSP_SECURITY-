@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	_ "net/http/pprof" // profiling endpoint /debug/pprof/
 	"os"
 	"os/signal"
 	"strings"
