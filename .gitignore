@@ -100,3 +100,15 @@ vsp-gateway
 vsp-agent
 /bin/
 *.exe
+
+# Compiled binaries - never commit
+/dev-stub
+/vsp-gateway
+/vsp-agent
+/vsp-cli
+/scanner
+/migrate
+/seed
+/siem-seed
+/soc-shell
+*.exe
