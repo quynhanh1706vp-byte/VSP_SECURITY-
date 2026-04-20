@@ -100,7 +100,7 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pdfBytes, err := os.ReadFile(pdfPath) //nolint:gosec // G703: pdfPath uses rid validated by isValidRID()
+	pdfBytes, err := os.ReadFile(pdfPath) //#nosec G304 -- pdfPath uses rid validated by isValidRID()
 	if err != nil {
 		jsonError(w, "pdf read error", http.StatusInternalServerError)
 		return
