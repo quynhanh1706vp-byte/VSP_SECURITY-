@@ -1,10 +1,15 @@
-title = "VSP Gitleaks Config"
+# .gitleaks.toml — extend default rules with VSP-specific allowlist
+
+[extend]
+useDefault = true
 
 [allowlist]
-  description = "Exclude local config files"
-  paths = [
-    '''.env''',
-    '''.env\..*''',
-    '''config/config\.yaml\.bak''',
-    '''.*\.bak''',
-  ]
+description = "VSP Security Platform — example/template files may contain fake credentials for documentation"
+paths = [
+  '''\.env\.example$''',
+  '''\.env\.template$''',
+  '''\.env\.sample$''',
+]
+# NOTE: .env itself is in .gitignore and NEVER committed (verified via
+# `git log --all --full-history -- .env` returning empty as of commit dcd41d0).
+# Do not add it here — if it ever appears in history, rotate secrets immediately.
