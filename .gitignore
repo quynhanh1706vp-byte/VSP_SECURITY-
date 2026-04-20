@@ -89,3 +89,6 @@ __pycache__/
 # Python cache
 .deadcode/
 !scripts/build-gateway.sh
+leaks_report.json
+leaks_*.json
+leaks_*.json

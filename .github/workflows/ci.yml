@@ -371,18 +371,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Mirror the sanitize step from the docker job (line ~324) so the
+      # image reference here matches the tag that was actually pushed.
+      # github.repository for this repo = quynhanh1706vp-byte/VSP_SECURITY-
+      # which Docker registries reject (uppercase + trailing dash).
+      - name: Sanitize image name
+        id: image
+        run: |
+          NAME=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]' | \
+            sed 's/[^a-z0-9._/-]/-/g' | sed 's/-$//')
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+
       - name: Trivy — vulnerability scan (CRITICAL+HIGH → fail)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          image-ref: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
           exit-code: 1
           ignore-unfixed: true
 
+      # Guard with hashFiles so the SARIF upload is skipped when Trivy
+      # fails before producing trivy-results.sarif — avoids noise in logs.
       - name: Upload Trivy SARIF to GitHub Security
-        if: always()
+        if: always() && hashFiles('trivy-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
@@ -391,7 +404,7 @@ jobs:
       - name: Generate SBOM (CycloneDX)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          image-ref: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
           format: cyclonedx
           output: sbom.cdx.json
 
