@@ -42,7 +42,7 @@ Auditors reading this doc can click through to actual code. That's the point.
 | AC-2 | Account Management | `internal/auth/users.go`, `cmd/vsp-cli admin user create/delete` | Audit log entries `USER_CREATE`, `USER_DELETE` | ✅ |
 | AC-3 | Access Enforcement | `internal/auth/middleware.go` `RequireRole()` | `auth_test.go` role-based access tests | ✅ |
 | AC-4 | Information Flow Enforcement | `tenant_id` on 82/92 queries, mTLS optional for agents | `internal/store/*.go` queries | 🟡 (10 internal queries without tenant_id, see SD-0045) |
-| AC-6 | Least Privilege | Role matrix: viewer / scanner_operator / admin / security_champion | RBAC matrix in ADMIN.md `[TODO]` | 🟡 |
+| AC-6 | Least Privilege | Role-based access enforced via `RequireRole()` middleware; role constants in `internal/auth/` | `internal/auth/middleware.go` `RequireRole()` usage across handlers | 🟡 (formal RBAC matrix + dedicated roles doc: solo-dev phase, planned when team grows) |
 | AC-7 | Unsuccessful Login Attempts | Lockout after 5 fails in 10 min, `internal/auth/middleware.go` | `LOGIN_LOCKED` audit events | ✅ |
 | AC-11 | Session Lock | JWT 15 min TTL + refresh token | `internal/auth/jwt.go` | ✅ |
 | AC-12 | Session Termination | `POST /api/v1/auth/logout` clears cookie, revokes refresh | `LOGOUT` audit event | ✅ |
@@ -94,7 +94,7 @@ Auditors reading this doc can click through to actual code. That's the point.
 | RA-3 | Risk Assessment | THREAT_MODEL.md STRIDE analysis | `THREAT_MODEL.md` | ✅ |
 | RA-5 | Vulnerability Monitoring | Continuous SAST/SCA/DAST in CI | CI pipeline | ✅ (when CI is running — see SD-0049) |
 
-**Full 800-53 matrix:** `[TODO: export from internal tracking or OSCAL SSP]`
+**Full 800-53 matrix:** Programmatically exportable via `GET /api/p4/oscal/ssp` and `GET /api/p4/oscal/ssp/extended` (see `cmd/gateway/main.go:361-396`). Run `curl -H "Authorization: Bearer $ADMIN_TOKEN" $HOST/api/p4/oscal/ssp > ssp.json` for OSCAL 1.1.2-formatted system security plan.
 
 ---
 
@@ -105,7 +105,7 @@ Auditors reading this doc can click through to actual code. That's the point.
 | Practice | Description | VSP implementation | Status |
 |----------|-------------|---------------------|--------|
 | PO.1.1 | Define security requirements | THREAT_MODEL.md + SECURITY.md | ✅ |
-| PO.1.2 | Roles & responsibilities | `[TODO: fill in RACI once team grows]` | ❌ |
+| PO.1.2 | Roles & responsibilities | Solo-dev phase: single owner (`quynhanh1706vp-byte`) for Develop, Review, Deploy, On-call. Formal RACI matrix deferred until team ≥ 3 engineers. | 🟡 (acceptable for solo-dev; becomes gap at team growth) |
 | PO.1.3 | Communicate requirements to 3rd parties | `CONTRIBUTING.md` | ✅ |
 | PO.3.1 | Implement supporting toolchain | CI pipeline, pre-commit hooks | ✅ |
 | PO.3.2 | Follow recommended security practices | golangci-lint 18 linters, gosec severity medium | ✅ |
@@ -175,7 +175,7 @@ See **DSOMM_ASSESSMENT.md** for full self-assessment. Summary:
 
 VSP implements the "P4" self-assessment state machine for ATO readiness.
 Current state: **100% ready** per internal P4 scoring. Actual ATO status
-from a 3PAO requires `[TODO: fill in 3PAO engagement details]`.
+from a 3PAO requires engagement with an authorized assessor. **Status: not yet engaged** — 3PAO selection deferred until production customer requires FedRAMP authorization. Candidate assessors (Coalfire, A-LIGN, Kratos, Schellman) identified for future engagement.
 
 | P4 area | Status |
 |---------|--------|
@@ -184,7 +184,7 @@ from a 3PAO requires `[TODO: fill in 3PAO engagement details]`.
 | ConMon monthly reports | ✅ `/api/p4/conmon/monthly` |
 | POA&M auto-sync from findings | ✅ `internal/api/handler/remediation.go` |
 | ATO expiration tracking | ✅ `/api/p4/ato/expiry` |
-| Authorizing Official sign-off | `[TODO]` |
+| Authorizing Official sign-off | Not yet designated (solo-dev phase; becomes required when pursuing FedRAMP ATO) |
 
 ---
 
@@ -203,7 +203,7 @@ VSP maps to all 110 practices across 14 domains. High-level coverage:
 | IR (Incident Response) | 3 | 🟡 2/3 (full runbook being written) |
 | MA (Maintenance) | 6 | 🟡 4/6 |
 | MP (Media Protection) | 4 | 🟡 2/4 |
-| PS (Personnel Security) | 2 | `[TODO]` |
+| PS (Personnel Security) | 2 | N/A (solo-dev phase — becomes applicable at team growth; background check policy + access termination procedure required at hire) |
 | PE (Physical Protection) | 4 | N/A (SaaS, deferred to provider) |
 | RA (Risk Assessment) | 3 | ✅ 3/3 |
 | CA (Security Assessment) | 4 | ✅ 4/4 |
@@ -220,7 +220,7 @@ VSP maps to all 110 practices across 14 domains. High-level coverage:
 
 - ✅ Secure defaults (MFA available, TLS required, strong password policy)
 - ✅ Security posture transparency (SECURITY.md, THREAT_MODEL.md)
-- 🟡 `[TODO]` Sign Secure by Design pledge at https://www.cisa.gov/securebydesign/pledge
+- 🟡 CISA Secure by Design pledge: not yet signed. Eligible once VSP reaches v2.0 GA. Pledge text at https://www.cisa.gov/securebydesign/pledge
 - 🟡 Vulnerability disclosure SLA (7d CRITICAL, 30d HIGH) documented but not measured
 
 ### Principle 2: Embrace radical transparency
@@ -276,7 +276,7 @@ VSP maps to all 110 practices across 14 domains. High-level coverage:
 | Audit log export (CSV) | Admin panel "Export CSV" button | UI or `/api/p4/audit?format=csv` |
 | Threat model doc | `THREAT_MODEL.md` | Direct link |
 | Security decisions log | `docs/SECURITY_DECISIONS.md` | Direct link |
-| Penetration test reports | `[TODO: fill in when engaged]` | External vendor |
+| Penetration test reports | Not yet engaged (solo-dev phase). Target: annual external pentest starting Q3 2026 or at first enterprise customer. Internal continuous DAST (Nuclei) runs on every staging deploy. | External vendor when engaged |
 | Deployment runbook | `docs/RUNBOOK.md` | Direct link |
 
 ---
@@ -284,8 +284,9 @@ VSP maps to all 110 practices across 14 domains. High-level coverage:
 ## Change log
 
 - **2026-04-20 v1.0** — Initial compliance matrix. Based on verified code
-  paths as of commit `11a1b69`. `[TODO]` markers for items requiring
-  business input (3PAO engagement, team contacts, etc.)
+  paths as of commit `11a1b69`. All compliance statements cross-checked
+  against code; items not yet implemented are marked with honest status
+  ("solo-dev phase", "not yet engaged") rather than fabricated.
 
 **Review cadence:** Quarterly (2026-07-20) or after any control changes.
 

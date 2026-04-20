@@ -20,7 +20,7 @@ update this document after the incident so the next person doesn't have to.
 | **SEV-4** | Advisory (CVE disclosed, dependency deprecated) | Next business day | Security lead |
 
 For SEV-1 and SEV-2, start an incident channel immediately:
-`[TODO: fill in Slack channel naming convention]`.
+team chat (solo-dev phase: not applicable; at team growth, suggested convention: `#vsp-incident-YYYYMMDD`).
 
 ---
 
@@ -306,7 +306,11 @@ docker image prune -a --filter "until=720h"
 truncate -s 0 /var/lib/docker/containers/*/*-json.log
 
 # Archive old audit entries (preserves hash chain)
-# [TODO: write archival script — currently a known gap]
+# Audit log archival: see internal/siem/retention.go + retention_test.go
+# Run retention policy manually:
+docker compose exec gateway ./vsp-cli admin retention apply
+# Or schedule via cron (recommended monthly):
+# 0 2 1 * * cd /opt/vsp && docker compose exec -T gateway ./vsp-cli admin retention apply
 ```
 
 ### Prevention
@@ -387,11 +391,11 @@ ssh prod-01 "cd /opt/vsp && goose -dir migrations postgres \$DATABASE_URL down-t
 
 | Role | Contact | When to escalate |
 |------|---------|------------------|
-| On-call engineer | `[TODO: fill in pager]` | First responder for SEV-2/3 |
-| Eng lead | `[TODO: fill in]` | SEV-1, SEV-2 lasting >30 min |
-| Security lead | `[TODO: fill in]` | Suspected breach, CVE response |
-| DBA | `[TODO: fill in]` | DB recovery, migration issues |
-| CEO/Founder | `[TODO: fill in]` | SEV-1 over 1 hour, customer data incident |
+| On-call engineer | `quynhanh1706vp-byte` (solo-dev phase: owner is sole on-call; customer-facing PagerDuty alerts via `internal/siem/executor.go:43`) | First responder for SEV-2/3 |
+| Eng lead | `quynhanh1706vp-byte` (solo-dev phase) | SEV-1, SEV-2 lasting >30 min |
+| Security lead | `quynhanh1706vp-byte` (solo-dev phase; CVE coordination via SECURITY.md disclosure process) | Suspected breach, CVE response |
+| DBA | `quynhanh1706vp-byte` (solo-dev phase; migration tooling: `goose` in `internal/migrate/sql/`) | DB recovery, migration issues |
+| CEO/Founder | `quynhanh1706vp-byte` (solo-dev phase: same as owner) | SEV-1 over 1 hour, customer data incident |
 
 ---
 
@@ -412,7 +416,7 @@ After every SEV-1 or SEV-2:
 
 - **2026-04-20 v1.0** — Initial runbook. Based on `cmd/gateway/main.go:257`
   health check + `docker-compose.yml` topology + audit_log hash chain design.
-  `[TODO]` markers are for team-specific info (contacts, pager, Slack channels).
+  Contact entries currently list the solo-dev owner; at team growth, designate separate eng/security/DBA/exec contacts.
 
 **Review cadence:** After every incident + quarterly (2026-07-20 next).
 

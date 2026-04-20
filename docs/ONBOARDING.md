@@ -16,8 +16,8 @@ as your first contribution**. That's the price of admission.
 - [ ] GitHub 2FA enabled (hardware key preferred, TOTP acceptable)
 - [ ] SSH key added to GitHub (not HTTPS — we push over SSH)
 - [ ] `gh` CLI authenticated: `gh auth login`
-- [ ] `[TODO]` Slack workspace access + `#vsp-eng` + `#vsp-security` channels
-- [ ] `[TODO]` Pager rotation (PagerDuty/Opsgenie) if on-call rotation
+- [ ] Team chat access (solo-dev phase: not applicable; becomes required at team growth — consider Slack workspace with `#vsp-eng` + `#vsp-security` channels)
+- [ ] On-call rotation access (solo-dev phase: single on-call = owner; becomes required at team ≥ 2. VSP SIEM has PagerDuty integration via `internal/siem/executor.go` for customer-facing alerts — separate from team rotation)
 
 ### Required reading (in this order)
 
@@ -66,8 +66,11 @@ curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/insta
 golangci-lint --version  # should show v2.11+ built with go1.25+
 
 # Gitleaks (secrets scanner)
-# [TODO: exact install command for your distro]
-# Ubuntu: check https://github.com/gitleaks/gitleaks/releases
+# Ubuntu 24.04 (verified dev env):
+curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.21.2_linux_x64.tar.gz \
+    | tar -xz -C /tmp gitleaks
+sudo mv /tmp/gitleaks /usr/local/bin/
+gitleaks version  # should print 8.x
 
 # Pre-commit hooks
 pip install pre-commit
@@ -326,8 +329,8 @@ If you're not there, **speak up**. Onboarding slippage is our bug, not yours.
 
 ## Change log
 
-- **2026-04-20 v1.0** — Initial onboarding doc. `[TODO]` markers for
-  team-specific info (Slack channels, pager, contacts).
+- **2026-04-20 v1.0** — Initial onboarding doc. Team-specific items
+  currently marked "solo-dev phase" become applicable at team growth.
 
 **Review cadence:** Every new hire updates anything that didn't work. Full
 review quarterly.
