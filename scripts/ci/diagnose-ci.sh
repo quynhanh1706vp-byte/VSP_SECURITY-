@@ -18,6 +18,52 @@ info()    { printf "  %s\n" "$1"; }
 FAIL=0
 WARNS=0
 
+# ── 0. GitHub billing / permissions pre-check ───────────────────────────────
+# If recent runs failed in <10s with no logs, it's almost always billing or
+# permissions — NOT code. Check this first before running any local scans.
+section "0. GitHub Actions billing/permissions check"
+
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "")
+  if [[ -n "$REPO" ]]; then
+    # Latest failed run
+    RUN_ID=$(gh run list --status failure --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null)
+    if [[ -n "$RUN_ID" ]]; then
+      # Duration of latest failed run
+      DURATION=$(gh api "repos/$REPO/actions/runs/$RUN_ID" \
+        --jq '(.updated_at | fromdateiso8601) - (.run_started_at | fromdateiso8601)' 2>/dev/null || echo 999)
+
+      if [[ "$DURATION" -lt 10 ]]; then
+        warn "Latest failed run completed in ${DURATION}s — suspicious, checking annotations"
+
+        # Get first check run ID and its annotations
+        JOB_ID=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" --jq '.jobs[0].id' 2>/dev/null)
+        if [[ -n "$JOB_ID" ]]; then
+          ANNOTATION=$(gh api "repos/$REPO/check-runs/$JOB_ID/annotations" \
+            --jq '.[0].message // ""' 2>/dev/null)
+
+          if [[ "$ANNOTATION" == *"payment"* ]] || [[ "$ANNOTATION" == *"billing"* ]] || [[ "$ANNOTATION" == *"spending"* ]]; then
+            bad "BILLING ISSUE DETECTED:"
+            info "$ANNOTATION"
+            echo ""
+            info "This is NOT a code problem. Fix billing at:"
+            info "  Personal: https://github.com/settings/billing"
+            info "  Org:      https://github.com/organizations/YOUR_ORG/billing"
+            echo ""
+            info "After fixing, rerun: gh api repos/$REPO/actions/runs/$RUN_ID/rerun -X POST"
+            exit 2
+          elif [[ -n "$ANNOTATION" ]]; then
+            warn "Annotation found: $ANNOTATION"
+          fi
+        fi
+      else
+        ok "Latest failed run took ${DURATION}s — long enough that code was actually exercised"
+      fi
+    fi
+  fi
+fi
+
+
 # ── 1. Toolchain ────────────────────────────────────────────────────────────
 section "1. Toolchain"
 

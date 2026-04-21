@@ -234,3 +234,51 @@ Update to previous entry (420MB binaries discovery).
   forced bypass. Both close out when CI restored.
 
 **Status:** Accepted. Review quarterly (next: 2026-07-20).
+
+---
+
+## SD-0049 — CI suspended due to GitHub Actions billing (RESOLVED 2026-04-21)
+
+**Status:** CLOSED
+**Severity:** P0 (blocked all quality gates)
+**Detected:** 2026-04-13 (first failed run with log: "recent account payments have failed")
+**Resolved:** 2026-04-21
+**Duration:** 8 days of CI red on main + feature branches
+
+### What happened
+
+GitHub Actions refused to start any job on this repository with the annotation:
+
+> "The job was not started because recent account payments have failed or your
+> spending limit needs to be increased. Please check the 'Billing & plans' section."
+
+All five jobs (Lint, Test, Security Scan, UI Security & Quality, Validate Migrations) completed in ~3 seconds with `failure` conclusion and **empty logs**. No step in the workflow actually ran.
+
+### Why it stayed broken for 8 days
+
+Team shipped 10+ commits with messages like "ci: trigger run to verify CI status" without reading the failure annotation. The annotation was present on every run but only visible via `gh api .../check-runs/.../annotations` — not in the default `gh run view --log-failed` output, which returned empty (because there were no logs, not because there were no errors).
+
+**Contributing factor:** the term "CI billing" in earlier documentation was ambiguous. Some readers (including Claude during the 2026-04-21 diagnostic session) interpreted it as "billing code module" and looked for `internal/billing` or `cmd/billing` paths that don't exist as separate gate targets.
+
+### Root cause
+
+GitHub account `quynhanh1706vp-byte` (personal) — payment method issue. Details redacted from public doc; see internal runbook.
+
+### Fix
+
+- Updated payment method in GitHub billing settings.
+- Pushed empty commit to re-trigger CI.
+- Verified 5 jobs ran successfully with non-empty logs.
+
+### Lessons learned
+
+1. **"Fail fast with empty log" = billing/permissions, not code.** A job that completes in under 10 seconds with no log output is almost never a code problem. Check `annotations` API first.
+2. **Rename ambiguous decisions.** "CI billing" became SD-0049-b with the clearer title "GitHub Actions quota exhaustion" in future docs.
+3. **Document the annotation API.** Added `scripts/ci/diagnose-ci.sh` that now queries `/check-runs/{id}/annotations` first before attempting log inspection.
+4. **Pre-sprint gate:** Sprint 3.6 postmortem confirmed that branch protection (applying after this merge) would not have made the billing issue worse — rules would still require CI green, which is correct behavior for a commercial account outage.
+
+### Related
+
+- SD-0047 — `--admin` bypass to merge while CI was red (historical, documented)
+- SD-0048 — gitleaks postgres rule false positives (resolved in PR #23)
+- SD-0049 — this item
