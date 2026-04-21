@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script src="/static/js/dom-safe.js"></script>
 <script>
 (function(){
   if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
@@ -285,7 +286,11 @@ async function showIncidentDetail(id){
   try{const r=await fetch('/api/p4/ir/incident/detail?id='+encodeURIComponent(id));
     const d=await r.json();
     if(!r.ok)throw new Error(JSON.stringify(d));
-    document.getElementById('mi-title').innerHTML=`<b>${d.incident_id}</b> — ${d.title}`;
+    // SEC-006 fixed 2026-04-21: d.title from API is tainted; use safeCreate
+    document.getElementById('mi-title').replaceChildren(
+      window.safeCreate('b', { text: String(d.incident_id || '') }),
+      document.createTextNode(' — ' + String(d.title || ''))
+    );
     const flags=[];
     if(d.is_substantial)flags.push('<span class="badge b-warn">72h CIRCIA</span>');
     if(d.is_ransomware)flags.push('<span class="badge b-bad">💰24h CIRCIA</span>');
@@ -448,7 +453,12 @@ async function createIncident(){
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
     let m=`✅ Created: ${d.incident_id}`;
     if(d.is_substantial)m+='\n⚠️ 72h deadline: '+new Date(d.circia_deadline_72h).toLocaleString();
-    document.getElementById('nc-result').innerHTML=`<div class="banner banner-blue">${m.replace(/\n/g,'<br>')}</div>`;
+    // SEC-006 fixed 2026-04-21: m is tainted but needs <br> rendering from newlines.
+    // Use safeSetHTML (DOMPurify-backed) which allows <br> but strips <script>/<img>/event handlers.
+    window.safeSetHTML(
+      document.getElementById('nc-result'),
+      '<div class="banner banner-blue">' + String(m || '').replace(/\n/g, '<br>') + '</div>'
+    );
     document.getElementById('nc-title').value='';document.getElementById('nc-desc').value='';
     document.querySelectorAll('.chk-row input, #nc-ransom').forEach(c=>c.checked=false);
     loadKPIs();alert(m);
@@ -486,7 +496,15 @@ async function showCIRCIADetail(uuid){
   modal.classList.add('show');
   try{const r=await fetch('/api/p4/circia/report/detail?uuid='+uuid);
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    document.getElementById('mc-title').innerHTML=`CIRCIA Report <span class="mono" style="color:var(--t3);font-size:11px">${uuid.slice(0,8)}…</span>`;
+    // SEC-006 fixed 2026-04-21: uuid via textContent in safeCreate (defense in depth)
+    document.getElementById('mc-title').replaceChildren(
+      document.createTextNode('CIRCIA Report '),
+      window.safeCreate('span', {
+        cls: 'mono',
+        style: { color: 'var(--t3)', fontSize: '11px' },
+        text: String(uuid || '').slice(0, 8) + '…'
+      })
+    );
     const submitHtml=d.status==='draft'?`
       <div class="section-title">Submit to CISA</div>
       <div class="form-grid">

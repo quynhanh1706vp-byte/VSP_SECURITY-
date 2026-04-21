@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VSP Security Platform v2.0</title>
+<script src="/static/js/dom-safe.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="/vsp_enterprise_ui.css">
 <link rel="stylesheet" href="/vsp_enterprise_navy_theme.css">
@@ -1698,7 +1699,15 @@ function showToast(msg, type='info') {
   const colors = {success:'var(--green)',error:'var(--red)',warn:'var(--amber)',info:'var(--cyan)'};
   const t = document.createElement('div');
   t.className = `toast toast-${type}`;
-  t.innerHTML = `<span class="toast-icon" style="color:${colors[type]}">${icons[type]||'◉'}</span><span>${msg}</span>`;
+  // SEC-006 fixed 2026-04-21: replaced innerHTML+tainted-msg with safeCreate (msg=user input)
+  t.replaceChildren(
+    window.safeCreate('span', {
+      cls: 'toast-icon',
+      style: { color: colors[type] },
+      text: icons[type] || '◉'
+    }),
+    window.safeCreate('span', { text: String(msg == null ? '' : msg) })
+  );
   document.getElementById('toast-container').appendChild(t);
   setTimeout(() => { t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3000);
 }
@@ -2184,7 +2193,22 @@ async function runEval() {
     if (TOKEN) {
       const r = await api('POST', '/policy/evaluate', {repo:'current'});
       const color = r.decision==='PASS'?'var(--green)':r.decision==='WARN'?'var(--amber)':'var(--red)';
-      el.innerHTML = `<span style="color:${color};font-size:16px;font-weight:700">${r.decision}</span> · score: <b>${r.score}</b> · posture: <b>${r.posture}</b> · <span style="color:var(--t3)">${r.reason}</span>`;
+      // SEC-006 fixed 2026-04-21: r.* from API response are tainted; build with safeCreate
+      el.replaceChildren(
+        window.safeCreate('span', {
+          style: { color: color, fontSize: '16px', fontWeight: '700' },
+          text: String(r.decision || '')
+        }),
+        document.createTextNode(' · score: '),
+        window.safeCreate('b', { text: String(r.score ?? '') }),
+        document.createTextNode(' · posture: '),
+        window.safeCreate('b', { text: String(r.posture ?? '') }),
+        document.createTextNode(' · '),
+        window.safeCreate('span', {
+          style: { color: 'var(--t3)' },
+          text: String(r.reason || '')
+        })
+      );
     } else {
       // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
       el.innerHTML = `<span style="color:var(--red);font-size:16px;font-weight:700">FAIL</span> · score: <b>—</b> · posture: <b>—</b> · <span style="color:var(--t3)">Critical findings detected (Block Critical rule triggered)</span>`;
