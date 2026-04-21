@@ -200,7 +200,7 @@ async function loadSSDF() {
       const impl = prac.filter(p => p.status === 'implemented').length;
       const box = document.createElement('div');
       box.className = 'ssdf-group';
-      box.innerHTML = `
+      box.textContent = `
         <div class="ssdf-group-hdr">
           <div class="ssdf-group-name">${g} — ${groupsMap[g]}</div>
           <div class="ssdf-group-stats">${impl}/${prac.length}</div>

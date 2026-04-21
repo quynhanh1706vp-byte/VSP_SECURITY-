@@ -77,7 +77,7 @@ function upgradeDashboard() {
   const extra = document.createElement('div');
   extra.id = 'dash-extra-kpis';
   extra.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px';
-  extra.innerHTML = `
+  extra.textContent = `
     <div class="kpi-card" style="padding:12px;border-left:3px solid var(--amber)">
       <div class="kpi-label">SLA Breaches</div>
       <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--amber)" id="kpi-breach">—</div>
@@ -132,7 +132,7 @@ window.injectDoDRow = function injectDoDRow() {
   const row = document.createElement('div');
   row.id = 'dod-widget-row';
   row.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px';
-  row.innerHTML = `
+  row.textContent = `
     <!-- ATO Countdown -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer"
          onclick="if(window.showPanel)showPanel('p4compliance',null)" title="→ P4 Compliance">
@@ -291,7 +291,7 @@ function upgradeFindings() {
   const bar = document.createElement('div');
   bar.id = 'findings-filter-bar';
   bar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center';
-  bar.innerHTML = `
+  bar.textContent = `
     <select id="vsp-filter-severity" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
       <option value="">All Severities</option>
       <option value="CRITICAL">🔴 CRITICAL</option>
@@ -497,7 +497,7 @@ function upgradeExecutive() {
   if (!panel || document.getElementById('exec-trend-card')) return;
   const card = document.createElement('div');
   card.id = 'exec-trend-card'; card.className = 'card'; card.style.cssText = 'margin-bottom:16px';
-  card.innerHTML = `
+  card.textContent = `
     <div class="card-head">
       <span class="card-title">Security score trend</span>
       <span style="font-size:10px;color:var(--text3)">last 10 scans</span>
@@ -584,7 +584,7 @@ window.loadSBOM = async function() {
     const kpis = document.createElement('div');
     kpis.id = 'sbom-summary-kpis';
     kpis.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px';
-    kpis.innerHTML = `
+    kpis.textContent = `
       <div class="kpi-card" style="padding:12px;border-left:3px solid var(--cyan)">
         <div class="kpi-label">Total Components</div>
         <div style="font-family:var(--display);font-size:24px;font-weight:800;color:var(--cyan)" id="sbom-total">—</div>

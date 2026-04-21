@@ -1992,7 +1992,7 @@ function initGovernance() {
   const maxVal = Math.max(...Object.values(matrix));
   const heatEl = document.getElementById('gov-heatmap');
   if (heatEl) {
-    heatEl.innerHTML = `
+    heatEl.textContent = `
       <div style="display:grid;grid-template-columns:60px repeat(4,1fr);gap:3px;font-size:9px">
         <div></div>
         ${sevs.map(s=>`<div class="heatmap-header" style="color:${SEV_COLORS[s]}">${s.slice(0,4)}</div>`).join('')}
@@ -3734,7 +3734,7 @@ window.loadRuns = async function() {
     const kpiRow = panel?.querySelector('.runs-kpi-row');
     if (kpiRow) {
       const scoreColor = avgScore>=70?'c-green':avgScore>=40?'c-amber':'c-red';
-      kpiRow.innerHTML = `
+      kpiRow.textContent = `
         <div class="spark-card">
           <div class="spark-label">Total Runs</div>
           <div class="spark-value c-cyan">${runs.length}</div>
@@ -7528,7 +7528,7 @@ function _openNewRuleModal() {
   var overlay = document.createElement('div');
   overlay.id = 'new-rule-modal-gov';
   overlay.className = 'modal-overlay';
-  overlay.innerHTML = `
+  overlay.textContent = `
     <div class="modal" style="width:min(500px,95vw)">
       <div class="modal-head">
         <div class="modal-title">Create policy rule</div>

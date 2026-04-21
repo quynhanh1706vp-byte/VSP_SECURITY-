@@ -972,7 +972,7 @@ async function generateATOLetter() {
   if (!data) return;
   const box = document.getElementById('ato-letter-box');
   box.style.display = 'block';
-  box.innerHTML = `
+  box.textContent = `
     <div class="ato-card">
       <div class="ato-title">// ${data.document_type} — ${data.classification}</div>
       ${[
@@ -994,7 +994,7 @@ async function loadConMon() {
   if (!data) return;
   const box = document.getElementById('conmon-box');
   box.style.display = 'block';
-  box.innerHTML = `
+  box.textContent = `
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
       <div class="section-title" style="margin-bottom:10px">CONTINUOUS MONITORING REPORT</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">

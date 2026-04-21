@@ -313,7 +313,7 @@ async function showIncidentDetail(id){
        <td class="mono">${fmtBytes(e.file_size_bytes)}</td>
        <td class="mono">${e.custody_count} entries</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No evidence</td></tr>';
     const actions=Array.isArray(d.corrective_actions)?d.corrective_actions:[];
-    body.innerHTML=`
+    body.textContent=`
       <div style="margin-bottom:12px">${flags.join(' ')||''}</div>
       <div class="section-title">Overview</div>
       <div class="kv-grid">
@@ -495,7 +495,7 @@ async function showCIRCIADetail(uuid){
         <div class="form-row"><label>Email</label><input id="sub-email" placeholder="ciso@org"></div>
       </div>
       <button class="btn btn-danger" onclick="submitCIRCIA('${uuid}')">⏱️ Submit to CISA</button>`:'';
-    body.innerHTML=`
+    body.textContent=`
       <div class="kv-grid">
         <div class="kv-key">Type</div><div class="kv-val"><span class="badge b-info">${d.report_type.replace(/_/g,' ')}</span></div>
         <div class="kv-key">Status</div><div class="kv-val"><span class="badge ${d.status==='submitted'?'b-info':'b-neutral'}">${d.status}</span></div>

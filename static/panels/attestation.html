@@ -193,7 +193,7 @@ async function loadDraft() {
     const attests = d.ssdf_attestations || {};
     const practices = Object.entries(attests).sort(([a],[b]) => a.localeCompare(b));
     
-    body.innerHTML = `
+    body.textContent = `
       <div style="margin-bottom:10px;font-size:12px">
         <b>Form UUID:</b> <span class="mono" style="color:var(--t3)">${d.form_uuid}</span><br>
         <b>Product:</b> ${d.product?.name} v${d.product?.version}<br>

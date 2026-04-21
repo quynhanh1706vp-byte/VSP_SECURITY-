@@ -269,7 +269,7 @@
   /* ─── 1. CREATE MODAL DOM ──────────────────────────────────────────── */
   const overlay = document.createElement('div');
   overlay.id = 'ctrl-detail-overlay';
-  overlay.innerHTML = `
+  overlay.textContent = `
     <div id="ctrl-detail-box">
       <div id="ctrl-detail-head">
         <div>
@@ -327,7 +327,7 @@
       ovPanel.appendChild(mount);
     }
 
-    mount.innerHTML = `
+    mount.textContent = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div style="font-size:11px;font-weight:700;color:var(--t2);letter-spacing:.08em;text-transform:uppercase">
           ▸ FedRAMP / CMMC — Controls Detail
@@ -597,7 +597,7 @@
       }
     }
 
-    el.innerHTML = `
+    el.textContent = `
       <div class="ctrl-page-info">${total === 0 ? 'No results' : `${start}–${end} of ${total}`}</div>
       <div class="ctrl-page-btns">
         <button class="ctrl-page-btn" onclick="window._ctrlGoPage(${_ctrlPage - 1})" ${_ctrlPage <= 1 ? 'disabled' : ''}>‹</button>
