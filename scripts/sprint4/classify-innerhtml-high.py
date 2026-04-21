@@ -38,7 +38,14 @@ def get_hits():
         parts = line.split(':', 2)
         if len(parts) < 3:
             continue
-        hits.append({'file': parts[0], 'line': int(parts[1]), 'content': parts[2]})
+        content_line = parts[2]
+        # Skip JSDoc example lines — "*   el.innerHTML = ..." in comment blocks
+        if re.match(r'\s*\*', content_line):
+            continue
+        # Skip single-line JS comments — "// el.innerHTML = ..."
+        if re.match(r'\s*//', content_line):
+            continue
+        hits.append({'file': parts[0], 'line': int(parts[1]), 'content': content_line})
     return hits
 
 

@@ -9,25 +9,10 @@ static/index.html,2187,DYNAMIC,"HTML + dangerous source: ['r.decision', 'r.score
 static/index.html,2189,STRUCTURED,HTML tags but no interpolation — fixed template,"el.innerHTML = `<span style=""color:var(--red);font-size:16px;font-weight:700"">FAIL</span> · score: <b>—</b> · posture: <b>—</b> · <span style=""color:var(--t3)"">Critical findings detected (Block Critic"
 static/index.html,2192,STRUCTURED,HTML tags but no interpolation — fixed template,"el.innerHTML = `<span style=""color:var(--red)"">FAIL</span> · score: — · Block Critical rule triggered`;"
 static/index.html,2205,STRUCTURED,HTML + 1 safe interpolation(s) (numeric/date),"el.innerHTML = `<span style=""color:var(--green)"">✓ Chain intact</span> — all audit entries verified · last verified: ${new Date().toLocaleTimeString()}`;"
-static/js/dom-safe.js,61,TEXT,"no HTML, use textContent regardless of source",*   el.innerHTML = `Score: ${score}`;
-static/js/dom-safe.js,74,STRUCTURED,HTML tags but no interpolation — fixed template,"*   el.innerHTML = `<div class=""card""><span>Hello</span></div>`;"
-static/js/dom-safe.js,127,DYNAMIC,HTML + dangerous source: ['apiResult.description'],*   el.innerHTML = `<span>${apiResult.description}</span>`;
-static/p4_compliance.html,890,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('ov-pipeline-summary').innerHTML = `
-static/p4_compliance.html,943,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('ato-artifacts').innerHTML = `
-static/p4_compliance.html,1071,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('pipeline-run-header').innerHTML = `
-static/p4_compliance.html,1138,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('schedules-list').innerHTML = `
 static/panels/ai_analyst.html,884,STRUCTURED,HTML tags but no interpolation — fixed template,"el.innerHTML = `<div class=""msg-av"" style=""background:linear-gradient(135deg,#0ea5e9,#8b5cf6)"">AI</div>"
 static/panels/incident_response.html,288,DYNAMIC,HTML + dangerous source: ['d.title'],document.getElementById('mi-title').innerHTML=`<b>${d.incident_id}</b> — ${d.title}`;
-static/panels/incident_response.html,363,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('mr-body').innerHTML=`
-static/panels/incident_response.html,395,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('ml-body').innerHTML=`
 static/panels/incident_response.html,451,DYNAMIC,"HTML + unknown source: [""m.replace(/\\n/g,'<br>')""]","document.getElementById('nc-result').innerHTML=`<div class=""banner banner-blue"">${m.replace(/\n/g,'<br>')}</div>`;"
 static/panels/incident_response.html,489,DYNAMIC,"HTML + unknown source: ['uuid.slice(0,8)']","document.getElementById('mc-title').innerHTML=`CIRCIA Report <span class=""mono"" style=""color:var(--t3);font-size:11px"">${uuid.slice(0,8)}…</span>`;"
-static/panels/incident_response.html,567,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('me-body').innerHTML=`
-static/panels/p4_compliance.html,1342,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('ov-pipeline-summary').innerHTML = `
-static/panels/p4_compliance.html,1406,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('ato-artifacts').innerHTML = `
-static/panels/p4_compliance.html,1534,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('pipeline-run-header').innerHTML = `
-static/panels/p4_compliance.html,1628,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('schedules-list').innerHTML = `
 static/panels/sw_inventory.html,878,STRUCTURED,HTML tags but no interpolation — fixed template,"document.getElementById('hash-result').innerHTML = `<div class=""hash-result result-bad"">"
 static/panels/sw_inventory.html,884,STRUCTURED,HTML tags but no interpolation — fixed template,"document.getElementById('hash-result').innerHTML = `<div class=""hash-result result-ok"">"
-static/panels/sw_inventory.html,997,TEXT,"no HTML tags, no interpolation — pure static text",document.getElementById('dm-body').innerHTML = `
 static/panels/vsp_compliance_table_patch.js,557,STRUCTURED,HTML tags but no interpolation — fixed template,"tbody.innerHTML = `<tr><td colspan=""5"" style=""text-align:center;padding:24px;color:var(--t3);font-size:11px"">"

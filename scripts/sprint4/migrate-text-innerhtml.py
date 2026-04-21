@@ -52,7 +52,7 @@ def migrate_file(filepath, lines_to_fix):
         original = lines[idx]
         # Replace `.innerHTML = \`` with `.textContent = \``
         new_line = re.sub(
-            r'(\w+(?:\.\w+|\[[^\]]+\])*)\.innerHTML(\s*=\s*`)',
+            r'([\w.$]+(?:\([^)]*\)|\[[^\]]+\]|\.\w+)*)\.innerHTML(\s*=\s*`)',
             r'\1.textContent\2',
             original,
             count=1
