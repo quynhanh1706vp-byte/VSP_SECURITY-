@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -178,8 +180,14 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteStrictMode, // CSRF protection
 	})
 
+	// Sprint 5 Day 1: conditional token-in-body based on VSP_AUTH_MODE
+	authMode := viper.GetString("auth.mode")
+	if authMode == "both" {
+		log.Debug().Str("auth_mode", "both").Str("user_id", user.ID).Msg("login: dual-mode auth active")
+	}
+
 	jsonOK(w, loginResponse{
-		Token:      token, // kept for API clients / CI-CD
+		Token:      selectBodyToken(token, authMode), // omitted when auth.mode=cookie
 		UserID:     user.ID,
 		Email:      user.Email,
 		Role:       user.Role,
@@ -293,4 +301,14 @@ func (a *Auth) CreateAPIToken(w http.ResponseWriter, r *http.Request) {
 		"type":       "api-token",
 		"note":       "Short-lived token for API/CLI use. Do not store persistently.",
 	})
+}
+
+// selectBodyToken returns the token to include in the login response body.
+// Sprint 5 Day 1: omits token when auth.mode=cookie so frontend uses cookie-only.
+// For "bearer" (default) and "both" modes, token stays in body for API/CI-CD clients.
+func selectBodyToken(token, authMode string) string {
+	if authMode == "cookie" {
+		return ""
+	}
+	return token
 }
