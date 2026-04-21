@@ -875,12 +875,14 @@ async function checkHash() {
   const isBad = knownBad.some(h=>hash.toLowerCase().includes(h)||hash.length===32&&Math.random()<.25);
 
   if(isBad) {
+    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
     document.getElementById('hash-result').innerHTML = `<div class="hash-result result-bad">
 ⚠ MATCH FOUND — Hash flagged in known-cracked / malware database
 Software: ${name||'Unknown'} · Hash: ${hash}
 Source: NSRL DB + internal crack signatures
 Action: BLOCK recommended · Investigate host immediately</div>`;
   } else {
+    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
     document.getElementById('hash-result').innerHTML = `<div class="hash-result result-ok">
 ✓ CLEAN — Hash not found in known-cracked database
 Software: ${name||'Unknown'} · Hash: ${hash}

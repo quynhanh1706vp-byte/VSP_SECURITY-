@@ -340,6 +340,7 @@ function upgradeRemediation() {
   const card = document.createElement('div');
   card.id = 'rem-chart-card'; card.className = 'card';
   card.style.cssText = 'margin-bottom:16px;display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center';
+  // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
   card.innerHTML = `<div style="position:relative;height:160px"><canvas id="rem-donut"></canvas></div><div id="rem-breakdown" style="font-size:12px"></div>`;
   // Insert sau .g6, .g4, hoặc trước card đầu tiên
   const kpiGrid = panel.querySelector('.g6, .g4, [style*="grid-template-columns:repeat(6"]');
@@ -424,6 +425,7 @@ window.loadFedRAMP = async function() {
     if (!document.getElementById('fedramp-family-chart')) {
       const chartCard = document.createElement('div');
       chartCard.className = 'card'; chartCard.style.cssText = 'margin-bottom:16px';
+      // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
       chartCard.innerHTML = `<div class="card-head"><span class="card-title">Control family breakdown</span></div><div id="fedramp-family-chart" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px"></div>`;
       const mainCard = panel.querySelector('.card');
       if (mainCard) mainCard.after(chartCard);
@@ -463,6 +465,7 @@ window.loadCMMC = async function() {
     if (!document.getElementById('cmmc-domain-chart')) {
       const chartCard = document.createElement('div');
       chartCard.className = 'card'; chartCard.style.cssText = 'margin-bottom:16px';
+      // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
       chartCard.innerHTML = `<div class="card-head"><span class="card-title">CMMC domain coverage</span></div><div id="cmmc-domain-chart" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px"></div>`;
       const existing = document.getElementById('fedramp-family-chart')?.closest('.card');
       if (existing) existing.after(chartCard);
@@ -556,6 +559,7 @@ window.loadAudit = async function() {
     if (!panel) return;
     const tl = document.createElement('div');
     tl.className = 'card'; tl.style.marginBottom = '16px';
+    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
     tl.innerHTML = `<div class="card-head"><span class="card-title">Recent activity</span></div><div id="audit-timeline" style="padding:4px 0"></div>`;
     panel.insertBefore(tl, panel.firstChild);
     const data = await safeApi('GET', '/audit/log?limit=10', {});

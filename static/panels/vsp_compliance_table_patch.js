@@ -554,6 +554,7 @@
     if (!tbody) return;
 
     if (!slice.length) {
+      // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--t3);font-size:11px">
         No controls match current filter</td></tr>`;
       return;

@@ -2186,9 +2186,11 @@ async function runEval() {
       const color = r.decision==='PASS'?'var(--green)':r.decision==='WARN'?'var(--amber)':'var(--red)';
       el.innerHTML = `<span style="color:${color};font-size:16px;font-weight:700">${r.decision}</span> · score: <b>${r.score}</b> · posture: <b>${r.posture}</b> · <span style="color:var(--t3)">${r.reason}</span>`;
     } else {
+      // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
       el.innerHTML = `<span style="color:var(--red);font-size:16px;font-weight:700">FAIL</span> · score: <b>—</b> · posture: <b>—</b> · <span style="color:var(--t3)">Critical findings detected (Block Critical rule triggered)</span>`;
     }
   } catch(e) {
+    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
     el.innerHTML = `<span style="color:var(--red)">FAIL</span> · score: — · Block Critical rule triggered`;
   }
 }
@@ -2202,6 +2204,7 @@ async function verifyAudit() {
   const el = document.getElementById('verify-result');
   el.textContent = '⏳ Verifying hash chain…';
   await new Promise(r => setTimeout(r, 800));
+  // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
   el.innerHTML = `<span style="color:var(--green)">✓ Chain intact</span> — all audit entries verified · last verified: ${new Date().toLocaleTimeString()}`;
 }
 
