@@ -1,0 +1,28 @@
+name: ui-security-gate
+
+on:
+  pull_request:
+    paths:
+      - '**.html'
+      - '**.js'
+      - '**.ts'
+      - '**.jsx'
+      - '**.tsx'
+  push:
+    branches: [main]
+
+jobs:
+  ui-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run UI hygiene budget check
+        run: bash scripts/ui-hygiene-budget.sh
+
+      - name: Fail if budget exceeded
+        if: failure()
+        run: |
+          echo "::error::UI security budget exceeded."
+          echo "::error::See scripts/ui-hygiene-budget.sh for limits."
+          exit 1

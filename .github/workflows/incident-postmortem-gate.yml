@@ -1,0 +1,50 @@
+name: incident-postmortem-gate
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-postmortem:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract SD-XXXX references from PR commits
+        id: scan
+        run: |
+          COMMITS=$(git log --format=%B origin/main..HEAD)
+          SD_IDS=$(echo "$COMMITS" | grep -oE 'SD-[0-9]+' | sort -u || true)
+          echo "sd_ids<<EOF_MARKER" >> $GITHUB_OUTPUT
+          echo "$SD_IDS" >> $GITHUB_OUTPUT
+          echo "EOF_MARKER" >> $GITHUB_OUTPUT
+
+      - name: Block close without postmortem
+        run: |
+          COMMITS=$(git log --format=%B origin/main..HEAD)
+          CLOSES=$(echo "$COMMITS" | grep -oE '(close|resolve|fix)(s|d|es)?\s+SD-[0-9]+' -i | grep -oE 'SD-[0-9]+' || true)
+
+          if [ -z "$CLOSES" ]; then
+            echo "No incident close detected — OK."
+            exit 0
+          fi
+
+          MISSING=()
+          for SD in $CLOSES; do
+            if [ ! -f "docs/postmortems/${SD}.md" ]; then
+              MISSING+=("$SD")
+            fi
+          done
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Cannot close incidents without postmortem:"
+            for SD in "${MISSING[@]}"; do
+              echo "::error::  - $SD → missing docs/postmortems/${SD}.md"
+            done
+            echo "::error::Use docs/postmortems/TEMPLATE.md to create one."
+            exit 1
+          fi
+
+          echo "✓ All closed incidents have postmortems."
