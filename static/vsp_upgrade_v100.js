@@ -500,7 +500,7 @@ function upgradeExecutive() {
   if (!panel || document.getElementById('exec-trend-card')) return;
   const card = document.createElement('div');
   card.id = 'exec-trend-card'; card.className = 'card'; card.style.cssText = 'margin-bottom:16px';
-  card.textContent = `
+  card.innerHTML = `
     <div class="card-head">
       <span class="card-title">Security score trend</span>
       <span style="font-size:10px;color:var(--text3)">last 10 scans</span>
@@ -588,7 +588,7 @@ window.loadSBOM = async function() {
     const kpis = document.createElement('div');
     kpis.id = 'sbom-summary-kpis';
     kpis.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px';
-    kpis.textContent = `
+    kpis.innerHTML = `
       <div class="kpi-card" style="padding:12px;border-left:3px solid var(--cyan)">
         <div class="kpi-label">Total Components</div>
         <div style="font-family:var(--display);font-size:24px;font-weight:800;color:var(--cyan)" id="sbom-total">—</div>
