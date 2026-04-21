@@ -1,8 +1,8 @@
 # UI debt inventory — Sprint 4 input
 
-**Generated:** 2026-04-21T01:25:17Z
-**Branch:** docs/sprint35-docs-burst-20260420_190826
-**Commit:** 049320e
+**Generated:** 2026-04-21T01:58:06Z
+**Branch:** sprint4/ui-security-hardening
+**Commit:** 862b87b
 
 ## Risk breakdown
 
