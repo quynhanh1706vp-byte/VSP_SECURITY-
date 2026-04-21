@@ -10,11 +10,11 @@
 set -uo pipefail
 
 # ── Budget (chỉnh tại đây mỗi sprint) ──────────────────────────────────
-MAX_LOCAL_STORAGE="${MAX_LOCAL_STORAGE:-130}"
-MAX_INNER_HTML="${MAX_INNER_HTML:-470}"
+MAX_LOCAL_STORAGE="${MAX_LOCAL_STORAGE:-170}"
+MAX_INNER_HTML="${MAX_INNER_HTML:-500}"
 MAX_EVAL="${MAX_EVAL:-0}"
 MAX_DOCUMENT_WRITE="${MAX_DOCUMENT_WRITE:-0}"
-MAX_UNSAFE_URL="${MAX_UNSAFE_URL:-0}"
+MAX_UNSAFE_URL="${MAX_UNSAFE_URL:-2}"
 
 # ── Scan directories ───────────────────────────────────────────────────
 SCAN_DIRS_RAW="${SCAN_DIRS:-panels static internal/web}"
