@@ -28,15 +28,54 @@ Current login flow already returns both cookie and token-in-body (dual mode). Th
 ### Frontend 140 localStorage reads
 
 Frontend currently ignores the cookie and reads localStorage:
-- 98 getItem vsp_token
+- 98 getItem vsp_token (verified 2026-04-21)
 - 36 setItem vsp_token
 - 10 removeItem vsp_token
+- Total: 144 localStorage sites (local-ci counts 130, diff likely comments)
 
 Source: static/js/vsp_iframe_bootstrap.js writes, 25 panels + index.html read.
 
 ### CSRF currently bypassed for Bearer auth
 
 csrf.go:55-60 skips CSRF when Authorization header starts with Bearer. Once frontend stops sending Bearer header, CSRF double-submit will kick in automatically.
+
+
+
+## ⚠️ Scope correction (2026-04-21 audit before Sprint 5 Day 2)
+
+Initial design estimate of ~80 Bearer sites was wrong. Actual grep reveals:
+
+- Bearer header sites: 212 (not ~80)
+- localStorage sites: 144 (not 140)
+
+Implication: Sprint 5 Day 2 effort revised from 3-4 hours to 8-12 hours
+(full day of work). Recommend splitting into 2-3 sprints:
+
+- Sprint 5 Day 2a: Top 5 files codemod (~60 sites)
+- Sprint 5 Day 2b: Remaining panels (~150 sites)
+- Sprint 5 Day 2c: Async auth check refactor + smoke test
+
+## ⚠️ Complexity note
+
+Many sites use fallback chains like:
+
+    window.TOKEN || localStorage.getItem('vsp_token') || ''
+
+This is NOT a simple text replace. HttpOnly cookie is unreadable from
+JavaScript, so the frontend needs architectural change from:
+
+    sync: check localStorage → use token in fetch header
+
+To:
+
+    async: fetch /api/v1/auth/check → if 200, proceed; else redirect to login
+
+Implementation requires:
+1. Remove all TOKEN reads from fetch() call sites
+2. Use credentials: 'include' on all fetch() calls
+3. Replace localStorage checks with session-check endpoint calls
+4. Update iframe bootstrap to not rely on token propagation (cookie auto-shared)
+
 
 ## Target state
 
@@ -50,7 +89,7 @@ csrf.go:55-60 skips CSRF when Authorization header starts with Bearer. Once fron
 
 ### Frontend pattern change
 
-Pattern A, explicit Bearer, common in ~80 sites:
+Pattern A, explicit Bearer, 212 sites (verified 2026-04-21, originally estimated ~80):
     fetch(API + '/api/v1/foo', { headers: { Authorization: 'Bearer ' + TOKEN } })
 
 Pattern B, credentials same-origin, ~30 sites already correct:
