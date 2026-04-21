@@ -4,6 +4,17 @@
 (function vsp100() {
 'use strict';
 
+// ── SEC-005b cleanup (2026-04-21) ──────────────────────────────────────────
+// Remove any legacy Anthropic API key that older builds may have stored in
+// localStorage. Server-side /api/v1/ai/chat is the only supported path.
+// This cleanup runs once per page load and is safe to keep permanently.
+try {
+  if (localStorage.getItem('vsp_anthropic_key')) {
+    console.warn('[SEC-005b] Removing legacy vsp_anthropic_key from localStorage');
+    localStorage.removeItem('vsp_anthropic_key');
+  }
+} catch (e) { /* storage unavailable, safe to ignore */ }
+
 // ── HELPERS ──
 const GRADE_COLORS = {A:'var(--green)',B:'#4ade80',C:'var(--amber)',D:'#f97316',F:'var(--red)'};
 const GATE_COLORS  = {PASS:'var(--green)',WARN:'var(--amber)',FAIL:'var(--red)'};
