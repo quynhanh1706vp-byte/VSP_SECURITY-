@@ -132,7 +132,7 @@ window.injectDoDRow = function injectDoDRow() {
   const row = document.createElement('div');
   row.id = 'dod-widget-row';
   row.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px';
-  row.textContent = `
+  row.innerHTML = `
     <!-- ATO Countdown -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer"
          onclick="if(window.showPanel)showPanel('p4compliance',null)" title="→ P4 Compliance">
