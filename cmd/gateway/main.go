@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"database/sql"
+
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/hibiken/asynq"
@@ -23,6 +24,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"crypto/tls"
+
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/vsp/platform/internal/api/handler"
@@ -56,6 +58,7 @@ func main() {
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("redis.addr", "localhost:6379")
 	viper.SetDefault("telemetry.otlp_endpoint", "")
+	viper.SetDefault("auth.mode", "bearer") // Sprint 5: bearer|cookie|both (default bearer for backward compat)
 	// Docker env var mappings — sau SetDefault để override
 	// BindEnv errors are non-fatal — viper falls back to SetDefault values
 	if err := viper.BindEnv("database.url", "DATABASE_URL"); err != nil {
@@ -71,6 +74,7 @@ func main() {
 	viper.BindEnv("anthropic.api_key", "ANTHROPIC_API_KEY")
 	viper.BindEnv("server.env", "SERVER_ENV")
 	viper.BindEnv("server.allowed_origins", "ALLOWED_ORIGINS")
+	viper.BindEnv("auth.mode", "VSP_AUTH_MODE") // Sprint 5 Day 1: feature flag
 	if err := viper.ReadInConfig(); err != nil {
 		log.Warn().Err(err).Msg("no config file — using defaults")
 	}
@@ -464,6 +468,15 @@ func main() {
 		r.Use(vspMW.NewUserRateLimiter(600, time.Minute)) // per-user: 600 req/min
 
 		// Auth
+		// Sprint 5 Day 1: Public config endpoint — frontend reads auth.mode to decide fetch strategy
+		r.Get("/api/v1/config", func(w http.ResponseWriter, r *http.Request) {
+			authMode := viper.GetString("auth.mode")
+			if authMode == "" {
+				authMode = "bearer"
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"auth_mode":"` + authMode + `"}`))
+		})
 		r.Post("/api/v1/auth/logout", authH.Logout)
 		r.Post("/api/v1/auth/refresh", authH.Refresh)
 		r.Post("/api/v1/auth/mfa/setup", mfaH.Setup)

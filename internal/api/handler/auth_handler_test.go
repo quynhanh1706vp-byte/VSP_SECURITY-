@@ -173,3 +173,30 @@ func TestRefresh_ZeroTTLDefaultsTo24h(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&resp)
 	assert.NotEmpty(t, resp["token"])
 }
+
+// ── Sprint 5 Day 1: VSP_AUTH_MODE feature flag tests ─────────────────────
+
+func TestSelectBodyToken_Bearer(t *testing.T) {
+	// Default mode — token stays in body for API clients
+	assert.Equal(t, "abc123", selectBodyToken("abc123", "bearer"))
+}
+
+func TestSelectBodyToken_Cookie(t *testing.T) {
+	// Cookie mode — token omitted from body (frontend uses cookie)
+	assert.Equal(t, "", selectBodyToken("abc123", "cookie"))
+}
+
+func TestSelectBodyToken_Both(t *testing.T) {
+	// Both mode — token in body AND cookie for dual-client rollout
+	assert.Equal(t, "abc123", selectBodyToken("abc123", "both"))
+}
+
+func TestSelectBodyToken_EmptyMode_FallsBackToBearer(t *testing.T) {
+	// Edge case: empty mode string — treated as bearer (backward compat)
+	assert.Equal(t, "abc123", selectBodyToken("abc123", ""))
+}
+
+func TestSelectBodyToken_UnknownMode_FallsBackToBearer(t *testing.T) {
+	// Edge case: unrecognized mode — treated as bearer (defensive)
+	assert.Equal(t, "abc123", selectBodyToken("abc123", "invalid"))
+}
