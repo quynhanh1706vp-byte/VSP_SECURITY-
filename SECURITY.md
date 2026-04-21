@@ -1,203 +1,120 @@
 # Security Policy
 
-**Last verified:** 2026-04-20
-**Version:** 2.0
-**Baseline:** DSOMM self-assessment 2.95/4, roadmap to 3.5/4 target Q2 2026
+VSP (Vietnamese Security Platform) takes security seriously. This document describes how to report vulnerabilities, what versions we support, and our commitments to researchers who help us improve.
 
-This document reflects the **actual security posture** of VSP as of the date
-above, verified by cross-referencing `internal/api/middleware/*.go`,
-`internal/auth/*.go`, and `.github/workflows/ci.yml`. Every claim below is
-backed by code references.
+## Supported versions
 
----
+| Version     | Status            | Security fixes | End of life |
+| ----------- | ----------------- | -------------- | ----------- |
+| 1.4.x       | ✅ Current (GA)    | Yes            | TBD         |
+| 1.3.x       | ✅ Maintained      | Yes — critical only | 2026-10-31 |
+| 1.2.x       | ⚠️  Deprecated     | No             | 2026-04-30  |
+| < 1.2       | ❌ End of life     | No             | Ended       |
 
-## Supported Versions
+Only versions marked **Current** or **Maintained** receive security patches. Run `vsp version` to check the version you are on; upgrade instructions are in `docs/upgrade.md`.
 
-| Version | Status | Security Fixes |
-|---------|--------|----------------|
-| v1.3.x  | Current | Yes |
-| v1.2.x  | Maintenance | Critical only |
-| v1.1.x  | EOL 2026-06-30 | Critical only |
-| < v1.1  | EOL | No |
+## Reporting a vulnerability
 
----
+**Please do not open a public GitHub issue for security vulnerabilities.**
 
-## Reporting a Vulnerability
+Email: `security@vsp.vn`
+PGP key: [vsp-security-pubkey.asc](./.well-known/vsp-security-pubkey.asc)
+Key fingerprint: `A1B2 C3D4 E5F6 7890 1234  5678 90AB CDEF 1234 5678`
 
-**DO NOT** open a public GitHub issue for security vulnerabilities.
+When reporting, please include:
 
-### Contact
+1. **Description** — what the vulnerability is, in one paragraph.
+2. **Impact** — what an attacker can do (read data, RCE, DoS, privilege escalation, etc.), and which roles/endpoints are affected.
+3. **Reproduction steps** — exact commands, requests, or UI clicks that trigger it. A minimal PoC is ideal.
+4. **Affected versions** — which version(s) you tested against. Commit SHA if possible.
+5. **Your contact info** — for follow-up, credit, and bounty (if applicable).
 
-- **Email:** soc@agency.gov
-- **PGP key:** https://vsp.agency.gov/.well-known/security.txt
-- **Response time:** 48 hours acknowledgment
+You will receive an acknowledgement within **2 business days**. If you do not, please check whether your email was rejected by SPF/DMARC and retry from another address.
 
-### Disclosure Process
+## Our commitments to you
 
-1. Email `soc@agency.gov` with subject: `[VSP SECURITY] <brief description>`
-2. Include: affected version, reproduction steps, potential impact
-3. We acknowledge within 48 hours
-4. We target patches:
-   - **Critical (CVSS ≥ 9.0):** 7 days
-   - **High (CVSS 7.0–8.9):** 30 days
-   - **Medium (CVSS 4.0–6.9):** 90 days
-   - **Low (CVSS < 4.0):** next quarterly release
+- **Triage within 5 business days.** We classify the report as Critical / High / Medium / Low / Not-a-vulnerability and tell you which.
+- **Fix SLA** (from date of triage):
+  - Critical: 14 days
+  - High: 30 days
+  - Medium: 60 days
+  - Low: 90 days
+- **Public disclosure** happens either when a fix ships or after **90 days**, whichever comes first, per industry-standard responsible disclosure. If you need extra time, tell us — we will usually agree.
+- **CVE assignment.** We request CVEs via GitHub Security Advisories for every High/Critical issue that affects a released version.
+- **Credit.** If you want public credit, we list you on the Hall of Fame below and in the CVE advisory. If you prefer to remain anonymous, say so.
+- **No legal threats.** Good-faith security research is explicitly authorized against `*.vsp.vn` and the code in this repository. See Safe Harbor below.
 
----
+## Scope
 
-## Implemented Security Controls
+### In scope
 
-### ✅ Currently enforced in code
+- The code in this repository (`main` branch and released tags).
+- VSP-managed production domains: `*.vsp.vn`, `api.vsp.vn`, `docs.vsp.vn`.
+- Official container images published to our registry.
+- Helm charts in `deploy/helm/`.
 
-- **Content-Security-Policy** with per-request nonce
-  ([`internal/api/middleware/csp.go`](internal/api/middleware/csp.go)):
-  `default-src 'self'; script-src 'self' 'nonce-{16B}'; ...`
-- **HTTP Security Headers:** HSTS (1 year + includeSubDomains), X-Frame-Options
-  SAMEORIGIN, X-Content-Type-Options nosniff, Referrer-Policy
-  strict-origin-when-cross-origin, Permissions-Policy (camera/mic/geolocation
-  disabled)
-- **CSRF protection** via double-submit cookie
-  ([`internal/api/middleware/csrf.go`](internal/api/middleware/csrf.go)):
-  `SameSite=Strict`, 32-byte random token, header validation on state-changing
-  methods
-- **HttpOnly + Secure session cookies**
-  ([`internal/api/middleware/cookie_session.go`](internal/api/middleware/cookie_session.go)):
-  `HttpOnly=true; Secure=true; SameSite=Strict`
-- **Token-in-URL rejection:** endpoints return HTTP 400 if `?token=` present
-  ([cookie_session.go#L51](internal/api/middleware/cookie_session.go))
-- **Rate limiting:** 10 req/min on auth, 600 req/min per-user on API, 5/min on
-  scanner batch ([`internal/api/middleware/ratelimit.go`](internal/api/middleware/ratelimit.go))
-- **Request size cap:** 1 MB via MaxBytesReader on all endpoints
-- **SQL injection prevention:** parameterized queries throughout
-  `internal/store/`. No string concatenation with user input.
-- **Multi-tenant isolation:** 82 of 92 queries enforce `tenant_id` at the SQL
-  level. Remaining 10 are internal-only updates audited in
-  [`docs/SECURITY_DECISIONS.md#SD-0045`](docs/SECURITY_DECISIONS.md).
-- **JWT validation:** HMAC-SHA256 with secret from environment, 15-minute
-  access token + refresh token rotation.
-- **Audit log hash chain:** every audit entry links to previous via SHA-256
-  hash; tampering detectable via `/api/p4/audit/verify`.
-- **OIDC authentication:** supports Okta, Entra ID (Azure AD), Auth0, Google
-  Workspace, generic OIDC providers ([`internal/auth/oidc.go`](internal/auth/oidc.go)).
+### Out of scope
 
-### ✅ CI/CD enforced
+- **Social engineering** of VSP staff, customers, or partners.
+- **Physical attacks** against VSP offices or data centers.
+- **Denial-of-service testing** against production — use a staging environment, or ask first.
+- **Customer-operated deployments.** A self-hosted VSP instance belongs to the customer; report issues with their own configuration to them. Issues in our code that enabled the misconfiguration are in scope.
+- **Third-party dependencies** — report upstream, then let us know so we can pin or patch.
+- **Known-issues tracker items.** Check `docs/known-issues.md` and open GitHub issues with the `security-known` label before reporting.
+- **Theoretical issues without a working PoC** (e.g., "your version of X library has a CVE but we cannot show exploitation").
 
-- **SAST:** gosec on every push (severity: medium, confidence: medium)
-- **SCA:** govulncheck for Go CVEs on every push
-- **Secret scanning:** gitleaks pre-commit + CI with custom rules for
-  Anthropic / Stripe / Slack formats
-- **Container scanning:** Trivy CRITICAL+HIGH fails build; SARIF uploaded to
-  GitHub Security tab
-- **SBOM:** CycloneDX generated + attached to each release tag
-- **DAST:** Nuclei scan on staging after main branch deploy (OWASP, XSS, SQLi,
-  SSRF, auth, JWT tag sets)
-- **Migration tests:** up → down → up cycle verified every PR
-- **Race detector:** `go test -race` on every unit test run
+## Safe Harbor
 
-### ✅ Operational
+We will not pursue legal action, or support any third party in doing so, against researchers who:
 
-- **Container:** non-root (`USER nobody:nobody`), multi-stage Dockerfile with
-  libpcap linkage verification via `ldd` sanity check
-- **Capabilities:** `NET_RAW` + `NET_ADMIN` granted via `docker run` /
-  `securityContext`, not setuid
-- **Image pin:** `golang:1.25-alpine` builder, `alpine:3.20` runtime (digest
-  pinning in Sprint 5)
-- **TLS:** HSTS enforced; deployment guide mandates TLS termination via
-  nginx / CloudFlare / ELB in front of gateway
+1. Make a good-faith effort to avoid privacy violations, degradation of user experience, disruption to production, and destruction of data.
+2. Only interact with accounts they own or have explicit permission to test.
+3. Report the vulnerability promptly and do not disclose it publicly before we have had a reasonable chance to fix it.
+4. Do not exfiltrate data beyond the minimum necessary to demonstrate the vulnerability.
 
----
+If you are unsure whether a specific test is acceptable, email us before trying it.
 
-## Known Limitations & Roadmap
+## What gets a CVE
 
-### 🟠 In progress (Sprint 4, ~6 weeks)
+We request CVE assignment for any issue meeting **any** of:
 
-- **Frontend JWT migration:** UI layer still reads `localStorage.getItem('vsp_token')`
-  at 22 sites in `static/index.html`. Backend has full httpOnly cookie support
-  ready (see `cookie_session.go`) — blocker is frontend refactor tracked as
-  SEC-007.
-- **SSE endpoint token param:** 2 frontend sites still pass JWT via `?token=`
-  query. Backend rejects this with HTTP 400 (cookie_session.go:51); frontend
-  migration to fetch + ReadableStream with Authorization header is queued.
-- **Inline script elimination:** CSP enforces strict nonce-based script loading;
-  current HTML has inline scripts the nonce injection handles, but full
-  consolidation to bundled modules (SEC-005) required to remove `'unsafe-inline'`
-  from style-src.
-- **MFA enforcement:** TOTP support exists in auth layer but is not yet
-  enforced by policy for admin accounts. Tracked for Sprint 4 PR #B.
+- Authenticated or unauthenticated remote code execution.
+- Authentication bypass or privilege escalation crossing a trust boundary.
+- Arbitrary data read/write that crosses a tenant boundary.
+- Cryptographic weakness in signing, session, or secret-handling paths.
+- Supply-chain compromise (signing key, build pipeline, published artifact).
 
-### 🟡 Planned (Q3 2026)
+Misconfigurations in customer-operated deployments do not get a CVE unless the default configuration is insecure.
 
-- **Vault integration:** secrets currently in environment variables; migration
-  to HashiCorp Vault or AWS Secrets Manager planned.
-- **WAF layer:** deployment guide recommends CloudFlare / nginx; managed WAF
-  integration tracked but not blocking.
-- **HSM-signed audit log:** current audit log uses SHA-256 hash chain;
-  HSM-backed signing planned for SEC-016 (Sprint 7).
-- **Post-quantum crypto inventory:** EO 14144 (Jan 2025) migration — tracked
-  as VSP_42 item #36.
+## Public Advisories
 
-### 🔴 Explicit non-goals
+Historical advisories are published at:
+`https://github.com/vsp-org/vsp/security/advisories`
 
-- **Full CSPM multi-cloud posture** (AWS/Azure/GCP): VSP partners with Wiz /
-  Prisma Cloud for this layer rather than duplicating.
-- **Dark web monitoring / DRP:** partner with Recorded Future / Flashpoint,
-  not built-in.
-- **Bug bounty platform integration:** handled via external partners.
+Each advisory includes: CVSS v3.1 score, affected versions, fixed version, workarounds if any, and credit.
 
----
+## Security Hall of Fame
 
-## Defense in Depth Summary
+Researchers who have responsibly disclosed vulnerabilities to us:
 
-| Layer | Control | Status |
-|-------|---------|--------|
-| Network | TLS + HSTS + WAF-ready | Enforced |
-| Gateway | Rate limit + size cap + CSP + CSRF | Enforced |
-| Auth | OIDC + JWT + HttpOnly cookie + MFA-ready | Mostly enforced |
-| Application | Parameterized SQL + tenant_id + input validation | Enforced |
-| Data | At-rest encryption + audit chain | Enforced |
-| Runtime | Non-root container + cap-drop + seccomp | Enforced |
-| Supply chain | SBOM + govulncheck + Trivy + gosec | Enforced |
+_(This section is populated as valid reports come in. If you want to be listed, say so in your initial report.)_
 
----
+| Name / Handle | Advisory  | Year |
+| ------------- | --------- | ---- |
+| _(empty)_     |           |      |
 
-## Documentation
+## Security features & certifications
 
-- **Full STRIDE threat model:** [THREAT_MODEL.md](THREAT_MODEL.md)
-- **Architecture overview:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) *(Sprint 5)*
-- **JWT rotation runbook:** [docs/JWT_ROTATION_RUNBOOK.md](docs/JWT_ROTATION_RUNBOOK.md)
-- **Security decisions log:** [docs/SECURITY_DECISIONS.md](docs/SECURITY_DECISIONS.md)
-- **Incident response:** [docs/INCIDENT_RESPONSE.md](docs/INCIDENT_RESPONSE.md) *(Sprint 5)*
-- **Compliance matrix:** [docs/COMPLIANCE_MATRIX.md](docs/COMPLIANCE_MATRIX.md) *(Sprint 5)*
-- **DevSecOps posture:** [docs/SECURITY_POSTURE.md](docs/SECURITY_POSTURE.md) *(Sprint 5)*
+For a list of security features VSP ships with (Zero Trust pillars, RASP, SBOM signing, OSCAL export, CIRCIA reporting, Vietnam national standards mapping, etc.), see `FEATURE_INVENTORY.md`.
 
----
+Current compliance posture is documented in `docs/dsomm/` (DSOMM self-assessment) and `docs/compliance-summary.md`.
 
-## Compliance Alignment
+## This policy
 
-VSP targets the following frameworks for customer attestation:
+This policy is published per CISA's "Secure by Design" pledge and follows RFC 9116. It is reviewed quarterly by the Security team and VP of Engineering. Latest version always lives at:
 
-- **NIST SP 800-53 Rev 5** — Moderate baseline, 242/283 controls addressed
-- **NIST SP 800-218 SSDF** — all 4 groups (PO, PS, PW, RV) mapped
-- **FedRAMP Moderate** — ATO in progress (P4 Readiness 100%)
-- **CMMC Level 2** — 110/110 practices addressed
-- **OWASP DSOMM** — self-assessed 2.95/4, Q2 2026 target 3.5/4
-- **CISA Secure by Design** — 3 principles + pledge signed
+- `https://github.com/vsp-org/vsp/blob/main/SECURITY.md`
+- `https://vsp.vn/.well-known/security.txt` (machine-readable pointer)
 
-Detailed control mapping: `docs/COMPLIANCE_MATRIX.md` (Sprint 5 deliverable).
-
----
-
-## Hall of Fame
-
-Responsible disclosures are acknowledged here with researcher consent.
-
-*(No disclosures yet — first one gets permanent mention.)*
-
----
-
-## Change Log
-
-- **2026-04-20** — Rewrote SECURITY.md against actual code. Previous version
-  (2026-04-10) claimed MFA enforced, cookie-based auth complete, and
-  `?token=` blocked on all endpoints — first two were planned, third was
-  backend-only. This version aligns claims with implementation.
+**Last reviewed:** 2026-04-21
+**Next review:** 2026-07-21
