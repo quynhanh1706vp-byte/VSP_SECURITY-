@@ -77,7 +77,7 @@ function upgradeDashboard() {
   const extra = document.createElement('div');
   extra.id = 'dash-extra-kpis';
   extra.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px';
-  extra.textContent = `
+  extra.innerHTML = `
     <div class="kpi-card" style="padding:12px;border-left:3px solid var(--amber)">
       <div class="kpi-label">SLA Breaches</div>
       <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--amber)" id="kpi-breach">—</div>
@@ -291,7 +291,7 @@ function upgradeFindings() {
   const bar = document.createElement('div');
   bar.id = 'findings-filter-bar';
   bar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center';
-  bar.textContent = `
+  bar.innerHTML = `
     <select id="vsp-filter-severity" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
       <option value="">All Severities</option>
       <option value="CRITICAL">🔴 CRITICAL</option>
