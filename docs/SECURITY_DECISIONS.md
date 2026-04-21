@@ -282,3 +282,28 @@ GitHub account `quynhanh1706vp-byte` (personal) — payment method issue. Detail
 - SD-0047 — `--admin` bypass to merge while CI was red (historical, documented)
 - SD-0048 — gitleaks postgres rule false positives (resolved in PR #23)
 - SD-0049 — this item
+
+---
+
+## Meta-rule: Evidence-gated closure
+
+Starting 2026-04-21 (post-SD-0049), any Security Decision item can only be
+marked CLOSED when accompanied by **reproducible evidence** in the same commit
+or PR that closes it.
+
+**Evidence examples:**
+- CI run URL showing the gate green (for CI-related items)
+- Screenshot or command output showing the vulnerability patched
+- Link to merged PR with the actual fix
+- Test run showing the previously-failing case now passing
+
+**Not evidence:**
+- Message in Slack saying "I think it's fixed"
+- Commit message asserting the fix without a verification step
+- Ticket-system status change by itself
+
+This rule was established because SD-0049 was prematurely marked "closed"
+on 2026-04-20 (commit message: "re-trigger after billing resolved") while
+the underlying GitHub billing issue was still blocking all CI runs. The
+premature closure cost ~8 days of continued CI red time and ~10 wasted
+commits attempting to verify a non-fix.
