@@ -77,3 +77,40 @@ _Planned:_
 | 1 codemod run may break 144 sites simultaneously | `scripts/.../migrate-*.sh` creates backup, fixes are reversible |
 | `vsp_anthropic_key` fix requires AI Analyst refactor | If >1 day, split into Sprint 4.5 subtask |
 
+
+
+---
+
+## Sprint 4 FINAL status (2026-04-21)
+
+### Completed
+
+| Task | Status | Commit |
+|---|---|---|
+| SEC-005b frontend fix | ✅ | 4076809 |
+| SEC-005b cleanup code | ✅ | 862b87b |
+| Week 1 bootstrap verify | ✅ | 7c3ab2d |
+| SEC-006 Phase 1a TEXT | ✅ | 8265647 |
+| SEC-006 Phase 1b TEXT | ✅ | a9b8a38 |
+| SEC-006 Phase 2 STRUCTURED | ✅ | a5a4696 |
+| SEC-006 Phase 3 DYNAMIC | ✅ | 213dcce |
+| Cookie design doc | ✅ | 811e4e3 |
+| Sprint 4 retro | ✅ | 811e4e3 |
+
+### Metrics verified post-sprint
+
+- HIGH template-literal innerHTML: 53 → 0 (TEXT + DYNAMIC fully migrated)
+- STRUCTURED: 12 marked reviewed (XSS risk = 0 by analysis)
+- SEC-006 fixed markers: 5 (grep verified)
+- SEC-006 reviewed markers: 12 (grep verified)
+- vsp_anthropic_key: 3 references remain, ALL in SEC-005b cleanup block (intentional)
+- Local CI: pass 60-98s
+- PR #26: OPEN, MERGEABLE, not draft
+- GitHub Actions CI: 5 FAILURE (SD-0049 billing, not code)
+
+### Cross-references
+
+- Cookie migration: docs/sprint4/cookie-migration-design.md
+- Sprint retro: docs/retros/2026-04-21-sprint4.md
+- Inventory final state: docs/sprint4/innerhtml-high-classified.csv
+- DSOMM tracking: updated in FEATURE_INVENTORY.md (needs verify)
