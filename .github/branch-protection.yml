@@ -1,0 +1,35 @@
+# VSP Branch Protection — apply với gh CLI:
+#
+#   gh api -X PUT repos/:owner/:repo/branches/main/protection \
+#     --input .github/branch-protection.yml
+#
+# Hoặc copy config vào: Settings → Branches → Add rule → main
+
+main:
+  required_status_checks:
+    strict: true          # PR phải up-to-date với main trước khi merge
+    contexts:
+      - local-ci          # local-ci.sh pass
+      - ui-security-gate  # SEC-005/006 budget
+      - incident-postmortem-gate
+      - security-scan     # gitleaks + govulncheck
+      - compliance-gate   # FedRAMP/CMMC score check
+
+  enforce_admins: true    # ★ CRITICAL — admin KHÔNG được bypass
+
+  required_pull_request_reviews:
+    required_approving_review_count: 2
+    dismiss_stale_reviews: true
+    require_code_owner_reviews: true
+    require_last_push_approval: true      # reviewer phải approve commit mới nhất
+
+  required_signatures: true               # ★ GPG/SSH signed commits
+  allow_force_pushes: false
+  allow_deletions: false
+  required_linear_history: true           # no merge commits — rebase/squash only
+  required_conversation_resolution: true  # all review comments phải resolved
+
+  restrictions:                           # chỉ user trong list được push direct
+    users: []                             # (empty = phải qua PR)
+    teams: [release-bot]
+    apps: []

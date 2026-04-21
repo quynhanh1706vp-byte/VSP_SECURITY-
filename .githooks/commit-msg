@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Enforce conventional commits format + security-impact tag
+# Install: git config core.hooksPath .githooks
+
+MSG_FILE="$1"
+MSG=$(head -n1 "$MSG_FILE")
+
+# Skip merge/revert commits
+if echo "$MSG" | grep -qE '^(Merge|Revert)'; then
+  exit 0
+fi
+
+# Conventional commits: type(scope): subject
+PATTERN='^(feat|fix|docs|style|refactor|test|chore|perf|sec|build|ci|revert)(\([a-z0-9/-]+\))?!?:\s.{3,}'
+
+if ! echo "$MSG" | grep -qE "$PATTERN"; then
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo " ❌ Commit message không đúng format"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo "Format: type(scope): subject"
+  echo ""
+  echo "Types:  feat | fix | docs | style | refactor | test"
+  echo "        chore | perf | sec | build | ci | revert"
+  echo ""
+  echo "Examples:"
+  echo "  feat(auth): add MFA enforcement for admin role"
+  echo "  fix(siem): SD-0049 correlation rule false positive"
+  echo "  sec(ui): SEC-005 migrate JWT to HttpOnly cookie"
+  echo ""
+  echo "Your message:"
+  echo "  $MSG"
+  echo ""
+  exit 1
+fi
+
+# Warn if sec/fix commit without SD-XXXX reference
+if echo "$MSG" | grep -qE '^(sec|fix)'; then
+  if ! grep -qE 'SD-[0-9]+|SEC-[0-9]+|CVE-[0-9]+' "$MSG_FILE"; then
+    echo "⚠  Security fix commit nên reference SD-XXXX, SEC-XXX, hoặc CVE-XXXX"
+    echo "   Commit vẫn cho phép, nhưng sẽ flag trong review."
+  fi
+fi
+
+exit 0
