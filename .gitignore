@@ -126,3 +126,8 @@ patches/
 .*.swp
 .*.swo
 *~
+
+# Editor swap files
+.*.swp
+.*.swo
+*~
