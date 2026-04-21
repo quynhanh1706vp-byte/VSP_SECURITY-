@@ -116,3 +116,8 @@ vsp-agent
 # Claude/AI work artifacts — not part of production repo
 patches/
 *.bak_hotfix
+
+# Sprint 4 — local backups before codemod (DO NOT COMMIT)
+.backup/
+*.bak
+*.orig

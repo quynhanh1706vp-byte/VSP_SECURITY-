@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script src="/static/js/dom-safe.js"></script>
 <script>
 (function(){
   if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
@@ -285,7 +286,11 @@ async function showIncidentDetail(id){
   try{const r=await fetch('/api/p4/ir/incident/detail?id='+encodeURIComponent(id));
     const d=await r.json();
     if(!r.ok)throw new Error(JSON.stringify(d));
-    document.getElementById('mi-title').innerHTML=`<b>${d.incident_id}</b> — ${d.title}`;
+    // SEC-006 fixed 2026-04-21: d.title from API is tainted; use safeCreate
+    document.getElementById('mi-title').replaceChildren(
+      window.safeCreate('b', { text: String(d.incident_id || '') }),
+      document.createTextNode(' — ' + String(d.title || ''))
+    );
     const flags=[];
     if(d.is_substantial)flags.push('<span class="badge b-warn">72h CIRCIA</span>');
     if(d.is_ransomware)flags.push('<span class="badge b-bad">💰24h CIRCIA</span>');
@@ -313,7 +318,7 @@ async function showIncidentDetail(id){
        <td class="mono">${fmtBytes(e.file_size_bytes)}</td>
        <td class="mono">${e.custody_count} entries</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No evidence</td></tr>';
     const actions=Array.isArray(d.corrective_actions)?d.corrective_actions:[];
-    body.innerHTML=`
+    body.textContent=`
       <div style="margin-bottom:12px">${flags.join(' ')||''}</div>
       <div class="section-title">Overview</div>
       <div class="kv-grid">
@@ -360,7 +365,7 @@ async function editField(incidentId, field, currentVal){
 
 function showRansomForm(id){
   document.getElementById('modal-ransom').classList.add('show');
-  document.getElementById('mr-body').innerHTML=`
+  document.getElementById('mr-body').textContent=`
     <div class="banner banner-yellow">⚠️ Recording ransom payment triggers <b>CIRCIA 24-hour reporting deadline</b>.</div>
     <div class="form-row"><label>Incident</label><input value="${id}" readonly></div>
     <div class="form-row"><label>Amount (USD) *</label><input id="rp-amount" type="number" placeholder="50000" step="0.01"></div>
@@ -392,7 +397,7 @@ async function submitRansom(id){
 
 function showLessonsForm(id){
   document.getElementById('modal-lessons').classList.add('show');
-  document.getElementById('ml-body').innerHTML=`
+  document.getElementById('ml-body').textContent=`
     <div class="form-row"><label>Root Cause Analysis</label><textarea id="ll-rc" placeholder="Primary cause of the incident..."></textarea></div>
     <div class="form-row"><label>Lessons Learned</label><textarea id="ll-lessons" placeholder="What worked, what didn't..."></textarea></div>
     <div class="form-row"><label>Corrective Actions (1 per line)</label><textarea id="ll-actions" placeholder="Patch system X\nImplement control Y\nUpdate runbook Z"></textarea></div>
@@ -448,7 +453,12 @@ async function createIncident(){
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
     let m=`✅ Created: ${d.incident_id}`;
     if(d.is_substantial)m+='\n⚠️ 72h deadline: '+new Date(d.circia_deadline_72h).toLocaleString();
-    document.getElementById('nc-result').innerHTML=`<div class="banner banner-blue">${m.replace(/\n/g,'<br>')}</div>`;
+    // SEC-006 fixed 2026-04-21: m is tainted but needs <br> rendering from newlines.
+    // Use safeSetHTML (DOMPurify-backed) which allows <br> but strips <script>/<img>/event handlers.
+    window.safeSetHTML(
+      document.getElementById('nc-result'),
+      '<div class="banner banner-blue">' + String(m || '').replace(/\n/g, '<br>') + '</div>'
+    );
     document.getElementById('nc-title').value='';document.getElementById('nc-desc').value='';
     document.querySelectorAll('.chk-row input, #nc-ransom').forEach(c=>c.checked=false);
     loadKPIs();alert(m);
@@ -486,7 +496,15 @@ async function showCIRCIADetail(uuid){
   modal.classList.add('show');
   try{const r=await fetch('/api/p4/circia/report/detail?uuid='+uuid);
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    document.getElementById('mc-title').innerHTML=`CIRCIA Report <span class="mono" style="color:var(--t3);font-size:11px">${uuid.slice(0,8)}…</span>`;
+    // SEC-006 fixed 2026-04-21: uuid via textContent in safeCreate (defense in depth)
+    document.getElementById('mc-title').replaceChildren(
+      document.createTextNode('CIRCIA Report '),
+      window.safeCreate('span', {
+        cls: 'mono',
+        style: { color: 'var(--t3)', fontSize: '11px' },
+        text: String(uuid || '').slice(0, 8) + '…'
+      })
+    );
     const submitHtml=d.status==='draft'?`
       <div class="section-title">Submit to CISA</div>
       <div class="form-grid">
@@ -495,7 +513,7 @@ async function showCIRCIADetail(uuid){
         <div class="form-row"><label>Email</label><input id="sub-email" placeholder="ciso@org"></div>
       </div>
       <button class="btn btn-danger" onclick="submitCIRCIA('${uuid}')">⏱️ Submit to CISA</button>`:'';
-    body.innerHTML=`
+    body.textContent=`
       <div class="kv-grid">
         <div class="kv-key">Type</div><div class="kv-val"><span class="badge b-info">${d.report_type.replace(/_/g,' ')}</span></div>
         <div class="kv-key">Status</div><div class="kv-val"><span class="badge ${d.status==='submitted'?'b-info':'b-neutral'}">${d.status}</span></div>
@@ -564,7 +582,7 @@ function showCustody(i){
 
 function showAddEvidence(){
   document.getElementById('modal-evidence').classList.add('show');
-  document.getElementById('me-body').innerHTML=`
+  document.getElementById('me-body').textContent=`
     <div class="form-row"><label>Incident ID *</label><input id="ae-inc" placeholder="INC-2026-0001"></div>
     <div class="form-row"><label>Evidence Type</label>
       <select id="ae-type">

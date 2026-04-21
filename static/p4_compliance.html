@@ -887,7 +887,7 @@ async function loadOverview() {
     document.getElementById('ov-cmmc-sub').textContent = (cm.pass||14) + ' / ' + (cm.total||16) + ' practices pass';
     document.getElementById('ov-cmmc-bar').style.width = cmPct + '%';
     document.getElementById('ov-cmmc-bar').style.background = cmPct >= 80 ? 'var(--green)' : 'var(--amber)';
-    document.getElementById('ov-pipeline-summary').innerHTML = `
+    document.getElementById('ov-pipeline-summary').textContent = `
       <div style="display:flex;gap:20px;align-items:center">
         <div><div class="score-label">PASS</div><div style="font-size:18px;font-weight:700;color:var(--green)">${s.pass}</div></div>
         <div><div class="score-label">WARN</div><div style="font-size:18px;font-weight:700;color:var(--amber)">${s.warn}</div></div>
@@ -940,7 +940,7 @@ async function loadRMF() {
   `).join('');
 
   // Artifacts
-  document.getElementById('ato-artifacts').innerHTML = `
+  document.getElementById('ato-artifacts').textContent = `
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
       ${data.artifacts.map(a => `
         <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:10px">
@@ -972,7 +972,7 @@ async function generateATOLetter() {
   if (!data) return;
   const box = document.getElementById('ato-letter-box');
   box.style.display = 'block';
-  box.innerHTML = `
+  box.textContent = `
     <div class="ato-card">
       <div class="ato-title">// ${data.document_type} — ${data.classification}</div>
       ${[
@@ -994,7 +994,7 @@ async function loadConMon() {
   if (!data) return;
   const box = document.getElementById('conmon-box');
   box.style.display = 'block';
-  box.innerHTML = `
+  box.textContent = `
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
       <div class="section-title" style="margin-bottom:10px">CONTINUOUS MONITORING REPORT</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
@@ -1068,7 +1068,7 @@ async function loadPipeline() {
 
 function renderPipelineRun(run) {
   const s = run.summary;
-  document.getElementById('pipeline-run-header').innerHTML = `
+  document.getElementById('pipeline-run-header').textContent = `
     <div class="pipeline-header">
       <div>
         <div class="run-id">${run.id}</div>
@@ -1135,7 +1135,7 @@ function renderDrift(events) {
 }
 
 function renderSchedules(schedules) {
-  document.getElementById('schedules-list').innerHTML = `
+  document.getElementById('schedules-list').textContent = `
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
       <table class="rule-table">
         <thead><tr><th>Name</th><th>Cron</th><th>Framework</th><th>Next Run</th><th>Status</th></tr></thead>

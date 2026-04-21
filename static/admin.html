@@ -480,7 +480,7 @@ async function loadConMon(period) {
   const vuln = data.vulnerability_summary;
   const comp = data.compliance_summary;
   const pipe = data.pipeline_summary;
-  div.innerHTML = `
+  div.textContent = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div><div style="font-size:14px;font-weight:600">ConMon Report — ${period.charAt(0).toUpperCase()+period.slice(1)}</div>
       <div style="font-size:11px;color:var(--t3)">${data.report_period.start.slice(0,10)} to ${data.report_period.end.slice(0,10)} · ${data.classification}</div></div>
@@ -562,7 +562,7 @@ function exportConMon() {
 async function loadHealth() {
   const data = await api('/api/p4/health');
   const div = document.getElementById('health-detail');
-  div.innerHTML = `
+  div.textContent = `
 [P4-DB] PostgreSQL persistence: ENABLED
 [P4-DB] ZT state: P4 Readiness 100% — AUTHORIZED
 [P4-DB] POAM items: loaded from DB

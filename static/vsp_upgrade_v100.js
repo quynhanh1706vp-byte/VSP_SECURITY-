@@ -4,6 +4,17 @@
 (function vsp100() {
 'use strict';
 
+// ── SEC-005b cleanup (2026-04-21) ──────────────────────────────────────────
+// Remove any legacy Anthropic API key that older builds may have stored in
+// localStorage. Server-side /api/v1/ai/chat is the only supported path.
+// This cleanup runs once per page load and is safe to keep permanently.
+try {
+  if (localStorage.getItem('vsp_anthropic_key')) {
+    console.warn('[SEC-005b] Removing legacy vsp_anthropic_key from localStorage');
+    localStorage.removeItem('vsp_anthropic_key');
+  }
+} catch (e) { /* storage unavailable, safe to ignore */ }
+
 // ── HELPERS ──
 const GRADE_COLORS = {A:'var(--green)',B:'#4ade80',C:'var(--amber)',D:'#f97316',F:'var(--red)'};
 const GATE_COLORS  = {PASS:'var(--green)',WARN:'var(--amber)',FAIL:'var(--red)'};
@@ -66,7 +77,7 @@ function upgradeDashboard() {
   const extra = document.createElement('div');
   extra.id = 'dash-extra-kpis';
   extra.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px';
-  extra.innerHTML = `
+  extra.textContent = `
     <div class="kpi-card" style="padding:12px;border-left:3px solid var(--amber)">
       <div class="kpi-label">SLA Breaches</div>
       <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--amber)" id="kpi-breach">—</div>
@@ -121,7 +132,7 @@ window.injectDoDRow = function injectDoDRow() {
   const row = document.createElement('div');
   row.id = 'dod-widget-row';
   row.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px';
-  row.innerHTML = `
+  row.textContent = `
     <!-- ATO Countdown -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer"
          onclick="if(window.showPanel)showPanel('p4compliance',null)" title="→ P4 Compliance">
@@ -280,7 +291,7 @@ function upgradeFindings() {
   const bar = document.createElement('div');
   bar.id = 'findings-filter-bar';
   bar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center';
-  bar.innerHTML = `
+  bar.textContent = `
     <select id="vsp-filter-severity" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
       <option value="">All Severities</option>
       <option value="CRITICAL">🔴 CRITICAL</option>
@@ -329,6 +340,7 @@ function upgradeRemediation() {
   const card = document.createElement('div');
   card.id = 'rem-chart-card'; card.className = 'card';
   card.style.cssText = 'margin-bottom:16px;display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center';
+  // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
   card.innerHTML = `<div style="position:relative;height:160px"><canvas id="rem-donut"></canvas></div><div id="rem-breakdown" style="font-size:12px"></div>`;
   // Insert sau .g6, .g4, hoặc trước card đầu tiên
   const kpiGrid = panel.querySelector('.g6, .g4, [style*="grid-template-columns:repeat(6"]');
@@ -413,6 +425,7 @@ window.loadFedRAMP = async function() {
     if (!document.getElementById('fedramp-family-chart')) {
       const chartCard = document.createElement('div');
       chartCard.className = 'card'; chartCard.style.cssText = 'margin-bottom:16px';
+      // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
       chartCard.innerHTML = `<div class="card-head"><span class="card-title">Control family breakdown</span></div><div id="fedramp-family-chart" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px"></div>`;
       const mainCard = panel.querySelector('.card');
       if (mainCard) mainCard.after(chartCard);
@@ -452,6 +465,7 @@ window.loadCMMC = async function() {
     if (!document.getElementById('cmmc-domain-chart')) {
       const chartCard = document.createElement('div');
       chartCard.className = 'card'; chartCard.style.cssText = 'margin-bottom:16px';
+      // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
       chartCard.innerHTML = `<div class="card-head"><span class="card-title">CMMC domain coverage</span></div><div id="cmmc-domain-chart" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px"></div>`;
       const existing = document.getElementById('fedramp-family-chart')?.closest('.card');
       if (existing) existing.after(chartCard);
@@ -486,7 +500,7 @@ function upgradeExecutive() {
   if (!panel || document.getElementById('exec-trend-card')) return;
   const card = document.createElement('div');
   card.id = 'exec-trend-card'; card.className = 'card'; card.style.cssText = 'margin-bottom:16px';
-  card.innerHTML = `
+  card.textContent = `
     <div class="card-head">
       <span class="card-title">Security score trend</span>
       <span style="font-size:10px;color:var(--text3)">last 10 scans</span>
@@ -545,6 +559,7 @@ window.loadAudit = async function() {
     if (!panel) return;
     const tl = document.createElement('div');
     tl.className = 'card'; tl.style.marginBottom = '16px';
+    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
     tl.innerHTML = `<div class="card-head"><span class="card-title">Recent activity</span></div><div id="audit-timeline" style="padding:4px 0"></div>`;
     panel.insertBefore(tl, panel.firstChild);
     const data = await safeApi('GET', '/audit/log?limit=10', {});
@@ -573,7 +588,7 @@ window.loadSBOM = async function() {
     const kpis = document.createElement('div');
     kpis.id = 'sbom-summary-kpis';
     kpis.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px';
-    kpis.innerHTML = `
+    kpis.textContent = `
       <div class="kpi-card" style="padding:12px;border-left:3px solid var(--cyan)">
         <div class="kpi-label">Total Components</div>
         <div style="font-family:var(--display);font-size:24px;font-weight:800;color:var(--cyan)" id="sbom-total">—</div>

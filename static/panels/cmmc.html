@@ -290,7 +290,7 @@ function renderMain(){
   const color=pct>=80?'#10b981':pct>=50?'#f59e0b':'#ef4444';
 
   const main=document.getElementById('main');
-  main.innerHTML=`
+  main.textContent=`
     <div class="domain-title">${dom.id} — ${dom.name}</div>
     <div class="domain-sub">${st.pass} passed · ${st.fail} failed · ${st.open} open · ${st.total} total</div>
     <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>

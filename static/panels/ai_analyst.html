@@ -881,6 +881,7 @@ function addThinking() {
   const el = document.createElement('div');
   el.id = 'thinking-msg';
   el.className = 'msg';
+  // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
   el.innerHTML = `<div class="msg-av" style="background:linear-gradient(135deg,#0ea5e9,#8b5cf6)">AI</div>
     <div class="msg-body">
       <div class="msg-meta"><span class="msg-name">VSP AI Analyst</span><span class="msg-time" style="color:var(--accent2)">Analyzing...</span></div>
@@ -939,8 +940,10 @@ async function sendMessage() {
 
     // Fallback: direct Anthropic (needs user-provided key)
     if (!resp) {
-      const apiKey = window._anthropicKey || localStorage.getItem('vsp_anthropic_key') || '';
-      if (!apiKey) throw new Error('Gateway unavailable. Configure ANTHROPIC_API_KEY on server.');
+      // SEC-005b: Anthropic API key MUST come from server-side via /api/v1/ai/chat proxy.
+      // Never reference client-side key material. If this path is reached without gateway,
+      // it means /api/v1/ai/chat returned error — surface that, don't fallback to localStorage.
+      throw new Error('Gateway unavailable. AI features require ANTHROPIC_API_KEY on server (see docs/ARCHITECTURE.md#ai).');
       resp = await fetch('https://api.anthropic.com/v1/messages', {
         method:'POST',
         headers:{

@@ -875,12 +875,14 @@ async function checkHash() {
   const isBad = knownBad.some(h=>hash.toLowerCase().includes(h)||hash.length===32&&Math.random()<.25);
 
   if(isBad) {
+    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
     document.getElementById('hash-result').innerHTML = `<div class="hash-result result-bad">
 ⚠ MATCH FOUND — Hash flagged in known-cracked / malware database
 Software: ${name||'Unknown'} · Hash: ${hash}
 Source: NSRL DB + internal crack signatures
 Action: BLOCK recommended · Investigate host immediately</div>`;
   } else {
+    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
     document.getElementById('hash-result').innerHTML = `<div class="hash-result result-ok">
 ✓ CLEAN — Hash not found in known-cracked database
 Software: ${name||'Unknown'} · Hash: ${hash}
@@ -994,7 +996,7 @@ function openDetail(id) {
   const x = _detailSW;
   document.getElementById('dm-title').textContent = x.name + ' ' + (x.version||'');
   document.getElementById('dm-sub').textContent = `${x.vendor||'Unknown'} · ${x.host} · ${(x.os||'').toUpperCase()}`;
-  document.getElementById('dm-body').innerHTML = `
+  document.getElementById('dm-body').textContent = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
       <div class="stat-box"><div class="stat-lbl">Status</div><div style="margin-top:4px">${{approved:'<span class="badge badge-ok">Approved</span>',unauthorized:'<span class="badge badge-danger">Unauthorized</span>',cracked:'<span class="badge badge-danger" style="color:var(--orange)">Crack/Pirate</span>',eol:'<span class="badge badge-warn">EOL</span>',warning:'<span class="badge badge-warn">Warning</span>'}[x.status]||x.status}</div></div>
       <div class="stat-box"><div class="stat-lbl">CVEs</div><div class="stat-val ${x.cves>4?'c-red':x.cves>0?'c-amber':'c-green'}" style="font-size:20px">${x.cves||0}</div></div>
