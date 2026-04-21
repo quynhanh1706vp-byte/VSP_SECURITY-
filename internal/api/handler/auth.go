@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
-
-	"os"
-
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 	"github.com/vsp/platform/internal/audit"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
