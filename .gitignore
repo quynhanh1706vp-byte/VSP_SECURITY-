@@ -121,3 +121,13 @@ patches/
 .backup/
 *.bak
 *.orig
+
+# Editor swap files
+.*.swp
+.*.swo
+*~
+
+# Editor swap files
+.*.swp
+.*.swo
+*~

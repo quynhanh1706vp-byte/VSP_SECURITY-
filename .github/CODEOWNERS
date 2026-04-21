@@ -1,66 +1,26 @@
-# VSP CODEOWNERS
-# Mỗi PR cần approve từ owner tương ứng trước khi merge.
-# Docs: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-security/customizing-your-repository/about-code-owners
+# VSP CODEOWNERS — 2 reviewers required cho protected paths
+# Format: <pattern> <@user-or-team> [<@user2>]
 
-# ─── Default owner ──────────────────────────────────────────────────────────
-*                                   @vsp-security
+# Global fallback — bất kỳ thay đổi nào
+*                                   @quynhanh1706vp-byte
 
-# ─── Backend — Go services ──────────────────────────────────────────────────
-/cmd/gateway/                       @vsp-security @vsp-backend
-/cmd/gateway/supply_chain.go        @vsp-security @supply-chain-wg
-/cmd/gateway/p4_*.go                @vsp-security @vsp-compliance
-/cmd/gateway/incident_response.go   @vsp-security @vsp-soc
-/cmd/gateway/oscal_extended.go      @vsp-compliance
+# Auth & security-critical paths — require security team review
+/internal/auth/                     @quynhanh1706vp-byte @security-lead
+/internal/siem/                     @quynhanh1706vp-byte @security-lead
+/internal/scanner/                  @quynhanh1706vp-byte
+/internal/store/                    @quynhanh1706vp-byte
+/internal/telemetry/                @quynhanh1706vp-byte
 
-/internal/auth/                     @vsp-security
-/internal/secrets/                  @vsp-security
-/internal/telemetry/                @vsp-platform
-/internal/ai/                       @vsp-security @ml-team
-/internal/scanner/                  @vsp-security
-/internal/policy/                   @vsp-security @vsp-compliance
-/internal/                          @vsp-backend
+# Compliance artifacts — require compliance officer
+/docs/compliance/                   @quynhanh1706vp-byte @compliance-officer
+/oscal/                             @compliance-officer
+/panels/p4_compliance.html          @compliance-officer
 
-# ─── Frontend ────────────────────────────────────────────────────────────────
-/static/panels/                     @vsp-frontend
-/static/panels/p4_compliance.html   @vsp-frontend @vsp-compliance
-/static/panels/ai_analyst.html      @vsp-frontend @vsp-security
-/static/panels/soar.html            @vsp-frontend @vsp-soc
-/static/panels/incident_response.html @vsp-frontend @vsp-soc
-/static/vsp_upgrade_v*.js           @vsp-frontend @vsp-security
-/static/*.html                      @vsp-frontend
+# CI/CD — nobody can silently weaken the gate
+/.github/workflows/                 @quynhanh1706vp-byte
+/.githooks/                         @quynhanh1706vp-byte
+/local-ci.sh                        @quynhanh1706vp-byte
 
-# ─── Infra, build, release ──────────────────────────────────────────────────
-/.github/                           @vsp-devops @vsp-security
-/.github/workflows/                 @vsp-devops @vsp-security
-/.github/CODEOWNERS                 @vsp-security @vp-engineering
-/Dockerfile*                        @vsp-devops @vsp-security
-/docker-compose*.yml                @vsp-devops
-/Makefile                           @vsp-devops
-/deploy/                            @vsp-devops @vsp-platform
-/deploy/helm/                       @vsp-platform @vsp-devops
-/deploy/prometheus/                 @vsp-platform
-/deploy/grafana/                    @vsp-platform
-
-# ─── Tests ──────────────────────────────────────────────────────────────────
-/tests/                             @vsp-security @qa-team
-/tests/load/                        @vsp-platform @qa-team
-/tests/security/                    @vsp-security
-
-# ─── Docs & policy ──────────────────────────────────────────────────────────
-/docs/                              @vsp-security @tech-writers
-/docs/runbooks/                     @vsp-soc @vsp-platform
-/docs/dsomm/                        @vsp-security @vp-engineering
-/docs/retros/                       @vp-engineering
-/README.md                          @vsp-security @tech-writers
-/SECURITY.md                        @vsp-security @vp-engineering
-/ROADMAP.md                         @vp-engineering @vsp-security
-/FEATURE_INVENTORY.md               @vsp-security @tech-writers
-/CHANGELOG.md                       @vp-engineering
-
-# ─── Compliance & supply chain artifacts ────────────────────────────────────
-/compliance/                        @vsp-compliance @vsp-security
-/sbom/                              @supply-chain-wg @vsp-security
-/.well-known/                       @vsp-security
-
-# ─── Sensitive — require 2 reviewers ────────────────────────────────────────
-/.github/workflows/release.yml      @vsp-security @vp-engineering @vsp-devops
+# Governance — require explicit approval
+/docs/governance/                   @quynhanh1706vp-byte
+/CODEOWNERS                         @quynhanh1706vp-byte
