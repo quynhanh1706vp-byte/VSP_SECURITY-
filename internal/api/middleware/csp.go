@@ -65,21 +65,20 @@ func CSPNonce(next http.Handler) http.Handler {
 			return
 		}
 		csp := fmt.Sprintf(
-			"default-src 'self'; " +
-				"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
-				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; " +
-				"font-src 'self' https://fonts.gstatic.com; " +
-				"img-src 'self' data: blob:; " +
-				"connect-src 'self' wss: ws: https://api.anthropic.com https://cdn.jsdelivr.net; " +
-				"frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+			"default-src 'self'; "+
+				"script-src 'self' 'nonce-%s' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "+
+				"style-src 'self' 'nonce-%s' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "+
+				"font-src 'self' https://fonts.gstatic.com; "+
+				"img-src 'self' data: blob:; "+
+				"connect-src 'self' wss: ws: https://api.anthropic.com https://cdn.jsdelivr.net; "+
+				"frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+			nonce, nonce,
 		)
 		w.Header().Set("Content-Security-Policy", csp)
 		setCommonSecurityHeaders(w)
-		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		// Headers specific to strict (non-panel) routes:
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		w.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
-		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
