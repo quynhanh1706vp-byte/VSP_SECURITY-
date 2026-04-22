@@ -10,6 +10,7 @@ import (
 	"github.com/vsp/platform/internal/scanner/bandit"
 	"github.com/vsp/platform/internal/scanner/checkov"
 	"github.com/vsp/platform/internal/scanner/codeql"
+	"github.com/vsp/platform/internal/scanner/gosec"
 	"github.com/vsp/platform/internal/scanner/gitleaks"
 	"github.com/vsp/platform/internal/scanner/grype"
 	"github.com/vsp/platform/internal/scanner/hadolint"
@@ -22,6 +23,7 @@ import (
 	"github.com/vsp/platform/internal/scanner/semgrep"
 	"github.com/vsp/platform/internal/scanner/sslscan"
 	"github.com/vsp/platform/internal/scanner/trivy"
+	"github.com/vsp/platform/internal/scanner/trufflehog"
 )
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -106,6 +108,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		bandit.New(),
 		semgrep.New(),
 		codeql.New(),
+		gosec.New(),
 	}
 	sca := []scanner.Runner{
 		grype.New(),
@@ -115,6 +118,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 	secrets := []scanner.Runner{
 		gitleaks.New(),
 		secretcheck.NewRunner(),
+		trufflehog.New(),
 	}
 	iac := []scanner.Runner{
 		kics.New(),
