@@ -1,0 +1,111 @@
+name: Security CI (Deep)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  codeql:
+    name: CodeQL extended
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: "8.0.x" }
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: csharp,javascript
+          queries: +security-extended,+security-and-quality
+      - run: |
+          if [ -f "DeMasterProCloud.sln" ]; then
+            dotnet restore DeMasterProCloud.sln
+            dotnet build DeMasterProCloud.sln -c Release --no-restore
+          else
+            CS=$(git ls-files "*.csproj" | head -n 1); [ -n "$CS" ] && { dotnet restore "$CS"; dotnet build "$CS" -c Release --no-restore; } || true
+          fi
+      - uses: github/codeql-action/analyze@v3
+        with: { category: "codeql" }
+
+  semgrep:
+    name: Semgrep wide packs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: semgrep/semgrep-action@v1
+        with:
+          config: >
+            p/owasp-top-ten
+            p/csharp
+            p/secrets
+            p/docker
+            p/kubernetes
+            p/ci
+          generateSarif: "1"
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: { sarif_file: semgrep.sarif }
+
+  trivy_fs:
+    name: Trivy FS (deep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          format: sarif
+          output: trivy-fs.sarif
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          scanners: "vuln,config,license,secret"
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: { sarif_file: trivy-fs.sarif }
+
+  terrascan:
+    name: Terrascan (Terraform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Terrascan
+        run: |
+          V="1.18.1"
+          curl -sSL "https://github.com/tenable/terrascan/releases/download/v${V}/terrascan_${V}_Linux_x86_64.tar.gz" -o /tmp/ts.tgz
+          tar -xzf /tmp/ts.tgz -C /tmp && sudo mv /tmp/terrascan /usr/local/bin/terrascan
+          terrascan version
+      - name: Guard (skip if no *.tf)
+        id: guard
+        run: |
+          [ -z "$(git ls-files "**/*.tf")" ] && echo "skip=true" >> $GITHUB_OUTPUT || true
+      - name: Terrascan init
+        if: steps.guard.outputs.skip != true
+        run: terrascan init
+      - name: Terrascan scan
+        if: steps.guard.outputs.skip != true
+        run: |
+          terrascan scan -t terraform -i terraform -o sarif > terrascan.sarif || true
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always() && steps.guard.outputs.skip != true
+        with: { sarif_file: terrascan.sarif }
+
+  gitleaks:
+    name: Gitleaks (secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --no-color --redact --report-format sarif --report-path gitleaks.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: { sarif_file: gitleaks.sarif }
