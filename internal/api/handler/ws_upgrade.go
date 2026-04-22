@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- RFC6455 WebSocket handshake mandates SHA-1 accept-key
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -93,7 +93,7 @@ func wsServe(w http.ResponseWriter, r *http.Request) {
 }
 
 func wsAcceptKey(key string) string {
-	h := sha1.New()
+	h := sha1.New() // #nosec G401 -- RFC6455 WebSocket accept-key requires SHA-1
 	h.Write([]byte(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }

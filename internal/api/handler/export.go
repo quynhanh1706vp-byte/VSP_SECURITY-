@@ -41,7 +41,7 @@ func (h *Export) SARIF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/sarif+json")
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=vsp-%s.sarif", rid))
-	_, _ = w.Write(data)
+	_, _ = w.Write(data) // #nosec G705 -- SARIF JSON export, Content-Type application/json
 }
 
 // GET /api/v1/export/csv/{rid}
