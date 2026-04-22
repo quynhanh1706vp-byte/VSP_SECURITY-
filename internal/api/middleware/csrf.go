@@ -44,6 +44,14 @@ func CSRFProtect(next http.Handler) http.Handler {
 		}
 
 		// Skip auth endpoints — CSRF not applicable to token-based auth login
+		// Agent endpoint: SW Risk agent POSTs dpkg/rpm inventory here.
+		// Agent auth = Bearer token + HMAC signature (see cmd/vsp-agent).
+		// No browser cookie flow -> CSRF not applicable. Exact path match.
+		if r.URL.Path == "/api/v1/software-inventory/report" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		if r.URL.Path == "/api/v1/auth/login" ||
 			r.URL.Path == "/api/v1/auth/refresh" ||
 			strings.HasPrefix(r.URL.Path, "/api/v1/siem/") {
