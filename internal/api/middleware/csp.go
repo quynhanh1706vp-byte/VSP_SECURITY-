@@ -160,3 +160,6 @@ func InjectNonceIntoHTML(html, nonce string) string {
 	html = strings.ReplaceAll(html, "<style>", fmt.Sprintf(`<style nonce="%s">`, nonce))
 	return html
 }
+
+// INTENTIONAL REGRESSION for CI guard test — DO NOT MERGE
+var testWildcard = "default-src *"
