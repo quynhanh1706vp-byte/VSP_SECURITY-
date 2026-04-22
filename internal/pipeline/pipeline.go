@@ -47,6 +47,7 @@ const (
 	ModeSecrets Mode = "SECRETS"
 	ModeIAC     Mode = "IAC"
 	ModeFull    Mode = "FULL"
+	ModeFullSOC Mode = "FULL_SOC"
 	ModeNetwork Mode = "NETWORK"
 )
 
@@ -140,13 +141,19 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		return dast
 	case ModeNetwork:
 		return []scanner.Runner{sslscan.New()}
-	case ModeFull:
-		all := make([]scanner.Runner, 0, 9)
-		all = append(all, sast...)
-		all = append(all, sca...)
-		all = append(all, secrets...)
-		all = append(all, iac...)
-		all = append(all, dast...)
+	case ModeFull, ModeFullSOC:
+		// FULL and FULL_SOC both run all scanners.
+		// FULL_SOC additionally feeds findings into SIEM correlation (handled downstream).
+		seen := make(map[string]bool)
+		all := make([]scanner.Runner, 0, 15)
+		for _, group := range [][]scanner.Runner{sast, sca, secrets, iac, dast} {
+			for _, r := range group {
+				if !seen[r.Name()] {
+					seen[r.Name()] = true
+					all = append(all, r)
+				}
+			}
+		}
 		return all
 	default:
 		// Default: SAST + SCA + Secrets (safe for most repos)
