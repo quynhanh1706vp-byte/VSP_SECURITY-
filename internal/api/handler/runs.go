@@ -84,6 +84,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		"DAST":    3,  // nikto + nuclei + sslscan
 		"NETWORK": 1,  // sslscan
 		"FULL":    14, // all: sast(3)+sca(3)+secrets(2)+iac(2)+dast(3)+network(1)
+		"FULL_SOC": 16, // FULL + SIEM correlation + nmap (16 tools max)
 	}[req.Mode]
 	if toolsTotal == 0 {
 		toolsTotal = 3
