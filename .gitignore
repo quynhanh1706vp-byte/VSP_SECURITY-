@@ -135,3 +135,8 @@ patches/
 # VSP reports (generated locally, not source)
 report_TT13_*.pdf
 report_*.pdf
+
+# Local-only marketing/reports (not for version control)
+VSP-Billing.html
+VSP-P4-Report-*.html
+VSP-P4-Sales-*.html
