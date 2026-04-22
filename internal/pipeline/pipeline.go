@@ -23,6 +23,7 @@ import (
 	"github.com/vsp/platform/internal/scanner/semgrep"
 	"github.com/vsp/platform/internal/scanner/sslscan"
 	"github.com/vsp/platform/internal/scanner/trivy"
+	"github.com/vsp/platform/internal/scanner/trufflehog"
 )
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 	secrets := []scanner.Runner{
 		gitleaks.New(),
 		secretcheck.NewRunner(),
+		trufflehog.New(),
 	}
 	iac := []scanner.Runner{
 		kics.New(),
