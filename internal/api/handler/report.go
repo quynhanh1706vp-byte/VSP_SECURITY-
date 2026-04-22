@@ -514,7 +514,7 @@ func (h *Report) TT13PDF(w http.ResponseWriter, r *http.Request) {
 
 	var pdfErr error
 	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...) //nolint:gosec // G702: args hardcoded [wkhtmltopdf|chromium-browser] + tempfile from os.CreateTemp above
+		cmd := exec.Command(args[0], args[1:]...) // #nosec G702 -- args[0] is hardcoded ("wkhtmltopdf"|"chromium-browser"), args from tempfile via os.CreateTemp()
 		pdfErr = cmd.Run()
 		if pdfErr == nil {
 			break
