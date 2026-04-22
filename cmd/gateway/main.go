@@ -317,6 +317,21 @@ func main() {
 		_, _ = w.Write([]byte(html))
 	})
 
+	// Serve root-level CSS + JS assets referenced from index.html.
+	// These files live in ./static/ but index.html references them at /
+	// (e.g. href="/vsp_enterprise_ui.css"). Without these routes they 404.
+	// Using ServeFile directly so Go's http package sets the correct
+	// Content-Type header (text/css, application/javascript) via extension.
+	r.Get("/vsp_enterprise_ui.css", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_enterprise_ui.css")
+	})
+	r.Get("/vsp_enterprise_navy_theme.css", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_enterprise_navy_theme.css")
+	})
+	r.Get("/vsp_upgrade_v100.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_upgrade_v100.js")
+	})
+
 	// Serve JS assets from ./static/js/ (dom-safe.js, vsp_iframe_bootstrap.js, etc.)
 	// These scripts are referenced by index.html and panel HTML files.
 	r.Get("/static/js/*", http.StripPrefix("/static/js/",
