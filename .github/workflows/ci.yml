@@ -389,7 +389,7 @@ jobs:
           echo "name=$NAME" >> $GITHUB_OUTPUT
 
       - name: Trivy — vulnerability scan (CRITICAL+HIGH → fail)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — SHA-pinned post GHSA-69fq-xp46-6x23
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -411,7 +411,7 @@ jobs:
           category: trivy-container
 
       - name: Generate SBOM (CycloneDX)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — SHA-pinned post GHSA-69fq-xp46-6x23
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
