@@ -337,23 +337,19 @@ func main() {
 	r.Get("/static/js/*", http.StripPrefix("/static/js/",
 		http.FileServer(http.Dir("./static/js/"))).ServeHTTP)
 
-	// Serve P4 static panel directly (bypasses Python proxy)
+	// Serve panel HTML/JS assets. CSP is set by vspMW.CSPNonce middleware,
+	// which applies PanelCSP() for panel paths. Do NOT override CSP here.
+	// Phase 2 (docs/CSP_HARDENING_ROADMAP.md) will migrate panels to the
+	// strict nonce policy after inline handlers are refactored.
 	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
-		// Override CSP for P4 panel — allow inline styles/scripts
-		w.Header().Del("Content-Security-Policy")
-		w.Header().Del("X-Frame-Options")
-		// Wrap to set CSP after middleware
-		rw := &p4ResponseWriter{ResponseWriter: w, cspSet: false}
-		http.StripPrefix("/static/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(rw, r)
+		http.StripPrefix("/static/panels/",
+			http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
 	})
-	// Serve panels/ with relaxed CSP for iframes
 	r.Get("/panels/*", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Del("Content-Security-Policy")
-		w.Header().Del("X-Frame-Options")
-		w.Header().Set("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: http:; connect-src *; frame-ancestors *;")
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
-		http.StripPrefix("/panels/", http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
+		http.StripPrefix("/panels/",
+			http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
 	})
 	// P4 Compliance — public routes (no auth required)
 	r.Get("/api/p4/health", p4Health)
@@ -1902,23 +1898,6 @@ func getDefaultTenantID(ctx context.Context, db *store.DB) string {
 	return id
 }
 
-// p4ResponseWriter overrides CSP header for P4 panel
-type p4ResponseWriter struct {
-	http.ResponseWriter
-	cspSet bool
-}
-
-func (rw *p4ResponseWriter) WriteHeader(code int) {
-	rw.ResponseWriter.Header().Del("Content-Security-Policy")
-	rw.ResponseWriter.Header().Set("Content-Security-Policy", "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; connect-src *;")
-	rw.ResponseWriter.WriteHeader(code)
-}
-
-func (rw *p4ResponseWriter) Write(b []byte) (int, error) {
-	if !rw.cspSet {
-		rw.ResponseWriter.Header().Del("Content-Security-Policy")
-		rw.ResponseWriter.Header().Set("Content-Security-Policy", "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; connect-src *;")
-		rw.cspSet = true
-	}
-	return rw.ResponseWriter.Write(b)
-}
+// p4ResponseWriter was removed in VSP-CSP-001 Commit 2a.
+// Panel CSP is now handled centrally by vspMW.CSPNonce via PanelCSP();
+// see internal/api/middleware/csp.go.
