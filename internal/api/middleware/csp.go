@@ -64,17 +64,15 @@ func CSPNonce(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-		csp := fmt.Sprintf(
-			"default-src 'self'; "+
-				"script-src 'self' 'nonce-%s' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "+
-				"style-src 'self' 'nonce-%s' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "+
-				"font-src 'self' https://fonts.gstatic.com; "+
-				"img-src 'self' data: blob:; "+
-				"connect-src 'self' wss: ws: https://api.anthropic.com https://cdn.jsdelivr.net; "+
-				"frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
-			nonce, nonce,
-		)
-		w.Header().Set("Content-Security-Policy", csp)
+		// PHASE 1 HOTFIX (VSP-CSP-001 c2c): strict CSP temporarily uses
+		// PanelCSP because index.html still contains inline event handlers
+		// and inline styles that would be blocked by CSP3 nonce enforcement
+		// (browsers ignore 'unsafe-inline' once a nonce is present).
+		// Phase 2 will refactor inline handlers/styles in index.html and
+		// then re-introduce the nonce-based strict policy here.
+		// The nonce is still generated and injected into <script>/<style>
+		// tags by InjectNonceIntoHTML, ready for Phase 2 activation.
+		w.Header().Set("Content-Security-Policy", PanelCSP())
 		setCommonSecurityHeaders(w)
 		// Headers specific to strict (non-panel) routes:
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
