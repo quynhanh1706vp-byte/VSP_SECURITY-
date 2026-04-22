@@ -6,16 +6,18 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/vsp/platform/internal/netcap"
 	"github.com/vsp/platform/internal/scanner"
 	"github.com/vsp/platform/internal/scanner/bandit"
 	"github.com/vsp/platform/internal/scanner/checkov"
 	"github.com/vsp/platform/internal/scanner/codeql"
-	"github.com/vsp/platform/internal/scanner/gosec"
 	"github.com/vsp/platform/internal/scanner/gitleaks"
+	"github.com/vsp/platform/internal/scanner/gosec"
 	"github.com/vsp/platform/internal/scanner/grype"
 	"github.com/vsp/platform/internal/scanner/hadolint"
 	"github.com/vsp/platform/internal/scanner/kics"
 	"github.com/vsp/platform/internal/scanner/license"
+	netcapscanner "github.com/vsp/platform/internal/scanner/netcap"
 	"github.com/vsp/platform/internal/scanner/nikto"
 	"github.com/vsp/platform/internal/scanner/nmap"
 	"github.com/vsp/platform/internal/scanner/nuclei"
@@ -101,6 +103,21 @@ type JobPayload struct {
 
 // ── ToolSet — select runners based on mode ────────────────────────────────────
 
+// netcapEngine is a package-level reference to the shared netcap capture engine.
+// It is set by the gateway's main() via SetNetcapEngine() at startup. When nil
+// (e.g. in tests, CLI tools, or when packet capture is disabled), RunnersFor
+// simply omits the netcap runner from the NETWORK mode set.
+var netcapEngine *netcap.Engine
+
+// SetNetcapEngine wires the netcap engine into the pipeline so that
+// RunnersFor(ModeNetwork) can include the netcap anomaly runner. Safe to call
+// with a nil engine — callers that don't use packet capture should leave it
+// unset rather than passing nil explicitly.
+//
+// Must be called before any scan job in NETWORK or FULL_SOC mode is enqueued.
+// Call from main() immediately after netcap.NewEngine().
+func SetNetcapEngine(e *netcap.Engine) { netcapEngine = e }
+
 // RunnersFor returns the set of tool runners appropriate for the given mode.
 // This is the single place that controls which tools run per mode.
 func RunnersFor(mode Mode) []scanner.Runner {
@@ -129,7 +146,6 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		nikto.New(),
 		nuclei.New(),
 		sslscan.New(),
-		nmap.New(),
 	}
 
 	switch mode {
@@ -144,7 +160,14 @@ func RunnersFor(mode Mode) []scanner.Runner {
 	case ModeDAST:
 		return dast
 	case ModeNetwork:
-		return []scanner.Runner{sslscan.New()}
+		// NETWORK mode covers L2-L7 packet inspection.
+		// sslscan: TLS/SSL audit; nmap: service + port discovery;
+		// netcap: live anomaly detection (optional — requires engine injection).
+		runners := []scanner.Runner{sslscan.New(), nmap.New()}
+		if netcapEngine != nil {
+			runners = append(runners, netcapscanner.New(netcapEngine))
+		}
+		return runners
 	case ModeFull, ModeFullSOC:
 		// FULL and FULL_SOC both run all scanners.
 		// FULL_SOC additionally feeds findings into SIEM correlation (handled downstream).

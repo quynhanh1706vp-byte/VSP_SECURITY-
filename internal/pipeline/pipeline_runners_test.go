@@ -72,3 +72,40 @@ func TestRunnersFor_FullSOC(t *testing.T) {
 		seen[r.Name()] = true
 	}
 }
+
+// TestRunnersFor_NetworkMode verifies NETWORK mode contains the expected
+// baseline tools (sslscan + nmap). Netcap is conditional on engine being
+// wired — when nil (default in tests), it's omitted cleanly.
+//
+// Regression test for BUG-020 (nmap was originally in DAST, netcap not
+// registered at all despite being listed in docs/FEATURE_INVENTORY.md).
+func TestRunnersFor_NetworkMode(t *testing.T) {
+	runners := RunnersFor(ModeNetwork)
+	if len(runners) < 2 {
+		t.Fatalf("NETWORK should have at least sslscan + nmap, got %d", len(runners))
+	}
+	names := map[string]bool{}
+	for _, r := range runners {
+		names[r.Name()] = true
+	}
+	for _, must := range []string{"sslscan", "nmap"} {
+		if !names[must] {
+			t.Errorf("NETWORK missing expected runner: %s", must)
+		}
+	}
+	// netcap should NOT be present when engine is nil (test default)
+	if names["netcap"] {
+		t.Error("netcap should be absent when netcapEngine is nil")
+	}
+}
+
+// TestRunnersFor_DASTWithoutNmap verifies nmap is no longer in DAST after
+// regrouping per docs spec §8.1 (nmap belongs to NETWORK).
+func TestRunnersFor_DASTWithoutNmap(t *testing.T) {
+	runners := RunnersFor(ModeDAST)
+	for _, r := range runners {
+		if r.Name() == "nmap" {
+			t.Error("nmap should no longer be in DAST — it belongs to NETWORK per FEATURE_INVENTORY.md §8.1")
+		}
+	}
+}

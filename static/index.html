@@ -171,7 +171,7 @@ function updateScanTools() {
     'DAST':     'nuclei · nikto · sslscan',
     'NETWORK':  'nmap · sslscan · netcap',
     'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap (16 tools)',
-    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap + SIEM (16 tools max)',
+    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap + SIEM (18 tools max)',
   };
   var el = document.getElementById('scan-tools-preview');
   if (el) el.textContent = toolMap[mode] || mode;

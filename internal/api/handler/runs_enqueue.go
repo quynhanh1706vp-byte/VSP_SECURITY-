@@ -41,9 +41,9 @@ func (h *Runs) EnqueueDirect(rid, tenantID string, mode pipeline.Mode, profile p
 		"SECRETS": 3,  // gitleaks+secretcheck+trufflehog
 		"IAC":     2,  // kics+checkov
 		"DAST":    3,  // nikto+nuclei+sslscan
-		"NETWORK": 1,  // sslscan
-		"FULL":    16, // all tools
-		"FULL_SOC": 17, // all unique tools
+		"NETWORK": 3,  // sslscan+nmap+netcap
+		"FULL":    17, // all unique tools
+		"FULL_SOC": 18, // all unique tools incl netcap
 	}[string(mode)]
 	if toolsTotal == 0 {
 		toolsTotal = 3
