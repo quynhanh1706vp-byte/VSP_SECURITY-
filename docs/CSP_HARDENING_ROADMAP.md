@@ -114,6 +114,31 @@ Each sprint must:
 4. Confirm no new CSP violations in the browser console on a full UI
    walkthrough (login -> dashboard -> every panel tab).
 
+### Migration tool: static/js/vsp-actions.js
+
+An event-delegation helper has been prepared to automate the inline
+handler migration. It converts `onclick="expr"` → `data-vsp-click="expr"`
+and attaches a single document-level listener that evaluates the
+expression with `this` bound to the element and `event` in scope.
+
+**Trade-off:** the current implementation uses `new Function()` to
+preserve inline expression syntax (not just function names). This
+requires `'unsafe-eval'` in `script-src`, which Phase 1 explicitly
+removed. Two paths forward for Phase 2:
+
+1. **Registry pattern (preferred):** convert each `data-vsp-click="foo(1)"`
+   call-site to `data-vsp-action="foo" data-vsp-args="[1]"`, looking up
+   named handlers from a window-scoped registry. Removes the need for
+   `new Function()` entirely. Higher up-front cost but keeps Phase 1
+   invariants intact.
+
+2. **Two-step migration:** temporarily re-enable `'unsafe-eval'`
+   during Phase 2.1 (strictly less harmful than today's wildcard and
+   `'unsafe-inline'` combination), then drop it in Phase 2.2 after the
+   registry conversion is complete.
+
+Decision required before Phase 2 Sprint 1 begins.
+
 ### Ratchet-down policy
 
 The CI guard (csp-guard.yml) enforces that the total handler count
