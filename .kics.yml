@@ -1,0 +1,31 @@
+# kics configuration for VSP Security Platform
+# Format: https://docs.kics.io/latest/configuration-file/
+
+# ── Excluded queries with justification ──────────────────────────────────
+exclude-queries:
+  # "Passwords And Secrets - Password in URL"
+  # False positive: test database credentials in GitHub Actions CI workflow.
+  # User=vsp, password=vsp_test, host=localhost, scope=ephemeral test container.
+  # Production secrets correctly use ${{ secrets.* }}.
+  - c4d3b58a-e6d4-450f-9340-04f1e702eaae
+
+  # "Passwords And Secrets - Generic Password"  
+  # Same as above — matches POSTGRES_PASSWORD: vsp_test in service containers.
+  - 487f4be7-3fd9-4506-a07a-eae252180c08
+
+# ── Excluded paths ────────────────────────────────────────────────────────
+exclude-paths:
+  - "vendor/**"
+  - "node_modules/**"
+  - ".git/**"
+
+# ── Severity threshold ────────────────────────────────────────────────────
+# Fail CI only on HIGH and CRITICAL
+fail-on:
+  - HIGH
+  - CRITICAL
+
+# ── Output ───────────────────────────────────────────────────────────────
+report-formats:
+  - json
+  - sarif

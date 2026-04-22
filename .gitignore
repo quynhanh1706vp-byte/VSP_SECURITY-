@@ -131,3 +131,7 @@ patches/
 .*.swp
 .*.swo
 *~
+
+# VSP reports (generated locally, not source)
+report_TT13_*.pdf
+report_*.pdf
