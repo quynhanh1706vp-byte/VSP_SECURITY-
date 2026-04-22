@@ -83,7 +83,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		"IAC":     2,  // kics + checkov
 		"DAST":    3,  // nikto + nuclei + sslscan (nmap moved to NETWORK)
 		"NETWORK": 3,  // sslscan + nmap + netcap
-		"FULL":    17, // sast(4)+sca(3)+secrets(3)+iac(3)+dast(3)+network(3) dedup sslscan+nmap
+		"FULL":    17, // 16 base + nmap (+netcap when engine live = 18)
 		"FULL_SOC": 18, // FULL + netcap packet inspection
 	}[req.Mode]
 	if toolsTotal == 0 {

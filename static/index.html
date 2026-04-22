@@ -119,8 +119,8 @@
             <option value="IAC">IAC — Infrastructure</option>
             <option value="DAST">DAST — Web app</option>
             <option value="NETWORK">NETWORK — L2-L7</option>
-            <option value="FULL">FULL — All 16 tools</option>
-            <option value="FULL_SOC">FULL_SOC — SAST+SCA+IAC+DAST+NET</option>
+            <option value="FULL">FULL — all scanners</option>
+            <option value="FULL_SOC">FULL_SOC — all scanners + SIEM correlation</option>
           </select>
         </div>
         <div class="form-group mb0">
@@ -143,7 +143,7 @@
 
       <!-- Tools preview -->
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:4px">
-        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Tools: <span id="scan-tools-preview" style="color:var(--t2);text-transform:none">semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap (16 tools)</span></div>
+        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Tools: <span id="scan-tools-preview" style="color:var(--t2);text-transform:none">semgrep · gosec · codeql · bandit · trivy · grype · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap (17 tools)</span></div>
       </div>
 
       <div id="scanMsg" style="margin-top:8px;font-size:11px;font-family:var(--font-mono)"></div>
@@ -165,13 +165,13 @@ function updateScanTools() {
   var mode = document.getElementById('scanMode').value;
   var toolMap = {
     'SAST':     'semgrep · gosec · bandit · codeql',
-    'SCA':      'trivy · grype · govulncheck',
-    'SECRETS':  'gitleaks · trufflehog',
+    'SCA':      'trivy · grype · license',
+    'SECRETS':  'gitleaks · secretcheck · trufflehog',
     'IAC':      'kics · checkov · hadolint',
     'DAST':     'nuclei · nikto · sslscan',
     'NETWORK':  'nmap · sslscan · netcap',
-    'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap (16 tools)',
-    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · govulncheck · gitleaks · trufflehog · syft · kics · checkov · nuclei · nikto · sslscan · nmap + SIEM (18 tools max)',
+    'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap (17 tools)',
+    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap + SIEM (18 tools max)',
   };
   var el = document.getElementById('scan-tools-preview');
   if (el) el.textContent = toolMap[mode] || mode;

@@ -109,3 +109,47 @@ func TestRunnersFor_DASTWithoutNmap(t *testing.T) {
 		}
 	}
 }
+
+// TestRunnersFor_FullIncludesNetworkTools verifies FULL mode aggregates
+// tools from ALL groups including NETWORK, not just sast+sca+secrets+iac+dast.
+//
+// Regression test for BUG-021 (post-PR#53 regression): after nmap was
+// moved from DAST to NETWORK, the FULL case in RunnersFor kept iterating
+// only the original 5 groups, silently dropping nmap + netcap from FULL.
+func TestRunnersFor_FullIncludesNetworkTools(t *testing.T) {
+	runners := RunnersFor(ModeFull)
+	names := map[string]bool{}
+	for _, r := range runners {
+		names[r.Name()] = true
+	}
+
+	// nmap must be in FULL — it's a core NETWORK scanner
+	if !names["nmap"] {
+		t.Error("FULL mode missing nmap (regression from BUG-021)")
+	}
+
+	// sslscan dedup check — DAST has it, NETWORK has it too.
+	// Should appear exactly once in FULL (not dropped, not duplicated).
+	sslCount := 0
+	for _, r := range runners {
+		if r.Name() == "sslscan" {
+			sslCount++
+		}
+	}
+	if sslCount != 1 {
+		t.Errorf("sslscan should appear exactly 1 time in FULL (dedup), got %d", sslCount)
+	}
+}
+
+// TestRunnersFor_FullSOCMatchesFull — currently FULL_SOC has no extra tools
+// beyond FULL; SOC-level enrichment is downstream post-processing.
+// This test documents that invariant — changing it requires updating the
+// tool count metadata in internal/api/handler/runs.go toolsTotal map.
+func TestRunnersFor_FullSOCMatchesFull(t *testing.T) {
+	full := RunnersFor(ModeFull)
+	soc := RunnersFor(ModeFullSOC)
+	if len(full) != len(soc) {
+		t.Errorf("FULL=%d vs FULL_SOC=%d — if intentional, update toolsTotal map and this test",
+			len(full), len(soc))
+	}
+}
