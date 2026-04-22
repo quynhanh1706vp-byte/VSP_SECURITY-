@@ -104,8 +104,14 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: gitleaks/gitleaks-action@v2
+        env:
+          # gitleaks-action@v2 breaking change: requires GITHUB_TOKEN to scan PRs.
+          # https://github.com/gitleaks/gitleaks-action#-announcement
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: detect --no-color --redact --report-format sarif --report-path gitleaks.sarif
       - uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        # Guard with hashFiles: when gitleaks finds no secrets OR hits an early
+        # exit, the SARIF file may not exist and upload would fail loudly.
+        if: always() && hashFiles('gitleaks.sarif') != ''
         with: { sarif_file: gitleaks.sarif }
