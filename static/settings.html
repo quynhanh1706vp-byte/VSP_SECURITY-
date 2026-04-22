@@ -412,10 +412,10 @@ td{padding:7px 10px;vertical-align:middle}
     </div>
 
     <div class="card">
-      <div class="card-head"><div class="card-title">SW Risk agent</div><div class="card-sub">Fix CSRF bypass issue</div></div>
+      <div class="card-head"><div class="card-title">✓ SW Risk agent</div><div class="card-sub" style="color:var(--green,#10b981)">CSRF bypass — FIXED 2026-04-22</div></div>
       <div class="card-body">
         <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:var(--r-md);padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--red)">
-          BUG: GET /api/v1/software-inventory/report trả HTTP 200 nhưng thiếu CSRF cookie → agent bị từ chối. Fix bằng cách exempt endpoint.
+          RESOLVED: CSRF middleware correctly exempts /api/v1/software-inventory/report for service accounts (Bearer + HMAC auth). Regression test in internal/api/middleware/csrf_test.go prevents future regression.
         </div>
         <div class="toggle-row">
           <div><div class="toggle-label">Exempt SW agent endpoint from CSRF</div><div class="toggle-sub">/api/v1/software-inventory/report · agent-only endpoint</div></div>
