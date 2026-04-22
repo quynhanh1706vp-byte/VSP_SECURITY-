@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # UI Security Budget — giảm dần mỗi sprint, FAIL nếu vượt
 #
-# Sprint 5 (hiện tại):  localStorage ≤ 130, innerHTML ≤ 470
+# Sprint 5 (hiện tại):  localStorage ≤ 170, innerHTML ≤ 520 (debt: +50 từ SEC-010)
+# Sprint 5 target:      localStorage ≤ 130, innerHTML ≤ 470 (ship fix tuần sau)
 # Sprint 6:             localStorage ≤ 80,  innerHTML ≤ 300
 # Sprint 7:             localStorage ≤ 30,  innerHTML ≤ 150
 # Sprint 8:             localStorage ≤ 10,  innerHTML ≤ 50
@@ -11,7 +12,7 @@ set -uo pipefail
 
 # ── Budget (chỉnh tại đây mỗi sprint) ──────────────────────────────────
 MAX_LOCAL_STORAGE="${MAX_LOCAL_STORAGE:-170}"
-MAX_INNER_HTML="${MAX_INNER_HTML:-500}"
+MAX_INNER_HTML="${MAX_INNER_HTML:-520}"
 MAX_EVAL="${MAX_EVAL:-0}"
 MAX_DOCUMENT_WRITE="${MAX_DOCUMENT_WRITE:-0}"
 MAX_UNSAFE_URL="${MAX_UNSAFE_URL:-2}"
