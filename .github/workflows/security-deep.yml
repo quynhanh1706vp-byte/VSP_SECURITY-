@@ -82,19 +82,31 @@ jobs:
           curl -sSL "https://github.com/tenable/terrascan/releases/download/v${V}/terrascan_${V}_Linux_x86_64.tar.gz" -o /tmp/ts.tgz
           tar -xzf /tmp/ts.tgz -C /tmp && sudo mv /tmp/terrascan /usr/local/bin/terrascan
           terrascan version
-      - name: Guard (skip if no *.tf)
+      - name: Guard — detect Terraform files
         id: guard
         run: |
-          [ -z "$(git ls-files "**/*.tf")" ] && echo "skip=true" >> $GITHUB_OUTPUT || true
+          # Use `find` instead of shell-expanded glob: `git ls-files "**/*.tf"`
+          # does not reliably expand in non-interactive shells.
+          if find . -name '*.tf' -not -path './vendor/*' -not -path './node_modules/*' -print -quit | grep -q . ; then
+            echo "has_tf=true" >> "$GITHUB_OUTPUT"
+            echo "Terraform files detected — Terrascan will run."
+          else
+            echo "has_tf=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Terraform files found — skipping Terrascan."
+          fi
       - name: Terrascan init
-        if: steps.guard.outputs.skip != true
+        # IMPORTANT: the output is a string, compare to the string 'true'.
+        # Previous code used `!= true` which compared string to boolean and
+        # always evaluated to true, defeating the guard.
+        if: steps.guard.outputs.has_tf == 'true'
         run: terrascan init
       - name: Terrascan scan
-        if: steps.guard.outputs.skip != true
+        if: steps.guard.outputs.has_tf == 'true'
         run: |
           terrascan scan -t terraform -i terraform -o sarif > terrascan.sarif || true
       - uses: github/codeql-action/upload-sarif@v3
-        if: always() && steps.guard.outputs.skip != true
+        # Only upload when the scan ran AND produced a non-empty SARIF file.
+        if: steps.guard.outputs.has_tf == 'true' && hashFiles('terrascan.sarif') != ''
         with: { sarif_file: terrascan.sarif }
 
   gitleaks:
