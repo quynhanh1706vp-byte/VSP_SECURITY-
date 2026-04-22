@@ -169,11 +169,18 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		}
 		return runners
 	case ModeFull, ModeFullSOC:
-		// FULL and FULL_SOC both run all scanners.
+		// FULL and FULL_SOC both run all scanners across every mode group.
 		// FULL_SOC additionally feeds findings into SIEM correlation (handled downstream).
 		seen := make(map[string]bool)
-		all := make([]scanner.Runner, 0, 15)
-		for _, group := range [][]scanner.Runner{sast, sca, secrets, iac, dast} {
+		all := make([]scanner.Runner, 0, 18)
+
+		// Build network group matching the ModeNetwork case exactly.
+		network := []scanner.Runner{sslscan.New(), nmap.New()}
+		if netcapEngine != nil {
+			network = append(network, netcapscanner.New(netcapEngine))
+		}
+
+		for _, group := range [][]scanner.Runner{sast, sca, secrets, iac, dast, network} {
 			for _, r := range group {
 				if !seen[r.Name()] {
 					seen[r.Name()] = true
