@@ -412,6 +412,7 @@ func main() {
 
 	// ── Deep Packet Analysis (NetCap) ──────────────────────────────────────────
 	netCapEngine := netcap.NewEngine()
+	pipeline.SetNetcapEngine(netCapEngine) // register with scan pipeline (NETWORK/FULL_SOC modes)
 	netCapH := handler.NewNetCapHandler(netCapEngine)
 	// Auto-start on best available interface
 	go func() {

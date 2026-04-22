@@ -81,10 +81,10 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		"SCA":     3,  // grype + trivy + license
 		"SECRETS": 3,  // gitleaks + secretcheck + trufflehog
 		"IAC":     2,  // kics + checkov
-		"DAST":    3,  // nikto + nuclei + sslscan
-		"NETWORK": 1,  // sslscan
-		"FULL":    16, // all: sast(4)+sca(3)+secrets(3)+iac(3)+dast(4)-sslscan-dedup
-		"FULL_SOC": 17, // all unique tools (sslscan dedup)
+		"DAST":    3,  // nikto + nuclei + sslscan (nmap moved to NETWORK)
+		"NETWORK": 3,  // sslscan + nmap + netcap
+		"FULL":    17, // sast(4)+sca(3)+secrets(3)+iac(3)+dast(3)+network(3) dedup sslscan+nmap
+		"FULL_SOC": 18, // FULL + netcap packet inspection
 	}[req.Mode]
 	if toolsTotal == 0 {
 		toolsTotal = 3
