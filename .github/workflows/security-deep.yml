@@ -16,19 +16,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: "8.0.x" }
+
+      # Set up Go for CodeQL build-mode (CodeQL requires compiling Go to
+      # analyze it). Version kept in sync with ci.yml via env.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.9"
+          cache: true
+
       - uses: github/codeql-action/init@v3
         with:
-          languages: csharp,javascript
-          queries: +security-extended,+security-and-quality
-      - run: |
-          if [ -f "DeMasterProCloud.sln" ]; then
-            dotnet restore DeMasterProCloud.sln
-            dotnet build DeMasterProCloud.sln -c Release --no-restore
-          else
-            CS=$(git ls-files "*.csproj" | head -n 1); [ -n "$CS" ] && { dotnet restore "$CS"; dotnet build "$CS" -c Release --no-restore; } || true
-          fi
+          # Repo composition: ~210 Go files, ~12 JS files, ~9 Python.
+          # CodeQL 'javascript' language covers both JS and TS.
+          # Previous config scanned 'csharp,javascript' — carried over from a
+          # .NET repo template (DeMasterProCloud.sln references). There is
+          # no C# in this repository.
+          languages: go, javascript
+          # CodeQL 2.15+ rejects the '+suite,+suite' comma syntax with:
+          #   A fatal error occurred: +security-and-quality is not a .ql
+          #   file, .qls file, a directory, or a query pack specification.
+          # Use a single suite name. 'security-and-quality' is a superset
+          # of 'security-extended'.
+          queries: security-and-quality
+
+      # Autobuild handles Go module resolution and compilation for CodeQL
+      # tracing. No .NET project exists, so the dotnet build scaffolding
+      # has been removed.
+      - uses: github/codeql-action/autobuild@v3
+
       - uses: github/codeql-action/analyze@v3
         with: { category: "codeql" }
 
@@ -82,19 +97,31 @@ jobs:
           curl -sSL "https://github.com/tenable/terrascan/releases/download/v${V}/terrascan_${V}_Linux_x86_64.tar.gz" -o /tmp/ts.tgz
           tar -xzf /tmp/ts.tgz -C /tmp && sudo mv /tmp/terrascan /usr/local/bin/terrascan
           terrascan version
-      - name: Guard (skip if no *.tf)
+      - name: Guard — detect Terraform files
         id: guard
         run: |
-          [ -z "$(git ls-files "**/*.tf")" ] && echo "skip=true" >> $GITHUB_OUTPUT || true
+          # Use `find` instead of shell-expanded glob: `git ls-files "**/*.tf"`
+          # does not reliably expand in non-interactive shells.
+          if find . -name '*.tf' -not -path './vendor/*' -not -path './node_modules/*' -print -quit | grep -q . ; then
+            echo "has_tf=true" >> "$GITHUB_OUTPUT"
+            echo "Terraform files detected — Terrascan will run."
+          else
+            echo "has_tf=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Terraform files found — skipping Terrascan."
+          fi
       - name: Terrascan init
-        if: steps.guard.outputs.skip != true
+        # IMPORTANT: the output is a string, compare to the string 'true'.
+        # Previous code used `!= true` which compared string to boolean and
+        # always evaluated to true, defeating the guard.
+        if: steps.guard.outputs.has_tf == 'true'
         run: terrascan init
       - name: Terrascan scan
-        if: steps.guard.outputs.skip != true
+        if: steps.guard.outputs.has_tf == 'true'
         run: |
           terrascan scan -t terraform -i terraform -o sarif > terrascan.sarif || true
       - uses: github/codeql-action/upload-sarif@v3
-        if: always() && steps.guard.outputs.skip != true
+        # Only upload when the scan ran AND produced a non-empty SARIF file.
+        if: steps.guard.outputs.has_tf == 'true' && hashFiles('terrascan.sarif') != ''
         with: { sarif_file: terrascan.sarif }
 
   gitleaks:
@@ -104,8 +131,14 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: gitleaks/gitleaks-action@v2
+        env:
+          # gitleaks-action@v2 breaking change: requires GITHUB_TOKEN to scan PRs.
+          # https://github.com/gitleaks/gitleaks-action#-announcement
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: detect --no-color --redact --report-format sarif --report-path gitleaks.sarif
       - uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        # Guard with hashFiles: when gitleaks finds no secrets OR hits an early
+        # exit, the SARIF file may not exist and upload would fail loudly.
+        if: always() && hashFiles('gitleaks.sarif') != ''
         with: { sarif_file: gitleaks.sarif }
