@@ -43,7 +43,7 @@ func (h *Runs) EnqueueDirect(rid, tenantID string, mode pipeline.Mode, profile p
 		"DAST":    3,  // nikto+nuclei+sslscan
 		"NETWORK": 1,  // sslscan
 		"FULL":    14, // all tools
-		"FULL_SOC": 16, // FULL + SIEM + nmap
+		"FULL_SOC": 15, // all unique tools
 	}[string(mode)]
 	if toolsTotal == 0 {
 		toolsTotal = 3
