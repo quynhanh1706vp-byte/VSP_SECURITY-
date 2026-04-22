@@ -12,7 +12,7 @@
 #   gopacket/pcap uses AF_PACKET sockets (Linux) which need CAP_NET_RAW
 #   for raw frame read and CAP_NET_ADMIN for promiscuous mode.
 
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-alpine3.22 AS builder
 
 # Build deps:
 #   git          — go mod download via git
@@ -56,7 +56,7 @@ RUN ldd /app/vsp-gateway | grep -q libpcap \
 # ──────────────────────────────────────────────────────────────
 # Runtime stage — alpine (not scratch) because we need libpcap.so
 # alpine:3.20 adds ~7MB over scratch. Acceptable trade-off for dynamic linking.
-FROM alpine:3.20
+FROM alpine:3.22
 
 LABEL org.opencontainers.image.title="VSP Gateway" \
       org.opencontainers.image.vendor="VSP Security Platform" \
