@@ -135,7 +135,7 @@ jobs:
           gosec -severity medium -confidence medium \
             -exclude=G204,G304,G703,G307,G118 \
             -exclude-dir=cmd/dev-stub \
-            -exclude-dir=internal/migrate/sql
+            -exclude-dir=internal/migrate/sql \
             ./...
 
       - name: gitleaks — secret scan
