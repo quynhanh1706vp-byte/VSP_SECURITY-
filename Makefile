@@ -68,3 +68,27 @@ fmt: ## Format code
 
 tidy: ## Tidy go modules
 	go mod tidy
+
+# ─── CSP hardening guards (VSP-CSP-001) ────────────────────────────────
+# Mirrors .github/workflows/csp-guard.yml for local pre-push checks.
+# See docs/CSP_HARDENING_ROADMAP.md.
+.PHONY: csp-guard csp-wildcards csp-baseline
+
+csp-guard: csp-wildcards csp-baseline
+	@echo "✓ All CSP guards passed."
+
+csp-wildcards:
+	@echo "═══ CSP wildcards check ═══"
+	@BANNED='default-src \*|connect-src \*|script-src \*|style-src \*|unsafe-eval|frame-ancestors \*|p4ResponseWriter'; \
+	MATCHES=$$(grep -rnE "$$BANNED" internal/ cmd/ --include="*.go" 2>/dev/null | grep -v "_test.go" | grep -v "// " || true); \
+	if [ -n "$$MATCHES" ]; then echo "✗ Banned patterns:"; echo "$$MATCHES"; exit 1; fi; \
+	echo "✓ No wildcards"
+
+csp-baseline:
+	@echo "═══ Inline handler baseline check ═══"
+	@CURRENT=$$(grep -rohE ' on[a-z]+=' static/ --include="*.html" 2>/dev/null | wc -l); \
+	BASELINE=$$(grep -oE '^[0-9]+' docs/csp_handler_baseline.txt | head -n1); \
+	echo "  baseline=$$BASELINE  current=$$CURRENT"; \
+	if [ "$$CURRENT" -gt "$$BASELINE" ]; then echo "✗ count increased"; exit 1; fi; \
+	if [ "$$CURRENT" -lt "$$BASELINE" ]; then echo "ℹ update baseline to $$CURRENT"; fi; \
+	echo "✓ OK"

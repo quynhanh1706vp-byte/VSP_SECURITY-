@@ -1,0 +1,21 @@
+753
+
+# Inline event handler baseline for VSP-CSP-001 Phase 2 ratchet-down.
+#
+# This number is the total count of inline event-handler attributes
+# (onclick=, onchange=, onsubmit=, onload=, etc.) across all files in
+# static/*.html at the moment Phase 1 completed.
+#
+# The CI guard (.github/workflows/csp-guard.yml handler-baseline job)
+# reads the first integer token on the first line. Everything below is
+# commentary and is ignored.
+#
+# Rules:
+#   - Never increase this number. CI will fail on PRs that do.
+#   - You may decrease this number only in the same PR that refactors
+#     inline handlers to external listeners.
+#
+# Reference count methodology:
+#   grep -rohE ' on[a-z]+=' static/ --include="*.html" | wc -l
+#
+# See docs/CSP_HARDENING_ROADMAP.md for the full plan.

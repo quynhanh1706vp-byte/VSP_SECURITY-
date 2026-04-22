@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	ai "github.com/vsp/platform/internal/ai"
+	vspMW "github.com/vsp/platform/internal/api/middleware"
 
 	"encoding/json"
 	"github.com/rs/zerolog"
@@ -32,7 +33,7 @@ func securityMiddleware(next http.Handler) http.Handler {
 
 		// P4 panel needs permissive CSP for inline scripts
 		if strings.HasPrefix(r.URL.Path, "/static/panels/") || r.URL.Path == "/p4" {
-			w.Header().Set("Content-Security-Policy", "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;")
+			w.Header().Set("Content-Security-Policy", vspMW.PanelCSP())
 		} else {
 			csp := "default-src 'self'; " +
 				"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; " +
@@ -151,7 +152,7 @@ func main() {
 
 	mux.HandleFunc("/p4", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Content-Security-Policy", "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; connect-src *;")
+		w.Header().Set("Content-Security-Policy", vspMW.PanelCSP())
 		w.Header().Set("Cache-Control", "no-store")
 		// If token in query, inject it as window.TOKEN before page scripts
 		token := r.URL.Query().Get("token")

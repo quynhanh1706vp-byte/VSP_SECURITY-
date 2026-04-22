@@ -15,37 +15,79 @@ import (
 
 type cspKey struct{}
 
+// ───────────────────────────────────────────────────────────────────────────
+// CSP POLICIES (VSP-CSP-001)
+// Two policies coexist during Phase 1 of CSP hardening:
+//
+//   strictCSP  — used for /, APIs, and routes we fully control. Nonce-based;
+//                inline event handlers will be blocked.
+//
+//   PanelCSP   — used for /panels/*, /static/panels/*, /p4 during Phase 1.
+//                Keeps 'unsafe-inline' so legacy inline event handlers
+//                (~1440 across panels) continue to work. Crucially, PanelCSP
+//                does NOT contain wildcards — those were the real backdoor.
+//
+// Phase 2 migrates panels off PanelCSP one-by-one; see
+// docs/CSP_HARDENING_ROADMAP.md.
+// ───────────────────────────────────────────────────────────────────────────
+
+// PanelCSP returns the Phase 1 CSP policy for panel HTML routes.
+func PanelCSP() string {
+	return "default-src 'self'; " +
+		"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
+		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; " +
+		"font-src 'self' https://fonts.gstatic.com; " +
+		"img-src 'self' data: blob:; " +
+		"connect-src 'self' wss: ws: https://api.anthropic.com https://cdn.jsdelivr.net; " +
+		"frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+}
+
+// IsPanelPath reports whether a request path should receive PanelCSP.
+func IsPanelPath(path string) bool {
+	return strings.HasPrefix(path, "/panels/") ||
+		strings.HasPrefix(path, "/static/panels/") ||
+		path == "/p4"
+}
+
+
 func CSPNonce(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// P4 panel — skip strict CSP, allow inline
-		if strings.HasPrefix(r.URL.Path, "/static/panels/") {
-			w.Header().Set("Content-Security-Policy", "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; connect-src *;")
-			next.ServeHTTP(w, r)
-			return
-		}
 		b := make([]byte, 16)
 		rand.Read(b) //nolint:errcheck
 		nonce := base64.StdEncoding.EncodeToString(b)
 		ctx := context.WithValue(r.Context(), cspKey{}, nonce)
-		csp := fmt.Sprintf(
-			"default-src 'self'; "+
-				"script-src 'self' 'nonce-%s' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "+
-				"style-src 'self' 'nonce-%s' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "+
-				"font-src 'self' https://fonts.gstatic.com; "+
-				"img-src 'self' data: blob:; "+
-				"connect-src 'self' wss: ws: https://api.anthropic.com https://cdn.jsdelivr.net; "+
-				"frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
-			nonce, nonce,
-		)
-		w.Header().Set("Content-Security-Policy", csp)
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+		// Panel routes get the Phase 1 policy (see PanelCSP docstring).
+		if IsPanelPath(r.URL.Path) {
+			w.Header().Set("Content-Security-Policy", PanelCSP())
+			setCommonSecurityHeaders(w)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		// PHASE 1 HOTFIX (VSP-CSP-001 c2c): strict CSP temporarily uses
+		// PanelCSP because index.html still contains inline event handlers
+		// and inline styles that would be blocked by CSP3 nonce enforcement
+		// (browsers ignore 'unsafe-inline' once a nonce is present).
+		// Phase 2 will refactor inline handlers/styles in index.html and
+		// then re-introduce the nonce-based strict policy here.
+		// The nonce is still generated and injected into <script>/<style>
+		// tags by InjectNonceIntoHTML, ready for Phase 2 activation.
+		w.Header().Set("Content-Security-Policy", PanelCSP())
+		setCommonSecurityHeaders(w)
+		// Headers specific to strict (non-panel) routes:
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		w.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
-		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+
+// setCommonSecurityHeaders applies headers shared by strict and panel policies.
+func setCommonSecurityHeaders(w http.ResponseWriter) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 }
 
 func GetNonce(ctx context.Context) string {
