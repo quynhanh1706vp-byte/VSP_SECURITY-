@@ -16,19 +16,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: "8.0.x" }
+
+      # Set up Go for CodeQL build-mode (CodeQL requires compiling Go to
+      # analyze it). Version kept in sync with ci.yml via env.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.9"
+          cache: true
+
       - uses: github/codeql-action/init@v3
         with:
-          languages: csharp,javascript
-          queries: +security-extended,+security-and-quality
-      - run: |
-          if [ -f "DeMasterProCloud.sln" ]; then
-            dotnet restore DeMasterProCloud.sln
-            dotnet build DeMasterProCloud.sln -c Release --no-restore
-          else
-            CS=$(git ls-files "*.csproj" | head -n 1); [ -n "$CS" ] && { dotnet restore "$CS"; dotnet build "$CS" -c Release --no-restore; } || true
-          fi
+          # Repo composition: ~210 Go files, ~12 JS files, ~9 Python.
+          # CodeQL 'javascript' language covers both JS and TS.
+          # Previous config scanned 'csharp,javascript' — carried over from a
+          # .NET repo template (DeMasterProCloud.sln references). There is
+          # no C# in this repository.
+          languages: go, javascript
+          # CodeQL 2.15+ rejects the '+suite,+suite' comma syntax with:
+          #   A fatal error occurred: +security-and-quality is not a .ql
+          #   file, .qls file, a directory, or a query pack specification.
+          # Use a single suite name. 'security-and-quality' is a superset
+          # of 'security-extended'.
+          queries: security-and-quality
+
+      # Autobuild handles Go module resolution and compilation for CodeQL
+      # tracing. No .NET project exists, so the dotnet build scaffolding
+      # has been removed.
+      - uses: github/codeql-action/autobuild@v3
+
       - uses: github/codeql-action/analyze@v3
         with: { category: "codeql" }
 
