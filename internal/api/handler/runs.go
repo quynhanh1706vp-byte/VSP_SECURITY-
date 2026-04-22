@@ -77,13 +77,13 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 
 	// Tools total depends on mode
 	toolsTotal := map[string]int{
-		"SAST":    4,  // bandit + semgrep + codeql + gosec
-		"SCA":     3,  // grype + trivy + license
-		"SECRETS": 3,  // gitleaks + secretcheck + trufflehog
-		"IAC":     2,  // kics + checkov
-		"DAST":    3,  // nikto + nuclei + sslscan (nmap moved to NETWORK)
-		"NETWORK": 3,  // sslscan + nmap + netcap
-		"FULL":    17, // 16 base + nmap (+netcap when engine live = 18)
+		"SAST":     4,  // bandit + semgrep + codeql + gosec
+		"SCA":      3,  // grype + trivy + license
+		"SECRETS":  3,  // gitleaks + secretcheck + trufflehog
+		"IAC":      2,  // kics + checkov
+		"DAST":     3,  // nikto + nuclei + sslscan (nmap moved to NETWORK)
+		"NETWORK":  3,  // sslscan + nmap + netcap
+		"FULL":     17, // 16 base + nmap (+netcap when engine live = 18)
 		"FULL_SOC": 18, // FULL + netcap packet inspection
 	}[req.Mode]
 	if toolsTotal == 0 {

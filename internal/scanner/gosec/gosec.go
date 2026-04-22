@@ -42,9 +42,9 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 
 	args := []string{
 		"-fmt=json",
-		"-quiet",            // suppress scanning progress to stderr only
-		"-no-fail",          // exit 0 even when findings exist (cleaner for CI)
-		"-severity=low",     // report all severities; pipeline filters later
+		"-quiet",        // suppress scanning progress to stderr only
+		"-no-fail",      // exit 0 even when findings exist (cleaner for CI)
+		"-severity=low", // report all severities; pipeline filters later
 		"-confidence=low",
 		target,
 	}

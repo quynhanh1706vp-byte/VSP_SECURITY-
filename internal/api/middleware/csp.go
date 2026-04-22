@@ -49,7 +49,6 @@ func IsPanelPath(path string) bool {
 		path == "/p4"
 }
 
-
 func CSPNonce(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b := make([]byte, 16)
@@ -80,7 +79,6 @@ func CSPNonce(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
-
 
 // setCommonSecurityHeaders applies headers shared by strict and panel policies.
 func setCommonSecurityHeaders(w http.ResponseWriter) {
