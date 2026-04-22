@@ -300,10 +300,27 @@ func main() {
 	// SSE — cookie-based auth (no ?token= in URL — prevents log leakage)
 	r.With(authMw).Get("/api/v1/events", handler.SSEHandler)
 
-	// Root route — serve main UI (index.html)
+	// Root route — serve main UI (index.html) with CSP nonce injected
+	// into inline <script> and <style> tags so they don't violate CSP.
+	// Without injection, ~44 inline scripts + many inline styles would be
+	// blocked by the browser (see internal/api/middleware/csp.go).
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/index.html")
+		raw, err := os.ReadFile("./static/index.html")
+		if err != nil {
+			http.Error(w, "index.html not found", http.StatusNotFound)
+			return
+		}
+		nonce := vspMW.GetNonce(r.Context())
+		html := vspMW.InjectNonceIntoHTML(string(raw), nonce)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(html))
 	})
+
+	// Serve JS assets from ./static/js/ (dom-safe.js, vsp_iframe_bootstrap.js, etc.)
+	// These scripts are referenced by index.html and panel HTML files.
+	r.Get("/static/js/*", http.StripPrefix("/static/js/",
+		http.FileServer(http.Dir("./static/js/"))).ServeHTTP)
 
 	// Serve P4 static panel directly (bypasses Python proxy)
 	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
