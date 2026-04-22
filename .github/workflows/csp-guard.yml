@@ -1,0 +1,67 @@
+# CSP Hardening Guard (VSP-CSP-001)
+# See docs/CSP_HARDENING_ROADMAP.md for context.
+name: CSP Hardening Guard
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  wildcards:
+    name: Wildcard regression guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan Go source for banned CSP patterns
+        run: |
+          set -u
+          BANNED='default-src \*|connect-src \*|script-src \*|style-src \*|unsafe-eval|frame-ancestors \*|p4ResponseWriter'
+          MATCHES=$(grep -rnE "$BANNED" internal/ cmd/ \
+            --include="*.go" 2>/dev/null \
+            | grep -v "_test.go" | grep -v "// " || true)
+          if [ -n "$MATCHES" ]; then
+            echo "::error::CSP regression — banned patterns reappeared."
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "OK: no wildcards or dead-code markers."
+
+  handler-baseline:
+    name: Inline handler baseline (ratchet-down)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Count inline event handlers
+        id: count
+        run: |
+          set -u
+          COUNT=$(grep -rohE ' on[a-z]+=' static/ --include="*.html" \
+            2>/dev/null | wc -l)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Current: $COUNT"
+      - name: Compare against baseline
+        run: |
+          set -u
+          CURRENT="${{ steps.count.outputs.count }}"
+          BASELINE_FILE="docs/csp_handler_baseline.txt"
+          if [ ! -f "$BASELINE_FILE" ]; then
+            echo "::error::$BASELINE_FILE missing."
+            exit 1
+          fi
+          BASELINE=$(grep -oE '^[0-9]+' "$BASELINE_FILE" | head -n1)
+          echo "Baseline: $BASELINE   Current: $CURRENT"
+          if [ "$CURRENT" -gt "$BASELINE" ]; then
+            DELTA=$((CURRENT - BASELINE))
+            echo "::error::Inline handlers increased by $DELTA ($BASELINE -> $CURRENT)."
+            echo "::error::See docs/CSP_HARDENING_ROADMAP.md Phase 2."
+            exit 1
+          fi
+          if [ "$CURRENT" -lt "$BASELINE" ]; then
+            echo "::notice::Handlers decreased — update $BASELINE_FILE to $CURRENT."
+          fi
+          echo "OK: ratchet passed."
