@@ -12,6 +12,12 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 # ── Job 1: Lint & Static Analysis ─────────────────────────────────────────
+# ── Security: principle of least privilege ──────────────────
+# Default all jobs to read-only. Individual jobs override with
+# specific permissions they need.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint & Static Analysis
