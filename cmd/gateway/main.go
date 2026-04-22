@@ -1526,7 +1526,7 @@ func main() {
 				// Copy auth header
 				trigReq.Header.Set("Content-Type", "application/json")
 				trigReq.Header.Set("Authorization", r.Header.Get("Authorization"))
-				trigReq.AddCookie(&http.Cookie{Name: "vsp_csrf", Value: ""})
+				trigReq.AddCookie(&http.Cookie{Name: "vsp_csrf", Value: ""}) // #nosec G124 -- empty internal-trigger cookie, not sent to browser
 				client2 := &http.Client{Timeout: 10 * time.Second}
 				resp2, err := client2.Do(trigReq)
 				if err != nil {

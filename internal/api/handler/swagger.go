@@ -57,6 +57,7 @@ func SwaggerUI(w http.ResponseWriter, r *http.Request) {
 	}
 	host := r.Host
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// #nosec G705 -- static Swagger UI HTML, no user input in this template
 	_, _ = w.Write([]byte(`<!DOCTYPE html>
 <html>
 <head>

@@ -117,7 +117,7 @@ func (c *Client) Middleware(name string, ttl time.Duration) func(next http.Handl
 			if cached := c.Get(r.Context(), key); cached != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("X-Cache", "HIT")
-				_, _ = w.Write(cached)
+				_, _ = w.Write(cached) // #nosec G705 -- cached response preserves original Content-Type header
 				return
 			}
 

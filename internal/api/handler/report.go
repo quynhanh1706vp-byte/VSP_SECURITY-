@@ -540,7 +540,7 @@ func (h *Report) TT13PDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf(`attachment; filename="vsp-tt13-%s.pdf"`, rid))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
-	_, _ = w.Write(pdfBytes) //nolint:errcheck
+	_, _ = w.Write(pdfBytes) //nolint:errcheck // #nosec G705 -- bytes are application/pdf binary, not HTML
 }
 
 // ── ConMon PDF Report ─────────────────────────────────────────────────────────
