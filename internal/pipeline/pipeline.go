@@ -10,6 +10,7 @@ import (
 	"github.com/vsp/platform/internal/scanner/bandit"
 	"github.com/vsp/platform/internal/scanner/checkov"
 	"github.com/vsp/platform/internal/scanner/codeql"
+	"github.com/vsp/platform/internal/scanner/gosec"
 	"github.com/vsp/platform/internal/scanner/gitleaks"
 	"github.com/vsp/platform/internal/scanner/grype"
 	"github.com/vsp/platform/internal/scanner/hadolint"
@@ -106,6 +107,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		bandit.New(),
 		semgrep.New(),
 		codeql.New(),
+		gosec.New(),
 	}
 	sca := []scanner.Runner{
 		grype.New(),

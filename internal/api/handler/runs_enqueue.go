@@ -36,14 +36,14 @@ func (h *Runs) enqueueOrLog(rid, tenantID string, mode pipeline.Mode, profile pi
 func (h *Runs) EnqueueDirect(rid, tenantID string, mode pipeline.Mode, profile pipeline.Profile, src, url string) {
 	// Sync với RunnersFor() — SECRETS:2(gitleaks+secretcheck), SCA:3(grype+trivy+license)
 	toolsTotal := map[string]int{
-		"SAST":    3,  // bandit+semgrep+codeql
+		"SAST":    4,  // bandit+semgrep+codeql+gosec
 		"SCA":     3,  // grype+trivy+license
 		"SECRETS": 2,  // gitleaks+secretcheck
 		"IAC":     2,  // kics+checkov
 		"DAST":    3,  // nikto+nuclei+sslscan
 		"NETWORK": 1,  // sslscan
-		"FULL":    14, // all tools
-		"FULL_SOC": 15, // all unique tools
+		"FULL":    15, // all tools
+		"FULL_SOC": 16, // all unique tools
 	}[string(mode)]
 	if toolsTotal == 0 {
 		toolsTotal = 3
