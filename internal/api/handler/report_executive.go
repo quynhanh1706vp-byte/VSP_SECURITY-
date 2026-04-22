@@ -86,7 +86,8 @@ func (h *Report) ExecutivePDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=vsp-executive-%s.pdf", rid))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(b)))
-	_, _ = w.Write(b) //nolint:errcheck // #nosec G705 -- static executive report PDF bytes
+	// #nosec G705 -- b is static executive report PDF bytes, not HTML
+	_, _ = w.Write(b) //nolint:errcheck
 }
 
 // ── Executive data model ─────────────────────────────────────────────────────

@@ -181,6 +181,7 @@ func main() {
 					for _, c := range gresp.Cookies() {
 						if c.Name == "vsp_csrf" {
 							// Relay gateway's CSRF cookie to browser
+							// #nosec G124 -- intentionally non-HttpOnly: vsp_csrf is double-submit CSRF cookie, JS must read
 							http.SetCookie(w, &http.Cookie{
 								Name:     "vsp_csrf",
 								Value:    c.Value,
@@ -189,7 +190,7 @@ func main() {
 								HttpOnly: false,
 							})
 							// Also forward cookie to all subsequent proxy requests
-							r.AddCookie(&http.Cookie{Name: "vsp_csrf", Value: c.Value})
+							r.AddCookie(&http.Cookie{Name: "vsp_csrf", Value: c.Value}) // #nosec G124 -- forwards CSRF cookie to upstream request (attrs not applicable on outgoing)
 							break
 						}
 					}

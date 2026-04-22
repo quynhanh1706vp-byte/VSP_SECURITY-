@@ -110,7 +110,8 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=vsp-%s.pdf", rid))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
-	_, _ = w.Write(pdfBytes) //nolint:errcheck // #nosec G705 -- bytes are application/pdf binary, not HTML
+	// #nosec G705 -- pdfBytes is application/pdf binary, not HTML (Content-Type set above)
+	_, _ = w.Write(pdfBytes) //nolint:errcheck
 }
 
 // fileExists checks if file at path exists.

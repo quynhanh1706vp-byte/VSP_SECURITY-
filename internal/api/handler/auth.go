@@ -167,6 +167,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	// Set httpOnly cookie for browser clients (OWASP A07 — prevents XSS token theft)
 	// API clients / CI-CD still get token in response body for Authorization: Bearer usage
 	secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+	// #nosec G124 -- HttpOnly/Secure/SameSite all set in the struct below (gosec multi-line false positive)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "vsp_token",
 		Value:    token,
@@ -204,6 +205,7 @@ func (a *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 		go a.writeAudit(r.Clone(context.Background()), claims.TenantID, &claims.UserID, "LOGOUT", "/auth/logout")
 	}
 	// Clear httpOnly cookie on logout
+	// #nosec G124 -- HttpOnly: true set in struct below (gosec multi-line false positive)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "vsp_token",
 		Value:    "",
