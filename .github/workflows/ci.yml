@@ -110,11 +110,15 @@ jobs:
     # gitleaks-action needs to list commits on PR to scan incremental diffs.
     # Default GITHUB_TOKEN permissions don't include pull-requests:read —
     # without this block gitleaks returns HTTP 403 on PR events.
+    # fetch-depth: 0 — gitleaks needs full history to scan HEAD^..HEAD;
+    # shallow clone (default depth=1) makes git log fail with "unknown revision".
     permissions:
       contents: read
       pull-requests: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -378,6 +382,9 @@ jobs:
 
       - name: Trivy — vulnerability scan (CRITICAL+HIGH → fail)
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
           format: sarif
@@ -397,6 +404,9 @@ jobs:
 
       - name: Generate SBOM (CycloneDX)
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
           format: cyclonedx
