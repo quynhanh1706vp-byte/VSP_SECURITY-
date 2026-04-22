@@ -28,14 +28,13 @@ func CSPNonce(next http.Handler) http.Handler {
 		nonce := base64.StdEncoding.EncodeToString(b)
 		ctx := context.WithValue(r.Context(), cspKey{}, nonce)
 		csp := fmt.Sprintf(
-			"default-src 'self'; "+
-				"script-src 'self' 'nonce-%s' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "+
-				"style-src 'self' 'nonce-%s' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "+
-				"font-src 'self' https://fonts.gstatic.com; "+
-				"img-src 'self' data: blob:; "+
-				"connect-src 'self' wss: ws: https://api.anthropic.com https://cdn.jsdelivr.net; "+
+			"default-src 'self'; " +
+				"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
+				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; " +
+				"font-src 'self' https://fonts.gstatic.com; " +
+				"img-src 'self' data: blob:; " +
+				"connect-src 'self' wss: ws: https://api.anthropic.com https://cdn.jsdelivr.net; " +
 				"frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
-			nonce, nonce,
 		)
 		w.Header().Set("Content-Security-Policy", csp)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
