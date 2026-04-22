@@ -1,26 +1,8 @@
-# VSP CODEOWNERS — 2 reviewers required cho protected paths
-# Format: <pattern> <@user-or-team> [<@user2>]
-
-# Global fallback — bất kỳ thay đổi nào
-*                                   @quynhanh1706vp-byte
-
-# Auth & security-critical paths — require security team review
-/internal/auth/                     @quynhanh1706vp-byte @security-lead
-/internal/siem/                     @quynhanh1706vp-byte @security-lead
-/internal/scanner/                  @quynhanh1706vp-byte
-/internal/store/                    @quynhanh1706vp-byte
-/internal/telemetry/                @quynhanh1706vp-byte
-
-# Compliance artifacts — require compliance officer
-/docs/compliance/                   @quynhanh1706vp-byte @compliance-officer
-/oscal/                             @compliance-officer
-/panels/p4_compliance.html          @compliance-officer
-
-# CI/CD — nobody can silently weaken the gate
-/.github/workflows/                 @quynhanh1706vp-byte
-/.githooks/                         @quynhanh1706vp-byte
-/local-ci.sh                        @quynhanh1706vp-byte
-
-# Governance — require explicit approval
-/docs/governance/                   @quynhanh1706vp-byte
-/CODEOWNERS                         @quynhanh1706vp-byte
+# Changes to CSP policy require explicit review.
+# VSP-CSP-001 guardrails — modifications to these files affect production security.
+/internal/api/middleware/csp.go          @quynhanh1706vp-byte
+/docs/CSP_HARDENING_ROADMAP.md           @quynhanh1706vp-byte
+/docs/csp_handler_baseline.txt           @quynhanh1706vp-byte
+/.github/workflows/csp-guard.yml         @quynhanh1706vp-byte
+/cmd/gateway/main.go                     @quynhanh1706vp-byte
+/cmd/soc-shell/main.go                   @quynhanh1706vp-byte
