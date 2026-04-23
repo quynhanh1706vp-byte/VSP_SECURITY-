@@ -74,6 +74,7 @@ tr:hover td{background:var(--bg3)}
 .attest-no{color:#facc15;font-weight:700}
 </style>
 </head>
+<script>function escapeHtml(s){if(s==null)return "";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}</script>
 <body>
 
 <div class="hdr">
@@ -193,12 +194,12 @@ async function loadDraft() {
     const attests = d.ssdf_attestations || {};
     const practices = Object.entries(attests).sort(([a],[b]) => a.localeCompare(b));
     
-    body.textContent = `
+    body.innerHTML = `
       <div style="margin-bottom:10px;font-size:12px">
-        <b>Form UUID:</b> <span class="mono" style="color:var(--t3)">${d.form_uuid}</span><br>
-        <b>Product:</b> ${d.product?.name} v${d.product?.version}<br>
-        <b>Form type:</b> ${d.form_type}<br>
-        <b>Reference:</b> ${d.reference}
+        <b>Form UUID:</b> <span class="mono" style="color:var(--t3)">${escapeHtml(d.form_uuid)}</span><br>
+        <b>Product:</b> ${escapeHtml(d.product?.name)} v${escapeHtml(d.product?.version)}<br>
+        <b>Form type:</b> ${escapeHtml(d.form_type)}<br>
+        <b>Reference:</b> ${escapeHtml(d.reference)}
       </div>
       
       <div style="margin-top:14px;font-size:12px;font-weight:600">
@@ -209,7 +210,7 @@ async function loadDraft() {
           const attest = info.can_attest;
           return `<div class="practice-row">
             <div>
-              <span class="practice-id">${id}</span> ${info.name || ''}
+              <span class="practice-id">${escapeHtml(id)}</span> ${escapeHtml(info.name || '')}
             </div>
             <div>
               <span class="${attest?'attest-yes':'attest-no'}">${attest?'✓ CAN ATTEST':'⚠ PARTIAL'}</span>
@@ -287,6 +288,17 @@ async function loadForms() {
 
 loadDraft();
 loadForms();
+</script>
+<script>
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 </script>
 </body>
 </html>
