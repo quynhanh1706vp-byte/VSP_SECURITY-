@@ -1,6 +1,6 @@
 # VSP Security Platform — Threat Model (STRIDE)
 
-**Version:** 1.1 | **Date:** 2026-04-23 | **Method:** STRIDE
+**Version:** 1.2 | **Date:** 2026-04-23 | **Method:** STRIDE
 
 ## System Overview
 
@@ -79,7 +79,7 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
 | Container escape | nonroot UID 65534, scratch image | OK |
 | Dependency CVEs | govulncheck CI, crypto v0.50 | OK |
 | gRPC auth bypass | Upgraded v1.73-dev to v1.80 (CVSS 9.1) | OK |
-| MFA not enforced for admins | TOTP Setup/Verify/Disable available (`handler/mfa.go`); policy enforcement pending | IN_PROGRESS |
+| MFA enforced for admins | Login gate at `handler/auth.go:109` rejects admin login when MFA incomplete; active when `server.env=production\|staging` (dev allows warn+continue) | OK (prod/staging) |
 
 ## Remaining Risks
 
@@ -128,5 +128,13 @@ in the interim.
   implementation. MFA row moved from Remaining Risks to § E (TOTP code exists,
   policy enforcement pending). Known Limitations section added linking issue #62
   (15 CodeQL findings, Sprint 2 triage scope).
+
+- **2026-04-23 (afternoon, v1.2)**: MFA row status IN_PROGRESS → OK
+  (prod/staging). Root-caused and fixed admin lockout race in `SetMFASecret`
+  (was setting `mfa_enabled=true` before user confirmed TOTP). Added
+  `ConfirmMFAEnabled` method for atomic enable+verify at `/auth/mfa/verify`.
+  Migration 018 resets dirty-state rows. `SERVER_ENV` check refactored to
+  use viper (consistency with `auth.mode`). See commits `de58740` (bug fix)
+  and `717ccc2` (refactor).
 
 **Next verification:** 2026-07-23 (quarterly cadence).

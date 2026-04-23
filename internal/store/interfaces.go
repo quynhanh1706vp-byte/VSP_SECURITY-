@@ -86,7 +86,7 @@ type UserStore interface {
 	DeleteUser(ctx context.Context, tenantID, id string) error
 	UpdateLastLogin(ctx context.Context, id string) error
 	SetMFASecret(ctx context.Context, userID, secret string) error
-	VerifyMFASetup(ctx context.Context, userID string) error
+	ConfirmMFAEnabled(ctx context.Context, userID string) error
 	DisableMFA(ctx context.Context, tenantID, userID string) error
 	RecordFailedLogin(ctx context.Context, userID string) (int, error)
 	ResetFailedLogins(ctx context.Context, userID string) error
