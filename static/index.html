@@ -2882,7 +2882,7 @@ async function ensureToken() {
       localStorage.removeItem('vsp_token');
       // Notify tất cả iframes
       document.querySelectorAll('iframe').forEach(function(f) {
-        try { f.contentWindow.postMessage({type:'vsp:token', token:''}, '*'); } catch(e) {}
+        try { f.contentWindow.postMessage({type:'vsp:token', token:''}, window.location.origin); } catch(e) {}
       });
       // Redirect về login page sau 300ms
       setTimeout(function() {
@@ -8546,24 +8546,13 @@ function startMFATimer() {
 </div>
 
 
-<script>
-window.addEventListener('message', async function(e) {
-  if (!e.data || e.data.type !== 'anthropic_proxy') return;
-  var id = e.data.id;
-  var payload = e.data.payload;
-  try {
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    });
-    var result = await resp.json();
-    e.source.postMessage({id: id, result: result}, '*');
-  } catch(err) {
-    e.source.postMessage({id: id, result: {error: err.message}}, '*');
-  }
-});
-</script>
+<!-- VSP-SEC-001 (Sprint 0): Removed frontend Anthropic proxy.
+     Rationale: open relay vuln — any iframe could postMessage
+     'anthropic_proxy' and relay calls through browser.
+     Server-side proxy at /api/v1/ai/chat handles AI requests.
+     See: cmd/gateway/main.go:597 (Go handler)
+          internal/ai/advisor.go (AI advisor module)
+     DO NOT re-add this pattern. -->
 
 </body>
 </html>

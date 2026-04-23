@@ -492,7 +492,9 @@ var STATIC_EOL=[
   {name:'BKAV Pro 2018',vendor:'BKAV',version:'2018',eol_date:'2020-12-31',status:'eol',source:'manual'}
 ];
 
-window.addEventListener('message',function(e){
+window.addEventListener('message', function(e) {
+
+  if (!window.VSPOrigin.check(e)) return;
   if(!e.data) return;
   if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){
     TOKEN=e.data.token;
@@ -506,8 +508,8 @@ window.addEventListener('message',function(e){
     r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');
   }
 });
-if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
-if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'},'*');
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 renderEOL();
 </script>
 </body>

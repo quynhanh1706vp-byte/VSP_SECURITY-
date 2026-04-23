@@ -776,6 +776,7 @@ try {
   if (!TOKEN && window.parent && window.parent.TOKEN) TOKEN = window.parent.TOKEN;
 } catch(e) {}
 window.addEventListener('message', function(e) {
+  if (!window.VSPOrigin.check(e)) return;
   if (e.data && e.data.type === 'vsp:token') { TOKEN = e.data.token || ''; }
   if (e.data && e.data.type === 'vsp:siem') { _siem = e.data.data || {}; }
 });
@@ -943,17 +944,10 @@ async function sendMessage() {
       // SEC-005b: Anthropic API key MUST come from server-side via /api/v1/ai/chat proxy.
       // Never reference client-side key material. If this path is reached without gateway,
       // it means /api/v1/ai/chat returned error — surface that, don't fallback to localStorage.
-      throw new Error('Gateway unavailable. AI features require ANTHROPIC_API_KEY on server (see docs/ARCHITECTURE.md#ai).');
-      resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'anthropic-version':'2023-06-01',
-          'anthropic-dangerous-direct-browser-access':'true',
-          'x-api-key': apiKey,
-        },
-        body: JSON.stringify(gwPayload)
-      });
+      // VSP-SEC-001: no fallback to direct Anthropic from browser.
+      // API key MUST stay server-side (internal/ai/advisor.go).
+      // If /api/v1/ai/chat unavailable, user sees clean error.
+      throw new Error('Gateway AI endpoint unavailable. Check server config (ANTHROPIC_API_KEY).');
     }
     const data = await resp.json();
     const reply = data.content && data.content[0] && data.content[0].text || 'Xin lỗi, có lỗi xảy ra.';

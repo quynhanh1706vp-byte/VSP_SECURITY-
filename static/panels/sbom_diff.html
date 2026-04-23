@@ -274,11 +274,12 @@ function _init(tk){
   API=window.location.origin==='null'?'':window.location.origin;
   loadRuns();
 }
-window.addEventListener('message',function(e){
+window.addEventListener('message', function(e) {
+  if (!window.VSPOrigin.check(e)) return;
   if(e.data&&e.data.type==='vsp:token')_init(e.data.token);
 });
 if(window.parent!==window){
-  window.parent.postMessage({type:'vsp:request_token'},'*');
+  window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
 }else{
   // Standalone dev — try localStorage
   var tk=localStorage.getItem('vsp_token')||'';

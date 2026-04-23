@@ -762,7 +762,10 @@ function testPRComment(){showToast('PR comment test sent (requires GitHub token)
 function saveGatePolicy(){showToast('Gate policy saved','success');}
 
 // ── INIT ──
-window.addEventListener('message',e=>{if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;});
+window.addEventListener('message', e => {
+  if (!window.VSPOrigin.check(e)) return;
+  if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;
+});
 document.addEventListener('DOMContentLoaded',async()=>{
   await loadKPIs();
   loadSchedules();

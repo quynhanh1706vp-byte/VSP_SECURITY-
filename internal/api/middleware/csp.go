@@ -38,7 +38,7 @@ func PanelCSP() string {
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; " +
 		"font-src 'self' https://fonts.gstatic.com; " +
 		"img-src 'self' data: blob:; " +
-		"connect-src 'self' wss: ws: https://api.anthropic.com https://cdn.jsdelivr.net; " +
+		"connect-src 'self' wss: ws: https://cdn.jsdelivr.net; " +
 		"frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
 }
 

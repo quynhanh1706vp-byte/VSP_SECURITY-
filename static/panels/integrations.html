@@ -565,7 +565,13 @@ async function testAllConnections(){
 }
 function clearLog(){document.getElementById('test-log').innerHTML='<span style="color:var(--t3)">Log cleared.</span>';}
 
-window.addEventListener('message',e=>{if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;});
+window.addEventListener('message', e => {
+
+  if (!window.VSPOrigin.check(e)) return;
+
+  if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;
+
+});
 </script>
 </body>
 </html>
