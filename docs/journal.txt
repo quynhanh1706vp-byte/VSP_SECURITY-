@@ -33,3 +33,9 @@
   - Update docx 42 → 58 items
   - Clean 9 orphan remote branches
   - Investigate 5 large blobs >10MB in pack (total ~130MB)
+
+## 2026-04-23 — Sprint 0 Day 2 complete
+- PR #64 merged (threat model v1.1 + doc realignment)
+- 4 tasks: 2.1, 2.2a, 2.2b, 2.2c
+- Email config drift fixed (missing dot in local git config)
+- SSH signing key uploaded to GitHub as signing type
