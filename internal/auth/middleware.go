@@ -217,53 +217,6 @@ func injectClaims(ctx context.Context, c Claims) context.Context {
 	return ctx
 }
 
-// TokenFromQuery returns middleware cho SSE/WS — đọc JWT từ ?token= query param.
-// SSE không thể set Authorization header nên dùng query param thay thế.
-func TokenFromQuery(jwtSecret string, keyStore APIKeyStore) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var claims Claims
-			var ok bool
-
-			// 1. Thử query param ?token=
-			if token := r.URL.Query().Get("token"); token != "" {
-				c, err := parseJWTWithRotation(token, resolveSecrets(jwtSecret))
-				if err == nil {
-					claims, ok = c, true
-				}
-			}
-
-			// 2. Fallback: Authorization header (WS có thể set header)
-			if !ok {
-				if bearer := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); bearer != "" {
-					c, err := parseJWTWithRotation(bearer, resolveSecrets(jwtSecret))
-					if err == nil {
-						claims, ok = c, true
-					}
-				}
-			}
-
-			// 3. Fallback: X-API-Key
-			if !ok {
-				if k := r.Header.Get("X-API-Key"); k != "" {
-					c, err := keyStore.ValidateAPIKey(r.Context(), k)
-					if err == nil {
-						claims, ok = c, true
-					}
-				}
-			}
-
-			if !ok {
-				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
-				return
-			}
-
-			ctx := injectClaims(r.Context(), claims)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
 // InjectForTest injects Claims into context for use in unit tests.
 // Do NOT use in production code.
 func InjectForTest(ctx context.Context, c Claims) context.Context {
