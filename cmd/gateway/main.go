@@ -478,16 +478,13 @@ func main() {
 		r.Get("/export/flows.csv", netCapH.ExportFlowsCSV)
 		r.Get("/export/anomalies.json", netCapH.ExportAnomaliesJSON)
 	})
-	// SSE stream — token via query param (EventSource cannot set headers)
-	r.Get("/api/v1/netcap/stream", func(w http.ResponseWriter, r *http.Request) {
-		tk := r.URL.Query().Get("token")
-		if tk == "" {
-			tk = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		}
-		if tk == "" {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
-			return
-		}
+	// SSE stream — auth via vsp_token HttpOnly cookie (SEC-009, 2026-04-23).
+	// EventSource cannot set Authorization headers but sends cookies when
+	// constructed with { withCredentials: true }. Query-param tokens are
+	// rejected to prevent leakage via access logs and Referer headers.
+	r.With(authMw).Get("/api/v1/netcap/stream", func(w http.ResponseWriter, r *http.Request) {
+		// authMw has already validated the cookie/Bearer and injected
+		// claims into context. No handler-level token check needed.
 		netCapH.Stream(w, r)
 	})
 	r.Get("/api/p4/conmon/report", p4AuthMiddleware(handleConMonReport))

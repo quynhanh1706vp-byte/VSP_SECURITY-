@@ -53,9 +53,13 @@ func p4AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			w.WriteHeader(204)
 			return
 		}
+		// SEC-009 (2026-04-23): replaced ?token= query fallback with cookie.
+		// Query params leak via access logs, Referer, and browser history.
 		bearer := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if bearer == "" {
-			bearer = r.URL.Query().Get("token")
+			if c, err := r.Cookie("vsp_token"); err == nil {
+				bearer = c.Value
+			}
 		}
 		apiKey := r.Header.Get("X-API-Key")
 		// No Referer-based bypass — Referer headers can be spoofed by clients
