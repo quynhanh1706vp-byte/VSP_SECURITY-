@@ -66,6 +66,17 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
 .b-na{background:var(--bg3);color:var(--t3)}
 .b-not-impl{background:rgba(239,68,68,.15);color:#ef4444}
 </style>
+<script>
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+</script>
 </head>
 <body>
 
@@ -200,16 +211,16 @@ async function loadSSDF() {
       const impl = prac.filter(p => p.status === 'implemented').length;
       const box = document.createElement('div');
       box.className = 'ssdf-group';
-      box.textContent = `
+      box.innerHTML = `
         <div class="ssdf-group-hdr">
-          <div class="ssdf-group-name">${g} — ${groupsMap[g]}</div>
+          <div class="ssdf-group-name">${escapeHtml(g)} — ${escapeHtml(groupsMap[g])}</div>
           <div class="ssdf-group-stats">${impl}/${prac.length}</div>
         </div>
         ${prac.map(p => {
           const bc = {implemented:'b-impl', partial:'b-partial', not_applicable:'b-na', not_implemented:'b-not-impl'}[p.status] || 'b-na';
           return `<div class="ssdf-practice">
-            <div><span class="ssdf-practice-id">${p.practice_id}</span> ${p.name}</div>
-            <span class="badge ${bc}">${p.status.replace('_',' ')}</span>
+            <div><span class="ssdf-practice-id">${escapeHtml(p.practice_id)}</span> ${escapeHtml(p.name)}</div>
+            <span class="badge ${bc}">${escapeHtml(p.status.replace('_',' '))}</span>
           </div>`;
         }).join('')}
       `;
