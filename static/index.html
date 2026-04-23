@@ -2689,9 +2689,13 @@ function updateTicker() {
 
 /* ─── SSE connection ─── */
 function connectSSE() {
+  // SEC-009 (2026-04-23): token previously sent as ?token= query param
+  // leaks via access logs, Referer, and browser history. The backend
+  // auth middleware reads the JWT from the `vsp_token` HttpOnly cookie,
+  // and EventSource attaches it automatically with withCredentials.
   if (!TOKEN) return;
-  const url = `/api/v1/events?token=${encodeURIComponent(TOKEN)}`;
-  const source = new EventSource(url);
+  const url = '/api/v1/events';
+  const source = new EventSource(url, { withCredentials: true });
   source.onopen = () => {
     document.getElementById('sse-dot').className = 'sse-dot sse-live';
     document.getElementById('sse-label').textContent = 'SSE live';

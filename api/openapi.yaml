@@ -40,6 +40,15 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    # SEC-009 (2026-04-23): Session cookie for SSE/WS endpoints.
+    # Browsers cannot attach Authorization headers to EventSource, so
+    # these streams authenticate via the HttpOnly cookie set at login.
+    # Query param `?token=` is rejected server-side to prevent token
+    # leakage through access logs and Referer headers.
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: vsp_token
     ApiKeyAuth:
       type: apiKey
       in: header
@@ -686,6 +695,33 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+  /api/v1/events:
+    get:
+      summary: Server-Sent Events stream (scan_complete, incident_created, anomaly)
+      description: |
+        Live event stream for the UI. Authenticates via the `vsp_token`
+        HttpOnly cookie set at login.
+
+        **SEC-009 (2026-04-23):** The legacy `?token=<JWT>` query parameter
+        is no longer accepted by the auth middleware. Clients must use
+        `new EventSource(url, { withCredentials: true })` so the browser
+        attaches the session cookie. Missing cookie returns 401.
+      tags: [SIEM]
+      security:
+        - CookieAuth: []
+      responses:
+        "200":
+          description: Event stream opened
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Newline-delimited events. Each `data:` payload is JSON
+                  with a `type` field: `scan_complete`, `incident_created`,
+                  `incident`, or `anomaly`.
+        "401": { description: Missing or invalid session cookie }
+
 
 tags:
   - name: System
