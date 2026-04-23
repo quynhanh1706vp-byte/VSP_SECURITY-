@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -105,9 +104,10 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enforce MFA for admin role — admin MUST have MFA enabled (production only)
+	// Enforce MFA for admin role — admin MUST have MFA enabled (production only).
+	// Uses viper.server.env (bound to SERVER_ENV) to match auth.mode pattern.
 	if user.Role == "admin" && (!user.MFAEnabled || !user.MFAVerified) {
-		env := os.Getenv("SERVER_ENV")
+		env := viper.GetString("server.env")
 		if env == "production" || env == "staging" {
 			log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured")
 			jsonError(w, "admin accounts require MFA — please set up TOTP before logging in",
