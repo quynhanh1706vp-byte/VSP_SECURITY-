@@ -78,7 +78,7 @@ func Middleware(jwtSecret string, keyStore APIKeyStore) func(http.Handler) http.
 			if !ok {
 				bearer := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 				if bearer != "" {
-					c, err := parseJWT(bearer, jwtSecret)
+					c, err := parseJWTWithRotation(bearer, resolveSecrets(jwtSecret))
 					if err != nil {
 						log.Warn().Str("ip", r.RemoteAddr).Err(err).Msg("invalid jwt")
 						http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
@@ -91,7 +91,7 @@ func Middleware(jwtSecret string, keyStore APIKeyStore) func(http.Handler) http.
 			// 3. Try httpOnly cookie (browser path — OWASP A07)
 			if !ok {
 				if cookie, err := r.Cookie("vsp_token"); err == nil && cookie.Value != "" {
-					c, err := parseJWT(cookie.Value, jwtSecret)
+					c, err := parseJWTWithRotation(cookie.Value, resolveSecrets(jwtSecret))
 					if err != nil {
 						log.Warn().Str("ip", r.RemoteAddr).Err(err).Msg("invalid cookie jwt")
 						http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
@@ -227,7 +227,7 @@ func TokenFromQuery(jwtSecret string, keyStore APIKeyStore) func(http.Handler) h
 
 			// 1. Thử query param ?token=
 			if token := r.URL.Query().Get("token"); token != "" {
-				c, err := parseJWT(token, jwtSecret)
+				c, err := parseJWTWithRotation(token, resolveSecrets(jwtSecret))
 				if err == nil {
 					claims, ok = c, true
 				}
@@ -236,7 +236,7 @@ func TokenFromQuery(jwtSecret string, keyStore APIKeyStore) func(http.Handler) h
 			// 2. Fallback: Authorization header (WS có thể set header)
 			if !ok {
 				if bearer := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); bearer != "" {
-					c, err := parseJWT(bearer, jwtSecret)
+					c, err := parseJWTWithRotation(bearer, resolveSecrets(jwtSecret))
 					if err == nil {
 						claims, ok = c, true
 					}
