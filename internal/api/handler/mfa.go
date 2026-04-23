@@ -65,7 +65,7 @@ func (h *MFA) Verify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.DB.VerifyMFASetup(r.Context(), claims.UserID); err != nil {
+	if err := h.DB.ConfirmMFAEnabled(r.Context(), claims.UserID); err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}

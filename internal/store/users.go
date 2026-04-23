@@ -99,16 +99,26 @@ func (db *DB) UpdateLastLogin(ctx context.Context, id string) error {
 
 // ── MFA methods ───────────────────────────────────────────────────────────────
 
+// SetMFASecret stores a candidate TOTP secret for /auth/mfa/setup.
+// It does NOT enable MFA — that happens only after the user confirms the
+// TOTP code via /auth/mfa/verify (see ConfirmMFAEnabled below). This
+// separation prevents the race where a user is locked out by
+// mfa_enabled=true after starting setup but before completing it.
+// See migrations/018_fix_mfa_dirty_state.sql.
 func (db *DB) SetMFASecret(ctx context.Context, userID, secret string) error {
 	_, err := db.pool.Exec(ctx,
-		`UPDATE users SET mfa_secret = $1, mfa_enabled = true WHERE id = $2`,
+		`UPDATE users SET mfa_secret = $1 WHERE id = $2`,
 		secret, userID)
 	return err
 }
 
-func (db *DB) VerifyMFASetup(ctx context.Context, userID string) error {
+// ConfirmMFAEnabled atomically marks MFA as both enabled and verified.
+// Called from /auth/mfa/verify after the first TOTP code is validated,
+// proving the user correctly scanned the QR and has a working authenticator.
+func (db *DB) ConfirmMFAEnabled(ctx context.Context, userID string) error {
 	_, err := db.pool.Exec(ctx,
-		`UPDATE users SET mfa_verified = true WHERE id = $1`, userID)
+		`UPDATE users SET mfa_enabled = true, mfa_verified = true WHERE id = $1`,
+		userID)
 	return err
 }
 
