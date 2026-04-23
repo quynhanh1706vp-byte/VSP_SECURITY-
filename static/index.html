@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<script>
+// SEC-R2: XSS helpers — escape HTML for text and attribute contexts
+function __esc(s){
+  if(s==null) return '';
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+window.__esc = __esc;
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VSP Security Platform v2.0</title>
@@ -2251,7 +2262,7 @@ function _ensureCompModal() {
 
 function _showCompDetail(ctrl) {
   _ensureCompModal();
-  document.getElementById('cdm-title').innerHTML = (ctrl.id + ' — ' + (ctrl.control||ctrl.practice||ctrl.title||'')) + ' <span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--t3)">read-only</span>';
+  { const t=document.getElementById('cdm-title'); t.innerHTML=''; t.appendChild(document.createTextNode(String(ctrl.id||'')+' — '+String(ctrl.control||ctrl.practice||ctrl.title||'')+' ')); const sp=document.createElement('span'); sp.style.cssText='font-size:9px;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--t3)'; sp.textContent='read-only'; t.appendChild(sp); }
   document.getElementById('cdm-id').textContent = (ctrl.family||ctrl.domain||'—') + ' · ' + (ctrl.framework||'');
   var statusColor = ctrl.status==='assessed' ? 'var(--green)' : 'var(--t3)';
   var statusPill  = ctrl.status==='assessed' ? 'pill-pass' : 'pill-queue';
@@ -4820,7 +4831,7 @@ window.runEval = async function() {
       +' &middot; posture: <b>'+(d.posture||'?')+'</b>'
       +' &middot; <span style="color:var(--t3)">'+(d.reason||'')+'</span>';
   } catch(e) {
-    el.innerHTML = '<span style="color:var(--red)">Error: '+e.message+'</span>';
+    el.innerHTML = ''; const sp=document.createElement('span'); sp.style.color='var(--red)'; sp.textContent='Error: '+String(e && e.message || e || ''); el.appendChild(sp);
   }
 };
 
@@ -5025,7 +5036,7 @@ window.verifyAudit = async function() {
       +' &mdash; '+runs.length+' audit entries verified'
       +' &middot; last verified: '+new Date().toLocaleTimeString('vi-VN');
   } catch(e) {
-    el.innerHTML = '<span style="color:var(--amber)">&#9888; Verify error: '+e.message+'</span>';
+    el.innerHTML = ''; const sp=document.createElement('span'); sp.style.color='var(--amber)'; sp.textContent='⚠ Verify error: '+String(e && e.message || e || ''); el.appendChild(sp);
   }
 };
 
@@ -5136,7 +5147,7 @@ async function loadSOCv2() {
       if (g2) g2.before(rc); else panel.appendChild(rc);
     } else {
       var lbl = existing.querySelector('.card-head .mono-sm');
-      if (lbl) lbl.innerHTML = 'Avg: <b style="color:'+(ztAvg>=70?'var(--green)':ztAvg>=40?'var(--amber)':'var(--red)')+'">'+ztAvg+'</b>/100';
+      if (lbl) { lbl.innerHTML=''; lbl.appendChild(document.createTextNode('Avg: ')); const b=document.createElement('b'); b.style.color=(ztAvg>=70?'var(--green)':ztAvg>=40?'var(--amber)':'var(--red)'); b.textContent=String(Number(ztAvg)||0); lbl.appendChild(b); lbl.appendChild(document.createTextNode('/100')); }
     }
 
     var rcanvas = document.getElementById('soc-radar-canvas');
@@ -6064,7 +6075,7 @@ function _showSLADetail(e) {
   var statusPill  = e.status==='red'?'pill-fail':e.status==='yellow'?'pill-warn':'pill-pass';
   var daysLeft = e.sla_days - e.avg_age_days;
 
-  document.getElementById('sla-dm-title').innerHTML = '<span class="sev '+sevClass[e.severity]+'">'+e.severity+'</span> SLA Detail';
+  { const t=document.getElementById('sla-dm-title'); t.innerHTML=''; const sp=document.createElement('span'); sp.className='sev '+(sevClass[e.severity]||''); sp.textContent=String(e.severity||''); t.appendChild(sp); t.appendChild(document.createTextNode(' SLA Detail')); }
   document.getElementById('sla-dm-sub').textContent = 'SLA target: '+e.sla_days+' days · Status: '+statusLabel;
 
   document.getElementById('sla-dm-body').innerHTML =
@@ -6205,7 +6216,7 @@ function showFindingDetail(idx) {
   }
   var sevClass = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
   var sevColor = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--amber)',LOW:'var(--green)'};
-  document.getElementById('fdm-title').innerHTML = '<span class="sev '+(sevClass[f.severity]||'')+'">'+f.severity+'</span> · '+f.tool;
+  { const t=document.getElementById('fdm-title'); t.innerHTML=''; const sp=document.createElement('span'); sp.className='sev '+(sevClass[f.severity]||''); sp.textContent=String(f.severity||''); t.appendChild(sp); t.appendChild(document.createTextNode(' · '+String(f.tool||''))); }
   document.getElementById('fdm-id').textContent = f.id;
   document.getElementById('fdm-body').innerHTML =
     '<div class="g3 mb14">'
@@ -6375,7 +6386,7 @@ function _openRemEditModal(r) {
     document.body.appendChild(m);
   }
   var sevClass = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
-  document.getElementById('rem-em-title').innerHTML = '<span class="sev '+(sevClass[r.severity]||'')+'">'+r.severity+'</span> · '+(r.tool||'');
+  { const t=document.getElementById('rem-em-title'); t.innerHTML=''; const sp=document.createElement('span'); sp.className='sev '+(sevClass[r.severity]||''); sp.textContent=String(r.severity||''); t.appendChild(sp); t.appendChild(document.createTextNode(' · '+String(r.tool||''))); }
   document.getElementById('rem-em-sub').textContent = 'Finding: '+(r.finding_id||r.id||'');
   document.getElementById('rem-em-body').innerHTML =
     '<div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px">'
