@@ -16,11 +16,11 @@ import (
 	ai "github.com/vsp/platform/internal/ai"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 
-	"encoding/json"
+	"io"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
-	"io"
 )
 
 // securityMiddleware adds security headers and a per-request CSP nonce to every response.
@@ -154,19 +154,12 @@ func main() {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Content-Security-Policy", vspMW.PanelCSP())
 		w.Header().Set("Cache-Control", "no-store")
-		// If token in query, inject it as window.TOKEN before page scripts
-		token := r.URL.Query().Get("token")
-		if token != "" {
-			data, err := os.ReadFile("./static/panels/p4_compliance.html")
-			if err == nil {
-				html := string(data)
-				tokenJSON, _ := json.Marshal(token)
-				inject := "<script>window.TOKEN=" + string(tokenJSON) + ";</script>"
-				html = strings.Replace(html, "<head>", "<head>"+inject, 1)
-				_, _ = w.Write([]byte(html)) //nolint:errcheck
-				return
-			}
-		}
+		// SEC-009 (2026-04-23): removed `?token=` query injection.
+		// Token was being reflected into the HTML response, which leaks
+		// via server logs, browser history, and the document DOM (amplifying
+		// any XSS elsewhere on the page). Clients now read the JWT from
+		// the `vsp_token` HttpOnly cookie via window.TOKEN hydration in
+		// the panel itself (same pattern as other panels).
 		http.ServeFile(w, r, "./static/panels/p4_compliance.html")
 	})
 	// Serve static files, fallback to index.html for SPA
