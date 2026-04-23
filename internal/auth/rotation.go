@@ -58,12 +58,10 @@ func parseJWTWithRotation(tokenStr string, secrets []string) (Claims, error) {
 		return Claims{}, ErrNoSecretsConfigured
 	}
 
-	// Try primary first
-	primaryErr := error(nil)
-	if claims, err := parseJWT(tokenStr, secrets[0]); err == nil {
+	// Try primary first — capture its error to return if all fallbacks fail
+	claims, primaryErr := parseJWT(tokenStr, secrets[0])
+	if primaryErr == nil {
 		return claims, nil
-	} else {
-		primaryErr = err
 	}
 
 	// Try fallbacks (JWT_SECRET_OLD during rotation window)
