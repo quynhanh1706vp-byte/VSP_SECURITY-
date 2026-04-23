@@ -3032,7 +3032,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initSSE() {
   await ensureToken();
   if (!window.TOKEN) return;
-  const src = new EventSource('/api/v1/events');
+  const src = new EventSource('/api/v1/events', { withCredentials: true });
   src.onopen = () => {
     const dot = document.getElementById('sse-dot');
     const lbl = document.getElementById('sse-label');
