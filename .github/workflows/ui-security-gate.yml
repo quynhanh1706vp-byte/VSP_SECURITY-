@@ -2,12 +2,7 @@ name: ui-security-gate
 
 on:
   pull_request:
-    paths:
-      - '**.html'
-      - '**.js'
-      - '**.ts'
-      - '**.jsx'
-      - '**.tsx'
+    branches: [main]
   push:
     branches: [main]
 
