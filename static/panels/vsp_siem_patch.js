@@ -40,9 +40,9 @@ function _siemShowPanel(name) {
     frame.onload = function() {
       var t = window.TOKEN || localStorage.getItem('vsp_token') || '';
       setTimeout(function() {
-        try { frame.contentWindow.postMessage({type:'vsp:token', token:t}, '*'); } catch(e) {}
+        try { frame.contentWindow.postMessage({type:'vsp:token', token:t}, window.location.origin); } catch(e) {}
         setTimeout(function() {
-          try { frame.contentWindow.postMessage({type:'vsp:token', token:t}, '*'); } catch(e) {}
+          try { frame.contentWindow.postMessage({type:'vsp:token', token:t}, window.location.origin); } catch(e) {}
         }, 1000);
       }, 300);
       var loaders = {correlation:loadCorrelation,soar:loadSOAR,logsources:loadLogSources,
@@ -51,7 +51,7 @@ function _siemShowPanel(name) {
     };
   } else {
     // Đã load — push token + data
-    try { frame.contentWindow.postMessage({type:'vsp:token', token:tk}, '*'); } catch(e) {}
+    try { frame.contentWindow.postMessage({type:'vsp:token', token:tk}, window.location.origin); } catch(e) {}
     var loaders = {correlation:loadCorrelation,soar:loadSOAR,logsources:loadLogSources,
                    threatintel:loadThreatIntel,ueba:loadUEBA,assets:loadAssetsPanel};
     if (loaders[name]) setTimeout(loaders[name], 200);
@@ -79,7 +79,7 @@ window.addEventListener('load', function() {
 function _sendToken(frame) {
   var tk = window.TOKEN || '';
   if (!tk || tk.length < 50) return;
-  try { frame.contentWindow.postMessage({type:'vsp:token', token: tk}, '*'); } catch(e) {}
+  try { frame.contentWindow.postMessage({type:'vsp:token', token: tk}, window.location.origin); } catch(e) {}
 }
 
 // 4. Helper: gửi token + data vào frame theo panel id
@@ -87,7 +87,7 @@ function _postFrame(panelId, data) {
   var frame = document.querySelector('#' + panelId + ' iframe');
   if (!frame) return;
   _sendToken(frame);
-  if (data) try { frame.contentWindow.postMessage(data, '*'); } catch(e) {}
+  if (data) try { frame.contentWindow.postMessage(data, window.location.origin); } catch(e) {}
 }
 
 // 5. Loaders
@@ -146,12 +146,14 @@ async function loadAssetsPanel() {
 
 // 6. Parent: lắng nghe iframe xin token — chỉ reply khi có JWT thật
 window.addEventListener('message', function(e) {
+  // VSP-SEC-001: same-origin only (parent does not load VSPOrigin)
+  if (e.origin !== window.location.origin) return;
   if (!e.data || e.data.type !== 'vsp:request_token') return;
   var tk = window.TOKEN || '';
   if (!tk || tk.length < 50 || tk.split('.').length !== 3) return;
   // Reply chỉ cho iframe gửi request
   document.querySelectorAll('iframe').forEach(function(fr) {
-    try { fr.contentWindow.postMessage({type:'vsp:token', token: tk}, '*'); } catch(ex) {}
+    try { fr.contentWindow.postMessage({type:'vsp:token', token: tk}, window.location.origin); } catch(ex) {}
   });
 });
 
@@ -166,7 +168,7 @@ window.addEventListener('message', function(e) {
     clearInterval(_poll);
     // Broadcast token
     document.querySelectorAll('iframe').forEach(function(fr) {
-      try { fr.contentWindow.postMessage({type:'vsp:token', token: tk}, '*'); } catch(ex) {}
+      try { fr.contentWindow.postMessage({type:'vsp:token', token: tk}, window.location.origin); } catch(ex) {}
     });
     // Gọi loader cho panel đang active
     var active = document.querySelector('.nav-item.active');
@@ -251,7 +253,7 @@ window._downloadSIEMExcel = function() {
   function _broadcastTheme() {
     var theme = document.documentElement.getAttribute('data-theme') || 'dark';
     document.querySelectorAll('iframe').forEach(function(fr) {
-      try { fr.contentWindow.postMessage({type:'vsp:theme', theme:theme}, '*'); } catch(e) {}
+      try { fr.contentWindow.postMessage({type:'vsp:theme', theme:theme}, window.location.origin); } catch(e) {}
     });
   }
   // Observe theme changes
@@ -263,10 +265,12 @@ window._downloadSIEMExcel = function() {
   observer.observe(document.documentElement, {attributes: true});
   // Handle theme requests from iframes
   window.addEventListener('message', function(e) {
+  // VSP-SEC-001: same-origin only (parent does not load VSPOrigin)
+  if (e.origin !== window.location.origin) return;
     if (e.data && e.data.type === 'vsp:request_theme') {
       var theme = document.documentElement.getAttribute('data-theme') || 'dark';
       document.querySelectorAll('iframe').forEach(function(fr) {
-        try { fr.contentWindow.postMessage({type:'vsp:theme', theme:theme}, '*'); } catch(e) {}
+        try { fr.contentWindow.postMessage({type:'vsp:theme', theme:theme}, window.location.origin); } catch(e) {}
       });
     }
   });

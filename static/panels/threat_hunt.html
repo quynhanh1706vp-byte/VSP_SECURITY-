@@ -444,14 +444,14 @@ window.addEventListener('message', function(e) {
   }
   if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
 });
-if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
 
 function _applyTheme(t){
   var r=document.documentElement;
   if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}
   else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}
 }
-if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'},'*');
+if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 </script>
 </body>
 </html>

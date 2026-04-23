@@ -1,0 +1,159 @@
+name: postMessage Security Guards (VSP-SEC-001)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'static/**'
+      - 'internal/api/middleware/csp.go'
+      - 'cmd/**/*.go'
+  push:
+    branches: [main]
+    paths:
+      - 'static/**'
+      - 'internal/api/middleware/csp.go'
+      - 'cmd/**/*.go'
+
+permissions:
+  contents: read
+
+jobs:
+  postmessage-origin-check:
+    name: postMessage Origin Check Required
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan window.addEventListener('message') for origin check
+        shell: bash
+        run: |
+          set -euo pipefail
+          violations=0
+
+          # IMPORTANT: Only match window.addEventListener or top-level
+          # addEventListener on 'message' events (postMessage API).
+          # Do NOT match:
+          #   - EventSource.addEventListener('message') — SSE, different event model
+          #   - Other sources (websocket, custom emitters)
+          # Pattern requires 'window.' prefix OR bare addEventListener
+          # NOT preceded by a variable like source., eventsource., ws.
+
+          while IFS= read -r match; do
+            file="${match%%:*}"
+            line="${match#*:}"
+            line="${line%%:*}"
+
+            # Get 15-line window from the match
+            window=$(sed -n "${line},$((line+15))p" "$file")
+
+            if echo "$window" | grep -qE '(VSPOrigin\.check|e\.origin|event\.origin|msg\.origin|ALLOWED_ORIGINS)'; then
+              echo "✓ $file:$line has origin check"
+            else
+              echo "::error file=$file,line=$line::postMessage handler missing origin check (VSP-SEC-001). Add: if (!window.VSPOrigin.check(e)) return;"
+              violations=$((violations+1))
+            fi
+          done < <(grep -rn -E "^\s*window\.addEventListener\s*\(\s*['\"]message['\"]" \
+                    --include='*.html' --include='*.js' \
+                    --exclude-dir=node_modules \
+                    --exclude-dir=.git . 2>/dev/null || true)
+
+          if [ "$violations" -gt 0 ]; then
+            echo ""
+            echo "::error::Found $violations postMessage handler(s) without origin check"
+            exit 1
+          fi
+          echo ""
+          echo "✓ All postMessage handlers have origin check"
+
+  postmessage-wildcard-target:
+    name: postMessage Must Not Use Wildcard Target
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Disallow postMessage(..., '*')
+        shell: bash
+        run: |
+          set -euo pipefail
+          violations=$(grep -rn "postMessage\s*(.*,\s*['\"]\*['\"]" \
+                       --include='*.html' --include='*.js' \
+                       --exclude-dir=node_modules \
+                       --exclude-dir=.git . 2>/dev/null || true)
+
+          if [ -n "$violations" ]; then
+            echo "::error::postMessage with wildcard target origin detected (VSP-SEC-001)"
+            echo "$violations"
+            echo ""
+            echo "Fix: use window.VSPOrigin.send(target, data, origin) or window.location.origin"
+            exit 1
+          fi
+          echo "✓ No wildcard postMessage targets"
+
+  no-anthropic-frontend:
+    name: No Direct Anthropic API From Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject api.anthropic.com in HTML/JS
+        shell: bash
+        run: |
+          set -euo pipefail
+          violations=$(grep -rn "api\.anthropic\.com" \
+                       --include='*.html' --include='*.js' \
+                       --exclude-dir=node_modules \
+                       --exclude-dir=.git . 2>/dev/null || true)
+
+          if [ -n "$violations" ]; then
+            echo "::error::Direct Anthropic API reference in frontend (VSP-SEC-001)"
+            echo "$violations"
+            exit 1
+          fi
+          echo "✓ No frontend Anthropic API calls"
+
+  csp-no-unsafe-eval:
+    name: CSP Must Not Allow unsafe-eval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Disallow unsafe-eval in CSP headers (not test files)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # IMPORTANT: exclude _test.go files — tests check for absence
+          # of 'unsafe-eval' in CSP (correct pattern)
+          violations=$(grep -rn "'unsafe-eval'" \
+                       --include='*.go' \
+                       --exclude='*_test.go' \
+                       --exclude-dir=.git . 2>/dev/null || true)
+
+          if [ -n "$violations" ]; then
+            echo "::error::CSP contains 'unsafe-eval' in production code (VSP-SEC-001)"
+            echo "$violations"
+            exit 1
+          fi
+          echo "✓ No unsafe-eval in production CSP"
+
+  csp-no-anthropic-connect:
+    name: CSP connect-src Must Not Include api.anthropic.com
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Disallow api.anthropic.com in connect-src (not test files)
+        shell: bash
+        run: |
+          set -euo pipefail
+          violations=$(grep -rn "connect-src.*api\.anthropic\.com" \
+                       --include='*.go' \
+                       --exclude='*_test.go' \
+                       --exclude-dir=.git . 2>/dev/null || true)
+
+          if [ -n "$violations" ]; then
+            echo "::error::CSP connect-src allows api.anthropic.com (VSP-SEC-001)"
+            echo "$violations"
+            exit 1
+          fi
+          echo "✓ CSP connect-src clean"

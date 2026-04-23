@@ -2882,7 +2882,7 @@ async function ensureToken() {
       localStorage.removeItem('vsp_token');
       // Notify tất cả iframes
       document.querySelectorAll('iframe').forEach(function(f) {
-        try { f.contentWindow.postMessage({type:'vsp:token', token:''}, '*'); } catch(e) {}
+        try { f.contentWindow.postMessage({type:'vsp:token', token:''}, window.location.origin); } catch(e) {}
       });
       // Redirect về login page sau 300ms
       setTimeout(function() {

@@ -608,7 +608,7 @@ async function openIncidentDetail(id){
   };
   document.getElementById('imod-soar-btn').onclick=function(){
     closeModal('inc-modal');
-    window.parent && window.parent.postMessage({type:'vsp:nav',panel:'soar'},'*');
+    window.parent && window.parent.postMessage({type:'vsp:nav',panel:'soar'}, window.location.origin);
   };
 
   document.getElementById('inc-modal').classList.add('open');
@@ -747,7 +747,7 @@ window.addEventListener('message', function(e) {
   if(e.data.type==='vsp:data') _onData(e.data);
   if(e.data.type==='vsp:theme') _applyTheme(e.data.theme);
 });
-if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
 
 // ── Theme ──────────────────────────────────────────────────
 function _applyTheme(theme){
@@ -766,7 +766,7 @@ function _applyTheme(theme){
     document.body.style.background='#0a0c10';
   }
 }
-if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'},'*');
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 
 // ── Init ───────────────────────────────────────────────────
 renderRules();

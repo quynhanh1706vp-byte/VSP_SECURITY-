@@ -752,7 +752,7 @@ window.addEventListener('message', function(e) {
   if(e.data.type==='vsp:data') _onData(e.data);
   if(e.data.type==='vsp:theme') _applyTheme(e.data.theme);
 });
-if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
 
 // ── Theme ──────────────────────────────────────────────────
 function _applyTheme(theme){
@@ -768,7 +768,7 @@ function _applyTheme(theme){
     r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');
   }
 }
-if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'},'*');
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 
 // ── Init ───────────────────────────────────────────────────
 renderList();

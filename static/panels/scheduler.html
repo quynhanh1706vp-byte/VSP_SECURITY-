@@ -695,8 +695,8 @@ addEventListener('message', function(e) {
 });
 
 if (window.parent !== window) {
-  window.parent.postMessage({ type: 'vsp:request_token' }, '*');
-  window.parent.postMessage({ type: 'vsp:request_theme' }, '*');
+  window.parent.postMessage({ type: 'vsp:request_token' }, window.location.origin);
+  window.parent.postMessage({ type: 'vsp:request_theme' }, window.location.origin);
 }
 (function() {
   var tk = '';
