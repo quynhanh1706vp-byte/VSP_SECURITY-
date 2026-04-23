@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -46,13 +47,24 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
 		return
 	}
-	_, jwtErr := jwt.ParseWithClaims(rawToken, &jwt.MapClaims{},
-		func(t *jwt.Token) (any, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return []byte(sseJWTSecret), nil
-		})
+	// VSP-SEC (JWT rotation): try primary + old secret (if set)
+	secrets := []string{sseJWTSecret}
+	if old := os.Getenv("JWT_SECRET_OLD"); old != "" && old != sseJWTSecret {
+		secrets = append(secrets, old)
+	}
+	var jwtErr error
+	for _, s := range secrets {
+		_, jwtErr = jwt.ParseWithClaims(rawToken, &jwt.MapClaims{},
+			func(t *jwt.Token) (any, error) {
+				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, jwt.ErrSignatureInvalid
+				}
+				return []byte(s), nil
+			})
+		if jwtErr == nil {
+			break
+		}
+	}
 	if jwtErr != nil {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return
