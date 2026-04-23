@@ -16,16 +16,23 @@ import (
 func WSUpgradeHandler(w http.ResponseWriter, r *http.Request) {
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	if upgrade == "websocket" {
-		rawToken := r.URL.Query().Get("token")
+		// SEC-009 (2026-04-23): auth.Middleware on this route validates
+		// Bearer header / cookie BEFORE upgrade. The ?token= query-param
+		// fallback was removed because it leaks via access logs and
+		// Referer headers. If no Authorization header is set, the browser
+		// must have sent the vsp_token cookie for this to reach us.
+		rawToken := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if rawToken == "" {
-			rawToken = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			if c, err := r.Cookie("vsp_token"); err == nil {
+				rawToken = c.Value
+			}
 		}
 		if rawToken == "" {
 			http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
 			return
 		}
-		// Validate token length — real JWT validation happens in middleware
-		// WS upgrades bypass middleware, so basic sanity check here
+		// Sanity: middleware already validated; this guards against handler being
+		// wired directly without middleware in some future refactor.
 		if len(rawToken) < 50 || !strings.Contains(rawToken, ".") {
 			http.Error(w, `{"error":"invalid token format"}`, http.StatusUnauthorized)
 			return
