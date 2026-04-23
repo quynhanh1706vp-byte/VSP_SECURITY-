@@ -86,7 +86,6 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
 | Risk | Severity | Notes |
 |------|----------|-------|
 | No WAF in front of gateway | HIGH | CloudFlare/nginx recommended |
-| JWT secret rotation runbook | HIGH | Document rotation process |
 | Secrets in env vars, not Vault | MEDIUM | Vault migration planned |
 | DAST coverage tuning | LOW | Nuclei in CI, needs templates |
 

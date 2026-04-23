@@ -24,7 +24,7 @@
 //  - FedRAMP IA-5 control requires periodic credential rotation.
 //  - Dual-secret preserves user sessions across rotation.
 //
-// See: docs/runbooks/jwt-rotation.md (TODO)
+// See: docs/JWT_ROTATION_RUNBOOK.md
 
 package auth
 
