@@ -39,9 +39,16 @@ func (h *WSHub) unregister(ch chan []byte) { h.mu.Lock(); delete(h.clients, ch);
 
 // GET /api/v1/events — Server-Sent Events (SSE) stream
 func SSEHandler(w http.ResponseWriter, r *http.Request) {
-	rawToken := r.URL.Query().Get("token")
+	// SEC-009 (2026-04-23): auth is handled by auth.Middleware mounted
+	// on this route in gateway/main.go. Claims are already in context.
+	// The token itself is re-parsed below only to validate JWT rotation,
+	// which is already done by the middleware — consider removing this
+	// secondary validation in a follow-up PR once SSE tests land.
+	rawToken := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if rawToken == "" {
-		rawToken = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if c, err := r.Cookie("vsp_token"); err == nil {
+			rawToken = c.Value
+		}
 	}
 	if rawToken == "" || sseJWTSecret == "" {
 		http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
