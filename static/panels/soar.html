@@ -745,7 +745,8 @@ function _onData(d){
   }
   if(d.runs&&d.runs.runs) loadRunHistory();
 }
-window.addEventListener('message',function(e){
+window.addEventListener('message', function(e) {
+  if (!window.VSPOrigin.check(e)) return;
   if(!e.data) return;
   if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN)TOKEN=e.data.token;}
   if(e.data.type==='vsp:data') _onData(e.data);

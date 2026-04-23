@@ -737,7 +737,8 @@ function _onData(d){
   if(d.rules&&d.rules.rules&&d.rules.rules.length){RULES=d.rules.rules;renderRules();}
   if(d.incidents&&d.incidents.incidents&&d.incidents.incidents.length){INCIDENTS=d.incidents.incidents;renderIncidents();}
 }
-window.addEventListener('message',function(e){
+window.addEventListener('message', function(e) {
+  if (!window.VSPOrigin.check(e)) return;
   if(!e.data) return;
   if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50&&e.data.token.split('.').length===3){
     if(!TOKEN) TOKEN=e.data.token;

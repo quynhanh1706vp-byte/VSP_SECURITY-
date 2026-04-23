@@ -650,7 +650,13 @@ async function loadHealth(){
     '</div>').join('');
 }
 
-window.addEventListener('message',e=>{if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;});
+window.addEventListener('message', e => {
+
+  if (!window.VSPOrigin.check(e)) return;
+
+  if(e.data?.type==='vsp:token'&&e.data.token)TOKEN=e.data.token;
+
+});
 document.addEventListener('DOMContentLoaded',()=>{
   renderDastTargets();
   renderAlertRules();

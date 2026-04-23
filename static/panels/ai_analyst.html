@@ -776,6 +776,7 @@ try {
   if (!TOKEN && window.parent && window.parent.TOKEN) TOKEN = window.parent.TOKEN;
 } catch(e) {}
 window.addEventListener('message', function(e) {
+  if (!window.VSPOrigin.check(e)) return;
   if (e.data && e.data.type === 'vsp:token') { TOKEN = e.data.token || ''; }
   if (e.data && e.data.type === 'vsp:siem') { _siem = e.data.data || {}; }
 });

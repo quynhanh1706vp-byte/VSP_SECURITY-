@@ -492,7 +492,9 @@ var STATIC_EOL=[
   {name:'BKAV Pro 2018',vendor:'BKAV',version:'2018',eol_date:'2020-12-31',status:'eol',source:'manual'}
 ];
 
-window.addEventListener('message',function(e){
+window.addEventListener('message', function(e) {
+
+  if (!window.VSPOrigin.check(e)) return;
   if(!e.data) return;
   if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){
     TOKEN=e.data.token;

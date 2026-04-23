@@ -367,7 +367,8 @@ async function loadAssets(){
   }catch(e){}
 }
 function _onTokenReady(){}
-window.addEventListener('message',function(e){
+window.addEventListener('message', function(e) {
+  if (!window.VSPOrigin.check(e)) return;
   if(!e.data)return;
   if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;loadAssets();}}
   if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
