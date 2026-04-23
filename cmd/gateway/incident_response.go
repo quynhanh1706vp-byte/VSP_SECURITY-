@@ -26,6 +26,22 @@ import (
 
 // GET /api/p4/ir/incidents
 // Query params: phase, severity, status, substantial, limit
+
+// irFieldQueries maps each updatable incident field to its full parameterized
+// UPDATE statement. Introduced to silence CodeQL go/sql-injection (alert #61)
+// and to make the set of updatable fields structurally obvious to readers.
+// See handler at line ~966.
+var irFieldQueries = map[string]string{
+	"severity":           "UPDATE ir_incidents SET severity = $1, updated_at = NOW() WHERE incident_id = $2",
+	"status":             "UPDATE ir_incidents SET status = $1, updated_at = NOW() WHERE incident_id = $2",
+	"description":        "UPDATE ir_incidents SET description = $1, updated_at = NOW() WHERE incident_id = $2",
+	"assigned_to":        "UPDATE ir_incidents SET assigned_to = $1, updated_at = NOW() WHERE incident_id = $2",
+	"incident_commander": "UPDATE ir_incidents SET incident_commander = $1, updated_at = NOW() WHERE incident_id = $2",
+	"lessons_learned":    "UPDATE ir_incidents SET lessons_learned = $1, updated_at = NOW() WHERE incident_id = $2",
+	"root_cause":         "UPDATE ir_incidents SET root_cause = $1, updated_at = NOW() WHERE incident_id = $2",
+	"title":              "UPDATE ir_incidents SET title = $1, updated_at = NOW() WHERE incident_id = $2",
+}
+
 func handleIRIncidentsList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if p4SQLDB == nil {
@@ -953,16 +969,16 @@ func handleIRIncidentUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", 400)
 		return
 	}
-	allowed := map[string]bool{
-		"severity": true, "status": true, "description": true,
-		"assigned_to": true, "incident_commander": true,
-		"lessons_learned": true, "root_cause": true, "title": true,
-	}
-	if !allowed[req.Field] {
+	// SEC (defense-in-depth, 2026-04-23): map each allowed field to a
+	// fully-formed query string. Prevents a future refactor from removing
+	// the allowlist and reintroducing SQL injection via fmt.Sprintf.
+	// Also silences CodeQL go/sql-injection (alert #61) — taint analyzer
+	// cannot prove allowlist safety, but can prove table lookup safety.
+	query, ok := irFieldQueries[req.Field]
+	if !ok {
 		http.Error(w, "field not updatable", 400)
 		return
 	}
-	query := fmt.Sprintf("UPDATE ir_incidents SET %s = $1, updated_at = NOW() WHERE incident_id = $2", req.Field)
 	res, err := p4SQLDB.Exec(query, req.Value, req.IncidentID)
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), 500)
