@@ -2588,7 +2588,15 @@ async function renderQS(q) {
 
   _qsItems = panels;
   _qsSel = 0;
-  el.innerHTML = html2 || `<div style="padding:20px;text-align:center;color:var(--t3);font-size:12px">No results for "${q}"</div>`;
+  if (html2) {
+    el.innerHTML = html2;
+  } else {
+    el.innerHTML = '';
+    const noRes = document.createElement('div');
+    noRes.style.cssText = 'padding:20px;text-align:center;color:var(--t3);font-size:12px';
+    noRes.textContent = 'No results for "' + String(q || '') + '"';
+    el.appendChild(noRes);
+  }
 }
 
 function selectQS(idx) {
