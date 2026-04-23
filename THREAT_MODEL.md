@@ -1,6 +1,6 @@
 # VSP Security Platform — Threat Model (STRIDE)
 
-**Version:** 1.0 | **Date:** 2026-04-10 | **Method:** STRIDE
+**Version:** 1.1 | **Date:** 2026-04-23 | **Method:** STRIDE
 
 ## System Overview
 
@@ -22,10 +22,12 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
 |--------|------------|--------|
 | JWT forgery | HMAC-SHA256, secret from env | OK |
 | Token theft via XSS | httpOnly cookie (CWE-312) | OK |
-| Token in SSE/WS URL | Removed ?token= from all URLs | OK |
+| Token in SSE/WS URL | Cookie migration in progress (SEC-009); `ws.go:42` still accepts `?token=` query | IN_PROGRESS |
 | Brute force login | 10 req/min + lockout after 5 fails | OK |
 | Session fixation | New JWT issued on every login | OK |
 | CAC/PIV bypass | OIDC validation, no Referer bypass | OK |
+| postMessage origin bypass | `VSPOrigin.check()` on 17 panels + 5 CI guards (VSP-SEC-001, PR #61) | OK |
+| JWT key compromise | Dual-secret rotation (`internal/auth/rotation.go`, PR #63); 24h transition window | OK |
 
 ### T — Tampering
 
@@ -51,10 +53,11 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
 |--------|------------|--------|
 | Version in /health | Removed from public response | OK |
 | Stack traces in errors | Generic error messages only | OK |
-| Token in URL | Cookie-based, ?token= blocked (400) | OK |
+| Token in SSE URL | Cookie migration pending (SEC-009); middleware blocks non-SSE paths only | IN_PROGRESS |
 | Secrets in repo | pre-commit gitleaks + CI gitleaks | OK |
 | User enumeration | Generic "invalid credentials" message | OK |
 | Tenant data leak | tenant_id on 82/92 queries (10 internal-only, SD-0045) | OK |
+| Anthropic API open relay | Frontend proxy removed (dead code purge, PR #61); CSP blocks `api.anthropic.com` | OK |
 
 ### D — Denial of Service
 
@@ -76,6 +79,7 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
 | Container escape | nonroot UID 65534, scratch image | OK |
 | Dependency CVEs | govulncheck CI, crypto v0.50 | OK |
 | gRPC auth bypass | Upgraded v1.73-dev to v1.80 (CVSS 9.1) | OK |
+| MFA not enforced for admins | TOTP Setup/Verify/Disable available (`handler/mfa.go`); policy enforcement pending | IN_PROGRESS |
 
 ## Remaining Risks
 
@@ -84,8 +88,25 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
 | No WAF in front of gateway | HIGH | CloudFlare/nginx recommended |
 | JWT secret rotation runbook | HIGH | Document rotation process |
 | Secrets in env vars, not Vault | MEDIUM | Vault migration planned |
-| MFA not enforced for admins | MEDIUM | Policy config needed |
 | DAST coverage tuning | LOW | Nuclei in CI, needs templates |
+
+## Known Limitations
+
+Tracked findings from CodeQL / security tooling, deferred to a scheduled sprint
+rather than blocking current release. These are **known and accepted**, not unmanaged.
+
+| ID | Category | Count | Tracked In | Scheduled |
+|----|----------|-------|------------|-----------|
+| #62 | CodeQL XSS | 9 | GitHub issue #62 | Sprint 2 triage |
+| #62 | CodeQL CSRF | 2 | GitHub issue #62 | Sprint 2 triage |
+| #62 | CodeQL unreachable | 2 | GitHub issue #62 | Sprint 2 triage |
+| #62 | CodeQL XSS-via-exception | 2 | GitHub issue #62 | Sprint 2 triage |
+| SD-0045 | Tenant isolation gaps | 10 queries | `docs/COMPLIANCE_MATRIX.md` | Internal-only paths; documented |
+| SEC-009 | SSE cookie migration | 1 handler | `ws.go:42` | Sprint 4 frontend work |
+
+**Status:** These items are pre-existing (not introduced by Sprint 0) and have
+compensating controls (CSP, origin checks, CI guards) preventing exploitation
+in the interim.
 
 ## Security Contacts
 
@@ -102,4 +123,11 @@ Key components: API Gateway, Scanner workers, PostgreSQL, Redis, SIEM engine.
   IN_PROGRESS (frontend migration SEC-009 pending). MFA enforcement marked
   IN_PROGRESS (TOTP available, policy enforcement Sprint 4 PR #B).
 
-**Next verification:** 2026-07-20 (quarterly cadence).
+- **2026-04-23**: Post-Sprint 0 update (v1.1). Added STRIDE rows for
+  VSP-SEC-001 (postMessage origin check, PR #61) and JWT dual-secret rotation
+  (PR #63). SSE token rows re-synced to IN_PROGRESS to match `ws.go:42`
+  implementation. MFA row moved from Remaining Risks to § E (TOTP code exists,
+  policy enforcement pending). Known Limitations section added linking issue #62
+  (15 CodeQL findings, Sprint 2 triage scope).
+
+**Next verification:** 2026-07-23 (quarterly cadence).
