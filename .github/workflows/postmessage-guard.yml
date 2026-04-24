@@ -14,7 +14,7 @@ jobs:
     name: postMessage Origin Check Required
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Scan window.addEventListener('message') for origin check
         shell: bash
@@ -61,7 +61,7 @@ jobs:
     name: postMessage Must Not Use Wildcard Target
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Disallow postMessage(..., '*')
         shell: bash
@@ -85,7 +85,7 @@ jobs:
     name: No Direct Anthropic API From Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Reject api.anthropic.com in HTML/JS
         shell: bash
@@ -107,7 +107,7 @@ jobs:
     name: CSP Must Not Allow unsafe-eval
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Disallow unsafe-eval in CSP headers (not test files)
         shell: bash
@@ -132,7 +132,7 @@ jobs:
     name: CSP connect-src Must Not Include api.anthropic.com
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Disallow api.anthropic.com in connect-src (not test files)
         shell: bash
