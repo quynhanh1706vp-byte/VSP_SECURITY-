@@ -15,16 +15,16 @@ jobs:
     name: CodeQL extended
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       # Set up Go for CodeQL build-mode (CodeQL requires compiling Go to
       # analyze it). Version kept in sync with ci.yml via env.
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "1.25.9"
           cache: true
 
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3.35.2
         with:
           # Repo composition: ~210 Go files, ~12 JS files, ~9 Python.
           # CodeQL 'javascript' language covers both JS and TS.
@@ -42,18 +42,18 @@ jobs:
       # Autobuild handles Go module resolution and compilation for CodeQL
       # tracing. No .NET project exists, so the dotnet build scaffolding
       # has been removed.
-      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/autobuild@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3.35.2
 
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3.35.2
         with: { category: "codeql" }
 
   semgrep:
     name: Semgrep wide packs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with: { fetch-depth: 0 }
-      - uses: semgrep/semgrep-action@v1
+      - uses: semgrep/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d # v0.58.0
         with:
           config: >
             p/owasp-top-ten
@@ -65,7 +65,7 @@ jobs:
           generateSarif: "1"
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3.35.2
         if: always()
         with: { sarif_file: semgrep.sarif }
 
@@ -73,7 +73,7 @@ jobs:
     name: Trivy FS (deep)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — SHA-pinned post GHSA-69fq-xp46-6x23
         with:
           scan-type: fs
@@ -82,7 +82,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: "os,library"
           scanners: "vuln,config,license,secret"
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3.35.2
         if: always()
         with: { sarif_file: trivy-fs.sarif }
 
@@ -90,7 +90,7 @@ jobs:
     name: Terrascan (Terraform)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install Terrascan
         run: |
           V="1.18.1"
@@ -119,7 +119,7 @@ jobs:
         if: steps.guard.outputs.has_tf == 'true'
         run: |
           terrascan scan -t terraform -i terraform -o sarif > terrascan.sarif || true
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3.35.2
         # Only upload when the scan ran AND produced a non-empty SARIF file.
         if: steps.guard.outputs.has_tf == 'true' && hashFiles('terrascan.sarif') != ''
         with: { sarif_file: terrascan.sarif }
@@ -128,16 +128,16 @@ jobs:
     name: Gitleaks (secrets)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with: { fetch-depth: 0 }
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           # gitleaks-action@v2 breaking change: requires GITHUB_TOKEN to scan PRs.
           # https://github.com/gitleaks/gitleaks-action#-announcement
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: detect --no-color --redact --report-format sarif --report-path gitleaks.sarif
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3.35.2
         # Guard with hashFiles: when gitleaks finds no secrets OR hits an early
         # exit, the SARIF file may not exist and upload would fail loudly.
         if: always() && hashFiles('gitleaks.sarif') != ''

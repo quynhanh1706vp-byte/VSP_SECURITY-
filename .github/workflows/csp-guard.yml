@@ -16,7 +16,7 @@ jobs:
     name: Wildcard regression guard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Scan Go source for banned CSP patterns
         run: |
           set -u
@@ -35,7 +35,7 @@ jobs:
     name: Inline handler baseline (ratchet-down)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Count inline event handlers
         id: count
         run: |
