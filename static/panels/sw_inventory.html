@@ -597,7 +597,7 @@ async function ensureToken() {
   TOKEN = window.parent?.TOKEN || window.TOKEN || localStorage.getItem('vsp_token') || '';
   if (!TOKEN) {
     try {
-      const r = await fetch(API+'/api/v1/auth/token', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:'admin123'})});
+      const r = await fetch(API+'/api/v1/auth/check', {credentials:'include'});
       const d = await r.json(); TOKEN = d.access_token || d.token || '';
     } catch(e) { TOKEN = 'demo'; }
   }

@@ -2353,6 +2353,7 @@ function _exportCompCSV() {
 }
 
 async function _loadComplianceData(type) {
+(async () => {
   await ensureToken();
   var url = type==='fedramp' ? '/api/v1/compliance/fedramp' : '/api/v1/compliance/cmmc';
   var h = {'Authorization':'Bearer '+window.TOKEN};
@@ -2382,6 +2383,7 @@ async function _loadComplianceData(type) {
     showToast('Error loading compliance data','error');
     console.error(e);
   }
+})();
 }
 
 function loadFedRAMP() {
