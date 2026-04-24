@@ -40,6 +40,9 @@ var aggrTools = map[string]bool{
 	"nmap": true,
 	"syft": true,
 	"govulncheck": true,
+	"osv-scanner": true,
+	"cosign": true,
+	"retire-js": true,
 }
 
 func filterRunners(runners []scanner.Runner, allowed map[string]bool) []scanner.Runner {
@@ -80,7 +83,7 @@ func ToolNamesForMode(mode Mode) []string {
 	case ModeSAST:
 		return []string{"bandit", "semgrep", "codeql", "gosec"}
 	case ModeSCA:
-		return []string{"trivy", "grype", "license", "syft", "govulncheck"}
+		return []string{"trivy", "grype", "license", "syft", "govulncheck", "osv-scanner", "retire-js"}
 	case ModeSecrets:
 		return []string{"gitleaks", "secretcheck", "trufflehog"}
 	case ModeIAC:
@@ -97,6 +100,7 @@ func ToolNamesForMode(mode Mode) []string {
 			"gitleaks", "secretcheck", "trufflehog",
 			"nikto", "nuclei", "sslscan",
 			"nmap", "netcap",
+			"osv-scanner", "cosign", "retire-js",
 		}
 	default:
 		return []string{"bandit", "semgrep", "trivy", "grype", "gitleaks", "secretcheck"}

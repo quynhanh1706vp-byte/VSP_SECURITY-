@@ -3304,10 +3304,10 @@ if (document.readyState !== 'loading') {
 const TOOLS_BY_MODE = {
   IAC:     ['kics','checkov'],
   SAST:    ['bandit','semgrep','codeql','gosec'],
-  SCA:     ['trivy','grype','license','syft','govulncheck'],
+  SCA:     ['trivy','grype','license','syft','govulncheck','osv-scanner','retire-js'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js'],
 };
 const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
 
@@ -3454,20 +3454,17 @@ console.log('VSP Patch v2.2 loaded ✓');
 // ── PATCH v2.3 — Fix tools by actual findings + gate line + source ─────────
 
 // Override TOOLS_BY_MODE — dùng tools thật từ findings thay vì hardcode
+TOOLS_BY_MODE — dùng tools thật từ findings thay vì hardcode
 const TOOLS_BY_MODE_V2 = {
   IAC:     ['kics','checkov','hadolint','trivy','gitleaks'],
   SAST:    ['bandit','semgrep','codeql','gosec'],
-  SCA:     ['trivy','grype','license','syft','govulncheck'],
+  SCA:     ['trivy','grype','license','syft','govulncheck','osv-scanner','retire-js'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
   NETWORK: ['sslscan','nmap','netcap'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
-  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
-};
-
-async function loadRunLog(rid) {
-  if (!rid) return;
-  await ensureToken();
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js'],
+  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js'],
+}it ensureToken();
   try {
     const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const run = await r.json();

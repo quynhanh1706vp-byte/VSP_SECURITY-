@@ -27,6 +27,9 @@ import (
 	"github.com/vsp/platform/internal/scanner/sslscan"
 	"github.com/vsp/platform/internal/scanner/syft"
 	"github.com/vsp/platform/internal/scanner/trivy"
+	"github.com/vsp/platform/internal/scanner/osvscanner"
+	"github.com/vsp/platform/internal/scanner/cosign"
+	"github.com/vsp/platform/internal/scanner/retirejs"
 	"github.com/vsp/platform/internal/scanner/trufflehog"
 )
 
@@ -133,6 +136,9 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		grype.New(),
 		trivy.New(),
 		license.NewRunner(),
+		osvscanner.New(),
+		cosign.New(),
+		retirejs.New(),
 		syft.New(),
 		govulncheck.New(),
 	}

@@ -93,6 +93,10 @@ var toolCategory = map[string]SourceCategory{
 	// Phase 2: SBOM family
 	"syft":        SourceSCA,
 	"govulncheck": SourceSCA,
+	// Phase 3: supply chain scanners
+	"osv-scanner":  SourceSCA,
+	"cosign":       SourceSCA,
+	"retire-js":    SourceSCA,
 }
 
 // CategoryOf returns the SourceCategory for a given tool name.
