@@ -6,9 +6,14 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o soc-shell ./cmd/soc-shell/
 
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S vsp && adduser -S -u 1000 -G vsp vsp
 WORKDIR /app
-COPY --from=builder /app/soc-shell .
-COPY static/ ./static/
+COPY --from=builder --chown=vsp:vsp /app/soc-shell .
+COPY --chown=vsp:vsp static/ ./static/
+
+# SEC: Drop privileges
+USER vsp:vsp
+
 EXPOSE 8922
 CMD ["./soc-shell"]
