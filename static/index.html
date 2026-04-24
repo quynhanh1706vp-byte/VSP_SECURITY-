@@ -3303,11 +3303,11 @@ if (document.readyState !== 'loading') {
 
 const TOOLS_BY_MODE = {
   IAC:     ['kics','checkov'],
-  SAST:    ['bandit','semgrep','codeql'],
+  SAST:    ['bandit','semgrep','codeql','gosec'],
   SCA:     ['trivy','grype'],
-  SECRETS: ['gitleaks','trufflehog'],
-  DAST:    ['nuclei','zap'],
-  FULL:    ['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+  SECRETS: ['gitleaks','secretcheck','trufflehog'],
+  DAST:    ['nikto','nuclei','sslscan'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
 };
 const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
 
@@ -3572,10 +3572,10 @@ async function loadRunLog(rid) {
     const run = await fetch('/api/v1/vsp/run/'+rid, {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const mode = run.mode || 'FULL';
     const TOOLS_BY_MODE = {
-      IAC:['kics','checkov'], SAST:['bandit','semgrep','codeql'],
-      SCA:['trivy','grype'], SECRETS:['gitleaks','trufflehog'],
-      DAST:['nuclei','zap'],
-      FULL:['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+      IAC:['kics','checkov'], SAST:    ['bandit','semgrep','codeql','gosec'],
+      SCA:['trivy','grype'], SECRETS: ['gitleaks','secretcheck','trufflehog'],
+      DAST:    ['nikto','nuclei','sslscan'],
+      FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
     };
     const expectedTools = TOOLS_BY_MODE[mode] || ['kics','checkov'];
 
