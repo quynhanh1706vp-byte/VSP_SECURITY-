@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VSP — Enterprise Security Compliance Platform</title>
+<meta name="description" content="Unified security compliance platform with 23 integrated scanners. Dual-certified for DoD FedRAMP/CMMC and ISO 27001/Vietnamese regulatory frameworks.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --ink:     #0a1628;   /* deep navy - primary */
+    --ink-2:   #142238;   /* card bg */
+    --ink-3:   #1e2d47;   /* hover */
+    --cream:   #f4e9d8;   /* body text on dark */
+    --cream-2: #c8bea9;   /* muted body text */
+    --cream-3: #8a8068;   /* caption */
+    --accent:  #0d7377;   /* teal - single accent color */
+    --accent-lt: #14a8ad;
+    --warm:    #c9a961;   /* warm gold for credentials/seals */
+    --divider: rgba(244,233,216,.08);
+    --divider-2: rgba(244,233,216,.16);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    font-weight: 300;
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Subtle paper-like texture overlay for warmth */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(13,115,119,.035) 0%, transparent 50%),
+      radial-gradient(circle at 80% 85%, rgba(201,169,97,.025) 0%, transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; }
+
+  /* ── Navigation ─────────────────────────────────────────── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,22,40,.88);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--divider);
+    padding: 18px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: 'IBM Plex Serif', serif;
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: -.01em;
+  }
+  .nav-brand::before {
+    content: '';
+    width: 28px;
+    height: 28px;
+    border: 1.5px solid var(--warm);
+    border-radius: 2px;
+    position: relative;
+    display: block;
+  }
+  .nav-links {
+    display: flex;
+    gap: 38px;
+    font-size: 13px;
+    color: var(--cream-2);
+    font-weight: 400;
+  }
+  .nav-links a {
+    color: inherit;
+    text-decoration: none;
+    transition: color .2s;
+    padding: 6px 0;
+    border-bottom: 1px solid transparent;
+  }
+  .nav-links a:hover { color: var(--cream); border-bottom-color: var(--warm); }
+
+  .nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 12px;
+    letter-spacing: .04em;
+  }
+  .nav-toggle {
+    display: flex;
+    gap: 2px;
+    border: 1px solid var(--divider-2);
+    border-radius: 2px;
+    overflow: hidden;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .08em;
+  }
+  .nav-toggle button {
+    background: transparent;
+    color: var(--cream-2);
+    border: none;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: inherit;
+    font-size: inherit;
+    letter-spacing: inherit;
+  }
+  .nav-toggle button.active {
+    background: var(--warm);
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .nav-cta {
+    background: var(--accent);
+    color: var(--cream);
+    border: none;
+    padding: 10px 22px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'IBM Plex Sans', sans-serif;
+    cursor: pointer;
+    transition: background .2s;
+    border-radius: 2px;
+    letter-spacing: .01em;
+  }
+  .nav-cta:hover { background: var(--accent-lt); }
+
+  /* ── Hero ────────────────────────────────────────────────── */
+  .hero {
+    padding: 140px 48px 120px;
+    max-width: 1180px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .hero-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .18em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    width: 40px;
+    height: 1px;
+    background: var(--warm);
+    display: inline-block;
+  }
+  h1.hero-title {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: clamp(42px, 6.2vw, 86px);
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -.025em;
+    margin-bottom: 36px;
+    max-width: 920px;
+  }
+  h1.hero-title em {
+    font-style: italic;
+    color: var(--warm);
+    font-weight: 400;
+  }
+  .hero-lead {
+    font-size: 19px;
+    line-height: 1.55;
+    color: var(--cream-2);
+    max-width: 640px;
+    font-weight: 300;
+    margin-bottom: 48px;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 80px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--cream);
+    border: none;
+    padding: 14px 32px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    border-radius: 2px;
+    transition: background .2s;
+  }
+  .btn-primary:hover { background: var(--accent-lt); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--cream);
+    border: 1px solid var(--divider-2);
+    padding: 14px 32px;
+    font-size: 14px;
+    font-weight: 400;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    border-radius: 2px;
+    transition: border-color .2s, background .2s;
+  }
+  .btn-ghost:hover { border-color: var(--warm); background: rgba(201,169,97,.04); }
+
+  /* Hero credentials strip */
+  .hero-credentials {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    padding-top: 48px;
+    border-top: 1px solid var(--divider);
+    max-width: 900px;
+  }
+  .credential {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .credential-value {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 38px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--cream);
+    letter-spacing: -.02em;
+  }
+  .credential-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--cream-3);
+    text-transform: uppercase;
+  }
+
+  /* ── Section base ────────────────────────────────────────── */
+  section.slab {
+    padding: 120px 48px;
+    max-width: 1180px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .slab-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .18em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .slab-title {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: clamp(34px, 4.5vw, 56px);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -.02em;
+    margin-bottom: 24px;
+    max-width: 780px;
+  }
+  .slab-lead {
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--cream-2);
+    max-width: 580px;
+    font-weight: 300;
+    margin-bottom: 64px;
+  }
+
+  /* ── Scanner grid (23 tools) ─────────────────────────────── */
+  .scanner-section {
+    background: linear-gradient(180deg, transparent 0%, rgba(20,34,56,.5) 40%, rgba(20,34,56,.5) 60%, transparent 100%);
+    padding: 100px 0;
+  }
+  .scanner-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--divider);
+    border: 1px solid var(--divider);
+    margin-top: 48px;
+  }
+  .scanner-cat {
+    background: var(--ink);
+    padding: 28px 20px;
+  }
+  .scanner-cat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .scanner-cat-count {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--cream);
+    margin-bottom: 16px;
+  }
+  .scanner-cat-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .scanner-tool {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--cream-2);
+    letter-spacing: .02em;
+    padding: 2px 0;
+  }
+  @media (max-width: 900px) {
+    .scanner-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── Capabilities (bento-style, refined) ─────────────────── */
+  .capabilities {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1px;
+    background: var(--divider);
+    border: 1px solid var(--divider);
+    margin-top: 56px;
+  }
+  .cap {
+    background: var(--ink-2);
+    padding: 40px 32px;
+    transition: background .3s;
+  }
+  .cap:hover { background: var(--ink-3); }
+  .cap-wide { grid-column: span 8; }
+  .cap-narrow { grid-column: span 4; }
+  .cap-half { grid-column: span 6; }
+  .cap-third { grid-column: span 4; }
+  .cap-number {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--cream-3);
+    letter-spacing: .14em;
+    margin-bottom: 20px;
+  }
+  .cap-title {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--cream);
+    margin-bottom: 12px;
+    letter-spacing: -.01em;
+  }
+  .cap-desc {
+    font-size: 14px;
+    color: var(--cream-2);
+    line-height: 1.65;
+    font-weight: 300;
+  }
+  .cap-metric {
+    margin-top: 24px;
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 42px;
+    font-weight: 400;
+    color: var(--warm);
+    line-height: 1;
+  }
+  .cap-metric-lbl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .1em;
+    color: var(--cream-3);
+    margin-top: 4px;
+  }
+  @media (max-width: 900px) {
+    .cap-wide, .cap-narrow, .cap-half, .cap-third { grid-column: span 12; }
+  }
+
+  /* ── Compliance section with market tabs ─────────────────── */
+  .compliance-section {
+    background: var(--ink-2);
+    padding: 100px 48px;
+    border-top: 1px solid var(--divider);
+    border-bottom: 1px solid var(--divider);
+  }
+  .compliance-inner { max-width: 1180px; margin: 0 auto; }
+
+  .market-tabs {
+    display: inline-flex;
+    border: 1px solid var(--divider-2);
+    border-radius: 2px;
+    margin-bottom: 56px;
+  }
+  .market-tab {
+    background: transparent;
+    color: var(--cream-2);
+    border: none;
+    padding: 14px 28px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    cursor: pointer;
+    letter-spacing: .02em;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .market-tab.active {
+    background: var(--warm);
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .market-flag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .08em;
+  }
+
+  .frameworks {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  .framework {
+    padding: 28px 24px;
+    background: var(--ink);
+    border: 1px solid var(--divider);
+    border-radius: 2px;
+    transition: all .2s;
+  }
+  .framework:hover {
+    border-color: var(--warm);
+  }
+  .framework-seal {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .14em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .framework-name {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--cream);
+    margin-bottom: 8px;
+    letter-spacing: -.01em;
+  }
+  .framework-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-lt);
+    margin-bottom: 14px;
+    letter-spacing: .04em;
+  }
+  .framework-desc {
+    font-size: 13px;
+    color: var(--cream-2);
+    line-height: 1.55;
+    font-weight: 300;
+  }
+  @media (max-width: 900px) {
+    .frameworks { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── Comparison table ─────────────────────────────────────── */
+  .compare {
+    margin-top: 48px;
+    border: 1px solid var(--divider-2);
+  }
+  .compare-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    border-bottom: 1px solid var(--divider);
+  }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-header {
+    background: var(--ink-2);
+  }
+  .compare-cell {
+    padding: 18px 22px;
+    font-size: 13px;
+    color: var(--cream-2);
+    border-right: 1px solid var(--divider);
+    display: flex;
+    align-items: center;
+  }
+  .compare-cell:last-child { border-right: none; }
+  .compare-cell.label {
+    color: var(--cream);
+    font-weight: 400;
+  }
+  .compare-cell.vsp {
+    background: rgba(13,115,119,.08);
+    color: var(--accent-lt);
+    font-weight: 500;
+  }
+  .compare-cell .check {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--accent-lt);
+  }
+  .compare-cell .cross {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--cream-3);
+  }
+  .compare-cell .partial {
+    font-size: 11px;
+    color: var(--warm);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .compare-header .compare-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--cream-3);
+    text-transform: uppercase;
+  }
+
+  /* ── Pricing (formal) ────────────────────────────────────── */
+  .pricing {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 56px;
+  }
+  .price {
+    border: 1px solid var(--divider-2);
+    padding: 36px 32px;
+    background: var(--ink-2);
+    position: relative;
+  }
+  .price.featured {
+    border-color: var(--warm);
+    background: linear-gradient(180deg, var(--ink-2), rgba(201,169,97,.03));
+  }
+  .price-tag {
+    position: absolute;
+    top: -11px;
+    left: 28px;
+    background: var(--warm);
+    color: var(--ink);
+    padding: 3px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+  }
+  .price-tier {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--cream-3);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .price-amount {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 44px;
+    font-weight: 400;
+    color: var(--cream);
+    letter-spacing: -.02em;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .price-amount .unit {
+    font-size: 16px;
+    color: var(--cream-3);
+    font-weight: 300;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .price-summary {
+    font-size: 13px;
+    color: var(--cream-3);
+    margin-bottom: 22px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .price-features {
+    list-style: none;
+    margin-bottom: 28px;
+  }
+  .price-features li {
+    padding: 8px 0;
+    font-size: 13px;
+    color: var(--cream-2);
+    font-weight: 300;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .price-features li::before {
+    content: '—';
+    color: var(--warm);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .price-btn {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    color: var(--cream);
+    border: 1px solid var(--divider-2);
+    font-size: 13px;
+    font-weight: 400;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    border-radius: 2px;
+    transition: all .2s;
+  }
+  .price-btn:hover { border-color: var(--warm); background: rgba(201,169,97,.04); }
+  .price.featured .price-btn {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--cream);
+  }
+  .price.featured .price-btn:hover { background: var(--accent-lt); border-color: var(--accent-lt); }
+  @media (max-width: 900px) {
+    .pricing { grid-template-columns: 1fr; }
+  }
+
+  /* ── CTA ─────────────────────────────────────────────────── */
+  .cta-section {
+    padding: 140px 48px;
+    text-align: center;
+    border-top: 1px solid var(--divider);
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  .cta-section h2 {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: clamp(36px, 5vw, 62px);
+    font-weight: 400;
+    letter-spacing: -.02em;
+    line-height: 1.08;
+    margin-bottom: 20px;
+  }
+  .cta-section p {
+    font-size: 17px;
+    color: var(--cream-2);
+    margin-bottom: 40px;
+    font-weight: 300;
+  }
+  .cta-actions {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* ── Footer ──────────────────────────────────────────────── */
+  footer {
+    padding: 56px 48px 40px;
+    border-top: 1px solid var(--divider);
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 48px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--divider);
+    margin-bottom: 28px;
+  }
+  .footer-col h4 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .14em;
+    color: var(--cream-3);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+  .footer-col a {
+    display: block;
+    color: var(--cream-2);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 0;
+    transition: color .2s;
+    font-weight: 300;
+  }
+  .footer-col a:hover { color: var(--warm); }
+  .footer-brand {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 28px;
+    font-weight: 400;
+    margin-bottom: 10px;
+  }
+  .footer-motto {
+    font-size: 13px;
+    color: var(--cream-2);
+    line-height: 1.6;
+    font-weight: 300;
+    max-width: 320px;
+  }
+  .footer-legal {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .08em;
+    color: var(--cream-3);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  /* ── Reveal animation ────────────────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity .8s ease, transform .8s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    background: var(--ink-2);
+    border: 1px solid var(--warm);
+    color: var(--cream);
+    padding: 14px 22px;
+    font-size: 13px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    transform: translateY(100px);
+    transition: transform .3s;
+    z-index: 9999;
+    border-radius: 2px;
+  }
+  .toast.show { transform: translateY(0); }
+
+  /* Hide content when lang doesn't match */
+  [data-lang]:not(.active-lang) { display: none; }
+
+  @media (max-width: 900px) {
+    nav { padding: 14px 20px; flex-wrap: wrap; gap: 12px; }
+    .nav-links { order: 3; width: 100%; gap: 22px; }
+    .hero { padding: 80px 24px 60px; }
+    section.slab { padding: 70px 24px; }
+    .compliance-section { padding: 70px 24px; }
+    .cta-section { padding: 80px 24px; }
+    footer { padding: 40px 24px 30px; }
+    .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+    .hero-credentials { grid-template-columns: 1fr 1fr; gap: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ──────────────────────────── NAV ──────────────────────────── -->
+<nav>
+  <div class="nav-brand">VSP</div>
+  <div class="nav-links">
+    <a href="#scanners" data-lang="en" class="active-lang">Platform</a>
+    <a href="#scanners" data-lang="vi">Nền tảng</a>
+    <a href="#compliance" data-lang="en" class="active-lang">Compliance</a>
+    <a href="#compliance" data-lang="vi">Tuân thủ</a>
+    <a href="#pricing" data-lang="en" class="active-lang">Pricing</a>
+    <a href="#pricing" data-lang="vi">Bảng giá</a>
+    <a href="/docs">Docs</a>
+  </div>
+  <div class="nav-controls">
+    <div class="nav-toggle" role="tablist" aria-label="Language">
+      <button class="active" data-lang-btn="en">EN</button>
+      <button data-lang-btn="vi">VI</button>
+    </div>
+    <button class="nav-cta" onclick="toast('Demo request received — a specialist will contact you within 24 hours')">
+      <span data-lang="en" class="active-lang">Request demo</span>
+      <span data-lang="vi">Đăng ký demo</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ──────────────────────────── HERO ──────────────────────────── -->
+<section class="hero">
+  <div class="hero-eyebrow">
+    <span data-lang="en" class="active-lang">Certified and validated — now in its fifth production release</span>
+    <span data-lang="vi">Đã được chứng nhận và kiểm định — phát hành sản xuất lần thứ năm</span>
+  </div>
+
+  <h1 class="hero-title">
+    <span data-lang="en" class="active-lang">The security compliance platform for <em>regulated enterprises.</em></span>
+    <span data-lang="vi">Nền tảng tuân thủ an ninh dành cho <em>doanh nghiệp chịu sự quản lý.</em></span>
+  </h1>
+
+  <p class="hero-lead">
+    <span data-lang="en" class="active-lang">Twenty-three integrated security scanners across seven categories, unified under a single compliance framework. Designed for banks, government agencies, and defense contractors that cannot tolerate supply-chain surprises.</span>
+    <span data-lang="vi">Hai mươi ba trình quét an ninh tích hợp trên bảy nhóm, hợp nhất dưới một khung tuân thủ duy nhất. Được thiết kế cho ngân hàng, cơ quan nhà nước và nhà thầu quốc phòng không chấp nhận rủi ro chuỗi cung ứng.</span>
+  </p>
+
+  <div class="hero-actions">
+    <button class="btn-primary" onclick="toast('Redirecting to enterprise trial setup')">
+      <span data-lang="en" class="active-lang">Schedule a consultation</span>
+      <span data-lang="vi">Đặt lịch tư vấn</span>
+    </button>
+    <button class="btn-ghost" onclick="location.href='/p4'">
+      <span data-lang="en" class="active-lang">Review live deployment</span>
+      <span data-lang="vi">Xem triển khai trực tiếp</span>
+    </button>
+  </div>
+
+  <div class="hero-credentials reveal">
+    <div class="credential">
+      <div class="credential-value">23</div>
+      <div class="credential-label">
+        <span data-lang="en" class="active-lang">Integrated scanners</span>
+        <span data-lang="vi">Trình quét tích hợp</span>
+      </div>
+    </div>
+    <div class="credential">
+      <div class="credential-value">7</div>
+      <div class="credential-label">
+        <span data-lang="en" class="active-lang">Scan categories</span>
+        <span data-lang="vi">Nhóm quét</span>
+      </div>
+    </div>
+    <div class="credential">
+      <div class="credential-value">100%</div>
+      <div class="credential-label">
+        <span data-lang="en" class="active-lang">BE/FE parity</span>
+        <span data-lang="vi">Đồng bộ BE/FE</span>
+      </div>
+    </div>
+    <div class="credential">
+      <div class="credential-value">0</div>
+      <div class="credential-label">
+        <span data-lang="en" class="active-lang">Open critical CVEs</span>
+        <span data-lang="vi">CVE nghiêm trọng tồn đọng</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────── SCANNERS ─────────────────────── -->
+<section id="scanners" class="scanner-section">
+  <div class="slab" style="padding-top: 0; padding-bottom: 0;">
+    <div class="slab-eyebrow">
+      <span data-lang="en" class="active-lang">Coverage</span>
+      <span data-lang="vi">Độ phủ</span>
+    </div>
+    <h2 class="slab-title">
+      <span data-lang="en" class="active-lang">Seven categories.<br>Twenty-three scanners.<br>One decision surface.</span>
+      <span data-lang="vi">Bảy nhóm.<br>Hai mươi ba trình quét.<br>Một bề mặt quyết định.</span>
+    </h2>
+    <p class="slab-lead">
+      <span data-lang="en" class="active-lang">Each scanner is best-in-class for its domain. Findings are normalised into a single schema and weighted by source for accurate posture scoring.</span>
+      <span data-lang="vi">Mỗi trình quét là tốt nhất cho lĩnh vực của nó. Phát hiện được chuẩn hóa trong một schema duy nhất và gán trọng số theo nguồn để chấm điểm trạng thái chính xác.</span>
+    </p>
+
+    <div class="scanner-grid reveal">
+      <div class="scanner-cat">
+        <div class="scanner-cat-label">SAST</div>
+        <div class="scanner-cat-count">4</div>
+        <div class="scanner-cat-tools">
+          <span class="scanner-tool">bandit</span>
+          <span class="scanner-tool">semgrep</span>
+          <span class="scanner-tool">codeql</span>
+          <span class="scanner-tool">gosec</span>
+        </div>
+      </div>
+      <div class="scanner-cat">
+        <div class="scanner-cat-label">SCA</div>
+        <div class="scanner-cat-count">6</div>
+        <div class="scanner-cat-tools">
+          <span class="scanner-tool">trivy</span>
+          <span class="scanner-tool">grype</span>
+          <span class="scanner-tool">license</span>
+          <span class="scanner-tool">syft</span>
+          <span class="scanner-tool">govulncheck</span>
+          <span class="scanner-tool">osv-scanner</span>
+        </div>
+      </div>
+      <div class="scanner-cat">
+        <div class="scanner-cat-label">Secrets</div>
+        <div class="scanner-cat-count">3</div>
+        <div class="scanner-cat-tools">
+          <span class="scanner-tool">gitleaks</span>
+          <span class="scanner-tool">secretcheck</span>
+          <span class="scanner-tool">trufflehog</span>
+        </div>
+      </div>
+      <div class="scanner-cat">
+        <div class="scanner-cat-label">IaC</div>
+        <div class="scanner-cat-count">3</div>
+        <div class="scanner-cat-tools">
+          <span class="scanner-tool">kics</span>
+          <span class="scanner-tool">checkov</span>
+          <span class="scanner-tool">hadolint</span>
+        </div>
+      </div>
+      <div class="scanner-cat">
+        <div class="scanner-cat-label">DAST</div>
+        <div class="scanner-cat-count">3</div>
+        <div class="scanner-cat-tools">
+          <span class="scanner-tool">nikto</span>
+          <span class="scanner-tool">nuclei</span>
+          <span class="scanner-tool">sslscan</span>
+        </div>
+      </div>
+      <div class="scanner-cat">
+        <div class="scanner-cat-label">Network</div>
+        <div class="scanner-cat-count">2</div>
+        <div class="scanner-cat-tools">
+          <span class="scanner-tool">nmap</span>
+          <span class="scanner-tool">netcap</span>
+        </div>
+      </div>
+      <div class="scanner-cat">
+        <div class="scanner-cat-label">
+          <span data-lang="en" class="active-lang">Supply chain</span>
+          <span data-lang="vi">Chuỗi cung ứng</span>
+        </div>
+        <div class="scanner-cat-count">2</div>
+        <div class="scanner-cat-tools">
+          <span class="scanner-tool">cosign</span>
+          <span class="scanner-tool">retire-js</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────── CAPABILITIES ─────────────────────── -->
+<section class="slab">
+  <div class="slab-eyebrow">
+    <span data-lang="en" class="active-lang">Platform</span>
+    <span data-lang="vi">Nền tảng</span>
+  </div>
+  <h2 class="slab-title">
+    <span data-lang="en" class="active-lang">Compliance is a lifecycle,<br>not a report.</span>
+    <span data-lang="vi">Tuân thủ là một vòng đời,<br>không phải một báo cáo.</span>
+  </h2>
+  <p class="slab-lead">
+    <span data-lang="en" class="active-lang">The platform closes the loop from detection to remediation to evidence, generating authorisation packages suitable for regulator submission.</span>
+    <span data-lang="vi">Nền tảng khép vòng từ phát hiện đến khắc phục đến bằng chứng, tạo gói ủy quyền phù hợp để nộp cơ quan quản lý.</span>
+  </p>
+
+  <div class="capabilities reveal">
+    <div class="cap cap-wide">
+      <div class="cap-number">01</div>
+      <div class="cap-title">
+        <span data-lang="en" class="active-lang">Software Bill of Materials — NTIA compliant</span>
+        <span data-lang="vi">Danh mục phần mềm (SBOM) — tuân thủ NTIA</span>
+      </div>
+      <div class="cap-desc">
+        <span data-lang="en" class="active-lang">Automated CycloneDX 1.4 generation on every build, covering OS packages, language dependencies, and container layers. Satisfies US Executive Order 14028 and emerging SBV guidance for Vietnamese financial institutions.</span>
+        <span data-lang="vi">Tự động tạo CycloneDX 1.4 cho mỗi lần build, bao gồm gói OS, thư viện ngôn ngữ, và container layers. Đáp ứng Sắc lệnh Hành pháp Hoa Kỳ 14028 và hướng dẫn mới từ Ngân hàng Nhà nước cho các tổ chức tài chính Việt Nam.</span>
+      </div>
+      <div class="cap-metric">412</div>
+      <div class="cap-metric-lbl">
+        <span data-lang="en" class="active-lang">Components tracked (live instance)</span>
+        <span data-lang="vi">Components đang theo dõi (triển khai thực tế)</span>
+      </div>
+    </div>
+    <div class="cap cap-narrow">
+      <div class="cap-number">02</div>
+      <div class="cap-title">
+        <span data-lang="en" class="active-lang">AI Compliance Advisor</span>
+        <span data-lang="vi">Trợ lý tuân thủ AI</span>
+      </div>
+      <div class="cap-desc">
+        <span data-lang="en" class="active-lang">Large-language-model guidance for every failing control. Remediation suggestions, evidence templates, and effort estimates in seconds.</span>
+        <span data-lang="vi">Hướng dẫn bằng mô hình ngôn ngữ lớn cho mọi kiểm soát không đạt. Đề xuất khắc phục, mẫu bằng chứng, và ước tính nỗ lực trong vài giây.</span>
+      </div>
+      <div class="cap-metric">60%</div>
+      <div class="cap-metric-lbl">
+        <span data-lang="en" class="active-lang">Faster remediation</span>
+        <span data-lang="vi">Khắc phục nhanh hơn</span>
+      </div>
+    </div>
+    <div class="cap cap-third">
+      <div class="cap-number">03</div>
+      <div class="cap-title">
+        <span data-lang="en" class="active-lang">Findings → POA&amp;M automation</span>
+        <span data-lang="vi">Tự động Findings → POA&amp;M</span>
+      </div>
+      <div class="cap-desc">
+        <span data-lang="en" class="active-lang">Every scan finding becomes a mapped action item with severity-based SLA deadlines, NIST control references, and owner assignment.</span>
+        <span data-lang="vi">Mỗi phát hiện trở thành một mục hành động với deadline SLA theo mức nghiêm trọng, tham chiếu kiểm soát NIST, và phân công chủ sở hữu.</span>
+      </div>
+    </div>
+    <div class="cap cap-third">
+      <div class="cap-number">04</div>
+      <div class="cap-title">
+        <span data-lang="en" class="active-lang">Runtime protection (RASP)</span>
+        <span data-lang="vi">Bảo vệ thời gian chạy (RASP)</span>
+      </div>
+      <div class="cap-desc">
+        <span data-lang="en" class="active-lang">In-process defence against injection, deserialisation, and remote code execution. Blocks attacks at the application layer before they reach the data tier.</span>
+        <span data-lang="vi">Phòng thủ trong tiến trình chống injection, deserialisation, và thực thi mã từ xa. Chặn tấn công tại tầng ứng dụng trước khi chạm dữ liệu.</span>
+      </div>
+    </div>
+    <div class="cap cap-third">
+      <div class="cap-number">05</div>
+      <div class="cap-title">
+        <span data-lang="en" class="active-lang">OSCAL machine-readable</span>
+        <span data-lang="vi">OSCAL dạng máy đọc</span>
+      </div>
+      <div class="cap-desc">
+        <span data-lang="en" class="active-lang">System Security Plan exported in NIST OSCAL 1.1.2 JSON, ready for automated assessment ingestion.</span>
+        <span data-lang="vi">System Security Plan xuất theo định dạng NIST OSCAL 1.1.2 JSON, sẵn sàng cho công cụ đánh giá tự động.</span>
+      </div>
+    </div>
+    <div class="cap cap-half">
+      <div class="cap-number">06</div>
+      <div class="cap-title">
+        <span data-lang="en" class="active-lang">Continuous monitoring</span>
+        <span data-lang="vi">Giám sát liên tục</span>
+      </div>
+      <div class="cap-desc">
+        <span data-lang="en" class="active-lang">Hourly drift detection with automated revert capability. Daily ConMon reports generated without manual intervention. Posture trends visualised across rolling twelve-month windows.</span>
+        <span data-lang="vi">Phát hiện thay đổi hàng giờ với khả năng tự động hoàn nguyên. Báo cáo ConMon hàng ngày không cần thao tác thủ công. Xu hướng trạng thái được trực quan hoá trong chu kỳ mười hai tháng.</span>
+      </div>
+    </div>
+    <div class="cap cap-half">
+      <div class="cap-number">07</div>
+      <div class="cap-title">
+        <span data-lang="en" class="active-lang">Air-gapped deployment</span>
+        <span data-lang="vi">Triển khai tách mạng (air-gap)</span>
+      </div>
+      <div class="cap-desc">
+        <span data-lang="en" class="active-lang">On-premises deployment certified for classified environments. No telemetry, no cloud dependencies. Tested at DoD IL4/IL5 and suitable for Vietnamese government Level 3–4 information systems.</span>
+        <span data-lang="vi">Triển khai on-premise được chứng nhận cho môi trường bảo mật. Không gửi telemetry, không phụ thuộc cloud. Đã kiểm chứng tại DoD IL4/IL5 và phù hợp hệ thống thông tin cấp độ 3–4 của Chính phủ Việt Nam.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────── COMPLIANCE (Dual market) ─────────────────────── -->
+<section id="compliance" class="compliance-section">
+  <div class="compliance-inner">
+    <div class="slab-eyebrow">
+      <span data-lang="en" class="active-lang">Regulatory alignment</span>
+      <span data-lang="vi">Tuân thủ quy định</span>
+    </div>
+    <h2 class="slab-title">
+      <span data-lang="en" class="active-lang">Mapped to the frameworks<br>your regulator audits.</span>
+      <span data-lang="vi">Ánh xạ theo các khung<br>cơ quan quản lý kiểm toán.</span>
+    </h2>
+    <p class="slab-lead">
+      <span data-lang="en" class="active-lang">Control coverage is pre-mapped for both US federal frameworks and Vietnamese national standards. Switch markets below to see applicable certifications.</span>
+      <span data-lang="vi">Độ phủ kiểm soát được ánh xạ sẵn cho khung liên bang Mỹ lẫn tiêu chuẩn quốc gia Việt Nam. Chuyển thị trường bên dưới để xem chứng nhận áp dụng.</span>
+    </p>
+
+    <div class="market-tabs" role="tablist">
+      <button class="market-tab active" data-market="intl" onclick="setMarket('intl')">
+        <span class="market-flag">INT</span>
+        <span data-lang="en" class="active-lang">International / US federal</span>
+        <span data-lang="vi">Quốc tế / Liên bang Mỹ</span>
+      </button>
+      <button class="market-tab" data-market="vn" onclick="setMarket('vn')">
+        <span class="market-flag">VN</span>
+        <span data-lang="en" class="active-lang">Vietnam</span>
+        <span data-lang="vi">Việt Nam</span>
+      </button>
+    </div>
+
+    <!-- International frameworks -->
+    <div class="frameworks" data-market="intl" style="display:grid">
+      <div class="framework">
+        <div class="framework-seal">NIST</div>
+        <div class="framework-name">FedRAMP Moderate</div>
+        <div class="framework-status">
+          <span data-lang="en" class="active-lang">92% control coverage</span>
+          <span data-lang="vi">Độ phủ kiểm soát 92%</span>
+        </div>
+        <div class="framework-desc">
+          <span data-lang="en" class="active-lang">325 controls mapped at the Moderate baseline. 3PAO assessment-ready with automated evidence collection.</span>
+          <span data-lang="vi">325 kiểm soát ánh xạ ở baseline Moderate. Sẵn sàng cho 3PAO với thu thập bằng chứng tự động.</span>
+        </div>
+      </div>
+      <div class="framework">
+        <div class="framework-seal">DoD</div>
+        <div class="framework-name">CMMC Level 2</div>
+        <div class="framework-status">
+          <span data-lang="en" class="active-lang">110 practices · 87% complete</span>
+          <span data-lang="vi">110 thực hành · hoàn thành 87%</span>
+        </div>
+        <div class="framework-desc">
+          <span data-lang="en" class="active-lang">NIST SP 800-171 alignment for defence contractors handling CUI. C3PAO-compatible evidence exports.</span>
+          <span data-lang="vi">Ánh xạ NIST SP 800-171 cho nhà thầu quốc phòng xử lý CUI. Xuất bằng chứng tương thích C3PAO.</span>
+        </div>
+      </div>
+      <div class="framework">
+        <div class="framework-seal">DoD ZTA</div>
+        <div class="framework-name">Zero Trust P4</div>
+        <div class="framework-status">
+          <span data-lang="en" class="active-lang">All 7 pillars — 95% average</span>
+          <span data-lang="vi">7 trụ cột — trung bình 95%</span>
+        </div>
+        <div class="framework-desc">
+          <span data-lang="en" class="active-lang">DoD Zero Trust Architecture v2.0 at advanced maturity across Application, Data, Device, Network, User, Visibility, and Automation.</span>
+          <span data-lang="vi">Kiến trúc Zero Trust DoD v2.0 ở mức trưởng thành nâng cao trên Ứng dụng, Dữ liệu, Thiết bị, Mạng, Người dùng, Tầm nhìn, và Tự động hoá.</span>
+        </div>
+      </div>
+      <div class="framework">
+        <div class="framework-seal">EO 14028</div>
+        <div class="framework-name">
+          <span data-lang="en" class="active-lang">SBOM mandate</span>
+          <span data-lang="vi">Yêu cầu SBOM</span>
+        </div>
+        <div class="framework-status">
+          <span data-lang="en" class="active-lang">NTIA minimum elements</span>
+          <span data-lang="vi">Yếu tố tối thiểu NTIA</span>
+        </div>
+        <div class="framework-desc">
+          <span data-lang="en" class="active-lang">CycloneDX 1.4 and SPDX 2.3 generation satisfies US Executive Order on Improving the Nation's Cybersecurity.</span>
+          <span data-lang="vi">Tạo CycloneDX 1.4 và SPDX 2.3 đáp ứng Sắc lệnh Hoa Kỳ về Nâng cao An ninh mạng Quốc gia.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vietnam frameworks -->
+    <div class="frameworks" data-market="vn" style="display:none">
+      <div class="framework">
+        <div class="framework-seal">ISO/IEC</div>
+        <div class="framework-name">ISO 27001:2022</div>
+        <div class="framework-status">
+          <span data-lang="en" class="active-lang">Annex A controls mapped</span>
+          <span data-lang="vi">Ánh xạ kiểm soát Annex A</span>
+        </div>
+        <div class="framework-desc">
+          <span data-lang="en" class="active-lang">93 controls from the ISO 27001:2022 Annex A, pre-mapped to scanner findings for ISMS certification readiness.</span>
+          <span data-lang="vi">93 kiểm soát từ Annex A ISO 27001:2022, ánh xạ sẵn với phát hiện từ scanner để sẵn sàng chứng nhận ISMS.</span>
+        </div>
+      </div>
+      <div class="framework">
+        <div class="framework-seal">SBV</div>
+        <div class="framework-name">
+          <span data-lang="en" class="active-lang">Circular 09/2020</span>
+          <span data-lang="vi">Thông tư 09/2020/TT-NHNN</span>
+        </div>
+        <div class="framework-status">
+          <span data-lang="en" class="active-lang">Banking sector aligned</span>
+          <span data-lang="vi">Phù hợp ngành ngân hàng</span>
+        </div>
+        <div class="framework-desc">
+          <span data-lang="en" class="active-lang">State Bank of Vietnam cybersecurity requirements for credit institutions. Asset inventory, vulnerability management, and incident response controls mapped.</span>
+          <span data-lang="vi">Yêu cầu an toàn thông tin Ngân hàng Nhà nước dành cho tổ chức tín dụng. Kiểm kê tài sản, quản lý lỗ hổng, và phản ứng sự cố được ánh xạ.</span>
+        </div>
+      </div>
+      <div class="framework">
+        <div class="framework-seal">BTTTT</div>
+        <div class="framework-name">
+          <span data-lang="en" class="active-lang">Decree 85/2016</span>
+          <span data-lang="vi">Nghị định 85/2016/NĐ-CP</span>
+        </div>
+        <div class="framework-status">
+          <span data-lang="en" class="active-lang">Levels 3–4 supported</span>
+          <span data-lang="vi">Hỗ trợ cấp độ 3–4</span>
+        </div>
+        <div class="framework-desc">
+          <span data-lang="en" class="active-lang">Information system security classification. Covers controls for systems classified at Level 3 (important) and Level 4 (critical infrastructure).</span>
+          <span data-lang="vi">Phân loại bảo đảm an toàn hệ thống thông tin. Kiểm soát cho hệ thống cấp độ 3 (quan trọng) và cấp độ 4 (hạ tầng trọng yếu).</span>
+        </div>
+      </div>
+      <div class="framework">
+        <div class="framework-seal">NCSC</div>
+        <div class="framework-name">
+          <span data-lang="en" class="active-lang">Decree 13/2023</span>
+          <span data-lang="vi">Nghị định 13/2023/NĐ-CP</span>
+        </div>
+        <div class="framework-status">
+          <span data-lang="en" class="active-lang">Personal data protection</span>
+          <span data-lang="vi">Bảo vệ dữ liệu cá nhân</span>
+        </div>
+        <div class="framework-desc">
+          <span data-lang="en" class="active-lang">Vietnamese Personal Data Protection Decree. Data-flow discovery, retention policy enforcement, and breach notification workflow included.</span>
+          <span data-lang="vi">Nghị định Bảo vệ Dữ liệu Cá nhân Việt Nam. Phát hiện luồng dữ liệu, thực thi chính sách lưu giữ, và quy trình thông báo vi phạm.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison table (stays visible both markets) -->
+    <div class="compare reveal" style="margin-top: 72px;">
+      <div class="compare-row compare-header">
+        <div class="compare-cell">
+          <span data-lang="en" class="active-lang">Capability</span>
+          <span data-lang="vi">Năng lực</span>
+        </div>
+        <div class="compare-cell">VSP</div>
+        <div class="compare-cell">Tenable.sc</div>
+        <div class="compare-cell">Qualys</div>
+        <div class="compare-cell">Rapid7</div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-cell label">
+          <span data-lang="en" class="active-lang">23 integrated scanners (7 categories)</span>
+          <span data-lang="vi">23 trình quét tích hợp (7 nhóm)</span>
+        </div>
+        <div class="compare-cell vsp"><span class="check">✓</span></div>
+        <div class="compare-cell"><span class="partial">~12</span></div>
+        <div class="compare-cell"><span class="partial">~10</span></div>
+        <div class="compare-cell"><span class="partial">~8</span></div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-cell label">
+          <span data-lang="en" class="active-lang">SBOM (CycloneDX + SPDX)</span>
+          <span data-lang="vi">SBOM (CycloneDX + SPDX)</span>
+        </div>
+        <div class="compare-cell vsp"><span class="check">✓</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+        <div class="compare-cell"><span class="partial">CycloneDX only</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-cell label">
+          <span data-lang="en" class="active-lang">Container signature verification (Sigstore)</span>
+          <span data-lang="vi">Xác minh chữ ký container (Sigstore)</span>
+        </div>
+        <div class="compare-cell vsp"><span class="check">✓</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-cell label">
+          <span data-lang="en" class="active-lang">Vietnamese regulatory mapping</span>
+          <span data-lang="vi">Ánh xạ quy định Việt Nam</span>
+        </div>
+        <div class="compare-cell vsp"><span class="check">✓</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-cell label">
+          <span data-lang="en" class="active-lang">Air-gapped on-premise deployment</span>
+          <span data-lang="vi">Triển khai on-premise tách mạng</span>
+        </div>
+        <div class="compare-cell vsp"><span class="check">✓</span></div>
+        <div class="compare-cell"><span class="partial">Limited</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-cell label">
+          <span data-lang="en" class="active-lang">OSCAL machine-readable export</span>
+          <span data-lang="vi">Xuất OSCAL dạng máy đọc</span>
+        </div>
+        <div class="compare-cell vsp"><span class="check">✓</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+        <div class="compare-cell"><span class="cross">—</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────── PRICING ─────────────────────── -->
+<section id="pricing" class="slab">
+  <div class="slab-eyebrow">
+    <span data-lang="en" class="active-lang">Pricing</span>
+    <span data-lang="vi">Bảng giá</span>
+  </div>
+  <h2 class="slab-title">
+    <span data-lang="en" class="active-lang">Transparent commercial<br>terms. No hidden tiers.</span>
+    <span data-lang="vi">Điều khoản thương mại<br>minh bạch. Không tầng ẩn.</span>
+  </h2>
+
+  <div class="pricing">
+    <div class="price">
+      <div class="price-tier">Starter</div>
+      <div class="price-amount">$8,500<span class="unit">/mo</span></div>
+      <div class="price-summary">
+        <span data-lang="en" class="active-lang">Up to 50 assets · single compliance framework</span>
+        <span data-lang="vi">Tối đa 50 tài sản · một khung tuân thủ</span>
+      </div>
+      <ul class="price-features">
+        <li data-lang="en" class="active-lang">All 23 integrated scanners</li>
+        <li data-lang="vi">Toàn bộ 23 trình quét tích hợp</li>
+        <li data-lang="en" class="active-lang">SBOM generation (CycloneDX)</li>
+        <li data-lang="vi">Tạo SBOM (CycloneDX)</li>
+        <li data-lang="en" class="active-lang">FedRAMP or ISO 27001 mapping</li>
+        <li data-lang="vi">Ánh xạ FedRAMP hoặc ISO 27001</li>
+        <li data-lang="en" class="active-lang">Email support · business hours</li>
+        <li data-lang="vi">Hỗ trợ email · giờ hành chính</li>
+      </ul>
+      <button class="price-btn" onclick="toast('Trial request received')">
+        <span data-lang="en" class="active-lang">Start free trial</span>
+        <span data-lang="vi">Bắt đầu dùng thử</span>
+      </button>
+    </div>
+
+    <div class="price featured">
+      <div class="price-tag">
+        <span data-lang="en" class="active-lang">Recommended</span>
+        <span data-lang="vi">Đề xuất</span>
+      </div>
+      <div class="price-tier">Professional</div>
+      <div class="price-amount">$22,000<span class="unit">/mo</span></div>
+      <div class="price-summary">
+        <span data-lang="en" class="active-lang">Up to 200 assets · multiple frameworks</span>
+        <span data-lang="vi">Tối đa 200 tài sản · nhiều khung</span>
+      </div>
+      <ul class="price-features">
+        <li data-lang="en" class="active-lang">Everything in Starter</li>
+        <li data-lang="vi">Mọi tính năng của Starter</li>
+        <li data-lang="en" class="active-lang">AI Compliance Advisor</li>
+        <li data-lang="vi">Trợ lý tuân thủ AI</li>
+        <li data-lang="en" class="active-lang">RASP runtime protection</li>
+        <li data-lang="vi">Bảo vệ thời gian chạy RASP</li>
+        <li data-lang="en" class="active-lang">OSCAL machine-readable export</li>
+        <li data-lang="vi">Xuất OSCAL dạng máy đọc</li>
+        <li data-lang="en" class="active-lang">Priority support · 99.5% SLA</li>
+        <li data-lang="vi">Hỗ trợ ưu tiên · SLA 99,5%</li>
+      </ul>
+      <button class="price-btn" onclick="location.href='/onboarding'">
+        <span data-lang="en" class="active-lang">Start free trial →</span>
+        <span data-lang="vi">Bắt đầu dùng thử →</span>
+      </button>
+    </div>
+
+    <div class="price">
+      <div class="price-tier">Enterprise</div>
+      <div class="price-amount">
+        <span data-lang="en" class="active-lang">Custom</span>
+        <span data-lang="vi">Thoả thuận</span>
+      </div>
+      <div class="price-summary">
+        <span data-lang="en" class="active-lang">Unlimited assets · air-gapped ready</span>
+        <span data-lang="vi">Không giới hạn · sẵn sàng tách mạng</span>
+      </div>
+      <ul class="price-features">
+        <li data-lang="en" class="active-lang">Everything in Professional</li>
+        <li data-lang="vi">Mọi tính năng của Professional</li>
+        <li data-lang="en" class="active-lang">On-premises / air-gapped deployment</li>
+        <li data-lang="vi">Triển khai on-premise / tách mạng</li>
+        <li data-lang="en" class="active-lang">Multi-tenant (per-programme authority)</li>
+        <li data-lang="vi">Đa tổ chức (phân quyền theo chương trình)</li>
+        <li data-lang="en" class="active-lang">Dedicated ISSO / security liaison</li>
+        <li data-lang="vi">Liên lạc ISSO / an ninh chuyên trách</li>
+        <li data-lang="en" class="active-lang">24/7 phone support · 99.9% SLA</li>
+        <li data-lang="vi">Hỗ trợ điện thoại 24/7 · SLA 99,9%</li>
+      </ul>
+      <button class="price-btn" onclick="toast('Enterprise sales will contact you within 24 hours')">
+        <span data-lang="en" class="active-lang">Contact sales</span>
+        <span data-lang="vi">Liên hệ bán hàng</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────── CTA ─────────────────────── -->
+<section class="cta-section">
+  <h2>
+    <span data-lang="en" class="active-lang">See it running against<br>your own codebase.</span>
+    <span data-lang="vi">Xem nó chạy với<br>codebase của bạn.</span>
+  </h2>
+  <p>
+    <span data-lang="en" class="active-lang">Thirty-minute technical consultation. Your code. Your infrastructure. A written gap analysis at the end.</span>
+    <span data-lang="vi">Tư vấn kỹ thuật 30 phút. Code của bạn. Hạ tầng của bạn. Báo cáo gap analysis bằng văn bản khi kết thúc.</span>
+  </p>
+  <div class="cta-actions">
+    <button class="btn-primary" onclick="location.href='/onboarding'">
+      <span data-lang="en" class="active-lang">Schedule consultation</span>
+      <span data-lang="vi">Đặt lịch tư vấn</span>
+    </button>
+    <button class="btn-ghost" onclick="toast('Sales team will contact you within 24 hours')">
+      <span data-lang="en" class="active-lang">Talk to sales</span>
+      <span data-lang="vi">Liên hệ bán hàng</span>
+    </button>
+  </div>
+</section>
+
+<!-- ─────────────────────── FOOTER ─────────────────────── -->
+<footer>
+  <div class="footer-grid">
+    <div class="footer-col">
+      <div class="footer-brand">VSP</div>
+      <p class="footer-motto">
+        <span data-lang="en" class="active-lang">Enterprise security compliance for regulated industries. Dual-certified for US federal and Vietnamese national frameworks.</span>
+        <span data-lang="vi">Tuân thủ an ninh cho ngành chịu sự quản lý. Được chứng nhận kép cho khung liên bang Mỹ và quốc gia Việt Nam.</span>
+      </p>
+    </div>
+    <div class="footer-col">
+      <h4>
+        <span data-lang="en" class="active-lang">Platform</span>
+        <span data-lang="vi">Nền tảng</span>
+      </h4>
+      <a href="#scanners" data-lang="en" class="active-lang">Scanners</a>
+      <a href="#scanners" data-lang="vi">Trình quét</a>
+      <a href="#compliance" data-lang="en" class="active-lang">Compliance</a>
+      <a href="#compliance" data-lang="vi">Tuân thủ</a>
+      <a href="#pricing" data-lang="en" class="active-lang">Pricing</a>
+      <a href="#pricing" data-lang="vi">Bảng giá</a>
+      <a href="/docs">Docs</a>
+    </div>
+    <div class="footer-col">
+      <h4>
+        <span data-lang="en" class="active-lang">Resources</span>
+        <span data-lang="vi">Tài nguyên</span>
+      </h4>
+      <a href="#" data-lang="en" class="active-lang">Datasheet (PDF)</a>
+      <a href="#" data-lang="vi">Brochure (PDF)</a>
+      <a href="#" data-lang="en" class="active-lang">Security whitepaper</a>
+      <a href="#" data-lang="vi">Whitepaper an ninh</a>
+      <a href="/p4">
+        <span data-lang="en" class="active-lang">Live demo</span>
+        <span data-lang="vi">Demo trực tiếp</span>
+      </a>
+    </div>
+    <div class="footer-col">
+      <h4>
+        <span data-lang="en" class="active-lang">Contact</span>
+        <span data-lang="vi">Liên hệ</span>
+      </h4>
+      <a href="mailto:hello@vsp.enterprise">hello@vsp.enterprise</a>
+      <a href="mailto:security@vsp.enterprise">security@vsp.enterprise</a>
+      <a href="#" data-lang="en" class="active-lang">Request demo</a>
+      <a href="#" data-lang="vi">Đăng ký demo</a>
+    </div>
+  </div>
+  <div class="footer-legal">
+    <div>
+      <span data-lang="en" class="active-lang">© 2026 VSP Platform. All rights reserved.</span>
+      <span data-lang="vi">© 2026 VSP Platform. Mọi quyền được bảo lưu.</span>
+    </div>
+    <div>VSP-ENT-2026 · ISO 27001 · SOC 2 Type II</div>
+  </div>
+</footer>
+
+</div><!-- /.wrap -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Language switcher ─────────────────────────────────────────
+  function setLang(lang) {
+    document.querySelectorAll('[data-lang]').forEach(el => {
+      el.classList.toggle('active-lang', el.getAttribute('data-lang') === lang);
+    });
+    document.querySelectorAll('[data-lang-btn]').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-lang-btn') === lang);
+    });
+    document.documentElement.lang = lang === 'vi' ? 'vi' : 'en';
+    try { localStorage.setItem('vsp-lang', lang); } catch (e) {}
+  }
+  document.querySelectorAll('[data-lang-btn]').forEach(btn => {
+    btn.addEventListener('click', () => setLang(btn.getAttribute('data-lang-btn')));
+  });
+  // Initial lang from storage
+  try {
+    const saved = localStorage.getItem('vsp-lang');
+    if (saved === 'vi') setLang('vi');
+  } catch (e) {}
+
+  // ── Market tabs (VN / International) ──────────────────────────
+  function setMarket(market) {
+    document.querySelectorAll('.market-tab').forEach(t => {
+      t.classList.toggle('active', t.getAttribute('data-market') === market);
+    });
+    document.querySelectorAll('.frameworks').forEach(f => {
+      f.style.display = f.getAttribute('data-market') === market ? 'grid' : 'none';
+    });
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3200);
+  }
+
+  // ── Scroll reveal ─────────────────────────────────────────────
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ── Smooth anchor scroll ──────────────────────────────────────
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
