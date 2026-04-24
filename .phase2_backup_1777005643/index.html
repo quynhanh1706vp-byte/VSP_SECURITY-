@@ -3304,10 +3304,10 @@ if (document.readyState !== 'loading') {
 const TOOLS_BY_MODE = {
   IAC:     ['kics','checkov'],
   SAST:    ['bandit','semgrep','codeql','gosec'],
-  SCA:     ['trivy','grype','license','syft','govulncheck'],
+  SCA:     ['trivy','grype'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
 };
 const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
 
@@ -3457,12 +3457,12 @@ console.log('VSP Patch v2.2 loaded ✓');
 const TOOLS_BY_MODE_V2 = {
   IAC:     ['kics','checkov','hadolint','trivy','gitleaks'],
   SAST:    ['bandit','semgrep','codeql','gosec'],
-  SCA:     ['trivy','grype','license','syft','govulncheck'],
+  SCA:     ['trivy','grype','license'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
   NETWORK: ['sslscan','nmap','netcap'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
-  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
+  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
 };
 
 async function loadRunLog(rid) {
@@ -3573,9 +3573,9 @@ async function loadRunLog(rid) {
     const mode = run.mode || 'FULL';
     const TOOLS_BY_MODE = {
       IAC:['kics','checkov'], SAST:    ['bandit','semgrep','codeql','gosec'],
-      SCA:     ['trivy','grype','license','syft','govulncheck'], SECRETS: ['gitleaks','secretcheck','trufflehog'],
+      SCA:['trivy','grype'], SECRETS: ['gitleaks','secretcheck','trufflehog'],
       DAST:    ['nikto','nuclei','sslscan'],
-      FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
+      FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
     };
     const expectedTools = TOOLS_BY_MODE[mode] || ['kics','checkov'];
 

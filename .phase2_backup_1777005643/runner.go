@@ -90,9 +90,6 @@ var toolCategory = map[string]SourceCategory{
 	"nmap":        SourceNetwork,
 	"trufflehog":  SourceSecrets,
 	"netcap":      SourceNetwork,
-	// Phase 2: SBOM family
-	"syft":        SourceSCA,
-	"govulncheck": SourceSCA,
 }
 
 // CategoryOf returns the SourceCategory for a given tool name.

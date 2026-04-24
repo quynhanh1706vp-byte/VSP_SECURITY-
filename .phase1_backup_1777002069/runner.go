@@ -85,14 +85,6 @@ var toolCategory = map[string]SourceCategory{
 	"checkov":     SourceIAC,
 	"kics":        SourceIAC,
 	"hadolint":    SourceIAC,
-	// Added by Phase 1 registry sync
-	"gosec":       SourceSAST,
-	"nmap":        SourceNetwork,
-	"trufflehog":  SourceSecrets,
-	"netcap":      SourceNetwork,
-	// Phase 2: SBOM family
-	"syft":        SourceSCA,
-	"govulncheck": SourceSCA,
 }
 
 // CategoryOf returns the SourceCategory for a given tool name.

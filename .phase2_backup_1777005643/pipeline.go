@@ -12,7 +12,6 @@ import (
 	"github.com/vsp/platform/internal/scanner/checkov"
 	"github.com/vsp/platform/internal/scanner/codeql"
 	"github.com/vsp/platform/internal/scanner/gitleaks"
-	"github.com/vsp/platform/internal/scanner/govulncheck"
 	"github.com/vsp/platform/internal/scanner/gosec"
 	"github.com/vsp/platform/internal/scanner/grype"
 	"github.com/vsp/platform/internal/scanner/hadolint"
@@ -25,7 +24,6 @@ import (
 	"github.com/vsp/platform/internal/scanner/secretcheck"
 	"github.com/vsp/platform/internal/scanner/semgrep"
 	"github.com/vsp/platform/internal/scanner/sslscan"
-	"github.com/vsp/platform/internal/scanner/syft"
 	"github.com/vsp/platform/internal/scanner/trivy"
 	"github.com/vsp/platform/internal/scanner/trufflehog"
 )
@@ -133,8 +131,6 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		grype.New(),
 		trivy.New(),
 		license.NewRunner(),
-		syft.New(),
-		govulncheck.New(),
 	}
 	secrets := []scanner.Runner{
 		gitleaks.New(),
