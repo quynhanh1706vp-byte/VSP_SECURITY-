@@ -35,6 +35,9 @@ var aggrTools = map[string]bool{
 	"trivy": true, "grype": true, "license": true,
 	"gitleaks": true, "secretcheck": true,
 	"nikto": true, "nuclei": true, "sslscan": true,
+	"gosec": true,
+	"trufflehog": true,
+	"nmap": true,
 }
 
 func filterRunners(runners []scanner.Runner, allowed map[string]bool) []scanner.Runner {
@@ -73,24 +76,25 @@ func TimeoutForProfile(profile Profile) int {
 func ToolNamesForMode(mode Mode) []string {
 	switch mode {
 	case ModeSAST:
-		return []string{"bandit", "semgrep", "codeql"}
+		return []string{"bandit", "semgrep", "codeql", "gosec"}
 	case ModeSCA:
 		return []string{"trivy", "grype", "license"}
 	case ModeSecrets:
-		return []string{"gitleaks", "secretcheck"}
+		return []string{"gitleaks", "secretcheck", "trufflehog"}
 	case ModeIAC:
 		return []string{"kics", "checkov", "hadolint"}
 	case ModeDAST:
 		return []string{"nikto", "nuclei", "sslscan"}
 	case ModeNetwork:
-		return []string{"netcap", "sslscan"}
-	case ModeFull:
+		return []string{"sslscan", "nmap", "netcap"}
+	case ModeFull, ModeFullSOC:
 		return []string{
 			"kics", "checkov", "hadolint",
-			"bandit", "semgrep", "codeql",
+			"bandit", "semgrep", "codeql", "gosec",
 			"trivy", "grype", "license",
-			"gitleaks", "secretcheck",
+			"gitleaks", "secretcheck", "trufflehog",
 			"nikto", "nuclei", "sslscan",
+			"nmap", "netcap",
 		}
 	default:
 		return []string{"bandit", "semgrep", "trivy", "grype", "gitleaks", "secretcheck"}

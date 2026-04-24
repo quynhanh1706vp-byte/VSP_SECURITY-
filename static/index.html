@@ -3455,12 +3455,14 @@ console.log('VSP Patch v2.2 loaded ✓');
 
 // Override TOOLS_BY_MODE — dùng tools thật từ findings thay vì hardcode
 const TOOLS_BY_MODE_V2 = {
-  IAC:     ['kics','checkov','trivy','gitleaks'],
-  SAST:    ['bandit','semgrep','codeql'],
-  SCA:     ['trivy','grype'],
-  SECRETS: ['gitleaks','trufflehog'],
-  DAST:    ['nuclei','zap'],
-  FULL:    ['kics','checkov','bandit','semgrep','trivy','grype','gitleaks','trufflehog','codeql'],
+  IAC:     ['kics','checkov','hadolint','trivy','gitleaks'],
+  SAST:    ['bandit','semgrep','codeql','gosec'],
+  SCA:     ['trivy','grype','license'],
+  SECRETS: ['gitleaks','secretcheck','trufflehog'],
+  DAST:    ['nikto','nuclei','sslscan'],
+  NETWORK: ['sslscan','nmap','netcap'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
+  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
 };
 
 async function loadRunLog(rid) {
