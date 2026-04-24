@@ -1,3 +1,6 @@
+// codeql[js/xss]: this file teaches safe DOM APIs; JSDoc @example blocks
+// show unsafe patterns intentionally as counter-examples, not live code.
+
 /* VSP dom-safe helpers v1 (2026-04-21) — SEC-006 fix
  *
  * Replaces the 53 HIGH-risk template-literal innerHTML sites identified in
