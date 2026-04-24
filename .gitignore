@@ -153,3 +153,5 @@ gateway.log
 *.log
 gateway.log
 *.log
+.admin_password.txt
+.env.production.rotated-*
