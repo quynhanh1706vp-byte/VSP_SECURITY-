@@ -140,3 +140,9 @@ report_*.pdf
 VSP-Billing.html
 VSP-P4-Report-*.html
 VSP-P4-Sales-*.html
+.phase*_backup_*/
+phase*_before.log
+phase*_after.log
+phase*_apply.log
+phase*_smoketest.log
+PHASE*_DEPLOY.md
