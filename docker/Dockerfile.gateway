@@ -9,14 +9,13 @@ RUN CGO_ENABLED=0 GOOS=linux \
     -o gateway ./cmd/gateway/
 
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates tzdata && \
-    addgroup -g 65534 -S nonroot && \
-    adduser  -u 65534 -S nonroot -G nonroot
+# Use Alpine's built-in 'nobody' user (UID/GID 65534)
+RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/gateway .
 COPY config/config.yaml ./config/
 COPY static/ ./static/
-USER nonroot:nonroot
+USER nobody:nobody
 EXPOSE 8921
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:8921/health || exit 1
