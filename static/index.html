@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <script>
+
 // SEC-R2: XSS helpers — escape HTML for text and attribute contexts
 function __esc(s){
   if(s==null) return '';
@@ -2240,7 +2241,7 @@ async function verifyAudit() {
   el.textContent = '⏳ Verifying hash chain…';
   await new Promise(r => setTimeout(r, 800));
   // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
-  el.innerHTML = `<span style="color:var(--green)">✓ Chain intact</span> — all audit entries verified · last verified: ${new Date().toLocaleTimeString()}`;
+  el.innerHTML = ''; const sp=document.createElement('span'); sp.style.color='var(--green)'; sp.textContent='✓ Chain intact'; el.appendChild(sp); el.appendChild(document.createTextNode(' — all audit entries verified · last verified: '+new Date().toLocaleTimeString()));
 }
 
 /* ─── Compliance ─── */
@@ -8365,7 +8366,7 @@ var _siemKPIpoll = setInterval(function() {
   // SSE scan_complete → fast mode 30s, sau đó về normal
   const _origSSE = window.connectSSE;
   function patchSSEHandler(source) {
-    source.addEventListener('message', function(e) {
+    source.addEventListener('message', function(e) { if (window.VSPOrigin && !window.VSPOrigin.check(e)) return;
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'scan_complete') {
