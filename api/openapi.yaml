@@ -117,6 +117,32 @@ components:
                 type: object
                 additionalProperties: { type: string }
 
+  responses:
+    Unauthorized:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Authenticated but lacks permission (RBAC or tenant mismatch)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimit:
+      description: Too many requests — client should back off
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds until retry is allowed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found OR access denied (returns 404 to prevent enumeration)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
   schemas:
     Error:
       type: object
