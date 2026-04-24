@@ -300,6 +300,18 @@ func main() {
 	// SSE — cookie-based auth (no ?token= in URL — prevents log leakage)
 	r.With(authMw).Get("/api/v1/events", handler.SSEHandler)
 
+	// ── Landing page (Phase 4 go-to-market) ──
+	// Marketing landing page, referenced from nginx location block:
+	//   location ~ ^/(landing|onboarding|admin|docs|p4|static)
+	// Nginx forwards these paths to this gateway; without these routes
+	// it 404s (no filesystem fallback for /static/*.html).
+	r.Get("/landing", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/landing.html")
+	})
+	r.Get("/landing.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/landing.html")
+	})
+
 	// Root route — serve main UI (index.html) with CSP nonce injected
 	// into inline <script> and <style> tags so they don't violate CSP.
 	// Without injection, ~44 inline scripts + many inline styles would be

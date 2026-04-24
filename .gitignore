@@ -146,3 +146,10 @@ phase*_after.log
 phase*_apply.log
 phase*_smoketest.log
 PHASE*_DEPLOY.md
+static/*.backup-*.html
+static/*.bak.html
+static/*-v[0-9].html
+gateway.log
+*.log
+gateway.log
+*.log
