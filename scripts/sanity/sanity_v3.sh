@@ -220,11 +220,12 @@ done
 section "9. ERROR SCAN (last 15 min)"
 # ════════════════════════════════════════════════════════════════
 LOG=$(sudo journalctl -u vsp-gateway --since "15 minutes ago" --no-pager 2>&1 | grep -v 'redis:\|KEV source')
-ERR=$(echo "$LOG" | grep -cE "FTL|level=error" 2>/dev/null || echo 0)
-PANIC=$(echo "$LOG" | grep -cE "panic:" 2>/dev/null || echo 0)
-S500=$(echo "$LOG" | grep -c "status=500" 2>/dev/null || echo 0)
-S200=$(echo "$LOG" | grep -c "status=200" 2>/dev/null || echo 0)
-INVJWT=$(echo "$LOG" | grep -c "invalid jwt" 2>/dev/null || echo 0)
+_count() { echo "$1" | grep -cE "$2" 2>/dev/null | head -1 | tr -dc '0-9'; }
+ERR=$(_count "$LOG" "FTL|level=error"); ERR=${ERR:-0}
+PANIC=$(_count "$LOG" "panic:"); PANIC=${PANIC:-0}
+S500=$(_count "$LOG" "status=500"); S500=${S500:-0}
+S200=$(_count "$LOG" "status=200"); S200=${S200:-0}
+INVJWT=$(_count "$LOG" "invalid jwt"); INVJWT=${INVJWT:-0}
 
 [ "${ERR:-0}" -lt 2 ] && ok "Errors: ${ERR:-0}" || warn "Errors: $ERR"
 [ "${PANIC:-0}" = "0" ] && ok "No panics" || fail "Panics: $PANIC"
