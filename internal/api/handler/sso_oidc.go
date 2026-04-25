@@ -285,7 +285,7 @@ func (h *SSOOIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	// Set HttpOnly cookie + redirect
 	http.SetCookie(w, &http.Cookie{
-		Name:     "vsp_jwt",
+		Name:     "vsp_token",
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
