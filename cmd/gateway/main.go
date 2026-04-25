@@ -503,11 +503,11 @@ func main() {
 	r.Get("/api/p4/conmon/report", p4AuthMiddleware(handleConMonReport))
 	r.With(authMw).Get("/api/v1/ws", handler.WSUpgradeHandler) // cookie-based auth
 	// ConMon handler (used inside auth route group below)
-	conmonH := handler.NewConMonHandler(stdDB)
-	aiH := handler.NewAIAdvisorHandler(stdDB,
+	conmonH := handler.NewConMonHandler(p4DB)
+	aiH := handler.NewAIAdvisorHandler(p4DB,
 		viper.GetString("anthropic.api_key"),
 		viper.GetBool("airgap.enabled"))
-	ssoOIDCH := handler.NewSSOOIDCHandler(stdDB,
+	ssoOIDCH := handler.NewSSOOIDCHandler(p4DB,
 		jwtSecret,
 		jwtTTL,
 		auth.IssueJWT,
