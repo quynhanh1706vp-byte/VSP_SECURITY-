@@ -318,7 +318,7 @@ async function showIncidentDetail(id){
        <td class="mono">${fmtBytes(e.file_size_bytes)}</td>
        <td class="mono">${e.custody_count} entries</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No evidence</td></tr>';
     const actions=Array.isArray(d.corrective_actions)?d.corrective_actions:[];
-    body.textContent=`
+    body.innerHTML=`
       <div style="margin-bottom:12px">${flags.join(' ')||''}</div>
       <div class="section-title">Overview</div>
       <div class="kv-grid">
@@ -365,7 +365,7 @@ async function editField(incidentId, field, currentVal){
 
 function showRansomForm(id){
   document.getElementById('modal-ransom').classList.add('show');
-  document.getElementById('mr-body').textContent=`
+  document.getElementById('mr-body').innerHTML=`
     <div class="banner banner-yellow">⚠️ Recording ransom payment triggers <b>CIRCIA 24-hour reporting deadline</b>.</div>
     <div class="form-row"><label>Incident</label><input value="${id}" readonly></div>
     <div class="form-row"><label>Amount (USD) *</label><input id="rp-amount" type="number" placeholder="50000" step="0.01"></div>
@@ -397,7 +397,7 @@ async function submitRansom(id){
 
 function showLessonsForm(id){
   document.getElementById('modal-lessons').classList.add('show');
-  document.getElementById('ml-body').textContent=`
+  document.getElementById('ml-body').innerHTML=`
     <div class="form-row"><label>Root Cause Analysis</label><textarea id="ll-rc" placeholder="Primary cause of the incident..."></textarea></div>
     <div class="form-row"><label>Lessons Learned</label><textarea id="ll-lessons" placeholder="What worked, what didn't..."></textarea></div>
     <div class="form-row"><label>Corrective Actions (1 per line)</label><textarea id="ll-actions" placeholder="Patch system X\nImplement control Y\nUpdate runbook Z"></textarea></div>
