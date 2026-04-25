@@ -513,7 +513,7 @@ async function showCIRCIADetail(uuid){
         <div class="form-row"><label>Email</label><input id="sub-email" placeholder="ciso@org"></div>
       </div>
       <button class="btn btn-danger" onclick="submitCIRCIA('${uuid}')">⏱️ Submit to CISA</button>`:'';
-    body.textContent=`
+    body.innerHTML=`
       <div class="kv-grid">
         <div class="kv-key">Type</div><div class="kv-val"><span class="badge b-info">${d.report_type.replace(/_/g,' ')}</span></div>
         <div class="kv-key">Status</div><div class="kv-val"><span class="badge ${d.status==='submitted'?'b-info':'b-neutral'}">${d.status}</span></div>
