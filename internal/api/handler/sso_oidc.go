@@ -237,12 +237,16 @@ func (h *SSOOIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, err := sso.ParseIDToken(tokens.IDToken)
+	// Phase 5.2: Full JWKS-based ID token signature verification.
+	// Verifies RSA/ECDSA signature against provider's published keys,
+	// plus iss/aud/exp/nbf claims. Replaces unsafe parse-only path.
+	claims, err := sso.VerifyIDToken(r.Context(), tokens.IDToken, disc.JWKSURI, p.IssuerURL, p.ClientID)
 	if err != nil {
-		writeJSON2(w, http.StatusBadGateway, map[string]string{"error": "id_token parse: " + err.Error()})
+		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "id_token verify: " + err.Error()})
 		return
 	}
 
+	// ValidateClaims still checks nonce (binds token to login request)
 	if err := sso.ValidateClaims(claims, p, ls.Nonce); err != nil {
 		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "id_token invalid: " + err.Error()})
 		return
