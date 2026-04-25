@@ -1,0 +1,15 @@
+# Gosec configuration for VSP
+# https://github.com/securego/gosec
+
+# Global config
+global:
+  audit: true
+
+# Exclude paths (false positives or non-production code)
+exclude:
+  - .phase*_backup_*
+  - tests/load
+  - cmd/seed
+
+# Exclude specific rules per file (if needed)
+# Format: path:rule_id:reason

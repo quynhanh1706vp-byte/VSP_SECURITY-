@@ -155,3 +155,5 @@ gateway.log
 *.log
 .admin_password.txt
 .env.production.rotated-*
+go.mod.bak
+go.sum.bak
