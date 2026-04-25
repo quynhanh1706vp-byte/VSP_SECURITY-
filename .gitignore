@@ -157,3 +157,5 @@ gateway.log
 .env.production.rotated-*
 go.mod.bak
 go.sum.bak
+phase4_3_pitch.tar.gz
+*.tar.gz
