@@ -15,6 +15,7 @@ import (
 
 	"database/sql"
 
+	"github.com/google/uuid"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/hibiken/asynq"
@@ -28,6 +29,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/vsp/platform/internal/api/handler"
+	"github.com/vsp/platform/internal/conmon"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/billing"
@@ -504,6 +506,25 @@ func main() {
 	r.With(authMw).Get("/api/v1/ws", handler.WSUpgradeHandler) // cookie-based auth
 	// ConMon handler (used inside auth route group below)
 	conmonH := handler.NewConMonHandler(p4DB)
+
+	// ─── Phase 5.1: ConMon scheduler goroutine ───────────────────
+	// Wires the existing ConMon CRUD layer to actual pipeline execution.
+	// Each tick (60s), schedules with next_run_at <= now() are triggered
+	// via runsH.EnqueueDirect — same code path used by manual /scan calls
+	// and the existing schedEngine. Tenant + target are taken from the
+	// schedule row; mode is mapped through pipeline.Mode/Profile types.
+	conmonRunTrigger := func(ctx context.Context, tenantID, mode, target string) (int64, error) {
+		rid := uuid.NewString()
+		runsH.EnqueueDirect(rid, tenantID, pipeline.Mode(mode), pipeline.Profile("default"), target, "")
+		// EnqueueDirect is fire-and-forget; we return 0 because the run ID
+		// is the rid string, but Schedule.LastRunID is *int64 (legacy schema).
+		// The drift detector reads runs by tenant+timestamp, not by this id.
+		_ = rid
+		return 0, nil
+	}
+	conmonSched := conmon.NewScheduler(p4DB, conmonRunTrigger)
+	go conmonSched.Start(ctx)
+	log.Info().Dur("tick", conmonSched.TickInterval).Msg("ConMon scheduler started")
 	aiH := handler.NewAIAdvisorHandler(p4DB,
 		viper.GetString("anthropic.api_key"),
 		viper.GetBool("airgap.enabled"))
