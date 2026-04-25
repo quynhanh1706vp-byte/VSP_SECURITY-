@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ConMon — Continuous Monitoring</title>
+<style>
+  :root {
+    --ink:#0a1628; --ink2:#142238; --cream:#f4e9d8; --cream2:#c8bea9; --t3:#8a8068;
+    --accent:#0d7377; --warm:#c9a961; --red:#b85042; --green:#4a7c59; --blue:#3a6a9a;
+  }
+  body { margin:0; background:#0a1019; color:var(--cream); font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+  .wrap { max-width:1400px; margin:0 auto; padding:24px; }
+  h1 { font-family:Georgia,serif; font-weight:400; font-size:32px; margin:0 0 4px; color:var(--cream); }
+  .subtitle { color:var(--t3); font-size:13px; margin-bottom:24px; }
+
+  .stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:32px; }
+  .stat { background:var(--ink2); border:1px solid #1f2a3d; border-radius:6px; padding:18px; }
+  .stat .label { font-size:10px; color:var(--t3); letter-spacing:2px; text-transform:uppercase; }
+  .stat .value { font-family:Georgia,serif; font-size:32px; font-weight:400; margin-top:4px; }
+  .stat.ok .value { color:var(--green); }
+  .stat.warn .value { color:var(--warm); }
+  .stat.bad .value { color:var(--red); }
+  .stat .meta { font-size:11px; color:var(--t3); margin-top:6px; }
+
+  .section { margin-top:32px; }
+  .section-title {
+    font-family:Georgia,serif; font-size:18px; color:var(--cream);
+    margin-bottom:12px; padding-bottom:8px;
+    border-bottom:1px solid #1f2a3d; display:flex; justify-content:space-between; align-items:center;
+  }
+  .btn {
+    background:var(--accent); color:#fff; border:none; padding:8px 14px;
+    border-radius:4px; font:13px monospace; cursor:pointer; letter-spacing:1px;
+  }
+  .btn:hover { background:#0fa8b0; }
+  .btn-sm { padding:4px 10px; font-size:11px; }
+  .btn-warn { background:var(--warm); color:#000; }
+  .btn-ghost { background:transparent; border:1px solid var(--cream2); color:var(--cream); }
+
+  table { width:100%; border-collapse:collapse; background:var(--ink2); }
+  th, td { text-align:left; padding:10px 14px; font-size:13px; border-bottom:1px solid #1f2a3d; }
+  th { font-family:monospace; font-size:10px; letter-spacing:2px; color:var(--t3); text-transform:uppercase; font-weight:normal; }
+  tr:hover td { background:#172234; }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-family:monospace; letter-spacing:1px; }
+  .badge.b-ok { background:rgba(74,124,89,.2); color:#7fb893; }
+  .badge.b-warn { background:rgba(201,169,97,.2); color:#d8c082; }
+  .badge.b-bad { background:rgba(184,80,66,.2); color:#d18b80; }
+  .badge.b-info { background:rgba(58,106,154,.2); color:#7ba8d4; }
+  .badge.b-neutral { background:rgba(138,128,104,.2); color:var(--cream2); }
+
+  .empty { padding:32px; text-align:center; color:var(--t3); font-style:italic; }
+
+  /* Modal */
+  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; }
+  .modal-backdrop.show { display:flex; align-items:center; justify-content:center; }
+  .modal { background:#15233a; border:1px solid #1f2a3d; border-radius:6px; padding:24px; max-width:520px; width:90%; }
+  .modal h3 { font-family:Georgia,serif; font-weight:400; margin:0 0 16px; }
+  .modal label { display:block; font-size:11px; color:var(--t3); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; margin-top:12px; }
+  .modal input, .modal select, .modal textarea {
+    width:100%; box-sizing:border-box; padding:8px 10px;
+    background:#0a1019; border:1px solid #2a3a55; color:var(--cream);
+    font:13px monospace; border-radius:3px;
+  }
+  .modal textarea { min-height:80px; resize:vertical; }
+  .modal .actions { display:flex; gap:8px; margin-top:20px; justify-content:flex-end; }
+
+  .ack-row { display:flex; gap:8px; align-items:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Continuous Monitoring</h1>
+  <div class="subtitle">FedRAMP-aligned scheduled re-scans · drift detection · POA&amp;M auto-creation</div>
+
+  <!-- Cadence health stats -->
+  <div class="stats" id="cadence-stats">
+    <div class="stat ok"><div class="label">FEDRAMP 30-DAY</div><div class="value" id="s-30d">—</div><div class="meta" id="m-30d">Loading...</div></div>
+    <div class="stat ok"><div class="label">FEDRAMP 60-DAY</div><div class="value" id="s-60d">—</div><div class="meta" id="m-60d">Loading...</div></div>
+    <div class="stat ok"><div class="label">FEDRAMP 90-DAY</div><div class="value" id="s-90d">—</div><div class="meta" id="m-90d">Loading...</div></div>
+    <div class="stat warn"><div class="label">OPEN DEVIATIONS</div><div class="value" id="s-dev">—</div><div class="meta" id="m-dev">Click Refresh</div></div>
+  </div>
+
+  <!-- Schedules -->
+  <div class="section">
+    <div class="section-title">
+      <span>Active Schedules</span>
+      <div>
+        <button class="btn btn-sm" onclick="showCreateModal()">+ New Schedule</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadAll()">↻ Refresh</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Cadence</th><th>Mode</th><th>Last Run</th>
+          <th>Last Verdict</th><th>Next Run</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="schedules-body"><tr><td colspan="7" class="empty">Loading schedules...</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Deviations -->
+  <div class="section">
+    <div class="section-title">
+      <span>Drift Events <span id="dev-count" style="font-size:12px;color:var(--t3)"></span></span>
+      <div>
+        <button class="btn btn-ghost btn-sm" onclick="toggleOpenOnly()" id="filter-btn">Open only</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Detected</th><th>Gate</th><th>Framework</th><th>Severity</th>
+          <th>Transition</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="deviations-body"><tr><td colspan="7" class="empty">Loading deviations...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Create Schedule Modal -->
+<div class="modal-backdrop" id="modal-create">
+  <div class="modal">
+    <h3>New ConMon Schedule</h3>
+    <label>Name</label>
+    <input id="ns-name" placeholder="Quarterly FedRAMP Re-scan">
+    <label>Cadence</label>
+    <select id="ns-cadence">
+      <option value="30d">30-day (FedRAMP Moderate)</option>
+      <option value="60d">60-day (FedRAMP Moderate)</option>
+      <option value="90d">90-day (FedRAMP Moderate)</option>
+      <option value="weekly">Weekly</option>
+      <option value="daily">Daily</option>
+    </select>
+    <label>Scan Mode</label>
+    <select id="ns-mode">
+      <option value="FULL">FULL (all scanners)</option>
+      <option value="FULL_SOC">FULL + SOC correlation</option>
+      <option value="SAST">SAST only</option>
+      <option value="SCA">SCA only</option>
+      <option value="IAC">IaC only</option>
+    </select>
+    <label>Target Path</label>
+    <input id="ns-target" placeholder="/path/to/repo or registry://image">
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="closeCreateModal()">Cancel</button>
+      <button class="btn" onclick="createSchedule()">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let openOnly = false;
+
+function fmtDT(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleString();
+}
+
+function relTime(s) {
+  if (!s) return '—';
+  const ms = new Date(s) - new Date();
+  const days = Math.round(ms / 86400000);
+  if (days > 0) return `in ${days}d`;
+  if (days < 0) return `${-days}d ago`;
+  return 'today';
+}
+
+function verdictBadge(v) {
+  if (v === 'PASS') return '<span class="badge b-ok">✓ PASS</span>';
+  if (v === 'FAIL') return '<span class="badge b-bad">✗ FAIL</span>';
+  if (v === 'WAIVE') return '<span class="badge b-warn">~ WAIVE</span>';
+  return '<span class="badge b-neutral">—</span>';
+}
+
+function sevBadge(s) {
+  const cls = { critical:'b-bad', high:'b-bad', medium:'b-warn', low:'b-info' }[s] || 'b-neutral';
+  return `<span class="badge ${cls}">${(s||'—').toUpperCase()}</span>`;
+}
+
+async function loadAll() {
+  await Promise.all([loadCadence(), loadSchedules(), loadDeviations()]);
+}
+
+async function loadCadence() {
+  try {
+    const r = await fetch('/api/v1/conmon/cadence');
+    const d = await r.json();
+    const cad = (d.cadence || []);
+
+    const map = {};
+    cad.forEach(c => { map[c.cadence_days] = c; });
+
+    [30, 60, 90].forEach(days => {
+      const c = map[days];
+      const sEl = document.getElementById(`s-${days}d`);
+      const mEl = document.getElementById(`m-${days}d`);
+      const stat = sEl.parentElement;
+
+      if (!c) {
+        sEl.textContent = '—';
+        mEl.textContent = 'Not configured';
+        stat.classList.remove('ok','warn','bad');
+        stat.classList.add('warn');
+      } else if (c.is_overdue) {
+        sEl.textContent = 'OVERDUE';
+        mEl.textContent = 'Last: ' + fmtDT(c.last_scan_at);
+        stat.classList.remove('ok','warn'); stat.classList.add('bad');
+      } else {
+        sEl.textContent = '✓';
+        mEl.textContent = `Next: ${relTime(c.next_due_at)}`;
+        stat.classList.remove('warn','bad'); stat.classList.add('ok');
+      }
+    });
+  } catch (e) {
+    console.error('cadence load error', e);
+  }
+}
+
+async function loadSchedules() {
+  const tbody = document.getElementById('schedules-body');
+  try {
+    const r = await fetch('/api/v1/conmon/schedules');
+    const d = await r.json();
+    const list = d.schedules || [];
+
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No schedules. Click "+ New Schedule" to create one.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = list.map(s => `
+      <tr>
+        <td><b>${escapeHtml(s.name)}</b></td>
+        <td><code>${s.cadence}</code></td>
+        <td><span class="badge b-info">${s.mode}</span></td>
+        <td>${fmtDT(s.last_run_at)}</td>
+        <td>${verdictBadge(s.last_verdict)}</td>
+        <td>${fmtDT(s.next_run_at)} <span style="color:var(--t3);font-size:11px">(${relTime(s.next_run_at)})</span></td>
+        <td>${s.enabled ? '<span class="badge b-ok">ENABLED</span>' : '<span class="badge b-neutral">PAUSED</span>'}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function loadDeviations() {
+  const tbody = document.getElementById('deviations-body');
+  try {
+    const url = openOnly ? '/api/v1/conmon/deviations?open=1' : '/api/v1/conmon/deviations';
+    const r = await fetch(url);
+    const d = await r.json();
+    const list = d.deviations || [];
+
+    document.getElementById('dev-count').textContent = list.length ? `· ${list.length} ${openOnly ? 'open' : 'total'}` : '';
+    document.getElementById('s-dev').textContent = list.filter(x => !x.acknowledged_at).length;
+    document.getElementById('m-dev').textContent = list.filter(x => !x.acknowledged_at).length === 0
+      ? 'All clear'
+      : 'Action required';
+
+    if (list.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty">No ${openOnly ? 'open ' : ''}deviations</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = list.map(d => `
+      <tr>
+        <td>${fmtDT(d.detected_at)}</td>
+        <td><code>${escapeHtml(d.gate_name)}</code></td>
+        <td><span class="badge b-info">${escapeHtml(d.framework)}</span></td>
+        <td>${sevBadge(d.severity)}</td>
+        <td>${verdictBadge(d.prev_verdict)} → ${verdictBadge(d.curr_verdict)}</td>
+        <td>${d.acknowledged_at
+          ? `<span class="badge b-ok">ACK</span> <span style="color:var(--t3);font-size:11px">by ${escapeHtml(d.acknowledged_by||'')}</span>`
+          : '<span class="badge b-warn">OPEN</span>'}</td>
+        <td>${d.acknowledged_at ? '' : `<button class="btn btn-sm" onclick="ackDeviation(${d.id})">Acknowledge</button>`}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function toggleOpenOnly() {
+  openOnly = !openOnly;
+  document.getElementById('filter-btn').textContent = openOnly ? 'All' : 'Open only';
+  loadDeviations();
+}
+
+async function ackDeviation(id) {
+  const notes = prompt('Acknowledgement notes (optional):', '');
+  if (notes === null) return;
+  try {
+    const r = await fetch(`/api/v1/conmon/deviations/${id}/acknowledge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    loadDeviations();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+function showCreateModal() {
+  document.getElementById('modal-create').classList.add('show');
+}
+function closeCreateModal() {
+  document.getElementById('modal-create').classList.remove('show');
+}
+
+async function createSchedule() {
+  const body = {
+    name:        document.getElementById('ns-name').value.trim(),
+    cadence:     document.getElementById('ns-cadence').value,
+    mode:        document.getElementById('ns-mode').value,
+    target_path: document.getElementById('ns-target').value.trim(),
+  };
+  if (!body.name || !body.target_path) {
+    alert('Name and target path are required');
+    return;
+  }
+  try {
+    const r = await fetch('/api/v1/conmon/schedules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    closeCreateModal();
+    document.getElementById('ns-name').value = '';
+    document.getElementById('ns-target').value = '';
+    loadAll();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+// Initial load + auto refresh every 60s
+loadAll();
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>

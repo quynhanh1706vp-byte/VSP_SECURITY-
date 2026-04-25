@@ -257,6 +257,7 @@ func main() {
 		}
 		handler.MetricsHandler().ServeHTTP(w, req)
 	}))
+
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		ctx2, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
@@ -501,6 +502,22 @@ func main() {
 	})
 	r.Get("/api/p4/conmon/report", p4AuthMiddleware(handleConMonReport))
 	r.With(authMw).Get("/api/v1/ws", handler.WSUpgradeHandler) // cookie-based auth
+	// ConMon handler (used inside auth route group below)
+	conmonH := handler.NewConMonHandler(stdDB)
+	aiH := handler.NewAIAdvisorHandler(stdDB,
+		viper.GetString("anthropic.api_key"),
+		viper.GetBool("airgap.enabled"))
+	ssoOIDCH := handler.NewSSOOIDCHandler(stdDB,
+		jwtSecret,
+		jwtTTL,
+		auth.IssueJWT,
+	)
+	// ─── SSO public endpoints (no auth required) — Phase 4.5.3 ───
+	r.Get("/api/v1/auth/sso/login",    ssoOIDCH.Login)
+	r.Get("/api/v1/auth/sso/callback", ssoOIDCH.Callback)
+
+
+
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
 		r.Use(vspMW.NewUserRateLimiter(600, time.Minute)) // per-user: 600 req/min
@@ -555,6 +572,22 @@ func main() {
 		r.Delete("/api/v1/vsp/batch/{batch_id}", batchH.Cancel)
 		r.Get("/api/v1/vsp/findings", findingsH.List)
 		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
+		// ─── ConMon (Continuous Monitoring) — Phase 4.5.1 ─────────────
+		r.Get("/api/v1/conmon/schedules",  conmonH.Schedules)
+		r.Post("/api/v1/conmon/schedules", conmonH.Schedules)
+		r.Get("/api/v1/conmon/deviations", conmonH.Deviations)
+		r.Get("/api/v1/conmon/cadence",    conmonH.CadenceStatus)
+		r.Post("/api/v1/conmon/deviations/{id}/acknowledge", conmonH.AckDeviation)
+		// ─── AI Compliance Advisor — Phase 4.5.2 ─────────────────────
+		r.Post("/api/v1/ai/advise",          aiH.Advise)
+		r.Get("/api/v1/ai/mode",            aiH.Mode)
+		r.Get("/api/v1/ai/cache/stats",     aiH.CacheStats)
+		r.Post("/api/v1/ai/feedback/{id}", aiH.Feedback)
+		// ─── SSO Provider Admin — Phase 4.5.3 ─────────────────────────
+		r.Get("/api/v1/sso/providers",       ssoOIDCH.Providers)
+		r.Post("/api/v1/sso/providers",      ssoOIDCH.Providers)
+		r.Put("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Delete("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
 		r.Get("/api/v1/vsp/findings/by-tool", findingsH.ByTool)
 
 		// Gate + Policy

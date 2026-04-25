@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI Compliance Advisor</title>
+<style>
+  :root {
+    --ink:#0a1628; --ink2:#142238; --cream:#f4e9d8; --cream2:#c8bea9; --t3:#8a8068;
+    --accent:#0d7377; --accentLt:#14a8ad; --warm:#c9a961; --red:#b85042; --green:#4a7c59;
+  }
+  body { margin:0; background:#0a1019; color:var(--cream); font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+  .wrap { max-width:1400px; margin:0 auto; padding:24px; }
+  h1 { font-family:Georgia,serif; font-weight:400; font-size:32px; margin:0 0 4px; color:var(--cream); }
+  .subtitle { color:var(--t3); font-size:13px; margin-bottom:24px; }
+  .mode-badge {
+    display:inline-block; padding:3px 10px; border-radius:3px; font-size:10px;
+    font-family:monospace; letter-spacing:2px; text-transform:uppercase;
+    margin-left:12px; vertical-align:middle;
+  }
+  .mode-claude { background:rgba(13,115,119,.25); color:#7fcecf; }
+  .mode-local  { background:rgba(201,169,97,.25); color:#d8c082; }
+
+  .grid { display:grid; grid-template-columns:380px 1fr; gap:24px; }
+
+  .panel { background:var(--ink2); border:1px solid #1f2a3d; border-radius:6px; padding:18px; }
+  .panel h3 { font-family:Georgia,serif; font-weight:400; font-size:16px; margin:0 0 12px; }
+
+  label { display:block; font-size:10px; color:var(--t3); letter-spacing:2px; text-transform:uppercase; margin:12px 0 4px; }
+  input, select, textarea {
+    width:100%; box-sizing:border-box; padding:8px 10px;
+    background:#0a1019; border:1px solid #2a3a55; color:var(--cream);
+    font:13px monospace; border-radius:3px;
+  }
+  textarea { min-height:80px; resize:vertical; }
+
+  .btn {
+    background:var(--accent); color:#fff; border:none; padding:10px 18px;
+    border-radius:4px; font:13px monospace; cursor:pointer; letter-spacing:1px;
+    margin-top:16px; width:100%;
+  }
+  .btn:hover { background:#0fa8b0; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-sm { padding:5px 10px; font-size:11px; margin-top:0; width:auto; }
+
+  .result { min-height:300px; }
+  .result.empty { padding:48px; text-align:center; color:var(--t3); font-style:italic; }
+
+  .section-block { margin-bottom:24px; }
+  .section-block h4 {
+    font-family:monospace; font-size:11px; letter-spacing:2px;
+    color:var(--warm); margin:0 0 10px; padding-bottom:6px;
+    border-bottom:1px solid #2a3a55; text-transform:uppercase;
+  }
+  .remediation { line-height:1.6; }
+  .remediation pre {
+    background:#0a1019; padding:12px; border-radius:4px;
+    overflow-x:auto; border-left:3px solid var(--accent);
+    font-size:12px;
+  }
+  .remediation code { background:#0a1019; padding:1px 4px; border-radius:2px; font-size:12px; }
+
+  .effort-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:8px; }
+  .effort-card { background:#0a1019; padding:14px; border-radius:4px; text-align:center; }
+  .effort-card .level { font-size:9px; color:var(--t3); letter-spacing:2px; }
+  .effort-card .hours { font-family:Georgia,serif; font-size:24px; color:var(--cream); margin-top:4px; }
+  .effort-card .unit  { font-size:10px; color:var(--t3); }
+
+  .evidence-block {
+    background:#0a1019; padding:14px; border-radius:4px;
+    border-left:3px solid var(--warm);
+    font-style:italic; line-height:1.6;
+  }
+
+  .refs { display:flex; flex-wrap:wrap; gap:6px; }
+  .ref { background:rgba(13,115,119,.25); color:#7fcecf;
+         padding:3px 10px; border-radius:3px;
+         font-family:monospace; font-size:11px; }
+
+  .meta {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 14px; background:#0a1019; border-radius:4px;
+    font-family:monospace; font-size:11px; color:var(--t3);
+    margin-top:16px;
+  }
+
+  .feedback-row { display:flex; gap:8px; margin-top:14px; }
+  .fb-btn {
+    background:transparent; color:var(--cream2); border:1px solid var(--cream2);
+    padding:6px 12px; border-radius:3px; cursor:pointer;
+    font:11px monospace; letter-spacing:1px;
+  }
+  .fb-btn:hover { background:rgba(255,255,255,.05); }
+  .fb-btn.helpful { color:#7fb893; border-color:#7fb893; }
+  .fb-btn.not_helpful { color:#d18b80; border-color:#d18b80; }
+
+  .stats-bar {
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;
+    margin-bottom:24px;
+  }
+  .stat { background:var(--ink2); padding:14px; border-radius:4px; }
+  .stat .label { font-size:9px; color:var(--t3); letter-spacing:2px; text-transform:uppercase; }
+  .stat .value { font-family:Georgia,serif; font-size:22px; color:var(--cream); margin-top:4px; }
+
+  .spin {
+    display:inline-block; width:14px; height:14px;
+    border:2px solid var(--cream2); border-top-color:transparent;
+    border-radius:50%; animation:spin .8s linear infinite;
+    vertical-align:middle; margin-right:6px;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI Compliance Advisor <span id="mode-badge" class="mode-badge">…</span></h1>
+  <div class="subtitle">Per-control remediation guidance · code diff · effort estimate · evidence template</div>
+
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat"><div class="label">Cached Suggestions</div><div class="value" id="s-total">—</div></div>
+    <div class="stat"><div class="label">Times Reused</div><div class="value" id="s-uses">—</div></div>
+    <div class="stat"><div class="label">Tokens Saved (est)</div><div class="value" id="s-tokens">—</div></div>
+    <div class="stat"><div class="label">Mode</div><div class="value" id="s-mode" style="font-size:14px;font-family:monospace;letter-spacing:2px;">—</div></div>
+  </div>
+
+  <div class="grid">
+    <!-- Left: Input form -->
+    <div class="panel">
+      <h3>New Advisory Request</h3>
+
+      <label>Compliance Framework</label>
+      <select id="framework">
+        <option value="fedramp_moderate">FedRAMP Moderate (NIST 800-53)</option>
+        <option value="cmmc_l2">CMMC Level 2</option>
+        <option value="iso_27001">ISO/IEC 27001:2022</option>
+        <option value="sbv_09_2020">SBV TT 09/2020 (Vietnamese banking)</option>
+        <option value="eo_14028">EO 14028 / SBOM Mandate</option>
+      </select>
+
+      <label>Control / Practice ID</label>
+      <input id="control_id" placeholder="e.g. AC-2, SI-2, RA-5, A.5.15">
+
+      <label>Failing Finding (description)</label>
+      <textarea id="finding_summary" placeholder="e.g. Three privileged service accounts have not rotated credentials in 180 days, exceeding the 60-day FedRAMP threshold."></textarea>
+
+      <label>Evidence (one per line, optional)</label>
+      <textarea id="evidence" placeholder="e.g.&#10;account: svc-prod-deploy, last rotation: 2025-09-01&#10;policy doc: docs/security/credential-rotation.md"></textarea>
+
+      <button class="btn" id="advise-btn" onclick="getAdvice()">Get Remediation</button>
+    </div>
+
+    <!-- Right: Response -->
+    <div class="panel">
+      <div id="result" class="result empty">
+        Submit a finding on the left to receive a four-part remediation:
+        code diff · effort estimate · evidence template · references.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+// Lightweight markdown → HTML (handles fences, inline code, headings, lists)
+function md(s) {
+  s = String(s||'');
+  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, body) =>
+    `<pre><code>${escapeHtml(body)}</code></pre>`);
+  s = s.replace(/`([^`]+)`/g, (_, c) => `<code>${escapeHtml(c)}</code>`);
+  s = s.replace(/^### (.+)$/gm, '<h4 style="margin:14px 0 6px">$1</h4>');
+  s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  s = s.replace(/(<li>[\s\S]*?<\/li>)/g, '<ol>$1</ol>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  s = s.replace(/\n\n/g, '</p><p>');
+  return '<p>' + s + '</p>';
+}
+
+async function loadMode() {
+  try {
+    const r = await fetch('/api/v1/ai/mode');
+    const d = await r.json();
+    const b = document.getElementById('mode-badge');
+    if (d.mode === 'claude') {
+      b.textContent = 'Claude API';
+      b.className = 'mode-badge mode-claude';
+      document.getElementById('s-mode').textContent = 'CLAUDE';
+    } else {
+      b.textContent = 'Local Rules';
+      b.className = 'mode-badge mode-local';
+      document.getElementById('s-mode').textContent = 'LOCAL';
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch('/api/v1/ai/cache/stats');
+    const d = await r.json();
+    const s = d.stats || {};
+    document.getElementById('s-total').textContent = s.total_entries ?? 0;
+    document.getElementById('s-uses').textContent = s.total_uses ?? 0;
+    document.getElementById('s-tokens').textContent = (s.tokens_saved_estimate||0).toLocaleString();
+  } catch (e) { /* silent */ }
+}
+
+let lastCacheID = null;
+
+async function getAdvice() {
+  const btn = document.getElementById('advise-btn');
+  const result = document.getElementById('result');
+
+  const body = {
+    framework:       document.getElementById('framework').value,
+    control_id:      document.getElementById('control_id').value.trim(),
+    finding_summary: document.getElementById('finding_summary').value.trim(),
+    evidence:        document.getElementById('evidence').value.trim()
+                       .split('\n').map(s => s.trim()).filter(Boolean),
+  };
+  if (!body.control_id || !body.finding_summary) {
+    alert('Control ID and finding summary are required');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Analyzing...';
+  result.classList.remove('empty');
+  result.innerHTML = '<div style="padding:48px;text-align:center;color:var(--t3)"><span class="spin"></span> Generating remediation...</div>';
+
+  try {
+    const r = await fetch('/api/v1/ai/advise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const d = await r.json();
+    lastCacheID = d.cache_id;
+    renderResponse(d);
+    loadStats();
+  } catch (e) {
+    result.innerHTML = `<div style="padding:24px;color:var(--red)">Error: ${escapeHtml(e.message)}</div>`;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Get Remediation';
+}
+
+function renderResponse(d) {
+  const result = document.getElementById('result');
+  const eff = d.effort_hours || {};
+  const refs = (d.references || []).map(r => `<span class="ref">${escapeHtml(r)}</span>`).join('');
+  const cachedBadge = d.cached
+    ? '<span class="ref" style="background:rgba(74,124,89,.25);color:#7fb893">CACHED</span>'
+    : '';
+  const sourceBadge = d.source === 'claude'
+    ? '<span class="ref" style="background:rgba(13,115,119,.25);color:#7fcecf">CLAUDE</span>'
+    : '<span class="ref" style="background:rgba(201,169,97,.25);color:#d8c082">LOCAL RULES</span>';
+
+  let html = `
+    <div class="section-block">
+      <h4>Remediation</h4>
+      <div class="remediation">${md(d.remediation || '—')}</div>
+    </div>
+
+    <div class="section-block">
+      <h4>Effort Estimate</h4>
+      <div class="effort-grid">
+        <div class="effort-card">
+          <div class="level">JUNIOR</div>
+          <div class="hours">${eff.junior ?? '—'}</div>
+          <div class="unit">hours</div>
+        </div>
+        <div class="effort-card">
+          <div class="level">MID</div>
+          <div class="hours">${eff.mid ?? '—'}</div>
+          <div class="unit">hours</div>
+        </div>
+        <div class="effort-card">
+          <div class="level">SENIOR</div>
+          <div class="hours">${eff.senior ?? '—'}</div>
+          <div class="unit">hours</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h4>Evidence Template (for auditor)</h4>
+      <div class="evidence-block">${escapeHtml(d.evidence || '—')}</div>
+    </div>
+  `;
+
+  if (d.risk_acceptance_language) {
+    html += `
+    <div class="section-block">
+      <h4>Risk Acceptance Language (if deferred)</h4>
+      <div class="evidence-block" style="border-left-color:var(--red)">${escapeHtml(d.risk_acceptance_language)}</div>
+    </div>`;
+  }
+
+  html += `
+    <div class="section-block">
+      <h4>Control References</h4>
+      <div class="refs">${refs}</div>
+    </div>
+
+    <div class="meta">
+      <span>Source: ${sourceBadge} ${cachedBadge}</span>
+      <span>Cache ID: ${d.cache_id || '—'}</span>
+    </div>
+
+    <div class="feedback-row">
+      <span style="font-size:12px;color:var(--t3);align-self:center;margin-right:8px">Was this helpful?</span>
+      <button class="fb-btn helpful"     onclick="sendFeedback('helpful')">✓ Helpful</button>
+      <button class="fb-btn"             onclick="sendFeedback('partially')">~ Partially</button>
+      <button class="fb-btn not_helpful" onclick="sendFeedback('not_helpful')">✗ Not helpful</button>
+    </div>
+  `;
+
+  result.innerHTML = html;
+}
+
+async function sendFeedback(rating) {
+  if (!lastCacheID) return;
+  try {
+    await fetch(`/api/v1/ai/feedback/${lastCacheID}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating }),
+    });
+    alert('Feedback recorded — thanks!');
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+loadMode();
+loadStats();
+setInterval(loadStats, 30000);
+</script>
+</body>
+</html>

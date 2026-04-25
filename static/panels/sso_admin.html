@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SSO Provider Admin</title>
+<style>
+  :root {
+    --ink:#0a1628; --ink2:#142238; --cream:#f4e9d8; --cream2:#c8bea9; --t3:#8a8068;
+    --accent:#0d7377; --warm:#c9a961; --red:#b85042; --green:#4a7c59;
+  }
+  body { margin:0; background:#0a1019; color:var(--cream); font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+  .wrap { max-width:1200px; margin:0 auto; padding:24px; }
+  h1 { font-family:Georgia,serif; font-weight:400; font-size:32px; margin:0 0 4px; }
+  .subtitle { color:var(--t3); font-size:13px; margin-bottom:24px; }
+
+  .panel { background:var(--ink2); border:1px solid #1f2a3d; border-radius:6px; padding:20px; margin-bottom:24px; }
+  h3 { font-family:Georgia,serif; font-weight:400; font-size:18px; margin:0 0 12px; }
+
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:10px 14px; font-size:13px; border-bottom:1px solid #1f2a3d; }
+  th { font:11px monospace; letter-spacing:2px; color:var(--t3); text-transform:uppercase; font-weight:normal; }
+  tr:hover td { background:#172234; }
+  td code { font-size:11px; color:var(--cream2); }
+
+  .btn {
+    background:var(--accent); color:#fff; border:none; padding:8px 14px;
+    border-radius:4px; font:13px monospace; cursor:pointer; letter-spacing:1px;
+  }
+  .btn:hover { background:#0fa8b0; }
+  .btn-sm { padding:4px 10px; font-size:11px; }
+  .btn-warn { background:var(--warm); color:#000; }
+  .btn-danger { background:var(--red); }
+  .btn-ghost { background:transparent; border:1px solid var(--cream2); color:var(--cream); }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-family:monospace; letter-spacing:1px; }
+  .b-ok { background:rgba(74,124,89,.2); color:#7fb893; }
+  .b-warn { background:rgba(201,169,97,.2); color:#d8c082; }
+  .b-info { background:rgba(58,106,154,.2); color:#7ba8d4; }
+
+  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; }
+  .modal-backdrop.show { display:flex; align-items:center; justify-content:center; }
+  .modal { background:#15233a; border:1px solid #1f2a3d; border-radius:6px;
+           padding:24px; max-width:560px; width:90%; max-height:90vh; overflow:auto; }
+  .modal h3 { margin:0 0 16px; }
+
+  label { display:block; font:10px monospace; color:var(--t3); letter-spacing:2px;
+          text-transform:uppercase; margin:14px 0 4px; }
+  input, select, textarea {
+    width:100%; box-sizing:border-box; padding:8px 10px;
+    background:#0a1019; border:1px solid #2a3a55; color:var(--cream);
+    font:13px monospace; border-radius:3px;
+  }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .actions { display:flex; gap:8px; margin-top:20px; justify-content:flex-end; }
+  .help { font-size:11px; color:var(--t3); margin-top:4px; }
+
+  .empty { padding:32px; text-align:center; color:var(--t3); font-style:italic; }
+
+  .preset-bar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .preset-btn {
+    background:transparent; color:var(--cream2); border:1px solid var(--cream2);
+    padding:5px 11px; border-radius:3px; cursor:pointer;
+    font:11px monospace; letter-spacing:1px;
+  }
+  .preset-btn:hover { background:rgba(255,255,255,.05); border-color:var(--accent); color:var(--cream); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Single Sign-On (SSO)</h1>
+  <div class="subtitle">OIDC providers · Okta · Microsoft Entra ID · Google · Keycloak · Auth0</div>
+
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="margin:0">Configured Providers</h3>
+      <button class="btn" onclick="showCreateModal()">+ Add Provider</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Type</th><th>Issuer</th><th>Status</th><th>Default Role</th><th></th></tr>
+      </thead>
+      <tbody id="providers-body"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Test Login Flow</h3>
+    <p style="color:var(--cream2);font-size:13px">
+      To test a configured provider, navigate to:
+      <code style="background:#0a1019;padding:3px 8px;border-radius:3px;font-size:12px">
+        /api/v1/auth/sso/login?provider_id=&lt;ID&gt;
+      </code>
+    </p>
+    <p style="color:var(--t3);font-size:12px">
+      Make sure your IdP redirect URI matches the redirect_uri configured here exactly.
+    </p>
+  </div>
+</div>
+
+<!-- Create / Edit Modal -->
+<div class="modal-backdrop" id="modal-prov">
+  <div class="modal">
+    <h3 id="modal-title">New SSO Provider</h3>
+
+    <div class="preset-bar">
+      <button class="preset-btn" onclick="applyPreset('okta')">Okta</button>
+      <button class="preset-btn" onclick="applyPreset('entra')">Microsoft Entra</button>
+      <button class="preset-btn" onclick="applyPreset('google')">Google</button>
+      <button class="preset-btn" onclick="applyPreset('keycloak')">Keycloak</button>
+      <button class="preset-btn" onclick="applyPreset('auth0')">Auth0</button>
+    </div>
+
+    <input type="hidden" id="p-id">
+
+    <label>Display Name</label>
+    <input id="p-name" placeholder="Production Okta">
+
+    <label>OIDC Issuer URL</label>
+    <input id="p-issuer" placeholder="https://your-org.okta.com/oauth2/default">
+    <div class="help">Without trailing slash. Discovery happens at issuer + /.well-known/openid-configuration</div>
+
+    <div class="row2">
+      <div>
+        <label>Client ID</label>
+        <input id="p-client-id" placeholder="0oab1c2d3...">
+      </div>
+      <div>
+        <label>Client Secret</label>
+        <input id="p-client-secret" type="password" placeholder="leave blank to keep">
+      </div>
+    </div>
+
+    <label>Redirect URI (must match IdP config)</label>
+    <input id="p-redirect" placeholder="https://vsp.your-domain.com/api/v1/auth/sso/callback">
+
+    <div class="row2">
+      <div>
+        <label>Scopes</label>
+        <input id="p-scopes" value="openid email profile">
+      </div>
+      <div>
+        <label>Default Role for New Users</label>
+        <select id="p-role">
+          <option value="analyst">analyst</option>
+          <option value="auditor">auditor</option>
+          <option value="operator">operator</option>
+          <option value="admin">admin</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Allowed Email Domains (comma separated, optional)</label>
+    <input id="p-domains" placeholder="company.com, subsidiary.com">
+
+    <label>
+      <input type="checkbox" id="p-enabled" checked style="width:auto;margin-right:8px">
+      Enabled
+    </label>
+
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveProvider()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const presets = {
+  okta:     { name: 'Okta',           scopes: 'openid email profile groups',
+              issuer: 'https://YOUR-ORG.okta.com/oauth2/default' },
+  entra:    { name: 'Microsoft Entra', scopes: 'openid email profile',
+              issuer: 'https://login.microsoftonline.com/YOUR-TENANT-ID/v2.0' },
+  google:   { name: 'Google',          scopes: 'openid email profile',
+              issuer: 'https://accounts.google.com' },
+  keycloak: { name: 'Keycloak',        scopes: 'openid email profile',
+              issuer: 'https://kc.example.com/realms/YOUR-REALM' },
+  auth0:    { name: 'Auth0',           scopes: 'openid email profile',
+              issuer: 'https://YOUR-TENANT.auth0.com' },
+};
+
+function applyPreset(key) {
+  const p = presets[key];
+  if (!p) return;
+  document.getElementById('p-name').value = p.name;
+  document.getElementById('p-scopes').value = p.scopes;
+  document.getElementById('p-issuer').value = p.issuer;
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+async function loadProviders() {
+  const tbody = document.getElementById('providers-body');
+  try {
+    const r = await fetch('/api/v1/sso/providers');
+    if (!r.ok) throw new Error(await r.text());
+    const d = await r.json();
+    const list = d.providers || [];
+
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No SSO providers configured. Click "+ Add Provider" to create one.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = list.map(p => `
+      <tr>
+        <td><b>${escapeHtml(p.name)}</b></td>
+        <td><span class="badge b-info">${p.type.toUpperCase()}</span></td>
+        <td><code>${escapeHtml(p.issuer_url)}</code></td>
+        <td>${p.enabled ? '<span class="badge b-ok">ENABLED</span>' : '<span class="badge b-warn">DISABLED</span>'}</td>
+        <td><code>${escapeHtml(p.default_role)}</code></td>
+        <td style="text-align:right">
+          <button class="btn btn-sm btn-ghost" onclick='editProvider(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Edit</button>
+          <button class="btn btn-sm" onclick="testLogin(${p.id})">Test</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteProvider(${p.id})">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">Error: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+function showCreateModal() {
+  document.getElementById('modal-title').textContent = 'New SSO Provider';
+  document.getElementById('p-id').value = '';
+  document.getElementById('p-name').value = '';
+  document.getElementById('p-issuer').value = '';
+  document.getElementById('p-client-id').value = '';
+  document.getElementById('p-client-secret').value = '';
+  document.getElementById('p-redirect').value = window.location.origin + '/api/v1/auth/sso/callback';
+  document.getElementById('p-scopes').value = 'openid email profile';
+  document.getElementById('p-role').value = 'analyst';
+  document.getElementById('p-domains').value = '';
+  document.getElementById('p-enabled').checked = true;
+  document.getElementById('modal-prov').classList.add('show');
+}
+
+function editProvider(p) {
+  document.getElementById('modal-title').textContent = 'Edit Provider';
+  document.getElementById('p-id').value = p.id;
+  document.getElementById('p-name').value = p.name;
+  document.getElementById('p-issuer').value = p.issuer_url;
+  document.getElementById('p-client-id').value = p.client_id;
+  document.getElementById('p-client-secret').value = '';
+  document.getElementById('p-redirect').value = p.redirect_uri;
+  document.getElementById('p-scopes').value = p.scopes;
+  document.getElementById('p-role').value = p.default_role;
+  document.getElementById('p-domains').value = (p.allowed_domains||[]).join(', ');
+  document.getElementById('p-enabled').checked = p.enabled;
+  document.getElementById('modal-prov').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal-prov').classList.remove('show');
+}
+
+async function saveProvider() {
+  const id = document.getElementById('p-id').value.trim();
+  const body = {
+    name:        document.getElementById('p-name').value.trim(),
+    type:        'oidc',
+    issuer_url:  document.getElementById('p-issuer').value.trim(),
+    client_id:   document.getElementById('p-client-id').value.trim(),
+    client_secret: document.getElementById('p-client-secret').value,
+    redirect_uri:  document.getElementById('p-redirect').value.trim(),
+    scopes:      document.getElementById('p-scopes').value.trim(),
+    default_role: document.getElementById('p-role').value,
+    allowed_domains: document.getElementById('p-domains').value
+                       .split(',').map(s => s.trim()).filter(Boolean),
+    enabled:     document.getElementById('p-enabled').checked,
+  };
+  if (!body.name || !body.issuer_url || !body.client_id) {
+    alert('Name, issuer URL, and client ID are required');
+    return;
+  }
+  try {
+    const url = id ? `/api/v1/sso/providers/${id}` : '/api/v1/sso/providers';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    closeModal();
+    loadProviders();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function deleteProvider(id) {
+  if (!confirm('Delete this SSO provider?')) return;
+  try {
+    const r = await fetch(`/api/v1/sso/providers/${id}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error(await r.text());
+    loadProviders();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+function testLogin(id) {
+  // Open login in new tab — user completes IdP flow there
+  window.open(`/api/v1/auth/sso/login?provider_id=${id}&redirect=/`, '_blank');
+}
+
+loadProviders();
+</script>
+</body>
+</html>
