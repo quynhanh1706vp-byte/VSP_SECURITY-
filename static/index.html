@@ -3467,6 +3467,7 @@ const TOOLS_BY_MODE_V2 = {
   FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js'],
 }
 
+async function loadRunLog(rid) {
   await ensureToken();
   try {
     const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
@@ -3556,6 +3557,7 @@ const TOOLS_BY_MODE_V2 = {
     console.error('loadRunLog v2.3', e);
     if (typeof showToast==='function') showToast('Error: '+e.message,'error');
   }
+}
 }
 window.loadRunLog = loadRunLog;
 
