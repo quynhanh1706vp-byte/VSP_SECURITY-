@@ -53,7 +53,7 @@ section "3. AUTH + CSRF BOOTSTRAP"
 # Step A: Login (sets vsp_token only)
 LOGIN=$(curl -s -i -c "$COOKIE" -X POST http://localhost:8921/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@vsp.local","password":"AdminPass123"}')
+  -d '{"email":"admin@vsp.local","password":"NewSecurePass123"}')
 STATUS=$(echo "$LOGIN" | grep -oP 'HTTP/\d\.\d \K\d+' | head -1)
 [ "$STATUS" = "200" ] && ok "Login HTTP 200" || fail "Login HTTP $STATUS"
 
