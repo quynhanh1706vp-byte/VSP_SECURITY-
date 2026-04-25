@@ -582,7 +582,7 @@ function showCustody(i){
 
 function showAddEvidence(){
   document.getElementById('modal-evidence').classList.add('show');
-  document.getElementById('me-body').textContent=`
+  document.getElementById('me-body').innerHTML=`
     <div class="form-row"><label>Incident ID *</label><input id="ae-inc" placeholder="INC-2026-0001"></div>
     <div class="form-row"><label>Evidence Type</label>
       <select id="ae-type">
