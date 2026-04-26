@@ -253,7 +253,7 @@ async function loadDeviations() {
   const tbody = document.getElementById('deviations-body');
   try {
     const url = openOnly ? '/api/v1/conmon/deviations?open=1' : '/api/v1/conmon/deviations';
-    const r = await fetch(url);
+    const r = await fetch(url, { credentials: 'same-origin' });
     const d = await r.json();
     const list = d.deviations || [];
 
@@ -296,7 +296,7 @@ async function ackDeviation(id) {
   const notes = prompt('Acknowledgement notes (optional):', '');
   if (notes === null) return;
   try {
-    const r = await fetch(`/api/v1/conmon/deviations/${id}/acknowledge`, {
+    const r = await fetch(`/api/v1/conmon/deviations/${id}/acknowledge`, { credentials: 'same-origin',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ notes }),

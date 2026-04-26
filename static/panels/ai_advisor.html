@@ -323,7 +323,7 @@ function renderResponse(d) {
 async function sendFeedback(rating) {
   if (!lastCacheID) return;
   try {
-    await fetch(`/api/v1/ai/feedback/${lastCacheID}`, {
+    await fetch(`/api/v1/ai/feedback/${lastCacheID}`, { credentials: 'same-origin',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rating }),
