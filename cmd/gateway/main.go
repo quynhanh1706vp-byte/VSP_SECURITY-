@@ -366,6 +366,10 @@ func main() {
 		http.StripPrefix("/panels/",
 			http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
 	})
+
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/favicon.ico")
+	})
 	// P4 Compliance — public routes (no auth required)
 	r.Get("/api/p4/health", p4Health)
 	r.Get("/api/p4/health/detailed", handleP4HealthDetailed)

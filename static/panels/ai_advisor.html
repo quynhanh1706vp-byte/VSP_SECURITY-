@@ -159,6 +159,17 @@
 </div>
 
 <script>
+// Auth bootstrap — read JWT from parent window (httpOnly cookie can't be read by JS)
+// Falls back to empty string; backend will reject unauth'd requests with 401
+const TOKEN = (function() {
+  try {
+    return (window.parent && window.parent !== window && window.parent.TOKEN) || 
+           (window.TOKEN) || 
+           '';
+  } catch(e) { return ''; }
+})();
+const AUTH_HEADERS = TOKEN ? { 'Authorization': 'Bearer ' + TOKEN } : {};
+
 function escapeHtml(s) {
   return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 }
@@ -180,7 +191,7 @@ function md(s) {
 
 async function loadMode() {
   try {
-    const r = await fetch('/api/v1/ai/mode', { credentials: 'same-origin' });
+    const r = await fetch('/api/v1/ai/mode', { headers: { ...AUTH_HEADERS } });
     const d = await r.json();
     const b = document.getElementById('mode-badge');
     if (d.mode === 'claude') {
@@ -197,7 +208,7 @@ async function loadMode() {
 
 async function loadStats() {
   try {
-    const r = await fetch('/api/v1/ai/cache/stats', { credentials: 'same-origin' });
+    const r = await fetch('/api/v1/ai/cache/stats', { headers: { ...AUTH_HEADERS } });
     const d = await r.json();
     const s = d.stats || {};
     document.getElementById('s-total').textContent = s.total_entries ?? 0;
@@ -230,8 +241,8 @@ async function getAdvice() {
   result.innerHTML = '<div style="padding:48px;text-align:center;color:var(--t3)"><span class="spin"></span> Generating remediation...</div>';
 
   try {
-    const r = await fetch('/api/v1/ai/advise', { credentials: 'same-origin', method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const r = await fetch('/api/v1/ai/advise', { method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!r.ok) throw new Error(await r.text());
@@ -323,9 +334,8 @@ function renderResponse(d) {
 async function sendFeedback(rating) {
   if (!lastCacheID) return;
   try {
-    await fetch(`/api/v1/ai/feedback/${lastCacheID}`, { credentials: 'same-origin',
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    await fetch(`/api/v1/ai/feedback/${lastCacheID}`, { method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
       body: JSON.stringify({ rating }),
     });
     alert('Feedback recorded — thanks!');

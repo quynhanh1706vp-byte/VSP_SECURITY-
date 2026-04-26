@@ -165,6 +165,17 @@
 </div>
 
 <script>
+// Auth bootstrap — read JWT from parent window (httpOnly cookie can't be read by JS)
+// Falls back to empty string; backend will reject unauth'd requests with 401
+const TOKEN = (function() {
+  try {
+    return (window.parent && window.parent !== window && window.parent.TOKEN) || 
+           (window.TOKEN) || 
+           '';
+  } catch(e) { return ''; }
+})();
+const AUTH_HEADERS = TOKEN ? { 'Authorization': 'Bearer ' + TOKEN } : {};
+
 const presets = {
   okta:     { name: 'Okta',           scopes: 'openid email profile groups',
               issuer: 'https://YOUR-ORG.okta.com/oauth2/default' },
@@ -193,7 +204,7 @@ function escapeHtml(s) {
 async function loadProviders() {
   const tbody = document.getElementById('providers-body');
   try {
-    const r = await fetch('/api/v1/sso/providers', { credentials: 'same-origin' });
+    const r = await fetch('/api/v1/sso/providers', { headers: { ...AUTH_HEADERS } });
     if (!r.ok) throw new Error(await r.text());
     const d = await r.json();
     const list = d.providers || [];
