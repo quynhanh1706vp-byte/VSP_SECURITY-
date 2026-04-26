@@ -2086,7 +2086,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
 (function(){
   var iframePanels = ['swinventory','users','ai_analyst','scheduler','correlation','soar',
     'logsources','ueba','assets','netflow','threathunt','vulnmgmt','threatintel',
-    'p4compliance','cicd','integrations','settings'];
+    'p4compliance','cicd','integrations','settings','conmon','ai_advisor','sso_admin'];
   
   setInterval(function(){
     iframePanels.forEach(function(name){
@@ -2106,7 +2106,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
 (function(){
   var iframePanels = ['swinventory','users','ai_analyst','scheduler','correlation','soar',
     'logsources','ueba','assets','netflow','threathunt','vulnmgmt','threatintel',
-    'p4compliance','cicd','integrations','settings'];
+    'p4compliance','cicd','integrations','settings','conmon','ai_advisor','sso_admin'];
   
   setInterval(function(){
     iframePanels.forEach(function(name){
