@@ -180,7 +180,7 @@ function md(s) {
 
 async function loadMode() {
   try {
-    const r = await fetch('/api/v1/ai/mode');
+    const r = await fetch('/api/v1/ai/mode', { credentials: 'same-origin' });
     const d = await r.json();
     const b = document.getElementById('mode-badge');
     if (d.mode === 'claude') {
@@ -197,7 +197,7 @@ async function loadMode() {
 
 async function loadStats() {
   try {
-    const r = await fetch('/api/v1/ai/cache/stats');
+    const r = await fetch('/api/v1/ai/cache/stats', { credentials: 'same-origin' });
     const d = await r.json();
     const s = d.stats || {};
     document.getElementById('s-total').textContent = s.total_entries ?? 0;
@@ -230,8 +230,7 @@ async function getAdvice() {
   result.innerHTML = '<div style="padding:48px;text-align:center;color:var(--t3)"><span class="spin"></span> Generating remediation...</div>';
 
   try {
-    const r = await fetch('/api/v1/ai/advise', {
-      method: 'POST',
+    const r = await fetch('/api/v1/ai/advise', { credentials: 'same-origin', method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });

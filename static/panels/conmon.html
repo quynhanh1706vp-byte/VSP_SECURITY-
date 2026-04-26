@@ -188,7 +188,7 @@ async function loadAll() {
 
 async function loadCadence() {
   try {
-    const r = await fetch('/api/v1/conmon/cadence');
+    const r = await fetch('/api/v1/conmon/cadence', { credentials: 'same-origin' });
     const d = await r.json();
     const cad = (d.cadence || []);
 
@@ -224,7 +224,7 @@ async function loadCadence() {
 async function loadSchedules() {
   const tbody = document.getElementById('schedules-body');
   try {
-    const r = await fetch('/api/v1/conmon/schedules');
+    const r = await fetch('/api/v1/conmon/schedules', { credentials: 'same-origin' });
     const d = await r.json();
     const list = d.schedules || [];
 
@@ -325,8 +325,7 @@ async function createSchedule() {
     return;
   }
   try {
-    const r = await fetch('/api/v1/conmon/schedules', {
-      method: 'POST',
+    const r = await fetch('/api/v1/conmon/schedules', { credentials: 'same-origin', method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
