@@ -6312,23 +6312,30 @@ async function loadRemediations() {
   var h = {'Authorization':'Bearer '+window.TOKEN};
   var status = (document.getElementById('rem-filter-status')||{}).value||'';
   try {
-    var [remD, statsD, findD] = await Promise.all([
+    var [remD, statsD] = await Promise.all([
+
       fetch('/api/v1/remediation'+(status?'?status='+status:''), {headers:h}).then(function(r){return r.json();}),
-      fetch('/api/v1/remediation/stats', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};}),
-      fetch('/api/v1/vsp/findings?limit=5000', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};})
+
+      fetch('/api/v1/remediation/stats', {headers:h}).then(function(r){return r.json();}).catch(function(){return {};})
+
     ]);
-    // Build findings map by id
-    var findMap = {};
-    (findD.findings||[]).forEach(function(f){ findMap[f.id] = f; });
-    // Merge findings data into remediations
+
+    // Backend already JOINs findings — use API fields directly
+
     _remData = (remD.remediations||[]).map(function(r) {
-      var f = findMap[r.finding_id] || {};
+
       return Object.assign({}, r, {
-        severity:    f.severity    || '—',
-        tool:        f.tool        || '—',
-        rule_id:     f.rule_id     || '—',
-        description: f.message     || '—',
+
+        severity:    r.severity || '—',
+
+        tool:        r.tool     || '—',
+
+        rule_id:     r.rule_id  || '—',
+
+        description: r.title    || '—',
+
       });
+
     });
 
     // Update KPI stats
