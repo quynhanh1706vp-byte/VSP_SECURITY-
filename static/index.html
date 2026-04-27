@@ -155,7 +155,7 @@ window.__esc = __esc;
 
       <!-- Tools preview -->
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:4px">
-        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Tools: <span id="scan-tools-preview" style="color:var(--t2);text-transform:none">semgrep · gosec · codeql · bandit · trivy · grype · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap (17 tools)</span></div>
+        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Tools: <span id="scan-tools-preview" style="color:var(--t2);text-transform:none">semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js (23 tools)</span></div>
       </div>
 
       <div id="scanMsg" style="margin-top:8px;font-size:11px;font-family:var(--font-mono)"></div>
@@ -182,7 +182,7 @@ function updateScanTools() {
     'IAC':      'kics · checkov · hadolint',
     'DAST':     'nuclei · nikto · sslscan',
     'NETWORK':  'nmap · sslscan · netcap',
-    'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap (17 tools)',
+    'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js (23 tools)',
     'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap + SIEM (18 tools max)',
   };
   var el = document.getElementById('scan-tools-preview');
