@@ -183,7 +183,7 @@ function updateScanTools() {
     'DAST':     'nuclei · nikto · sslscan',
     'NETWORK':  'nmap · sslscan · netcap',
     'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js (23 tools)',
-    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap + SIEM (18 tools max)',
+    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js + SIEM (23 tools + SIEM)',
   };
   var el = document.getElementById('scan-tools-preview');
   if (el) el.textContent = toolMap[mode] || mode;
