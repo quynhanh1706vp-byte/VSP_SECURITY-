@@ -1781,7 +1781,7 @@ function showPanel(name, btn) {
   // Panel-specific initialization
   setTimeout(() => {
     if (!window.TOKEN || window.TOKEN === '') return;
-    if (name === 'dashboard')   initDashboardCharts();
+    if (name === 'dashboard')   { initDashboardCharts(); loadDashKPIs(); }
     if (name === 'governance')  initGovernance();
     if (name === 'compliance')  { initGauges(); setTimeout(loadFedRAMP, 300); }
     if (name === 'sbom') setTimeout(loadSBOM, 200);
@@ -2863,6 +2863,28 @@ window.verifyAudit = verifyAudit;
 window.loadFedRAMP = loadFedRAMP;
 window.loadCMMC = loadCMMC;
 window.loadRuns = () => showToast('Runs refreshed','info');
+
+async function loadDashKPIs() {
+  if (!window.TOKEN) return;
+  try {
+    const r = await fetch('/api/v1/vsp/findings/summary?scope=all', {
+      headers: { 'Authorization': 'Bearer ' + window.TOKEN }
+    });
+    const d = await r.json();
+    const map = {
+      'd-critical': d.critical || 0,
+      'd-high':     d.high || 0,
+      'd-medium':   d.medium || 0,
+      'd-low':      d.low || 0,
+    };
+    Object.entries(map).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val.toLocaleString();
+    });
+  } catch(e) { console.warn('loadDashKPIs failed', e); }
+}
+window.loadDashKPIs = loadDashKPIs;
+
 window.loadCurrentPanel = loadCurrentPanel;
 window.loadExecutive = loadExecutive;
 </script>

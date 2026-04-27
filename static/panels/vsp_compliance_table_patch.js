@@ -617,6 +617,9 @@
   };
 
   window._ctrlOpenDetail = function(idx) {
+  // Null guard: if any DOM element missing, abort to prevent textContent error
+  try {
+
     const r = _ctrlFiltered[idx];
     if (!r) return;
     const overlay = document.getElementById('ctrl-detail-overlay');
@@ -652,7 +655,8 @@
       </div>`).join('');
 
     overlay.classList.add('open');
-  };
+    } catch(e) { console.warn('_ctrlOpenDetail:', e); }
+};
 
   /* ─── 5. ALSO PATCH renderTests for Pipeline tab ──────────────────── */
   window.renderTests = function(tests) {
