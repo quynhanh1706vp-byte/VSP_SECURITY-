@@ -1467,6 +1467,9 @@ func main() {
 			})
 		})
 
+		// POST /api/v1/remediation/auto-resolve — close remediations whose finding is gone
+		r.Post("/api/v1/remediation/auto-resolve", remediationH.AutoResolve)
+
 		// GET /api/v1/remediation/stats — remediation stats
 		r.Get("/api/v1/remediation/stats", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
