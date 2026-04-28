@@ -159,6 +159,29 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		len(result.Findings), summaryJSON)
 	// Store gate reason for audit trail
 	h.DB.UpdateRunGateReason(dbCtx, payload.TenantID, payload.RID, eval.Reason)
+
+	// Post-scan hook: auto-resolve orphan remediations whose finding fingerprint
+	// is no longer present in this newer same-mode run. Non-fatal — log and continue.
+	// Only triggers on PASS/WARN paths (FAILED runs return early above).
+	if len(result.Findings) > 0 {
+		go func(tenantID, runID string) {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			res, err := h.DB.AutoResolveOrphans(bgCtx, tenantID)
+			if err != nil {
+				log.Warn().Err(err).
+					Str("tenant", tenantID).Str("run_id", runID).
+					Msg("post-scan auto-resolve failed (non-fatal)")
+				return
+			}
+			log.Info().
+				Int("resolved", res.Resolved).
+				Int("checked", res.Checked).
+				Int("skipped", res.Skipped).
+				Str("tenant", tenantID).Str("run_id", runID).
+				Msg("post-scan auto-resolve completed")
+		}(payload.TenantID, payload.RID)
+	}
 	// Audit: log scan completion (synchronous - context.Background avoids cancellation)
 	{
 		auditCtx := context.Background()
