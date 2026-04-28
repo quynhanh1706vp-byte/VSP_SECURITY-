@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -59,6 +60,36 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 
 	// Mark RUNNING
 	h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "RUNNING", 0)
+
+	// Pre-flight: validate src path exists and is non-empty.
+	// Prevents scheduler-triggered scans against missing/empty dirs from
+	// reporting "DONE 17/17 tools, 0 findings, gate=PASS" — which polluted
+	// 286/488 historical runs (~58%) with false-positive clean status.
+	// SAST/IAC/SCA/SECRETS/FULL all require a source dir; DAST/NETWORK use URL.
+	requiresSrc := payload.Mode != "DAST" && payload.Mode != "NETWORK"
+	if requiresSrc && payload.Src != "" {
+		info, statErr := os.Stat(payload.Src)
+		if statErr != nil || !info.IsDir() {
+			h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "FAILED", 0)
+			h.DB.UpdateRunGateReason(ctx, payload.TenantID, payload.RID,
+				fmt.Sprintf("pre-flight: src not found or not a directory: %s", payload.Src))
+			log.Warn().
+				Str("rid", payload.RID).Str("src", payload.Src).Str("mode", string(payload.Mode)).
+				Msg("scan aborted: src missing")
+			return nil
+		}
+		entries, _ := os.ReadDir(payload.Src)
+		if len(entries) == 0 {
+			h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "FAILED", 0)
+			h.DB.UpdateRunGateReason(ctx, payload.TenantID, payload.RID,
+				fmt.Sprintf("pre-flight: src directory is empty: %s", payload.Src))
+			log.Warn().
+				Str("rid", payload.RID).Str("src", payload.Src).Str("mode", string(payload.Mode)).
+				Msg("scan aborted: src empty")
+			return nil
+		}
+	}
+
 
 	// Execute — apply profile filtering + timeout per profile
 	profileRunners := RunnersForProfile(payload.Mode, payload.Profile)
