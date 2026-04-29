@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/jackc/pgx/v5"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -355,26 +356,42 @@ func (h *Findings) ByTool(w http.ResponseWriter, r *http.Request) {
 			rid, claims.TenantID).Scan(&id)
 		runID = id
 	}
+
+	// Global mode: no run_id/rid → aggregate across all findings for the tenant.
+	// Dashboard widgets and SOC overviews call this endpoint without a run filter.
+	var rows pgx.Rows
+	var err error
 	if runID == "" {
-		jsonError(w, "run_id or rid required", http.StatusBadRequest)
-		return
+		rows, err = h.DB.Pool().Query(r.Context(), `
+			SELECT tool, COUNT(*),
+			       COUNT(*) FILTER (WHERE severity='CRITICAL'),
+			       COUNT(*) FILTER (WHERE severity='HIGH'),
+			       COUNT(*) FILTER (WHERE severity='MEDIUM'),
+			       COUNT(*) FILTER (WHERE severity='LOW')
+			FROM findings WHERE tenant_id=$1
+			GROUP BY tool ORDER BY COUNT(*) DESC`, claims.TenantID)
+	} else {
+		rows, err = h.DB.Pool().Query(r.Context(), `
+			SELECT tool, COUNT(*),
+			       COUNT(*) FILTER (WHERE severity='CRITICAL'),
+			       COUNT(*) FILTER (WHERE severity='HIGH'),
+			       COUNT(*) FILTER (WHERE severity='MEDIUM'),
+			       COUNT(*) FILTER (WHERE severity='LOW')
+			FROM findings WHERE run_id=$1::uuid AND tenant_id=$2
+			GROUP BY tool ORDER BY COUNT(*) DESC`, runID, claims.TenantID)
 	}
-	rows, err := h.DB.Pool().Query(r.Context(), `
-		SELECT tool, COUNT(*),
-		       COUNT(*) FILTER (WHERE severity='CRITICAL'),
-		       COUNT(*) FILTER (WHERE severity='HIGH'),
-		       COUNT(*) FILTER (WHERE severity='MEDIUM'),
-		       COUNT(*) FILTER (WHERE severity='LOW')
-		FROM findings WHERE run_id=$1::uuid AND tenant_id=$2
-		GROUP BY tool ORDER BY COUNT(*) DESC`, runID, claims.TenantID)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 	type T struct {
-		Tool                               string `json:"tool"`
-		Total, Critical, High, Medium, Low int
+		Tool     string `json:"tool"`
+		Total    int    `json:"total"`
+		Critical int    `json:"critical"`
+		High     int    `json:"high"`
+		Medium   int    `json:"medium"`
+		Low      int    `json:"low"`
 	}
 	var tools []T
 	for rows.Next() {
