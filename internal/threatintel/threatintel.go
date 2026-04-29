@@ -308,11 +308,12 @@ func (c *Client) fetchEPSS(ctx context.Context, cveID string, enr *CVEEnrichment
 // Fix 2026-04-17: set UA (bypass Akamai 403), check HTTP status,
 // use working GitHub mirror, avoid defer-in-loop leak.
 func (c *Client) LoadKEV(ctx context.Context) error {
-	// Primary: CISA direct. Fallback: cisagov/kev-data GitHub mirror.
-	// (The old cisagov/known-exploited-vulnerabilities repo returns 404.)
+	// Primary: cisagov/kev-data GitHub mirror (reliable, no Akamai 403).
+	// Fallback: CISA direct (often returns 403 from server-side userland).
+	// Order swapped 2026-04-28 — Github mirror loads cleanly without warning spam.
 	urls := []string{
-		"https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
 		"https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json",
+		"https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
 	}
 
 	for _, url := range urls {
