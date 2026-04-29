@@ -461,23 +461,33 @@ func main() {
 	netCapEngine := netcap.NewEngine()
 	pipeline.SetNetcapEngine(netCapEngine) // register with scan pipeline (NETWORK/FULL_SOC modes)
 	netCapH := handler.NewNetCapHandler(netCapEngine)
-	// Auto-start on best available interface
-	go func() {
-		ifaces, _ := netCapEngine.GetInterfaces()
-		iface := "any"
-		for _, i := range ifaces {
-			if i != "lo" && !strings.HasPrefix(i, "docker") && !strings.HasPrefix(i, "br-") && !strings.HasPrefix(i, "veth") {
-				iface = i
-				break
+	// Auto-start on best available interface — disabled by default.
+	// NetCap auto-start requires CAP_NET_RAW capability which most deploys don't grant.
+	// Engine is still registered with pipeline (line above) for on-demand use by
+	// NETWORK/FULL_SOC scan modes, and REST API /api/v1/netcap/start remains available
+	// for manual triggering. Set NETCAP_AUTO_START=true to enable boot-time capture.
+	if os.Getenv("NETCAP_AUTO_START") == "true" {
+		go func() {
+			ifaces, _ := netCapEngine.GetInterfaces()
+			iface := "any"
+			for _, i := range ifaces {
+				if i != "lo" && !strings.HasPrefix(i, "docker") && !strings.HasPrefix(i, "br-") && !strings.HasPrefix(i, "veth") {
+					iface = i
+					break
+				}
 			}
-		}
-		if err := netCapEngine.Start(netcap.CaptureConfig{Interface: iface, SnapLen: 1500, Promiscuous: true}); err != nil {
-			log.Warn().Err(err).Str("iface", iface).Msg("[NetCap] capture start failed — needs CAP_NET_RAW")
-		}
-		ctxNC, cancelNC := context.WithCancel(context.Background())
-		_ = cancelNC // cancelled when goroutine exits via engine.Stop()
-		netCapEngine.StartTsharkDecoder(ctxNC, iface)
-	}()
+			if err := netCapEngine.Start(netcap.CaptureConfig{Interface: iface, SnapLen: 1500, Promiscuous: true}); err != nil {
+				log.Warn().Err(err).Str("iface", iface).Msg("[NetCap] capture start failed — needs CAP_NET_RAW")
+				return
+			}
+			ctxNC, cancelNC := context.WithCancel(context.Background())
+			_ = cancelNC // cancelled when goroutine exits via engine.Stop()
+			netCapEngine.StartTsharkDecoder(ctxNC, iface)
+			log.Info().Str("iface", iface).Msg("[NetCap] auto-capture started")
+		}()
+	} else {
+		log.Info().Msg("[NetCap] auto-start disabled (set NETCAP_AUTO_START=true to enable)")
+	}
 	r.Route("/api/v1/netcap", func(r chi.Router) {
 		r.Use(authMw)
 		r.Get("/interfaces", netCapH.Interfaces)
