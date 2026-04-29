@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -226,4 +227,65 @@ func (db *DB) BulkUpsertRemediations(ctx context.Context, items []Remediation) e
 		return fmt.Errorf("bulk upsert remediation close: %w", err)
 	}
 	return tx.Commit(ctx)
+}
+
+
+// UpdateRemediationFields applies a partial update to a remediation row.
+// Only the keys present in `fields` are written to SQL — zero-value defaults
+// for omitted keys do NOT clobber existing data. Used by PATCH endpoints
+// where clients send only the fields they want to change.
+//
+// Allowed columns are whitelisted to prevent SQL injection via field name.
+// resolved_at is auto-set when status transitions to a terminal value.
+func (db *DB) UpdateRemediationFields(ctx context.Context, findingID, tenantID string, fields map[string]any) (*Remediation, error) {
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	allowed := map[string]bool{
+		"status": true, "assignee": true, "priority": true,
+		"notes": true, "ticket_url": true, "due_date": true,
+	}
+
+	setParts := []string{"updated_at = NOW()"}
+	args := []any{findingID, tenantID}
+	i := 3
+
+	for col, val := range fields {
+		if !allowed[col] {
+			continue
+		}
+		setParts = append(setParts, fmt.Sprintf("%s=$%d", col, i))
+		args = append(args, val)
+		i++
+	}
+
+	if len(setParts) == 1 { // only updated_at — no real fields after whitelist
+		return nil, fmt.Errorf("no allowed fields to update")
+	}
+
+	q := fmt.Sprintf(`
+		UPDATE remediations 
+		SET %s,
+		    resolved_at = CASE 
+		        WHEN status IN ('resolved','false_positive') AND resolved_at IS NULL THEN NOW()
+		        ELSE resolved_at 
+		    END
+		WHERE finding_id=$1::uuid AND tenant_id=$2::uuid
+		RETURNING id, finding_id, tenant_id, status, assignee, priority, due_date,
+		          notes, ticket_url, resolved_at, created_at, updated_at`,
+		strings.Join(setParts, ", "))
+
+	var out Remediation
+	err := db.pool.QueryRow(ctx, q, args...).Scan(
+		&out.ID, &out.FindingID, &out.TenantID, &out.Status,
+		&out.Assignee, &out.Priority, &out.DueDate, &out.Notes,
+		&out.TicketURL, &out.ResolvedAt, &out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("remediation not found for finding_id=%s", findingID)
+		}
+		return nil, fmt.Errorf("partial update remediation: %w", err)
+	}
+	return &out, nil
 }

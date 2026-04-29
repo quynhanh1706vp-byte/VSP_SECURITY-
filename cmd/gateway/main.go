@@ -1154,36 +1154,70 @@ func main() {
 		r.Post("/api/v1/remediation/{rem_id}/comments", remediationH.AddComment)
 
 		// PATCH /api/v1/remediation/finding/{finding_id}/status
+		// Partial update: only fields present in body are written. Omitted fields
+		// keep their existing DB values. Prevents data loss from zero-value clobber.
 		r.Patch("/api/v1/remediation/finding/{finding_id}/status", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
 			fid := chi.URLParam(r, "finding_id")
-			var req struct {
-				Status  string `json:"status"`
-				Comment string `json:"comment"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+
+			// Decode as raw map to detect which keys client actually sent
+			var raw map[string]json.RawMessage
+			if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 				http.Error(w, `{"error":"invalid body"}`, http.StatusBadRequest)
 				return
 			}
-			valid := map[string]bool{"open": true, "in_progress": true, "resolved": true, "accepted": true, "false_positive": true, "suppressed": true}
-			if !valid[req.Status] {
-				http.Error(w, `{"error":"invalid status"}`, http.StatusBadRequest)
+
+			fields := make(map[string]any)
+			validStatus := map[string]bool{"open": true, "in_progress": true, "resolved": true, "accepted": true, "false_positive": true, "suppressed": true}
+
+			if v, ok := raw["status"]; ok {
+				var s string
+				_ = json.Unmarshal(v, &s)
+				if !validStatus[s] {
+					http.Error(w, `{"error":"invalid status"}`, http.StatusBadRequest)
+					return
+				}
+				fields["status"] = s
+			}
+			for _, col := range []string{"assignee", "priority", "ticket_url"} {
+				if v, ok := raw[col]; ok {
+					var s string
+					_ = json.Unmarshal(v, &s)
+					fields[col] = s
+				}
+			}
+			// notes: support new "notes" key, fall back to legacy "comment"
+			if v, ok := raw["notes"]; ok {
+				var s string
+				_ = json.Unmarshal(v, &s)
+				fields["notes"] = s
+			} else if v, ok := raw["comment"]; ok {
+				var s string
+				_ = json.Unmarshal(v, &s)
+				fields["notes"] = s
+			}
+
+			if len(fields) == 0 {
+				http.Error(w, `{"error":"no fields to update"}`, http.StatusBadRequest)
 				return
 			}
-			rem, err := remediationH.DB.UpsertRemediation(r.Context(), store.Remediation{
-				FindingID: fid,
-				TenantID:  claims.TenantID,
-				Status:    store.RemediationStatus(req.Status),
-				Notes:     req.Comment,
-			})
+
+			rem, err := remediationH.DB.UpdateRemediationFields(r.Context(), fid, claims.TenantID, fields)
 			if err != nil {
-				http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
+				http.Error(w, `{"error":"db error: `+err.Error()+`"}`, http.StatusInternalServerError)
 				return
 			}
+
+			updatedKeys := make([]string, 0, len(fields))
+			for k := range fields {
+				updatedKeys = append(updatedKeys, k)
+			}
+
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
 				"ok": true, "finding_id": fid,
-				"new_status": req.Status, "resolved_at": rem.ResolvedAt,
+				"new_status": rem.Status, "resolved_at": rem.ResolvedAt,
+				"updated_fields": updatedKeys,
 			})
 		})
 		// SBOM
