@@ -202,6 +202,8 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 func (a *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
 	if ok {
+		// Revoke token via blacklist — JTI added to Redis until natural expiry
+		auth.RevokeCurrentToken(r.Context(), claims.JTI, claims.ExpiresAt)
 		go a.writeAudit(r.Clone(context.Background()), claims.TenantID, &claims.UserID, "LOGOUT", "/auth/logout")
 	}
 	// Clear httpOnly cookie on logout

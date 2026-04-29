@@ -17,20 +17,24 @@ import (
 type contextKey string
 
 const (
-	CtxUserID   contextKey = "user_id"
-	CtxTenantID contextKey = "tenant_id"
-	CtxRole     contextKey = "role"
-	CtxEmail    contextKey = "email"
+	CtxUserID    contextKey = "user_id"
+	CtxTenantID  contextKey = "tenant_id"
+	CtxRole      contextKey = "role"
+	CtxEmail     contextKey = "email"
+	CtxJTI       contextKey = "jti"
+	CtxExpiresAt contextKey = "exp"
 )
 
 // ── Claims ────────────────────────────────────────────────────────────────────
 
 // Claims holds the parsed identity from JWT or API key.
 type Claims struct {
-	UserID   string
-	TenantID string
-	Role     string
-	Email    string
+	UserID    string
+	TenantID  string
+	Role      string
+	Email     string
+	JTI       string    // JWT ID — for token revocation
+	ExpiresAt time.Time // for blacklist TTL calculation
 }
 
 func FromContext(ctx context.Context) (Claims, bool) {
@@ -38,10 +42,19 @@ func FromContext(ctx context.Context) (Claims, bool) {
 	tid, ok2 := ctx.Value(CtxTenantID).(string)
 	role, _ := ctx.Value(CtxRole).(string)
 	email, _ := ctx.Value(CtxEmail).(string)
+	jti, _ := ctx.Value(CtxJTI).(string)
+	exp, _ := ctx.Value(CtxExpiresAt).(time.Time)
 	if !ok1 || !ok2 || uid == "" || tid == "" {
 		return Claims{}, false
 	}
-	return Claims{UserID: uid, TenantID: tid, Role: role, Email: email}, true
+	return Claims{
+		UserID:    uid,
+		TenantID:  tid,
+		Role:      role,
+		Email:     email,
+		JTI:       jti,
+		ExpiresAt: exp,
+	}, true
 }
 
 // ── APIKeyStore interface ─────────────────────────────────────────────────────
@@ -152,6 +165,20 @@ var globalBlacklist BlacklistChecker
 
 func SetBlacklist(b BlacklistChecker) { globalBlacklist = b }
 
+// RevokeCurrentToken adds a JTI to the blacklist. Called from Logout handler.
+// Safe no-op if blacklist is not configured or JTI is empty.
+func RevokeCurrentToken(ctx context.Context, jti string, expiresAt time.Time) {
+	if globalBlacklist == nil || jti == "" {
+		return
+	}
+	type revoker interface {
+		Revoke(ctx context.Context, tokenID string, expiresAt time.Time) error
+	}
+	if r, ok := globalBlacklist.(revoker); ok {
+		_ = r.Revoke(ctx, jti, expiresAt)
+	}
+}
+
 // IssueJWT creates a signed JWT for the given user.
 func IssueJWT(secret string, c Claims, ttl time.Duration) (string, error) {
 	now := time.Now()
@@ -201,18 +228,25 @@ func parseJWT(tokenStr, secret string) (Claims, error) {
 			return Claims{}, fmt.Errorf("user tokens revoked")
 		}
 	}
-	return Claims{
+	out := Claims{
 		UserID:   c.UserID,
 		TenantID: c.TenantID,
 		Role:     c.Role,
 		Email:    c.Email,
-	}, nil
+		JTI:      c.ID,
+	}
+	if c.ExpiresAt != nil {
+		out.ExpiresAt = c.ExpiresAt.Time
+	}
+	return out, nil
 }
 
 func injectClaims(ctx context.Context, c Claims) context.Context {
 	ctx = context.WithValue(ctx, CtxUserID, c.UserID)
 	ctx = context.WithValue(ctx, CtxTenantID, c.TenantID)
 	ctx = context.WithValue(ctx, CtxRole, c.Role)
+	ctx = context.WithValue(ctx, CtxJTI, c.JTI)
+	ctx = context.WithValue(ctx, CtxExpiresAt, c.ExpiresAt)
 	ctx = context.WithValue(ctx, CtxEmail, c.Email)
 	return ctx
 }

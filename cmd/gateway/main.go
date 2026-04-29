@@ -174,6 +174,12 @@ func main() {
 	ca := cache.New(redisAddr, redisPass)
 
 	// ── All handlers ──────────────────────────────────────────────
+
+	// ── Token blacklist (Redis DB 1) — wires JWT revocation into middleware ──
+	tokenBlacklist := auth.NewTokenBlacklist(redisAddr, redisPass)
+	auth.SetBlacklist(tokenBlacklist)
+	log.Info().Str("redis", redisAddr).Msg("token blacklist initialized (Redis DB 1)")
+
 	authH := &handler.Auth{DB: db, JWTSecret: jwtSecret, JWTTTL: jwtTTL, DefaultTID: defaultTID}
 	handler.SetJWTSecret(jwtSecret)
 	usersH := &handler.Users{DB: db}
