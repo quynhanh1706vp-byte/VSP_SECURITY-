@@ -1,6 +1,7 @@
 package semgrep
 
 import (
+	"os"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,7 +32,12 @@ func (a *Adapter) Run(ctx context.Context, opts scanner.RunOpts) ([]scanner.Find
 		"scan",
 		"--json",
 		"--quiet",
-		"--config=auto", // use community rules; override with ExtraArgs
+		(func() string {
+			if d := os.Getenv("SEMGREP_RULES_DIR"); d != "" {
+				return "--config=" + d
+			}
+			return "--config=auto"
+		}()), // SEMGREP_RULES_DIR env nếu set, fallback community rules
 		opts.Src,
 	}
 	if extra, ok := opts.ExtraArgs["semgrep"]; ok {
