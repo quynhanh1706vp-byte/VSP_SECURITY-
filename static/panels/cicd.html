@@ -785,7 +785,7 @@ function _autofixDeriveFix(f){
 }
 function _autofixIsFixable(f){
   if(f.fix_signal) return true;
-  return ['gitleaks','trufflehog','kics','checkov','tfsec','terrascan'].indexOf(f.tool) >= 0;
+  return ['gitleaks','trufflehog','kics','checkov','checkov','kics'].indexOf(f.tool) >= 0;
 }
 function _autofixCategorize(findings){
   var cats = {
@@ -795,8 +795,8 @@ function _autofixCategorize(findings){
     sec:  {label:'Secrets exposed',               count:0, fixable:0, color:'var(--red)'}
   };
   var toolMap = {
-    kics:'iac', checkov:'iac', terrascan:'iac', tfsec:'iac',
-    semgrep:'sast', bandit:'sast', gosec:'sast', eslint:'sast',
+    kics:'iac', checkov:'iac', kics:'iac', checkov:'iac',
+    semgrep:'sast', bandit:'sast', gosec:'sast', gosec:'sast',
     trivy:'sca', grype:'sca', osv:'sca',
     gitleaks:'sec', trufflehog:'sec'
   };
