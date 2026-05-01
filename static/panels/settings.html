@@ -509,6 +509,9 @@ function sw(id,btn){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if(btn) btn.classList.add('active');
+  // Lazy-load tab data
+  if (id === 'tab-apikeys' && typeof loadAPIKeysFromBackend === 'function') loadAPIKeysFromBackend();
+  if (id === 'tab-health' && typeof loadHealth === 'function') loadHealth();
 }
 async function apiPost(path,data){
   await ensureToken();
@@ -585,18 +588,62 @@ function renderAlertRules(){
   </tr>`).join('');
 }
 function addAlertRule(){
-  var triggers=['gate_fail','critical_finding','sla_breach','secret_detected','scan_complete','new_cve'];
-  var trigger=prompt('Trigger (gate_fail / critical_finding / sla_breach / secret_detected / scan_complete):','gate_fail');
-  if(!trigger) return;
-  // Check duplicate
-  if(_alertRules.find(function(r){return r.trigger===trigger&&r.sev==='any';})){
-    showToast('Rule for '+trigger+' already exists','error'); return;
+  var body = `
+    <div class="form-group">
+      <div class="form-label">Trigger event</div>
+      <select class="form-ctrl" id="ar-trigger">
+        <option value="gate_fail">gate_fail — Gate check failed</option>
+        <option value="critical_finding">critical_finding — Critical severity detected</option>
+        <option value="sla_breach">sla_breach — SLA window exceeded</option>
+        <option value="secret_detected">secret_detected — Hardcoded secret found</option>
+        <option value="scan_complete">scan_complete — Run finished</option>
+        <option value="new_cve">new_cve — New CVE in dependency</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Severity filter</div>
+      <select class="form-ctrl" id="ar-sev">
+        <option value="any">any (no filter)</option>
+        <option value="CRITICAL">CRITICAL only</option>
+        <option value="HIGH">HIGH and above</option>
+        <option value="MEDIUM">MEDIUM and above</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Notification channels</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;padding:6px 2px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ch-slack" checked> <span>Slack</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ch-email" checked> <span>Email</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ch-pagerduty"> <span>PagerDuty</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ch-webhook"> <span>Webhook</span></label>
+      </div>
+    </div>
+  `;
+  var footer = '<button class="btn" onclick="window._vspUNI4.close()">Cancel</button>'
+             + '<button class="btn btn-primary" onclick="submitAlertRule()">Add rule</button>';
+  window._vspUNI4.showModal({title:'+ Add notification rule', body:body, footer:footer, width:'480px'});
+}
+
+function submitAlertRule(){
+  var trigger = document.getElementById('ar-trigger').value;
+  var sev = document.getElementById('ar-sev').value;
+  var channels = [];
+  ['slack','email','pagerduty','webhook'].forEach(function(c){
+    if (document.getElementById('ch-'+c).checked) channels.push(c);
+  });
+  if (channels.length === 0) {
+    showToast('Select at least 1 channel','error');
+    return;
   }
-  var sev=prompt('Severity filter (any / CRITICAL / HIGH / MEDIUM):','any');
-  var ch=prompt('Channels (slack / email / pagerduty, comma-separated):','slack,email');
-  _alertRules.push({trigger:trigger||'gate_fail',sev:sev||'any',channels:(ch||'slack').split(',').map(function(s){return s.trim();}),enabled:true});
+  if (_alertRules.find(function(r){return r.trigger===trigger && r.sev===sev;})) {
+    showToast('Rule for '+trigger+' / '+sev+' already exists','error');
+    return;
+  }
+  _alertRules.push({trigger:trigger, sev:sev, channels:channels, enabled:true});
   saveAlertRules();
   renderAlertRules();
+  window._vspUNI4.close();
+  showToast('Alert rule added','success');
 }
 function saveAlertRules(){showToast('Alert rules saved','success');}
 
@@ -621,16 +668,182 @@ function renderAPIKeys(){
   </tr>`).join('');
 }
 function createAPIKey(){
-  var name=prompt('API key name (e.g. "CI/CD pipeline"):');
-  if(!name) return;
-  var id='k'+Date.now();
-  var prefix='vsp_'+name.toLowerCase().replace(/[^a-z]/g,'_').slice(0,5)+'_';
-  _apiKeys.push({id,name,prefix,perms:'scans,read',created:'just now',expires:'90d',status:'active'});
-  renderAPIKeys();
-  showToast('API key created: '+prefix+'***','success');
+  var body = `
+    <div class="form-group">
+      <div class="form-label">Key label *</div>
+      <input class="form-ctrl" id="ak-label" placeholder="e.g. CI/CD pipeline" maxlength="100" autofocus>
+      <div style="font-size:10px;color:var(--t3);margin-top:4px">Max 100 characters. Used to identify the key.</div>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Role</div>
+      <select class="form-ctrl" id="ak-role">
+        <option value="analyst" selected>analyst — Read findings, trigger scans</option>
+        <option value="dev">dev — Trigger scans on own projects</option>
+        <option value="auditor">auditor — Read-only access for compliance</option>
+        <option value="admin">admin — Full control (use sparingly)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Expires after</div>
+      <select class="form-ctrl" id="ak-expiry">
+        <option value="30">30 days</option>
+        <option value="60">60 days</option>
+        <option value="90" selected>90 days (recommended)</option>
+        <option value="180">180 days</option>
+        <option value="365">365 days (max)</option>
+      </select>
+    </div>
+  `;
+  var footer = '<button class="btn" onclick="window._vspUNI4.close()">Cancel</button>'
+             + '<button class="btn btn-primary" onclick="submitAPIKey()">Generate key</button>';
+  window._vspUNI4.showModal({title:'+ Generate API key', body:body, footer:footer, width:'480px'});
+  setTimeout(function(){var el=document.getElementById('ak-label'); if(el) el.focus();}, 100);
+}
+
+async function submitAPIKey(){
+  var label = (document.getElementById('ak-label').value || '').trim();
+  var role = document.getElementById('ak-role').value;
+  var expiry = parseInt(document.getElementById('ak-expiry').value, 10);
+  if (!label) {
+    showToast('Label is required','error');
+    return;
+  }
+  if (label.length > 100) {
+    showToast('Label too long (max 100 chars)','error');
+    return;
+  }
+  try {
+    var token = (typeof window.vspToken === 'string' && window.vspToken)
+      ? window.vspToken
+      : (localStorage.getItem('vsp_token') || '');
+    var r = await fetch('/api/v1/admin/api-keys', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({label:label, role:role, expiry_days:expiry})
+    });
+    if (!r.ok) {
+      var errBody = await r.text();
+      var msg = 'Failed (HTTP '+r.status+')';
+      try { var j = JSON.parse(errBody); if (j.error) msg = j.error; } catch(e) {}
+      showToast(msg, 'error');
+      return;
+    }
+    var data = await r.json();
+    window._vspUNI4.close();
+    showAPIKeySecret(data, label);
+    loadAPIKeysFromBackend();
+  } catch (e) {
+    showToast('Network error: '+e.message,'error');
+  }
+}
+
+function showAPIKeySecret(data, label){
+  var fullKey = data.key || data.token || data.secret || '(missing in response)';
+  var prefix = data.prefix || (fullKey.length > 12 ? fullKey.slice(0,12) : '');
+  var body = `
+    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <span style="color:var(--amber);font-size:16px">⚠</span>
+        <div>
+          <div style="font-weight:600;color:var(--amber);margin-bottom:4px">Save this key now</div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.5">This is the only time the full key will be shown. After closing this dialog, only the prefix will be visible.</div>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Label</div>
+      <div style="font-size:12px;font-weight:500">${label}</div>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Full key (copy now)</div>
+      <div style="display:flex;gap:6px">
+        <input class="form-ctrl mono" id="ak-secret" value="${fullKey}" readonly style="font-family:var(--font-mono);font-size:11px;flex:1">
+        <button class="btn btn-primary btn-sm" onclick="copyAPIKey()">📋 Copy</button>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <div class="form-label">Prefix (visible later)</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">${prefix}***</div>
+    </div>
+  `;
+  var footer = '<button class="btn btn-primary" onclick="window._vspUNI4.close()">I saved it, close</button>';
+  window._vspUNI4.showModal({title:'✓ API key generated', body:body, footer:footer, width:'520px'});
+}
+
+function copyAPIKey(){
+  var el = document.getElementById('ak-secret');
+  if (!el) return;
+  el.select();
+  try {
+    navigator.clipboard.writeText(el.value);
+    showToast('Key copied to clipboard','success');
+  } catch(e) {
+    document.execCommand('copy');
+    showToast('Key copied','success');
+  }
+}
+
+async function loadAPIKeysFromBackend(){
+  try {
+    var token = (typeof window.vspToken === 'string' && window.vspToken)
+      ? window.vspToken
+      : (localStorage.getItem('vsp_token') || '');
+    var r = await fetch('/api/v1/admin/api-keys', {
+      headers: {'Authorization': 'Bearer ' + token}
+    });
+    if (!r.ok) return;
+    var data = await r.json();
+    if (data && Array.isArray(data.keys)) {
+      _apiKeys = data.keys.map(function(k){
+        var expiresStr = k.expires_at ? new Date(k.expires_at).toLocaleDateString() : 'never';
+        var status = 'active';
+        if (k.expires_at && new Date(k.expires_at) < new Date()) status = 'expired';
+        var createdStr = k.created_at ? new Date(k.created_at).toLocaleDateString() : '—';
+        return {
+          id: k.id,
+          name: k.label || '(no label)',
+          prefix: (k.prefix || '') + '_',
+          perms: k.role || 'analyst',
+          created: createdStr,
+          expires: expiresStr,
+          status: status
+        };
+      });
+      renderAPIKeys();
+    }
+  } catch(e) { /* keep stub data on error */ }
 }
 function rotateKey(id){showToast('Key rotated — copy new key from modal','success');}
-function revokeKey(id){if(confirm('Revoke this key?')){var k=_apiKeys.find(x=>x.id===id);if(k)k.status='expired';renderAPIKeys();showToast('Key revoked','success');}}
+async function revokeKey(id){
+  if (!confirm('Revoke this API key? This cannot be undone.')) return;
+  try {
+    var token = (typeof window.vspToken === 'string' && window.vspToken)
+      ? window.vspToken
+      : (localStorage.getItem('vsp_token') || '');
+    var r = await fetch('/api/v1/admin/api-keys/'+encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: {'Authorization': 'Bearer ' + token}
+    });
+    if (r.ok) {
+      showToast('Key revoked','success');
+      loadAPIKeysFromBackend();
+    } else {
+      // Fallback to local state if backend doesn't support DELETE
+      var k = _apiKeys.find(function(x){return x.id===id;});
+      if (k) k.status = 'expired';
+      renderAPIKeys();
+      showToast('Key revoked (local only)','success');
+    }
+  } catch(e) {
+    var k = _apiKeys.find(function(x){return x.id===id;});
+    if (k) k.status = 'expired';
+    renderAPIKeys();
+    showToast('Key revoked (offline)','success');
+  }
+}
 
 // ── Health ──
 async function loadHealth(){
