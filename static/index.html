@@ -155,7 +155,7 @@ window.__esc = __esc;
 
       <!-- Tools preview -->
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:4px">
-        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Tools: <span id="scan-tools-preview" style="color:var(--t2);text-transform:none">semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js (23 tools)</span></div>
+        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Tools: <span id="scan-tools-preview" style="color:var(--t2);text-transform:none">semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js · gofuzz · racedetect · apisec (26 tools)</span></div>
       </div>
 
       <div id="scanMsg" style="margin-top:8px;font-size:11px;font-family:var(--font-mono)"></div>
@@ -182,8 +182,8 @@ function updateScanTools() {
     'IAC':      'kics · checkov · hadolint',
     'DAST':     'nuclei · nikto · sslscan',
     'NETWORK':  'nmap · sslscan · netcap',
-    'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js (23 tools)',
-    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js + SIEM (23 tools + SIEM)',
+    'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js · gofuzz · racedetect · apisec (26 tools)',
+    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js · gofuzz · racedetect · apisec + SIEM (26 tools + SIEM)',
   };
   var el = document.getElementById('scan-tools-preview');
   if (el) el.textContent = toolMap[mode] || mode;
@@ -3344,7 +3344,7 @@ const TOOLS_BY_MODE = {
   SCA:     ['trivy','grype','license','syft','govulncheck','osv-scanner','retire-js'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
 };
 const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
 
@@ -3498,8 +3498,8 @@ const TOOLS_BY_MODE_V2 = {
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
   NETWORK: ['sslscan','nmap','netcap'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js'],
-  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
+  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
 }
 
 async function loadRunLog(rid) {
