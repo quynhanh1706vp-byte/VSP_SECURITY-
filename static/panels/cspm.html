@@ -9,7 +9,12 @@
 </head><body>
 <main class="vsp-main">
   <div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:12px;margin-bottom:14px">
-    ℹ <b>Cloud Security Posture Management</b> — aggregated từ kics + checkov + hadolint scans. Per NIST SP 800-53 (Cloud baseline) + CIS Cloud Benchmarks.
+    ℹ <b>Cloud Security Posture Management</b> — Phase 4 v1.0 (aggregator-based)
+        <div style="margin-top:6px;font-size:10px;color:var(--t3)">
+          Currently aggregates from kics + checkov + hadolint scanners.
+          Per NIST SP 800-53 (Cloud baseline) + CIS Cloud Benchmarks.
+          Dedicated CSPM endpoint <code>/api/v1/cspm/posture</code> — Phase 5 roadmap.
+        </div>
   </div>
 
   <h2 style="font-size:16px;margin-bottom:14px">Posture by Cloud Provider</h2>
