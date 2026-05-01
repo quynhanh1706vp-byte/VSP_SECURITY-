@@ -3344,7 +3344,7 @@ const TOOLS_BY_MODE = {
   SCA:     ['trivy','grype','license','syft','govulncheck','osv-scanner','retire-js'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
+  FULL: ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
 };
 const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
 
@@ -3498,8 +3498,8 @@ const TOOLS_BY_MODE_V2 = {
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
   NETWORK: ['sslscan','nmap','netcap'],
-  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
-  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
+  FULL: ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
+  FULL_SOC: ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
 }
 
 async function loadRunLog(rid) {
@@ -3611,7 +3611,7 @@ async function loadRunLog(rid) {
       IAC:['kics','checkov'], SAST:    ['bandit','semgrep','codeql','gosec'],
       SCA:     ['trivy','grype','license','syft','govulncheck'], SECRETS: ['gitleaks','secretcheck','trufflehog'],
       DAST:    ['nikto','nuclei','sslscan'],
-      FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap'],
+      FULL: ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','osv-scanner','cosign','retire-js','gofuzz','racedetect','apisec'],
     };
     const expectedTools = TOOLS_BY_MODE[mode] || ['kics','checkov'];
 
