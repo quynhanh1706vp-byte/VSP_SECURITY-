@@ -627,5 +627,716 @@ function refreshAll() {
 loadKPIs();
 loadSignatures();
 </script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+
+<!-- VSP-SC-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Supply Chain Panel Polish v1
+ *   Inject vào cuối supply_chain.html
+ *   Add: toast, demo digest, detail modals, filters, exports, config
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_SC_POLISH__) return;
+  window.__VSP_SC_POLISH__ = true;
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function copy(text) {
+    try { navigator.clipboard.writeText(text); toast('Copied to clipboard', 'success'); }
+    catch (e) { toast('Clipboard unavailable', 'warn'); }
+  }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function authFetch(url, opts) {
+    return (window.vspAuthFetch || window.fetch)(url, opts || {});
+  }
+
+  // ─── Toast system ─────────────────────────────────────────────────────────
+  let toastContainer = null;
+  function ensureToastContainer() {
+    if (toastContainer) return toastContainer;
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'vsp-toasts';
+    toastContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(toastContainer);
+    return toastContainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1, #e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!document.getElementById('vsp-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-toast-css';
+    s.textContent = '@keyframes vspToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+  // Override window.alert in this iframe scope for nicer UX
+  window.__originalAlert = window.alert;
+  window.alert = function (msg) {
+    if (/^✅|^✓/.test(msg)) toast(msg.replace(/^[✅✓]\s*/, ''), 'success');
+    else if (/^❌|^✗/.test(msg)) toast(msg.replace(/^[❌✗]\s*/, ''), 'error');
+    else if (/error|fail/i.test(msg)) toast(msg, 'error');
+    else if (/⚠/.test(msg)) toast(msg.replace(/^⚠\s*/, ''), 'warn');
+    else toast(msg, 'info');
+  };
+
+  // ─── Modal system ─────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-sc-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '680px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+        `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+           <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+           <button onclick="window._vspSC.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+         </div>
+         <div style="padding:18px">${opts.body || ''}</div>` +
+        (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = document.getElementById('vsp-sc-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  const SC = window._vspSC = {
+    close: closeModal,
+    copy: copy
+  };
+
+  // ─── Module 1: Sign & Verify polish ──────────────────────────────────────
+  function polishSignTab() {
+    // Add "Generate demo digest" button next to digest input
+    const digestInput = $('sign-digest');
+    if (digestInput && !digestInput.dataset.vspPol) {
+      digestInput.dataset.vspPol = '1';
+      digestInput.style.fontFamily = 'var(--font-mono, monospace)';
+      digestInput.style.fontSize = '11px';
+      const wrap = digestInput.parentNode;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm';
+      btn.style.cssText = 'margin-top:4px;font-size:10px';
+      btn.innerHTML = '🎲 Generate demo digest';
+      btn.onclick = function() {
+        const hex = '0123456789abcdef';
+        let h = 'sha256:';
+        for (let i = 0; i < 64; i++) h += hex[Math.floor(Math.random() * 16)];
+        digestInput.value = h;
+        digestInput.dispatchEvent(new Event('input', { bubbles: true }));
+        toast('Random sha256 digest generated', 'info');
+      };
+      wrap.appendChild(btn);
+    }
+
+    // Auto-fill demo payload nếu trống
+    const payloadInput = $('sign-payload');
+    if (payloadInput && !payloadInput.value.trim()) {
+      payloadInput.value = JSON.stringify({
+        build_id: 'vsp-build-' + Date.now().toString().slice(-6),
+        builder: 'local',
+        commit: '06f22db',
+        builtAt: new Date().toISOString()
+      }, null, 2);
+    }
+
+    // Live JSON validation cho payload
+    if (payloadInput && !payloadInput.dataset.vspVal) {
+      payloadInput.dataset.vspVal = '1';
+      payloadInput.addEventListener('input', () => {
+        try {
+          JSON.parse(payloadInput.value || '{}');
+          payloadInput.style.borderColor = '';
+        } catch (e) {
+          payloadInput.style.borderColor = '#ef4444';
+        }
+      });
+    }
+
+    // Polish bundle output: add buttons
+    const bundleOut = $('sign-bundle-out');
+    if (bundleOut && !bundleOut.dataset.vspPol) {
+      bundleOut.dataset.vspPol = '1';
+      const head = bundleOut.parentNode.querySelector('.card-head');
+      if (head) {
+        const right = head.querySelector('div:last-child');
+        if (right) {
+          right.innerHTML = ''
+            + '<button class="btn btn-sm" onclick="copyBundle()" title="Copy bundle JSON">📋 Copy</button> '
+            + '<button class="btn btn-sm" onclick="window._vspSC.downloadBundle()" title="Download as .json">↓ Download</button> '
+            + '<button class="btn btn-sm" onclick="window._vspSC.pasteBundle()" title="Paste to Verify tab">→ Verify</button>';
+        }
+      }
+    }
+
+    // Polish verify result: add trust chain after verify
+    const _origVerify = window.verifyBundle;
+    if (_origVerify && !window.__vspVerifyWrap) {
+      window.__vspVerifyWrap = true;
+      window.verifyBundle = async function() {
+        let bundle;
+        try { bundle = JSON.parse($('verify-bundle').value); }
+        catch (e) { toast('Invalid JSON: ' + e.message, 'error'); return; }
+        const resultEl = $('verify-result');
+        resultEl.innerHTML = '<div style="padding:10px;color:var(--t3)">Verifying…</div>';
+        try {
+          const res = await authFetch('/api/v1/supply-chain/verify', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bundle: bundle })
+          });
+          const data = await res.json();
+          if (data.valid) {
+            resultEl.innerHTML = renderVerifyResult(data);
+          } else {
+            resultEl.innerHTML = '<div style="background:rgba(239,68,68,.12);border-left:3px solid #ef4444;padding:10px 14px;border-radius:0 4px 4px 0;color:#ef4444;font-weight:600">✗ INVALID SIGNATURE</div>'
+              + (data.error ? '<div style="margin-top:6px;color:var(--t3);font-size:11px">' + esc(data.error) + '</div>' : '');
+          }
+        } catch (e) { toast('Verify error: ' + e.message, 'error'); }
+      };
+    }
+  }
+  function renderVerifyResult(d) {
+    const chain = d.trust_chain || [];
+    return ''
+      + '<div style="background:rgba(16,185,129,.12);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 4px 4px 0;font-weight:600;color:#10b981;margin-bottom:12px">'
+      +   '✓ VALID SIGNATURE'
+      +   '<span style="font-weight:400;font-size:10px;margin-left:10px;color:var(--t2,#a1a1aa)">algorithm: ' + esc(d.algorithm || 'ECDSA_P256') + '</span>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--t3,#71717a);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">TRUST CHAIN</div>'
+      + '<div style="background:var(--bg1,#111);padding:10px 14px;border-radius:6px;font-family:var(--font-mono,monospace);font-size:11px;line-height:1.7;margin-bottom:12px">'
+      +   chain.map((s, i) => {
+            const indent = '  '.repeat(i);
+            return '<div style="color:#10b981">' + indent + '✓ ' + esc(s.step) + '</div>';
+          }).join('')
+      + '</div>'
+      + (d.payload ? '<div style="font-size:10px;color:var(--t3,#71717a);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">PAYLOAD</div>'
+          + '<div style="background:var(--bg1,#111);padding:10px 14px;border-radius:6px;font-family:var(--font-mono,monospace);font-size:10px;line-height:1.5;max-height:200px;overflow:auto"><pre style="margin:0">' + esc(pretty(d.payload)) + '</pre></div>' : '');
+  }
+  SC.downloadBundle = function() {
+    if (!window.currentBundle) { toast('No bundle to download', 'warn'); return; }
+    downloadFile('signed-bundle-' + Date.now() + '.json', pretty(window.currentBundle), 'application/json');
+    toast('Bundle downloaded', 'success');
+  };
+  SC.pasteBundle = function() {
+    if (!window.currentBundle) { toast('Sign an artifact first', 'warn'); return; }
+    $('verify-bundle').value = pretty(window.currentBundle);
+    document.querySelector('[data-tab="sign"]').click(); // stay on sign tab
+    toast('Bundle copied to Verify field', 'success');
+    $('verify-bundle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  // ─── Module 2: Signatures table polish ───────────────────────────────────
+  let sigCache = [];
+  function polishSignaturesTab() {
+    // Wrap loadSignatures to cache + enhance render
+    const _origLoad = window.loadSignatures;
+    if (_origLoad && !window.__vspSigsWrap) {
+      window.__vspSigsWrap = true;
+      window.loadSignatures = async function() {
+        try {
+          const res = await authFetch('/api/v1/supply-chain/signatures?limit=200');
+          const d = await res.json();
+          sigCache = d.signatures || [];
+          $('sig-count').textContent = (d.count || d.total || sigCache.length) + ' signatures';
+          renderSignatures(sigCache);
+          ensureSigFilterBar();
+        } catch (e) { console.error('Sigs:', e); }
+      };
+    }
+  }
+  function ensureSigFilterBar() {
+    const card = $('sig-tbody').closest('.card');
+    if (!card || card.querySelector('.vsp-sc-filter')) return;
+    const cardBody = card.querySelector('.card-body');
+    const bar = document.createElement('div');
+    bar.className = 'vsp-sc-filter';
+    bar.style.cssText = 'display:flex;gap:8px;align-items:center;padding:8px 0;margin-bottom:10px;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + '<input id="sig-fq" placeholder="Search artifact / digest / signer…" style="font-size:11px;padding:5px 10px;flex:1;min-width:240px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<select id="sig-falgo" style="font-size:11px;padding:5px 10px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      +   '<option value="">All algorithms</option>'
+      +   '<option>ECDSA_P256_SHA256</option><option>ECDSA_P384_SHA384</option><option>RSA_PSS_SHA256</option><option>ED25519</option>'
+      + '</select>'
+      + '<select id="sig-fstatus" style="font-size:11px;padding:5px 10px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      +   '<option value="">All status</option>'
+      +   '<option value="verified">✓ Verified</option><option value="unverified">⏳ Unverified</option>'
+      + '</select>'
+      + '<button class="btn btn-sm" onclick="window._vspSC.exportSigsCSV()">↓ CSV</button>'
+      + '<button class="btn btn-sm" onclick="window._vspSC.verifyAllSigs()">⚡ Verify All</button>';
+    cardBody.insertBefore(bar, cardBody.querySelector('table'));
+    ['sig-fq', 'sig-falgo', 'sig-fstatus'].forEach(id => {
+      const el = $(id); if (el) el.addEventListener('input', () => filterSigs());
+      if (el) el.addEventListener('change', () => filterSigs());
+    });
+  }
+  function filterSigs() {
+    const q = (($('sig-fq') || {}).value || '').toLowerCase();
+    const algo = ($('sig-falgo') || {}).value || '';
+    const stat = ($('sig-fstatus') || {}).value || '';
+    let filtered = sigCache;
+    if (q) filtered = filtered.filter(s =>
+      (s.artifact || s.artifact_name || '').toLowerCase().includes(q) ||
+      (s.digest || s.artifact_digest || '').toLowerCase().includes(q) ||
+      (s.signed_by || '').toLowerCase().includes(q));
+    if (algo) filtered = filtered.filter(s => (s.algorithm || '').includes(algo));
+    if (stat === 'verified') filtered = filtered.filter(s => s.verified);
+    if (stat === 'unverified') filtered = filtered.filter(s => !s.verified);
+    renderSignatures(filtered);
+    $('sig-count').textContent = filtered.length + ' / ' + sigCache.length + ' signatures';
+  }
+  function renderSignatures(sigs) {
+    const tbody = $('sig-tbody');
+    if (!tbody) return;
+    if (sigs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No signatures match filter.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = sigs.map(s => {
+      const art = esc(s.artifact || s.artifact_name || '—');
+      const dig = esc((s.digest || s.artifact_digest || '').slice(0, 24)) + '…';
+      const fullDig = esc(s.digest || s.artifact_digest || '');
+      const signer = esc(s.signed_by || '—');
+      const algo = esc(s.algorithm || '—');
+      const when = s.signed_at ? new Date(s.signed_at).toLocaleString() : '—';
+      const id = esc(s.id || '');
+      const statusBadge = s.verified
+        ? '<span style="background:rgba(16,185,129,.12);color:#10b981;padding:2px 8px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);white-space:nowrap">✓ VERIFIED</span>'
+        : '<span style="background:rgba(245,158,11,.12);color:#f59e0b;padding:2px 8px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);white-space:nowrap">⏳ PENDING</span>';
+      return `<tr style="cursor:pointer" onclick="window._vspSC.showSigDetail('${id}')" title="Click for detail">
+        <td>${statusBadge} <b>${art}</b></td>
+        <td class="digest" title="${fullDig}">${dig}</td>
+        <td>${signer}</td>
+        <td class="mono">${algo}</td>
+        <td class="mono">${esc(when)}</td>
+      </tr>`;
+    }).join('');
+    // Update header to add status column note
+  }
+  SC.showSigDetail = async function(id) {
+    if (!id) return;
+    showModal({ title: '🔒 Signature detail', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const res = await authFetch('/api/v1/supply-chain/signatures/' + encodeURIComponent(id));
+      const d = await res.json();
+      const s = d.signature || {};
+      const fullDig = s.digest || '';
+      const body = ''
+        + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+        +   '<div style="font-size:14px;font-weight:600;flex:1;font-family:var(--font-mono,monospace)">' + esc(s.artifact || '—') + '</div>'
+        +   (s.verified ? '<span style="background:rgba(16,185,129,.12);color:#10b981;padding:3px 10px;border-radius:3px;font-size:10px">✓ VERIFIED</span>' : '<span style="background:rgba(245,158,11,.12);color:#f59e0b;padding:3px 10px;border-radius:3px;font-size:10px">⏳ PENDING</span>')
+        + '</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px;margin-bottom:14px">'
+        +   row('Digest', fullDig, true)
+        +   row('Algorithm', s.algorithm || '')
+        +   row('Signed by', s.signed_by || '', true)
+        +   row('Signed at', s.signed_at || '')
+        +   (s.verified_at ? row('Verified at', s.verified_at) : '')
+        +   (s.tlog_index ? row('Rekor index', String(s.tlog_index)) : '')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">SIGNATURE (base64)</div>'
+        + '<div style="background:var(--bg1,#111);padding:8px 12px;border-radius:6px;font-family:var(--font-mono,monospace);font-size:10px;word-break:break-all;line-height:1.5;margin-bottom:12px">' + esc((d.signature_b64 || '').slice(0, 200)) + (d.signature_b64 && d.signature_b64.length > 200 ? '…' : '') + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">FULL BUNDLE JSON</div>'
+        + '<div style="background:var(--bg1,#111);padding:10px 14px;border-radius:6px;max-height:250px;overflow:auto"><pre style="margin:0;font-size:10px;font-family:var(--font-mono,monospace)">' + esc(pretty(d.bundle || {})) + '</pre></div>';
+      const footer = ''
+        + '<button class="btn btn-sm" onclick="window._vspSC.copyBundleFromDetail(' + JSON.stringify(d.bundle || {}).replace(/"/g, '&quot;') + ')" style="margin-right:auto">📋 Copy bundle</button>'
+        + '<a class="btn btn-sm" target="_blank" rel="noopener" href="https://search.sigstore.dev/?hash=' + encodeURIComponent(fullDig) + '">↗ Rekor</a>'
+        + '<button class="btn btn-primary btn-sm" onclick="window._vspSC.close()">Close</button>';
+      showModal({ title: '🔒 Signature detail', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspSC.close()">Close</button>' });
+    }
+  };
+  SC.copyBundleFromDetail = function(bundle) {
+    copy(pretty(bundle));
+  };
+  function row(label, value, copyable) {
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspSC.copy('${esc(value).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:110px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;font-family:var(--font-mono,monospace);word-break:break-all;line-height:1.5">' + esc(value) + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+  SC.exportSigsCSV = function() {
+    const csv = ['Artifact,Digest,SignedBy,Algorithm,SignedAt,Verified'];
+    sigCache.forEach(s => {
+      csv.push([s.artifact || s.artifact_name, s.digest || s.artifact_digest, s.signed_by, s.algorithm,
+                s.signed_at, s.verified ? 'yes' : 'no']
+              .map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(','));
+    });
+    downloadFile('signatures-' + Date.now() + '.csv', csv.join('\n'), 'text/csv');
+    toast('Exported ' + sigCache.length + ' signatures', 'success');
+  };
+  SC.verifyAllSigs = async function() {
+    toast('Verifying ' + sigCache.length + ' signatures…', 'info');
+    let ok = 0, fail = 0;
+    for (const s of sigCache) {
+      if (!s.id) continue;
+      try {
+        const res = await authFetch('/api/v1/supply-chain/signatures/' + encodeURIComponent(s.id) + '/verify', { method: 'POST' });
+        if (res.ok) ok++; else fail++;
+      } catch (e) { fail++; }
+    }
+    toast(`Verified ${ok} OK, ${fail} failed`, fail > 0 ? 'warn' : 'success');
+    if (window.loadSignatures) window.loadSignatures();
+  };
+
+  // ─── Module 3: Provenance polish ─────────────────────────────────────────
+  let provCache = [];
+  function polishProvTab() {
+    const _origLoad = window.loadProvenance;
+    if (_origLoad && !window.__vspProvWrap) {
+      window.__vspProvWrap = true;
+      window.loadProvenance = async function() {
+        try {
+          const res = await authFetch('/api/v1/supply-chain/provenance?limit=200');
+          const d = await res.json();
+          provCache = d.provenance || [];
+          $('prov-count').textContent = (d.count || provCache.length) + ' attestations';
+          renderProvenance(provCache);
+        } catch (e) { console.error('Prov:', e); }
+      };
+    }
+  }
+  function renderProvenance(provs) {
+    const tbody = $('prov-tbody');
+    if (!tbody) return;
+    if (provs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No provenance yet.</td></tr>';
+      return;
+    }
+    const slsaTooltips = {
+      1: 'Level 1 — documented build process',
+      2: 'Level 2 — signed provenance, hosted build',
+      3: 'Level 3 — hardened builder, non-falsifiable',
+      4: 'Level 4 — fully reproducible builds (highest)'
+    };
+    const slsaColors = { 1: '#71717a', 2: '#3b82f6', 3: '#8b5cf6', 4: '#10b981' };
+    tbody.innerHTML = provs.map(p => {
+      const lvl = p.slsa_level || 2;
+      const id = esc(p.id || '');
+      return `<tr style="cursor:pointer" onclick="window._vspSC.showProvDetail('${id}')" title="Click for in-toto detail">
+        <td><b>${esc(p.artifact || p.artifact_name || '—')}</b></td>
+        <td><span title="${esc(slsaTooltips[lvl] || '')}" style="background:rgba(${lvl===1?'113,113,122':lvl===2?'59,130,246':lvl===3?'139,92,246':'16,185,129'},.15);color:${slsaColors[lvl]};padding:2px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace);font-weight:600">SLSA L${lvl}</span></td>
+        <td class="mono" style="font-size:10px">${esc(p.builder_id || '—')}</td>
+        <td class="digest">${esc((p.source_commit || '—').slice(0, 12))}</td>
+        <td class="mono" style="font-size:10px">${p.created_at ? new Date(p.created_at).toLocaleString() : '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+  SC.showProvDetail = async function(id) {
+    showModal({ title: '🏗 SLSA Provenance detail', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    // In-toto statement không expose qua /provenance/{id} riêng — mình lấy từ cache
+    const p = provCache.find(x => x.id === id);
+    if (!p) {
+      showModal({ title: 'Error', body: '<div>Provenance not found</div>', footer: '<button class="btn" onclick="window._vspSC.close()">Close</button>' });
+      return;
+    }
+    const body = ''
+      + '<div style="font-size:14px;font-weight:600;margin-bottom:14px;font-family:var(--font-mono,monospace)">' + esc(p.artifact || p.artifact_name || '—') + '</div>'
+      + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px;margin-bottom:14px">'
+      +   row('SLSA Level', 'L' + (p.slsa_level || '?'))
+      +   row('Builder ID', p.builder_id || '', true)
+      +   row('Build type', p.build_type || '')
+      +   row('Source URI', p.source_uri || '', true)
+      +   row('Source commit', p.source_commit || '', true)
+      +   row('Digest', p.digest || p.artifact_digest || '', true)
+      +   row('Created at', p.created_at || '')
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">SLSA REQUIREMENTS (Level ' + (p.slsa_level || '?') + ')</div>'
+      + '<div style="background:var(--bg1,#111);padding:10px 14px;border-radius:6px;font-size:11px;line-height:1.7">'
+      +   slsaReqs(p.slsa_level || 2)
+      + '</div>';
+    const footer = ''
+      + `<a class="btn btn-sm" target="_blank" rel="noopener" href="${esc(p.source_uri || '#')}" style="margin-right:auto">↗ Source</a>`
+      + '<button class="btn btn-primary btn-sm" onclick="window._vspSC.close()">Close</button>';
+    showModal({ title: '🏗 SLSA Provenance detail', body: body, footer: footer, width: '720px' });
+  };
+  function slsaReqs(level) {
+    const reqs = [
+      { l: 1, label: 'Documented build process', met: level >= 1 },
+      { l: 1, label: 'Provenance exists',          met: level >= 1 },
+      { l: 2, label: 'Hosted build service',       met: level >= 2 },
+      { l: 2, label: 'Provenance signed',          met: level >= 2 },
+      { l: 3, label: 'Hardened builder',           met: level >= 3 },
+      { l: 3, label: 'Non-falsifiable provenance', met: level >= 3 },
+      { l: 4, label: 'Hermetic build',             met: level >= 4 },
+      { l: 4, label: 'Reproducible build',         met: level >= 4 }
+    ];
+    return reqs.map(r => `<div style="color:${r.met ? '#10b981' : '#71717a'}">${r.met ? '✓' : '○'} ${esc(r.label)} <span style="font-size:9px;color:var(--t3)">[L${r.l}]</span></div>`).join('');
+  }
+
+  // ─── Module 4: VEX polish ────────────────────────────────────────────────
+  let vexCache = [];
+  function polishVexTab() {
+    const _origLoad = window.loadVEX;
+    if (_origLoad && !window.__vspVexWrap) {
+      window.__vspVexWrap = true;
+      window.loadVEX = async function() {
+        try {
+          const res = await authFetch('/api/p4/vex');
+          const d = await res.json();
+          vexCache = d.vex || [];
+          const s = d.statistics || {};
+          $('vex-stats').textContent = `${d.count || vexCache.length} total · ${s.affected || 0} affected · ${s.not_affected || 0} not_affected · ${s.fixed || 0} fixed`;
+          renderVex(vexCache);
+          ensureVexFilterBar();
+        } catch (e) { console.error('VEX:', e); }
+      };
+    }
+  }
+  function ensureVexFilterBar() {
+    const card = $('vex-tbody').closest('.card');
+    if (!card || card.querySelector('.vsp-vex-filter')) return;
+    const cardBody = card.querySelector('.card-body');
+    const bar = document.createElement('div');
+    bar.className = 'vsp-vex-filter';
+    bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:8px 0;margin-bottom:10px;flex-wrap:wrap';
+    bar.innerHTML = ''
+      + '<input id="vex-fq" placeholder="Search CVE / component / author…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+      +   '<button class="vex-pill vex-pill-active" data-vs="" onclick="window._vspSC.vexPill(\'\',this)">All</button>'
+      +   '<button class="vex-pill" data-vs="affected" onclick="window._vspSC.vexPill(\'affected\',this)" style="color:#ef4444">Affected</button>'
+      +   '<button class="vex-pill" data-vs="not_affected" onclick="window._vspSC.vexPill(\'not_affected\',this)" style="color:#10b981">Not affected</button>'
+      +   '<button class="vex-pill" data-vs="fixed" onclick="window._vspSC.vexPill(\'fixed\',this)" style="color:#3b82f6">Fixed</button>'
+      +   '<button class="vex-pill" data-vs="under_investigation" onclick="window._vspSC.vexPill(\'under_investigation\',this)" style="color:#f59e0b">Investigating</button>'
+      + '</div>'
+      + '<button class="btn btn-sm" onclick="window._vspSC.exportVexCDX()">↓ CycloneDX</button>';
+    cardBody.insertBefore(bar, cardBody.querySelector('table'));
+    if (!document.getElementById('vex-pill-css')) {
+      const css = document.createElement('style'); css.id = 'vex-pill-css';
+      css.textContent = '.vex-pill{background:transparent;border:0;padding:5px 10px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.vex-pill:hover{color:var(--t1,#e5e7eb)}.vex-pill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+    $('vex-fq').addEventListener('input', filterVex);
+  }
+  let vexFilterStatus = '';
+  SC.vexPill = function(s, btn) {
+    vexFilterStatus = s;
+    document.querySelectorAll('.vex-pill').forEach(p => p.classList.remove('vex-pill-active'));
+    btn.classList.add('vex-pill-active');
+    filterVex();
+  };
+  function filterVex() {
+    const q = (($('vex-fq') || {}).value || '').toLowerCase();
+    let f = vexCache;
+    if (q) f = f.filter(v =>
+      (v.cve_id || '').toLowerCase().includes(q) ||
+      (v.component || v.component_name || '').toLowerCase().includes(q) ||
+      (v.author || '').toLowerCase().includes(q));
+    if (vexFilterStatus) f = f.filter(v => v.status === vexFilterStatus);
+    renderVex(f);
+  }
+  function renderVex(vex) {
+    const tbody = $('vex-tbody');
+    if (!tbody) return;
+    if (vex.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No VEX statements match.</td></tr>';
+      return;
+    }
+    const sc = { affected: '#ef4444', not_affected: '#10b981', fixed: '#3b82f6', under_investigation: '#f59e0b', exploitable: '#dc2626', not_exploitable: '#059669' };
+    tbody.innerHTML = vex.map(v => {
+      const id = esc(v.id || '');
+      const color = sc[v.status] || '#71717a';
+      return `<tr style="cursor:pointer" onclick="window._vspSC.showVexDetail('${id}')" title="Click for full statement">
+        <td class="mono"><b>${esc(v.cve_id || '—')}</b></td>
+        <td>${esc(v.component || v.component_name || '—')} ${v.component_version ? '<span class="mono" style="font-size:10px;color:var(--t3)">@' + esc(v.component_version) + '</span>' : ''}</td>
+        <td><span style="background:rgba(${parseInt(color.slice(1,3),16)},${parseInt(color.slice(3,5),16)},${parseInt(color.slice(5,7),16)},.12);color:${color};padding:2px 8px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace)">${esc(v.status)}</span></td>
+        <td class="mono" style="font-size:10px">${esc(v.justification || '—')}</td>
+        <td class="mono" style="font-size:10px">${esc(v.author || '—')}</td>
+        <td class="mono" style="font-size:10px">${v.analysis_date ? new Date(v.analysis_date).toLocaleDateString() : '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+  SC.showVexDetail = function(id) {
+    const v = vexCache.find(x => x.id === id);
+    if (!v) { toast('VEX not found', 'error'); return; }
+    const body = ''
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+      +   '<div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:600;color:#3b82f6">' + esc(v.cve_id || 'no-cve') + '</div>'
+      +   '<span style="background:rgba(59,130,246,.12);color:#3b82f6;padding:3px 10px;border-radius:3px;font-size:10px">' + esc(v.status || '') + '</span>'
+      + '</div>'
+      + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px;margin-bottom:14px">'
+      +   row('Product', (v.product || v.product_name || '') + (v.product_version ? ' @ ' + v.product_version : ''))
+      +   row('Component', (v.component || v.component_name || '') + (v.component_version ? ' @ ' + v.component_version : ''))
+      +   row('Status', v.status || '')
+      +   row('Justification', v.justification || '—')
+      +   row('Author', v.author || '')
+      +   row('Analysis date', v.analysis_date || '')
+      +   (v.detail ? row('Detail', v.detail) : '')
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">CYCLONEDX VEX 1.4 STATEMENT</div>'
+      + '<div style="background:var(--bg1,#111);padding:10px 14px;border-radius:6px;max-height:280px;overflow:auto"><pre style="margin:0;font-size:10px;font-family:var(--font-mono,monospace)">' + esc(pretty(v.statement || v)) + '</pre></div>';
+    const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspSC.close()">Close</button>';
+    showModal({ title: '📋 VEX Statement detail', body: body, footer: footer, width: '720px' });
+  };
+  SC.exportVexCDX = function() {
+    // Build CycloneDX VEX 1.4 bundle
+    const cdx = {
+      bomFormat: 'CycloneDX',
+      specVersion: '1.4',
+      serialNumber: 'urn:uuid:' + crypto.randomUUID(),
+      version: 1,
+      metadata: { timestamp: new Date().toISOString(), tools: [{ vendor: 'VSP', name: 'Supply Chain', version: '1.0' }] },
+      vulnerabilities: vexCache.map(v => ({
+        id: v.cve_id || 'unknown',
+        affects: [{ ref: (v.component || v.component_name || 'unknown') + (v.component_version ? '@' + v.component_version : '') }],
+        analysis: {
+          state: v.status,
+          justification: v.justification || undefined,
+          detail: v.detail || undefined
+        }
+      }))
+    };
+    downloadFile('cyclonedx-vex-' + Date.now() + '.json', pretty(cdx), 'application/json');
+    toast('CycloneDX VEX bundle exported (' + vexCache.length + ' statements)', 'success');
+  };
+
+  // ─── Module 5: Public Key polish ─────────────────────────────────────────
+  function polishKeyTab() {
+    const _origLoad = window.loadPublicKey;
+    if (_origLoad && !window.__vspKeyWrap) {
+      window.__vspKeyWrap = true;
+      window.loadPublicKey = async function() {
+        try {
+          const res = await authFetch('/api/v1/supply-chain/public-key');
+          const d = await res.json();
+          window.currentPubKey = d.public_key || d.public_key_pem;
+          $('key-id').textContent = d.key_id || '—';
+          $('key-algo').textContent = d.algorithm || '—';
+          $('key-pem').textContent = window.currentPubKey || '—';
+          enhanceKeyTab(d);
+        } catch (e) { console.error('Key:', e); }
+      };
+    }
+  }
+  function enhanceKeyTab(d) {
+    const card = $('key-pem').closest('.card');
+    if (!card || card.querySelector('.vsp-key-extra')) return;
+    const cardHead = card.querySelector('.card-head > div:last-child');
+    if (cardHead) {
+      cardHead.innerHTML = ''
+        + '<button class="btn btn-sm" onclick="copyPubKey()">📋 Copy PEM</button> '
+        + '<button class="btn btn-sm" onclick="window._vspSC.downloadPubKey()">↓ Download .pub</button>';
+    }
+    const extra = document.createElement('div');
+    extra.className = 'vsp-key-extra';
+    extra.style.cssText = 'margin-top:14px;padding-top:12px;border-top:1px solid var(--bd,#27272a)';
+    const expiry = d.expires_at ? new Date(d.expires_at) : null;
+    const daysLeft = expiry ? Math.floor((expiry - Date.now()) / 86400000) : null;
+    extra.innerHTML = ''
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11px">'
+      +   '<div><div style="color:var(--t3);font-size:10px;text-transform:uppercase;margin-bottom:2px">Created</div><div class="mono">' + (d.created_at ? new Date(d.created_at).toLocaleString() : '—') + '</div></div>'
+      +   '<div><div style="color:var(--t3);font-size:10px;text-transform:uppercase;margin-bottom:2px">Expires</div><div class="mono">' + (expiry ? expiry.toLocaleDateString() + (daysLeft !== null ? ' <span style="color:' + (daysLeft < 30 ? '#f59e0b' : '#10b981') + '">(' + daysLeft + ' days)</span>' : '') : 'No expiry') + '</div></div>'
+      + '</div>';
+    card.querySelector('.card-body').appendChild(extra);
+  }
+  SC.downloadPubKey = function() {
+    if (!window.currentPubKey) { toast('No key loaded', 'warn'); return; }
+    downloadFile(($('key-id').textContent.trim() || 'vsp-signing') + '.pub', window.currentPubKey, 'application/x-pem-file');
+    toast('Public key downloaded', 'success');
+  };
+
+  // ─── Module 6: Settings/Config ───────────────────────────────────────────
+  function injectSettingsButton() {
+    if (document.getElementById('vsp-sc-settings-btn')) return;
+    const hdr = document.querySelector('.hdr');
+    if (!hdr) return;
+    const refreshBtn = hdr.querySelector('button[onclick="refreshAll()"]');
+    const btn = document.createElement('button');
+    btn.id = 'vsp-sc-settings-btn';
+    btn.className = 'btn btn-sm';
+    btn.style.marginRight = '6px';
+    btn.innerHTML = '⚙ Settings';
+    btn.onclick = SC.showSettings;
+    if (refreshBtn) refreshBtn.parentNode.insertBefore(btn, refreshBtn); else hdr.appendChild(btn);
+  }
+  SC.showSettings = function() {
+    const cfg = JSON.parse(localStorage.getItem('vsp_sc_settings') || '{}');
+    const body = ''
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px">Settings persist locally in your browser.</div>'
+      + '<div style="display:grid;gap:12px">'
+      +   '<div><div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Default signature algorithm</div>'
+      +     '<select id="cfg-algo" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1);border:1px solid var(--bd);color:var(--t1);border-radius:4px">'
+      +       ['ECDSA_P256_SHA256', 'ECDSA_P384_SHA384', 'RSA_PSS_SHA256', 'ED25519'].map(a => `<option value="${a}" ${cfg.algo === a ? 'selected' : ''}>${a}</option>`).join('')
+      +     '</select></div>'
+      +   '<div><div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Default SLSA level</div>'
+      +     '<select id="cfg-slsa" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1);border:1px solid var(--bd);color:var(--t1);border-radius:4px">'
+      +       [1,2,3,4].map(l => `<option value="${l}" ${cfg.slsa == l ? 'selected' : ''}>Level ${l}</option>`).join('')
+      +     '</select></div>'
+      +   '<div><label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input type="checkbox" id="cfg-autoverify" ' + (cfg.autoverify ? 'checked' : '') + '> Auto-verify signatures on load</label></div>'
+      +   '<div><label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input type="checkbox" id="cfg-toasts" ' + (cfg.toasts !== false ? 'checked' : '') + '> Show toast notifications</label></div>'
+      + '</div>';
+    const footer = ''
+      + '<button class="btn btn-sm" onclick="window._vspSC.close()" style="margin-right:auto">Cancel</button>'
+      + '<button class="btn btn-primary btn-sm" onclick="window._vspSC.saveSettings()">💾 Save</button>';
+    showModal({ title: '⚙ Supply Chain Settings', body: body, footer: footer, width: '480px' });
+  };
+  SC.saveSettings = function() {
+    const cfg = {
+      algo: $('cfg-algo').value,
+      slsa: parseInt($('cfg-slsa').value),
+      autoverify: $('cfg-autoverify').checked,
+      toasts: $('cfg-toasts').checked
+    };
+    localStorage.setItem('vsp_sc_settings', JSON.stringify(cfg));
+    closeModal();
+    toast('Settings saved', 'success');
+    // Apply default SLSA level
+    const provLevel = $('prov-level');
+    if (provLevel) provLevel.value = String(cfg.slsa);
+  };
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
+  function init() {
+    polishSignTab();
+    polishSignaturesTab();
+    polishProvTab();
+    polishVexTab();
+    polishKeyTab();
+    injectSettingsButton();
+    // Re-trigger renders nếu data đã load trước
+    if (sigCache.length === 0 && window.loadSignatures) window.loadSignatures();
+    console.log('[VSP-SC-POLISH] Loaded successfully');
+  }
+  if (document.readyState !== 'loading') setTimeout(init, 200);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 200));
+
+  // Re-init khi tab switch (trường hợp wrappers chưa attach)
+  setTimeout(init, 1500);
+})();
+
+</script>
+<!-- VSP-SC-POLISH-END -->
 </body>
 </html>

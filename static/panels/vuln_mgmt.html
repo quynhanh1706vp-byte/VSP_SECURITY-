@@ -586,5 +586,1272 @@ function _applyTheme(t) {
 // ── Init ───────────────────────────────────────────────────
 renderSampleData();
 </script>
+<script src="vsp_fe_sync_patch_v2.js?v=1777463431"></script>
+
+<!-- VSP-E5-EPSS-KEV: Add EPSS+KEV columns to CVE table (2026-04-29) -->
+<script>
+(function() {
+  if (window._vspE5Loaded) return;
+  window._vspE5Loaded = true;
+
+  // Cache enrichment results
+  var _enrichCache = {};
+  var _enrichInFlight = null;
+
+  // Update <thead> to include EPSS + KEV columns
+  function updateTableHeader() {
+    var theadRow = document.querySelector("#cve-body").parentElement.querySelector("thead tr");
+    if (!theadRow || theadRow.querySelector("[data-e5-col]")) return;
+    var thEPSS = document.createElement("th");
+    thEPSS.setAttribute("data-e5-col", "epss");
+    thEPSS.textContent = "EPSS";
+    theadRow.appendChild(thEPSS);
+    var thKEV = document.createElement("th");
+    thKEV.setAttribute("data-e5-col", "kev");
+    thKEV.textContent = "KEV";
+    theadRow.appendChild(thKEV);
+  }
+
+  // Update colspan in empty/loading rows
+  function fixColspan() {
+    document.querySelectorAll("#cve-body td[colspan]").forEach(function(td) {
+      var cs = parseInt(td.getAttribute("colspan"));
+      if (cs === 4) td.setAttribute("colspan", "6");
+    });
+  }
+
+  // Batch-enrich all CVE IDs
+  async function batchEnrich(cveIds) {
+    var uncached = cveIds.filter(function(c) { return !(c in _enrichCache); });
+    if (uncached.length === 0) return;
+    
+    // Get token (works in iframe)
+    var token = "";
+    try {
+      token = window.parent.localStorage.getItem("vsp_token") || localStorage.getItem("vsp_token") || "";
+    } catch(e) {
+      token = localStorage.getItem("vsp_token") || "";
+    }
+    if (!token) return;
+
+    var batches = [];
+    for (var i = 0; i < uncached.length; i += 50) {
+      batches.push(uncached.slice(i, i + 50));
+    }
+
+    for (var b = 0; b < batches.length; b++) {
+      try {
+        var r = await fetch("/api/v1/ti/enrich/batch", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
+          body: JSON.stringify({ cves: batches[b] })
+        });
+        if (!r.ok) continue;
+        var d = await r.json();
+        if (d.enrichments) {
+          Object.keys(d.enrichments).forEach(function(cve) {
+            _enrichCache[cve] = d.enrichments[cve];
+          });
+        }
+      } catch(e) {
+        console.warn("[VSP-E5] batch enrich failed:", e.message);
+      }
+    }
+
+    // Trigger re-render
+    if (typeof window.filterCVEs === "function") {
+      window.filterCVEs();
+    }
+  }
+
+  // Augment each CVE row with EPSS + KEV cells
+  function injectEnrichmentCells() {
+    var rows = document.querySelectorAll("#cve-body tr");
+    var cveIdsNeeded = [];
+    rows.forEach(function(tr) {
+      // Skip empty/loading rows
+      if (tr.querySelector("td[colspan]")) return;
+      
+      var firstCell = tr.querySelector("td:first-child");
+      if (!firstCell) return;
+      var cveText = firstCell.textContent.trim().split(/\s+/)[0]; // strip "✓" suffix
+      if (!cveText.startsWith("CVE-")) return;
+
+      // Already has E5 columns?
+      if (tr.querySelector("[data-e5-cell]")) return;
+
+      var enr = _enrichCache[cveText];
+      
+      // EPSS cell
+      var tdE = document.createElement("td");
+      tdE.setAttribute("data-e5-cell", "epss");
+      tdE.style.cssText = "font-family:var(--font-mono);font-size:10px;color:var(--t2)";
+      if (enr && enr.epss != null) {
+        var pct = (enr.epss * 100).toFixed(1);
+        tdE.textContent = pct + "%";
+        if (enr.epss >= 0.5) tdE.style.color = "var(--red)";
+        else if (enr.epss >= 0.1) tdE.style.color = "var(--amber)";
+      } else if (enr === undefined) {
+        tdE.textContent = "—";
+        tdE.style.color = "var(--t3)";
+        cveIdsNeeded.push(cveText);
+      } else {
+        tdE.textContent = "—";
+        tdE.style.color = "var(--t3)";
+      }
+      tr.appendChild(tdE);
+
+      // KEV cell  
+      var tdK = document.createElement("td");
+      tdK.setAttribute("data-e5-cell", "kev");
+      if (enr && enr.kev) {
+        var pill = document.createElement("span");
+        pill.className = "pill pill-red";
+        pill.style.cssText = "background:rgba(239,68,68,.15);color:var(--red);padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600";
+        pill.textContent = "KEV";
+        tdK.appendChild(pill);
+      } else if (enr) {
+        tdK.style.cssText = "color:var(--t3);font-size:10px";
+        tdK.textContent = "—";
+      } else {
+        tdK.style.cssText = "color:var(--t3);font-size:10px";
+        tdK.textContent = "—";
+      }
+      tr.appendChild(tdK);
+    });
+
+    // Trigger batch enrichment for missing CVEs (debounced)
+    if (cveIdsNeeded.length > 0) {
+      if (_enrichInFlight) clearTimeout(_enrichInFlight);
+      _enrichInFlight = setTimeout(function() {
+        batchEnrich(cveIdsNeeded);
+        _enrichInFlight = null;
+      }, 500);
+    }
+  }
+
+  // Hook filterCVEs to inject cells after each render
+  function hookFilterCVEs() {
+    if (typeof window.filterCVEs !== "function") {
+      setTimeout(hookFilterCVEs, 300);
+      return;
+    }
+    if (window._vspE5HookedFilter) return;
+    window._vspE5HookedFilter = true;
+    var _orig = window.filterCVEs;
+    window.filterCVEs = function() {
+      var ret = _orig.apply(this, arguments);
+      // Defer DOM mutation to after browser renders innerHTML
+      setTimeout(function() {
+        updateTableHeader();
+        fixColspan();
+        injectEnrichmentCells();
+      }, 50);
+      return ret;
+    };
+    console.log("[VSP-E5] EPSS/KEV columns enhancement active");
+  }
+
+  // Also hook openCVEDetail to show EPSS/KEV in modal
+  function hookCVEDetail() {
+    if (typeof window.openCVEDetail !== "function") {
+      setTimeout(hookCVEDetail, 300);
+      return;
+    }
+    if (window._vspE5HookedDetail) return;
+    window._vspE5HookedDetail = true;
+    var _orig = window.openCVEDetail;
+    window.openCVEDetail = function(i) {
+      var ret = _orig.apply(this, arguments);
+      var cveData = window._cveData || [];
+      var cve = cveData[i];
+      if (!cve) return ret;
+      var enr = _enrichCache[cve.cve];
+      if (!enr) return ret;
+      // Append EPSS + KEV to KPI row
+      setTimeout(function() {
+        var kpiRow = document.getElementById("cvd-kpis");
+        if (!kpiRow) return;
+        if (kpiRow.querySelector("[data-e5-kpi]")) return;
+        if (enr.epss != null) {
+          var box = document.createElement("div");
+          box.setAttribute("data-e5-kpi", "epss");
+          box.style.cssText = "background:var(--surface);border-radius:7px;padding:8px;text-align:center";
+          box.innerHTML = '<div style="font-size:9px;color:var(--t3);text-transform:uppercase">EPSS</div>'
+            + '<div style="font-size:14px;font-weight:700;color:' + (enr.epss >= 0.5 ? 'var(--red)' : enr.epss >= 0.1 ? 'var(--amber)' : 'var(--green)') + ';margin-top:2px">'
+            + (enr.epss * 100).toFixed(1) + "%</div>";
+          kpiRow.appendChild(box);
+        }
+        if (enr.kev != null) {
+          var box2 = document.createElement("div");
+          box2.setAttribute("data-e5-kpi", "kev");
+          box2.style.cssText = "background:var(--surface);border-radius:7px;padding:8px;text-align:center";
+          box2.innerHTML = '<div style="font-size:9px;color:var(--t3);text-transform:uppercase">KEV</div>'
+            + '<div style="font-size:14px;font-weight:700;color:' + (enr.kev ? 'var(--red)' : 'var(--green)') + ';margin-top:2px">'
+            + (enr.kev ? "YES" : "NO") + "</div>";
+          kpiRow.appendChild(box2);
+        }
+      }, 50);
+      return ret;
+    };
+  }
+
+  // Init
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() {
+      hookFilterCVEs();
+      hookCVEDetail();
+    });
+  } else {
+    setTimeout(function() {
+      hookFilterCVEs();
+      hookCVEDetail();
+    }, 200);
+  }
+})();
+</script>
+
+
+<!-- VSP-UNI-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Universal Panel Polish v1
+ *   Inject vào: vuln_mgmt.html / assets.html / conmon.html / soar.html
+ *   Auto-detect panel via location.pathname → enable per-panel modules
+ *   Common: toast (override alert) + modal helpers
+ *   Per-panel: filter bar, click row → detail, KPI clickable, CSV export
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_UNI_POLISH__) return;
+  window.__VSP_UNI_POLISH__ = true;
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+  function copy(t) { try { navigator.clipboard.writeText(t); toast('Copied', 'success'); } catch (e) {} }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function fmtTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString();
+  }
+  function relativeTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts); if (isNaN(d.getTime())) return '—';
+    const diff = Date.now() - d.getTime();
+    const days = Math.floor(diff / 86400000);
+    const hrs = Math.floor((diff % 86400000) / 3600000);
+    if (days > 0) return days + 'd ago';
+    if (hrs > 0) return hrs + 'h ago';
+    return Math.floor(diff / 60000) + 'm ago';
+  }
+
+  // Detect panel
+  const path = location.pathname;
+  const PANEL =
+    /vuln_mgmt/.test(path) ? 'vuln_mgmt' :
+    /assets/.test(path)    ? 'assets' :
+    /conmon/.test(path)    ? 'conmon' :
+    /soar/.test(path)      ? 'soar' : 'unknown';
+
+  console.log('[VSP-UNI-POLISH] Loaded for panel:', PANEL);
+
+  // ─── Toast ────────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-uni-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspUNIToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!$id('vsp-uni-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-uni-toast-css';
+    s.textContent = '@keyframes vspUNIToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+
+  // Override alert (per-panel scope)
+  if (!window.__vspUniOverrideAlert) {
+    window.__vspUniOverrideAlert = true;
+    window.__originalAlert = window.__originalAlert || window.alert;
+    window.alert = function (msg) {
+      if (/^✅|^✓/.test(msg)) toast(String(msg).replace(/^[✅✓]\s*/, ''), 'success');
+      else if (/^❌|^✗/.test(msg)) toast(String(msg).replace(/^[❌✗]\s*/, ''), 'error');
+      else if (/error|fail/i.test(msg)) toast(msg, 'error');
+      else if (/⚠/.test(msg)) toast(String(msg).replace(/^⚠\s*/, ''), 'warn');
+      else toast(msg, 'info');
+    };
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-uni-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '720px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+         <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+         <button onclick="window._vspUNI.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>
+       </div>
+       <div style="padding:18px">${opts.body || ''}</div>` +
+      (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-uni-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function row(label, value, copyable) {
+    const v = String(value == null ? '—' : value);
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspUNI.copy('${esc(v).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:130px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;line-height:1.5;word-break:break-word">' + esc(v) + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+
+  const UNI = window._vspUNI = {
+    close: closeModal,
+    copy: copy,
+    toast: toast,
+    showModal: showModal
+  };
+
+  // ─── Generic filter bar injector ─────────────────────────────────────────
+  function injectFilterBar(container, filters, onChange) {
+    if (!container) return null;
+    if (container.querySelector('.vsp-uni-filter')) return container.querySelector('.vsp-uni-filter');
+    const bar = document.createElement('div');
+    bar.className = 'vsp-uni-filter';
+    bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + (filters.search !== false
+          ? '<input class="vsp-uni-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+      + (filters.pills ? renderPillGroup('vsp-uni-pill', filters.pills) : '')
+      + (filters.csv !== false
+          ? '<button class="btn btn-sm vsp-uni-csv" style="font-size:10px">↓ CSV</button>' : '')
+      + '<span class="vsp-uni-count" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
+
+    container.insertBefore(bar, container.firstChild);
+
+    if (!$id('vsp-uni-pill-css')) {
+      const css = document.createElement('style'); css.id = 'vsp-uni-pill-css';
+      css.textContent = '.vsp-uni-pill{background:transparent;border:0;padding:5px 9px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.vsp-uni-pill:hover{color:var(--t1,#e5e7eb)}.vsp-uni-pill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+
+    const q = bar.querySelector('.vsp-uni-q');
+    const csvBtn = bar.querySelector('.vsp-uni-csv');
+    if (q) q.addEventListener('input', () => onChange(getFilterState(bar)));
+    bar.querySelectorAll('.vsp-uni-pill').forEach(p => {
+      p.addEventListener('click', () => {
+        bar.querySelectorAll('.vsp-uni-pill[data-group="' + p.dataset.group + '"]').forEach(x => x.classList.remove('vsp-uni-pill-active'));
+        p.classList.add('vsp-uni-pill-active');
+        onChange(getFilterState(bar));
+      });
+    });
+    if (csvBtn && filters.onCSV) csvBtn.addEventListener('click', filters.onCSV);
+
+    return bar;
+  }
+  function renderPillGroup(cls, groups) {
+    return groups.map(g => {
+      return '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+        + g.options.map((o, i) => {
+            const isActive = i === 0;
+            return `<button class="vsp-uni-pill ${isActive ? 'vsp-uni-pill-active' : ''}" data-group="${esc(g.key)}" data-value="${esc(o.value || '')}" style="${o.color ? 'color:' + o.color : ''}">${esc(o.label)}</button>`;
+          }).join('')
+        + '</div>';
+    }).join('');
+  }
+  function getFilterState(bar) {
+    const state = { q: '' };
+    const q = bar.querySelector('.vsp-uni-q');
+    if (q) state.q = (q.value || '').toLowerCase();
+    bar.querySelectorAll('.vsp-uni-pill-active').forEach(p => {
+      state[p.dataset.group] = p.dataset.value || '';
+    });
+    return state;
+  }
+
+  // ─── Universal table CSV export ──────────────────────────────────────────
+  function tableToCSV(table) {
+    if (!table) return '';
+    const rows = [];
+    table.querySelectorAll('thead tr').forEach(tr => {
+      rows.push(Array.from(tr.querySelectorAll('th,td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(','));
+    });
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      if (tr.style.display === 'none') return;
+      rows.push(Array.from(tr.querySelectorAll('td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(','));
+    });
+    return rows.join('\n');
+  }
+
+  // ─── PANEL: vuln_mgmt ────────────────────────────────────────────────────
+  function initVulnMgmt() {
+    // Add filter bar trên main content
+    setTimeout(() => {
+      const main = $('main') || $('.main') || document.body;
+      const cards = $$('div').filter(d => d.querySelector('table') && !d.querySelector('.vsp-uni-filter'));
+      cards.slice(0, 1).forEach(card => {
+        const tableContainer = card.querySelector('table') ? card : null;
+        if (!tableContainer) return;
+        injectFilterBar(card, {
+          searchPlaceholder: 'Search CVE / tool / package…',
+          pills: [{
+            key: 'sev',
+            options: [
+              { label: 'All severity', value: '' },
+              { label: 'Critical', value: 'critical', color: '#dc2626' },
+              { label: 'High', value: 'high', color: '#ef4444' },
+              { label: 'Medium', value: 'medium', color: '#f59e0b' },
+              { label: 'Low', value: 'low', color: '#3b82f6' }
+            ]
+          }],
+          onCSV: () => {
+            const t = card.querySelector('table');
+            if (!t) return;
+            downloadFile('vuln-mgmt-' + Date.now() + '.csv', tableToCSV(t), 'text/csv');
+            toast('Exported vulnerabilities CSV', 'success');
+          }
+        }, applyFilters);
+      });
+
+      // KPI clickable
+      $$('div[class*="kpi"]').forEach(card => {
+        if (card.dataset.vspPol) return;
+        const txt = (card.textContent || '').toLowerCase();
+        if (/total/i.test(txt) || /cve/i.test(txt) || /critical/i.test(txt) || /high/i.test(txt)) {
+          card.dataset.vspPol = '1';
+          card.style.cursor = 'pointer';
+          card.title = 'Click for vulnerability breakdown';
+          card.onclick = showVulnBreakdown;
+        }
+      });
+    }, 600);
+  }
+  async function showVulnBreakdown() {
+    showModal({ title: '🛡 Vulnerability Breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const [trendRes, byToolRes, topRes] = await Promise.all([
+        authFetch('/api/v1/vulns/trend').then(r => r.json()).catch(() => ({})),
+        authFetch('/api/v1/vulns/by-tool').then(r => r.json()).catch(() => ({})),
+        authFetch('/api/v1/vulns/top-cves').then(r => r.json()).catch(() => ({}))
+      ]);
+
+      const tools = byToolRes.tools || byToolRes.by_tool || [];
+      const cves = topRes.cves || topRes.top_cves || [];
+
+      const body = ''
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">BY TOOL</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;margin-bottom:14px;display:grid;gap:4px">'
+        +   tools.slice(0, 10).map(t => {
+              const n = t.count || t.findings || 0;
+              const name = t.name || t.tool || 'unknown';
+              return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+                <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(name)}</span>
+                <span style="color:var(--t1)">${n.toLocaleString()}</span>
+              </div>`;
+            }).join('')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">TOP CVES</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px">'
+        +   cves.slice(0, 15).map(c => {
+              const cve = c.cve_id || c.id || c.cve || 'unknown';
+              const cvss = c.cvss || 0;
+              const cvssColor = cvss >= 9 ? '#dc2626' : cvss >= 7 ? '#ef4444' : cvss >= 4 ? '#f59e0b' : '#71717a';
+              return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0">
+                <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(cve)}</span>
+                <span style="font-family:var(--font-mono,monospace);color:${cvssColor};font-weight:600">CVSS ${cvss}</span>
+              </div>`;
+            }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI.close()">Close</button>';
+      showModal({ title: '🛡 Vulnerability Breakdown', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: assets ───────────────────────────────────────────────────────
+  function initAssets() {
+    setTimeout(() => {
+      // Find table
+      const tbl = $('table');
+      if (!tbl) return;
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      if (!card) return;
+
+      injectFilterBar(card, {
+        searchPlaceholder: 'Search asset name / type / hostname…',
+        pills: [{
+          key: 'type',
+          options: [
+            { label: 'All types', value: '' },
+            { label: 'Software', value: 'software', color: '#3b82f6' },
+            { label: 'Hardware', value: 'hardware', color: '#a855f7' },
+            { label: 'Service', value: 'service', color: '#10b981' }
+          ]
+        }],
+        onCSV: () => {
+          downloadFile('assets-' + Date.now() + '.csv', tableToCSV(tbl), 'text/csv');
+          toast('Exported assets CSV', 'success');
+        }
+      }, applyFilters);
+
+      // Click row → modal
+      tbl.addEventListener('click', e => {
+        const tr = e.target.closest('tbody tr');
+        if (!tr) return;
+        const cells = Array.from(tr.querySelectorAll('td')).map(c => (c.textContent || '').trim());
+        if (cells.length < 2) return;
+        const body = '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+          + cells.map((c, i) => row('Field ' + (i+1), c)).join('')
+          + '</div>';
+        showModal({
+          title: '📦 Asset detail',
+          body: body,
+          footer: '<button class="btn btn-primary btn-sm" onclick="window._vspUNI.close()">Close</button>'
+        });
+      });
+    }, 600);
+  }
+
+  // ─── PANEL: conmon ───────────────────────────────────────────────────────
+  function initConmon() {
+    setTimeout(() => {
+      // Add filter for deviations table
+      const tables = $$('table');
+      tables.forEach(tbl => {
+        const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+        if (!card || card.querySelector('.vsp-uni-filter')) return;
+
+        injectFilterBar(card, {
+          searchPlaceholder: 'Search control / status…',
+          pills: [{
+            key: 'st',
+            options: [
+              { label: 'All', value: '' },
+              { label: 'Open', value: 'open', color: '#ef4444' },
+              { label: 'Approved', value: 'approved', color: '#10b981' },
+              { label: 'Pending', value: 'pending', color: '#f59e0b' }
+            ]
+          }],
+          csv: false
+        }, applyFilters);
+      });
+
+      // KPI clickable
+      $$('div[class*="kpi"]').forEach(card => {
+        if (card.dataset.vspPol) return;
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click for ConMon details';
+        card.onclick = showConmonBreakdown;
+      });
+    }, 600);
+  }
+  async function showConmonBreakdown() {
+    showModal({ title: '📊 ConMon Cadence (NIST 800-137)', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const cad = await authFetch('/api/v1/conmon/cadence').then(r => r.json()).catch(() => ({}));
+      const dev = await authFetch('/api/v1/conmon/deviations').then(r => r.json()).catch(() => ({}));
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + val + '</div>'
+          + '</div>';
+      }
+      const totalDev = dev.count || (dev.deviations ? dev.deviations.length : 0) || 0;
+      const cadCount = cad.count || (cad.cadences ? cad.cadences.length : 0) || 0;
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('CADENCES', cadCount, '#3b82f6')
+        +   kbox('DEVIATIONS', totalDev, '#f59e0b')
+        + '</div>'
+        + '<div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5">'
+        +   '<b style="color:#3b82f6">Continuous Monitoring</b> tracks ongoing assessment per <b>NIST SP 800-137</b>. Deviations from baseline cadence trigger CISO review.'
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI.close()">Close</button>';
+      showModal({ title: '📊 ConMon Cadence', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: soar ─────────────────────────────────────────────────────────
+  function initSoar() {
+    setTimeout(() => {
+      const tables = $$('table');
+      tables.forEach(tbl => {
+        const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+        if (!card || card.querySelector('.vsp-uni-filter')) return;
+
+        injectFilterBar(card, {
+          searchPlaceholder: 'Search playbook / status / target…',
+          pills: [{
+            key: 'st',
+            options: [
+              { label: 'All', value: '' },
+              { label: 'Running', value: 'running', color: '#3b82f6' },
+              { label: 'Success', value: 'success', color: '#10b981' },
+              { label: 'Failed', value: 'failed', color: '#ef4444' },
+              { label: 'Pending', value: 'pending', color: '#f59e0b' }
+            ]
+          }],
+          onCSV: () => {
+            downloadFile('soar-runs-' + Date.now() + '.csv', tableToCSV(tbl), 'text/csv');
+            toast('Exported SOAR runs', 'success');
+          }
+        }, applyFilters);
+      });
+
+      $$('div[class*="kpi"]').forEach(card => {
+        if (card.dataset.vspPol) return;
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click for SOAR breakdown';
+        card.onclick = showSoarBreakdown;
+      });
+    }, 600);
+  }
+  async function showSoarBreakdown() {
+    showModal({ title: '🤖 SOAR Playbook breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const pbs = await authFetch('/api/v1/soar/playbooks').then(r => r.json()).catch(() => ({}));
+      const runs = await authFetch('/api/v1/soar/runs').then(r => r.json()).catch(() => ({}));
+
+      const playbooks = pbs.playbooks || [];
+      const runList = runs.runs || [];
+      const counts = { success: 0, failed: 0, running: 0, pending: 0 };
+      runList.forEach(r => {
+        const s = (r.status || '').toLowerCase();
+        if (counts.hasOwnProperty(s)) counts[s]++;
+      });
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + val + '</div>'
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('PLAYBOOKS', playbooks.length, '#3b82f6')
+        +   kbox('TOTAL RUNS', runList.length, '#a855f7')
+        +   kbox('SUCCESS', counts.success, '#10b981')
+        +   kbox('FAILED', counts.failed, '#ef4444')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">RECENT RUNS</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;max-height:280px;overflow:auto">'
+        +   runList.slice(0, 10).map(r => {
+              const s = (r.status || '').toLowerCase();
+              const c = s === 'success' ? '#10b981' : s === 'failed' ? '#ef4444' : s === 'running' ? '#3b82f6' : '#f59e0b';
+              return `<div style="display:flex;gap:10px;font-size:11px;padding:4px 0;border-bottom:1px solid var(--bd,#27272a)">
+                <span style="font-family:var(--font-mono,monospace);font-size:10px;color:#3b82f6;min-width:120px">${esc((r.id || '').slice(0, 14))}</span>
+                <span style="flex:1">${esc(r.playbook_name || r.playbook || '—')}</span>
+                <span style="background:rgba(${parseInt(c.slice(1,3),16)},${parseInt(c.slice(3,5),16)},${parseInt(c.slice(5,7),16)},.15);color:${c};padding:2px 7px;border-radius:3px;font-size:9px">${esc(r.status || 'unknown')}</span>
+                <span style="font-size:10px;color:var(--t3);min-width:70px;text-align:right">${esc(relativeTime(r.created_at || r.started_at))}</span>
+              </div>`;
+            }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI.close()">Close</button>';
+      showModal({ title: '🤖 SOAR Playbook breakdown', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
+    }
+  }
+
+  // ─── Generic table filter applier ────────────────────────────────────────
+  function applyFilters(state) {
+    $$('table').forEach(tbl => {
+      const rows = tbl.querySelectorAll('tbody tr');
+      let shown = 0;
+      rows.forEach(tr => {
+        const text = (tr.textContent || '').toLowerCase();
+        let ok = true;
+        if (state.q && text.indexOf(state.q) < 0) ok = false;
+        for (const k of Object.keys(state)) {
+          if (k === 'q' || !state[k]) continue;
+          const v = state[k].toLowerCase();
+          if (text.indexOf(v) < 0) ok = false;
+        }
+        tr.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      const counter = card && card.querySelector('.vsp-uni-count');
+      if (counter) counter.textContent = shown + ' / ' + rows.length + ' rows';
+    });
+  }
+
+  // ─── Init dispatch ───────────────────────────────────────────────────────
+  function init() {
+    if (PANEL === 'vuln_mgmt') initVulnMgmt();
+    else if (PANEL === 'assets') initAssets();
+    else if (PANEL === 'conmon') initConmon();
+    else if (PANEL === 'soar') initSoar();
+  }
+  if (document.readyState !== 'loading') setTimeout(init, 800);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 800));
+
+  // Re-init for late-loaded data
+  let pollCount = 0;
+  const poll = setInterval(() => {
+    init();
+    if (++pollCount > 4) clearInterval(poll);
+  }, 1500);
+})();
+
+</script>
+<!-- VSP-UNI-POLISH-END -->
+
+
+
+
+
+
+
+<!-- VSP-CROSS-LINK-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Cross-Link Hub v3 — Use REAL backend endpoint
+ *   Fix: POST /api/v1/soar/playbooks/{UUID}/run (not /soar/runs)
+ *   Body: {trigger_event, context} — playbook_id từ URL path
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_CROSS_LINK_V3__) return;
+  window.__VSP_CROSS_LINK_V3__ = true;
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+
+  // UUID validator
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function isUUID(s) { return typeof s === 'string' && UUID_REGEX.test(s); }
+
+  const PANEL_NAME_MAP = {
+    'vuln_mgmt':         'vulnmgmt',
+    'threat_intel':      'threatintel',
+    'threat_hunt':       'threathunt',
+    'incident_response': 'incident_response',
+    'p4_compliance':     'p4compliance',
+    'oscal':             'oscal',
+    'soar':              'soar',
+    'sbom':              'sbom',
+    'attestation':       'attestation',
+    'supply_chain':      'supply_chain',
+    'network_flow':      'netflow',
+    'sw_inventory':      'sw_inventory'
+  };
+
+  const path = location.pathname;
+  const PANEL =
+    /vuln_mgmt/.test(path)         ? 'vuln_mgmt' :
+    /incident_response/.test(path) ? 'incident_response' :
+    /p4_compliance/.test(path)     ? 'p4_compliance' : 'unknown';
+
+  console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL);
+
+  // ─── Toast ────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    const existing = $id('vsp-uni-toasts') || $id('vsp-uni2-toasts') || $id('vsp-uni3-toasts') || $id('vsp-uni4-toasts') || $id('vsp-ir-toasts');
+    if (existing) { tcontainer = existing; return existing; }
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-cross-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = 'pointer-events:auto;background:' + c.bg + ';border-left:3px solid ' + c.border + ';padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);display:flex;gap:10px;align-items:flex-start';
+    t.innerHTML = '<span style="font-size:14px;color:' + c.border + ';flex-shrink:0">' + c.icon + '</span><span style="flex:1;line-height:1.4">' + esc(msg) + '</span>';
+    ensureToastContainer().appendChild(t);
+    setTimeout(function () {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(function () { t.remove(); }, 250);
+    }, 4000);
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-cross-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = function (e) { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:' + (opts.width || '720px') + ';width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)';
+    box.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">'
+      + '<div style="font-size:13px;font-weight:600;flex:1">' + esc(opts.title || '') + '</div>'
+      + '<button onclick="window._vspCROSS.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>'
+      + '</div>'
+      + '<div style="padding:18px">' + (opts.body || '') + '</div>'
+      + (opts.footer ? '<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">' + opts.footer + '</div>' : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = function (e) { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-cross-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  const CROSS = window._vspCROSS = { close: closeModal, toast: toast, showModal: showModal };
+
+  // ─── Cross-window navigation ─────────────────────────────────────────
+  function navigateToPanel(panelFile, hint) {
+    const panelArg = PANEL_NAME_MAP[panelFile] || panelFile;
+    try {
+      if (window.parent && window.parent !== window && typeof window.parent.showPanel === 'function') {
+        let navBtn = null;
+        try {
+          const buttons = window.parent.document.querySelectorAll('.nav-item');
+          for (const btn of buttons) {
+            const onclick = btn.getAttribute('onclick') || '';
+            if (onclick.indexOf("'" + panelArg + "'") >= 0) {
+              navBtn = btn;
+              break;
+            }
+          }
+        } catch (e) {}
+        window.parent.showPanel(panelArg, navBtn);
+        if (hint) {
+          setTimeout(function () {
+            try { window.parent.postMessage({ type: 'vsp-cross-nav', panel: panelFile, hint: hint }, '*'); } catch (e) {}
+          }, 300);
+        }
+        return true;
+      }
+    } catch (e) { console.warn('[VSP-CROSS-LINK-V3] Navigation error:', e); }
+    return false;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: vuln_mgmt — CVE enrichment cross-link (UNCHANGED from v2)
+  // ═════════════════════════════════════════════════════════════════════
+  function initVulnMgmt() {
+    setTimeout(async function () {
+      try {
+        const r = await authFetch('/api/v1/vulns/top-cves');
+        if (!r.ok) return;
+        const d = await r.json();
+        const cves = d.cves || [];
+        const kevCves = cves.filter(function (c) { return c.kev || (c.tags && c.tags.indexOf && c.tags.indexOf('KEV') >= 0); });
+        const criticalCves = cves.filter(function (c) { return (c.severity || '').toLowerCase() === 'critical'; });
+
+        if (criticalCves.length > 0 && !$id('vsp-cross-vuln-banner')) {
+          const main = $('main') || $('.main') || document.body;
+          if (main) {
+            const banner = document.createElement('div');
+            banner.id = 'vsp-cross-vuln-banner';
+            banner.style.cssText = 'background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin:0 0 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap';
+            banner.innerHTML =
+              '<span style="color:#ef4444;font-size:14px">⚠</span>'
+              + '<span style="flex:1"><b style="color:#ef4444">' + criticalCves.length + ' CRITICAL CVEs</b> detected.'
+              + (kevCves.length > 0 ? ' Including <b style="color:#dc2626">' + kevCves.length + ' in CISA KEV</b> catalog (actively exploited).' : '')
+              + ' Recommend immediate patching per <b>BOD 22-01</b>.</span>'
+              + '<button id="vsp-cross-open-ti" style="background:rgba(168,85,247,.2);border:1px solid #a855f7;color:#a855f7;padding:5px 12px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap">🌐 Open Threat Intel</button>';
+            const target = main.querySelector('div');
+            if (target) target.parentNode.insertBefore(banner, target);
+            $id('vsp-cross-open-ti').addEventListener('click', function () {
+              const ok = navigateToPanel('threat_intel', { focus: 'cves' });
+              toast(ok ? 'Switching to Threat Intel…' : 'Cannot navigate (parent unavailable)', ok ? 'success' : 'warn');
+            });
+          }
+        }
+
+        $$('table').forEach(function (tbl) {
+          if (tbl.dataset.vspCross) return;
+          tbl.dataset.vspCross = '1';
+          const rows = tbl.querySelectorAll('tbody tr');
+          rows.forEach(function (tr) {
+            const cells = tr.querySelectorAll('td');
+            cells.forEach(function (td) {
+              if (td.dataset.vspCveLinked) return;
+              const text = (td.textContent || '').trim();
+              const cveMatch = text.match(/CVE-\d{4}-\d{4,7}/);
+              if (cveMatch) {
+                td.dataset.vspCveLinked = '1';
+                const cve = cveMatch[0];
+                const link = document.createElement('span');
+                link.style.cssText = 'display:inline-block;margin-left:6px;background:rgba(168,85,247,.15);color:#a855f7;padding:1px 6px;border-radius:3px;font-size:9px;cursor:pointer;font-family:var(--font-mono,monospace);font-weight:600';
+                link.textContent = '🌐 TI';
+                link.title = 'Show Threat Intel context for ' + cve;
+                link.onclick = function (e) {
+                  e.stopPropagation();
+                  showCVEEnrichment(cve);
+                };
+                td.appendChild(link);
+              }
+            });
+          });
+        });
+      } catch (e) {
+        console.warn('Vuln Mgmt cross-link init error:', e);
+      }
+    }, 1000);
+  }
+
+  async function showCVEEnrichment(cve) {
+    showModal({
+      title: '🌐 Threat Intel — ' + cve,
+      body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>',
+      width: '720px'
+    });
+    try {
+      const r = await authFetch('/api/v1/vulns/top-cves');
+      const d = await r.json();
+      const cves = d.cves || [];
+      const target = cves.find(function (c) { return (c.cve || '').toUpperCase() === cve.toUpperCase(); });
+
+      if (!target) {
+        showModal({
+          title: '🌐 ' + cve,
+          body: '<div style="padding:20px;color:var(--t3);font-size:11px">No threat intel context found for ' + esc(cve) + '.</div>'
+              + '<div style="margin-top:10px"><a href="https://nvd.nist.gov/vuln/detail/' + esc(cve) + '" target="_blank" style="color:#3b82f6;font-size:11px">↗ View on NVD</a></div>',
+          footer: '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>',
+          width: '500px'
+        });
+        return;
+      }
+
+      const sevColor = { critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#3b82f6' };
+      const sevC = sevColor[(target.severity || '').toLowerCase()] || '#71717a';
+      const cvss = target.cvss || target.score || '?';
+      const tools = (target.tools && target.tools.length) ? target.tools.join(', ') : '—';
+      const fixable = target.fixable ? '✓ Fix available' : '⚠ No fix yet';
+      const fixColor = target.fixable ? '#10b981' : '#f59e0b';
+
+      const body = ''
+        + '<div style="display:flex;gap:14px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
+        +   '<span style="background:rgba(' + parseInt(sevC.slice(1,3),16) + ',' + parseInt(sevC.slice(3,5),16) + ',' + parseInt(sevC.slice(5,7),16) + ',.15);color:' + sevC + ';padding:4px 12px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase">' + esc(target.severity || 'UNKNOWN') + '</span>'
+        +   '<span style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--t2)">CVSS <b style="color:' + sevC + '">' + esc(String(cvss)) + '</b></span>'
+        +   '<span style="font-size:11px;color:' + fixColor + '">' + esc(fixable) + '</span>'
+        + '</div>'
+        + '<div style="background:rgba(168,85,247,.08);border-left:3px solid #a855f7;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#a855f7">Threat Intelligence Context</b><br>'
+        +   'Affected by ' + (target.count || '?') + ' findings · Detected by: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px">' + esc(tools) + '</code>'
+        + '</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:6px">'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">CVE ID</span><span style="font-family:var(--font-mono,monospace);color:#3b82f6">' + esc(target.cve) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Severity</span><span style="color:' + sevC + ';text-transform:uppercase">' + esc(target.severity || '—') + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Findings count</span><span style="color:var(--t1);font-family:var(--font-mono,monospace)">' + (target.count || 0) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Tools detected</span><span style="color:var(--t2);font-size:10px">' + esc(tools) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Patch available</span><span style="color:' + fixColor + '">' + (target.fixable ? 'Yes' : 'No') + '</span></div>'
+        + '</div>'
+        + '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+        +   '<a href="https://nvd.nist.gov/vuln/detail/' + esc(target.cve) + '" target="_blank" style="color:#3b82f6;font-size:11px;text-decoration:none;background:rgba(59,130,246,.1);padding:6px 12px;border-radius:4px">↗ NVD</a>'
+        +   '<a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" style="color:#dc2626;font-size:11px;text-decoration:none;background:rgba(220,38,38,.1);padding:6px 12px;border-radius:4px">↗ CISA KEV</a>'
+        +   '<a href="https://www.cve.org/CVERecord?id=' + esc(target.cve) + '" target="_blank" style="color:#a855f7;font-size:11px;text-decoration:none;background:rgba(168,85,247,.1);padding:6px 12px;border-radius:4px">↗ CVE.org</a>'
+        + '</div>';
+      const footer = '<button class="btn btn-sm" onclick="window._vspCROSS.openTI()" style="margin-right:auto">↗ View in Threat Intel</button>'
+                   + '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>';
+      showModal({ title: '🌐 ' + cve + ' — Threat Intel', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspCROSS.close()">Close</button>' });
+    }
+  }
+  CROSS.openTI = function () {
+    closeModal();
+    const ok = navigateToPanel('threat_intel', {});
+    toast(ok ? 'Switching to Threat Intel…' : 'Cannot navigate', ok ? 'success' : 'warn');
+  };
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: incident_response — SOAR playbook trigger (FIXED v3)
+  // ═════════════════════════════════════════════════════════════════════
+  function initIncidentResponse() {
+    setTimeout(function () {
+      const tab = $id('tab-incidents') || document.body;
+      const rows = tab.querySelectorAll('tbody tr');
+      rows.forEach(function (tr) {
+        if (tr.dataset.vspSoarLinked) return;
+        const cells = tr.querySelectorAll('td');
+        const actionCell = cells[cells.length - 1];
+        if (!actionCell) return;
+        if (actionCell.querySelector('.vsp-soar-btn')) return;
+        tr.dataset.vspSoarLinked = '1';
+
+        const idCell = cells[0];
+        const incidentId = (idCell ? (idCell.textContent || '').trim() : '');
+
+        const btn = document.createElement('button');
+        btn.className = 'vsp-soar-btn';
+        btn.style.cssText = 'background:rgba(168,85,247,.15);border:1px solid #a855f7;color:#a855f7;padding:3px 8px;border-radius:3px;font-size:9px;cursor:pointer;font-weight:600;margin-left:6px;font-family:inherit';
+        btn.textContent = '🤖 Playbook';
+        btn.title = 'Run SOAR playbook for this incident';
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          showPlaybookPicker(incidentId, tr);
+        };
+        actionCell.appendChild(btn);
+      });
+    }, 1500);
+  }
+
+  async function showPlaybookPicker(incidentId, tr) {
+    showModal({
+      title: '🤖 Run Playbook for ' + incidentId,
+      body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading playbooks…</div>',
+      width: '720px'
+    });
+
+    try {
+      const results = await Promise.all([
+        authFetch('/api/v1/soar/playbooks').then(function (r) { return r.json(); }).catch(function () { return {}; }),
+        authFetch('/api/p4/ir/playbooks').then(function (r) { return r.json(); }).catch(function () { return {}; })
+      ]);
+      const soarRes = results[0], irRes = results[1];
+
+      const soarPlaybooks = soarRes.playbooks || [];
+      const irPlaybooks = irRes.playbooks || [];
+
+      let incCategory = '', incSeverity = '';
+      if (tr) {
+        const text = (tr.textContent || '').toLowerCase();
+        if (/ransomware/.test(text)) incCategory = 'ransomware';
+        else if (/malware/.test(text)) incCategory = 'malware';
+        else if (/phishing/.test(text)) incCategory = 'phishing';
+        else if (/exfil/.test(text)) incCategory = 'exfil';
+        if (/critical/.test(text)) incSeverity = 'critical';
+        else if (/high/.test(text)) incSeverity = 'high';
+      }
+
+      function matchScore(pb) {
+        let score = 0;
+        const sevPb = (pb.sev || pb.severity || '').toLowerCase();
+        const desc = ((pb.description || '') + ' ' + (pb.name || '') + ' ' + (pb.trigger || '')).toLowerCase();
+        const types = pb.incident_types || [];
+        if (incCategory && desc.indexOf(incCategory) >= 0) score += 10;
+        if (incCategory && types.some(function (t) { return (t || '').toLowerCase().indexOf(incCategory) >= 0; })) score += 10;
+        if (incSeverity && sevPb && sevPb.indexOf(incSeverity) >= 0) score += 5;
+        return score;
+      }
+
+      // Mark UUID validity for SOAR playbooks (only those can be triggered via /run endpoint)
+      const allPbs = []
+        .concat(soarPlaybooks.map(function (p) { return Object.assign({}, p, { source: 'SOAR', score: matchScore(p), runnable: isUUID(p.id) }); }))
+        .concat(irPlaybooks.map(function (p) { return Object.assign({}, p, { source: 'IR', score: matchScore(p), runnable: false }); }))
+        .sort(function (a, b) { return b.score - a.score; });
+
+      function renderPb(p) {
+        const isMatch = p.score > 0;
+        const matchBadge = isMatch ? '<span style="background:rgba(16,185,129,.15);color:#10b981;padding:1px 6px;border-radius:3px;font-size:9px;margin-left:6px">✓ MATCH</span>' : '';
+        const runnableBadge = p.runnable ? '' : '<span style="background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 6px;border-radius:3px;font-size:9px;margin-left:4px">DOC ONLY</span>';
+        const sev = p.sev || p.severity || '—';
+        const desc = (p.description || '').slice(0, 120);
+        const types = (p.incident_types || []).slice(0, 3).join(', ');
+        const cursor = p.runnable ? 'cursor:pointer' : 'cursor:not-allowed;opacity:.55';
+        return '<div class="vsp-pb-row" data-id="' + esc(p.id || p.name) + '" data-source="' + esc(p.source) + '" data-runnable="' + (p.runnable ? '1' : '0') + '" style="padding:10px 12px;background:var(--bg1,#111);border-radius:6px;font-size:11px;' + cursor + ';border-left:3px solid ' + (isMatch ? '#10b981' : '#3b82f6') + ';transition:background .15s">'
+          + '<div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">'
+          +   '<span style="background:rgba(168,85,247,.15);color:#a855f7;padding:1px 6px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);min-width:38px;text-align:center">' + esc(p.source) + '</span>'
+          +   '<span style="flex:1;font-weight:600">' + esc(p.name || p.id) + '</span>'
+          +   matchBadge
+          +   runnableBadge
+          +   '<span style="font-size:9px;color:var(--t3);text-transform:uppercase">' + esc(sev) + '</span>'
+          + '</div>'
+          + '<div style="font-size:10px;color:var(--t3);line-height:1.4">' + esc(desc) + (types ? ' · Types: <code style="background:var(--bg2);padding:1px 3px;border-radius:2px">' + esc(types) + '</code>' : '') + '</div>'
+          + '</div>';
+      }
+
+      const body = ''
+        + (incCategory || incSeverity
+          ? '<div style="background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;margin-bottom:14px">Detected: <b>' + esc(incCategory || 'unknown category') + '</b> · <b style="text-transform:uppercase">' + esc(incSeverity || 'unknown severity') + '</b>. ✓ MATCH = recommended · DOC ONLY = reference runbook (not auto-triggerable).</div>'
+          : '<div style="background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;margin-bottom:14px"><b>SOAR</b> = auto-triggerable (creates run record) · <b>IR</b> = NIST 800-61 reference runbook (documentation).</div>')
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">SELECT PLAYBOOK</div>'
+        + '<div style="display:grid;gap:6px;max-height:400px;overflow:auto">'
+        + allPbs.map(renderPb).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-sm" onclick="window._vspCROSS.close()" style="margin-right:auto">Cancel</button>'
+                   + '<span style="font-size:10px;color:var(--t3);align-self:center">Click row to trigger SOAR playbook</span>';
+      showModal({ title: '🤖 Run Playbook for ' + incidentId, body: body, footer: footer, width: '760px' });
+
+      setTimeout(function () {
+        $$('.vsp-pb-row').forEach(function (row) {
+          const runnable = row.dataset.runnable === '1';
+          row.addEventListener('click', function () {
+            if (!runnable) {
+              toast('IR runbook là tài liệu tham chiếu — chọn SOAR playbook để trigger thật', 'warn');
+              return;
+            }
+            const pbId = row.dataset.id;
+            const source = row.dataset.source;
+            triggerPlaybook(incidentId, pbId, source);
+          });
+          if (runnable) {
+            row.addEventListener('mouseenter', function () { row.style.background = 'var(--bg2,#1c1c1c)'; });
+            row.addEventListener('mouseleave', function () { row.style.background = 'var(--bg1,#111)'; });
+          }
+        });
+      }, 50);
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspCROSS.close()">Close</button>' });
+    }
+  }
+
+  // ─── FIXED: Use real backend endpoint ────────────────────────────────
+  async function triggerPlaybook(incidentId, playbookId, source) {
+    closeModal();
+
+    if (source !== 'SOAR' || !isUUID(playbookId)) {
+      toast('Only SOAR playbooks (UUID) can be triggered', 'error');
+      return;
+    }
+
+    toast('Triggering SOAR playbook…', 'info');
+
+    // CORRECT endpoint: POST /api/v1/soar/playbooks/{UUID}/run
+    const url = '/api/v1/soar/playbooks/' + encodeURIComponent(playbookId) + '/run';
+    const body = {
+      trigger_event: 'manual_ir_link',
+      context: { incident_id: incidentId, target: incidentId, triggered_via: 'phase3n_cross_link' }
+    };
+
+    try {
+      const r = await authFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (r.ok) {
+        let runId = '';
+        try {
+          const d = await r.json();
+          runId = d.id || d.run_id || d.uuid || '';
+        } catch (e) {}
+
+        toast('✓ Playbook started: ' + (runId.slice(0, 8) + '…') , 'success');
+        setTimeout(function () {
+          showModal({
+            title: '🤖 Playbook started',
+            body: '<div style="background:rgba(16,185,129,.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+              + '<b style="color:#10b981">✓ SOAR run created</b><br>'
+              + 'Incident: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px">' + esc(incidentId) + '</code><br>'
+              + 'Playbook: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">' + esc(playbookId) + '</code><br>'
+              + 'Run ID: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">' + esc(runId || 'pending') + '</code><br>'
+              + 'Status: <span style="color:#3b82f6">running</span>'
+              + '</div>'
+              + '<div style="font-size:11px;color:var(--t2);line-height:1.5">Track execution in <b>SOAR</b> tab. Audit log entry created with tenant_id. Database row inserted in <code>playbook_runs</code>.</div>',
+            footer: '<button class="btn btn-sm" onclick="window._vspCROSS.openSOAR()" style="margin-right:auto">↗ View in SOAR</button>'
+                  + '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>',
+            width: '520px'
+          });
+        }, 200);
+      } else {
+        const errText = await r.text().catch(function () { return ''; });
+        toast('Playbook trigger failed: HTTP ' + r.status, 'error');
+        console.warn('[VSP-CROSS-LINK-V3] Trigger error:', r.status, errText.slice(0, 300));
+      }
+    } catch (e) {
+      toast('Network error: ' + e.message, 'error');
+    }
+  }
+  CROSS.openSOAR = function () {
+    closeModal();
+    const ok = navigateToPanel('soar', {});
+    toast(ok ? 'Switching to SOAR…' : 'Cannot navigate', ok ? 'success' : 'warn');
+  };
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: p4_compliance — Reverse link to OSCAL (UNCHANGED)
+  // ═════════════════════════════════════════════════════════════════════
+  function initP4Compliance() {
+    setTimeout(function () {
+      const headers = $$('h1, h2, h3').filter(function (h) { return /ssdf|practice|control/i.test(h.textContent || ''); });
+      headers.slice(0, 1).forEach(function (h) {
+        if (h.dataset.vspOscalLinked) return;
+        h.dataset.vspOscalLinked = '1';
+        const btn = document.createElement('button');
+        btn.style.cssText = 'background:rgba(59,130,246,.15);border:1px solid #3b82f6;color:#3b82f6;padding:4px 10px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:10px;font-weight:600;font-family:inherit';
+        btn.textContent = '↗ Open in OSCAL';
+        btn.title = 'View this control in OSCAL panel';
+        btn.onclick = function () {
+          const ok = navigateToPanel('oscal', {});
+          toast(ok ? 'Switching to OSCAL…' : 'Cannot navigate', ok ? 'success' : 'warn');
+        };
+        h.appendChild(btn);
+      });
+    }, 1000);
+  }
+
+  // ─── Init ────────────────────────────────────────────────────────────
+  function init() {
+    if (PANEL === 'vuln_mgmt')              initVulnMgmt();
+    else if (PANEL === 'incident_response') initIncidentResponse();
+    else if (PANEL === 'p4_compliance')     initP4Compliance();
+  }
+
+  if (document.readyState !== 'loading') setTimeout(init, 800);
+  else document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 800); });
+
+  let pollCount = 0;
+  const poll = setInterval(function () { init(); if (++pollCount > 5) clearInterval(poll); }, 1500);
+})();
+
+</script>
+<!-- VSP-CROSS-LINK-END -->
 </body>
 </html>

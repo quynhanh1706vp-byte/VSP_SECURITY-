@@ -30,6 +30,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/vsp/platform/internal/api/handler"
 	"github.com/vsp/platform/internal/conmon"
+	"github.com/vsp/platform/internal/poam"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/billing"
@@ -205,6 +206,16 @@ func main() {
 	exportH := &handler.Export{DB: db}
 	reportH := &handler.Report{DB: db}
 	sbomH := &handler.SBOM{DB: db}
+	// PHASE3G-HANDLERS-BEGIN
+	oscalModelsH := &handler.OSCALModels{DB: db}
+	// PHASE3G-HANDLERS-END
+	// PHASE3F-HANDLERS-BEGIN
+	oscalPackageH := &handler.OSCALPackage{DB: db}
+	// PHASE3F-HANDLERS-END
+	// PHASE3-HANDLERS-BEGIN
+	supplyChainH := &handler.SupplyChain{DB: db}
+	cisaAttestH  := &handler.CISAAttestation{DB: db}
+	// PHASE3-HANDLERS-END
 	slaH := &handler.SLA{DB: db}
 	sandboxH := &handler.Sandbox{DB: db}
 	importsH := &handler.Imports{DB: db}
@@ -225,6 +236,8 @@ func main() {
 
 	// ── Router ────────────────────────────────────────────────────
 	r := chi.NewRouter()
+	// Strip trailing slash before route matching (so /api/x/ → /api/x)
+	r.Use(chimw.StripSlashes)
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
 	r.Use(vspMW.CSPNonce)
@@ -415,7 +428,8 @@ func main() {
 	// NIST OSCAL 1.1.2 — Catalog, Profile, SSP, Assessment Plan/Results, POA&M
 	// NIST SP 800-218 SSDF v1.1
 	// CISA Secure Software Self-Attestation Common Form (2024)
-	r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
+		r.Get("/api/p4/oscal", p4AuthMiddleware(tiH.OSCALIndex))
+r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 	r.Get("/api/p4/oscal/profile", p4AuthMiddleware(handleOSCALProfile))
 	r.Get("/api/p4/oscal/ssp/extended", p4AuthMiddleware(handleOSCALSSPExtended))
 	r.Get("/api/p4/oscal/assessment-plan", p4AuthMiddleware(handleOSCALAssessmentPlan))
@@ -526,6 +540,11 @@ func main() {
 	r.With(authMw).Get("/api/v1/ws", handler.WSUpgradeHandler) // cookie-based auth
 	// ConMon handler (used inside auth route group below)
 	conmonH := handler.NewConMonHandler(p4DB)
+
+	// G37: ConMon FedRAMP template routes
+	r.Get("/api/p4/conmon/template/asr",  p4AuthMiddleware(conmonH.RenderASR))
+	r.Get("/api/p4/conmon/template/qar",  p4AuthMiddleware(conmonH.RenderQAR))
+	r.Get("/api/p4/conmon/template/mcmr", p4AuthMiddleware(conmonH.RenderMCMR))
 
 	// ─── Phase 5.1: ConMon scheduler goroutine ───────────────────
 	// Wires the existing ConMon CRUD layer to actual pipeline execution.
@@ -1108,6 +1127,26 @@ func main() {
 		r.Post("/api/v1/ti/secret/check", tiH.CheckSecret)
 		r.With(vspMW.StrictLimiter(20, time.Minute)).Post("/api/v1/ti/secret/check/batch", tiH.CheckSecretBatch)
 		r.Get("/api/v1/compliance/license", tiH.LicenseCompliance)
+		r.Get("/api/v1/ti/stats", tiH.Stats)
+		r.Get("/api/v1/sw/component/{hash}/threat", tiH.ComponentThreat)
+		r.Get("/api/v1/integrations/virustotal/stats", tiH.VTStats)
+
+		// UI Real Data — query actual DB tables
+		r.Get("/api/v1/integrations", tiH.IntegrationsList)
+		r.Post("/api/v1/integrations/{provider}/test-pr-comment", tiH.IntegrationsTestProvider)
+		r.Post("/api/v1/integrations/{provider}/test-ticket", tiH.IntegrationsTestProvider)
+		r.Get("/api/v1/settings/scan-config", tiH.SettingsScanConfig)
+		r.Get("/api/v1/settings/dast-targets", tiH.SettingsDastTargets)
+		r.Get("/api/v1/sbom", tiH.SBOMIndex)
+
+		// UI 404 FIX: stub routes (return empty/ok)
+		r.Get("/api/v1/settings/dast-targets", tiH.UISTubSettings)
+		r.Get("/api/v1/settings/scan-config", tiH.UISTubSettings)
+		r.Get("/api/v1/integrations", tiH.UISTubIntegrationsList)
+		r.Post("/api/v1/integrations/{provider}/test-pr-comment", tiH.UISTubIntegrationsTest)
+		r.Post("/api/v1/integrations/{provider}/test-ticket", tiH.UISTubIntegrationsTest)
+		r.Post("/api/v1/sw/report", tiH.UISTubSwReport)
+		r.Post("/api/v1/ti/kev/refresh", tiH.RefreshKEV)
 		r.Post("/api/v1/siem/webhooks", siemH.Create)
 		r.Delete("/api/v1/siem/webhooks/{id}", siemH.Delete)
 		r.Post("/api/v1/siem/webhooks/{id}/test", siemH.Test)
@@ -1224,6 +1263,38 @@ func main() {
 		r.Get("/api/v1/sbom/{rid}", sbomH.Generate)
 		r.Get("/api/v1/sbom/{rid}/grype", sbomH.Grype)
 		r.Get("/api/v1/sbom/{rid}/diff", sbomH.Diff)
+		// PHASE3-ROUTES-BEGIN
+		// ─── Supply Chain (Sigstore/SLSA/VEX) — Phase 3A ─────────────
+		r.Get("/api/v1/supply-chain/kpis",                supplyChainH.KPIs)
+		r.Get("/api/v1/supply-chain/signatures",          supplyChainH.Signatures)
+		r.Get("/api/v1/supply-chain/signatures/{id}",     supplyChainH.SignatureDetail)
+		r.Post("/api/v1/supply-chain/signatures/{id}/verify", supplyChainH.Verify)
+		r.Post("/api/v1/supply-chain/sign",               supplyChainH.Sign)
+		r.Get("/api/v1/supply-chain/provenance",          supplyChainH.Provenance)
+		r.Post("/api/v1/supply-chain/provenance/generate", supplyChainH.GenerateProvenance)
+		r.Get("/api/v1/supply-chain/vex",                 supplyChainH.VEX)
+		r.Get("/api/v1/supply-chain/key",                 supplyChainH.Key)
+		r.Get("/api/v1/supply-chain/public-key", supplyChainH.Key)
+		r.Post("/api/v1/supply-chain/verify",     supplyChainH.VerifyBundle)
+		// ─── CISA Secure Software Self-Attestation — Phase 3A ────────
+		r.Get("/api/v1/cisa-attestation/kpis",                  cisaAttestH.KPIs)
+		r.Get("/api/v1/cisa-attestation/practices",             cisaAttestH.Practices)
+		r.Post("/api/v1/cisa-attestation/practices/{id}",       cisaAttestH.UpdatePractice)
+		r.Put("/api/v1/cisa-attestation/practices/{id}",        cisaAttestH.UpdatePractice)
+		r.Get("/api/v1/cisa-attestation/forms",                 cisaAttestH.Forms)
+		r.Post("/api/v1/cisa-attestation/forms",                cisaAttestH.GenerateDraft)
+		r.Get("/api/v1/cisa-attestation/forms/{uuid}",          cisaAttestH.FormDetail)
+		r.Post("/api/v1/cisa-attestation/forms/{uuid}/sign",    cisaAttestH.SignForm)
+		r.Get("/api/v1/cisa-attestation/draft",                 cisaAttestH.CurrentDraft)
+		// PHASE3-ROUTES-END
+	// PHASE3F-ROUTES-BEGIN
+	r.Get("/api/v1/oscal/package", oscalPackageH.BuildPackage)
+	// PHASE3F-ROUTES-END
+	// PHASE3G-ROUTES-BEGIN
+	r.Get("/api/p4/oscal/ap",   oscalModelsH.AssessmentPlan)
+	r.Get("/api/p4/oscal/ar",   oscalModelsH.AssessmentResults)
+	r.Get("/api/p4/oscal/poam", oscalModelsH.POAM)
+	// PHASE3G-ROUTES-END
 		// Reports
 		r.Get("/api/v1/vsp/run_report_html/{rid}", reportH.HTML)
 		r.Get("/api/v1/vsp/run_report_pdf/{rid}", reportH.PDF)
@@ -1904,6 +1975,10 @@ func main() {
 	// ── Correlation engine ──────────────────────
 	safe.GoCtx(ctx, func(ctx context.Context) { siem.StartCorrelationEngine(ctx, db, handler.Hub.Broadcast) })
 	log.Info().Msg("Correlation engine started")
+
+	// G38: POAM auto-gen worker (every 5 min)
+	go poam.New(p4DB, 5*time.Minute).Start(ctx)
+	log.Info().Msg("poam: auto-gen worker scheduled")
 
 	log.Info().Msg("Incident email alerter started — interval: 30s")
 

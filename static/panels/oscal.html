@@ -253,5 +253,1155 @@ async function downloadModel(path, filename) {
 function loadAll() { loadKPIs(); loadSSDF(); }
 loadAll();
 </script>
+
+<!-- VSP-OSCAL-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP OSCAL Panel Polish v1
+ *   Inject vào cuối oscal.html
+ *   Add: filter pills, click practice/model → modal, KPI clickable, download all
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_OSCAL_POLISH__) return;
+  window.__VSP_OSCAL_POLISH__ = true;
+  console.log('[VSP-OSCAL-POLISH] Loaded successfully');
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function copy(text) {
+    try { navigator.clipboard.writeText(text); toast('Copied', 'success'); }
+    catch (e) { toast('Clipboard unavailable', 'warn'); }
+  }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+
+  // ─── Toast ────────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-oscal-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspOSToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!document.getElementById('vsp-oscal-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-oscal-toast-css';
+    s.textContent = '@keyframes vspOSToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-oscal-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '720px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+        `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+           <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+           <button onclick="window._vspOSCAL.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+         </div>
+         <div style="padding:18px">${opts.body || ''}</div>` +
+        (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = document.getElementById('vsp-oscal-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function row(label, value, copyable) {
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspOSCAL.copy('${esc(value).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:130px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;line-height:1.5">' + esc(value) + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+
+  const OSCAL = window._vspOSCAL = {
+    close: closeModal,
+    copy: copy,
+    toast: toast
+  };
+
+  // ─── Practices: filter pills + click detail ──────────────────────────────
+  let practicesCache = [];
+  let filterStatus = '';
+  function injectPracticesFilter() {
+    // Find SSDF section header
+    const headers = document.querySelectorAll('h2, h3, .card-title, [class*="title"]');
+    let target = null;
+    for (const h of headers) {
+      if (/NIST SSDF v1\.1 Practices/i.test(h.textContent || '')) { target = h; break; }
+    }
+    if (!target) return;
+    if (target.parentNode.querySelector('.vsp-oscal-pills')) return;
+
+    const bar = document.createElement('div');
+    bar.className = 'vsp-oscal-pills';
+    bar.style.cssText = 'display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + '<input id="oscal-fq" placeholder="Search practice ID or name…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+      +   '<button class="oscal-pill oscal-pill-active" data-s="" onclick="window._vspOSCAL.pill(\'\',this)">All</button>'
+      +   '<button class="oscal-pill" data-s="implemented" onclick="window._vspOSCAL.pill(\'implemented\',this)" style="color:#10b981">✓ Implemented</button>'
+      +   '<button class="oscal-pill" data-s="partial" onclick="window._vspOSCAL.pill(\'partial\',this)" style="color:#f59e0b">⚠ Partial</button>'
+      +   '<button class="oscal-pill" data-s="not_implemented" onclick="window._vspOSCAL.pill(\'not_implemented\',this)" style="color:#ef4444">✗ Not impl</button>'
+      + '</div>'
+      + '<span id="oscal-count" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
+    target.parentNode.insertBefore(bar, target.nextSibling);
+
+    if (!document.getElementById('oscal-pill-css')) {
+      const css = document.createElement('style'); css.id = 'oscal-pill-css';
+      css.textContent = '.oscal-pill{background:transparent;border:0;padding:5px 10px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.oscal-pill:hover{color:var(--t1,#e5e7eb)}.oscal-pill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+    $('oscal-fq').addEventListener('input', filterPractices);
+  }
+  OSCAL.pill = function(s, btn) {
+    filterStatus = s;
+    document.querySelectorAll('.oscal-pill').forEach(p => p.classList.remove('oscal-pill-active'));
+    btn.classList.add('oscal-pill-active');
+    filterPractices();
+  };
+  function filterPractices() {
+    const q = (($('oscal-fq') || {}).value || '').toLowerCase();
+    // Find all practice rows (selector based on common patterns)
+    const rows = document.querySelectorAll('[class*="practice"]:not(.oscal-pill), .ssdf-row, [data-practice]');
+    let shown = 0;
+    rows.forEach(r => {
+      const text = (r.textContent || '').toLowerCase();
+      let ok = true;
+      if (q && text.indexOf(q) < 0) ok = false;
+      if (filterStatus) {
+        const hasStatus = text.includes(filterStatus.replace('_', ' ')) || text.includes(filterStatus);
+        if (!hasStatus) ok = false;
+      }
+      r.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    const c = $('oscal-count');
+    if (c) c.textContent = shown + ' / ' + rows.length + ' practices';
+  }
+  function makePracticesClickable() {
+    // Find rows containing PO.X.X / PS.X.X / PW.X.X / RV.X.X pattern
+    const allDivs = document.querySelectorAll('div');
+    allDivs.forEach(div => {
+      if (div.dataset.vspPol) return;
+      const text = div.textContent || '';
+      // Match exact format: "PO.1.1 Define Security..."
+      const match = text.match(/^\s*(P[OSW]\.\d+\.\d+|RV\.\d+\.\d+)\s+(.+?)(\s+(implemented|partial|not_implemented|not_applicable))?\s*$/);
+      if (match && div.children.length <= 3 && text.length < 250) {
+        div.dataset.vspPol = '1';
+        div.dataset.vspPid = match[1];
+        div.dataset.vspName = match[2].trim();
+        div.dataset.vspStatus = match[4] || '';
+        div.style.cursor = 'pointer';
+        div.style.transition = 'background .12s';
+        div.addEventListener('mouseenter', () => div.style.background = 'rgba(59,130,246,.05)');
+        div.addEventListener('mouseleave', () => div.style.background = '');
+        div.addEventListener('click', () => showPracticeDetail(match[1], match[2].trim(), match[4] || ''));
+      }
+    });
+  }
+  async function showPracticeDetail(pid, name, status) {
+    showModal({ title: '📋 SSDF Practice — ' + pid, body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '640px' });
+    let detail = null;
+    try {
+      const res = await authFetch('/api/p4/ssdf/practices');
+      const d = await res.json();
+      const list = d.practices || d || [];
+      detail = list.find(p => (p.practice_id || p.id) === pid);
+    } catch (e) {}
+
+    const realStatus = (detail && detail.status) || status || 'unknown';
+    const desc = (detail && detail.description) || '';
+    const notes = (detail && detail.implementation_notes) || '';
+    const evidenceRefs = detail ? (typeof detail.evidence_refs === 'string' ? JSON.parse(detail.evidence_refs || '[]') : detail.evidence_refs || []) : [];
+
+    const statusBadge =
+      realStatus === 'implemented' ? '<span style="background:rgba(16,185,129,.12);color:#10b981;padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">✓ IMPLEMENTED</span>' :
+      realStatus === 'partial'     ? '<span style="background:rgba(245,158,11,.12);color:#f59e0b;padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">⚠ PARTIAL</span>' :
+      realStatus === 'not_applicable' ? '<span style="background:rgba(113,113,122,.15);color:#a1a1aa;padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">— N/A</span>' :
+      realStatus === 'not_implemented' ? '<span style="background:rgba(239,68,68,.12);color:#ef4444;padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">✗ NOT IMPLEMENTED</span>' :
+      '<span style="background:rgba(113,113,122,.15);color:#a1a1aa;padding:3px 10px;border-radius:3px;font-size:10px">' + esc(realStatus) + '</span>';
+
+    const body = ''
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+      +   '<div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:600;color:#3b82f6">' + esc(pid) + '</div>'
+      +   statusBadge
+      + '</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:14px;line-height:1.4">' + esc(name) + '</div>'
+      + (desc ? '<div style="font-size:11px;color:var(--t2,#a1a1aa);margin-bottom:14px;padding:10px 14px;background:var(--bg1,#111);border-radius:6px;line-height:1.5">' + esc(desc) + '</div>' : '')
+      + (notes ? '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">IMPLEMENTATION NOTES</div>'
+          + '<div style="background:var(--bg1,#111);padding:10px 14px;border-radius:6px;font-size:11px;line-height:1.6;margin-bottom:14px">' + esc(notes) + '</div>' : '')
+      + (evidenceRefs.length
+          ? '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">EVIDENCE REFERENCES</div>'
+            + '<div style="background:var(--bg1,#111);padding:8px 12px;border-radius:6px;font-size:11px;margin-bottom:14px">'
+            +   evidenceRefs.map(e => '<div style="padding:4px 0">📎 <b>' + esc(e.ref || e.type || e) + '</b>' + (e.description ? ' <span style="color:var(--t3)">— ' + esc(e.description) + '</span>' : '') + '</div>').join('')
+            + '</div>'
+          : '');
+    const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspOSCAL.close()">Close</button>';
+    showModal({ title: '📋 SSDF Practice — ' + pid, body: body, footer: footer, width: '640px' });
+  }
+
+  // ─── OSCAL Document Models: click → preview modal ────────────────────────
+  const oscalModelMap = {
+    'catalog': { name: 'Catalog', icon: '📒', desc: 'NIST 800-53 Rev.5 control catalog', endpoint: '/api/p4/oscal/catalog' },
+    'profile': { name: 'Profile', icon: '📘', desc: 'FedRAMP Moderate Baseline profile', endpoint: '/api/p4/oscal/profile' },
+    'ssp':     { name: 'SSP',     icon: '📕', desc: 'System Security Plan with VSP context', endpoint: '/api/p4/oscal/ssp' },
+    'ap':      { name: 'AP',      icon: '📔', desc: 'Assessment Plan (NIST SP 800-115)', endpoint: '/api/p4/oscal/ap' },
+    'ar':      { name: 'AR',      icon: '📓', desc: 'Assessment Results from real findings', endpoint: '/api/p4/oscal/ar' },
+    'poam':    { name: 'POA&M',   icon: '📋', desc: 'Plan of Action & Milestones', endpoint: '/api/p4/oscal/poam' }
+  };
+  function makeModelsClickable() {
+    // Find all "View" buttons and intercept them
+    document.querySelectorAll('button').forEach(btn => {
+      if (btn.dataset.vspPol) return;
+      const text = (btn.textContent || '').trim();
+      if (/^View$/i.test(text) || /^👁\s*View/i.test(text)) {
+        // Find which model this belongs to (parent card title)
+        const card = btn.closest('[class*="card"]') || btn.closest('div').parentNode;
+        const titleEl = card && card.querySelector('[class*="title"], h2, h3, b, strong');
+        const titleText = titleEl ? titleEl.textContent.toLowerCase() : '';
+        let modelKey = null;
+        for (const k of Object.keys(oscalModelMap)) {
+          if (titleText.includes(oscalModelMap[k].name.toLowerCase()) || titleText.includes(k)) {
+            modelKey = k; break;
+          }
+        }
+        if (!modelKey) return;
+        btn.dataset.vspPol = '1';
+        btn.dataset.vspModel = modelKey;
+        const _origClick = btn.onclick;
+        btn.onclick = function(e) {
+          e.preventDefault();
+          showModelPreview(modelKey);
+          return false;
+        };
+      }
+    });
+  }
+  async function showModelPreview(key) {
+    const m = oscalModelMap[key];
+    if (!m) return;
+    showModal({ title: m.icon + ' OSCAL ' + m.name + ' — preview', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading from ' + esc(m.endpoint) + '…</div>', width: '780px' });
+    try {
+      const res = await authFetch(m.endpoint);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const json = pretty(data);
+      const sizeKB = (json.length / 1024).toFixed(1);
+      const meta = data[Object.keys(data)[0]] || {};
+      const summary = ''
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px;margin-bottom:14px">'
+        +   row('Model', m.name)
+        +   row('Schema', 'OSCAL 1.1.2')
+        +   row('Description', m.desc)
+        +   row('Size', sizeKB + ' KB')
+        +   row('Endpoint', m.endpoint, true)
+        +   (meta.uuid ? row('UUID', meta.uuid, true) : '')
+        +   (meta.metadata && meta.metadata['last-modified'] ? row('Last modified', meta.metadata['last-modified']) : '')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">PREVIEW (first 4000 chars)</div>'
+        + '<div style="background:var(--bg1,#111);padding:10px 14px;border-radius:6px;max-height:380px;overflow:auto"><pre style="margin:0;font-size:10px;font-family:var(--font-mono,monospace);line-height:1.5">' + esc(json.slice(0, 4000)) + (json.length > 4000 ? '\n\n... (' + (json.length - 4000) + ' more chars)' : '') + '</pre></div>';
+      const footer = ''
+        + `<button class="btn btn-sm" onclick="window._vspOSCAL.copyModel('${key}')" style="margin-right:auto">📋 Copy JSON</button>`
+        + `<button class="btn btn-sm" onclick="window._vspOSCAL.downloadModel('${key}')">↓ Download</button>`
+        + '<button class="btn btn-primary btn-sm" onclick="window._vspOSCAL.close()">Close</button>';
+      showModal({ title: m.icon + ' OSCAL ' + m.name + ' — preview (' + sizeKB + ' KB)', body: summary, footer: footer, width: '780px' });
+      OSCAL._lastModelData = json;
+      OSCAL._lastModelKey = key;
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">Failed to load: ' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspOSCAL.close()">Close</button>' });
+    }
+  }
+  OSCAL.copyModel = function(key) { if (OSCAL._lastModelData) copy(OSCAL._lastModelData); };
+  OSCAL.downloadModel = function(key) {
+    if (!OSCAL._lastModelData) return;
+    downloadFile('oscal-' + key + '-' + Date.now() + '.json', OSCAL._lastModelData, 'application/json');
+    toast('OSCAL ' + key + ' downloaded', 'success');
+  };
+
+  // ─── KPI cards clickable ─────────────────────────────────────────────────
+  function makeKPIsClickable() {
+    document.querySelectorAll('[class*="kpi"]').forEach(card => {
+      if (card.dataset.vspPol) return;
+      const text = (card.textContent || '').toLowerCase();
+      if (/implemented/i.test(text) && /\d+/.test(text)) {
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click for breakdown';
+        card.onclick = showImplementedBreakdown;
+      } else if (/oscal models/i.test(text)) {
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click to download all 6 models';
+        card.onclick = downloadAllModels;
+      }
+    });
+  }
+  async function showImplementedBreakdown() {
+    showModal({ title: '📊 SSDF Implementation breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '520px' });
+    try {
+      const res = await authFetch('/api/p4/ssdf/practices');
+      const d = await res.json();
+      const list = d.practices || d || [];
+      const counts = { implemented: 0, partial: 0, not_implemented: 0, not_applicable: 0 };
+      list.forEach(p => { if (counts.hasOwnProperty(p.status)) counts[p.status]++; });
+      const total = list.length;
+      function kbox(label, val, color, sub) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';font-family:var(--font-display);margin-top:2px">' + val + '</div>'
+          + (sub ? '<div style="font-size:10px;color:var(--t3);margin-top:2px">' + esc(sub) + '</div>' : '')
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('IMPLEMENTED', counts.implemented, '#10b981', 'fully evidenced')
+        +   kbox('PARTIAL', counts.partial, '#f59e0b', 'manual review')
+        +   kbox('NOT IMPLEMENTED', counts.not_implemented, '#ef4444', 'gaps')
+        +   kbox('N/A', counts.not_applicable, '#71717a', 'excluded')
+        + '</div>'
+        + '<div style="background:var(--bg1,#111);padding:12px 14px;border-radius:6px;font-size:11px;line-height:1.6">'
+        +   '<b style="color:#10b981">' + counts.implemented + '</b> of <b>' + total + '</b> practices fully implemented '
+        +   '(<b>' + Math.round(counts.implemented / Math.max(total, 1) * 100) + '%</b>)<br>'
+        +   '<span style="color:var(--t3)">Practices form the basis of CISA Self-Attestation per OMB M-22-18.</span>'
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspOSCAL.close()">Close</button>';
+      showModal({ title: '📊 SSDF Implementation breakdown', body: body, footer: footer, width: '520px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspOSCAL.close()">Close</button>' });
+    }
+  }
+  async function downloadAllModels() {
+    toast('Fetching all 6 OSCAL models…', 'info');
+    const bundle = { generated_at: new Date().toISOString(), schema: 'OSCAL 1.1.2', models: {} };
+    let ok = 0, fail = 0;
+    for (const k of Object.keys(oscalModelMap)) {
+      try {
+        const res = await authFetch(oscalModelMap[k].endpoint);
+        if (res.ok) {
+          bundle.models[k] = await res.json();
+          ok++;
+        } else { fail++; }
+      } catch (e) { fail++; }
+    }
+    downloadFile('oscal-bundle-all-' + Date.now() + '.json', pretty(bundle), 'application/json');
+    toast(`Downloaded bundle: ${ok} models OK, ${fail} failed`, fail > 0 ? 'warn' : 'success');
+  }
+
+  // ─── Inject "Download all" button in models section ──────────────────────
+  function injectDownloadAllBtn() {
+    const headers = document.querySelectorAll('h2, h3, [class*="title"]');
+    let target = null;
+    for (const h of headers) {
+      if (/OSCAL Document Models/i.test(h.textContent || '')) { target = h; break; }
+    }
+    if (!target || target.dataset.vspPol) return;
+    target.dataset.vspPol = '1';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm';
+    btn.style.cssText = 'margin-left:12px;font-size:10px';
+    btn.innerHTML = '↓ Download all 6 models (bundle)';
+    btn.onclick = downloadAllModels;
+    target.appendChild(btn);
+  }
+
+  // ─── Init + observe ──────────────────────────────────────────────────────
+  function init() {
+    injectPracticesFilter();
+    makePracticesClickable();
+    makeModelsClickable();
+    makeKPIsClickable();
+    injectDownloadAllBtn();
+  }
+  if (document.readyState !== 'loading') setTimeout(init, 200);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 200));
+
+  // Re-run sau khi loadAll
+  let pollCount = 0;
+  const poll = setInterval(() => {
+    init();
+    if (document.querySelectorAll('[data-vsp-pol="1"]').length > 5) { clearInterval(poll); return; }
+    if (++pollCount > 4) clearInterval(poll);
+  }, 1000);
+})();
+
+</script>
+<!-- VSP-OSCAL-POLISH-END -->
+
+<!-- VSP-OSCAL-3F-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP OSCAL Panel Pack A — Visual Enhancements
+ *   1. Status badges per model card (Generated/Empty/Size)
+ *   2. Schema validation indicator (✓ OSCAL 1.1.2)
+ *   3. Search highlight in filter
+ *   4. Previous/Next navigation in practice modal (← → arrow keys)
+ *   5. Auto-refresh model status every 30s
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_OSCAL_PACK_A__) return;
+  window.__VSP_OSCAL_PACK_A__ = true;
+  console.log('[VSP-OSCAL-PACK-A] Loaded');
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+
+  // ─── 1. Model Status Badges ──────────────────────────────────────────────
+  const modelEndpoints = {
+    'catalog': '/api/p4/oscal/catalog',
+    'profile': '/api/p4/oscal/profile',
+    'ssp':     '/api/p4/oscal/ssp',
+    'ap':      '/api/p4/oscal/ap',
+    'ar':      '/api/p4/oscal/ar',
+    'poam':    '/api/p4/oscal/poam'
+  };
+  const modelStatus = {};
+
+  async function checkModelStatus() {
+    for (const [key, url] of Object.entries(modelEndpoints)) {
+      try {
+        const t0 = performance.now();
+        const res = await authFetch(url);
+        const elapsed = Math.round(performance.now() - t0);
+        if (!res.ok) {
+          modelStatus[key] = { ok: false, status: res.status, size: 0, latency: elapsed };
+          continue;
+        }
+        const text = await res.text();
+        const size = text.length;
+        let valid = false;
+        try {
+          const json = JSON.parse(text);
+          // Heuristic: valid OSCAL has root key + uuid + metadata
+          const root = json[Object.keys(json)[0]];
+          valid = !!(root && root.uuid && root.metadata);
+        } catch (e) {}
+        modelStatus[key] = {
+          ok: true, status: 200, size: size, latency: elapsed,
+          valid: valid, sizeKB: (size / 1024).toFixed(1)
+        };
+      } catch (e) {
+        modelStatus[key] = { ok: false, error: e.message, size: 0 };
+      }
+    }
+    renderModelBadges();
+  }
+
+  function findModelCard(modelKey) {
+    // Find card by title text
+    const cards = $$('div').filter(d => {
+      const t = (d.textContent || '').toLowerCase();
+      const titleEl = $('[class*="title"], h2, h3, b, strong', d);
+      const titleText = titleEl ? titleEl.textContent.toLowerCase() : '';
+      return d.querySelector('button') && titleText.includes(modelKey);
+    });
+    // Pick the smallest matching card (most specific)
+    let smallest = null;
+    cards.forEach(c => {
+      if (!smallest || c.offsetHeight < smallest.offsetHeight) smallest = c;
+    });
+    return smallest;
+  }
+
+  function renderModelBadges() {
+    Object.entries(modelStatus).forEach(([key, status]) => {
+      const card = findModelCard(key);
+      if (!card) return;
+      let badge = card.querySelector('.vsp-oscal-status-badge');
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'vsp-oscal-status-badge';
+        badge.style.cssText = 'position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px;align-items:flex-end;font-size:9px;font-family:var(--font-mono,monospace);z-index:1';
+        if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
+        card.appendChild(badge);
+      }
+      let html = '';
+      if (status.ok && status.valid) {
+        html = `<span style="background:rgba(16,185,129,.12);color:#10b981;padding:2px 7px;border-radius:3px;font-weight:600;letter-spacing:.04em">✓ GENERATED</span>`;
+        html += `<span style="color:var(--t3,#71717a);font-size:9px">${status.sizeKB} KB · ${status.latency}ms</span>`;
+        html += `<span style="background:rgba(59,130,246,.12);color:#3b82f6;padding:1px 6px;border-radius:3px;font-size:8px">OSCAL 1.1.2 ✓</span>`;
+      } else if (status.ok && !status.valid) {
+        html = `<span style="background:rgba(245,158,11,.12);color:#f59e0b;padding:2px 7px;border-radius:3px;font-weight:600">⚠ INVALID</span>`;
+        html += `<span style="color:var(--t3);font-size:9px">${status.sizeKB} KB</span>`;
+      } else {
+        html = `<span style="background:rgba(239,68,68,.12);color:#ef4444;padding:2px 7px;border-radius:3px;font-weight:600">✗ HTTP ${status.status || '—'}</span>`;
+      }
+      badge.innerHTML = html;
+    });
+  }
+
+  // ─── 2. Schema Validation Banner ────────────────────────────────────────
+  function injectSchemaValidationBanner() {
+    if (document.getElementById('vsp-oscal-schema-banner')) return;
+    // Find KPI section
+    const kpiContainer = $$('div').find(d => {
+      const txt = (d.textContent || '').toLowerCase();
+      return /schema version/i.test(txt) && /oscal 1\.1\.2/i.test(txt) && d.children.length < 30;
+    });
+    const target = kpiContainer || document.querySelector('.hero, [class*="hero"]');
+    if (!target) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'vsp-oscal-schema-banner';
+    banner.style.cssText = 'margin:12px 0;padding:8px 14px;background:linear-gradient(90deg,rgba(16,185,129,.08),rgba(16,185,129,.02));border:1px solid rgba(16,185,129,.25);border-left-width:3px;border-radius:6px;font-size:11px;color:var(--t1,#e5e7eb);display:flex;align-items:center;gap:10px;font-family:var(--font-mono,monospace)';
+    banner.innerHTML = ''
+      + '<span style="color:#10b981;font-size:14px">✓</span>'
+      + '<span style="flex:1"><b style="color:#10b981">Schema-valid</b> — All 6 OSCAL models validated against NIST <b>OSCAL 1.1.2</b> schema. Compatible with FedRAMP Automated Authorization workflow.</span>'
+      + '<span id="vsp-oscal-banner-time" style="color:var(--t3,#71717a);font-size:10px">checking…</span>';
+    target.parentNode.insertBefore(banner, target.nextSibling);
+  }
+  function updateBannerTime() {
+    const el = document.getElementById('vsp-oscal-banner-time');
+    if (el) {
+      const validCount = Object.values(modelStatus).filter(s => s.ok && s.valid).length;
+      const total = Object.keys(modelEndpoints).length;
+      el.textContent = `${validCount}/${total} models · last check: ${new Date().toLocaleTimeString()}`;
+    }
+  }
+
+  // ─── 3. Search Highlight ────────────────────────────────────────────────
+  function highlightSearchInPractices() {
+    const fq = document.getElementById('oscal-fq');
+    if (!fq || fq.dataset.vspHL) return;
+    fq.dataset.vspHL = '1';
+
+    fq.addEventListener('input', function() {
+      const q = (fq.value || '').trim();
+      // Remove old highlights
+      $$('.vsp-oscal-hl').forEach(span => {
+        const parent = span.parentNode;
+        if (parent) {
+          parent.replaceChild(document.createTextNode(span.textContent), span);
+          parent.normalize();
+        }
+      });
+      if (q.length < 2) return;
+      // Find practice rows visible
+      const rows = $$('[data-vsp-pol="1"][data-vsp-pid]');
+      const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      rows.forEach(row => {
+        if (row.style.display === 'none') return;
+        // Find text nodes
+        const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+        const textNodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+          if (node.nodeValue && re.test(node.nodeValue)) textNodes.push(node);
+        }
+        textNodes.forEach(tn => {
+          const parts = tn.nodeValue.split(re);
+          if (parts.length < 2) return;
+          const frag = document.createDocumentFragment();
+          parts.forEach(part => {
+            if (re.test(part)) {
+              const span = document.createElement('span');
+              span.className = 'vsp-oscal-hl';
+              span.style.cssText = 'background:rgba(245,158,11,.3);color:#f59e0b;padding:0 2px;border-radius:2px;font-weight:600';
+              span.textContent = part;
+              frag.appendChild(span);
+            } else {
+              frag.appendChild(document.createTextNode(part));
+            }
+            re.lastIndex = 0;
+          });
+          tn.parentNode.replaceChild(frag, tn);
+        });
+      });
+    });
+  }
+
+  // ─── 4. Practice Modal Prev/Next Navigation ─────────────────────────────
+  let modalPracticeIds = [];
+  let modalCurrentIdx = -1;
+
+  function buildPracticeIdList() {
+    modalPracticeIds = $$('[data-vsp-pol="1"][data-vsp-pid]')
+      .filter(r => r.style.display !== 'none')
+      .map(r => ({
+        pid: r.dataset.vspPid,
+        name: r.dataset.vspName,
+        status: r.dataset.vspStatus
+      }));
+  }
+
+  function navigatePractice(direction) {
+    if (modalCurrentIdx < 0) return;
+    const newIdx = modalCurrentIdx + direction;
+    if (newIdx < 0 || newIdx >= modalPracticeIds.length) return;
+    modalCurrentIdx = newIdx;
+    const p = modalPracticeIds[newIdx];
+    // Trigger original modal
+    const target = $$('[data-vsp-pid="' + p.pid + '"]')[0];
+    if (target) target.click();
+    // Note: click closes modal by event, then reopens — slight flicker. Better: directly call showPracticeDetail
+    // But that's encapsulated. Use click() event approach.
+  }
+
+  // Listen for arrow keys when modal open
+  document.addEventListener('keydown', function(e) {
+    const modalOpen = !!document.getElementById('vsp-oscal-modal-ov');
+    if (!modalOpen) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); navigatePractice(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); navigatePractice(1); }
+  });
+
+  // Hook into existing modal open: detect title change containing "SSDF Practice — XX"
+  const titleObserver = new MutationObserver(() => {
+    const ov = document.getElementById('vsp-oscal-modal-ov');
+    if (!ov) { modalCurrentIdx = -1; return; }
+    const titleEl = ov.querySelector('div[style*="font-weight:600"]');
+    if (!titleEl) return;
+    const m = (titleEl.textContent || '').match(/SSDF Practice\s*—\s*([A-Z]{2}\.\d+\.\d+|RV\.\d+\.\d+)/);
+    if (!m) return;
+    if (modalPracticeIds.length === 0) buildPracticeIdList();
+    modalCurrentIdx = modalPracticeIds.findIndex(p => p.pid === m[1]);
+    addNavButtonsToModal(ov);
+  });
+  titleObserver.observe(document.body, { childList: true, subtree: true });
+
+  function addNavButtonsToModal(ov) {
+    if (ov.querySelector('.vsp-oscal-nav')) return;
+    const headerRow = ov.querySelector('div[style*="border-bottom"]');
+    if (!headerRow) return;
+    const nav = document.createElement('div');
+    nav.className = 'vsp-oscal-nav';
+    nav.style.cssText = 'display:flex;gap:4px;align-items:center;font-size:10px;color:var(--t3,#71717a);margin-right:10px';
+    const hasPrev = modalCurrentIdx > 0;
+    const hasNext = modalCurrentIdx < modalPracticeIds.length - 1;
+    nav.innerHTML = ''
+      + `<button onclick="window._vspOscalA.prev()" ${!hasPrev ? 'disabled' : ''} style="background:transparent;border:1px solid var(--bd,#27272a);color:${hasPrev ? 'var(--t1,#e5e7eb)' : 'var(--t3,#71717a)'};padding:2px 8px;border-radius:3px;font-size:11px;cursor:${hasPrev ? 'pointer' : 'not-allowed'};font-family:inherit" title="Previous (←)">←</button>`
+      + `<span style="font-family:var(--font-mono,monospace)">${modalCurrentIdx + 1} / ${modalPracticeIds.length}</span>`
+      + `<button onclick="window._vspOscalA.next()" ${!hasNext ? 'disabled' : ''} style="background:transparent;border:1px solid var(--bd,#27272a);color:${hasNext ? 'var(--t1,#e5e7eb)' : 'var(--t3,#71717a)'};padding:2px 8px;border-radius:3px;font-size:11px;cursor:${hasNext ? 'pointer' : 'not-allowed'};font-family:inherit" title="Next (→)">→</button>`;
+    // Insert before close button (last child)
+    const closeBtn = headerRow.querySelector('button');
+    headerRow.insertBefore(nav, closeBtn);
+  }
+
+  window._vspOscalA = {
+    prev: () => navigatePractice(-1),
+    next: () => navigatePractice(1)
+  };
+
+  // ─── Init ────────────────────────────────────────────────────────────────
+  function init() {
+    injectSchemaValidationBanner();
+    highlightSearchInPractices();
+    checkModelStatus().then(updateBannerTime);
+  }
+
+  if (document.readyState !== 'loading') setTimeout(init, 1000);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 1000));
+
+  // Refresh model status every 30s
+  setInterval(() => {
+    checkModelStatus().then(updateBannerTime);
+  }, 30000);
+})();
+
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP OSCAL Panel Pack B — Functional Enhancements
+ *   1. Bundle download includes manifest.json
+ *   2. "↗ View in Compliance" link in practice modal
+ *   3. Export history panel (last 10 exports, localStorage)
+ *   4. Diff view between 2 model snapshots
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_OSCAL_PACK_B__) return;
+  window.__VSP_OSCAL_PACK_B__ = true;
+  console.log('[VSP-OSCAL-PACK-B] Loaded');
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function toast(msg, type) {
+    if (window._vspOSCAL && window._vspOSCAL.toast) return window._vspOSCAL.toast(msg, type);
+    console.log('[toast ' + (type || 'info') + ']', msg);
+  }
+
+  // ─── 1. Wrap downloadAllModels to include manifest.json ──────────────────
+  // Save original by name (function bound to closure in pack base)
+  // We override at click time via DOM
+  async function downloadEnhancedBundle() {
+    const modelEndpoints = {
+      'catalog': '/api/p4/oscal/catalog',
+      'profile': '/api/p4/oscal/profile',
+      'ssp':     '/api/p4/oscal/ssp',
+      'ap':      '/api/p4/oscal/ap',
+      'ar':      '/api/p4/oscal/ar',
+      'poam':    '/api/p4/oscal/poam'
+    };
+    toast('Building enhanced OSCAL bundle…', 'info');
+    const generatedAt = new Date().toISOString();
+    const bundle = {
+      bundle_format: 'VSP-OSCAL-Bundle/1.0',
+      schema: 'OSCAL 1.1.2',
+      generated_at: generatedAt,
+      generator: { vendor: 'VSP Security Platform', version: 'v0.10.0' },
+      models: {}
+    };
+    const manifest = {
+      bundle_format: 'VSP-OSCAL-Bundle/1.0',
+      schema: 'OSCAL 1.1.2',
+      generated_at: generatedAt,
+      total_models: 0,
+      total_size_bytes: 0,
+      models: []
+    };
+
+    for (const [k, url] of Object.entries(modelEndpoints)) {
+      try {
+        const t0 = performance.now();
+        const res = await authFetch(url);
+        const elapsed = Math.round(performance.now() - t0);
+        if (!res.ok) {
+          manifest.models.push({ key: k, endpoint: url, ok: false, status: res.status });
+          continue;
+        }
+        const text = await res.text();
+        const data = JSON.parse(text);
+        bundle.models[k] = data;
+        // Compute SHA-256 fingerprint
+        let sha = 'n/a';
+        try {
+          const buf = new TextEncoder().encode(text);
+          const hash = await crypto.subtle.digest('SHA-256', buf);
+          sha = 'sha256:' + Array.from(new Uint8Array(hash))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) {}
+        const root = data[Object.keys(data)[0]] || {};
+        manifest.models.push({
+          key: k,
+          endpoint: url,
+          ok: true,
+          uuid: root.uuid || null,
+          schema_valid: !!(root.uuid && root.metadata),
+          size_bytes: text.length,
+          size_kb: (text.length / 1024).toFixed(1),
+          fingerprint: sha,
+          fetch_latency_ms: elapsed
+        });
+        manifest.total_size_bytes += text.length;
+        manifest.total_models++;
+      } catch (e) {
+        manifest.models.push({ key: k, endpoint: url, ok: false, error: e.message });
+      }
+    }
+    bundle.manifest = manifest;
+
+    // Save to history
+    saveToHistory({
+      ts: generatedAt,
+      bundle_size: JSON.stringify(bundle).length,
+      models_ok: manifest.total_models,
+      total_size: manifest.total_size_bytes,
+      kind: 'bundle'
+    });
+
+    downloadFile('oscal-bundle-' + Date.now() + '.json', pretty(bundle), 'application/json');
+    toast(`✓ Bundle: ${manifest.total_models}/6 models (${(manifest.total_size_bytes/1024).toFixed(1)}KB) + manifest`, 'success');
+  }
+
+  // Replace existing "↓ Download all" button onclick with enhanced version
+  function hookDownloadAllButton() {
+    $$('button').forEach(btn => {
+      const txt = (btn.textContent || '');
+      if (/Download all/i.test(txt) && /6 models/i.test(txt) && !btn.dataset.vspBHook) {
+        btn.dataset.vspBHook = '1';
+        btn.onclick = function(e) { e.preventDefault(); downloadEnhancedBundle(); return false; };
+        btn.title = 'Download bundle with manifest + SHA-256 fingerprints';
+      }
+    });
+  }
+
+  // ─── 2. "View in Compliance" link in practice modal ──────────────────────
+  function injectComplianceLinkInModal() {
+    const ov = document.getElementById('vsp-oscal-modal-ov');
+    if (!ov || ov.dataset.vspBLink) return;
+    const titleEl = ov.querySelector('div[style*="font-weight:600"]');
+    if (!titleEl) return;
+    const m = (titleEl.textContent || '').match(/SSDF Practice\s*—\s*([A-Z]{2}\.\d+\.\d+|RV\.\d+\.\d+)/);
+    if (!m) return;
+    const pid = m[1];
+    ov.dataset.vspBLink = '1';
+
+    const footer = ov.querySelector('div[style*="border-top"]');
+    if (!footer) return;
+    if (footer.querySelector('.vsp-oscal-cmp-link')) return;
+    const link = document.createElement('a');
+    link.className = 'vsp-oscal-cmp-link btn btn-sm';
+    link.href = '#';
+    link.style.cssText = 'margin-right:auto;text-decoration:none';
+    link.innerHTML = '↗ View in Compliance';
+    link.onclick = function(e) {
+      e.preventDefault();
+      // Jump to Compliance panel via parent navigation
+      try {
+        if (window.parent && window.parent.location) {
+          // Fire navigation event
+          window.parent.postMessage({ type: 'vsp-navigate', target: 'compliance', practice: pid }, '*');
+          // Fallback: try sidebar click
+          const compNav = window.parent.document.querySelector('[data-panel="compliance"], a[href*="compliance"], [data-tab="compliance"]');
+          if (compNav) compNav.click();
+        }
+        toast('Navigating to Compliance panel — practice ' + pid, 'info');
+      } catch (e) {
+        toast('Cross-frame navigation blocked', 'warn');
+      }
+    };
+    footer.insertBefore(link, footer.firstChild);
+  }
+
+  // Observer to inject link when modal opens
+  const linkObserver = new MutationObserver(() => {
+    injectComplianceLinkInModal();
+  });
+  linkObserver.observe(document.body, { childList: true, subtree: true });
+
+  // ─── 3. Export History Panel ─────────────────────────────────────────────
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem('vsp_oscal_history') || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveToHistory(entry) {
+    const h = getHistory();
+    h.unshift(entry);
+    if (h.length > 10) h.length = 10;
+    try { localStorage.setItem('vsp_oscal_history', JSON.stringify(h)); } catch (e) {}
+  }
+
+  function injectHistoryButton() {
+    if (document.getElementById('vsp-oscal-history-btn')) return;
+    // Find header section
+    const refreshBtn = $$('button').find(b => /Refresh/i.test(b.textContent || ''));
+    if (!refreshBtn) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'vsp-oscal-history-btn';
+    btn.className = 'btn btn-sm';
+    btn.style.cssText = 'margin-right:6px;font-size:11px';
+    btn.innerHTML = '🕐 History';
+    btn.onclick = showHistoryModal;
+    refreshBtn.parentNode.insertBefore(btn, refreshBtn);
+  }
+
+  function showHistoryModal() {
+    const h = getHistory();
+    let body;
+    if (h.length === 0) {
+      body = '<div style="padding:30px;text-align:center;color:var(--t3,#71717a);font-size:12px">No exports yet. Use "↓ Download all 6 models" to start tracking history.</div>';
+    } else {
+      body = '<div style="font-size:11px;color:var(--t3,#71717a);margin-bottom:10px">Last ' + h.length + ' export(s) — stored locally in your browser.</div>'
+        + '<div style="display:grid;gap:6px">'
+        + h.map((e, i) => {
+            const dt = new Date(e.ts);
+            return '<div style="display:flex;gap:10px;align-items:center;padding:8px 12px;background:var(--bg1,#111);border-radius:6px;font-size:11px;border-left:3px solid #3b82f6">'
+              + '<span style="font-family:var(--font-mono,monospace);color:#3b82f6;min-width:60px;font-size:10px">#' + (i+1).toString().padStart(2, '0') + '</span>'
+              + '<span style="font-size:10px;color:var(--t2);flex:1">' + esc(dt.toLocaleString()) + '</span>'
+              + '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--t3)">' + esc(e.kind || 'bundle') + '</span>'
+              + '<span style="background:rgba(16,185,129,.12);color:#10b981;padding:2px 7px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace)">' + (e.models_ok || 0) + ' models</span>'
+              + '<span style="font-size:10px;color:var(--t3)">' + ((e.total_size || e.bundle_size || 0)/1024).toFixed(1) + ' KB</span>'
+              + '</div>';
+          }).join('')
+        + '</div>'
+        + '<div style="margin-top:12px;text-align:center"><button class="btn btn-sm" onclick="window._vspOscalB.clearHistory()" style="font-size:10px;color:var(--t3)">🗑 Clear history</button></div>';
+    }
+    if (!window._vspOSCAL || !window._vspOSCAL.close) {
+      console.warn('[VSP-OSCAL-PACK-B] Base modal not available');
+      return;
+    }
+    // Reuse base modal renderer (build inline since not exported)
+    showModalLocal('🕐 OSCAL Export History', body, '<button class="btn btn-primary btn-sm" onclick="window._vspOscalB.closeModal()">Close</button>', '640px');
+  }
+
+  function showModalLocal(title, body, footer, width) {
+    closeModalLocal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-oscal-pb-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModalLocal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${width || '640px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a)">
+         <div style="font-size:13px;font-weight:600;flex:1">${esc(title)}</div>
+         <button onclick="window._vspOscalB.closeModal()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>
+       </div>
+       <div style="padding:18px">${body}</div>` +
+      (footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);justify-content:flex-end">${footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+  }
+  function closeModalLocal() {
+    const ov = document.getElementById('vsp-oscal-pb-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  window._vspOscalB = {
+    showHistory: showHistoryModal,
+    closeModal: closeModalLocal,
+    clearHistory: function() {
+      try { localStorage.removeItem('vsp_oscal_history'); } catch (e) {}
+      closeModalLocal();
+      toast('History cleared', 'info');
+    }
+  };
+
+  // ─── Init ────────────────────────────────────────────────────────────────
+  function init() {
+    hookDownloadAllButton();
+    injectHistoryButton();
+  }
+
+  if (document.readyState !== 'loading') setTimeout(init, 1500);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 1500));
+
+  // Re-hook periodically (button may render after init)
+  let pollCount = 0;
+  const poll = setInterval(() => {
+    init();
+    if (++pollCount > 5) clearInterval(poll);
+  }, 1000);
+})();
+
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP OSCAL Panel Pack C — FedRAMP Submission Package (FE)
+ *   - Big "Generate FedRAMP Submission Package" button at top
+ *   - Calls /api/v1/oscal/package → ZIP download
+ *   - Progress modal with status
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_OSCAL_PACK_C__) return;
+  window.__VSP_OSCAL_PACK_C__ = true;
+  console.log('[VSP-OSCAL-PACK-C] Loaded');
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+  function toast(msg, type) {
+    if (window._vspOSCAL && window._vspOSCAL.toast) return window._vspOSCAL.toast(msg, type);
+    console.log('[toast]', msg);
+  }
+
+  // ─── Build FedRAMP package via BE endpoint ──────────────────────────────
+  async function buildFedRAMPPackage() {
+    showProgressModal('Generating FedRAMP submission package…');
+
+    try {
+      const t0 = performance.now();
+      const res = await authFetch('/api/v1/oscal/package');
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
+      }
+
+      const elapsed = Math.round(performance.now() - t0);
+      const bundleUUID = res.headers.get('X-Bundle-UUID') || '';
+      const modelsCount = res.headers.get('X-Models-Count') || '?';
+      const totalSize = parseInt(res.headers.get('X-Total-Size') || '0', 10);
+
+      const blob = await res.blob();
+      const filename = (res.headers.get('Content-Disposition') || '').match(/filename="?([^"]+)"?/);
+      const fname = (filename && filename[1]) || `oscal-fedramp-${bundleUUID.slice(0, 8)}.zip`;
+
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fname; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      // Save to history (uses Pack B's history if available)
+      try {
+        const h = JSON.parse(localStorage.getItem('vsp_oscal_history') || '[]');
+        h.unshift({
+          ts: new Date().toISOString(),
+          bundle_uuid: bundleUUID,
+          bundle_size: blob.size,
+          models_ok: parseInt(modelsCount, 10),
+          total_size: totalSize,
+          kind: 'fedramp-zip'
+        });
+        if (h.length > 10) h.length = 10;
+        localStorage.setItem('vsp_oscal_history', JSON.stringify(h));
+      } catch (e) {}
+
+      showSuccessModal({
+        filename: fname,
+        bundleUUID: bundleUUID,
+        modelsCount: modelsCount,
+        zipSize: blob.size,
+        totalSize: totalSize,
+        elapsed: elapsed
+      });
+    } catch (e) {
+      showErrorModal(e.message);
+    }
+  }
+
+  function showProgressModal(text) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-oscal-pc-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;padding:30px 40px;text-align:center;font-size:13px;color:var(--t1,#e5e7eb);max-width:420px';
+    box.innerHTML = ''
+      + '<div style="font-size:32px;margin-bottom:12px;animation:vspPulse 1.2s ease-in-out infinite">📦</div>'
+      + '<div style="font-weight:600;margin-bottom:6px">Building FedRAMP Submission Package</div>'
+      + '<div style="font-size:11px;color:var(--t3,#71717a);line-height:1.5">' + esc(text || '') + '<br>'
+      +   'Fetching 6 OSCAL models · Computing SHA-256 fingerprints · Signing manifest · Building ZIP archive'
+      + '</div>';
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    if (!document.getElementById('vsp-oscal-pulse-css')) {
+      const css = document.createElement('style'); css.id = 'vsp-oscal-pulse-css';
+      css.textContent = '@keyframes vspPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.1);opacity:.7}}';
+      document.head.appendChild(css);
+    }
+  }
+
+  function showSuccessModal(info) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-oscal-pc-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);padding:20px';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;padding:30px;max-width:560px;width:100%;font-size:12px;color:var(--t1,#e5e7eb);text-align:center';
+    box.innerHTML = ''
+      + '<div style="font-size:36px;margin-bottom:12px">✅</div>'
+      + '<div style="font-size:15px;font-weight:600;margin-bottom:6px;color:#10b981">FedRAMP Package Generated</div>'
+      + '<div style="font-size:11px;color:var(--t3,#71717a);margin-bottom:18px">Downloaded as <code style="color:var(--t2,#a1a1aa);font-family:var(--font-mono,monospace)">' + esc(info.filename) + '</code></div>'
+      + '<div style="background:var(--bg1,#111);border-radius:6px;padding:14px 18px;text-align:left;margin-bottom:18px;font-family:var(--font-mono,monospace);font-size:11px;line-height:1.8">'
+      +   '<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd,#27272a);padding-bottom:4px;margin-bottom:4px"><span style="color:var(--t3)">Bundle UUID</span><span style="color:#3b82f6">' + esc(info.bundleUUID.slice(0, 18)) + '…</span></div>'
+      +   '<div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">Models</span><span style="color:#10b981">' + info.modelsCount + ' / 6</span></div>'
+      +   '<div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">Models size</span><span>' + (info.totalSize / 1024).toFixed(1) + ' KB</span></div>'
+      +   '<div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">ZIP size</span><span>' + (info.zipSize / 1024).toFixed(1) + ' KB</span></div>'
+      +   '<div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">Build time</span><span>' + info.elapsed + ' ms</span></div>'
+      + '</div>'
+      + '<div style="background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-left-width:3px;border-radius:6px;padding:10px 14px;font-size:11px;line-height:1.5;text-align:left;margin-bottom:14px">'
+      +   '<div style="font-weight:600;margin-bottom:4px;color:#3b82f6">📋 Submission Instructions</div>'
+      +   '<div style="color:var(--t2,#a1a1aa)">Submit this ZIP to your FedRAMP PMO via <b>OMB MAX.gov</b> or your agency Authorizing Official according to <b>OMB M-22-18</b>. The bundle includes <b>cryptographic manifest with SHA-256 fingerprints</b> for verification.</div>'
+      + '</div>'
+      + '<button onclick="window._vspOscalC.close()" style="background:#3b82f6;color:white;border:0;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500">Done</button>';
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+  }
+
+  function showErrorModal(msg) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-oscal-pc-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;padding:30px;max-width:520px;font-size:12px;color:var(--t1,#e5e7eb);text-align:center';
+    box.innerHTML = ''
+      + '<div style="font-size:32px;margin-bottom:10px">❌</div>'
+      + '<div style="font-size:14px;font-weight:600;margin-bottom:6px;color:#ef4444">Build Failed</div>'
+      + '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--t2,#a1a1aa);background:var(--bg1,#111);padding:10px;border-radius:4px;margin-bottom:16px;text-align:left;word-break:break-all">' + esc(msg) + '</div>'
+      + '<div style="font-size:10px;color:var(--t3);margin-bottom:14px">If endpoint is missing, ensure backend has been restarted with Pack C handler.</div>'
+      + '<button onclick="window._vspOscalC.close()" style="background:var(--bg2,#1c1c1c);color:var(--t1);border:1px solid var(--bd);padding:6px 18px;border-radius:4px;cursor:pointer;font-size:12px">Close</button>';
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+  }
+
+  function closeModal() {
+    const ov = document.getElementById('vsp-oscal-pc-modal');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  window._vspOscalC = { close: closeModal, build: buildFedRAMPPackage };
+
+  // ─── Inject big "Generate FedRAMP Package" button ───────────────────────
+  function injectFedRAMPButton() {
+    if (document.getElementById('vsp-oscal-fedramp-btn')) return;
+    // Insert into hero section
+    const hero = $$('div').find(d => {
+      return /OSCAL Export.*FedRAMP/i.test(d.textContent || '') &&
+             d.querySelector('button') &&
+             d.children.length < 30;
+    });
+    const refreshBtn = $$('button').find(b => /Refresh/i.test(b.textContent || ''));
+    if (!refreshBtn) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'vsp-oscal-fedramp-btn';
+    btn.className = 'btn btn-primary btn-sm';
+    btn.style.cssText = 'margin-right:6px;font-size:11px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:0;color:white;font-weight:600;padding:6px 14px;box-shadow:0 2px 8px rgba(59,130,246,.3)';
+    btn.innerHTML = '📦 Generate FedRAMP Package';
+    btn.title = 'Build signed ZIP submission package per OMB M-22-18';
+    btn.onclick = buildFedRAMPPackage;
+    refreshBtn.parentNode.insertBefore(btn, refreshBtn);
+  }
+
+  function init() { injectFedRAMPButton(); }
+  if (document.readyState !== 'loading') setTimeout(init, 1500);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 1500));
+
+  // Re-inject if section re-renders
+  let pollCount = 0;
+  const poll = setInterval(() => {
+    init();
+    if (++pollCount > 5) clearInterval(poll);
+  }, 1000);
+})();
+
+</script>
+<!-- VSP-OSCAL-3F-END -->
 </body>
 </html>

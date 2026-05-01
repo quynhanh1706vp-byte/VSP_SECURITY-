@@ -1,6 +1,83 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<script>
+/* Replacement guard for sw_inventory.html — wait properly for parent token */
+(function () {
+  if (window.__VSP_SWINV_GUARD_V2__) return;
+  window.__VSP_SWINV_GUARD_V2__ = true;
+
+  var _origFetch = window.fetch;
+
+  // Get token from multiple sources, with retry
+  async function getToken(maxWaitMs) {
+    maxWaitMs = maxWaitMs || 10000; // 10s instead of 2.5s
+    var deadline = Date.now() + maxWaitMs;
+    var firstWarn = true;
+
+    while (Date.now() < deadline) {
+      // 1. Try parent window
+      try {
+        if (window.parent && window.parent !== window && window.parent.TOKEN) return window.parent.TOKEN;
+      } catch (e) {} // cross-origin
+
+      // 2. Try this window
+      if (window.TOKEN) return window.TOKEN;
+
+      // 3. Try localStorage (multiple keys)
+      try {
+        var t = localStorage.getItem('vsp_token') || localStorage.getItem('TOKEN') || localStorage.getItem('token');
+        if (t) return t;
+        // Try parent localStorage
+        if (window.parent && window.parent.localStorage) {
+          t = window.parent.localStorage.getItem('vsp_token') || window.parent.localStorage.getItem('TOKEN');
+          if (t) return t;
+        }
+      } catch (e) {}
+
+      // 4. Try sessionStorage
+      try {
+        var ts = sessionStorage.getItem('vsp_token') || sessionStorage.getItem('TOKEN');
+        if (ts) return ts;
+      } catch (e) {}
+
+      // Quiet wait — only warn once after 3s
+      if (firstWarn && (Date.now() - (deadline - maxWaitMs)) > 3000) {
+        console.info('[VSP guard] waiting for parent token…');
+        firstWarn = false;
+      }
+      await new Promise(r => setTimeout(r, 250));
+    }
+    return '';
+  }
+
+  window.vspAuthFetch = async function (url, opts) {
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + tk });
+    } else {
+      // Quiet final warning
+      console.warn('[VSP guard v2] no token after 10s — request may fail:', url);
+    }
+    return _origFetch(url, opts);
+  };
+
+  window.fetch = function (url, opts) {
+    if (typeof url === 'string' && url.indexOf('/api/') >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+
+  console.log('[VSP-SWINV-GUARD v2] Active — 10s timeout, multi-source token lookup');
+})();
+
+</script>
+
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
 <script>
 /* VSP auth fetch guard v2 — polling retry */
@@ -1055,5 +1132,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   loadScanHistory();
 });
 </script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 </body>
 </html>

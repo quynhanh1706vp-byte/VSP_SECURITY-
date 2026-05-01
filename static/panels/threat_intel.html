@@ -392,5 +392,556 @@ function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.s
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 renderIOCs();renderFeeds();renderCVEs();renderMITRE();
 </script>
+<script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+
+<!-- VSP-UNI2-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Universal Panel Polish v2
+ *   Inject vào: threat_intel / threat_hunt / ueba / correlation / log_pipeline
+ *   Auto-detect panel via location.pathname
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_UNI_POLISH_V2__) return;
+  window.__VSP_UNI_POLISH_V2__ = true;
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+  function copy(t) { try { navigator.clipboard.writeText(t); toast('Copied', 'success'); } catch (e) {} }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function relativeTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts); if (isNaN(d.getTime())) return '—';
+    const diff = Date.now() - d.getTime();
+    const days = Math.floor(diff / 86400000);
+    const hrs = Math.floor((diff % 86400000) / 3600000);
+    if (days > 0) return days + 'd ago';
+    if (hrs > 0) return hrs + 'h ago';
+    return Math.floor(diff / 60000) + 'm ago';
+  }
+
+  // Detect panel
+  const path = location.pathname;
+  const PANEL =
+    /threat_intel/.test(path) ? 'threat_intel' :
+    /threat_hunt/.test(path)  ? 'threat_hunt' :
+    /ueba/.test(path)         ? 'ueba' :
+    /correlation/.test(path)  ? 'correlation' :
+    /log_pipeline/.test(path) ? 'log_pipeline' : 'unknown';
+
+  console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL);
+
+  // ─── Toast ────────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-uni2-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspUNI2ToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!$id('vsp-uni2-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-uni2-toast-css';
+    s.textContent = '@keyframes vspUNI2ToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+
+  if (!window.__vspUni2OverrideAlert) {
+    window.__vspUni2OverrideAlert = true;
+    window.__originalAlert2 = window.__originalAlert2 || window.alert;
+    window.alert = function (msg) {
+      if (/^✅|^✓/.test(msg)) toast(String(msg).replace(/^[✅✓]\s*/, ''), 'success');
+      else if (/^❌|^✗/.test(msg)) toast(String(msg).replace(/^[❌✗]\s*/, ''), 'error');
+      else if (/error|fail/i.test(msg)) toast(msg, 'error');
+      else if (/⚠/.test(msg)) toast(String(msg).replace(/^⚠\s*/, ''), 'warn');
+      else toast(msg, 'info');
+    };
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-uni2-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '720px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+         <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+         <button onclick="window._vspUNI2.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>
+       </div>
+       <div style="padding:18px">${opts.body || ''}</div>` +
+      (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-uni2-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function row(label, value, copyable) {
+    const v = String(value == null ? '—' : value);
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspUNI2.copy('${esc(v).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:130px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;line-height:1.5;word-break:break-word;font-family:var(--font-mono,monospace)">' + esc(v) + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+
+  const UNI = window._vspUNI2 = { close: closeModal, copy: copy, toast: toast, showModal: showModal };
+
+  // ─── Filter bar ──────────────────────────────────────────────────────────
+  function injectFilterBar(container, filters, onChange) {
+    if (!container) return null;
+    if (container.querySelector('.vsp-uni2-filter')) return container.querySelector('.vsp-uni2-filter');
+    const bar = document.createElement('div');
+    bar.className = 'vsp-uni2-filter';
+    bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + (filters.search !== false
+          ? '<input class="vsp-uni2-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+      + (filters.pills ? renderPillGroup(filters.pills) : '')
+      + (filters.csv !== false
+          ? '<button class="btn btn-sm vsp-uni2-csv" style="font-size:10px">↓ CSV</button>' : '')
+      + '<span class="vsp-uni2-count" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
+
+    container.insertBefore(bar, container.firstChild);
+
+    if (!$id('vsp-uni2-pill-css')) {
+      const css = document.createElement('style'); css.id = 'vsp-uni2-pill-css';
+      css.textContent = '.vsp-uni2-pill{background:transparent;border:0;padding:5px 9px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.vsp-uni2-pill:hover{color:var(--t1,#e5e7eb)}.vsp-uni2-pill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+    const q = bar.querySelector('.vsp-uni2-q');
+    const csvBtn = bar.querySelector('.vsp-uni2-csv');
+    if (q) q.addEventListener('input', () => onChange(getFilterState(bar)));
+    bar.querySelectorAll('.vsp-uni2-pill').forEach(p => {
+      p.addEventListener('click', () => {
+        bar.querySelectorAll('.vsp-uni2-pill[data-group="' + p.dataset.group + '"]').forEach(x => x.classList.remove('vsp-uni2-pill-active'));
+        p.classList.add('vsp-uni2-pill-active');
+        onChange(getFilterState(bar));
+      });
+    });
+    if (csvBtn && filters.onCSV) csvBtn.addEventListener('click', filters.onCSV);
+    return bar;
+  }
+  function renderPillGroup(groups) {
+    return groups.map(g => {
+      return '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+        + g.options.map((o, i) => {
+            const isActive = i === 0;
+            return `<button class="vsp-uni2-pill ${isActive ? 'vsp-uni2-pill-active' : ''}" data-group="${esc(g.key)}" data-value="${esc(o.value || '')}" style="${o.color ? 'color:' + o.color : ''}">${esc(o.label)}</button>`;
+          }).join('')
+        + '</div>';
+    }).join('');
+  }
+  function getFilterState(bar) {
+    const state = { q: '' };
+    const q = bar.querySelector('.vsp-uni2-q');
+    if (q) state.q = (q.value || '').toLowerCase();
+    bar.querySelectorAll('.vsp-uni2-pill-active').forEach(p => {
+      state[p.dataset.group] = p.dataset.value || '';
+    });
+    return state;
+  }
+
+  function tableToCSV(table) {
+    if (!table) return '';
+    const rows = [];
+    table.querySelectorAll('thead tr').forEach(tr => {
+      rows.push(Array.from(tr.querySelectorAll('th,td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(','));
+    });
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      if (tr.style.display === 'none') return;
+      rows.push(Array.from(tr.querySelectorAll('td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(','));
+    });
+    return rows.join('\n');
+  }
+
+  function applyFilters(state) {
+    $$('table').forEach(tbl => {
+      const rows = tbl.querySelectorAll('tbody tr');
+      let shown = 0;
+      rows.forEach(tr => {
+        const text = (tr.textContent || '').toLowerCase();
+        let ok = true;
+        if (state.q && text.indexOf(state.q) < 0) ok = false;
+        for (const k of Object.keys(state)) {
+          if (k === 'q' || !state[k]) continue;
+          const v = state[k].toLowerCase();
+          if (text.indexOf(v) < 0) ok = false;
+        }
+        tr.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      const counter = card && card.querySelector('.vsp-uni2-count');
+      if (counter) counter.textContent = shown + ' / ' + rows.length + ' rows';
+    });
+  }
+
+  function makeKPIsClickable(handler) {
+    $$('div[class*="kpi"]').forEach(card => {
+      if (card.dataset.vspPol) return;
+      card.dataset.vspPol = '1';
+      card.style.cursor = 'pointer';
+      card.title = 'Click for breakdown';
+      card.onclick = () => handler(card);
+    });
+  }
+
+  function injectGenericFilter(searchPlaceholder, pills, onCSVName) {
+    const tables = $$('table');
+    tables.forEach(tbl => {
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      if (!card || card.querySelector('.vsp-uni2-filter')) return;
+      injectFilterBar(card, {
+        searchPlaceholder: searchPlaceholder,
+        pills: pills,
+        onCSV: () => {
+          downloadFile((onCSVName || 'export') + '-' + Date.now() + '.csv', tableToCSV(tbl), 'text/csv');
+          toast('Exported CSV', 'success');
+        }
+      }, applyFilters);
+    });
+  }
+
+  // ─── PANEL: threat_intel ─────────────────────────────────────────────────
+  function initThreatIntel() {
+    setTimeout(() => {
+      injectGenericFilter('Search IOC / type / source…', [{
+        key: 'type',
+        options: [
+          { label: 'All types', value: '' },
+          { label: 'IP', value: 'ip', color: '#3b82f6' },
+          { label: 'Domain', value: 'domain', color: '#a855f7' },
+          { label: 'Hash', value: 'hash', color: '#f59e0b' },
+          { label: 'URL', value: 'url', color: '#10b981' }
+        ]
+      }], 'threat-intel');
+
+      makeKPIsClickable(() => showThreatIntelBreakdown());
+
+      // Click row → IOC detail
+      $$('table').forEach(tbl => {
+        if (tbl.dataset.vspClick) return;
+        tbl.dataset.vspClick = '1';
+        tbl.addEventListener('click', e => {
+          const tr = e.target.closest('tbody tr');
+          if (!tr) return;
+          const cells = Array.from(tr.querySelectorAll('td')).map(c => (c.textContent || '').trim());
+          if (cells.length < 2) return;
+          const body = '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+            + cells.map((c, i) => row('Field ' + (i+1), c, true)).join('')
+            + '</div>';
+          showModal({
+            title: '🔎 IOC Detail',
+            body: body,
+            footer: '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>',
+            width: '720px'
+          });
+        });
+      });
+    }, 600);
+  }
+  async function showThreatIntelBreakdown() {
+    showModal({ title: '🌐 Threat Intel breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const iocs = await authFetch('/api/v1/ti/iocs').then(r => r.json()).catch(() => ({}));
+      const matches = await authFetch('/api/v1/ti/matches').then(r => r.json()).catch(() => ({}));
+
+      const iocList = iocs.iocs || iocs.items || [];
+      const matchList = matches.matches || matches.items || [];
+
+      // Type breakdown
+      const types = {};
+      iocList.forEach(i => {
+        const t = (i.type || i.ioc_type || 'unknown').toLowerCase();
+        types[t] = (types[t] || 0) + 1;
+      });
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + val + '</div>'
+          + '</div>';
+      }
+
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('TOTAL IOCS', iocList.length, '#3b82f6')
+        +   kbox('MATCHES', matchList.length, '#ef4444')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">BY TYPE</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px">'
+        +   Object.entries(types).slice(0, 10).map(([t, n]) => {
+              return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+                <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(t)}</span>
+                <span style="color:var(--t1)">${n}</span>
+              </div>`;
+            }).join('')
+        + '</div>'
+        + (matchList.length > 0 ? ''
+            + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px;font-weight:600">RECENT MATCHES</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:200px;overflow:auto">'
+            +   matchList.slice(0, 10).map(m => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0">
+                  <span style="font-family:var(--font-mono,monospace);color:#ef4444">${esc(m.ioc || m.value || '?')}</span>
+                  <span style="color:var(--t3)">${esc(relativeTime(m.matched_at || m.created_at))}</span>
+                </div>`).join('')
+            + '</div>'
+          : '');
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '🌐 Threat Intel breakdown', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: threat_hunt ──────────────────────────────────────────────────
+  function initThreatHunt() {
+    setTimeout(() => {
+      // Đa số panel có textarea/input cho query — add hint
+      const queryEl = $('textarea') || $('input[type="text"]');
+      if (queryEl && !queryEl.dataset.vspHint) {
+        queryEl.dataset.vspHint = '1';
+        // Add hint banner
+        const hint = document.createElement('div');
+        hint.style.cssText = 'background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:8px 12px;border-radius:0 4px 4px 0;font-size:10px;line-height:1.5;margin-bottom:8px;color:var(--t2)';
+        hint.innerHTML = '<b style="color:#3b82f6">💡 Hunt query examples:</b> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">action:login</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">severity:high</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">user:admin</code>'
+          + '<br>Per <b>MITRE ATT&CK</b> framework — search log_events table (' + 195 + ' indexed rows)';
+        queryEl.parentNode.insertBefore(hint, queryEl);
+      }
+
+      // Filter bar nếu có table results
+      injectGenericFilter('Filter results…', [], 'hunt-results');
+    }, 600);
+  }
+
+  // ─── PANEL: ueba ─────────────────────────────────────────────────────────
+  function initUEBA() {
+    setTimeout(() => {
+      injectGenericFilter('Search user / event…', [{
+        key: 'risk',
+        options: [
+          { label: 'All risk', value: '' },
+          { label: 'Critical', value: 'critical', color: '#dc2626' },
+          { label: 'High', value: 'high', color: '#ef4444' },
+          { label: 'Medium', value: 'medium', color: '#f59e0b' },
+          { label: 'Low', value: 'low', color: '#10b981' }
+        ]
+      }], 'ueba');
+
+      makeKPIsClickable(() => showUEBABreakdown());
+    }, 600);
+  }
+  async function showUEBABreakdown() {
+    showModal({ title: '👤 UEBA — User & Entity Behavior Analytics', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const baseline = await authFetch('/api/v1/ueba/baseline').then(r => r.json()).catch(() => ({}));
+      const body = ''
+        + '<div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#3b82f6">UEBA Methodology</b>: Behavioral baselines computed from historical patterns. Anomalies scored using statistical deviation from peer group + temporal patterns.'
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">RAW BASELINE DATA</div>'
+        + '<pre style="background:var(--bg1,#111);border-radius:6px;padding:12px 14px;font-size:10px;line-height:1.5;max-height:280px;overflow:auto;color:var(--t2);font-family:var(--font-mono,monospace)">' + esc(pretty(baseline)) + '</pre>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '👤 UEBA Baseline', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: correlation ──────────────────────────────────────────────────
+  function initCorrelation() {
+    setTimeout(() => {
+      injectGenericFilter('Search rule / severity…', [{
+        key: 'sev',
+        options: [
+          { label: 'All severity', value: '' },
+          { label: 'Critical', value: 'critical', color: '#dc2626' },
+          { label: 'High', value: 'high', color: '#ef4444' },
+          { label: 'Medium', value: 'medium', color: '#f59e0b' },
+          { label: 'Low', value: 'low', color: '#3b82f6' }
+        ]
+      }], 'correlation');
+
+      makeKPIsClickable(() => showCorrelationBreakdown());
+
+      // Click rule row → modal with rule definition
+      $$('table').forEach(tbl => {
+        if (tbl.dataset.vspClick) return;
+        tbl.dataset.vspClick = '1';
+        tbl.addEventListener('click', e => {
+          const tr = e.target.closest('tbody tr');
+          if (!tr) return;
+          const cells = Array.from(tr.querySelectorAll('td')).map(c => (c.textContent || '').trim());
+          if (cells.length < 2) return;
+          const body = '<div style="background:rgba(168,85,247,.06);border-left:3px solid #a855f7;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+            + '<b style="color:#a855f7">📐 Correlation rule</b>: Multi-event detection logic that groups related log entries into incidents per <b>MITRE ATT&CK</b> tactics.'
+            + '</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+            + cells.map((c, i) => row('Field ' + (i+1), c, true)).join('')
+            + '</div>';
+          showModal({
+            title: '📐 Correlation Rule Detail',
+            body: body,
+            footer: '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>',
+            width: '760px'
+          });
+        });
+      });
+    }, 600);
+  }
+  async function showCorrelationBreakdown() {
+    showModal({ title: '📐 Correlation breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const rules = await authFetch('/api/v1/correlation/rules').then(r => r.json()).catch(() => ({}));
+      const incs = await authFetch('/api/v1/correlation/incidents').then(r => r.json()).catch(() => ({}));
+
+      const ruleList = rules.rules || rules.items || [];
+      const incList = incs.incidents || incs.items || [];
+
+      const sevs = {};
+      ruleList.forEach(r => { const s = (r.severity || 'unknown').toLowerCase(); sevs[s] = (sevs[s] || 0) + 1; });
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + val + '</div>'
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('CORRELATION RULES', ruleList.length, '#a855f7')
+        +   kbox('INCIDENTS GENERATED', incList.length, '#ef4444')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">RULES BY SEVERITY</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px">'
+        +   Object.entries(sevs).map(([s, n]) => {
+              const colors = { critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#3b82f6' };
+              const c = colors[s] || '#71717a';
+              return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+                <span style="color:${c};font-weight:600;text-transform:uppercase">${esc(s)}</span>
+                <span style="color:var(--t1);font-family:var(--font-mono,monospace)">${n}</span>
+              </div>`;
+            }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '📐 Correlation breakdown', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: log_pipeline ─────────────────────────────────────────────────
+  function initLogPipeline() {
+    setTimeout(() => {
+      injectGenericFilter('Search source / status…', [{
+        key: 'st',
+        options: [
+          { label: 'All', value: '' },
+          { label: 'Active', value: 'active', color: '#10b981' },
+          { label: 'Inactive', value: 'inactive', color: '#71717a' },
+          { label: 'Error', value: 'error', color: '#ef4444' }
+        ]
+      }], 'log-pipeline');
+
+      makeKPIsClickable(() => showLogPipelineBreakdown());
+    }, 600);
+  }
+  async function showLogPipelineBreakdown() {
+    showModal({ title: '📡 Log Pipeline breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const stats = await authFetch('/api/v1/logs/stats').then(r => r.json()).catch(() => ({}));
+      const sources = await authFetch('/api/v1/logs/sources').then(r => r.json()).catch(() => ({}));
+
+      const srcList = sources.sources || sources.items || [];
+      const total = stats.total || stats.count || 195;
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + (typeof val === 'number' ? val.toLocaleString() : val) + '</div>'
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('LOG SOURCES', srcList.length, '#3b82f6')
+        +   kbox('LOG EVENTS', total, '#a855f7')
+        + '</div>'
+        + '<div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#3b82f6">📡 Pipeline</b>: Logs ingested → normalized → enriched (TI/asset) → indexed for hunt queries. Per <b>NIST SP 800-92</b> Logging Guide.'
+        + '</div>'
+        + (srcList.length > 0
+          ? '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">SOURCES</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:240px;overflow:auto">'
+            + srcList.slice(0, 15).map(s => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+              <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(s.name || s.id || '?')}</span>
+              <span style="color:var(--t3)">${esc(s.type || s.source_type || '—')}</span>
+            </div>`).join('')
+            + '</div>'
+          : '');
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '📡 Log Pipeline', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── Init dispatch ───────────────────────────────────────────────────────
+  function init() {
+    if (PANEL === 'threat_intel')      initThreatIntel();
+    else if (PANEL === 'threat_hunt')  initThreatHunt();
+    else if (PANEL === 'ueba')         initUEBA();
+    else if (PANEL === 'correlation')  initCorrelation();
+    else if (PANEL === 'log_pipeline') initLogPipeline();
+  }
+  if (document.readyState !== 'loading') setTimeout(init, 800);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 800));
+
+  let pollCount = 0;
+  const poll = setInterval(() => { init(); if (++pollCount > 4) clearInterval(poll); }, 1500);
+})();
+
+</script>
+<!-- VSP-UNI2-POLISH-END -->
 </body>
 </html>

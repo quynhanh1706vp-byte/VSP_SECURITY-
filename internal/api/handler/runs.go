@@ -201,8 +201,9 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 		Profile    string          `json:"profile"`
 		Gate       string          `json:"gate"`
 		Posture    string          `json:"posture"`
-		Total      int             `json:"total_findings"`
-		ToolsDone  int             `json:"tools_done"`
+		TotalFindings int          `json:"total_findings"`
+		Total         int          `json:"total"`
+		ToolsDone     int          `json:"tools_done"`
 		ToolsTotal int             `json:"tools_total"`
 		Summary    json.RawMessage `json:"summary"`
 		StartedAt  *time.Time      `json:"started_at"`
@@ -223,7 +224,8 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 			Profile:    run.Profile,
 			Gate:       run.Gate,
 			Posture:    run.Posture,
-			Total:      run.TotalFindings,
+			TotalFindings: run.TotalFindings,
+			Total:         run.TotalFindings,
 			ToolsDone:  run.ToolsDone,
 			ToolsTotal: run.ToolsTotal,
 			Summary:    summ,

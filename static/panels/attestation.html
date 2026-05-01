@@ -299,5 +299,506 @@ async function loadForms() {
 loadDraft();
 loadForms();
 </script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+
+
+
+<!-- VSP-ATT-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Attestation Panel Polish v1
+ *   Inject vào cuối attestation.html
+ *   Add: filter pills, click practice/form → modal, breakdown KPI, validate sign
+ *   - Compatible with both /api/p4/attestation/* và /api/v1/cisa-attestation/*
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_ATT_POLISH__) return;
+  window.__VSP_ATT_POLISH__ = true;
+  console.log('[VSP-ATT-POLISH] Loaded successfully');
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function copy(text) {
+    try { navigator.clipboard.writeText(text); toast('Copied to clipboard', 'success'); }
+    catch (e) { toast('Clipboard unavailable', 'warn'); }
+  }
+  function authFetch(url, opts) {
+    return (window.vspAuthFetch || window.fetch)(url, opts || {});
+  }
+  function isEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s || ''); }
+
+  // ─── Toast ────────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-att-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspATToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!document.getElementById('vsp-att-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-att-toast-css';
+    s.textContent = '@keyframes vspATToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+  // Override alert
+  window.__originalAlert = window.alert;
+  window.alert = function (msg) {
+    if (/^✅|^✓/.test(msg)) toast(msg.replace(/^[✅✓]\s*/, ''), 'success');
+    else if (/^❌|^✗/.test(msg)) toast(msg.replace(/^[❌✗]\s*/, ''), 'error');
+    else if (/error|fail/i.test(msg)) toast(msg, 'error');
+    else if (/⚠/.test(msg)) toast(msg.replace(/^⚠\s*/, ''), 'warn');
+    else toast(msg, 'info');
+  };
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-att-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '640px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+        `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+           <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+           <button onclick="window._vspATT.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+         </div>
+         <div style="padding:18px">${opts.body || ''}</div>` +
+        (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = document.getElementById('vsp-att-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function row(label, value, copyable) {
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspATT.copy('${esc(value).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:120px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;line-height:1.5">' + esc(value) + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+
+  const ATT = window._vspATT = {
+    close: closeModal,
+    copy: copy
+  };
+
+  // ─── Practices: filter pills + click detail ──────────────────────────────
+  let practicesFilter = '';
+  function injectPracticesFilter() {
+    const draftBody = $('draft-body');
+    if (!draftBody) return;
+    if (draftBody.querySelector('.vsp-att-pills')) return;
+
+    // Tìm vị trí "SSDF Practice Attestations" header
+    const headers = draftBody.querySelectorAll('div');
+    let target = null;
+    for (const h of headers) {
+      if (/SSDF Practice Attestations/i.test(h.textContent || '')) { target = h; break; }
+    }
+    if (!target) return;
+
+    const bar = document.createElement('div');
+    bar.className = 'vsp-att-pills';
+    bar.style.cssText = 'display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + '<input id="att-fq" placeholder="Search practice ID or name…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+      +   '<button class="att-pill att-pill-active" data-s="" onclick="window._vspATT.pill(\'\',this)">All</button>'
+      +   '<button class="att-pill" data-s="yes" onclick="window._vspATT.pill(\'yes\',this)" style="color:#10b981">✓ Can attest</button>'
+      +   '<button class="att-pill" data-s="no" onclick="window._vspATT.pill(\'no\',this)" style="color:#f59e0b">⚠ Partial</button>'
+      + '</div>'
+      + '<span id="att-count" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
+    target.parentNode.insertBefore(bar, target.nextSibling);
+
+    if (!document.getElementById('att-pill-css')) {
+      const css = document.createElement('style'); css.id = 'att-pill-css';
+      css.textContent = '.att-pill{background:transparent;border:0;padding:5px 10px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.att-pill:hover{color:var(--t1,#e5e7eb)}.att-pill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+    $('att-fq').addEventListener('input', filterPractices);
+  }
+  ATT.pill = function(s, btn) {
+    practicesFilter = s;
+    document.querySelectorAll('.att-pill').forEach(p => p.classList.remove('att-pill-active'));
+    btn.classList.add('att-pill-active');
+    filterPractices();
+  };
+  function filterPractices() {
+    const q = (($('att-fq') || {}).value || '').toLowerCase();
+    const rows = document.querySelectorAll('.practice-row');
+    let shown = 0;
+    rows.forEach(row => {
+      const text = (row.textContent || '').toLowerCase();
+      const yes = !!row.querySelector('.attest-yes');
+      let ok = true;
+      if (q && text.indexOf(q) < 0) ok = false;
+      if (practicesFilter === 'yes' && !yes) ok = false;
+      if (practicesFilter === 'no' && yes) ok = false;
+      row.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    const c = $('att-count'); if (c) c.textContent = shown + ' / ' + rows.length + ' practices';
+  }
+  function makePracticesClickable() {
+    document.querySelectorAll('.practice-row').forEach(row => {
+      if (row.dataset.vspPol) return;
+      row.dataset.vspPol = '1';
+      row.style.cursor = 'pointer';
+      row.style.transition = 'background .12s';
+      row.addEventListener('mouseenter', () => row.style.background = 'var(--bg2,#1c1c1c)');
+      row.addEventListener('mouseleave', () => row.style.background = '');
+      row.addEventListener('click', () => {
+        const idEl = row.querySelector('.practice-id');
+        if (!idEl) return;
+        const pid = idEl.textContent.trim();
+        const name = (row.children[0] && row.children[0].textContent || '').replace(pid, '').trim();
+        const yes = !!row.querySelector('.attest-yes');
+        showPracticeDetail(pid, name, yes);
+      });
+    });
+  }
+  async function showPracticeDetail(pid, name, canAttest) {
+    showModal({ title: '📋 SSDF Practice — ' + pid, body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    // Try fetch detail từ /api/v1/cisa-attestation/practices?status=...
+    let detail = null;
+    try {
+      const res = await authFetch('/api/v1/cisa-attestation/practices');
+      const d = await res.json();
+      if (d.practices) {
+        detail = d.practices.find(p => p.practice_id === pid);
+      }
+    } catch (e) { console.warn('Practices fetch failed:', e); }
+
+    const status = detail ? detail.status : (canAttest ? 'implemented' : 'partial');
+    const notes = detail ? (detail.implementation_notes || '') : '';
+    const evidenceRefs = detail ? (typeof detail.evidence_refs === 'string' ? JSON.parse(detail.evidence_refs || '[]') : detail.evidence_refs || []) : [];
+
+    const statusBadge =
+      status === 'implemented' ? '<span style="background:rgba(16,185,129,.12);color:#10b981;padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">✓ IMPLEMENTED</span>' :
+      status === 'partial'     ? '<span style="background:rgba(245,158,11,.12);color:#f59e0b;padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">⚠ PARTIAL</span>' :
+      status === 'not_applicable' ? '<span style="background:rgba(113,113,122,.15);color:#a1a1aa;padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">— N/A</span>' :
+                                  '<span style="background:rgba(239,68,68,.12);color:#ef4444;padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">✗ NOT IMPLEMENTED</span>';
+
+    const body = ''
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+      +   '<div style="font-family:var(--font-mono,monospace);font-size:13px;font-weight:600;color:#3b82f6">' + esc(pid) + '</div>'
+      +   statusBadge
+      + '</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:14px;line-height:1.4">' + esc(name) + '</div>'
+      + (detail && detail.description
+          ? '<div style="font-size:11px;color:var(--t2,#a1a1aa);margin-bottom:14px;padding:10px 14px;background:var(--bg1,#111);border-radius:6px;line-height:1.5">' + esc(detail.description) + '</div>'
+          : '')
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">IMPLEMENTATION NOTES</div>'
+      + '<textarea id="prac-notes" style="width:100%;padding:8px 10px;font-size:11px;min-height:80px;resize:vertical;font-family:inherit;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px;margin-bottom:14px" placeholder="Implementation details, evidence, exceptions…">' + esc(notes) + '</textarea>'
+      + (evidenceRefs.length
+          ? '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">EVIDENCE REFERENCES</div>'
+            + '<div style="background:var(--bg1,#111);padding:8px 12px;border-radius:6px;font-size:11px;margin-bottom:14px">'
+            +   evidenceRefs.map(e => '<div style="padding:4px 0">📎 <b>' + esc(e.ref || e.type) + '</b> <span style="color:var(--t3)">— ' + esc(e.description || '') + '</span></div>').join('')
+            + '</div>'
+          : '')
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">STATUS OVERRIDE</div>'
+      + '<select id="prac-status" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      +   ['implemented','partial','not_implemented','not_applicable'].map(s => `<option value="${s}" ${status === s ? 'selected' : ''}>${s}</option>`).join('')
+      + '</select>';
+
+    const footer = ''
+      + '<button class="btn btn-sm" onclick="window._vspATT.close()" style="margin-right:auto">Cancel</button>'
+      + `<button class="btn btn-primary btn-sm" onclick="window._vspATT.savePractice('${esc(pid)}')">💾 Save</button>`;
+
+    showModal({ title: '📋 SSDF Practice — ' + pid, body: body, footer: footer, width: '640px' });
+  }
+  ATT.savePractice = async function(pid) {
+    const status = ($('prac-status') || {}).value || '';
+    const notes = ($('prac-notes') || {}).value || '';
+    closeModal();
+    try {
+      const res = await authFetch('/api/v1/cisa-attestation/practices/' + encodeURIComponent(pid), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: status, implementation_notes: notes })
+      });
+      if (res.ok) {
+        toast('Practice ' + pid + ' updated', 'success');
+        if (window.loadDraft) window.loadDraft();
+      } else if (res.status === 404) {
+        // Fallback: lưu local
+        const local = JSON.parse(localStorage.getItem('vsp_att_overrides') || '{}');
+        local[pid] = { status, notes, updated: new Date().toISOString() };
+        localStorage.setItem('vsp_att_overrides', JSON.stringify(local));
+        toast('Saved locally (BE endpoint not available)', 'warn');
+      } else {
+        toast('Save failed: HTTP ' + res.status, 'error');
+      }
+    } catch (e) {
+      toast('Network error: ' + e.message, 'error');
+    }
+  };
+
+  // ─── KPI cards click → breakdown ─────────────────────────────────────────
+  function makeKPIsClickable() {
+    const cards = document.querySelectorAll('.kpi');
+    cards.forEach(card => {
+      if (card.dataset.vspPol) return;
+      card.dataset.vspPol = '1';
+      const label = (card.querySelector('.kpi-label') || {}).textContent || '';
+      if (/Attestation %/i.test(label)) {
+        card.style.cursor = 'pointer';
+        card.title = 'Click for breakdown';
+        card.onclick = showAttestBreakdown;
+      } else if (/Forms drafted/i.test(label)) {
+        card.style.cursor = 'pointer';
+        card.title = 'Click for forms history';
+        card.onclick = showFormsHistory;
+      } else if (/Attestable/i.test(label)) {
+        card.style.cursor = 'pointer';
+        card.title = 'Click for status detail';
+        card.onclick = showAttestBreakdown;
+      }
+    });
+  }
+  async function showAttestBreakdown() {
+    showModal({ title: '📊 Attestation breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '520px' });
+    try {
+      const res = await authFetch('/api/v1/cisa-attestation/practices');
+      const d = await res.json();
+      const counts = d.counts || {};
+      const total = d.total || 0;
+      const impl = counts.implemented || 0;
+      const partial = counts.partial || 0;
+      const notImpl = counts.not_implemented || 0;
+      const na = counts.not_applicable || 0;
+      const pct = total > 0 ? Math.round(((impl + partial) / total) * 100) : 0;
+
+      function kbox(label, val, color, sub) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';font-family:var(--font-display);margin-top:2px">' + val + '</div>'
+          + (sub ? '<div style="font-size:10px;color:var(--t3);margin-top:2px">' + esc(sub) + '</div>' : '')
+          + '</div>';
+      }
+
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('IMPLEMENTED', impl, '#10b981', 'fully evidenced')
+        +   kbox('PARTIAL', partial, '#f59e0b', 'manual review')
+        +   kbox('NOT IMPLEMENTED', notImpl, '#ef4444', 'gaps')
+        +   kbox('NOT APPLICABLE', na, '#71717a', 'excluded')
+        + '</div>'
+        + '<div style="background:var(--bg1,#111);padding:12px 14px;border-radius:6px;font-size:11px;color:var(--t2);line-height:1.6">'
+        +   '<b>Calculation:</b> ' + (impl + partial) + ' attestable / ' + total + ' total = '
+        +   '<b style="color:#10b981">' + pct + '%</b><br>'
+        +   '<span style="color:var(--t3)">Practices marked <i>implemented</i> or <i>partial</i> are attestable. Not implemented = gap; N/A = excluded by scope.</span>'
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspATT.close()">Close</button>';
+      showModal({ title: '📊 Attestation breakdown', body: body, footer: footer, width: '520px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspATT.close()">Close</button>' });
+    }
+  }
+  async function showFormsHistory() {
+    showModal({ title: '📁 Forms history', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const res = await authFetch('/api/p4/attestation/list');
+      const d = await res.json();
+      const forms = (d.forms || []).slice(0, 30);
+      const body = ''
+        + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Showing ' + forms.length + ' of ' + (d.count || 0) + ' total forms.</div>'
+        + '<div style="display:grid;gap:4px;max-height:400px;overflow:auto">'
+        + forms.map(f => {
+            const stColor = f.status === 'signed' ? '#10b981' : f.status === 'submitted' ? '#3b82f6' : '#f59e0b';
+            const dt = f.created_at ? new Date(f.created_at).toLocaleString() : '—';
+            return `<div style="display:flex;gap:10px;align-items:center;padding:8px 12px;background:var(--bg1,#111);border-radius:6px;font-size:11px;border-left:3px solid ${stColor}">`
+              + '<span style="font-family:var(--font-mono,monospace);font-size:10px;color:#3b82f6;min-width:90px">' + esc((f.form_uuid || '').slice(0, 8)) + '…</span>'
+              + '<span style="font-size:10px;color:var(--t2);flex:1">' + esc(dt) + '</span>'
+              + '<span style="font-size:9px;text-transform:uppercase;color:' + stColor + ';font-weight:600">' + esc(f.status) + '</span>'
+              + '<span style="font-size:10px;color:var(--t3)">' + esc(f.signed_by || '—') + '</span>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspATT.close()">Close</button>';
+      showModal({ title: '📁 Forms history (' + (d.count || 0) + ' total)', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspATT.close()">Close</button>' });
+    }
+  }
+
+  // ─── Forms table: click row → modal ──────────────────────────────────────
+  function makeFormsClickable() {
+    const tbody = $('forms-tbody');
+    if (!tbody) return;
+    if (tbody.dataset.vspPol) return;
+
+    // Use event delegation
+    tbody.addEventListener('click', function(e) {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      const cells = tr.querySelectorAll('td');
+      if (cells.length < 4) return;
+      // First cell is form_uuid (truncated)
+      const fullText = (cells[0].textContent || '').trim();
+      // Find full UUID — needs to fetch
+      const prefix = fullText.replace(/[…\.]/g, '').trim();
+      if (!prefix || prefix.length < 6) return;
+      showFormPreview(prefix);
+    });
+    tbody.dataset.vspPol = '1';
+    tbody.style.cursor = 'pointer';
+  }
+  async function showFormPreview(uuidPrefix) {
+    showModal({ title: '📄 Form preview', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '640px' });
+    try {
+      const res = await authFetch('/api/p4/attestation/list');
+      const d = await res.json();
+      const form = (d.forms || []).find(f => (f.form_uuid || '').startsWith(uuidPrefix));
+      if (!form) {
+        showModal({ title: 'Form not found', body: '<div>Could not load form ' + esc(uuidPrefix) + '</div>', footer: '<button class="btn" onclick="window._vspATT.close()">Close</button>' });
+        return;
+      }
+      const stColor = form.status === 'signed' ? '#10b981' : form.status === 'submitted' ? '#3b82f6' : '#f59e0b';
+      const body = ''
+        + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+        +   '<div style="font-family:var(--font-mono,monospace);font-size:11px;color:#3b82f6;flex:1">' + esc(form.form_uuid) + '</div>'
+        +   '<span style="background:rgba(' + parseInt(stColor.slice(1,3),16) + ',' + parseInt(stColor.slice(3,5),16) + ',' + parseInt(stColor.slice(5,7),16) + ',.12);color:' + stColor + ';padding:3px 10px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace)">' + esc(form.status) + '</span>'
+        + '</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+        +   row('Product', (form.product || '') + (form.version ? ' v' + form.version : ''))
+        +   row('Producer', form.producer || '—')
+        +   row('Signed by', form.signed_by || '—')
+        +   row('Title', form.title || '—')
+        +   row('Created at', form.created_at || '')
+        +   (form.signed_at && form.signed_at !== '0001-01-01T00:00:00Z' ? row('Signed at', form.signed_at) : '')
+        + '</div>';
+      const footer = ''
+        + `<button class="btn btn-sm" onclick="window._vspATT.copy('${esc(form.form_uuid)}')" style="margin-right:auto">📋 Copy UUID</button>`
+        + '<button class="btn btn-primary btn-sm" onclick="window._vspATT.close()">Close</button>';
+      showModal({ title: '📄 Attestation Form', body: body, footer: footer, width: '640px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspATT.close()">Close</button>' });
+    }
+  }
+
+  // ─── Sign workflow: validate + confirm ───────────────────────────────────
+  function wrapSignAttestation() {
+    const _orig = window.signAttestation;
+    if (!_orig || window.__vspSignWrap) return;
+    window.__vspSignWrap = true;
+    window.signAttestation = function() {
+      if (!window.currentDraft) { toast('Generate a draft first', 'warn'); return; }
+      const name = ($('sig-name') || {}).value.trim();
+      const email = ($('sig-email') || {}).value.trim();
+      const title = ($('sig-title') || {}).value.trim();
+      if (!name) { toast('Name is required', 'warn'); $('sig-name').focus(); return; }
+      if (!email) { toast('Email is required', 'warn'); $('sig-email').focus(); return; }
+      if (!isEmail(email)) { toast('Invalid email format', 'error'); $('sig-email').focus(); return; }
+      if (!title) { toast('Title is required (CEO/CTO/CISO)', 'warn'); $('sig-title').focus(); return; }
+
+      const body = ''
+        + '<div style="font-size:12px;line-height:1.6;margin-bottom:14px">You are about to digitally sign this CISA Self-Attestation form. This action is <b>logged for audit</b>.</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px;margin-bottom:14px">'
+        +   row('Form UUID', (window.currentDraft.form_uuid || '').slice(0, 36))
+        +   row('Signed by', name)
+        +   row('Title', title)
+        +   row('Email', email)
+        +   row('Method', ($('sig-method') || {}).value || 'electronic')
+        + '</div>'
+        + '<div style="background:rgba(245,158,11,.08);border-left:3px solid #f59e0b;padding:8px 12px;border-radius:0 4px 4px 0;font-size:11px;color:var(--t2);line-height:1.5">'
+        +   '<b style="color:#f59e0b">⚠ Legal commitment:</b> By signing, you certify under penalty of law (per OMB M-22-18) that the SSDF practices stated are accurately implemented.'
+        + '</div>';
+      const footer = ''
+        + '<button class="btn btn-sm" onclick="window._vspATT.close()" style="margin-right:auto">Cancel</button>'
+        + '<button class="btn btn-primary btn-sm" onclick="window._vspATT.confirmSign()">🔏 Confirm & Sign</button>';
+      showModal({ title: '🔐 Confirm CISA Attestation Sign', body: body, footer: footer, width: '560px' });
+    };
+  }
+  ATT.confirmSign = async function() {
+    closeModal();
+    try {
+      const res = await authFetch('/api/p4/attestation/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form_uuid: window.currentDraft.form_uuid,
+          signed_by_name: $('sig-name').value.trim(),
+          signed_by_title: $('sig-title').value.trim(),
+          signed_by_email: $('sig-email').value.trim(),
+          signature_method: ($('sig-method') || {}).value || 'electronic'
+        })
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || JSON.stringify(d));
+      toast('✓ Attestation signed: ' + (d.form_uuid || '').slice(0, 8) + '…', 'success');
+      if (window.loadForms) window.loadForms();
+      if (window.loadDraft) window.loadDraft();
+    } catch (e) { toast('Sign error: ' + e.message, 'error'); }
+  };
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
+  function init() {
+    injectPracticesFilter();
+    makePracticesClickable();
+    makeKPIsClickable();
+    makeFormsClickable();
+    wrapSignAttestation();
+  }
+
+  // Initial init + observer for dynamic content
+  if (document.readyState !== 'loading') setTimeout(init, 200);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 200));
+
+  // Re-run on draft load (loadDraft re-renders practice rows)
+  const _origLoadDraft = window.loadDraft;
+  if (_origLoadDraft && !window.__vspDraftWrap) {
+    window.__vspDraftWrap = true;
+    window.loadDraft = async function() {
+      const r = await _origLoadDraft.apply(this, arguments);
+      setTimeout(init, 200);
+      return r;
+    };
+  }
+  // Re-run periodically (catch async renders)
+  let pollCount = 0;
+  const poll = setInterval(() => {
+    init();
+    // Early exit nếu đã polish được practices
+    if (document.querySelectorAll('.practice-row[data-vsp-pol="1"]').length > 0) {
+      clearInterval(poll); return;
+    }
+    if (++pollCount > 4) clearInterval(poll);
+  }, 1000);
+})();
+
+</script>
+<!-- VSP-ATT-POLISH-END -->
 </body>
 </html>

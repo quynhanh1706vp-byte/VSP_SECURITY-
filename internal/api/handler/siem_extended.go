@@ -20,6 +20,7 @@ import (
 	"github.com/vsp/platform/internal/scanner/secretcheck"
 	"github.com/vsp/platform/internal/store"
 	"github.com/vsp/platform/internal/threatintel"
+	"github.com/vsp/platform/internal/integrations/virustotal"
 )
 
 // ── Correlation ───────────────────────────────────────────────
@@ -826,4 +827,407 @@ func (h *ThreatIntel) LicenseCompliance(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	jsonOK(w, result)
+}
+
+// Stats returns observability info about threat intel state.
+// GET /api/v1/ti/stats
+func (h *ThreatIntel) Stats(w http.ResponseWriter, r *http.Request) {
+	stats := _tiClient.Stats()
+	jsonOK(w, stats)
+}
+
+// RefreshKEV triggers immediate KEV catalog reload (admin only).
+// POST /api/v1/ti/kev/refresh
+func (h *ThreatIntel) RefreshKEV(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if user.Role != "admin" {
+		jsonError(w, "admin role required", http.StatusForbidden)
+		return
+	}
+	if err := _tiClient.RefreshKEV(r.Context()); err != nil {
+		jsonError(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	jsonOK(w, _tiClient.Stats())
+}
+
+// _vtClient is package-level singleton for VirusTotal integration.
+// Initialized once on package load. API key from VSP_VT_API_KEY env.
+var _vtClient = virustotal.NewClient()
+
+// ComponentThreat returns VirusTotal threat assessment for a SW component.
+// GET /api/v1/sw/component/:hash/threat
+// Returns 200 with verdict if VT configured, 503 if not configured,
+// 400 for invalid hash, 502 for VT API errors.
+func (h *ThreatIntel) ComponentThreat(w http.ResponseWriter, r *http.Request) {
+	hash := strings.TrimSpace(chi.URLParam(r, "hash"))
+	if hash == "" {
+		jsonError(w, "hash param required", http.StatusBadRequest)
+		return
+	}
+
+	if !_vtClient.Configured() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"error":     "virustotal not configured",
+			"hint":      "set VSP_VT_API_KEY environment variable",
+			"verdict":   "unavailable",
+		})
+		return
+	}
+
+	report, err := _vtClient.GetFileReport(r.Context(), hash)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	jsonOK(w, report)
+}
+
+// VTStats returns observability info for VirusTotal client.
+// GET /api/v1/integrations/virustotal/stats
+func (h *ThreatIntel) VTStats(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, _vtClient.Stats())
+}
+
+
+// ─── UI 404 FIX: Stub handlers for missing routes ─────────────────
+// These return empty data to prevent panel 404s.
+// Full implementation deferred to next sprint.
+
+// UISTubSettings serves GET /api/v1/settings/* with empty config.
+// Used by: settings panel (dast-targets, scan-config)
+func (h *ThreatIntel) UISTubSettings(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]any{
+		"items":   []any{},
+		"enabled": false,
+		"note":    "Stub endpoint — real settings storage pending",
+	})
+}
+
+// UISTubSwReport serves POST /api/v1/sw/report with stub success.
+// Used by: sw_inventory panel "Send Report" action
+func (h *ThreatIntel) UISTubSwReport(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]any{
+		"received": true,
+		"note":     "Stub endpoint — report storage pending",
+	})
+}
+
+// UISTubIntegrationsList serves GET /api/v1/integrations/* with empty list.
+// Used by: integrations panel
+func (h *ThreatIntel) UISTubIntegrationsList(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]any{
+		"integrations": []any{},
+		"note":         "Stub — only VirusTotal active. Other integrations pending.",
+	})
+}
+
+// UISTubIntegrationsTest serves POST /api/v1/integrations/{provider}/test-*
+// with stub "test passed".
+func (h *ThreatIntel) UISTubIntegrationsTest(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	if provider == "" {
+		provider = "unknown"
+	}
+	jsonOK(w, map[string]any{
+		"ok":       false,
+		"provider": provider,
+		"note":     "Stub — real test integration pending",
+	})
+}
+
+// ─── UI Real Data Handlers ─────────────────────────────────────────
+// Pattern: h.DB.Pool().QueryRow(ctx, ...) — pgx (not database/sql)
+
+// IntegrationsList serves GET /api/v1/integrations
+// Returns webhooks from siem_webhooks table.
+func (h *ThreatIntel) IntegrationsList(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT id::text, label, type, url, min_sev, active,
+		        COALESCE(last_fired::text, ''), fire_count
+		 FROM siem_webhooks
+		 WHERE tenant_id = $1
+		 ORDER BY type, label`,
+		claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type integration struct {
+		ID        string `json:"id"`
+		Label     string `json:"label"`
+		Type      string `json:"type"`
+		URL       string `json:"url"`
+		MinSev    string `json:"min_severity"`
+		Active    bool   `json:"active"`
+		LastFired string `json:"last_fired,omitempty"`
+		FireCount int    `json:"fire_count"`
+	}
+	var items []integration
+	for rows.Next() {
+		var it integration
+		if scanErr := rows.Scan(&it.ID, &it.Label, &it.Type, &it.URL,
+			&it.MinSev, &it.Active, &it.LastFired, &it.FireCount); scanErr == nil {
+			// Mask URL — show domain only
+			if idx := strings.Index(it.URL, "://"); idx > 0 {
+				rest := it.URL[idx+3:]
+				if slash := strings.Index(rest, "/"); slash > 0 {
+					it.URL = it.URL[:idx+3] + rest[:slash] + "/***"
+				}
+			}
+			items = append(items, it)
+		}
+	}
+	if items == nil {
+		items = []integration{}
+	}
+
+	providers := map[string]bool{
+		"slack":      false,
+		"teams":      false,
+		"smtp":       false,
+		"github":     false,
+		"jira":       false,
+		"servicenow": false,
+		"pagerduty":  false,
+		"virustotal": _vtClient.Configured(),
+	}
+	for _, it := range items {
+		providers[it.Type] = true
+	}
+
+	jsonOK(w, map[string]any{
+		"integrations": items,
+		"providers":    providers,
+		"total":        len(items),
+	})
+}
+
+// IntegrationsTestProvider serves POST /api/v1/integrations/{provider}/test-*
+func (h *ThreatIntel) IntegrationsTestProvider(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	provider := chi.URLParam(r, "provider")
+
+	var url, providerType string
+	var active bool
+	err := h.DB.Pool().QueryRow(r.Context(),
+		`SELECT url, type, active FROM siem_webhooks
+		 WHERE tenant_id = $1 AND type = $2
+		 LIMIT 1`, claims.TenantID, provider).Scan(&url, &providerType, &active)
+
+	if err != nil {
+		jsonOK(w, map[string]any{
+			"ok":       false,
+			"provider": provider,
+			"error":    "no integration configured for this provider",
+			"hint":     "configure in integrations panel first",
+		})
+		return
+	}
+
+	if !active {
+		jsonOK(w, map[string]any{
+			"ok":       false,
+			"provider": provider,
+			"error":    "integration is disabled",
+		})
+		return
+	}
+
+	// HEAD ping (5s timeout)
+	req, _ := http.NewRequestWithContext(r.Context(), http.MethodHead, url, nil)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, pingErr := client.Do(req)
+	if pingErr != nil {
+		jsonOK(w, map[string]any{
+			"ok":       false,
+			"provider": provider,
+			"error":    "endpoint unreachable: " + pingErr.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	jsonOK(w, map[string]any{
+		"ok":          resp.StatusCode < 500,
+		"provider":    provider,
+		"http_status": resp.StatusCode,
+	})
+}
+
+// SettingsScanConfig serves GET /api/v1/settings/scan-config
+// Queries policy_rules table.
+func (h *ThreatIntel) SettingsScanConfig(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT id::text, name, repo_pattern, fail_on, min_score,
+		        max_high, block_secrets, block_critical, active
+		 FROM policy_rules
+		 WHERE tenant_id = $1
+		 ORDER BY name`, claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type policyRule struct {
+		ID            string `json:"id"`
+		Name          string `json:"name"`
+		RepoPattern   string `json:"repo_pattern"`
+		FailOn        string `json:"fail_on"`
+		MinScore      int    `json:"min_score"`
+		MaxHigh       int    `json:"max_high"`
+		BlockSecrets  bool   `json:"block_secrets"`
+		BlockCritical bool   `json:"block_critical"`
+		Active        bool   `json:"active"`
+	}
+	var items []policyRule
+	for rows.Next() {
+		var p policyRule
+		if scanErr := rows.Scan(&p.ID, &p.Name, &p.RepoPattern, &p.FailOn,
+			&p.MinScore, &p.MaxHigh, &p.BlockSecrets, &p.BlockCritical, &p.Active); scanErr == nil {
+			items = append(items, p)
+		}
+	}
+	if items == nil {
+		items = []policyRule{}
+	}
+
+	jsonOK(w, map[string]any{"rules": items, "total": len(items)})
+}
+
+// SettingsDastTargets serves GET /api/v1/settings/dast-targets
+// Derives from runs.target_url history.
+func (h *ThreatIntel) SettingsDastTargets(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT target_url, MAX(created_at)::text as last_scan,
+		        COUNT(*)::int as scan_count
+		 FROM runs
+		 WHERE tenant_id = $1
+		   AND target_url IS NOT NULL
+		   AND target_url != ''
+		 GROUP BY target_url
+		 ORDER BY last_scan DESC
+		 LIMIT 50`, claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type dastTarget struct {
+		URL       string `json:"url"`
+		LastScan  string `json:"last_scan"`
+		ScanCount int    `json:"scan_count"`
+	}
+	var targets []dastTarget
+	for rows.Next() {
+		var t dastTarget
+		if scanErr := rows.Scan(&t.URL, &t.LastScan, &t.ScanCount); scanErr == nil {
+			targets = append(targets, t)
+		}
+	}
+	if targets == nil {
+		targets = []dastTarget{}
+	}
+
+	jsonOK(w, map[string]any{"targets": targets, "total": len(targets)})
+}
+
+// SBOMIndex serves GET /api/v1/sbom — list runs với SBOM URLs.
+func (h *ThreatIntel) SBOMIndex(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT rid, created_at::text, mode, status, total_findings
+		 FROM runs
+		 WHERE tenant_id = $1 AND status = 'DONE'
+		 ORDER BY created_at DESC
+		 LIMIT 50`, claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type sbomRun struct {
+		RID           string `json:"rid"`
+		CreatedAt     string `json:"created_at"`
+		Mode          string `json:"mode"`
+		Status        string `json:"status"`
+		TotalFindings int    `json:"total_findings"`
+		SBOMURL       string `json:"sbom_url"`
+		GrypeURL      string `json:"grype_url"`
+		DiffURL       string `json:"diff_url"`
+	}
+	var runs []sbomRun
+	for rows.Next() {
+		var s sbomRun
+		if scanErr := rows.Scan(&s.RID, &s.CreatedAt, &s.Mode, &s.Status, &s.TotalFindings); scanErr == nil {
+			s.SBOMURL = "/api/v1/sbom/" + s.RID
+			s.GrypeURL = "/api/v1/sbom/" + s.RID + "/grype"
+			s.DiffURL = "/api/v1/sbom/" + s.RID + "/diff"
+			runs = append(runs, s)
+		}
+	}
+	if runs == nil {
+		runs = []sbomRun{}
+	}
+
+	jsonOK(w, map[string]any{
+		"runs":   runs,
+		"total":  len(runs),
+		"format": "CycloneDX 1.5 (JSON)",
+	})
+}
+
+// OSCALIndex serves GET /api/p4/oscal — list of OSCAL endpoints.
+func (h *ThreatIntel) OSCALIndex(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]any{
+		"available_endpoints": []map[string]string{
+			{"path": "/api/p4/oscal/catalog", "description": "NIST 800-53 control catalog"},
+			{"path": "/api/p4/oscal/profile", "description": "VSP system profile"},
+			{"path": "/api/p4/oscal/ssp", "description": "System Security Plan"},
+			{"path": "/api/p4/oscal/ssp/extended", "description": "Extended SSP"},
+			{"path": "/api/p4/oscal/poam-extended", "description": "POA&M with metadata"},
+			{"path": "/api/p4/oscal/assessment-plan", "description": "SAP"},
+			{"path": "/api/p4/oscal/assessment-results", "description": "SAR"},
+		},
+		"version": "OSCAL 1.0.4",
+		"format":  "JSON",
+	})
 }

@@ -3,6 +3,9 @@ package handler
 import (
 	"net/http"
 
+	"strings"
+
+	"github.com/google/uuid"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
 )
@@ -12,6 +15,28 @@ type Findings struct {
 }
 
 // GET /api/v1/vsp/findings
+// --- BEGIN PATCH: run_id/rid resolver -----------------------------------------
+func (h *Findings) resolveRunID(r *http.Request, tenantID string) string {
+	q := r.URL.Query()
+	val := strings.TrimSpace(q.Get("run_id"))
+	if val == "" {
+		val = strings.TrimSpace(q.Get("rid"))
+	}
+	if val == "" {
+		return ""
+	}
+	if _, err := uuid.Parse(val); err == nil {
+		return val
+	}
+	var id string
+	_ = h.DB.Pool().QueryRow(r.Context(),
+		`SELECT id::text FROM runs WHERE rid=$1 AND tenant_id=$2 LIMIT 1`,
+		val, tenantID).Scan(&id)
+	return id
+}
+
+// --- END PATCH ---------------------------------------------------------------
+
 func (h *Findings) List(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	q := r.URL.Query()
@@ -54,7 +79,7 @@ func (h *Findings) List(w http.ResponseWriter, r *http.Request) {
 // Default: latest completed run only. ?scope=all for all-time totals.
 func (h *Findings) Summary(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	runID := r.URL.Query().Get("run_id")
+	runID := h.resolveRunID(r, claims.TenantID)
 
 	// Auto-select latest DONE run unless scope=all
 	if runID == "" && r.URL.Query().Get("scope") != "all" {
