@@ -31,9 +31,6 @@ import (
 	"github.com/vsp/platform/internal/scanner/cosign"
 	"github.com/vsp/platform/internal/scanner/retirejs"
 	"github.com/vsp/platform/internal/scanner/trufflehog"
-	"github.com/vsp/platform/internal/scanner/apisec"
-	"github.com/vsp/platform/internal/scanner/gofuzz"
-	"github.com/vsp/platform/internal/scanner/racedetect"
 )
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -160,11 +157,6 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		nuclei.New(),
 		sslscan.New(),
 	}
-	phase4 := []scanner.Runner{
-		apisec.New(),
-		gofuzz.New(),
-		racedetect.New(),
-	}
 
 	switch mode {
 	case ModeSAST:
@@ -190,7 +182,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		// FULL and FULL_SOC both run all scanners across every mode group.
 		// FULL_SOC additionally feeds findings into SIEM correlation (handled downstream).
 		seen := make(map[string]bool)
-		all := make([]scanner.Runner, 0, 26)
+		all := make([]scanner.Runner, 0, 18)
 
 		// Build network group matching the ModeNetwork case exactly.
 		network := []scanner.Runner{sslscan.New(), nmap.New()}
@@ -198,7 +190,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 			network = append(network, netcapscanner.New(netcapEngine))
 		}
 
-		for _, group := range [][]scanner.Runner{sast, sca, secrets, iac, dast, phase4, network} {
+		for _, group := range [][]scanner.Runner{sast, sca, secrets, iac, dast, network} {
 			for _, r := range group {
 				if !seen[r.Name()] {
 					seen[r.Name()] = true
