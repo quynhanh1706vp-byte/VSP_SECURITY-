@@ -153,9 +153,20 @@ window.__esc = __esc;
         <div style="font-size:9px;color:var(--t3);margin-top:3px">Local path · Git URL · empty = dùng đường dẫn mặc định</div>
       </div>
 
-      <!-- Tools preview -->
-      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:4px">
-        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Tools: <span id="scan-tools-preview" style="color:var(--t2);text-transform:none">semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js · gofuzz · racedetect · apisec (26 tools)</span></div>
+      <!-- Target URL (DAST/NETWORK only) -->
+      <div class="form-group" id="scanUrlGroup" style="margin-bottom:10px;display:none">
+        <label class="form-label">Target URL <span style="color:var(--red)">*</span></label>
+        <input id="scanUrl" class="form-ctrl" placeholder="https://example.com">
+        <div style="font-size:9px;color:var(--t3);margin-top:3px">Required for DAST/NETWORK · Web app or service endpoint</div>
+      </div>
+
+      <!-- Tools preview as chips -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Tools dispatched · <span id="scan-tools-count" style="color:var(--cyan);font-weight:600">26</span></div>
+          <div style="font-size:9px;color:var(--t3);font-style:italic" id="scan-tools-note"></div>
+        </div>
+        <div id="scan-tools-chips" style="display:flex;flex-wrap:wrap;gap:4px;line-height:1.6"></div>
       </div>
 
       <div id="scanMsg" style="margin-top:8px;font-size:11px;font-family:var(--font-mono)"></div>
@@ -173,21 +184,85 @@ function setScanPreset(mode, profile) {
   document.getElementById('scanProfile').value = profile;
   updateScanTools();
 }
+// Single source of truth — used by both scan dialog + scan log render
+window.TOOLS_BY_MODE_SCAN = {
+  SAST:    ['bandit','semgrep','codeql','gosec'],
+  SCA:     ['trivy','grype','license','osv-scanner','cosign','retire-js','syft','govulncheck'],
+  SECRETS: ['gitleaks','secretcheck','trufflehog'],
+  IAC:     ['kics','checkov','hadolint'],
+  DAST:    ['nikto','nuclei','sslscan'],
+  NETWORK: ['nmap','sslscan','netcap'],
+  FULL:    ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','osv-scanner','cosign','retire-js','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','apisec','gofuzz','racedetect'],
+  FULL_SOC:['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','osv-scanner','cosign','retire-js','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','apisec','gofuzz','racedetect'],
+};
+
+// Tool color hint by category for chip rendering
+window.TOOL_CATEGORY = {
+  // SAST = purple
+  bandit:'sast', semgrep:'sast', codeql:'sast', gosec:'sast',
+  // SCA = blue
+  trivy:'sca', grype:'sca', license:'sca', 'osv-scanner':'sca', cosign:'sca',
+  'retire-js':'sca', syft:'sca', govulncheck:'sca',
+  // SECRETS = red
+  gitleaks:'secrets', secretcheck:'secrets', trufflehog:'secrets',
+  // IAC = orange
+  kics:'iac', checkov:'iac', hadolint:'iac',
+  // DAST = cyan
+  nikto:'dast', nuclei:'dast', sslscan:'dast',
+  // NETWORK = teal
+  nmap:'network', netcap:'network',
+  // PHASE4 = green
+  apisec:'phase4', gofuzz:'phase4', racedetect:'phase4',
+};
+
+window.CATEGORY_COLORS = {
+  sast:    {bg:'rgba(139,92,246,.15)', bd:'rgba(139,92,246,.4)',  fg:'#a78bfa'},
+  sca:     {bg:'rgba(59,130,246,.15)', bd:'rgba(59,130,246,.4)',  fg:'#60a5fa'},
+  secrets: {bg:'rgba(239,68,68,.15)',  bd:'rgba(239,68,68,.4)',   fg:'#f87171'},
+  iac:     {bg:'rgba(245,158,11,.15)', bd:'rgba(245,158,11,.4)',  fg:'#fbbf24'},
+  dast:    {bg:'rgba(6,182,212,.15)',  bd:'rgba(6,182,212,.4)',   fg:'#22d3ee'},
+  network: {bg:'rgba(20,184,166,.15)', bd:'rgba(20,184,166,.4)',  fg:'#2dd4bf'},
+  phase4:  {bg:'rgba(34,197,94,.15)',  bd:'rgba(34,197,94,.4)',   fg:'#4ade80'},
+};
+
 function updateScanTools() {
   var mode = document.getElementById('scanMode').value;
-  var toolMap = {
-    'SAST':     'semgrep · gosec · bandit · codeql',
-    'SCA':      'trivy · grype · license',
-    'SECRETS':  'gitleaks · secretcheck · trufflehog',
-    'IAC':      'kics · checkov · hadolint',
-    'DAST':     'nuclei · nikto · sslscan',
-    'NETWORK':  'nmap · sslscan · netcap',
-    'FULL':     'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js · gofuzz · racedetect · apisec (26 tools)',
-    'FULL_SOC': 'semgrep · gosec · codeql · bandit · trivy · grype · syft · govulncheck · license · gitleaks · secretcheck · trufflehog · kics · checkov · hadolint · nuclei · nikto · sslscan · nmap · netcap · osv-scanner · cosign · retire-js · gofuzz · racedetect · apisec + SIEM (26 tools + SIEM)',
-  };
-  var el = document.getElementById('scan-tools-preview');
-  if (el) el.textContent = toolMap[mode] || mode;
+  var tools = window.TOOLS_BY_MODE_SCAN[mode] || [];
+  var chipsEl = document.getElementById('scan-tools-chips');
+  var countEl = document.getElementById('scan-tools-count');
+  var noteEl = document.getElementById('scan-tools-note');
+  var urlGroup = document.getElementById('scanUrlGroup');
+
+  // Render chips
+  if (chipsEl) {
+    chipsEl.innerHTML = tools.map(function(t){
+      var cat = window.TOOL_CATEGORY[t] || 'sast';
+      var c = window.CATEGORY_COLORS[cat] || window.CATEGORY_COLORS.sast;
+      return '<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;'
+           + 'font-size:10px;font-family:var(--font-mono);background:'+c.bg+';border:1px solid '+c.bd+';color:'+c.fg+'">'
+           + t + '</span>';
+    }).join('');
+  }
+  if (countEl) countEl.textContent = tools.length;
+
+  // Note for special modes
+  if (noteEl) {
+    if (mode === 'FULL_SOC') noteEl.textContent = '+ SIEM correlation downstream';
+    else if (mode === 'NETWORK') noteEl.textContent = 'sslscan dedup with DAST';
+    else noteEl.textContent = '';
+  }
+
+  // Show/hide URL field for DAST/NETWORK
+  if (urlGroup) {
+    var needsURL = (mode === 'DAST' || mode === 'NETWORK');
+    urlGroup.style.display = needsURL ? '' : 'none';
+  }
 }
+
+// Init chips on page load
+window.addEventListener('DOMContentLoaded', function(){
+  setTimeout(updateScanTools, 100);
+});
 </script>
 
 <!-- GOV PATCH: Classification Banner -->
@@ -2415,27 +2490,79 @@ function loadCMMC() {
 async function triggerScan() {
   const mode    = document.getElementById('scanMode').value;
   const profile = document.getElementById('scanProfile').value;
-  const src     = document.getElementById('scanSrc').value;
+  const src     = (document.getElementById('scanSrc').value || '').trim();
+  const urlEl   = document.getElementById('scanUrl');
+  const url     = urlEl ? (urlEl.value || '').trim() : '';
   const msg     = document.getElementById('scanMsg');
-  if (!src) { msg.style.color='var(--red)'; msg.textContent='⚠ Source path is required'; return; }
-  msg.style.color='var(--t3)'; msg.textContent='⏳ Triggering scan…';
-  try {
-    if (TOKEN) {
-      // /vsp/run đã handle FULL_SOC mode đúng (có worker thật).
-      // /vsp/run/full-soc chỉ insert DB stuck QUEUED — không dùng.
-      const r = await api('POST', '/vsp/run', {mode, profile, src});
-      const isFullSOC = (mode === 'FULL_SOC' || profile === 'FULL_SOC');
-      const label = isFullSOC ? '🚀 FULL_SOC triggered' : '✓';
-      msg.style.color='var(--green)';
-      msg.textContent = label + ' · ' + (r.rid||'') + ' · ' + (r.message || 'queued');
-    } else {
-      msg.style.color='var(--green)'; msg.textContent='✓ Scan triggered (offline mode) · Mode: ' + mode;
-    }
-    setTimeout(() => document.getElementById('scan-modal').classList.remove('open'), 2000);
-  } catch(e) {
-    msg.style.color='var(--amber)'; msg.textContent='ℹ Scan queued (offline mode)';
-    setTimeout(() => document.getElementById('scan-modal').classList.remove('open'), 2000);
+  const btnExec = document.querySelector('#scan-modal .modal-footer .btn-primary');
+
+  // Validation
+  const needsURL = (mode === 'DAST' || mode === 'NETWORK');
+  if (needsURL && !url) {
+    msg.style.color='var(--red)';
+    msg.innerHTML='⚠ Target URL is required for ' + mode + ' mode';
+    return;
   }
+  if (!needsURL && !src) {
+    msg.style.color='var(--red)';
+    msg.innerHTML='⚠ Source path is required';
+    return;
+  }
+  if (url && !/^https?:\/\//.test(url)) {
+    msg.style.color='var(--red)';
+    msg.innerHTML='⚠ URL must start with http:// or https://';
+    return;
+  }
+
+  // Submit
+  msg.style.color='var(--t3)';
+  msg.innerHTML='⏳ Triggering scan…';
+  if (btnExec) { btnExec.disabled=true; btnExec.style.opacity='0.6'; }
+
+  try {
+    if (!window.TOKEN) {
+      msg.style.color='var(--amber)';
+      msg.innerHTML='⚠ Not authenticated — please login first';
+      if (btnExec) { btnExec.disabled=false; btnExec.style.opacity=''; }
+      return;
+    }
+
+    const body = {mode: mode, profile: profile, src: src};
+    if (needsURL) body.target_url = url;
+
+    const r = await api('POST', '/vsp/run', body);
+    const rid = r && r.rid ? r.rid : '(no rid in response)';
+    const isFullSOC = (mode === 'FULL_SOC' || profile === 'FULL_SOC');
+    const icon = isFullSOC ? '🚀' : '✓';
+    const label = isFullSOC ? 'FULL_SOC scan queued' : 'Scan queued';
+
+    msg.style.color='var(--green)';
+    msg.innerHTML = icon + ' ' + label + ' · <code style="font-size:10px;color:var(--cyan)">' + rid + '</code>'
+                  + '<br><a href="javascript:void(0)" onclick="goToScanLog(\''+rid+'\')" style="color:var(--cyan);font-size:11px;text-decoration:underline;cursor:pointer">→ View in Scan log</a>';
+
+    // Auto-close + switch tab after 2.5s
+    setTimeout(function(){
+      document.getElementById('scan-modal').classList.remove('open');
+      goToScanLog(rid);
+    }, 2500);
+  } catch(e) {
+    var errMsg = (e && e.message) ? e.message : String(e);
+    msg.style.color='var(--red)';
+    msg.innerHTML = '✕ Failed: ' + errMsg;
+  } finally {
+    if (btnExec) { btnExec.disabled=false; btnExec.style.opacity=''; }
+  }
+}
+
+// Switch to Scan log tab và load run vừa trigger
+function goToScanLog(rid) {
+  try {
+    var btn = document.querySelector('.nav-item[onclick*="scanlog"]');
+    if (btn) btn.click();
+    setTimeout(function(){
+      if (typeof loadRunLog === 'function' && rid) loadRunLog(rid);
+    }, 300);
+  } catch(e) { console.error('goToScanLog:', e); }
 }
 
 /* ─── Executive ─── */
