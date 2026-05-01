@@ -423,6 +423,7 @@ function updateScanTools() {
       <span class="qs-key" style="margin-left:auto">⌘K</span>
     </div>
   </div>
+      <button class="nav-item" onclick="showPanel('cspm',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a3 3 0 0 1 .5-5.96A4 4 0 1 1 12 8h.5a3 3 0 0 1 0 6H4z"/></svg></span> CSPM <span class="nav-badge" style="background:rgba(239,68,68,.2);color:#ef4444;font-size:8px">NEW</span></button>
 </nav>
 
 <!-- ══════════════════════════════════════════════
@@ -8660,5 +8661,26 @@ function startMFATimer() {
 })();
 </script>
 <!-- VSP-NAV-BRIDGE-END -->
+
+<div class="phase4-banner" id="phase4-banner" onclick="document.getElementById('phase4-banner').classList.remove('show')">
+  ✨ Phase 4 Quick Wins deployed: +CSPM +Fuzzing +Race Detector +API Security
+</div>
+
+<script>
+// Show Phase 4 banner once per 24h
+(function(){
+  var seen = sessionStorage.getItem('vsp_phase4_seen');
+  if (!seen) {
+    setTimeout(function() {
+      var b = document.getElementById('phase4-banner');
+      if (b) b.classList.add('show');
+      sessionStorage.setItem('vsp_phase4_seen', '1');
+      setTimeout(function() {
+        if (b) b.classList.remove('show');
+      }, 8000); // Auto-hide after 8s
+    }, 1500);
+  }
+})();
+</script>
 </body>
 </html>
