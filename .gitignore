@@ -159,3 +159,11 @@ go.mod.bak
 go.sum.bak
 phase4_3_pitch.tar.gz
 *.tar.gz
+
+# VSP build artifacts
+*.bak.*
+*backup.*
+*.before_revert.*
+NOTES_FIX_*.md
+triggered_via
+internal/threatintel/conflicting_*/

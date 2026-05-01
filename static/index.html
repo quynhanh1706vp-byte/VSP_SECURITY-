@@ -8614,5 +8614,51 @@ function startMFATimer() {
           internal/ai/advisor.go (AI advisor module)
      DO NOT re-add this pattern. -->
 
+
+<!-- VSP-NAV-BRIDGE-START -->
+<script>
+(function(){
+  if (window.__VSP_NAV_BRIDGE__) return;
+  window.__VSP_NAV_BRIDGE__ = true;
+  console.log('[VSP-NAV-BRIDGE] Loaded — listening for cross-nav messages');
+  window.addEventListener('message', function(e) {
+    if (!e.data || e.data.type !== 'vsp-cross-nav') return;
+    var panel = e.data.panel;
+    var hint  = e.data.hint || {};
+    console.log('[VSP-NAV-BRIDGE] Received cross-nav:', panel, hint);
+
+    var nameMap = {
+      'vuln_mgmt': 'vulnmgmt',
+      'threat_intel': 'threatintel',
+      'threat_hunt': 'threathunt',
+      'p4_compliance': 'p4compliance',
+      'network_flow': 'netflow'
+    };
+    var target = nameMap[panel] || panel;
+
+    if (typeof showPanel === 'function') {
+      // Find matching nav button
+      var navBtn = null;
+      var buttons = document.querySelectorAll('.nav-item');
+      for (var i = 0; i < buttons.length; i++) {
+        var oc = buttons[i].getAttribute('onclick') || '';
+        if (oc.indexOf("'" + target + "'") >= 0) {
+          navBtn = buttons[i];
+          break;
+        }
+      }
+      try {
+        showPanel(target, navBtn);
+        console.log('[VSP-NAV-BRIDGE] showPanel("' + target + '") called');
+      } catch(err) {
+        console.warn('[VSP-NAV-BRIDGE] showPanel error:', err);
+      }
+    } else {
+      console.warn('[VSP-NAV-BRIDGE] showPanel function not found on top window');
+    }
+  });
+})();
+</script>
+<!-- VSP-NAV-BRIDGE-END -->
 </body>
 </html>
