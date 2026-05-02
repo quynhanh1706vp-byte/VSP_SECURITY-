@@ -186,6 +186,7 @@ func main() {
 	usersH := &handler.Users{DB: db}
 	mfaH := &handler.MFA{DB: db}
 	apiKeysH := &handler.APIKeys{DB: db}
+	toolConfigH := &handler.ToolConfig{DB: db}
 	runsH := &handler.Runs{DB: db}
 	runsH.SetAsynqClient(asynqClient)
 	findingsH := &handler.Findings{DB: db}
@@ -1137,6 +1138,11 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 		r.Post("/api/v1/integrations/{provider}/test-ticket", tiH.IntegrationsTestProvider)
 		r.Get("/api/v1/settings/scan-config", tiH.SettingsScanConfig)
 		r.Get("/api/v1/settings/dast-targets", tiH.SettingsDastTargets)
+
+		// Phase B Step 2 — per-tenant tool enable/disable
+		r.Get("/api/v1/settings/tool-config", toolConfigH.Get)
+		r.Put("/api/v1/settings/tool-config", toolConfigH.Update)
+		r.Post("/api/v1/settings/tool-config/reset", toolConfigH.Reset)
 		r.Get("/api/v1/sbom", tiH.SBOMIndex)
 
 		// UI 404 FIX: stub routes (return empty/ok)

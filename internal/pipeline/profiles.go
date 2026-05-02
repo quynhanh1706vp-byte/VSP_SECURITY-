@@ -93,14 +93,16 @@ func ToolNamesForMode(mode Mode) []string {
 	case ModeNetwork:
 		return []string{"sslscan", "nmap", "netcap"}
 	case ModeFull, ModeFullSOC:
+		// 26 tools — must match pipeline.RunnersFor(ModeFull) exactly.
+		// Order: IAC · SAST · SCA · SECRETS · DAST · NETWORK · PHASE4
 		return []string{
 			"kics", "checkov", "hadolint",
 			"bandit", "semgrep", "codeql", "gosec",
-			"trivy", "grype", "license", "syft", "govulncheck",
+			"trivy", "grype", "license", "osv-scanner", "cosign", "retire-js", "syft", "govulncheck",
 			"gitleaks", "secretcheck", "trufflehog",
 			"nikto", "nuclei", "sslscan",
 			"nmap", "netcap",
-			"osv-scanner", "cosign", "retire-js",
+			"apisec", "gofuzz", "racedetect",
 		}
 	default:
 		return []string{"bandit", "semgrep", "trivy", "grype", "gitleaks", "secretcheck"}

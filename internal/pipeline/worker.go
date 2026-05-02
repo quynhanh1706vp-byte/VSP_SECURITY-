@@ -94,6 +94,43 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	// Execute — apply profile filtering + timeout per profile
 	profileRunners := RunnersForProfile(payload.Mode, payload.Profile)
 	payload.TimeoutSec = TimeoutForProfile(payload.Profile)
+
+	// Phase B Step 2 — apply per-tenant tool config (disable opt-out).
+	// Tools the tenant explicitly disabled in Settings are filtered out here.
+	// Best-effort: if DB query fails, fall back to all tools (don't block scan).
+	if h.DB != nil && payload.TenantID != "" {
+		disabled, dbErr := h.DB.GetDisabledTools(ctx, payload.TenantID)
+		if dbErr != nil {
+			log.Warn().Err(dbErr).Str("rid", payload.RID).Msg("tool config: read disabled list failed (continuing with all tools)")
+		} else if len(disabled) > 0 {
+			disabledSet := make(map[string]bool, len(disabled))
+			for _, name := range disabled {
+				disabledSet[name] = true
+			}
+			filtered := make([]scanner.Runner, 0, len(profileRunners))
+			skipped := make([]string, 0, len(disabled))
+			for _, r := range profileRunners {
+				if disabledSet[r.Name()] {
+					skipped = append(skipped, r.Name())
+					continue
+				}
+				filtered = append(filtered, r)
+			}
+			if len(skipped) > 0 {
+				log.Info().
+					Str("rid", payload.RID).
+					Int("skipped_count", len(skipped)).
+					Strs("skipped_tools", skipped).
+					Int("remaining", len(filtered)).
+					Msg("tool config: filtered out tenant-disabled tools")
+			}
+			profileRunners = filtered
+		}
+	}
+	if len(profileRunners) == 0 {
+		log.Warn().Str("rid", payload.RID).Msg("tool config: ALL tools disabled by tenant — scan will produce no findings")
+	}
+
 	result, err := h.Exec.ExecuteWith(ctx, payload, profileRunners)
 	if err != nil {
 		h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "FAILED", 0)
