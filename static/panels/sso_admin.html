@@ -33,9 +33,9 @@
   .btn-ghost { background:transparent; border:1px solid var(--cream2); color:var(--cream); }
 
   .badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-family:monospace; letter-spacing:1px; }
-  .b-ok { background:rgba(74,124,89,.2); color:#7fb893; }
-  .b-warn { background:rgba(201,169,97,.2); color:#d8c082; }
-  .b-info { background:rgba(58,106,154,.2); color:#7ba8d4; }
+  .b-ok { background:rgba(34,197,94,.15); color:var(--green); }
+  .b-warn { background:rgba(245,158,11,.15); color:var(--amber); }
+  .b-info { background:rgba(6,182,212,.15); color:var(--cyan); }
 
   .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; }
   .modal-backdrop.show { display:flex; align-items:center; justify-content:center; }
@@ -283,7 +283,7 @@ async function saveProvider() {
     enabled:     document.getElementById('p-enabled').checked,
   };
   if (!body.name || !body.issuer_url || !body.client_id) {
-    alert('Name, issuer URL, and client ID are required');
+    window._vspUNI4.toast('Name, issuer URL, and client ID are required', 'error');
     return;
   }
   try {
@@ -292,17 +292,42 @@ async function saveProvider() {
     const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if (!r.ok) throw new Error(await r.text());
     closeModal();
+    window._vspUNI4.toast(id ? 'Provider updated' : 'Provider added', 'success');
     loadProviders();
-  } catch (e) { alert('Error: ' + e.message); }
+  } catch (e) { window._vspUNI4.toast('Error: ' + e.message, 'error'); }
 }
 
 async function deleteProvider(id) {
-  if (!confirm('Delete this SSO provider?')) return;
+  // Modal confirm — replaces native confirm()
+  const body = `
+    <div style="padding:6px 0">
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:14px">
+        <div style="font-size:28px;line-height:1">⚠️</div>
+        <div>
+          <div style="font-weight:600;color:var(--t1);margin-bottom:6px">Delete this SSO provider?</div>
+          <div style="color:var(--t3);font-size:12px;line-height:1.5">
+            Users authenticating with this provider will <b style="color:var(--amber)">lose SSO access</b>. They will need to log in via password or another configured provider.
+          </div>
+        </div>
+      </div>
+      <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:10px 12px;color:var(--red);font-size:11px;font-family:var(--font-mono)">
+        Provider ID: ${id}
+      </div>
+    </div>`;
+  const footer = `
+    <button class="btn btn-ghost" onclick="window._vspUNI4.close()">Cancel</button>
+    <button class="btn btn-primary" style="background:var(--red);border-color:var(--red)" onclick="confirmDeleteProvider('${id}')">🗑 Delete provider</button>`;
+  showModal({ title: '🔐 Confirm SSO provider delete', body: body, footer: footer, width: '480px' });
+}
+
+async function confirmDeleteProvider(id) {
   try {
     const r = await fetch(`/api/v1/sso/providers/${id}`, { method: 'DELETE' });
     if (!r.ok) throw new Error(await r.text());
+    window._vspUNI4.close();
+    window._vspUNI4.toast('SSO provider deleted', 'success');
     loadProviders();
-  } catch (e) { alert('Error: ' + e.message); }
+  } catch (e) { window._vspUNI4.toast('Error: ' + e.message, 'error'); }
 }
 
 function testLogin(id) {
@@ -680,7 +705,7 @@ loadProviders();
         + (providers.length > 0
             ? '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:6px">'
               + providers.map(p => `<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd,#27272a)">
-                <span style="background:rgba(6,182,212,.15);color:#06b6d4;padding:2px 7px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace);min-width:50px;text-align:center">${esc(p.type || '?')}</span>
+                <span style="background:rgba(6,182,212,.15);color:var(--cyan);padding:2px 7px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace);min-width:50px;text-align:center">${esc(p.type || '?')}</span>
                 <span style="flex:1;font-size:11px">${esc(p.name || p.id || '?')}</span>
                 <span style="font-size:10px;color:${p.enabled ? '#10b981' : '#71717a'}">${p.enabled ? '✓ enabled' : 'disabled'}</span>
               </div>`).join('')
@@ -689,7 +714,7 @@ loadProviders();
       const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI4.close()">Close</button>';
       showModal({ title: '🔐 SSO Providers', body: body, footer: footer, width: '600px' });
     } catch (e) {
-      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI4.close()">Close</button>' });
+      showModal({ title: 'Error', body: '<div style="color:var(--red)">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI4.close()">Close</button>' });
     }
   }
 

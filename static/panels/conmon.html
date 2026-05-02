@@ -43,7 +43,7 @@
   tr:hover td { background:#172234; }
 
   .badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-family:monospace; letter-spacing:1px; }
-  .badge.b-ok { background:rgba(74,124,89,.2); color:#7fb893; }
+  .badge.b-ok { background:rgba(74,124,89,.2); color:var(--green); }
   .badge.b-warn { background:rgba(201,169,97,.2); color:#d8c082; }
   .badge.b-bad { background:rgba(184,80,66,.2); color:#d18b80; }
   .badge.b-info { background:rgba(58,106,154,.2); color:#7ba8d4; }
@@ -304,16 +304,34 @@ function toggleOpenOnly() {
 }
 
 async function ackDeviation(id) {
-  const notes = prompt('Acknowledgement notes (optional):', '');
-  if (notes === null) return;
+  // Modal with textarea — replaces native prompt()
+  const body = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <label style="font-size:10px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase">Acknowledgement notes <span style="color:var(--t3);text-transform:none">(optional)</span></label>
+      <textarea id="ack-notes" rows="4" placeholder="e.g. Investigated by SOC team, false positive — control already in place&#10;Approved by: J. Smith (CISO)&#10;Reference: TICKET-1234"
+        style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;color:var(--t1);font-family:var(--font-mono);font-size:11px;width:100%;resize:vertical"></textarea>
+      <div style="font-size:10px;color:var(--t3);font-style:italic">Notes are stored in audit log for SOC follow-up. Empty = generic acknowledgement.</div>
+    </div>`;
+  const footer = `
+    <button class="btn btn-ghost" onclick="window._vspUNI.close()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitAckDeviation('${id}')">✓ Acknowledge</button>`;
+  showModal({ title: '🔔 Acknowledge Deviation', body: body, footer: footer, width: '520px' });
+  setTimeout(() => { var el = document.getElementById('ack-notes'); if (el) el.focus(); }, 50);
+}
+
+async function submitAckDeviation(id) {
+  var notesEl = document.getElementById('ack-notes');
+  var notes = notesEl ? notesEl.value : '';
   try {
     const r = await fetch(`/api/v1/conmon/deviations/${id}/acknowledge`, { method: 'POST',
       headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
       body: JSON.stringify({ notes }),
     });
     if (!r.ok) throw new Error(await r.text());
+    window._vspUNI.close();
+    window._vspUNI.toast('Deviation acknowledged', 'success');
     loadDeviations();
-  } catch (e) { alert('Error: ' + e.message); }
+  } catch (e) { window._vspUNI.toast('Error: ' + e.message, 'error'); }
 }
 
 function showCreateModal() {
@@ -331,7 +349,7 @@ async function createSchedule() {
     target_path: document.getElementById('ns-target').value.trim(),
   };
   if (!body.name || !body.target_path) {
-    alert('Name and target path are required');
+    window._vspUNI.toast('Name and target path are required', 'error');
     return;
   }
   try {
@@ -343,8 +361,9 @@ async function createSchedule() {
     closeCreateModal();
     document.getElementById('ns-name').value = '';
     document.getElementById('ns-target').value = '';
+    window._vspUNI.toast('Schedule created · ' + body.cadence + ' · ' + body.mode, 'success');
     loadAll();
-  } catch (e) { alert('Error: ' + e.message); }
+  } catch (e) { window._vspUNI.toast('Error: ' + e.message, 'error'); }
 }
 
 function escapeHtml(s) {
@@ -654,7 +673,7 @@ setInterval(loadAll, 60000);
       const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI.close()">Close</button>';
       showModal({ title: '🛡 Vulnerability Breakdown', body: body, footer: footer, width: '720px' });
     } catch (e) {
-      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
+      showModal({ title: 'Error', body: '<div style="color:var(--red)">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
     }
   }
 
@@ -761,7 +780,7 @@ setInterval(loadAll, 60000);
       const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI.close()">Close</button>';
       showModal({ title: '📊 ConMon Cadence', body: body, footer: footer, width: '600px' });
     } catch (e) {
-      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
+      showModal({ title: 'Error', body: '<div style="color:var(--red)">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
     }
   }
 
@@ -843,7 +862,7 @@ setInterval(loadAll, 60000);
       const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI.close()">Close</button>';
       showModal({ title: '🤖 SOAR Playbook breakdown', body: body, footer: footer, width: '720px' });
     } catch (e) {
-      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
+      showModal({ title: 'Error', body: '<div style="color:var(--red)">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI.close()">Close</button>' });
     }
   }
 

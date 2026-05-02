@@ -17,8 +17,8 @@
     font-family:monospace; letter-spacing:2px; text-transform:uppercase;
     margin-left:12px; vertical-align:middle;
   }
-  .mode-claude { background:rgba(13,115,119,.25); color:#7fcecf; }
-  .mode-local  { background:rgba(201,169,97,.25); color:#d8c082; }
+  .mode-claude { background:rgba(6,182,212,.15); color:var(--cyan); }
+  .mode-local  { background:rgba(245,158,11,.15); color:var(--amber); }
 
   .grid { display:grid; grid-template-columns:380px 1fr; gap:24px; }
 
@@ -72,7 +72,7 @@
   }
 
   .refs { display:flex; flex-wrap:wrap; gap:6px; }
-  .ref { background:rgba(13,115,119,.25); color:#7fcecf;
+  .ref { background:rgba(6,182,212,.15); color:var(--cyan);
          padding:3px 10px; border-radius:3px;
          font-family:monospace; font-size:11px; }
 
@@ -90,8 +90,8 @@
     font:11px monospace; letter-spacing:1px;
   }
   .fb-btn:hover { background:rgba(255,255,255,.05); }
-  .fb-btn.helpful { color:#7fb893; border-color:#7fb893; }
-  .fb-btn.not_helpful { color:#d18b80; border-color:#d18b80; }
+  .fb-btn.helpful { color:var(--green); border-color:var(--green); }
+  .fb-btn.not_helpful { color:var(--red); border-color:var(--red); }
 
   .stats-bar {
     display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;
@@ -231,7 +231,7 @@ async function getAdvice() {
                        .split('\n').map(s => s.trim()).filter(Boolean),
   };
   if (!body.control_id || !body.finding_summary) {
-    alert('Control ID and finding summary are required');
+    window._vspUNI3.toast('Control ID and finding summary are required', 'error');
     return;
   }
 
@@ -262,11 +262,11 @@ function renderResponse(d) {
   const eff = d.effort_hours || {};
   const refs = (d.references || []).map(r => `<span class="ref">${escapeHtml(r)}</span>`).join('');
   const cachedBadge = d.cached
-    ? '<span class="ref" style="background:rgba(74,124,89,.25);color:#7fb893">CACHED</span>'
+    ? '<span class="ref" style="background:rgba(34,197,94,.15);color:var(--green)">CACHED</span>'
     : '';
   const sourceBadge = d.source === 'claude'
-    ? '<span class="ref" style="background:rgba(13,115,119,.25);color:#7fcecf">CLAUDE</span>'
-    : '<span class="ref" style="background:rgba(201,169,97,.25);color:#d8c082">LOCAL RULES</span>';
+    ? '<span class="ref" style="background:rgba(6,182,212,.15);color:var(--cyan)">CLAUDE</span>'
+    : '<span class="ref" style="background:rgba(245,158,11,.15);color:var(--amber)">LOCAL RULES</span>';
 
   let html = `
     <div class="section-block">
@@ -338,8 +338,8 @@ async function sendFeedback(rating) {
       headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
       body: JSON.stringify({ rating }),
     });
-    alert('Feedback recorded — thanks!');
-  } catch (e) { alert('Error: ' + e.message); }
+    window._vspUNI3.toast('Feedback recorded — thanks!', 'success');
+  } catch (e) { window._vspUNI3.toast('Error: ' + e.message, 'error'); }
 }
 
 loadMode();
@@ -629,7 +629,7 @@ setInterval(loadStats, 30000);
       const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI3.close()">Close</button>';
       showModal({ title: '🤖 AI Advisor Stats', body: body, footer: footer, width: '600px' });
     } catch (e) {
-      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
+      showModal({ title: 'Error', body: '<div style="color:var(--red)">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
     }
   }
 
@@ -705,7 +705,7 @@ setInterval(loadStats, 30000);
       const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI3.close()">Close</button>';
       showModal({ title: '⚙ CI/CD Stats', body: body, footer: footer, width: '600px' });
     } catch (e) {
-      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
+      showModal({ title: 'Error', body: '<div style="color:var(--red)">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
     }
   }
 
@@ -765,7 +765,7 @@ setInterval(loadStats, 30000);
         const banner = document.createElement('div');
         banner.id = 'vsp-sbom-diff-banner';
         banner.innerHTML = infoBanner('#f59e0b', '🔄 SBOM Diff — Compare Two Software Inventories',
-          'Identifies <b style="color:#10b981">added</b>, <b style="color:#ef4444">removed</b>, and <b style="color:#f59e0b">changed</b> packages between two SBOM snapshots. Helps detect supply chain drift per <b>EO 14028</b>.');
+          'Identifies <b style="color:var(--green)">added</b>, <b style="color:var(--red)">removed</b>, and <b style="color:var(--amber)">changed</b> packages between two SBOM snapshots. Helps detect supply chain drift per <b>EO 14028</b>.');
         const target = main.querySelector('div');
         if (target) target.parentNode.insertBefore(banner, target);
       }
@@ -820,7 +820,7 @@ setInterval(loadStats, 30000);
             + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">EOL DATABASE (top 10)</div>'
             + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:280px;overflow:auto">'
             +   eolList.slice(0, 10).map(e => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
-                  <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(e.product || e.name || '?')}</span>
+                  <span style="font-family:var(--font-mono,monospace);color:var(--accent)">${esc(e.product || e.name || '?')}</span>
                   <span style="color:var(--t3)">EOL ${esc(e.eol_date || e.eol || '—')}</span>
                 </div>`).join('')
             + '</div>'
@@ -828,7 +828,7 @@ setInterval(loadStats, 30000);
       const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI3.close()">Close</button>';
       showModal({ title: '⚠ Software Risk', body: body, footer: footer, width: '720px' });
     } catch (e) {
-      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
+      showModal({ title: 'Error', body: '<div style="color:var(--red)">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
     }
   }
 
