@@ -1,6 +1,27 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script>
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500; var waited = 0;
+    while (waited < maxWait) {
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      try { tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || ""; if (tk && tk.length >= 20) { window.TOKEN = tk; try { localStorage.setItem("vsp_token", tk); } catch(e){} return tk; } } catch(e) {}
+      await new Promise(r=>setTimeout(r, 100)); waited += 100;
+    }
+    return "";
+  }
+  var _origFetch = window.fetch;
+  window.vspAuthFetch = async function(url, opts){ opts = opts || {}; var tk = await getToken(); if (tk) opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk}); return _origFetch(url, opts); };
+  window.fetch = function(url, opts){ if (typeof url==="string" && url.indexOf("/api/")>=0){ if (opts && opts.headers && (opts.headers.Authorization||opts.headers.authorization)) return _origFetch(url,opts); return window.vspAuthFetch(url,opts); } return _origFetch(url,opts); };
+})();
+</script>
+
 <meta charset="utf-8">
 <title>ConMon — Continuous Monitoring</title>
 <link rel="stylesheet" href="/vsp_enterprise_ui.css">
