@@ -260,29 +260,14 @@ td{padding:7px 10px;vertical-align:middle}
 
     <div class="card">
       <div class="card-head">
-        <div><div class="card-title">Tool configuration</div><div style="font-size:10px;color:var(--t3);margin-top:2px">FULL mode sử dụng tất cả tools đang ON</div></div>
-        <span style="font-size:10px;font-family:var(--font-mono);color:var(--accent);background:rgba(14,165,233,.1);padding:2px 8px;border-radius:4px">26 tools</span>
+        <div><div class="card-title">Tool configuration</div><div style="font-size:10px;color:var(--t3);margin-top:2px">FULL/FULL_SOC mode dispatches all enabled tools · Toggle to opt-out per tool</div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="tool-cfg-summary" style="font-size:10px;font-family:var(--font-mono);color:var(--accent);background:rgba(14,165,233,.1);padding:2px 8px;border-radius:4px">— / —</span>
+          <button class="btn btn-sm" onclick="resetToolConfig()" style="font-size:10px">Reset all</button>
+        </div>
       </div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:0">
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:6px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; SAST — Source code</div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Semgrep <span style="color:var(--t3);font-size:10px">multi-language</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-semgrep" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Bandit <span style="color:var(--t3);font-size:10px">Python SAST</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-bandit" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">CodeQL <span style="color:var(--t3);font-size:10px">deep analysis</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-codeql" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">GoSec <span style="color:var(--t3);font-size:10px">Golang</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-gosec" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; SCA — Dependencies</div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Trivy <span style="color:var(--t3);font-size:10px">SCA + IaC CVE</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-trivy" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Grype <span style="color:var(--t3);font-size:10px">vulnerability scanner</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-grype" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; Secrets</div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Gitleaks <span style="color:var(--t3);font-size:10px">git history</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-gitleaks" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Trufflehog <span style="color:var(--t3);font-size:10px">deep secrets</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-trufflehog" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; IaC</div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">KICS <span style="color:var(--t3);font-size:10px">Terraform · K8s · Docker</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-kics" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Checkov <span style="color:var(--t3);font-size:10px">policy as code</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-checkov" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 2px 4px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px">&#9656; DAST / Network</div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Nuclei <span style="color:var(--t3);font-size:10px">DAST templates</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-nuclei" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Nikto <span style="color:var(--t3);font-size:10px">web server scan</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-nikto" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:3px"><div><div class="toggle-label">Nmap <span style="color:var(--t3);font-size:10px">NETWORK L2-L7</span></div></div><label class="sw-wrap"><input type="checkbox" id="tool-nmap" checked><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
-        <div class="toggle-row" style="margin-bottom:0"><div><div class="toggle-label">ZAP <span style="color:var(--t3);font-size:10px">OWASP DAST proxy</span></div><div style="font-size:10px;color:var(--amber)">&#9888; Cần DAST target URL</div></div><label class="sw-wrap"><input type="checkbox" id="tool-zap"><div class="sw-track"></div><div class="sw-thumb"></div></label></div>
+      <div class="card-body" id="tool-cfg-body" style="padding:8px 14px">
+        <div style="text-align:center;padding:30px 0;color:var(--t3);font-size:11px">Loading tool configuration…</div>
       </div>
     </div>
   </div>
@@ -512,6 +497,7 @@ function sw(id,btn){
   // Lazy-load tab data
   if (id === 'tab-apikeys' && typeof loadAPIKeysFromBackend === 'function') loadAPIKeysFromBackend();
   if (id === 'tab-health' && typeof loadHealth === 'function') loadHealth();
+  if (id === 'tab-scan' && typeof loadToolConfig === 'function') loadToolConfig();
 }
 async function apiPost(path,data){
   await ensureToken();
@@ -862,6 +848,164 @@ async function loadHealth(){
     (v.latency?'<span style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+v.latency+'</span>':'')+
     (v.error?'<span style="font-size:10px;color:var(--amber)">'+v.error+'</span>':'')+
     '</div>').join('');
+}
+
+
+// ── Tool Configuration (Phase B Step 3) ────────────────────────────────────
+
+var _toolCfg = { tools: [], total: 0, total_enabled: 0, total_disabled: 0 };
+var _toolCfgPending = {}; // pending updates buffer for debounce
+var _toolCfgTimer = null;
+
+var TOOL_CAT_META = {
+  IAC:     { label: 'IAC',      desc: 'Infrastructure as Code', color: '#fbbf24', icon: '🏗' },
+  SAST:    { label: 'SAST',     desc: 'Source code analysis',   color: '#a78bfa', icon: '🔍' },
+  SCA:     { label: 'SCA',      desc: 'Dependencies & SBOM',    color: '#60a5fa', icon: '📦' },
+  SECRETS: { label: 'SECRETS',  desc: 'Credentials',            color: '#f87171', icon: '🔑' },
+  DAST:    { label: 'DAST',     desc: 'Web app dynamic',        color: '#22d3ee', icon: '🌐' },
+  NETWORK: { label: 'NETWORK',  desc: 'L2-L7 packet scan',      color: '#2dd4bf', icon: '📡' },
+  PHASE4:  { label: 'PHASE 4',  desc: 'API · Fuzz · Race',      color: '#4ade80', icon: '✨' },
+  OTHER:   { label: 'OTHER',    desc: '',                       color: '#a1a1aa', icon: '·' },
+};
+
+async function loadToolConfig(){
+  var body = document.getElementById('tool-cfg-body');
+  if (!body) return;
+  try {
+    var token = (typeof window.vspToken === 'string' && window.vspToken)
+      ? window.vspToken
+      : (localStorage.getItem('vsp_token') || '');
+    var r = await fetch('/api/v1/settings/tool-config', {
+      headers: {'Authorization':'Bearer '+token}
+    });
+    if (!r.ok) {
+      body.innerHTML = '<div style="color:var(--red);padding:20px;text-align:center;font-size:11px">Failed to load · HTTP '+r.status+'</div>';
+      return;
+    }
+    var data = await r.json();
+    _toolCfg = data;
+    renderToolConfig();
+  } catch(e) {
+    body.innerHTML = '<div style="color:var(--red);padding:20px;text-align:center;font-size:11px">Error: '+e.message+'</div>';
+  }
+}
+
+function renderToolConfig(){
+  var summaryEl = document.getElementById('tool-cfg-summary');
+  if (summaryEl) summaryEl.textContent = _toolCfg.total_enabled + ' / ' + _toolCfg.total + ' enabled';
+
+  // Group by category, preserve original order within each
+  var groups = {};
+  (_toolCfg.tools || []).forEach(function(t){
+    var cat = t.category || 'OTHER';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(t);
+  });
+
+  // Render in canonical category order
+  var catOrder = ['IAC','SAST','SCA','SECRETS','DAST','NETWORK','PHASE4','OTHER'];
+  var html = '';
+  catOrder.forEach(function(cat){
+    if (!groups[cat]) return;
+    var meta = TOOL_CAT_META[cat] || TOOL_CAT_META.OTHER;
+    var enabledInCat = groups[cat].filter(function(t){return t.enabled;}).length;
+    html += '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:10px 2px 6px;font-family:var(--font-mono);border-bottom:1px solid var(--border);margin-bottom:5px;display:flex;justify-content:space-between;align-items:center">'
+         +   '<span style="color:'+meta.color+'">'+meta.icon+' '+meta.label+' — '+meta.desc+'</span>'
+         +   '<span style="font-size:9px;color:var(--t3)">'+enabledInCat+'/'+groups[cat].length+'</span>'
+         + '</div>';
+    groups[cat].forEach(function(t){
+      var override = !t.default
+        ? '<span style="font-size:9px;color:var(--amber);background:rgba(245,158,11,.1);padding:1px 6px;border-radius:8px;margin-left:6px">overridden</span>'
+        : '';
+      html += '<div class="toggle-row" style="margin-bottom:3px">'
+           +   '<div>'
+           +     '<div class="toggle-label" style="font-family:var(--font-mono);font-size:11px">'+t.name+override+'</div>'
+           +   '</div>'
+           +   '<label class="sw-wrap">'
+           +     '<input type="checkbox" data-tool="'+t.name+'" '+(t.enabled?'checked':'')+' onchange="onToolToggle(this)">'
+           +     '<div class="sw-track"></div><div class="sw-thumb"></div>'
+           +   '</label>'
+           + '</div>';
+    });
+  });
+
+  document.getElementById('tool-cfg-body').innerHTML = html;
+}
+
+function onToolToggle(input){
+  var tool = input.getAttribute('data-tool');
+  var enabled = input.checked;
+  if (!tool) return;
+
+  // Optimistic local update + buffer for debounced save
+  var t = (_toolCfg.tools || []).find(function(x){return x.name === tool;});
+  if (t) {
+    t.enabled = enabled;
+    t.default = false;
+    if (enabled) _toolCfg.total_enabled++; else _toolCfg.total_enabled--;
+    if (enabled) _toolCfg.total_disabled--; else _toolCfg.total_disabled++;
+  }
+  _toolCfgPending[tool] = enabled;
+
+  var summaryEl = document.getElementById('tool-cfg-summary');
+  if (summaryEl) summaryEl.textContent = _toolCfg.total_enabled + ' / ' + _toolCfg.total + ' enabled';
+
+  // Debounce 600ms — bulk send if user toggles many
+  if (_toolCfgTimer) clearTimeout(_toolCfgTimer);
+  _toolCfgTimer = setTimeout(flushToolConfig, 600);
+}
+
+async function flushToolConfig(){
+  if (Object.keys(_toolCfgPending).length === 0) return;
+  var updates = _toolCfgPending;
+  _toolCfgPending = {};
+  try {
+    var token = (typeof window.vspToken === 'string' && window.vspToken)
+      ? window.vspToken
+      : (localStorage.getItem('vsp_token') || '');
+    var r = await fetch('/api/v1/settings/tool-config', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+      body: JSON.stringify({updates: updates})
+    });
+    if (!r.ok) {
+      var errBody = await r.text();
+      var msg = 'Save failed (HTTP '+r.status+')';
+      try { var j = JSON.parse(errBody); if (j.error) msg = j.error; } catch(e) {}
+      showToast(msg, 'error');
+      // Revert UI by reloading from server
+      loadToolConfig();
+      return;
+    }
+    var data = await r.json();
+    showToast('Saved · '+data.updated+' tools updated', 'success');
+    // Re-fetch to get fresh updated_at + override badges
+    loadToolConfig();
+  } catch(e) {
+    showToast('Save error: '+e.message, 'error');
+    loadToolConfig();
+  }
+}
+
+async function resetToolConfig(){
+  if (!confirm('Reset all tool configuration to default-on?\n\nAll explicit overrides will be removed.')) return;
+  try {
+    var token = (typeof window.vspToken === 'string' && window.vspToken)
+      ? window.vspToken
+      : (localStorage.getItem('vsp_token') || '');
+    var r = await fetch('/api/v1/settings/tool-config/reset', {
+      method: 'POST',
+      headers: {'Authorization':'Bearer '+token}
+    });
+    if (r.ok) {
+      showToast('Tool config reset to default', 'success');
+      loadToolConfig();
+    } else {
+      showToast('Reset failed (HTTP '+r.status+')', 'error');
+    }
+  } catch(e) {
+    showToast('Reset error: '+e.message, 'error');
+  }
 }
 
 window.addEventListener('message', e => {
