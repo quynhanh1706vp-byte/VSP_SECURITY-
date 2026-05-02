@@ -225,32 +225,32 @@ td{padding:7px 10px;vertical-align:middle}
     <div class="card-head"><div class="card-title">CI/CD Integration status</div><div class="card-sub">Connected via API key · Bearer token auth</div></div>
     <div class="card-body">
       <div class="int-grid">
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('github')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(34,197,94,.12);color:var(--green)">⑆</div>
           <div><div class="int-name">GitHub Actions</div><div class="int-status" style="color:var(--green)">● Connected · cicd@vsp.local</div></div>
           <div class="int-actions"><span class="badge badge-ok">Active</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('gitlab')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(245,158,11,.12);color:var(--amber)">⬡</div>
           <div><div class="int-name">GitLab CI</div><div class="int-status" style="color:var(--amber)">○ Config ready · not connected</div></div>
           <div class="int-actions"><span class="badge badge-warn">Pending</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('jenkins')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(139,92,246,.12);color:var(--purple)">◎</div>
           <div><div class="int-name">Jenkins</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
           <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('azure')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(6,182,212,.12);color:var(--cyan)">◈</div>
           <div><div class="int-name">Azure DevOps</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
           <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('bitbucket')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(249,115,22,.12);color:var(--orange)">⬟</div>
           <div><div class="int-name">Bitbucket Pipelines</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
           <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('vspcli')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(34,197,94,.12);color:var(--green)">◑</div>
           <div><div class="int-name">vspcli (local)</div><div class="int-status" style="color:var(--green)">● Available · Linux/Win/macOS</div></div>
           <div class="int-actions"><span class="badge badge-ok">Ready</span></div>
@@ -262,7 +262,32 @@ td{padding:7px 10px;vertical-align:middle}
 
 <!-- ══ TAB 2 — TEMPLATES ══ -->
 <div class="tab-panel" id="tab-templates">
-  <div class="card">
+  <!-- VSP-CICD-H2.F: Platform selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;color:var(--t1);font-weight:600;margin-bottom:4px">Pipeline template library</div>
+        <div style="font-size:10px;color:var(--t3)">Choose your CI/CD platform · 6 templates available</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm btn-tplsel active" data-tpl="github" onclick="selectTemplate('github')">⑆ GitHub</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="gitlab" onclick="selectTemplate('gitlab')">⬡ GitLab</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="jenkins" onclick="selectTemplate('jenkins')">◎ Jenkins</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="azure" onclick="selectTemplate('azure')">◈ Azure</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="bitbucket" onclick="selectTemplate('bitbucket')">⬟ Bitbucket</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="vspcli" onclick="selectTemplate('vspcli')">◑ vspcli</button>
+      </div>
+    </div>
+  </div>
+  <style>
+    .btn-tplsel { font-size:10px; padding:5px 11px; opacity:.55; transition:all .2s }
+    .btn-tplsel:hover { opacity:.85 }
+    .btn-tplsel.active { opacity:1; background:var(--accent,#0ea5e9); color:#fff; border-color:var(--accent,#0ea5e9) }
+    .tpl-card { display:none }
+    .tpl-card.active { display:block }
+  </style>
+
+  <div class="card tpl-card active" id="tpl-card-github" data-tpl="github">
     <div class="card-head">
       <div><div class="card-title">GitHub Actions — vsp-scan.yml</div><div class="card-sub">Copy vào .github/workflows/ trong repo của bạn</div></div>
       <button class="btn btn-sm" onclick="copyTemplate('github')">⊕ Copy</button>
@@ -319,7 +344,7 @@ td{padding:7px 10px;vertical-align:middle}
     </div>
   </div>
 
-  <div class="card">
+  <div class="card tpl-card" id="tpl-card-gitlab" data-tpl="gitlab">
     <div class="card-head">
       <div><div class="card-title">GitLab CI — .gitlab-ci.yml</div><div class="card-sub">Thêm stage vsp vào pipeline GitLab</div></div>
       <button class="btn btn-sm" onclick="copyTemplate('gitlab')">⊕ Copy</button>
@@ -359,6 +384,189 @@ td{padding:7px 10px;vertical-align:middle}
 </div>
     </div>
   </div>
+  <!-- ══ JENKINS TEMPLATE (H2.1) ══ -->
+  <div class="card tpl-card" id="tpl-card-jenkins" data-tpl="jenkins">
+    <div class="card-head">
+      <div><div class="card-title">Jenkins — Jenkinsfile</div><div class="card-sub">Add to repo root · works with declarative + scripted pipeline</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('jenkins')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-jenkins"><button class="copy-btn" onclick="copyTemplate('jenkins')">Copy</button><span class="cm">// Jenkinsfile — declarative pipeline with VSP gate</span>
+<span class="kw">pipeline</span> {
+  <span class="kw">agent</span> any
+  <span class="kw">environment</span> {
+    <span class="var">VSP_URL</span>   = <span class="kw">credentials</span>(<span class="str">'vsp-url'</span>)
+    <span class="var">VSP_TOKEN</span> = <span class="kw">credentials</span>(<span class="str">'vsp-token'</span>)
+  }
+  <span class="kw">stages</span> {
+    <span class="kw">stage</span>(<span class="str">'VSP Security Scan'</span>) {
+      <span class="kw">steps</span> {
+        sh <span class="str">'''
+          set -e
+          RID=$(curl -sf -X POST $VSP_URL/api/v1/vsp/run \
+            -H "Authorization: Bearer $VSP_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"mode":"FULL","profile":"FAST","src":"."}' | jq -r '.rid')
+          echo "VSP run: $RID"
+          for i in $(seq 1 30); do
+            S=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
+              $VSP_URL/api/v1/vsp/run/$RID | jq -r '.status')
+            [ "$S" = "DONE" ] &amp;&amp; break
+            sleep 10
+          done
+          GATE=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
+            $VSP_URL/api/v1/vsp/run/$RID | jq -r '.gate')
+          echo "Gate: $GATE"
+          [ "$GATE" = "FAIL" ] &amp;&amp; exit 1 || exit 0
+        '''</span>
+      }
+    }
+  }
+  <span class="kw">post</span> {
+    <span class="kw">always</span> {
+      archiveArtifacts artifacts: <span class="str">'vsp-results.sarif'</span>, allowEmptyArchive: <span class="kw">true</span>
+    }
+  }
+}
+</div>
+    </div>
+  </div>
+
+  <!-- ══ AZURE DEVOPS TEMPLATE ══ -->
+  <div class="card tpl-card" id="tpl-card-azure" data-tpl="azure">
+    <div class="card-head">
+      <div><div class="card-title">Azure DevOps — azure-pipelines.yml</div><div class="card-sub">Place at repo root · YAML-based pipeline</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('azure')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-azure"><button class="copy-btn" onclick="copyTemplate('azure')">Copy</button><span class="cm"># azure-pipelines.yml — Azure DevOps with VSP gate</span>
+<span class="kw">trigger:</span>
+  <span class="kw">branches:</span>
+    <span class="kw">include:</span> [<span class="str">main</span>, <span class="str">develop</span>]
+
+<span class="kw">pr:</span>
+  <span class="kw">branches:</span>
+    <span class="kw">include:</span> [<span class="str">main</span>]
+
+<span class="kw">pool:</span>
+  <span class="kw">vmImage:</span> <span class="str">ubuntu-latest</span>
+
+<span class="kw">variables:</span>
+  - <span class="kw">group:</span> <span class="str">vsp-secrets</span>      <span class="cm"># variable group with VSP_URL, VSP_TOKEN</span>
+
+<span class="kw">stages:</span>
+  - <span class="kw">stage:</span> <span class="str">VSPSecurityScan</span>
+    <span class="kw">jobs:</span>
+      - <span class="kw">job:</span> <span class="str">scan</span>
+        <span class="kw">steps:</span>
+          - <span class="kw">checkout:</span> <span class="str">self</span>
+          - <span class="kw">script:</span> |
+              <span class="var">RID</span>=$(curl -sf -X POST $(VSP_URL)/api/v1/vsp/run \
+                -H <span class="str">"Authorization: Bearer $(VSP_TOKEN)"</span> \
+                -H <span class="str">"Content-Type: application/json"</span> \
+                -d <span class="str">'{"mode":"FULL","profile":"FAST","src":"."}'</span> | jq -r <span class="str">'.rid'</span>)
+              echo <span class="str">"##vso[task.setvariable variable=RID]$RID"</span>
+            <span class="kw">displayName:</span> <span class="str">'Trigger VSP scan'</span>
+          - <span class="kw">script:</span> |
+              for i in $(seq 1 30); do
+                <span class="var">S</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $(VSP_TOKEN)"</span> \
+                  $(VSP_URL)/api/v1/vsp/run/$(RID) | jq -r <span class="str">'.status'</span>)
+                [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; break
+                sleep 10
+              done
+              <span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $(VSP_TOKEN)"</span> \
+                $(VSP_URL)/api/v1/vsp/run/$(RID) | jq -r <span class="str">'.gate'</span>)
+              [ <span class="str">"$GATE"</span> = <span class="str">"FAIL"</span> ] &amp;&amp; exit 1 || exit 0
+            <span class="kw">displayName:</span> <span class="str">'Wait + check gate'</span>
+</div>
+    </div>
+  </div>
+
+  <!-- ══ BITBUCKET PIPELINES TEMPLATE ══ -->
+  <div class="card tpl-card" id="tpl-card-bitbucket" data-tpl="bitbucket">
+    <div class="card-head">
+      <div><div class="card-title">Bitbucket Pipelines — bitbucket-pipelines.yml</div><div class="card-sub">Place at repo root · default + branch + PR pipelines</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('bitbucket')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-bitbucket"><button class="copy-btn" onclick="copyTemplate('bitbucket')">Copy</button><span class="cm"># bitbucket-pipelines.yml — VSP security gate</span>
+<span class="kw">image:</span> <span class="str">curlimages/curl:latest</span>
+
+<span class="kw">definitions:</span>
+  <span class="kw">steps:</span>
+    - <span class="kw">step:</span> &amp;vsp-scan
+        <span class="kw">name:</span> <span class="str">VSP Security Scan</span>
+        <span class="kw">script:</span>
+          - <span class="kw">apk add --no-cache jq</span>
+          - <span class="var">RID</span>=$(curl -sf -X POST $VSP_URL/api/v1/vsp/run -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> -d <span class="str">'{"mode":"FULL","profile":"FAST","src":"."}'</span> | jq -r <span class="str">'.rid'</span>)
+          - <span class="kw">echo</span> <span class="str">"VSP run: $RID"</span>
+          - |
+            for i in $(seq 1 30); do
+              S=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> $VSP_URL/api/v1/vsp/run/$RID | jq -r <span class="str">'.status'</span>)
+              [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; break
+              sleep 10
+            done
+          - <span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> $VSP_URL/api/v1/vsp/run/$RID | jq -r <span class="str">'.gate'</span>)
+          - <span class="str">[ "$GATE" = "FAIL" ] &amp;&amp; exit 1 || exit 0</span>
+
+<span class="kw">pipelines:</span>
+  <span class="kw">default:</span>
+    - <span class="kw">step:</span> *vsp-scan
+  <span class="kw">branches:</span>
+    <span class="kw">main:</span>
+      - <span class="kw">step:</span> *vsp-scan
+  <span class="kw">pull-requests:</span>
+    <span class="str">'**':</span>
+      - <span class="kw">step:</span> *vsp-scan
+</div>
+    </div>
+  </div>
+
+  <!-- ══ VSPCLI LOCAL TEMPLATE ══ -->
+  <div class="card tpl-card" id="tpl-card-vspcli" data-tpl="vspcli">
+    <div class="card-head">
+      <div><div class="card-title">vspcli — Local / shell pre-commit hook</div><div class="card-sub">For developer workstations or any custom CI runner</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('vspcli')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-vspcli"><button class="copy-btn" onclick="copyTemplate('vspcli')">Copy</button><span class="cm">#!/usr/bin/env bash</span>
+<span class="cm"># vspcli wrapper — works in any CI runner or local dev machine</span>
+<span class="cm"># Save as: scripts/vsp-scan.sh  (chmod +x)</span>
+
+<span class="kw">set</span> -euo pipefail
+
+<span class="cm"># Config (override via env)</span>
+<span class="var">VSP_URL</span>=<span class="str">"${VSP_URL:-http://127.0.0.1:8921}"</span>
+<span class="var">VSP_TOKEN</span>=<span class="str">"${VSP_TOKEN:?required}"</span>
+<span class="var">SCAN_MODE</span>=<span class="str">"${SCAN_MODE:-FULL}"</span>
+<span class="var">SCAN_PROFILE</span>=<span class="str">"${SCAN_PROFILE:-FAST}"</span>
+<span class="var">SRC</span>=<span class="str">"${SRC:-.}"</span>
+
+<span class="cm"># Trigger</span>
+<span class="var">RID</span>=$(curl -sf -X POST <span class="str">"$VSP_URL/api/v1/vsp/run"</span> \
+  -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">"{\"mode\":\"$SCAN_MODE\",\"profile\":\"$SCAN_PROFILE\",\"src\":\"$SRC\"}"</span> \
+  | jq -r <span class="str">'.rid'</span>)
+<span class="kw">echo</span> <span class="str">"VSP run: $RID"</span>
+
+<span class="cm"># Wait</span>
+<span class="kw">for</span> i <span class="kw">in</span> $(seq 1 60); <span class="kw">do</span>
+  <span class="var">S</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> \
+    <span class="str">"$VSP_URL/api/v1/vsp/run/$RID"</span> | jq -r <span class="str">'.status'</span>)
+  [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; <span class="kw">break</span>
+  sleep 5
+<span class="kw">done</span>
+
+<span class="cm"># Gate verdict</span>
+<span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> \
+  <span class="str">"$VSP_URL/api/v1/vsp/run/$RID"</span> | jq -r <span class="str">'.gate'</span>)
+<span class="kw">echo</span> <span class="str">"Gate: $GATE"</span>
+[ <span class="str">"$GATE"</span> = <span class="str">"FAIL"</span> ] &amp;&amp; <span class="kw">exit</span> 1 || <span class="kw">exit</span> 0
+</div>
+    </div>
+  </div>
+
 
   <div class="card">
     <div class="card-head">
@@ -620,7 +828,7 @@ async function loadSchedules(){
         <div class="sched-name">${s.name}</div>
         <div class="sched-meta">${s.mode} · ${s.cron} · ${s.src}</div>
       </div>
-      <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:8px">${s.next_run}</span>
+      <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:8px">${s.next_run||'—'}</span>
       <span class="badge badge-${s.last_gate==='PASS'?'ok':s.last_gate==='FAIL'?'danger':'warn'}">${s.last_gate||'—'}</span>
       <button class="btn btn-sm" style="margin-left:8px" onclick="runScheduleNow('${s.id}','${s.name}')">▶ Now</button>
     </div>`).join('');
@@ -628,8 +836,8 @@ async function loadSchedules(){
   document.getElementById('upcoming-tbody').innerHTML=list.filter(x=>x.enabled).slice(0,5).map(s=>`<tr>
     <td style="font-weight:500">${s.name}</td>
     <td><span class="badge badge-info">${s.mode}</span></td>
-    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${s.next_run}</td>
-    <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron}</td>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${s.next_run||'—'}</td>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron||'—'}</td>
     <td><span class="badge badge-ok">Enabled</span></td>
   </tr>`).join('');
 }
@@ -643,7 +851,14 @@ async function runScheduleNow(id,name){
   try{await fetch('/api/v1/schedules/'+id+'/run',{method:'POST',headers:hdr()});}catch(e){}
   showToast('Scan triggered: '+name,'success');
 }
-function openAddSchedule(){showToast('Use Scheduler panel for advanced config','info');}
+function openAddSchedule(){
+  // VSP-CICD-H2.F: inline modal create schedule
+  if(typeof window.showCreateScheduleModal === 'function'){
+    window.showCreateScheduleModal();
+    return;
+  }
+  showToast('Schedule modal not loaded — refresh page','warning');
+}
 
 // ── GATE HISTORY ──
 // (cleanup) MOCK_GATES removed — using real API
@@ -1533,5 +1748,238 @@ document.addEventListener('DOMContentLoaded',async()=>{
 
 </script>
 <!-- VSP-UNI3-POLISH-END -->
+
+<!-- ══ H2.2/H2.3 Setup wizard modal ══ -->
+<div class="modal-backdrop" id="modal-setup-wizard" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)">
+  <div class="modal" style="background:var(--bg1);border:1px solid var(--border);border-radius:var(--r-lg,8px);max-width:680px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1">
+      <div id="msw-title" style="font-weight:700"></div>
+      <button onclick="closeSetupWizard()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+    </div>
+    <div id="msw-body" style="padding:16px"></div>
+  </div>
+</div>
+
+<script>
+window.setupIntegration = function(platform){
+  var guides = {
+    github: {name:'GitHub Actions', status:'connected', tplId:'tpl-card-github', steps:[
+      '<b>Create repository secrets</b> in Settings → Secrets and variables → Actions:',
+      '&nbsp;&nbsp;• <code>VSP_URL</code> = '+(location.origin||'https://vsp.example.com'),
+      '&nbsp;&nbsp;• <code>VSP_TOKEN</code> = your VSP API key',
+      '<b>Copy</b> the workflow YAML to <code>.github/workflows/vsp-scan.yml</code>',
+      '<b>Push</b> the file — first run triggers automatically',
+      '<b>Verify</b>: GitHub Actions tab shows <code>VSP Security Scan</code> job'
+    ]},
+    gitlab: {name:'GitLab CI', status:'pending', tplId:'tpl-card-gitlab', steps:[
+      '<b>Set CI/CD variables</b> in Settings → CI/CD → Variables:',
+      '&nbsp;&nbsp;• <code>VSP_URL</code> — protected, masked',
+      '&nbsp;&nbsp;• <code>VSP_TOKEN</code> — protected, masked',
+      '<b>Copy</b> snippet to <code>.gitlab-ci.yml</code> at repo root',
+      '<b>Commit</b> — first MR/push runs <code>vsp-scan</code> stage',
+      '<b>Verify</b>: pipeline shows <code>vsp-security-scan</code> job'
+    ]},
+    jenkins: {name:'Jenkins', status:'template', tplId:'tpl-card-jenkins', steps:[
+      '<b>Add credentials</b> in Manage Jenkins → Credentials:',
+      '&nbsp;&nbsp;• ID <code>vsp-url</code> → secret text',
+      '&nbsp;&nbsp;• ID <code>vsp-token</code> → secret text',
+      '<b>Install jq</b> on agent: <code>apt-get install jq</code>',
+      '<b>Copy</b> Jenkinsfile to repo root',
+      '<b>Configure</b> pipeline: Pipeline script from SCM → branch main',
+      '<b>Run</b> — Jenkins triggers VSP gate stage'
+    ]},
+    azure: {name:'Azure DevOps', status:'template', tplId:'tpl-card-azure', steps:[
+      '<b>Create variable group</b> <code>vsp-secrets</code> in Pipelines → Library:',
+      '&nbsp;&nbsp;• <code>VSP_URL</code> — secure',
+      '&nbsp;&nbsp;• <code>VSP_TOKEN</code> — secure (locked)',
+      '<b>Copy</b> snippet to <code>azure-pipelines.yml</code>',
+      '<b>Create pipeline</b> → Existing YAML → select repo + branch',
+      '<b>Authorize</b> variable group on first run',
+      '<b>Verify</b>: Pipelines tab shows stage <code>VSPSecurityScan</code>'
+    ]},
+    bitbucket: {name:'Bitbucket Pipelines', status:'template', tplId:'tpl-card-bitbucket', steps:[
+      '<b>Enable Pipelines</b> in Repository settings → Pipelines',
+      '<b>Add repository variables</b>:',
+      '&nbsp;&nbsp;• <code>VSP_URL</code> — secured',
+      '&nbsp;&nbsp;• <code>VSP_TOKEN</code> — secured',
+      '<b>Copy</b> snippet to <code>bitbucket-pipelines.yml</code>',
+      '<b>Commit</b> — first push triggers default + branch + PR',
+      '<b>Verify</b>: Pipelines tab shows <code>VSP Security Scan</code>'
+    ]},
+    vspcli: {name:'vspcli (local)', status:'ready', tplId:'tpl-card-vspcli', steps:[
+      '<b>Save</b> the script to <code>scripts/vsp-scan.sh</code>',
+      '<b>Make executable</b>: <code>chmod +x scripts/vsp-scan.sh</code>',
+      '<b>Set environment</b>:',
+      '&nbsp;&nbsp;• <code>export VSP_URL='+(location.origin||'http://127.0.0.1:8921')+'</code>',
+      '&nbsp;&nbsp;• <code>export VSP_TOKEN=&lt;key&gt;</code>',
+      '<b>Pre-commit hook</b>: symlink to <code>.git/hooks/pre-push</code>',
+      '<b>Run</b>: <code>./scripts/vsp-scan.sh</code> — exits 1 if FAIL'
+    ]}
+  };
+  var g = guides[platform];
+  if(!g){ if(typeof showToast==='function') showToast('Unknown: '+platform,'error'); return; }
+  var statusBadge = ({connected:'<span class="badge badge-ok">● Connected</span>',pending:'<span class="badge badge-warn">○ Pending</span>',template:'<span class="badge badge-neutral">○ Template</span>',ready:'<span class="badge badge-ok">● Ready</span>'})[g.status]||'';
+  var stepsHtml = g.steps.map(function(stp,i){
+    return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);align-items:flex-start">'+
+      '<div style="width:22px;height:22px;border-radius:50%;background:var(--accent,#0ea5e9);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</div>'+
+      '<div style="flex:1;font-size:12px;line-height:1.6;color:var(--t1)">'+stp+'</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('msw-title').innerHTML = g.name+' &nbsp; '+statusBadge;
+  document.getElementById('msw-body').innerHTML =
+    '<div style="margin-bottom:14px;font-size:11px;color:var(--t2)">Follow these steps to integrate <b>'+g.name+'</b> with VSP:</div>'+
+    '<div style="margin-bottom:16px">'+stepsHtml+'</div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'+
+      '<button class="btn" onclick="closeSetupWizard()">Close</button>'+
+      '<button class="btn btn-primary" onclick="closeSetupWizard();gotoTemplate(\''+g.tplId+'\')">Open Template ↗</button>'+
+    '</div>';
+  document.getElementById('modal-setup-wizard').style.display = 'flex';
+};
+
+window.closeSetupWizard = function(){
+  document.getElementById('modal-setup-wizard').style.display = 'none';
+};
+
+window.gotoTemplate = function(cardId){
+  if(typeof switchTab==='function'){
+    switchTab('tab-templates', document.querySelector('.tab-btn[onclick*="tab-templates"]'));
+  }
+  setTimeout(function(){
+    var el = document.getElementById(cardId);
+    if(el){
+      el.scrollIntoView({behavior:'smooth', block:'start'});
+      el.style.transition = 'box-shadow .3s';
+      el.style.boxShadow = '0 0 0 2px var(--accent,#0ea5e9)';
+      setTimeout(function(){ el.style.boxShadow = ''; }, 1500);
+    }
+  }, 250);
+};
+
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'modal-setup-wizard') closeSetupWizard();
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && document.getElementById('modal-setup-wizard') && document.getElementById('modal-setup-wizard').style.display === 'flex'){
+    closeSetupWizard();
+  }
+});
+console.log('[CICD-H2] Setup wizard + 4 new templates loaded');
+</script>
+
+
+<!-- VSP-CICD-H2.F: Template selector + create schedule modal -->
+<div class="modal-backdrop" id="modal-create-schedule" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)">
+  <div class="modal" style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;max-width:560px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700">+ New Schedule</div>
+      <button onclick="closeCreateSchedule()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+    </div>
+    <div style="padding:16px" id="mcs-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px">Schedule name *</label>
+          <input id="cs-name" placeholder="Daily SAST scan" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px"></div>
+        <div><label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px">Mode *</label>
+          <select id="cs-mode" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px">
+            <option value="FULL">FULL — all 26 tools</option>
+            <option value="FULL_SOC">FULL_SOC — SOC-tuned</option>
+            <option value="SAST">SAST — code analysis</option>
+            <option value="SCA">SCA — dependencies</option>
+            <option value="SECRETS">SECRETS — leak detection</option>
+            <option value="IAC">IAC — infrastructure</option>
+            <option value="DAST">DAST — runtime</option>
+            <option value="NETWORK">NETWORK — port + ssl</option>
+          </select></div>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px">Source path *</label>
+        <input id="cs-src" placeholder="/home/user/repo  or  https://example.com" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;font-family:var(--font-mono)">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px">Cron expression *</label>
+        <input id="cs-cron" placeholder="0 2 * * *" value="0 2 * * *" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;font-family:var(--font-mono)">
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 2 * * *'" style="font-size:9px;padding:3px 8px">Daily 02:00</button>
+          <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 */6 * * *'" style="font-size:9px;padding:3px 8px">Every 6h</button>
+          <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 2 * * 1'" style="font-size:9px;padding:3px 8px">Weekly Mon</button>
+          <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 0 1 * *'" style="font-size:9px;padding:3px 8px">Monthly</button>
+        </div>
+        <div style="font-size:9px;color:var(--t3);margin-top:6px">Format: <code>min hour day month weekday</code> · UTC timezone</div>
+      </div>
+      <div style="margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="cs-enabled" checked style="cursor:pointer">
+        <label for="cs-enabled" style="font-size:11px;color:var(--t1);cursor:pointer">Enable immediately after create</label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="btn" onclick="closeCreateSchedule()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateSchedule()">Create Schedule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── H2.F: Template selector ──
+window.selectTemplate = function(key){
+  document.querySelectorAll('.btn-tplsel').forEach(function(b){
+    b.classList.toggle('active', b.dataset.tpl === key);
+  });
+  document.querySelectorAll('.tpl-card').forEach(function(c){
+    c.classList.toggle('active', c.dataset.tpl === key);
+  });
+};
+
+// ── H2.F: Create schedule modal ──
+window.showCreateScheduleModal = function(){
+  document.getElementById('cs-name').value = '';
+  document.getElementById('cs-src').value = '';
+  document.getElementById('cs-cron').value = '0 2 * * *';
+  document.getElementById('cs-mode').value = 'FULL';
+  document.getElementById('cs-enabled').checked = true;
+  document.getElementById('modal-create-schedule').style.display = 'flex';
+  setTimeout(function(){ var n=document.getElementById('cs-name'); if(n) n.focus(); }, 50);
+};
+window.closeCreateSchedule = function(){
+  document.getElementById('modal-create-schedule').style.display = 'none';
+};
+window.submitCreateSchedule = async function(){
+  var name = document.getElementById('cs-name').value.trim();
+  var mode = document.getElementById('cs-mode').value;
+  var src  = document.getElementById('cs-src').value.trim();
+  var cron = document.getElementById('cs-cron').value.trim();
+  var enabled = document.getElementById('cs-enabled').checked;
+  if(!name || !src || !cron){
+    if(typeof showToast==='function') showToast('Name, source, and cron are required','warning');
+    return;
+  }
+  try {
+    var r = await fetch('/api/v1/schedules',{
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, hdr ? hdr() : {}),
+      body: JSON.stringify({name:name, mode:mode, src:src, cron:cron, enabled:enabled})
+    });
+    if(!r.ok){
+      var t = await r.text();
+      throw new Error(t || 'HTTP ' + r.status);
+    }
+    if(typeof showToast==='function') showToast('Schedule created: ' + name,'success');
+    closeCreateSchedule();
+    if(typeof loadSchedules==='function') loadSchedules();
+  } catch(e) {
+    if(typeof showToast==='function') showToast('Error: ' + e.message,'error');
+  }
+};
+
+// Close on backdrop click
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'modal-create-schedule') closeCreateSchedule();
+});
+document.addEventListener('keydown', function(e){
+  var m = document.getElementById('modal-create-schedule');
+  if(e.key === 'Escape' && m && m.style.display === 'flex') closeCreateSchedule();
+});
+
+console.log('[CICD-H2.F] Template selector + create schedule modal loaded');
+</script>
+
 </body>
 </html>
