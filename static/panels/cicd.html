@@ -2286,9 +2286,38 @@ window.showFixPreview = function(finding){
     '</div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)">' +
       '<button class="btn" onclick="closeFixPreview()">Close</button>' +
-      '<button class="btn" onclick="navigator.clipboard.writeText('+JSON.stringify(fixSnippet||'')+').then(function(){showToast(\'Fix snippet copied\',\'success\')})">⊕ Copy snippet</button>' +
-      '<button class="btn btn-primary" onclick="markFixApplied('+JSON.stringify(f.id||f.finding_id||'')+')">✓ Mark as applied</button>' +
+      '<button class="btn" id="mfp-btn-copy">⊕ Copy snippet</button>' +
+      '<button class="btn btn-primary" id="mfp-btn-apply">✓ Mark as applied</button>' +
     '</div>';
+  
+  document.getElementById('modal-fix-preview').style.display = 'flex';
+  
+  // VSP-CICD-H3.I: Bind handlers AFTER render to avoid quote escape bug
+  setTimeout(function(){
+    var btnCopy = document.getElementById('mfp-btn-copy');
+    var btnApply = document.getElementById('mfp-btn-apply');
+    if(btnCopy){
+      btnCopy.onclick = function(){
+        var txt = fixSnippet || '';
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(txt).then(function(){
+            if(typeof showToast === 'function') showToast('Fix snippet copied', 'success');
+          }).catch(function(){
+            if(typeof showToast === 'function') showToast('Copy failed (clipboard blocked)', 'warning');
+          });
+        } else {
+          if(typeof showToast === 'function') showToast('Clipboard not available', 'warning');
+        }
+      };
+    }
+    if(btnApply){
+      btnApply.onclick = function(){
+        markFixApplied(f.id || f.finding_id || '');
+      };
+    }
+  }, 0);
+  
+  return; // EARLY RETURN — original return point removed below
   
   document.getElementById('modal-fix-preview').style.display = 'flex';
 };
