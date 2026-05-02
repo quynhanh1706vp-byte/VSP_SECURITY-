@@ -786,6 +786,19 @@ td{padding:7px 10px;vertical-align:middle}
 
 <script>
 var TOKEN='', API='';
+
+// VSP-CICD-H3.H: Early helper definition (must be available when buttons render)
+window.showFixPreviewByIdx = function(btn){
+  var idx = parseInt(btn.getAttribute('data-fix-idx') || '0', 10);
+  var f = (window._lastFixable || [])[idx];
+  if(!f){ if(typeof showToast==='function') showToast('Finding data not available','warning'); return; }
+  if(typeof window.showFixPreview === 'function'){
+    window.showFixPreview(f);
+  } else {
+    console.warn('[H3.H] showFixPreview not loaded yet');
+  }
+};
+
 async function ensureToken(){
   if(TOKEN) return;
   TOKEN=window.parent?.TOKEN||window.TOKEN||localStorage.getItem('vsp_token')||'';
@@ -2239,13 +2252,6 @@ window.openRunDetail = function(rid){
 };
 
 // K2: Fix preview modal
-window.showFixPreviewByIdx = function(btn){
-  var idx = parseInt(btn.getAttribute('data-fix-idx') || '0', 10);
-  var f = (window._lastFixable || [])[idx];
-  if(!f){ if(typeof showToast==='function') showToast('Finding data not available','warning'); return; }
-  window.showFixPreview(f);
-};
-
 window.showFixPreview = function(finding){
   // Accept either a finding object OR a button element with data-fix-idx
   var f;
