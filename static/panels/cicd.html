@@ -718,7 +718,33 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card">
     <div class="card-head">
       <div><div class="card-title">Top auto-fixable findings</div><div class="card-sub">Sorted by severity · with code fix snippet</div></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span id="af-result-count" style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:6px">— shown</span>
+        <button class="btn btn-sm" onclick="afExportCSV()" title="Export CSV">↓ CSV</button>
+      </div>
     </div>
+    <!-- VSP-CICD-H3.3: Filter bar -->
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-right:4px">Filter:</span>
+      <button class="btn btn-sm af-sev-pill active" data-sev="" onclick="afFilterSeverity(this,'')">All</button>
+      <button class="btn btn-sm af-sev-pill" data-sev="CRITICAL" onclick="afFilterSeverity(this,'CRITICAL')" style="color:#ef4444">Critical</button>
+      <button class="btn btn-sm af-sev-pill" data-sev="HIGH" onclick="afFilterSeverity(this,'HIGH')" style="color:#f97316">High</button>
+      <button class="btn btn-sm af-sev-pill" data-sev="MEDIUM" onclick="afFilterSeverity(this,'MEDIUM')" style="color:#f59e0b">Medium</button>
+      <button class="btn btn-sm af-sev-pill" data-sev="LOW" onclick="afFilterSeverity(this,'LOW')" style="color:#22c55e">Low</button>
+      <span style="width:1px;height:18px;background:var(--border);margin:0 4px"></span>
+      <select id="af-tool-filter" class="form-ctrl" style="font-size:10px;padding:4px 8px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px" onchange="renderAutofixTable()">
+        <option value="">All tools</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2);cursor:pointer;margin-left:6px">
+        <input type="checkbox" id="af-fixable-only" onchange="renderAutofixTable()">
+        Auto-fixable only
+      </label>
+    </div>
+    <style>
+      .af-sev-pill { font-size:10px; padding:4px 11px; opacity:.6 }
+      .af-sev-pill:hover { opacity:.9 }
+      .af-sev-pill.active { opacity:1; background:var(--accent,#0ea5e9); color:#fff!important; border-color:var(--accent,#0ea5e9) }
+    </style>
     <div style="overflow-x:auto">
       <table>
         <thead><tr><th>Severity</th><th>Tool</th><th>Rule</th><th>Description</th><th>Fix type</th><th>Status</th><th></th></tr></thead>
@@ -999,21 +1025,40 @@ function _autofixDeriveFix(f){
   return byTool[f.tool] || 'Manual review required';
 }
 function _autofixIsFixable(f){
+  // VSP-CICD-H3.2: full tool list (was missing semgrep/gosec/bandit/trivy/grype)
   if(f.fix_signal) return true;
-  return ['gitleaks','trufflehog','kics','checkov','checkov','kics'].indexOf(f.tool) >= 0;
+  if(f.fix_hint) return true;
+  var fixableTools = [
+    'gitleaks','trufflehog','secretcheck',     // SECRETS
+    'kics','checkov','hadolint',                // IAC
+    'semgrep','bandit','gosec',                 // SAST
+    'trivy','grype','osv-scanner','retire-js',  // SCA
+    'license','cosign','syft','govulncheck',    // SCA-extra
+    'nikto','nuclei','sslscan',                 // DAST
+    'apisec','gofuzz','racedetect'              // Phase 4
+  ];
+  return fixableTools.indexOf(f.tool) >= 0;
 }
 function _autofixCategorize(findings){
+  // VSP-CICD-H3.2: dedup + add missing categories (DAST, NETWORK, PHASE4)
   var cats = {
-    iac:  {label:'IaC misconfig (Terraform/K8s)', count:0, fixable:0, color:'var(--cyan)'},
-    sast: {label:'SAST code issues',              count:0, fixable:0, color:'var(--purple)'},
-    sca:  {label:'SCA vulnerable deps',           count:0, fixable:0, color:'var(--amber)'},
-    sec:  {label:'Secrets exposed',               count:0, fixable:0, color:'var(--red)'}
+    iac:    {label:'IaC misconfig (Terraform/K8s/Docker)', count:0, fixable:0, color:'var(--cyan)'},
+    sast:   {label:'SAST code issues',                     count:0, fixable:0, color:'var(--purple)'},
+    sca:    {label:'SCA vulnerable dependencies',          count:0, fixable:0, color:'var(--amber)'},
+    sec:    {label:'Secrets exposed',                      count:0, fixable:0, color:'var(--red)'},
+    dast:   {label:'DAST runtime issues',                  count:0, fixable:0, color:'var(--cyan)'},
+    network:{label:'Network exposure',                     count:0, fixable:0, color:'var(--orange)'},
+    phase4: {label:'API/Fuzz/Race (Phase 4)',              count:0, fixable:0, color:'var(--green)'}
   };
   var toolMap = {
-    kics:'iac', checkov:'iac', kics:'iac', checkov:'iac',
-    semgrep:'sast', bandit:'sast', gosec:'sast', gosec:'sast',
-    trivy:'sca', grype:'sca', osv:'sca',
-    gitleaks:'sec', trufflehog:'sec'
+    kics:'iac', checkov:'iac', hadolint:'iac',
+    semgrep:'sast', bandit:'sast', gosec:'sast', codeql:'sast',
+    trivy:'sca', grype:'sca', 'osv-scanner':'sca', 'retire-js':'sca',
+    syft:'sca', license:'sca', cosign:'sca', govulncheck:'sca',
+    gitleaks:'sec', trufflehog:'sec', secretcheck:'sec',
+    nikto:'dast', nuclei:'dast', sslscan:'dast',
+    nmap:'network', netcap:'network',
+    apisec:'phase4', gofuzz:'phase4', racedetect:'phase4'
   };
   for(var i=0;i<findings.length;i++){
     var f = findings[i];
@@ -1022,19 +1067,46 @@ function _autofixCategorize(findings){
     cats[cat].count += 1;
     if(_autofixIsFixable(f)) cats[cat].fixable += 1;
   }
-  return [cats.iac, cats.sast, cats.sca, cats.sec];
+  // Filter empty categories
+  var result = [];
+  ['iac','sast','sca','sec','dast','network','phase4'].forEach(function(k){
+    if(cats[k].count > 0) result.push(cats[k]);
+  });
+  return result.length ? result : [cats.iac, cats.sast, cats.sca, cats.sec];
 }
 async function loadAutofixStats(){
   await ensureToken();
   var findings = [];
-  // Fetch up to 200 latest open findings to categorize and pick top fixable
+  // VSP-CICD-H3.1: fetch all (limit 2000) for accurate KPIs
   try{
-    var r = await fetch('/api/v1/vsp/findings?limit=200&status=open', {headers: hdr()});
+    var r = await fetch('/api/v1/vsp/findings?limit=2000', {headers: hdr()});
     if(r.ok){ var d = await r.json(); findings = d.findings || []; }
   }catch(e){}
 
-  // Categories card
-  var cats = _autofixCategorize(findings);
+  // Save raw + filtered for filter pills (H3.3)
+  window._autofixAllFindings = findings;
+
+  // ─── H3.1: 4 KPI cards (live data) ───
+  var open = findings.filter(function(f){ return (f.status||'open') === 'open' || !f.status; });
+  var fixable = open.filter(_autofixIsFixable);
+  var resolved = findings.filter(function(f){ return f.status === 'resolved' || f.status === 'fixed'; });
+  // SLA breach: CRITICAL findings open > 7 days (per FedRAMP)
+  var now = Date.now();
+  var sevenDaysMs = 7 * 24 * 3600 * 1000;
+  var breaches = open.filter(function(f){
+    if(f.severity !== 'CRITICAL') return false;
+    var t = f.created_at || f.detected_at || f.first_seen;
+    if(!t) return false;
+    return (now - new Date(t).getTime()) > sevenDaysMs;
+  });
+  
+  document.getElementById('af-total').textContent     = open.length.toLocaleString();
+  document.getElementById('af-with-fix').textContent  = fixable.length.toLocaleString();
+  document.getElementById('af-resolved').textContent  = resolved.length.toLocaleString();
+  document.getElementById('af-breaches').textContent  = breaches.length.toLocaleString();
+
+  // ─── Categories card ───
+  var cats = _autofixCategorize(open);
   document.getElementById('fix-categories').innerHTML = cats.map(function(c){
     return '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md)">'
       + '<span style="font-size:11px;flex:1;color:var(--t2)">' + c.label + '</span>'
@@ -1043,19 +1115,58 @@ async function loadAutofixStats(){
       + '</div>';
   }).join('');
 
-  // Top fixable findings table — prioritize CRITICAL > HIGH > MEDIUM
-  var sevOrder = {CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3, INFO:4};
-  var fixable = findings.filter(_autofixIsFixable)
-    .sort(function(a,b){ return (sevOrder[a.severity]||9) - (sevOrder[b.severity]||9); })
-    .slice(0, 20);
+  // ─── H3.3: Tool filter dropdown (populate) ───
+  var allTools = {};
+  open.forEach(function(f){ if(f.tool) allTools[f.tool] = (allTools[f.tool]||0) + 1; });
+  var toolSelect = document.getElementById('af-tool-filter');
+  if(toolSelect && toolSelect.options.length <= 1){
+    Object.keys(allTools).sort().forEach(function(t){
+      var opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t + ' (' + allTools[t] + ')';
+      toolSelect.appendChild(opt);
+    });
+  }
 
+  // ─── Apply filter + render table ───
+  renderAutofixTable();
+}
+
+function renderAutofixTable(){
+  // VSP-CICD-H3.3: client-side filter
+  var all = (window._autofixAllFindings || []).filter(function(f){ return (f.status||'open')==='open' || !f.status; });
+  var sevFilter = (document.querySelector('.af-sev-pill.active')||{}).dataset?.sev || '';
+  var toolFilter = (document.getElementById('af-tool-filter')||{value:''}).value || '';
+  var fixableOnly = (document.getElementById('af-fixable-only')||{checked:false}).checked;
+  
+  var filtered = all.filter(function(f){
+    if(sevFilter && f.severity !== sevFilter) return false;
+    if(toolFilter && f.tool !== toolFilter) return false;
+    if(fixableOnly && !_autofixIsFixable(f)) return false;
+    return true;
+  });
+  
+  var sevOrder = {CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3, INFO:4};
+  var sortedFixable = filtered
+    .sort(function(a,b){ return (sevOrder[a.severity]||9) - (sevOrder[b.severity]||9); })
+    .slice(0, 50);
+  window._lastFixable = sortedFixable;
+  
   var sevClass = {CRITICAL:'sev-crit', HIGH:'sev-high', MEDIUM:'sev-med', LOW:'sev-low', INFO:''};
   var tbody = document.getElementById('autofix-tbody');
-  if(fixable.length === 0){
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--t3);font-size:11px">No fixable findings — all clean or scan in progress</td></tr>';
+  
+  // Update count display
+  var countEl = document.getElementById('af-result-count');
+  if(countEl) countEl.textContent = filtered.length + ' shown · ' + sortedFixable.length + ' top';
+  
+  if(sortedFixable.length === 0){
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3);font-size:11px">'
+      + (filtered.length === 0 ? 'No findings match current filters' : 'No fixable findings in current filter')
+      + '</td></tr>';
     return;
   }
-  tbody.innerHTML = fixable.map(function(f, fIdx){
+  
+  tbody.innerHTML = sortedFixable.map(function(f, fIdx){
     var desc = (f.message || '').length > 60 ? f.message.slice(0,57) + '...' : (f.message || '');
     var loc  = f.path ? f.path + (f.line ? ':' + f.line : '') : '';
     var descFull = loc ? desc + ' (' + loc + ')' : desc;
@@ -1063,6 +1174,7 @@ async function loadAutofixStats(){
     var sev  = f.severity || 'INFO';
     var statusBadge = (f.status === 'open' || !f.status) ? 'badge-danger' : 'badge-neutral';
     var statusLabel = (f.status || 'open').charAt(0).toUpperCase() + (f.status || 'open').slice(1);
+    var fixableMark = _autofixIsFixable(f) ? '' : '<span style="opacity:.5" title="Manual review only">·</span>';
     return '<tr>'
       + '<td><span class="sev ' + (sevClass[sev]||'') + '">' + sev + '</span></td>'
       + '<td style="font-size:10px;color:var(--t3)">' + (f.tool || '?') + '</td>'
@@ -1074,11 +1186,119 @@ async function loadAutofixStats(){
       + '</tr>';
   }).join('');
 }
+
+// VSP-CICD-H3.3: filter pill click handler
+window.afFilterSeverity = function(btn, sev){
+  document.querySelectorAll('.af-sev-pill').forEach(function(b){ b.classList.remove('active'); });
+  if(btn) btn.classList.add('active');
+  if(btn) btn.dataset.sev = sev;
+  renderAutofixTable();
+};
+
+// VSP-CICD-H3.5: CSV export
+window.afExportCSV = function(){
+  var rows = (window._lastFixable || []);
+  if(rows.length === 0){ if(typeof showToast==='function') showToast('No data to export','warning'); return; }
+  var headers = ['severity','tool','rule_id','message','path','line','suggested_fix','status'];
+  var csv = headers.join(',') + '\n';
+  csv += rows.map(function(f){
+    var row = [
+      f.severity || '',
+      f.tool || '',
+      f.rule_id || '',
+      '"' + (f.message||'').replace(/"/g,'""') + '"',
+      f.path || '',
+      f.line || '',
+      '"' + _autofixDeriveFix(f).replace(/"/g,'""') + '"',
+      f.status || 'open'
+    ];
+    return row.join(',');
+  }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'vsp-autofix-'+Date.now()+'.csv'; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  if(typeof showToast==='function') showToast('CSV exported · ' + rows.length + ' rows','success');
+};
+
+
 async function runAutoRemediation(){
   await ensureToken();
-  try{await fetch('/api/v1/remediation/auto',{method:'POST',headers:hdr()});}catch(e){}
-  showToast('Auto-remediation engine triggered','success');
+  // VSP-CICD-H3.4: fetch result + show modal with summary
+  showToast('Running auto-remediation engine...','info');
+  var result = null;
+  try {
+    var r = await fetch('/api/v1/remediation/auto-resolve', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, hdr()),
+      body: JSON.stringify({dry_run: false})
+    });
+    if(r.ok){ result = await r.json(); }
+  } catch(e) { console.warn('auto-resolve failed', e); }
+  
+  // Fallback to legacy endpoint
+  if(!result){
+    try {
+      var r2 = await fetch('/api/v1/remediation/auto', {method:'POST', headers: hdr()});
+      if(r2.ok){ result = await r2.json(); }
+    } catch(e) {}
+  }
+  
+  showAutoRemediationResult(result);
+  
+  // Refresh KPIs
+  setTimeout(loadAutofixStats, 800);
 }
+
+window.showAutoRemediationResult = function(result){
+  result = result || {};
+  var resolved = result.resolved_count || result.count || 0;
+  var skipped  = result.skipped_count  || 0;
+  var errors   = result.error_count    || 0;
+  var details  = result.resolved_findings || result.findings || [];
+  
+  var detailsHtml = '';
+  if(details.length){
+    detailsHtml = '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px">Resolved findings (' + details.length + ')</div>'
+      + '<div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">'
+      + details.slice(0, 50).map(function(f){
+          var sev = f.severity || 'INFO';
+          var sevColor = {CRITICAL:'#ef4444',HIGH:'#f97316',MEDIUM:'#f59e0b',LOW:'#22c55e'}[sev]||'#94a3b8';
+          return '<div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start;font-size:11px">'
+            + '<span style="background:'+sevColor+';color:#fff;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;flex-shrink:0">'+sev+'</span>'
+            + '<span style="font-family:var(--font-mono);color:var(--t3);font-size:10px;flex-shrink:0">'+(f.tool||'?')+'</span>'
+            + '<span style="flex:1;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+((f.message||f.title||'').slice(0,80))+'</span>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+  
+  var kpiBar = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'
+    + '<div style="background:rgba(34,197,94,.1);border-left:3px solid #22c55e;padding:10px 12px;border-radius:4px">'
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Resolved</div>'
+      + '<div style="font-family:var(--font-display);font-size:22px;font-weight:800;color:#22c55e">'+resolved+'</div>'
+    + '</div>'
+    + '<div style="background:rgba(245,158,11,.1);border-left:3px solid #f59e0b;padding:10px 12px;border-radius:4px">'
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Skipped</div>'
+      + '<div style="font-family:var(--font-display);font-size:22px;font-weight:800;color:#f59e0b">'+skipped+'</div>'
+    + '</div>'
+    + '<div style="background:rgba(239,68,68,.1);border-left:3px solid #ef4444;padding:10px 12px;border-radius:4px">'
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Errors</div>'
+      + '<div style="font-family:var(--font-display);font-size:22px;font-weight:800;color:#ef4444">'+errors+'</div>'
+    + '</div>'
+    + '</div>';
+  
+  document.getElementById('mar-body').innerHTML = kpiBar + detailsHtml +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">' +
+    '<button class="btn btn-primary" onclick="closeAutoRemediationModal()">Close</button>' +
+    '</div>';
+  
+  document.getElementById('modal-auto-remediation').style.display = 'flex';
+};
+window.closeAutoRemediationModal = function(){
+  document.getElementById('modal-auto-remediation').style.display = 'none';
+};
 
 // ── HISTORY ──
 var _histData=[];
@@ -2205,6 +2425,28 @@ document.addEventListener('keydown', function(e){
   if(e.key === 'Escape' && m && m.style.display === 'flex') closeFixPreview();
 });
 console.log('[CICD-H2.L] Run history click + fix preview modal loaded');
+</script>
+
+
+<!-- VSP-CICD-H3.4: Auto-remediation result modal -->
+<div class="modal-backdrop" id="modal-auto-remediation" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)">
+  <div class="modal" style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;max-width:680px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1">
+      <div style="font-weight:700">⚡ Auto-remediation result</div>
+      <button onclick="closeAutoRemediationModal()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+    </div>
+    <div id="mar-body" style="padding:16px"></div>
+  </div>
+</div>
+<script>
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'modal-auto-remediation') closeAutoRemediationModal();
+});
+document.addEventListener('keydown', function(e){
+  var m = document.getElementById('modal-auto-remediation');
+  if(e.key === 'Escape' && m && m.style.display === 'flex') closeAutoRemediationModal();
+});
+console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills + CSV + auto-remediation modal');
 </script>
 
 </body>
