@@ -355,12 +355,13 @@ async function showIncidentDetail(id){
 }
 
 async function editField(incidentId, field, currentVal){
+  if(typeof window.showEditFieldModal === 'function'){ window.showEditFieldModal(incidentId, field, currentVal); return; }
   const newVal=prompt(`Edit ${field}:`, currentVal||'');
   if(newVal===null||newVal===currentVal)return;
   try{const r=await fetch('/api/p4/ir/incident/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:incidentId,field:field,value:newVal})});
     if(!r.ok)throw new Error(await r.text());
-    alert('✅ Updated');showIncidentDetail(incidentId);loadIncidents();
-  }catch(e){alert('Error: '+e.message);}
+    vspIRToast('Updated','success');showIncidentDetail(incidentId);loadIncidents();
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 function showRansomForm(id){
@@ -386,13 +387,13 @@ function showRansomForm(id){
 
 async function submitRansom(id){
   const amount=parseFloat(document.getElementById('rp-amount').value);
-  if(!amount||amount<=0){alert('Amount required');return;}
+  if(!amount||amount<=0){vspIRToast('Amount is required and must be greater than 0','warning');return;}
   try{const r=await fetch('/api/p4/ir/incident/ransom-payment',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({incident_id:id,amount_usd:amount,payment_method:document.getElementById('rp-method').value,wallet:document.getElementById('rp-wallet').value})});
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    alert('✅ Payment recorded!\n\n⚠️ CIRCIA 24h deadline: '+new Date(d.circia_24h_deadline).toLocaleString());
+    vspIRToast('Payment recorded\nCIRCIA 24h deadline: '+new Date(d.circia_24h_deadline).toLocaleString(),'success');
     closeModal('ransom');showIncidentDetail(id);loadKPIs();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 function showLessonsForm(id){
@@ -418,37 +419,29 @@ async function submitLessons(id){
   try{const r=await fetch('/api/p4/ir/incident/lessons',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({incident_id:id,root_cause:document.getElementById('ll-rc').value,lessons_learned:document.getElementById('ll-lessons').value,corrective_actions:actions})});
     if(!r.ok)throw new Error(await r.text());
-    alert('✅ Saved '+actions.length+' corrective actions');closeModal('lessons');showIncidentDetail(id);
-  }catch(e){alert('Error: '+e.message);}
+    vspIRToast('Saved '+actions.length+' corrective actions','success');closeModal('lessons');showIncidentDetail(id);
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 async function showTransition(id,cur){
+  if(typeof window.showTransitionModal === 'function'){ window.showTransitionModal(id, cur); return; }
   const p=['preparation','detection_analysis','containment','eradication','recovery','post_incident'];
   const idx=p.indexOf(cur);
-  const next=p.slice(idx+1).map((x,i)=>`${i+1}. ${x.replace('_',' ')}`).join('\n');
-  const c=prompt(`Incident: ${id}\nCurrent: ${cur}\n\nNext:\n${next}\n\nEnter phase:`,p[idx+1]||'post_incident');
-  if(!c)return;
+  const c=p[idx+1]; if(!c){vspIRToast('Already at final phase','warning');return;}
   try{const r=await fetch('/api/p4/ir/incident/transition',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:id,phase:c})});
-    if(r.ok){alert('✅ Transitioned to '+c);if(document.getElementById('modal-inc').classList.contains('show'))showIncidentDetail(id);loadIncidents();loadKPIs();}
-    else alert('Error: '+await r.text());
-  }catch(e){alert(e.message);}
+    if(r.ok){vspIRToast('Transitioned to '+c,'success');if(document.getElementById('modal-inc').classList.contains('show'))showIncidentDetail(id);loadIncidents();loadKPIs();}
+    else vspIRToast('Error: '+await r.text(),'error');
+  }catch(e){vspIRToast(e.message,'error');}
 }
 
 async function genCIRCIA(id){
-  const t=prompt('Type:\n- substantial_incident (72h)\n- ransomware_payment (24h)\n- joint','substantial_incident');
-  if(!t)return;
-  const s=prompt('Sector:','information_technology');
-  if(!s)return;
-  try{const r=await fetch('/api/p4/circia/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:id,report_type:t,ci_sector:s})});
-    const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    alert('✅ Generated!\n\nUUID: '+d.report_uuid+'\nDeadline: '+new Date(d.timeline.report_deadline).toLocaleString());
-    loadCIRCIA();loadKPIs();if(document.getElementById('modal-inc').classList.contains('show'))showIncidentDetail(id);
-  }catch(e){alert('Error: '+e.message);}
+  if(typeof window.showCIRCIAGenModal === 'function'){ window.showCIRCIAGenModal(id); return; }
+  vspIRToast('Modal not loaded','error');
 }
 
 async function createIncident(){
   const b={title:document.getElementById('nc-title').value.trim(),description:document.getElementById('nc-desc').value,severity:document.getElementById('nc-severity').value,category:document.getElementById('nc-category').value,reporter:document.getElementById('nc-reporter').value,is_ransomware:document.getElementById('nc-ransom').checked,impact_confidentiality:document.getElementById('nc-imp-c').checked,impact_integrity:document.getElementById('nc-imp-i').checked,impact_availability:document.getElementById('nc-imp-a').checked,impact_safety:document.getElementById('nc-imp-s').checked,impact_business_ops:document.getElementById('nc-imp-b').checked,impact_supply_chain:document.getElementById('nc-imp-sc').checked};
-  if(!b.title){alert('Title required');return;}
+  if(!b.title){vspIRToast('Title is required','warning');return;}
   try{const r=await fetch('/api/p4/ir/incident',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
     let m=`✅ Created: ${d.incident_id}`;
@@ -461,8 +454,8 @@ async function createIncident(){
     );
     document.getElementById('nc-title').value='';document.getElementById('nc-desc').value='';
     document.querySelectorAll('.chk-row input, #nc-ransom').forEach(c=>c.checked=false);
-    loadKPIs();alert(m);
-  }catch(e){alert('Error: '+e.message);}
+    loadKPIs();vspIRToast(m,'success');
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 async function loadCIRCIA(){
@@ -535,13 +528,13 @@ async function showCIRCIADetail(uuid){
 
 async function submitCIRCIA(uuid){
   const name=document.getElementById('sub-name').value.trim();
-  if(!name){alert('Name required');return;}
+  if(!name){vspIRToast('Name is required','warning');return;}
   try{const r=await fetch('/api/p4/circia/submit',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({report_uuid:uuid,submitted_by_name:name,submitted_by_title:document.getElementById('sub-title').value,submitted_by_email:document.getElementById('sub-email').value})});
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    alert('✅ Submitted!\n\nCISA ID: '+d.cisa_submission_id+'\nDeadline met: '+(d.deadline_met?'YES':'NO'));
+    vspIRToast('Submitted to CISA\nID: '+d.cisa_submission_id+'\nDeadline met: '+(d.deadline_met?'YES':'NO'),'success');
     closeModal('circia');loadCIRCIA();loadKPIs();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 async function loadEvidence(){
@@ -563,21 +556,17 @@ async function loadEvidence(){
 }
 
 function showCustody(i){
-  const ev=window._evData[i];
-  const entries=ev.custody_log||[];
-  const html='<div class="custody-timeline">'+entries.map(e=>
-    `<div class="custody-entry"><b class="mono">${fmtDT(e.timestamp)}</b> — <span class="badge b-info">${e.action}</span><br>
-    <span style="color:var(--t2)">Actor:</span> ${e.actor} · <span style="color:var(--t2)">Location:</span> ${e.location||'—'}
-    ${e.notes?'<br><span class="mono">📝 '+e.notes+'</span>':''}</div>`).join('')+'</div>';
-  alert('Chain of Custody — '+ev.evidence_id+'\n\n'+entries.length+' entries (see modal)');
-  // Simple display - could be another modal but reuse existing
-  const newEntry=prompt('Add custody entry? Format:\nactor | action | location | notes\n(leave empty to cancel)');
-  if(!newEntry)return;
-  const parts=newEntry.split('|').map(s=>s.trim());
-  if(parts.length<2){alert('Need at least actor and action');return;}
-  fetch('/api/p4/forensics/custody',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({evidence_id:ev.evidence_id,actor:parts[0],action:parts[1],location:parts[2]||'',notes:parts[3]||''})})
-    .then(r=>r.json()).then(d=>{if(d.updated){alert('✅ Custody entry added');loadEvidence();}});
+  // VSP-IR-G1.D: defensive lookup — _evData may be undefined if Forensics tab not visited yet
+  const ev = (window._evData || [])[i];
+  if(!ev){
+    vspIRToast('Evidence data not loaded — please open Forensics tab first', 'warning');
+    return;
+  }
+  if(typeof window.showCustodyModal === 'function'){
+    window.showCustodyModal(ev);
+    return;
+  }
+  vspIRToast('Custody modal not loaded', 'error');
 }
 
 function showAddEvidence(){
@@ -623,11 +612,11 @@ async function submitEvidence(){
     collected_by:document.getElementById('ae-by').value,
     collection_method:document.getElementById('ae-method').value,
     source_system:document.getElementById('ae-src').value};
-  if(!b.incident_id||!b.description){alert('Incident ID and description required');return;}
+  if(!b.incident_id||!b.description){vspIRToast('Incident ID and description are required','warning');return;}
   try{const r=await fetch('/api/p4/forensics/evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    alert('✅ Evidence created: '+d.evidence_id);closeModal('evidence');loadEvidence();loadKPIs();
-  }catch(e){alert('Error: '+e.message);}
+    vspIRToast('Evidence created: '+d.evidence_id,'success');closeModal('evidence');loadEvidence();loadKPIs();
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 async function loadPlaybooks(){
@@ -1764,5 +1753,251 @@ loadKPIs();loadIncidents();
 
 </script>
 <!-- VSP-CROSS-LINK-END -->
+
+<!-- VSP-IR-G1: New modals for Phase G1 -->
+<div class="modal-backdrop" id="modal-editfield">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <div class="modal-title" id="mef-title">Edit Field</div>
+      <button class="modal-close" onclick="closeModal('editfield')">×</button>
+    </div>
+    <div class="modal-body" id="mef-body"></div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-transition">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <div class="modal-title">▶ Advance Incident Phase</div>
+      <button class="modal-close" onclick="closeModal('transition')">×</button>
+    </div>
+    <div class="modal-body" id="mt-body"></div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-circiagen">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <div class="modal-title">⏱️ Generate CIRCIA Report</div>
+      <button class="modal-close" onclick="closeModal('circiagen')">×</button>
+    </div>
+    <div class="modal-body" id="mcg-body"></div>
+  </div>
+</div>
+<div id="vsp-ir-toast-container" style="position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
+<script>
+window.vspIRToast = function(msg, type){
+  type = type || 'info';
+  var c = ({
+    success:{bg:'rgba(34,197,94,.15)',border:'#22c55e',icon:'✅'},
+    error:{bg:'rgba(239,68,68,.15)',border:'#ef4444',icon:'✗'},
+    warning:{bg:'rgba(250,204,21,.15)',border:'#facc15',icon:'⚠️'},
+    info:{bg:'rgba(59,130,246,.15)',border:'#3b82f6',icon:'ℹ️'}
+  })[type] || {bg:'rgba(59,130,246,.15)',border:'#3b82f6',icon:'ℹ️'};
+  var ct = document.getElementById('vsp-ir-toast-container');
+  if(!ct) return;
+  var t = document.createElement('div');
+  t.style.cssText = 'pointer-events:auto;background:'+c.bg+';border-left:3px solid '+c.border+';padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);display:flex;gap:10px;align-items:flex-start;animation:vspIRToastIn .25s ease';
+  t.innerHTML = '<span>'+c.icon+'</span><span style="flex:1;white-space:pre-line">'+String(msg||'').replace(/</g,'&lt;')+'</span>';
+  ct.appendChild(t);
+  setTimeout(function(){
+    t.style.transition='opacity .2s, transform .2s';t.style.opacity='0';t.style.transform='translateX(20px)';
+    setTimeout(function(){ t.remove(); }, 220);
+  }, type === 'error' ? 5500 : 3500);
+};
+if(!document.getElementById('vsp-ir-toast-style')){
+  var st = document.createElement('style');
+  st.id = 'vsp-ir-toast-style';
+  st.textContent = '@keyframes vspIRToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+  document.head.appendChild(st);
+}
+
+window.showEditFieldModal = function(incidentId, field, currentVal){
+  document.getElementById('mef-title').textContent = 'Edit ' + field;
+  var isLong = (field === 'description' || field === 'notes' || (currentVal||'').length > 80);
+  document.getElementById('mef-body').innerHTML =
+    '<div class="form-row"><label>Field</label><input value="'+field+'" readonly></div>' +
+    '<div class="form-row"><label>New Value</label>' +
+    (isLong
+      ? '<textarea id="mef-val" rows="5" style="width:100%">'+(currentVal||'').replace(/</g,'&lt;')+'</textarea>'
+      : '<input id="mef-val" value="'+(currentVal||'').replace(/"/g,'&quot;')+'">') +
+    '</div>' +
+    '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+    '<button class="btn" onclick="closeModal(\'editfield\')">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="submitEditField(\''+incidentId+'\',\''+field+'\')">Save</button>' +
+    '</div>';
+  document.getElementById('modal-editfield').classList.add('show');
+  setTimeout(function(){var el=document.getElementById('mef-val');if(el)el.focus();},50);
+};
+window.submitEditField = async function(incidentId, field){
+  var newVal = document.getElementById('mef-val').value;
+  try {
+    const r = await fetch('/api/p4/ir/incident/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:incidentId,field:field,value:newVal})});
+    if(!r.ok) throw new Error(await r.text());
+    vspIRToast('Updated '+field,'success');closeModal('editfield');showIncidentDetail(incidentId);loadIncidents();
+  } catch(e){ vspIRToast('Error: '+e.message,'error'); }
+};
+
+window.showTransitionModal = function(incidentId, currentPhase){
+  var phases = ['preparation','detection_analysis','containment','eradication','recovery','post_incident'];
+  var idx = phases.indexOf(currentPhase);
+  var nextPhases = phases.slice(idx+1);
+  if(nextPhases.length === 0){ vspIRToast('Already at final phase: '+currentPhase,'warning'); return; }
+  var opts = nextPhases.map(function(p, i){
+    var sel = i === 0 ? 'checked' : '';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer">'+
+      '<input type="radio" name="mt-phase" value="'+p+'" '+sel+'>'+
+      '<span><b>'+p.replace(/_/g,' ')+'</b></span></label>';
+  }).join('');
+  document.getElementById('mt-body').innerHTML =
+    '<div class="form-row"><label>Incident</label><input value="'+incidentId+'" readonly></div>' +
+    '<div class="form-row"><label>Current Phase</label><input value="'+currentPhase.replace(/_/g,' ')+'" readonly></div>' +
+    '<div class="form-row"><label>Next Phase</label>'+opts+'</div>' +
+    '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+    '<button class="btn" onclick="closeModal(\'transition\')">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="submitTransition(\''+incidentId+'\')">Advance</button>' +
+    '</div>';
+  document.getElementById('modal-transition').classList.add('show');
+};
+window.submitTransition = async function(incidentId){
+  var picked = document.querySelector('input[name="mt-phase"]:checked');
+  if(!picked){ vspIRToast('Please select a phase','warning'); return; }
+  try {
+    const r = await fetch('/api/p4/ir/incident/transition',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:incidentId,phase:picked.value})});
+    if(!r.ok) throw new Error(await r.text());
+    vspIRToast('Transitioned to '+picked.value.replace(/_/g,' '),'success');closeModal('transition');
+    if(document.getElementById('modal-inc').classList.contains('show')) showIncidentDetail(incidentId);
+    loadIncidents();loadKPIs();
+  } catch(e){ vspIRToast('Error: '+e.message,'error'); }
+};
+
+window.showCIRCIAGenModal = function(incidentId){
+  document.getElementById('mcg-body').innerHTML =
+    '<div class="banner banner-blue">CIRCIA reports must be filed within prescribed timelines: <b>72h</b> for substantial incidents, <b>24h</b> for ransomware payments.</div>' +
+    '<div class="form-row"><label>Incident</label><input value="'+incidentId+'" readonly></div>' +
+    '<div class="form-row"><label>Report Type *</label><select id="mcg-type">' +
+    '<option value="substantial_incident">Substantial Incident (72h)</option>' +
+    '<option value="ransomware_payment">Ransomware Payment (24h)</option>' +
+    '<option value="joint">Joint Report (combined)</option>' +
+    '</select></div>' +
+    '<div class="form-row"><label>Critical Infrastructure Sector *</label><select id="mcg-sector">' +
+    '<option value="information_technology">Information Technology</option>' +
+    '<option value="financial_services">Financial Services</option>' +
+    '<option value="healthcare_public_health">Healthcare &amp; Public Health</option>' +
+    '<option value="energy">Energy</option>' +
+    '<option value="communications">Communications</option>' +
+    '<option value="transportation_systems">Transportation Systems</option>' +
+    '<option value="water_wastewater">Water &amp; Wastewater Systems</option>' +
+    '<option value="critical_manufacturing">Critical Manufacturing</option>' +
+    '<option value="defense_industrial_base">Defense Industrial Base</option>' +
+    '<option value="government_facilities">Government Facilities</option>' +
+    '<option value="emergency_services">Emergency Services</option>' +
+    '<option value="commercial_facilities">Commercial Facilities</option>' +
+    '<option value="dams">Dams</option>' +
+    '<option value="chemical">Chemical</option>' +
+    '<option value="food_agriculture">Food &amp; Agriculture</option>' +
+    '<option value="nuclear">Nuclear Reactors</option>' +
+    '</select></div>' +
+    '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+    '<button class="btn" onclick="closeModal(\'circiagen\')">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="submitCIRCIAGen(\''+incidentId+'\')">Generate Report</button>' +
+    '</div>';
+  document.getElementById('modal-circiagen').classList.add('show');
+};
+window.submitCIRCIAGen = async function(incidentId){
+  var t = document.getElementById('mcg-type').value;
+  var s = document.getElementById('mcg-sector').value;
+  try {
+    const r = await fetch('/api/p4/circia/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:incidentId,report_type:t,ci_sector:s})});
+    const d = await r.json();
+    if(!r.ok) throw new Error(JSON.stringify(d));
+    vspIRToast('CIRCIA report generated\nUUID: '+d.report_uuid+'\nDeadline: '+new Date(d.timeline.report_deadline).toLocaleString(),'success');
+    closeModal('circiagen');loadCIRCIA();loadKPIs();
+    if(document.getElementById('modal-inc').classList.contains('show')) showIncidentDetail(incidentId);
+  } catch(e){ vspIRToast('Error: '+e.message,'error'); }
+};
+</script>
+
+<!-- VSP-IR-G1.D: Forensics modals (custody chain viewer + add entry) -->
+<div class="modal-backdrop" id="modal-custody">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-head">
+      <div class="modal-title" id="mcust-title">🔬 Chain of Custody</div>
+      <button class="modal-close" onclick="closeModal('custody')">×</button>
+    </div>
+    <div class="modal-body" id="mcust-body"></div>
+  </div>
+</div>
+<script>
+window.showCustodyModal = function(ev){
+  document.getElementById('mcust-title').textContent = '🔬 Chain of Custody — ' + ev.evidence_id;
+  var entries = ev.custody_log || [];
+  var timeline = entries.length === 0
+    ? '<div class="empty">No custody entries yet</div>'
+    : '<div class="custody-timeline" style="margin-bottom:14px">' + entries.map(function(e){
+        var ts = (typeof fmtDT==='function') ? fmtDT(e.timestamp) : (e.timestamp||'');
+        return '<div class="custody-entry" style="padding:8px;border-left:3px solid var(--accent);background:var(--bg2);margin-bottom:6px;border-radius:4px">' +
+          '<b class="mono">' + ts + '</b> — <span class="badge b-info">' + (e.action||'') + '</span><br>' +
+          '<span style="color:var(--t2)">Actor:</span> ' + (e.actor||'—') +
+          ' · <span style="color:var(--t2)">Location:</span> ' + (e.location || '—') +
+          (e.notes ? '<br><span class="mono">📝 ' + e.notes + '</span>' : '') +
+          '</div>';
+      }).join('') + '</div>';
+
+  document.getElementById('mcust-body').innerHTML =
+    '<div style="margin-bottom:8px;font-size:12px;color:var(--t2)">' + entries.length + ' entries logged for ' + ev.evidence_id + '</div>' +
+    timeline +
+    '<hr style="border-color:var(--border);margin:14px 0">' +
+    '<div class="section-title" style="font-size:13px;margin-bottom:8px">Add new custody entry</div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label>Actor *</label><input id="cust-actor" placeholder="forensics@vsp.local"></div>' +
+    '<div class="form-row"><label>Action *</label><select id="cust-action">' +
+    '<option value="seized">seized</option>' +
+    '<option value="transferred">transferred</option>' +
+    '<option value="analyzed">analyzed</option>' +
+    '<option value="hashed">hashed</option>' +
+    '<option value="copied">copied</option>' +
+    '<option value="examined">examined</option>' +
+    '<option value="returned">returned</option>' +
+    '<option value="destroyed">destroyed</option>' +
+    '</select></div></div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label>Location</label><input id="cust-location" placeholder="evidence-locker-01"></div>' +
+    '<div class="form-row"><label>Notes</label><input id="cust-notes" placeholder="optional"></div></div>' +
+    '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+    '<button class="btn" onclick="closeModal(\'custody\')">Close</button>' +
+    '<button class="btn btn-primary" onclick="submitCustodyEntry(\'' + ev.evidence_id + '\')">Add Entry</button>' +
+    '</div>';
+  document.getElementById('modal-custody').classList.add('show');
+};
+
+window.submitCustodyEntry = async function(evidenceId){
+  var actor = document.getElementById('cust-actor').value.trim();
+  var action = document.getElementById('cust-action').value;
+  if(!actor){ vspIRToast('Actor is required', 'warning'); return; }
+  if(!action){ vspIRToast('Action is required', 'warning'); return; }
+  try {
+    const r = await fetch('/api/p4/forensics/custody', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        evidence_id: evidenceId,
+        actor: actor,
+        action: action,
+        location: document.getElementById('cust-location').value,
+        notes: document.getElementById('cust-notes').value
+      })
+    });
+    const d = await r.json();
+    if(!r.ok || !d.updated) throw new Error(JSON.stringify(d));
+    vspIRToast('Custody entry added', 'success');
+    closeModal('custody');
+    loadEvidence();
+  } catch(e) {
+    vspIRToast('Error: ' + e.message, 'error');
+  }
+};
+</script>
+
+<!-- VSP-IR-G1-END -->
+
 </body>
 </html>
