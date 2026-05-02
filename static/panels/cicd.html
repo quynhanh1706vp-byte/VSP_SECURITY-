@@ -2332,7 +2332,7 @@ window.markFixApplied = async function(findingId){
   // Suppress 404 console error by checking existence first OR catching silently
   var marked = false;
   try {
-    var r = await fetch('/api/v1/findings/' + findingId + '/status', {
+    var r = await fetch('/api/v1/remediation/finding/' + findingId + '/status', {
       method: 'PATCH',
       headers: Object.assign({'Content-Type':'application/json'}, hdr ? hdr() : {}),
       body: JSON.stringify({status:'resolved', resolution:'auto-fix applied'})
