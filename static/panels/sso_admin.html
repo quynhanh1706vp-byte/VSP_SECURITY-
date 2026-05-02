@@ -5,33 +5,30 @@
 <title>SSO Provider Admin</title>
 <link rel="stylesheet" href="/vsp_enterprise_ui.css">
 <style>
- :root {
- --ink:#0a1628; --ink2:#142238; --cream:#f4e9d8; --cream2:#c8bea9; --t3:#8a8068;
  
- }
- body { margin:0; background:#0a1019; color:var(--cream); font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+ body { margin:0; background:var(--bg0); color:var(--t1); font:13px/1.5 var(--font-sans, -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif); }
  .wrap { max-width:1200px; margin:0 auto; padding:24px; }
  h1 { font-family:Georgia,serif; font-weight:400; font-size:32px; margin:0 0 4px; }
  .subtitle { color:var(--t3); font-size:13px; margin-bottom:24px; }
 
- .panel { background:var(--ink2); border:1px solid #1f2a3d; border-radius:6px; padding:20px; margin-bottom:24px; }
+ .panel { background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:20px; margin-bottom:24px; }
  h3 { font-family:Georgia,serif; font-weight:400; font-size:18px; margin:0 0 12px; }
 
  table { width:100%; border-collapse:collapse; }
- th, td { text-align:left; padding:10px 14px; font-size:13px; border-bottom:1px solid #1f2a3d; }
+ th, td { text-align:left; padding:10px 14px; font-size:13px; border-bottom:1px solid var(--border); }
  th { font:11px monospace; letter-spacing:2px; color:var(--t3); text-transform:uppercase; font-weight:normal; }
- tr:hover td { background:#172234; }
- td code { font-size:11px; color:var(--cream2); }
+ tr:hover td { background:var(--bg3); }
+ td code { font-size:11px; color:var(--t2); }
 
  .btn {
  background:var(--accent); color:#fff; border:none; padding:8px 14px;
  border-radius:4px; font:13px monospace; cursor:pointer; letter-spacing:1px;
  }
- .btn:hover { background:#0fa8b0; }
+ .btn:hover { background:var(--accent2); }
  .btn-sm { padding:4px 10px; font-size:11px; }
  .btn-warn { background:var(--warm); color:#000; }
  .btn-danger { background:var(--red); }
- .btn-ghost { background:transparent; border:1px solid var(--cream2); color:var(--cream); }
+ .btn-ghost { background:transparent; border:1px solid var(--t2); color:var(--t1); }
 
  .badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-family:monospace; letter-spacing:1px; }
  .b-ok { background:rgba(34,197,94,.15); color:var(--green); }
@@ -40,7 +37,7 @@
 
  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; }
  .modal-backdrop.show { display:flex; align-items:center; justify-content:center; }
- .modal { background:#15233a; border:1px solid #1f2a3d; border-radius:6px;
+ .modal { background:var(--bg2); border:1px solid var(--border); border-radius:6px;
  padding:24px; max-width:560px; width:90%; max-height:90vh; overflow:auto; }
  .modal h3 { margin:0 0 16px; }
 
@@ -48,7 +45,7 @@
  text-transform:uppercase; margin:14px 0 4px; }
  input, select, textarea {
  width:100%; box-sizing:border-box; padding:8px 10px;
- background:#0a1019; border:1px solid #2a3a55; color:var(--cream);
+ background:var(--bg2); border:1px solid var(--border); color:var(--t1);
  font:13px monospace; border-radius:3px;
  }
  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -59,11 +56,11 @@
 
  .preset-bar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
  .preset-btn {
- background:transparent; color:var(--cream2); border:1px solid var(--cream2);
+ background:transparent; color:var(--t2); border:1px solid var(--t2);
  padding:5px 11px; border-radius:3px; cursor:pointer;
  font:11px monospace; letter-spacing:1px;
  }
- .preset-btn:hover { background:rgba(255,255,255,.05); border-color:var(--accent); color:var(--cream); }
+ .preset-btn:hover { background:rgba(255,255,255,.05); border-color:var(--accent); color:var(--t1); }
 </style>
 </head>
 <body>
@@ -86,9 +83,9 @@
 
  <div class="panel">
  <h3>Test Login Flow</h3>
- <p style="color:var(--cream2);font-size:13px">
+ <p style="color:var(--t2);font-size:13px">
  To test a configured provider, navigate to:
- <code style="background:#0a1019;padding:3px 8px;border-radius:3px;font-size:12px">
+ <code style="background:var(--bg2);padding:3px 8px;border-radius:3px;font-size:12px">
  /api/v1/auth/sso/login?provider_id=&lt;ID&gt;
  </code>
  </p>
@@ -400,10 +397,10 @@ loadProviders();
  function toast(msg, type) {
  type = type || 'info';
  const colors = {
- success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
- error: { bg: 'rgba(239,68,68,.15)', border: '#ef4444', icon: '✗' },
- warn: { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
- info: { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+ success: { bg: 'rgba(16,185,129,.15)', border: 'var(--green)', icon: '✓' },
+ error: { bg: 'rgba(239,68,68,.15)', border: 'var(--red)', icon: '✗' },
+ warn: { bg: 'rgba(245,158,11,.15)', border: 'var(--amber)', icon: '⚠' },
+ info: { bg: 'rgba(59,130,246,.15)', border: 'var(--accent)', icon: 'ℹ' }
  };
  const c = colors[type] || colors.info;
  const t = document.createElement('div');

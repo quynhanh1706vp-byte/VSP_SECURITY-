@@ -5,13 +5,10 @@
 <title>AI Compliance Advisor</title>
 <link rel="stylesheet" href="/vsp_enterprise_ui.css">
 <style>
- :root {
- --ink:#0a1628; --ink2:#142238; --cream:#f4e9d8; --cream2:#c8bea9; --t3:#8a8068;
  
- }
- body { margin:0; background:#0a1019; color:var(--cream); font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+ body { margin:0; background:var(--bg0); color:var(--t1); font:13px/1.5 var(--font-sans, -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif); }
  .wrap { max-width:1400px; margin:0 auto; padding:24px; }
- h1 { font-family:Georgia,serif; font-weight:400; font-size:32px; margin:0 0 4px; color:var(--cream); }
+ h1 { font-family:Georgia,serif; font-weight:400; font-size:32px; margin:0 0 4px; color:var(--t1); }
  .subtitle { color:var(--t3); font-size:13px; margin-bottom:24px; }
  .mode-badge {
  display:inline-block; padding:3px 10px; border-radius:3px; font-size:10px;
@@ -23,13 +20,13 @@
 
  .grid { display:grid; grid-template-columns:380px 1fr; gap:24px; }
 
- .panel { background:var(--ink2); border:1px solid #1f2a3d; border-radius:6px; padding:18px; }
+ .panel { background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:18px; }
  .panel h3 { font-family:Georgia,serif; font-weight:400; font-size:16px; margin:0 0 12px; }
 
  label { display:block; font-size:10px; color:var(--t3); letter-spacing:2px; text-transform:uppercase; margin:12px 0 4px; }
  input, select, textarea {
  width:100%; box-sizing:border-box; padding:8px 10px;
- background:#0a1019; border:1px solid #2a3a55; color:var(--cream);
+ background:var(--bg2); border:1px solid var(--border); color:var(--t1);
  font:13px monospace; border-radius:3px;
  }
  textarea { min-height:80px; resize:vertical; }
@@ -39,7 +36,7 @@
  border-radius:4px; font:13px monospace; cursor:pointer; letter-spacing:1px;
  margin-top:16px; width:100%;
  }
- .btn:hover { background:#0fa8b0; }
+ .btn:hover { background:var(--accent2); }
  .btn:disabled { opacity:.5; cursor:not-allowed; }
  .btn-sm { padding:5px 10px; font-size:11px; margin-top:0; width:auto; }
 
@@ -50,24 +47,24 @@
  .section-block h4 {
  font-family:monospace; font-size:11px; letter-spacing:2px;
  color:var(--warm); margin:0 0 10px; padding-bottom:6px;
- border-bottom:1px solid #2a3a55; text-transform:uppercase;
+ border-bottom:1px solid var(--border); text-transform:uppercase;
  }
  .remediation { line-height:1.6; }
  .remediation pre {
- background:#0a1019; padding:12px; border-radius:4px;
+ background:var(--bg2); padding:12px; border-radius:4px;
  overflow-x:auto; border-left:3px solid var(--accent);
  font-size:12px;
  }
- .remediation code { background:#0a1019; padding:1px 4px; border-radius:2px; font-size:12px; }
+ .remediation code { background:var(--bg2); padding:1px 4px; border-radius:2px; font-size:12px; }
 
  .effort-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:8px; }
- .effort-card { background:#0a1019; padding:14px; border-radius:4px; text-align:center; }
+ .effort-card { background:var(--bg2); padding:14px; border-radius:4px; text-align:center; }
  .effort-card .level { font-size:9px; color:var(--t3); letter-spacing:2px; }
- .effort-card .hours { font-family:Georgia,serif; font-size:24px; color:var(--cream); margin-top:4px; }
+ .effort-card .hours { font-family:Georgia,serif; font-size:24px; color:var(--t1); margin-top:4px; }
  .effort-card .unit { font-size:10px; color:var(--t3); }
 
  .evidence-block {
- background:#0a1019; padding:14px; border-radius:4px;
+ background:var(--bg2); padding:14px; border-radius:4px;
  border-left:3px solid var(--warm);
  font-style:italic; line-height:1.6;
  }
@@ -79,14 +76,14 @@
 
  .meta {
  display:flex; justify-content:space-between; align-items:center;
- padding:10px 14px; background:#0a1019; border-radius:4px;
+ padding:10px 14px; background:var(--bg2); border-radius:4px;
  font-family:monospace; font-size:11px; color:var(--t3);
  margin-top:16px;
  }
 
  .feedback-row { display:flex; gap:8px; margin-top:14px; }
  .fb-btn {
- background:transparent; color:var(--cream2); border:1px solid var(--cream2);
+ background:transparent; color:var(--t2); border:1px solid var(--t2);
  padding:6px 12px; border-radius:3px; cursor:pointer;
  font:11px monospace; letter-spacing:1px;
  }
@@ -98,13 +95,13 @@
  display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;
  margin-bottom:24px;
  }
- .stat { background:var(--ink2); padding:14px; border-radius:4px; }
+ .stat { background:var(--bg2); padding:14px; border-radius:4px; }
  .stat .label { font-size:9px; color:var(--t3); letter-spacing:2px; text-transform:uppercase; }
- .stat .value { font-family:Georgia,serif; font-size:22px; color:var(--cream); margin-top:4px; }
+ .stat .value { font-family:Georgia,serif; font-size:22px; color:var(--t1); margin-top:4px; }
 
  .spin {
  display:inline-block; width:14px; height:14px;
- border:2px solid var(--cream2); border-top-color:transparent;
+ border:2px solid var(--t2); border-top-color:transparent;
  border-radius:50%; animation:spin .8s linear infinite;
  vertical-align:middle; margin-right:6px;
  }
@@ -417,10 +414,10 @@ setInterval(loadStats, 30000);
  function toast(msg, type) {
  type = type || 'info';
  const colors = {
- success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
- error: { bg: 'rgba(239,68,68,.15)', border: '#ef4444', icon: '✗' },
- warn: { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
- info: { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+ success: { bg: 'rgba(16,185,129,.15)', border: 'var(--green)', icon: '✓' },
+ error: { bg: 'rgba(239,68,68,.15)', border: 'var(--red)', icon: '✗' },
+ warn: { bg: 'rgba(245,158,11,.15)', border: 'var(--amber)', icon: '⚠' },
+ info: { bg: 'rgba(59,130,246,.15)', border: 'var(--accent)', icon: 'ℹ' }
  };
  const c = colors[type] || colors.info;
  const t = document.createElement('div');
