@@ -2328,22 +2328,30 @@ window.closeFixPreview = function(){
 
 window.markFixApplied = async function(findingId){
   if(!findingId){ closeFixPreview(); if(typeof showToast==='function') showToast('Marked locally only — no finding ID','warning'); return; }
+  // VSP-CICD-H3.J: Backend endpoint /findings/{id}/status not yet implemented
+  // Suppress 404 console error by checking existence first OR catching silently
+  var marked = false;
   try {
     var r = await fetch('/api/v1/findings/' + findingId + '/status', {
       method: 'PATCH',
       headers: Object.assign({'Content-Type':'application/json'}, hdr ? hdr() : {}),
       body: JSON.stringify({status:'resolved', resolution:'auto-fix applied'})
-    });
-    if(r.ok){
+    }).catch(function(){ return {ok: false, status: 0}; });
+    
+    if(r && r.ok){
+      marked = true;
       if(typeof showToast==='function') showToast('Marked as resolved · re-scan to verify','success');
+    } else if(r && r.status === 404){
+      // Backend endpoint not yet implemented — totally expected
+      if(typeof showToast==='function') showToast('Marked locally · backend wire pending','info');
     } else {
-      if(typeof showToast==='function') showToast('Marked locally (backend not connected)','info');
+      if(typeof showToast==='function') showToast('Marked locally (backend offline)','info');
     }
   } catch(e) {
     if(typeof showToast==='function') showToast('Marked locally (offline)','info');
   }
   closeFixPreview();
-  if(typeof loadAutofixStats === 'function') setTimeout(loadAutofixStats, 600);
+  if(marked && typeof loadAutofixStats === 'function') setTimeout(loadAutofixStats, 600);
 };
 
 document.addEventListener('click', function(e){
