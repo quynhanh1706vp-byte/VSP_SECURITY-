@@ -7092,7 +7092,7 @@ async function loadAnalytics() {
         var dur = (r.started_at&&r.finished_at) ? Math.round((new Date(r.finished_at)-new Date(r.started_at))/1000)+'s' : '—';
         var score = r.summary&&r.summary.SCORE!==undefined ? r.summary.SCORE : '—';
         var scoreColor = score==='—'?'c-t3':score>=70?'c-green':score>=40?'c-amber':'c-red';
-        return '<tr>'
+        return '<tr style="cursor:pointer" onclick="viewRunLog(\''+r.rid+'\')" title="Click to view run detail" onmouseover="this.style.background=\'rgba(56,189,248,.05)\'" onmouseout="this.style.background=\'transparent\'">'
           +'<td class="mono" style="font-size:9px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.rid+'</td>'
           +'<td class="mono-sm">'+new Date(r.created_at).toLocaleDateString('vi-VN')+'</td>'
           +'<td><span class="pill pill-run" style="font-size:8px">'+r.mode+'</span></td>'
