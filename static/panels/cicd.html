@@ -1182,7 +1182,7 @@ function renderAutofixTable(){
       + '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (f.message||'').replace(/"/g,'&quot;') + '">' + descFull + '</td>'
       + '<td style="font-size:11px;color:var(--cyan)">' + fix + '</td>'
       + '<td><span class="badge ' + statusBadge + '">' + statusLabel + '</span></td>'
-      + '<td><button class="btn btn-sm" onclick=\'showFixPreview('+JSON.stringify(f).replace(/"/g, "&quot;").replace(/\'/g, "&#39;")+')\' >Preview fix</button></td>'
+      + '<td><button class="btn btn-sm" data-fix-idx="' + fIdx + '" onclick="showFixPreviewByIdx(this)">Preview fix</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -2239,6 +2239,13 @@ window.openRunDetail = function(rid){
 };
 
 // K2: Fix preview modal
+window.showFixPreviewByIdx = function(btn){
+  var idx = parseInt(btn.getAttribute('data-fix-idx') || '0', 10);
+  var f = (window._lastFixable || [])[idx];
+  if(!f){ if(typeof showToast==='function') showToast('Finding data not available','warning'); return; }
+  window.showFixPreview(f);
+};
+
 window.showFixPreview = function(finding){
   // Accept either a finding object OR a button element with data-fix-idx
   var f;
