@@ -18,10 +18,10 @@ import (
 
 // SSOOIDCHandler exposes the OIDC SSO REST + auth endpoints.
 type SSOOIDCHandler struct {
-	DB         *sql.DB
-	JWTSecret  string
-	JWTTTL     time.Duration
-	IssueJWT   func(secret string, claims auth.Claims, ttl time.Duration) (string, error)
+	DB        *sql.DB
+	JWTSecret string
+	JWTTTL    time.Duration
+	IssueJWT  func(secret string, claims auth.Claims, ttl time.Duration) (string, error)
 }
 
 // NewSSOOIDCHandler constructs the handler. issueJWT comes from internal/auth.

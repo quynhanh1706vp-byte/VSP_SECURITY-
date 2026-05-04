@@ -16,11 +16,11 @@ import (
 
 	"github.com/rs/zerolog/log"
 	aiPkg "github.com/vsp/platform/internal/ai"
+	"github.com/vsp/platform/internal/integrations/virustotal"
 	licenseScanner "github.com/vsp/platform/internal/scanner/license"
 	"github.com/vsp/platform/internal/scanner/secretcheck"
 	"github.com/vsp/platform/internal/store"
 	"github.com/vsp/platform/internal/threatintel"
-	"github.com/vsp/platform/internal/integrations/virustotal"
 )
 
 // ── Correlation ───────────────────────────────────────────────
@@ -874,9 +874,9 @@ func (h *ThreatIntel) ComponentThreat(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"error":     "virustotal not configured",
-			"hint":      "set VSP_VT_API_KEY environment variable",
-			"verdict":   "unavailable",
+			"error":   "virustotal not configured",
+			"hint":    "set VSP_VT_API_KEY environment variable",
+			"verdict": "unavailable",
 		})
 		return
 	}
@@ -894,7 +894,6 @@ func (h *ThreatIntel) ComponentThreat(w http.ResponseWriter, r *http.Request) {
 func (h *ThreatIntel) VTStats(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, _vtClient.Stats())
 }
-
 
 // ─── UI 404 FIX: Stub handlers for missing routes ─────────────────
 // These return empty data to prevent panel 404s.
