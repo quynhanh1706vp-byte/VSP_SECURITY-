@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"github.com/jackc/pgx/v5"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"net/http"
 	"strings"
 
@@ -194,21 +194,21 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return fields needed by FE charts
 	type indexRow struct {
-		ID         string          `json:"id"`
-		RID        string          `json:"rid"`
-		Status     string          `json:"status"`
-		Mode       string          `json:"mode"`
-		Profile    string          `json:"profile"`
-		Gate       string          `json:"gate"`
-		Posture    string          `json:"posture"`
-		TotalFindings int          `json:"total_findings"`
-		Total         int          `json:"total"`
-		ToolsDone     int          `json:"tools_done"`
-		ToolsTotal int             `json:"tools_total"`
-		Summary    json.RawMessage `json:"summary"`
-		StartedAt  *time.Time      `json:"started_at"`
-		FinishedAt *time.Time      `json:"finished_at"`
-		CreatedAt  time.Time       `json:"created_at"`
+		ID            string          `json:"id"`
+		RID           string          `json:"rid"`
+		Status        string          `json:"status"`
+		Mode          string          `json:"mode"`
+		Profile       string          `json:"profile"`
+		Gate          string          `json:"gate"`
+		Posture       string          `json:"posture"`
+		TotalFindings int             `json:"total_findings"`
+		Total         int             `json:"total"`
+		ToolsDone     int             `json:"tools_done"`
+		ToolsTotal    int             `json:"tools_total"`
+		Summary       json.RawMessage `json:"summary"`
+		StartedAt     *time.Time      `json:"started_at"`
+		FinishedAt    *time.Time      `json:"finished_at"`
+		CreatedAt     time.Time       `json:"created_at"`
 	}
 	rows := make([]indexRow, 0, len(runs))
 	for _, run := range runs {
@@ -217,21 +217,21 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 			summ = json.RawMessage("{}")
 		}
 		rows = append(rows, indexRow{
-			ID:         run.ID,
-			RID:        run.RID,
-			Status:     run.Status,
-			Mode:       run.Mode,
-			Profile:    run.Profile,
-			Gate:       run.Gate,
-			Posture:    run.Posture,
+			ID:            run.ID,
+			RID:           run.RID,
+			Status:        run.Status,
+			Mode:          run.Mode,
+			Profile:       run.Profile,
+			Gate:          run.Gate,
+			Posture:       run.Posture,
 			TotalFindings: run.TotalFindings,
 			Total:         run.TotalFindings,
-			ToolsDone:  run.ToolsDone,
-			ToolsTotal: run.ToolsTotal,
-			Summary:    summ,
-			StartedAt:  run.StartedAt,
-			FinishedAt: run.FinishedAt,
-			CreatedAt:  run.CreatedAt,
+			ToolsDone:     run.ToolsDone,
+			ToolsTotal:    run.ToolsTotal,
+			Summary:       summ,
+			StartedAt:     run.StartedAt,
+			FinishedAt:    run.FinishedAt,
+			CreatedAt:     run.CreatedAt,
 		})
 	}
 	jsonOK(w, map[string]any{"runs": rows, "total": len(rows)})

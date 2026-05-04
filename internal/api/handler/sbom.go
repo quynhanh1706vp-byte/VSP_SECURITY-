@@ -273,14 +273,15 @@ func (h *SBOM) Diff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	run1, err := h.DB.GetRunByRID(ctx, claims.TenantID, rid1)
+	// Accept both UUID and RID (UI sends id, agents send rid)
+	run1, err := lookupRun(ctx, h.DB, claims.TenantID, rid1)
 	if err != nil || run1 == nil {
-		jsonError(w, "run1 not found", http.StatusNotFound)
+		jsonError(w, "run1 not found: "+rid1, http.StatusNotFound)
 		return
 	}
-	run2, err := h.DB.GetRunByRID(ctx, claims.TenantID, rid2)
+	run2, err := lookupRun(ctx, h.DB, claims.TenantID, rid2)
 	if err != nil || run2 == nil {
-		jsonError(w, "run2 not found", http.StatusNotFound)
+		jsonError(w, "run2 not found: "+rid2, http.StatusNotFound)
 		return
 	}
 
@@ -374,4 +375,13 @@ func (h *SBOM) Diff(w http.ResponseWriter, r *http.Request) {
 		"fixed":     fixedItems,
 		"persisted": persistedItems,
 	})
+}
+
+// lookupRun — accept either UUID (from UI) or RID (from agents/scripts)
+func lookupRun(ctx context.Context, db *store.DB, tenantID, idOrRID string) (*store.Run, error) {
+	// UUID format: 8-4-4-4-12 chars (36 with dashes)
+	if len(idOrRID) == 36 && idOrRID[8] == '-' && idOrRID[13] == '-' {
+		return db.GetRunByID(ctx, tenantID, idOrRID)
+	}
+	return db.GetRunByRID(ctx, tenantID, idOrRID)
 }

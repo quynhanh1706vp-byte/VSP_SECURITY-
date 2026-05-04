@@ -49,6 +49,15 @@ func (db *DB) GetRunByRID(ctx context.Context, tenantID, rid string) (*Run, erro
 	return scanRun(row)
 }
 
+// GetRunByID — same as GetRunByRID but matches the UUID primary key.
+// Used when UI dropdowns expose run.id (UUID) instead of run.rid (string).
+func (db *DB) GetRunByID(ctx context.Context, tenantID, id string) (*Run, error) {
+	row := db.pool.QueryRow(ctx,
+		`SELECT `+runCols+` FROM runs WHERE id=$1 AND tenant_id=$2 LIMIT 1`,
+		id, tenantID)
+	return scanRun(row)
+}
+
 func (db *DB) GetLatestRun(ctx context.Context, tenantID string) (*Run, error) {
 	row := db.pool.QueryRow(ctx,
 		`SELECT `+runCols+` FROM runs WHERE tenant_id=$1 AND status='DONE' ORDER BY created_at DESC LIMIT 1`,
