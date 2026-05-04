@@ -1,0 +1,39 @@
+id: pb-vn-vncert-ioc-sweep
+name: VNCERT IOC feed → scan toàn hạ tầng
+description: Khi VNCERT publish IOC mới, trigger sweep scan tìm dấu hiệu compromise
+trigger: manual
+sev_filter: any
+enabled: true
+tags: [vn, vncert, ioc, threat-hunt, proactive]
+steps:
+  - type: enrich
+    name: Pull IOC feed VNCERT
+    desc: Tải IOC mới từ VNCERT (24h qua)
+    config: |
+      source: vncert
+      endpoint: ${VNCERT_FEED_URL}
+      api_key: ${VNCERT_API_KEY}
+      window: 24h
+      types: [ip, domain, hash, url]
+  - type: condition
+    name: Kiểm tra số lượng IOC
+    desc: Bỏ qua nếu không có IOC mới
+    config: |
+      expr: ioc.count > 0
+  - type: remediate
+    name: Trigger sweep scan
+    desc: Chạy scan FULL_SOC mode trên toàn assets với IOC list
+    config: |
+      action: scan
+      mode: FULL_SOC
+      profile: DEEP
+      ioc_list: ${ioc.items}
+      scope: all_assets
+  - type: notify
+    name: Báo cáo SOC dashboard
+    desc: Update SOC dashboard + Slack notify khi có hit
+    config: |
+      channel: "#soc-threat-hunt"
+      webhook_url: ${SLACK_SOC_WEBHOOK}
+      only_if: scan.has_matches=true
+      message_vi: "VNCERT IOC sweep — phát hiện ${match_count} matches"

@@ -1,0 +1,58 @@
+id: pb-intl-cisa-kev-prioritize
+name: CISA KEV — auto-prioritize known exploited CVEs
+description: When CISA adds a CVE to KEV catalog, find affected assets and accelerate SLA
+trigger: manual
+sev_filter: any
+enabled: true
+tags: [cisa, kev, vulnerability-management, sla]
+steps:
+  - type: enrich
+    name: Pull CISA KEV catalog
+    desc: Fetch latest known exploited vulnerabilities
+    config: |
+      source: cisa_kev
+      endpoint: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+      cache_minutes: 60
+      diff_against: previous_run
+  - type: condition
+    name: New KEV entries since last run?
+    desc: Skip if no new entries
+    config: |
+      expr: kev.new_entries_count > 0
+  - type: enrich
+    name: Match against VSP findings
+    desc: Cross-reference KEV CVEs with open findings
+    config: |
+      match_by: cve_id
+      include: [open_findings, suppressed_findings]
+      enrich_with_assets: true
+  - type: remediate
+    name: Bump SLA on matched findings
+    desc: Override severity to CRITICAL, set 14-day SLA per BOD 22-01
+    config: |
+      action: update_findings
+      filter: "cve IN ${kev.new_entries}"
+      set:
+        severity: CRITICAL
+        sla_days: 14
+        labels: [cisa-kev, bod-22-01, accelerated-sla]
+  - type: ticket
+    name: P1 ticket per affected asset
+    desc: One ticket per asset (deduplicate by asset, not finding)
+    config: |
+      provider: jira
+      project: VULN-MGMT
+      priority: P1
+      group_by: asset_id
+      labels: [cisa-kev, bod-22-01]
+      sla_days: 14
+      template: kev_remediation
+  - type: notify
+    name: Notify vuln mgmt + asset owners
+    desc: Slack channel + email each asset owner
+    config: |
+      slack_channel: "#vuln-mgmt"
+      slack_webhook: ${SLACK_VULN_WEBHOOK}
+      email_asset_owners: true
+      email_template: kev_owner_notification
+      include_remediation_guidance: true

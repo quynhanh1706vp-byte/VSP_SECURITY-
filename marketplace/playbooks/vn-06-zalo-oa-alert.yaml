@@ -1,0 +1,44 @@
+id: pb-vn-zalo-oa-soc-alert
+name: Zalo OA — alert SOC oncall
+description: Push notification SOC oncall qua Zalo Official Account khi có CRITICAL
+trigger: critical_finding
+sev_filter: CRITICAL
+enabled: true
+tags: [vn, zalo, notify, oncall]
+steps:
+  - type: condition
+    name: Working hours filter
+    desc: Loại bỏ alert ngoài giờ trừ khi P0
+    config: |
+      expr: severity=CRITICAL AND (work_hours=true OR finding.priority=P0)
+      timezone: Asia/Ho_Chi_Minh
+      work_hours: "08:00-18:00"
+  - type: enrich
+    name: Resolve oncall
+    desc: Lookup SOC oncall từ schedule
+    config: |
+      source: oncall_rotation
+      team: soc-tier2
+      timezone: Asia/Ho_Chi_Minh
+  - type: notify
+    name: Send Zalo OA message
+    desc: Template message tiếng Việt qua Zalo OA
+    config: |
+      provider: zalo_oa
+      oa_id: ${ZALO_OA_ID}
+      access_token: ${ZALO_OA_TOKEN}
+      template_id: vsp_critical_alert_vi
+      recipient: ${oncall.zalo_user_id}
+      template_data:
+        severity: "${finding.severity}"
+        asset: "${finding.asset_name}"
+        rule: "${finding.rule_id}"
+        link: "${vsp_url}/findings/${finding.id}"
+  - type: notify
+    name: Slack fallback
+    desc: Nếu Zalo fail, fallback Slack #soc-alerts
+    config: |
+      only_if: previous_step.failed=true
+      channel: "#soc-alerts"
+      webhook_url: ${SLACK_SOC_WEBHOOK}
+      message_vi: "Zalo OA gửi fail — fallback Slack — oncall: ${oncall.name}"

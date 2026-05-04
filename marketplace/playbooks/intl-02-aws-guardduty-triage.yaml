@@ -1,0 +1,57 @@
+id: pb-intl-aws-guardduty-triage
+name: AWS GuardDuty finding triage
+description: Auto-triage GuardDuty findings — enrich, classify, route to correct team
+trigger: critical_finding
+sev_filter: HIGH
+enabled: true
+tags: [aws, guardduty, cloud, triage]
+steps:
+  - type: condition
+    name: Filter GuardDuty source
+    desc: Only handle findings from GuardDuty
+    config: |
+      expr: finding.source=aws_guardduty
+  - type: enrich
+    name: Pull AWS context
+    desc: Resource tags, account, region, IAM principal
+    config: |
+      provider: aws
+      role_arn: ${AWS_READONLY_ROLE}
+      fields: [resource_tags, account_id, region, principal, vpc_flow]
+  - type: condition
+    name: Classify by finding type
+    desc: Route by GuardDuty finding family
+    config: |
+      route_rules:
+        - match: "finding.type STARTS_WITH UnauthorizedAccess"
+          set: incident.team=ir
+          set: incident.priority=P1
+        - match: "finding.type STARTS_WITH CryptoCurrency"
+          set: incident.team=ir
+          set: incident.priority=P0
+        - match: "finding.type STARTS_WITH Recon"
+          set: incident.team=blue-team
+          set: incident.priority=P3
+        - default:
+          set: incident.team=ir
+          set: incident.priority=P2
+  - type: ticket
+    name: Create tracking ticket
+    desc: Jira ticket with GuardDuty finding payload
+    config: |
+      provider: jira
+      project: SECURITY
+      priority: ${incident.priority}
+      labels: [aws, guardduty, "${finding.type_family}"]
+      assignee_group: ${incident.team}
+      attach_payload: true
+  - type: notify
+    name: Slack route by team
+    desc: Post to team-specific channel
+    config: |
+      provider: slack
+      channel_map:
+        ir: "#aws-ir"
+        blue-team: "#blue-team-alerts"
+      webhook_url: ${SLACK_SECURITY_WEBHOOK}
+      template: guardduty_triage

@@ -1,0 +1,54 @@
+id: pb-vn-soc-daily-digest
+name: SOC daily digest — báo cáo sáng 8h
+description: Tổng hợp findings + incidents 24h gửi SOC team mỗi sáng
+trigger: manual
+sev_filter: any
+enabled: true
+tags: [vn, soc, digest, reporting, daily]
+steps:
+  - type: enrich
+    name: Tổng hợp số liệu 24h
+    desc: Aggregate findings, incidents, runs trong 24h qua
+    config: |
+      window: 24h
+      timezone: Asia/Ho_Chi_Minh
+      sections:
+        - critical_findings_count
+        - high_findings_count
+        - new_incidents
+        - resolved_incidents
+        - top_5_assets_at_risk
+        - sla_breaches
+        - scan_runs_summary
+  - type: enrich
+    name: VN threat intel summary
+    desc: Tóm tắt threat intel mới từ VN feeds
+    config: |
+      sources: [vncert, bkav, viettelcs]
+      window: 24h
+      include: [new_iocs, advisories, campaigns]
+      lang: vi
+  - type: remediate
+    name: Render digest report
+    desc: HTML email + PDF attachment, tiếng Việt
+    config: |
+      template: soc_daily_digest_vi
+      output_format: [html_email, pdf]
+      logo: vsp_agency_logo.png
+  - type: notify
+    name: Email SOC team
+    desc: Gửi 8h sáng theo Asia/Ho_Chi_Minh
+    config: |
+      to: [soc-team@agency.gov]
+      cc: [soc-lead@agency.gov, ciso@agency.gov]
+      subject_vi: "VSP SOC Digest — ${date}"
+      attach: ${pdf_path}
+      lang: vi
+  - type: notify
+    name: Slack #soc-daily
+    desc: Post summary card vào Slack
+    config: |
+      channel: "#soc-daily"
+      webhook_url: ${SLACK_SOC_WEBHOOK}
+      format: blocks
+      template_vi: soc_digest_card_vi
