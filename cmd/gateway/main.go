@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/vsp/platform/internal/autopr"
 	"io"
 	"net/http"
 	"os"
@@ -15,9 +16,9 @@ import (
 
 	"database/sql"
 
-	"github.com/google/uuid"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -28,26 +29,109 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/vsp/platform/internal/agentic"
 	"github.com/vsp/platform/internal/api/handler"
-	"github.com/vsp/platform/internal/conmon"
-	"github.com/vsp/platform/internal/poam"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/autofix"
 	"github.com/vsp/platform/internal/billing"
 	"github.com/vsp/platform/internal/cache"
+	"github.com/vsp/platform/internal/conmon"
+	"github.com/vsp/platform/internal/handlers"
+	"github.com/vsp/platform/internal/llm"
 	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/netcap"
 	"github.com/vsp/platform/internal/pipeline"
+	"github.com/vsp/platform/internal/poam"
 	"github.com/vsp/platform/internal/safe"
 	"github.com/vsp/platform/internal/scheduler"
 	"github.com/vsp/platform/internal/siem"
+	"github.com/vsp/platform/internal/soar"
 	"github.com/vsp/platform/internal/store"
 	"github.com/vsp/platform/internal/telemetry"
+	"path/filepath"
+	"strconv"
 )
 
 var startTime = time.Now()
 
+// wsBroadcaster bridges handler.Hub to soar.Broadcaster interface.
+type wsBroadcaster struct{}
+
+func (wsBroadcaster) Broadcast(msg []byte) { handler.Hub.Broadcast(msg) }
+
+// llmDBAdapter satisfies llm.PgxQuerier using whatever db.Pool() returns.
+// Uses interface{} + reflection-free type assertion on the methods we need.
+type llmDBAdapter struct{ raw interface{} }
+
+func (a llmDBAdapter) QueryRow(ctx context.Context, sqlStr string, args ...interface{}) llm.PgxRow {
+	type qr interface {
+		QueryRow(ctx context.Context, sql string, args ...interface{}) interface{ Scan(...interface{}) error }
+	}
+	if p, ok := a.raw.(qr); ok {
+		return p.QueryRow(ctx, sqlStr, args...)
+	}
+	return errRow{fmt.Errorf("db pool type does not implement QueryRow(ctx, sql, args...)")}
+}
+
+func (a llmDBAdapter) Exec(ctx context.Context, sqlStr string, args ...interface{}) (interface{}, error) {
+	type ex interface {
+		Exec(ctx context.Context, sql string, args ...interface{}) (interface{}, error)
+	}
+	if p, ok := a.raw.(ex); ok {
+		return p.Exec(ctx, sqlStr, args...)
+	}
+	return nil, fmt.Errorf("db pool type does not implement Exec(ctx, sql, args...)")
+}
+
+type errRow struct{ err error }
+
+func (e errRow) Scan(...interface{}) error { return e.err }
+
 func main() {
+	// ─── H3.N: Initialize LLM provider + policy ─────────────────────
+	var llmProvider llm.Provider
+	var llmPolicy *llm.Policy
+	if os.Getenv("LLM_ENABLED") == "true" {
+		provider := os.Getenv("LLM_PROVIDER")
+		if provider == "" {
+			provider = "ollama"
+		}
+		baseURL := os.Getenv("LLM_BASE_URL")
+		if baseURL == "" {
+			baseURL = "http://127.0.0.1:11434"
+		}
+		model := os.Getenv("LLM_MODEL")
+		if model == "" {
+			model = "deepseek-coder-v2:16b"
+		}
+		timeoutSec := 30
+		if s := os.Getenv("LLM_TIMEOUT_SECONDS"); s != "" {
+			if n, err := strconv.Atoi(s); err == nil && n > 0 {
+				timeoutSec = n
+			}
+		}
+		switch provider {
+		case "ollama":
+			if p, err := llm.NewOllamaProvider(baseURL, model, timeoutSec); err == nil {
+				llmProvider = p
+				log.Printf("[H3.N] LLM provider: ollama @ %s (model=%s)", baseURL, model)
+			} else {
+				log.Printf("[H3.N] LLM provider init failed: %v", err)
+			}
+		default:
+			log.Printf("[H3.N] LLM provider %q not implemented yet, only ollama", provider)
+		}
+		policyPath := os.Getenv("LLM_POLICY_PATH")
+		llmPolicy = llm.LoadPolicy(policyPath)
+	} else {
+		llmPolicy = llm.LoadPolicy("") // default-allow with secrets blocked
+		log.Printf("[H3.N] LLM disabled (LLM_ENABLED!=true) — using templates only")
+	}
+	_ = llmProvider // suppress unused warning if no LLM routes use it
+
+	_ = llmPolicy
+
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config")
@@ -114,6 +198,52 @@ func main() {
 	// P4 Persistence — open dedicated sql.DB for P4 tables
 	p4DB, _ := sql.Open("pgx", viper.GetString("database.url"))
 	initP4DB(p4DB)
+
+	// ─── [H3.T] Agentic Autofix orchestrator ─────────────────────────
+	agenticRepoRoot := os.Getenv("VSP_REPO_ROOT")
+	if agenticRepoRoot == "" {
+		agenticRepoRoot = "/home/test/Data/GOLANG_VSP"
+	}
+	agenticTools := agentic.NewToolBox(agenticRepoRoot)
+	agenticOrch := agentic.NewOrchestrator(p4DB, agenticTools)
+	agenticOrch.Telem = telemetry.G() // [H3.X] wire real telemetry (was noopTelemetry)
+	agenticHandlers := agentic.NewHandlerSet(agenticOrch)
+
+	// ─── [H3.X] Health trackers cho workers ───
+	agenticHealth := handler.NewWorkerHealth(2 * time.Minute)
+	remediationHealth := handler.NewWorkerHealth(7 * time.Minute)
+	healthH := &handler.HealthHandler{
+		AgenticHealth:     agenticHealth,
+		RemediationHealth: remediationHealth,
+	}
+
+	// ─── [H3.U] Remediation Worker — auto-populate items from findings ─
+	autofix.StartRemediationWorker(ctx, p4DB, remediationHealth)
+
+	// ─── [H3.O] Pre-compute Worker ───────────────────────────────────
+	// Background worker pre-computes AI fixes for CRITICAL/HIGH code findings
+	// after each scan completes, eliminating 25-40s "Loading diff..." UX latency.
+	// Uses p4DB (*sql.DB) — same connection style as all H3.N handlers.
+	var precomputeWorker *autofix.PrecomputeWorker
+	if os.Getenv("LLM_ENABLED") == "true" && os.Getenv("LLM_PRECOMPUTE_ENABLED") != "false" {
+		if llmProvider != nil && llmPolicy != nil && p4DB != nil {
+			precomputeWorker = autofix.NewPrecomputeWorker(p4DB, llmProvider, llmPolicy)
+			if precomputeWorker != nil {
+				precomputeWorker.SetHealth(agenticHealth)
+				ctxWorker, cancelWorker := context.WithCancel(context.Background())
+				go precomputeWorker.Run(ctxWorker)
+
+				// ── H3.S SLA scheduler (auto-PR creation) ─────────────
+
+				slaScheduler := autopr.NewSLAScheduler(p4DB)
+
+				slaScheduler.Start(ctxWorker)
+				log.Printf("[H3.O] Pre-compute worker initialized")
+				_ = cancelWorker
+			}
+		}
+	}
+	_ = precomputeWorker
 
 	if skErr := initOrLoadSigningKey(p4SQLDB); skErr != nil {
 		log.Printf("[main] WARN: supply chain signing key init failed: %v", skErr)
@@ -200,6 +330,50 @@ func main() {
 	uebaH := &handler.UEBA{DB: db}
 	assetsH := &handler.Assets{DB: db}
 	soarH := &handler.SOAR{DB: db}
+
+	// ───────── SOAR Engine v2 (Phase 2.1.B+C) ─────────
+	soarRepoKey := os.Getenv("VSP_REPO_KEY")
+	if soarRepoKey == "" {
+		log.Fatal().Msg("VSP_REPO_KEY env var required for SOAR vault")
+	}
+	soarSecretsStore := &soar.SecretsStoreAdapter{DB: db}
+	soarVault, err := soar.NewVault(soarSecretsStore, soarRepoKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("init SOAR vault")
+	}
+	soarSandbox := soar.NewSandbox()
+	soarDispatcher := soar.NewDispatcher()
+	soarDispatcher.RegisterDefault()
+	soar.RegisterIOExecutors(soarDispatcher, soar.NewSafeHTTPClient(), nil, nil)
+	soar.RegisterFlowExecutors(soarDispatcher, soarSandbox, nil, nil)
+
+	// Register 7 SOAR metrics
+	for name, meta := range soar.DescribeMetrics() {
+		telemetry.G().Describe(name, meta[0], meta[1])
+	}
+
+	soarAdapter := &soar.StoreAdapter{DB: db}
+	soarEngine, err := soar.New(soar.EngineConfig{
+		Store:         soarAdapter,
+		Dispatcher:    soarDispatcher,
+		Vault:         soarVault,
+		Sandbox:       soarSandbox,
+		Broadcaster:   wsBroadcaster{},
+		Metrics:       telemetry.NewSOARPromAdapter(),
+		MaxConcurrent: 100,
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("init SOAR engine")
+	}
+	soarManager := soar.NewManager(soarEngine, soarAdapter)
+	soarV2H := &handler.SOARv2{
+		DB:      db,
+		Manager: soarManager,
+		Vault:   soarVault,
+		Engine:  soarEngine,
+	}
+	log.Info().Msg("SOAR engine initialized")
+
 	logSrcH := &handler.LogSources{DB: db}
 	tiH := &handler.ThreatIntel{DB: db}
 	complianceH := &handler.Compliance{DB: db}
@@ -215,7 +389,7 @@ func main() {
 	// PHASE3F-HANDLERS-END
 	// PHASE3-HANDLERS-BEGIN
 	supplyChainH := &handler.SupplyChain{DB: db}
-	cisaAttestH  := &handler.CISAAttestation{DB: db}
+	cisaAttestH := &handler.CISAAttestation{DB: db}
 	// PHASE3-HANDLERS-END
 	slaH := &handler.SLA{DB: db}
 	sandboxH := &handler.Sandbox{DB: db}
@@ -255,6 +429,16 @@ func main() {
 	})
 	r.Use(corsMiddleware)
 	r.Use(rl.Middleware)
+
+	// [H3.X] Custom telemetry registry — agentic + remediation metrics
+	r.Handle("/metrics/vsp", telemetry.G())
+
+	// ─── [H3.X] Health routes — mounted at root, after global middlewares ───
+	// CSRF only checks POST/PUT/DELETE so GET /health/* passes naturally.
+	// No auth required — these are liveness probes for monitoring.
+	r.Get("/health/agentic", healthH.Agentic)
+	r.Get("/health/remediation", healthH.Remediation)
+	r.Get("/health/deep", healthH.DeepCheck(p4DB))
 
 	// pprof — chỉ enable trong dev mode
 	if viper.GetString("server.env") != "production" {
@@ -429,8 +613,8 @@ func main() {
 	// NIST OSCAL 1.1.2 — Catalog, Profile, SSP, Assessment Plan/Results, POA&M
 	// NIST SP 800-218 SSDF v1.1
 	// CISA Secure Software Self-Attestation Common Form (2024)
-		r.Get("/api/p4/oscal", p4AuthMiddleware(tiH.OSCALIndex))
-r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
+	r.Get("/api/p4/oscal", p4AuthMiddleware(tiH.OSCALIndex))
+	r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 	r.Get("/api/p4/oscal/profile", p4AuthMiddleware(handleOSCALProfile))
 	r.Get("/api/p4/oscal/ssp/extended", p4AuthMiddleware(handleOSCALSSPExtended))
 	r.Get("/api/p4/oscal/assessment-plan", p4AuthMiddleware(handleOSCALAssessmentPlan))
@@ -543,8 +727,8 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 	conmonH := handler.NewConMonHandler(p4DB)
 
 	// G37: ConMon FedRAMP template routes
-	r.Get("/api/p4/conmon/template/asr",  p4AuthMiddleware(conmonH.RenderASR))
-	r.Get("/api/p4/conmon/template/qar",  p4AuthMiddleware(conmonH.RenderQAR))
+	r.Get("/api/p4/conmon/template/asr", p4AuthMiddleware(conmonH.RenderASR))
+	r.Get("/api/p4/conmon/template/qar", p4AuthMiddleware(conmonH.RenderQAR))
 	r.Get("/api/p4/conmon/template/mcmr", p4AuthMiddleware(conmonH.RenderMCMR))
 
 	// ─── Phase 5.1: ConMon scheduler goroutine ───────────────────
@@ -574,10 +758,8 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 		auth.IssueJWT,
 	)
 	// ─── SSO public endpoints (no auth required) — Phase 4.5.3 ───
-	r.Get("/api/v1/auth/sso/login",    ssoOIDCH.Login)
+	r.Get("/api/v1/auth/sso/login", ssoOIDCH.Login)
 	r.Get("/api/v1/auth/sso/callback", ssoOIDCH.Callback)
-
-
 
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
@@ -634,19 +816,19 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 		r.Get("/api/v1/vsp/findings", findingsH.List)
 		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
 		// ─── ConMon (Continuous Monitoring) — Phase 4.5.1 ─────────────
-		r.Get("/api/v1/conmon/schedules",  conmonH.Schedules)
+		r.Get("/api/v1/conmon/schedules", conmonH.Schedules)
 		r.Post("/api/v1/conmon/schedules", conmonH.Schedules)
 		r.Get("/api/v1/conmon/deviations", conmonH.Deviations)
-		r.Get("/api/v1/conmon/cadence",    conmonH.CadenceStatus)
+		r.Get("/api/v1/conmon/cadence", conmonH.CadenceStatus)
 		r.Post("/api/v1/conmon/deviations/{id}/acknowledge", conmonH.AckDeviation)
 		// ─── AI Compliance Advisor — Phase 4.5.2 ─────────────────────
-		r.Post("/api/v1/ai/advise",          aiH.Advise)
-		r.Get("/api/v1/ai/mode",            aiH.Mode)
-		r.Get("/api/v1/ai/cache/stats",     aiH.CacheStats)
+		r.Post("/api/v1/ai/advise", aiH.Advise)
+		r.Get("/api/v1/ai/mode", aiH.Mode)
+		r.Get("/api/v1/ai/cache/stats", aiH.CacheStats)
 		r.Post("/api/v1/ai/feedback/{id}", aiH.Feedback)
 		// ─── SSO Provider Admin — Phase 4.5.3 ─────────────────────────
-		r.Get("/api/v1/sso/providers",       ssoOIDCH.Providers)
-		r.Post("/api/v1/sso/providers",      ssoOIDCH.Providers)
+		r.Get("/api/v1/sso/providers", ssoOIDCH.Providers)
+		r.Post("/api/v1/sso/providers", ssoOIDCH.Providers)
 		r.Put("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
 		r.Delete("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
 		r.Get("/api/v1/vsp/findings/by-tool", findingsH.ByTool)
@@ -807,6 +989,19 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 		r.Post("/api/v1/soar/playbooks/{id}/run", soarH.RunPlaybook)
 		r.Post("/api/v1/soar/trigger", soarH.Trigger)
 		r.Get("/api/v1/soar/runs", soarH.ListRuns)
+
+		// ── SOAR engine v2 (Phase 2.1.C) ────────────────────────
+		r.Post("/api/v1/soar/playbooks/{id}/execute", soarV2H.ExecutePlaybook)
+		r.Post("/api/v1/soar/playbooks/{id}/test", soarV2H.TestPlaybook)
+		r.Get("/api/v1/soar/runs/{id}", soarV2H.GetRun)
+		r.Post("/api/v1/soar/runs/{id}/cancel", soarV2H.CancelRun)
+		r.Get("/api/v1/soar/playbooks/{id}/versions", soarV2H.ListPlaybookVersions)
+		r.Post("/api/v1/soar/playbooks/{id}/version/{n}/rollback", soarV2H.RollbackVersion)
+		r.Get("/api/v1/soar/approvals/pending", soarV2H.ListPendingApprovals)
+		r.Post("/api/v1/soar/approvals/{id}/decide", soarV2H.DecideApproval)
+		r.Get("/api/v1/soar/secrets", soarV2H.ListSecrets)
+		r.Post("/api/v1/soar/secrets", soarV2H.CreateSecret)
+		r.Delete("/api/v1/soar/secrets/{name}", soarV2H.DeleteSecret)
 
 		// ── Vulnerability management ───────────────────────────────
 		r.Get("/api/v1/vulns/trend", func(w http.ResponseWriter, r *http.Request) {
@@ -1196,6 +1391,11 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 		r.Get("/api/v1/remediation/stats", remediationH.Stats)
 		r.Get("/api/v1/remediation/finding/{finding_id}", remediationH.Get)
 		r.Post("/api/v1/remediation/finding/{finding_id}", remediationH.Upsert)
+		// ── Phase 1: workflow endpoints (added 2026-05-04) ──
+		r.Post("/api/v1/remediation/finding/{finding_id}/transition", remediationH.Transition)
+		r.Get("/api/v1/remediation/finding/{finding_id}/history", remediationH.History)
+		r.Post("/api/v1/remediation/bulk", remediationH.Bulk)
+		r.Get("/api/v1/remediation/kpis", remediationH.KPIs)
 		r.Post("/api/v1/remediation/{rem_id}/comments", remediationH.AddComment)
 
 		// PATCH /api/v1/remediation/finding/{finding_id}/status
@@ -1213,7 +1413,7 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 			}
 
 			fields := make(map[string]any)
-			validStatus := map[string]bool{"open": true, "in_progress": true, "resolved": true, "accepted": true, "false_positive": true, "suppressed": true}
+			validStatus := map[string]bool{"open": true, "in_progress": true, "fix_applied": true, "verifying": true, "verified": true, "fix_failed": true, "resolved": true, "accepted": true, "false_positive": true, "suppressed": true}
 
 			if v, ok := raw["status"]; ok {
 				var s string
@@ -1265,42 +1465,253 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 				"updated_fields": updatedKeys,
 			})
 		})
+
+		// ─── H3.M Quick Wins ─────────────────────────────────────────────
+		// Stub routes for /api/v1/autofix/* and /api/v1/findings/{id}/diff.
+		// These return placeholder JSON until handlers are wired in.
+		// Once internal/handlers/* are imported, replace bodies with:
+		//   handlers.FindingDiffHandler(db, ".")(w, req)
+		//   handlers.LeaderboardHandler(db)(w, req)
+		//   handlers.AutofixMetricsHandler(db)(w, req)
+
+		// #8 Real diff preview — H3.N: with LLM fallback
+		r.Get("/api/v1/findings/{id}/diff", func(w http.ResponseWriter, req *http.Request) {
+			ctx := req.Context()
+			findingID := chi.URLParam(req, "id")
+			w.Header().Set("Content-Type", "application/json")
+
+			// Build response shell
+			type diffResp struct {
+				FindingID      string   `json:"finding_id"`
+				FilePath       string   `json:"file_path"`
+				LineStart      int      `json:"line_start"`
+				LineEnd        int      `json:"line_end"`
+				ContextBefore  []string `json:"context_before"`
+				CurrentCode    []string `json:"current_code"`
+				SuggestedFix   []string `json:"suggested_fix"`
+				ContextAfter   []string `json:"context_after"`
+				Rationale      string   `json:"rationale"`
+				Confidence     string   `json:"confidence"`
+				BreakingChange bool     `json:"breaking_change"`
+				HasTemplate    bool     `json:"has_template"`
+				Source         string   `json:"source"` // template|cache|llm|llm_failed|manual
+				Provider       string   `json:"provider,omitempty"`
+				Model          string   `json:"model,omitempty"`
+				LatencyMs      int64    `json:"latency_ms,omitempty"`
+			}
+			resp := diffResp{FindingID: findingID, Source: "manual", Confidence: "manual"}
+
+			// Lookup finding from DB (pgx)
+			var path, ruleID, severity, message string
+			var lineNum int
+			err := db.Pool().QueryRow(ctx,
+				`SELECT COALESCE(path,''), COALESCE(rule_id,''),
+				        COALESCE(severity,''), COALESCE(message,''),
+				        COALESCE(line_num, 0)
+				   FROM findings WHERE id = $1`, findingID).
+				Scan(&path, &ruleID, &severity, &message, &lineNum)
+			if err != nil {
+				resp.Rationale = "Finding not found"
+				_ = json.NewEncoder(w).Encode(resp)
+				return
+			}
+			resp.FilePath = path
+			resp.LineStart = lineNum
+
+			// Read source file (best-effort, ±5 lines)
+			repoRoot := os.Getenv("VSP_REPO_ROOT")
+			if repoRoot == "" {
+				repoRoot = "."
+			}
+			absRepo, _ := filepath.Abs(repoRoot)
+			// Handle both absolute paths (from gosec/bandit) and relative (from kics)
+			var absFile string
+			var ferr error
+			if filepath.IsAbs(path) {
+				// Path is already absolute — use as-is, but verify it's within repo or allowed
+				absFile, ferr = filepath.Abs(path)
+			} else {
+				// Relative path — join with repo root
+				absFile, ferr = filepath.Abs(filepath.Join(absRepo, path))
+			}
+			var beforeLines, currLines, afterLines []string
+			// Security: ensure resolved path is within repoRoot OR within /tmp (for IaC test paths)
+			pathOK := ferr == nil && (strings.HasPrefix(absFile, absRepo) || strings.HasPrefix(absFile, "/tmp/"))
+			if pathOK {
+				if data, rerr := os.ReadFile(absFile); rerr == nil && len(data) < 5*1024*1024 {
+					lines := strings.Split(string(data), "\n")
+					if lineNum > 0 && lineNum <= len(lines) {
+						bStart := lineNum - 6
+						if bStart < 0 {
+							bStart = 0
+						}
+						aEnd := lineNum + 5
+						if aEnd > len(lines) {
+							aEnd = len(lines)
+						}
+						beforeLines = lines[bStart : lineNum-1]
+						currLines = []string{lines[lineNum-1]}
+						resp.LineEnd = lineNum
+						if aEnd > lineNum {
+							afterLines = lines[lineNum:aEnd]
+						}
+					}
+				}
+			}
+			resp.ContextBefore = beforeLines
+			resp.CurrentCode = currLines
+			resp.ContextAfter = afterLines
+
+			// === H3.N LLM integration ===
+			if llmProvider != nil && llmPolicy != nil && llmPolicy.AllowLLM(ruleID) && len(currLines) > 0 {
+				fixReq := llm.FixRequest{
+					RuleID:          ruleID,
+					RuleDescription: message,
+					FilePath:        path,
+					Language:        llm.LanguageFromPath(path),
+					Severity:        severity,
+					CodeBefore:      strings.Join(beforeLines, "\n"),
+					VulnerableCode:  strings.Join(currLines, "\n"),
+					CodeAfter:       strings.Join(afterLines, "\n"),
+				}
+				cacheKey := llm.CacheKey(fixReq)
+
+				// Try cache first
+				if cached, cerr := llm.CacheGet(ctx, llmDBAdapter{db.Pool()}, cacheKey); cerr == nil && cached != nil {
+					resp.SuggestedFix = strings.Split(cached.SuggestedCode, "\n")
+					resp.Rationale = cached.Rationale
+					resp.Confidence = cached.Confidence
+					resp.BreakingChange = cached.BreakingChange
+					resp.HasTemplate = true
+					resp.Source = "cache"
+					resp.Provider = cached.Provider
+					resp.Model = cached.Model
+					resp.LatencyMs = cached.LatencyMs
+					_ = json.NewEncoder(w).Encode(resp)
+					return
+				}
+
+				// Cache miss — call LLM with bounded timeout
+				// [H3.N.fix8] llm timeout from env
+				llmTimeout := 30 * time.Second
+				if s := os.Getenv("LLM_TIMEOUT_SECONDS"); s != "" {
+					if n, err := strconv.Atoi(s); err == nil && n > 0 && n <= 600 {
+						llmTimeout = time.Duration(n) * time.Second
+					}
+				}
+				llmCtx, cancel := context.WithTimeout(ctx, llmTimeout)
+				defer cancel()
+				fixResp, lerr := llmProvider.GenerateFix(llmCtx, fixReq)
+				if lerr == nil {
+					resp.SuggestedFix = strings.Split(fixResp.SuggestedCode, "\n")
+					resp.Rationale = fixResp.Rationale
+					resp.Confidence = fixResp.Confidence
+					resp.BreakingChange = fixResp.BreakingChange
+					resp.HasTemplate = true
+					resp.Source = "llm"
+					resp.Provider = fixResp.Provider
+					resp.Model = fixResp.Model
+					resp.LatencyMs = fixResp.LatencyMs
+					// Cache (best effort, don't fail request on cache error)
+					_ = llm.CacheSet(ctx, llmDBAdapter{db.Pool()}, cacheKey, findingID, fixResp, 0)
+					_ = json.NewEncoder(w).Encode(resp)
+					return
+				}
+				// LLM failed — fall through to manual response
+				resp.Source = "llm_failed"
+				resp.Rationale = "AI fix unavailable (timeout or invalid response). Manual review required."
+				_ = json.NewEncoder(w).Encode(resp)
+				return
+			}
+
+			// Policy blocked or LLM disabled
+			if reason := func() string {
+				if llmPolicy != nil {
+					return llmPolicy.BlockReason(ruleID)
+				}
+				return ""
+			}(); reason != "" {
+				resp.Rationale = reason
+			} else {
+				resp.Rationale = "Manual review required (no auto-fix template, AI generation disabled for this rule)"
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+		})
+		// #11 Leaderboard
+		r.Get("/api/v1/autofix/leaderboard", func(w http.ResponseWriter, req *http.Request) {
+			period := req.URL.Query().Get("period")
+			if period == "" {
+				period = "30d"
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"period":"` + period + `","tenant":"default","entries":[],"total":0}`))
+		})
+		// #12 Audit metrics
+		r.Get("/api/v1/autofix/metrics", func(w http.ResponseWriter, req *http.Request) {
+			period := req.URL.Query().Get("period")
+			if period == "" {
+				period = "30d"
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"period_days":30,"period":"` + period + `","tenant_id":"default","totals":{"findings_open":0,"findings_applied":0,"findings_verified":0,"findings_failed":0,"findings_accepted":0,"findings_false_pos":0},"rates":{"verification_rate":0,"first_attempt_success":0,"auto_remediation_rate":0},"mttr":{"critical_hours":0,"high_hours":0,"medium_hours":0,"low_hours":0,"overall_hours":0},"top_rules_remediated":[]}`))
+		})
+		// ─── End H3.M ────────────────────────────────────────────────────
+		// ─── [H3.O] Pre-compute status endpoints ─────────────────────
+		r.Get("/api/v1/autofix/precompute/status", handlers.PrecomputeStatusHandler(p4DB))
+		r.Get("/api/v1/autofix/precompute/history", handlers.PrecomputeHistoryHandler(p4DB))
+		r.Get("/api/v1/autofix/validation/stats", autofix.HandlerValidationStats(p4DB))
+		r.Post("/api/v1/autofix/validation/run", autofix.HandlerRunValidation(p4DB))
+		r.Get("/api/v1/autofix/validation/{cacheKey}", autofix.HandlerGetValidation(p4DB))
+		// ── H3.S Auto-PR endpoints ────────────────────────────────
+		r.Post("/api/v1/autofix/pr/create", autopr.HandlerCreatePR(p4DB))
+		r.Get("/api/v1/autofix/pr/list", autopr.HandlerListPR(p4DB))
+		r.Get("/api/v1/autofix/pr/{id}/status", autopr.HandlerPRStatus(p4DB))
+		r.Post("/api/v1/autofix/repo/register", autopr.HandlerRegisterRepo(p4DB))
+		r.Get("/api/v1/autofix/repo/list", autopr.HandlerListRepos(p4DB))
+		// Webhook: NOT under auth middleware (signature-verified instead)
+		r.Post("/api/v1/autofix/pr/webhook/{repoID}", autopr.HandlerWebhook(p4DB))
+		// ─── End H3.O ────────────────────────────────────────────────────
+
+		// ─── End H3.O ────────────────────────────────────────────────────
+
+		// ─── End H3.O ────────────────────────────────────────────────────
+
 		// SBOM
 		r.Get("/api/v1/sbom/{rid}", sbomH.Generate)
 		r.Get("/api/v1/sbom/{rid}/grype", sbomH.Grype)
 		r.Get("/api/v1/sbom/{rid}/diff", sbomH.Diff)
 		// PHASE3-ROUTES-BEGIN
 		// ─── Supply Chain (Sigstore/SLSA/VEX) — Phase 3A ─────────────
-		r.Get("/api/v1/supply-chain/kpis",                supplyChainH.KPIs)
-		r.Get("/api/v1/supply-chain/signatures",          supplyChainH.Signatures)
-		r.Get("/api/v1/supply-chain/signatures/{id}",     supplyChainH.SignatureDetail)
+		r.Get("/api/v1/supply-chain/kpis", supplyChainH.KPIs)
+		r.Get("/api/v1/supply-chain/signatures", supplyChainH.Signatures)
+		r.Get("/api/v1/supply-chain/signatures/{id}", supplyChainH.SignatureDetail)
 		r.Post("/api/v1/supply-chain/signatures/{id}/verify", supplyChainH.Verify)
-		r.Post("/api/v1/supply-chain/sign",               supplyChainH.Sign)
-		r.Get("/api/v1/supply-chain/provenance",          supplyChainH.Provenance)
+		r.Post("/api/v1/supply-chain/sign", supplyChainH.Sign)
+		r.Get("/api/v1/supply-chain/provenance", supplyChainH.Provenance)
 		r.Post("/api/v1/supply-chain/provenance/generate", supplyChainH.GenerateProvenance)
-		r.Get("/api/v1/supply-chain/vex",                 supplyChainH.VEX)
-		r.Get("/api/v1/supply-chain/key",                 supplyChainH.Key)
+		r.Get("/api/v1/supply-chain/vex", supplyChainH.VEX)
+		r.Get("/api/v1/supply-chain/key", supplyChainH.Key)
 		r.Get("/api/v1/supply-chain/public-key", supplyChainH.Key)
-		r.Post("/api/v1/supply-chain/verify",     supplyChainH.VerifyBundle)
+		r.Post("/api/v1/supply-chain/verify", supplyChainH.VerifyBundle)
 		// ─── CISA Secure Software Self-Attestation — Phase 3A ────────
-		r.Get("/api/v1/cisa-attestation/kpis",                  cisaAttestH.KPIs)
-		r.Get("/api/v1/cisa-attestation/practices",             cisaAttestH.Practices)
-		r.Post("/api/v1/cisa-attestation/practices/{id}",       cisaAttestH.UpdatePractice)
-		r.Put("/api/v1/cisa-attestation/practices/{id}",        cisaAttestH.UpdatePractice)
-		r.Get("/api/v1/cisa-attestation/forms",                 cisaAttestH.Forms)
-		r.Post("/api/v1/cisa-attestation/forms",                cisaAttestH.GenerateDraft)
-		r.Get("/api/v1/cisa-attestation/forms/{uuid}",          cisaAttestH.FormDetail)
-		r.Post("/api/v1/cisa-attestation/forms/{uuid}/sign",    cisaAttestH.SignForm)
-		r.Get("/api/v1/cisa-attestation/draft",                 cisaAttestH.CurrentDraft)
+		r.Get("/api/v1/cisa-attestation/kpis", cisaAttestH.KPIs)
+		r.Get("/api/v1/cisa-attestation/practices", cisaAttestH.Practices)
+		r.Post("/api/v1/cisa-attestation/practices/{id}", cisaAttestH.UpdatePractice)
+		r.Put("/api/v1/cisa-attestation/practices/{id}", cisaAttestH.UpdatePractice)
+		r.Get("/api/v1/cisa-attestation/forms", cisaAttestH.Forms)
+		r.Post("/api/v1/cisa-attestation/forms", cisaAttestH.GenerateDraft)
+		r.Get("/api/v1/cisa-attestation/forms/{uuid}", cisaAttestH.FormDetail)
+		r.Post("/api/v1/cisa-attestation/forms/{uuid}/sign", cisaAttestH.SignForm)
+		r.Get("/api/v1/cisa-attestation/draft", cisaAttestH.CurrentDraft)
 		// PHASE3-ROUTES-END
-	// PHASE3F-ROUTES-BEGIN
-	r.Get("/api/v1/oscal/package", oscalPackageH.BuildPackage)
-	// PHASE3F-ROUTES-END
-	// PHASE3G-ROUTES-BEGIN
-	r.Get("/api/p4/oscal/ap",   oscalModelsH.AssessmentPlan)
-	r.Get("/api/p4/oscal/ar",   oscalModelsH.AssessmentResults)
-	r.Get("/api/p4/oscal/poam", oscalModelsH.POAM)
-	// PHASE3G-ROUTES-END
+		// PHASE3F-ROUTES-BEGIN
+		r.Get("/api/v1/oscal/package", oscalPackageH.BuildPackage)
+		// PHASE3F-ROUTES-END
+		// PHASE3G-ROUTES-BEGIN
+		r.Get("/api/p4/oscal/ap", oscalModelsH.AssessmentPlan)
+		r.Get("/api/p4/oscal/ar", oscalModelsH.AssessmentResults)
+		r.Get("/api/p4/oscal/poam", oscalModelsH.POAM)
+		// PHASE3G-ROUTES-END
 		// Reports
 		r.Get("/api/v1/vsp/run_report_html/{rid}", reportH.HTML)
 		r.Get("/api/v1/vsp/run_report_pdf/{rid}", reportH.PDF)
@@ -1852,16 +2263,30 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 		r.Get("/api/v1/export/csv/{rid}", exportH.CSV)
 		r.Get("/api/v1/export/json/{rid}", exportH.JSON)
 
-		// Software Inventory routes
+		// Software Inventory routes (read-only — under CSRF group)
 		swH := &handler.SoftwareInventoryHandler{DB: db}
-		r.Post("/api/v1/software-inventory/report", swH.ReceiveReport)
 		r.Get("/api/v1/software-inventory/stats", swH.GetStats)
 		r.Get("/api/v1/software-inventory/eol-database", swH.ListEOL)
 		r.Get("/api/v1/software-inventory/{hostname}", swH.GetAsset)
 		r.Get("/api/v1/software-inventory", swH.ListAssets)
 	})
 
+	// ─── [H3.U-1] SW Risk Agent ingest — JWT auth, NO CSRF ──────────
+	// Agent gửi report bằng API token thuần (không phải browser),
+	// nên cần exempt CSRF middleware. Vẫn yêu cầu authMw.
+	r.Group(func(r chi.Router) {
+		r.Use(authMw)
+		swIngestH := &handler.SoftwareInventoryHandler{DB: db}
+		r.Post("/api/v1/software-inventory/report", swIngestH.ReceiveReport)
+	})
+
 	addr := fmt.Sprintf(":%d", viper.GetInt("server.gateway_port"))
+	// ─── [H3.T] Agentic routes (auth-protected) ──────────────────────
+	r.Group(func(r chi.Router) {
+		r.Use(authMw)
+		agenticHandlers.RegisterRoutes(r)
+	})
+
 	srv := &http.Server{Addr: addr, Handler: r,
 		ReadTimeout: 30 * time.Second, WriteTimeout: 0}
 
@@ -1990,6 +2415,11 @@ r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 
 	// ── Retention policy worker ──────────────────────────────────
 	safe.GoCtx(ctx, func(ctx context.Context) { siem.StartRetentionWorker(ctx, db) })
+
+	// ── SOAR zombie run cleanup ──────────────────────────────────
+	soarZombie := soar.NewZombieRecovery(db, 10*time.Minute)
+	safe.GoCtx(ctx, func(ctx context.Context) { soarZombie.StartLoop(ctx, 5*time.Minute) })
+	log.Info().Msg("SOAR zombie cleanup worker started")
 
 	// ── Syslog receiver UDP:514 + TCP:514 ───────────────────────
 	udpAddr := viper.GetString("siem.syslog_udp_addr")
