@@ -1102,7 +1102,7 @@ async function loadAutofixStats(){
   // ─── H3.1: 4 KPI cards (live data) ───
   var open = findings.filter(function(f){ return (f.status||'open') === 'open' || !f.status; });
   var fixable = open.filter(_autofixIsFixable);
-  var resolved = findings.filter(function(f){ return f.status === 'resolved' || f.status === 'fixed'; });
+  var resolved = findings.filter(function(f){ return f.status === 'verified' || f.status === 'resolved' || f.status === 'fixed'; });
   // SLA breach: CRITICAL findings open > 7 days (per FedRAMP)
   var now = Date.now();
   var sevenDaysMs = 7 * 24 * 3600 * 1000;
@@ -2335,12 +2335,12 @@ window.markFixApplied = async function(findingId){
     var r = await fetch('/api/v1/remediation/finding/' + findingId + '/status', {
       method: 'PATCH',
       headers: Object.assign({'Content-Type':'application/json'}, hdr ? hdr() : {}),
-      body: JSON.stringify({status:'resolved', resolution:'auto-fix applied'})
+      body: JSON.stringify({status:'fix_applied', resolution:'auto-fix applied'})
     }).catch(function(){ return {ok: false, status: 0}; });
     
     if(r && r.ok){
       marked = true;
-      if(typeof showToast==='function') showToast('Marked as resolved · re-scan to verify','success');
+      if(typeof showToast==='function') showToast('Fix recorded — click Verify to re-scan','success');
     } else if(r && r.status === 404){
       // Backend endpoint not yet implemented — totally expected
       if(typeof showToast==='function') showToast('Marked locally · backend wire pending','info');
@@ -2388,5 +2388,1296 @@ document.addEventListener('keydown', function(e){
 console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills + CSV + auto-remediation modal');
 </script>
 
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     [H3.L] Autofix verification loop
+     - Status fix_applied → click [Verify] → triggers targeted rescan
+     - Backend re-scans the file/rule of the finding
+     - If finding gone   → status = 'verified' (real win, KPI counts)
+     - If finding remains → status = 'fix_failed' (revert + manual hint)
+════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3lVerifyLoaded) return;
+  window._h3lVerifyLoaded = true;
+
+  // Map status → visual badge
+  const STATUS_BADGE = {
+    open:           {label: 'Open',         color: 'var(--orange)', bg: 'rgba(249,115,22,.10)'},
+    fix_applied:    {label: 'Fix applied',  color: 'var(--amber)',  bg: 'rgba(245,158,11,.10)'},
+    verifying:      {label: 'Verifying…',   color: 'var(--cyan)',   bg: 'rgba(6,182,212,.10)'},
+    verified:       {label: '✓ Verified',   color: 'var(--green)',  bg: 'rgba(16,185,129,.10)'},
+    fix_failed:     {label: '✗ Fix failed', color: 'var(--red)',    bg: 'rgba(239,68,68,.10)'},
+    resolved:       {label: 'Resolved',     color: 'var(--green)',  bg: 'rgba(16,185,129,.10)'},
+    accepted:       {label: 'Accepted',     color: 'var(--text2)',  bg: 'rgba(120,120,120,.10)'},
+    false_positive: {label: 'False pos.',   color: 'var(--text2)',  bg: 'rgba(120,120,120,.10)'},
+    suppressed:     {label: 'Suppressed',   color: 'var(--text2)',  bg: 'rgba(120,120,120,.10)'},
+  };
+  window.h3lStatusBadge = function (status) {
+    const s = STATUS_BADGE[status] || STATUS_BADGE.open;
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;'
+      + 'font-size:10px;font-weight:600;color:' + s.color + ';background:' + s.bg + '">'
+      + s.label + '</span>';
+  };
+
+  /**
+   * Verify a fix by triggering a targeted rescan.
+   * Workflow:
+   *   1. PATCH status → 'verifying'
+   *   2. POST /vsp/run with target_finding (backend scans only this file/rule)
+   *   3. Poll run status every 2s
+   *   4. When done, GET /vsp/findings filtered by original rule
+   *      - If finding gone   → PATCH status = 'verified'
+   *      - If finding remains → PATCH status = 'fix_failed'
+   */
+  window.verifyFix = async function (findingId) {
+    const btn = document.querySelector('[data-verify-id="' + findingId + '"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
+    try {
+      // Step 1: mark verifying
+      await fetch('/api/v1/remediation/finding/' + findingId + '/status', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + (window.TOKEN || '')},
+        body: JSON.stringify({status: 'verifying'}),
+      });
+
+      // Step 2: get finding details so we know what file/rule to rescan
+      const fRes = await fetch('/api/v1/remediation/finding/' + findingId,
+        {headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}});
+      const fData = await fRes.json();
+      const finding = fData.finding || fData.remediation || {};
+
+      // Step 3: trigger targeted rescan
+      const runRes = await fetch('/api/v1/vsp/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + (window.TOKEN || '')},
+        body: JSON.stringify({
+          mode: 'targeted',
+          target_finding: findingId,
+          target_path: finding.path || '',
+          target_rule: finding.rule_id || '',
+          src: finding.path || '.',
+        }),
+      });
+      const runData = await runRes.json();
+      const rid = runData.rid || runData.run_id;
+      if (!rid) throw new Error('no run id returned');
+
+      if (typeof showToast === 'function') {
+        showToast('Verify rescan started: ' + rid.slice(-12), 'info');
+      }
+
+      // Step 4: poll up to 60s
+      let attempts = 0;
+      const poll = async () => {
+        attempts++;
+        if (attempts > 30) {  // 30 × 2s = 60s
+          await markStatus(findingId, 'fix_applied');
+          if (typeof showToast === 'function') {
+            showToast('Verify timed out — kept as fix_applied', 'warn');
+          }
+          return refreshRow(findingId);
+        }
+        try {
+          const statusRes = await fetch('/api/v1/vsp/runs/' + rid,
+            {headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}});
+          const statusData = await statusRes.json();
+          if (statusData.status === 'done' || statusData.status === 'complete') {
+            // Check whether finding still exists
+            const findRes = await fetch(
+              '/api/v1/vsp/findings?run_id=' + rid + '&limit=1000',
+              {headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}}
+            );
+            const findData = await findRes.json();
+            const stillThere = (findData.findings || []).some(f =>
+              f.rule_id === finding.rule_id && f.path === finding.path
+            );
+            const newStatus = stillThere ? 'fix_failed' : 'verified';
+            await markStatus(findingId, newStatus, rid);
+            if (typeof showToast === 'function') {
+              showToast(
+                stillThere ? '✗ Fix did not resolve finding' : '✓ Verified — finding gone',
+                stillThere ? 'error' : 'success'
+              );
+            }
+            return refreshRow(findingId);
+          }
+        } catch (e) { console.warn('poll err', e); }
+        setTimeout(poll, 2000);
+      };
+      setTimeout(poll, 2000);
+    } catch (e) {
+      console.error('verifyFix error', e);
+      if (typeof showToast === 'function') showToast('Verify failed: ' + e.message, 'error');
+      await markStatus(findingId, 'fix_applied');  // revert
+      if (btn) { btn.disabled = false; btn.textContent = 'Verify'; }
+    }
+  };
+
+  async function markStatus(findingId, status, scanRunId) {
+    const body = {status};
+    if (scanRunId) body.verify_run_id = scanRunId;
+    return fetch('/api/v1/remediation/finding/' + findingId + '/status', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (window.TOKEN || '')},
+      body: JSON.stringify(body),
+    });
+  }
+
+  function refreshRow(findingId) {
+    // Re-render the findings table if available
+    if (typeof window.loadFindings === 'function') return window.loadFindings();
+    if (typeof window.applyFindingsFilter === 'function') return window.applyFindingsFilter();
+  }
+
+  /**
+   * Render action button per status — used by the table renderer.
+   *   open         → [Preview fix]
+   *   fix_applied  → [Verify]      ← KEY: closes the loop
+   *   verifying    → spinner
+   *   verified     → ✓ done
+   *   fix_failed   → [Retry]
+   */
+  window.h3lRenderActionBtn = function (finding) {
+    const status = (finding.remediation_status || finding.status || 'open');
+    const id = finding.id;
+    if (status === 'fix_applied') {
+      return '<button class="btn btn-sm" style="background:var(--cyan);color:#000;'
+        + 'font-weight:600" data-verify-id="' + id + '" '
+        + 'onclick="verifyFix(\'' + id + '\')">▶ Verify</button>';
+    }
+    if (status === 'verifying') {
+      return '<span style="color:var(--cyan);font-size:11px">⟳ verifying…</span>';
+    }
+    if (status === 'verified') {
+      return '<span style="color:var(--green);font-size:11px;font-weight:600">✓ verified</span>';
+    }
+    if (status === 'fix_failed') {
+      return '<button class="btn btn-sm" style="background:var(--red);color:#fff" '
+        + 'onclick="markFixApplied(\'' + id + '\')">Retry fix</button>';
+    }
+    return '<button class="btn btn-sm" onclick="previewFix(\'' + id + '\')">Preview fix</button>';
+  };
+
+  console.log('[H3.L] Autofix verify loop loaded');
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     [H3.L] Real KPIs — separate "claimed" from "verified"
+════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3lKpiLoaded) return;
+  window._h3lKpiLoaded = true;
+
+  window.refreshAutofixKPIs = async function () {
+    try {
+      const res = await fetch('/api/v1/remediation/stats',
+        {headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}});
+      const stats = await res.json();
+      const counts = stats.counts || stats || {};
+      const set = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val || 0;
+      };
+      set('h3l-kpi-open',     counts.open || 0);
+      set('h3l-kpi-applied',  counts.fix_applied || 0);
+      set('h3l-kpi-verified', counts.verified || 0);
+      set('h3l-kpi-failed',   counts.fix_failed || 0);
+    } catch (e) { console.warn('kpi refresh', e); }
+  };
+
+  // Inject the KPI bar above the findings table
+  function injectKPIBar() {
+    if (document.getElementById('h3l-autofix-kpi-bar')) return;
+    const anchor = document.querySelector('[id*="findings"]')
+                || document.querySelector('.findings-table')
+                || document.querySelector('table');
+    if (!anchor) return;
+    const bar = document.createElement('div');
+    bar.id = 'h3l-autofix-kpi-bar';
+    bar.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:12px;'
+      + 'margin:14px 0;padding:14px;background:var(--card,#0f1419);'
+      + 'border:1px solid var(--border,#1f2937);border-radius:8px';
+    bar.innerHTML = ''
+      + kpiCell('Open',         'h3l-kpi-open',     'var(--orange)', 'awaiting fix')
+      + kpiCell('Fix applied',  'h3l-kpi-applied',  'var(--amber)',  'awaiting rescan')
+      + kpiCell('Verified',     'h3l-kpi-verified', 'var(--green)',  'rescan confirmed ✓')
+      + kpiCell('Fix failed',   'h3l-kpi-failed',   'var(--red)',    'rescan still finds');
+    anchor.parentNode.insertBefore(bar, anchor);
+  }
+
+  function kpiCell(label, id, color, sub) {
+    return '<div style="text-align:center;padding:8px">'
+      + '<div style="font-size:10px;text-transform:uppercase;color:var(--text3);letter-spacing:.5px">'
+      + label + '</div>'
+      + '<div id="' + id + '" style="font-size:28px;font-weight:700;color:' + color + ';margin:6px 0">0</div>'
+      + '<div style="font-size:10px;color:var(--text3)">' + sub + '</div>'
+      + '</div>';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => { injectKPIBar(); refreshAutofixKPIs(); }, 800);
+  });
+
+  // Refresh after every status change
+  const origMarkStatus = window.markFixApplied;
+  if (typeof origMarkStatus === 'function') {
+    window.markFixApplied = async function (...args) {
+      const r = await origMarkStatus.apply(this, args);
+      setTimeout(refreshAutofixKPIs, 500);
+      return r;
+    };
+  }
+
+  console.log('[H3.L] Autofix KPI bar loaded');
+})();
+</script>
+
+
+<!-- [H3.L] KPI bar retry-injector + observer (fix iframe/late-render) -->
+<script>
+(function () {
+  if (window._h3lRetryInjector) return;
+  window._h3lRetryInjector = true;
+
+  function tryInject() {
+    if (document.getElementById('h3l-autofix-kpi-bar')) return true;
+    // Tìm anchor SPECIFIC cho tab cicd, KHÔNG phải dashboard
+    // Find the autofix card by text content (works inside iframe)
+    let anchor = null;
+    for (const el of document.querySelectorAll('div')) {
+      if (el.offsetWidth > 0 &&
+          el.textContent.includes('Top auto-fixable') &&
+          el.children.length < 20) {
+        anchor = el;
+        break;
+      }
+    }
+    if (!anchor) return false;
+
+    const card = anchor.closest('.card, .panel, section') || anchor;
+    const bar = document.createElement('div');
+    bar.id = 'h3l-autofix-kpi-bar';
+    bar.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:12px;'
+      + 'margin:14px 0;padding:14px;background:rgba(15,20,25,0.6);'
+      + 'border:1px solid #1f2937;border-radius:8px';
+    const cell = (l, id, c, s) =>
+      '<div style="text-align:center;padding:8px">'
+      + '<div style="font-size:10px;text-transform:uppercase;color:#9ca3af;letter-spacing:.5px">'+l+'</div>'
+      + '<div id="'+id+'" style="font-size:28px;font-weight:700;color:'+c+';margin:6px 0">0</div>'
+      + '<div style="font-size:10px;color:#9ca3af">'+s+'</div></div>';
+    bar.innerHTML =
+        cell('Open',        'h3l-kpi-open',     '#f97316', 'awaiting fix')
+      + cell('Fix applied', 'h3l-kpi-applied',  '#f59e0b', 'awaiting rescan')
+      + cell('Verified',    'h3l-kpi-verified', '#10b981', 'rescan confirmed')
+      + cell('Fix failed',  'h3l-kpi-failed',   '#ef4444', 'rescan still finds');
+    card.parentNode.insertBefore(bar, card);
+    if (typeof refreshAutofixKPIs === 'function') refreshAutofixKPIs();
+    console.log('[H3.L] KPI bar injected via retry-observer');
+    return true;
+  }
+
+  // Retry every 500ms up to 30 times (15s total)
+  let tries = 0;
+  const tick = setInterval(() => {
+    if (tryInject() || ++tries > 120) clearInterval(tick);
+  }, 500);
+
+  // Re-inject on tab switch / SPA navigation
+  const mo = new MutationObserver(() => {
+    if (!document.getElementById('h3l-autofix-kpi-bar')) tryInject();
+  });
+  mo.observe(document.body, {childList: true, subtree: true});
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     [H3.M] Autofix Quick Wins
+     #8  Real diff preview
+     #9  Keyboard shortcuts (j/k/p/m/v/g/?)
+     #11 Leaderboard widget
+     #12 Audit metrics card
+════════════════════════════════════════════════════════════════════ -->
+<style>
+  /* Diff preview styles — vanilla, no external libs */
+  .h3m-diff { font-family: var(--font-mono, monospace); font-size: 12px;
+              background: rgba(15,20,25,0.5); border: 1px solid #1f2937;
+              border-radius: 6px; padding: 10px; overflow-x: auto;
+              white-space: pre; line-height: 1.5; }
+  .h3m-diff-line { display: block; padding: 0 8px; min-height: 18px; }
+  .h3m-diff-num  { display: inline-block; width: 40px; color: #6b7280;
+                   text-align: right; padding-right: 12px; user-select: none; }
+  .h3m-diff-add  { background: rgba(16,185,129,0.18); color: #d1fae5; }
+  .h3m-diff-del  { background: rgba(239,68,68,0.18);  color: #fecaca; }
+  .h3m-diff-ctx  { color: #9ca3af; }
+  .h3m-confidence-high   { color: #10b981; }
+  .h3m-confidence-medium { color: #f59e0b; }
+  .h3m-confidence-low    { color: #ef4444; }
+  .h3m-confidence-manual { color: #6b7280; }
+  /* Keyboard focus highlight */
+  .h3m-kbd-focused { outline: 2px solid #06b6d4 !important; outline-offset: -2px; }
+  /* Help overlay */
+  #h3m-help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+                      display: none; align-items: center; justify-content: center;
+                      z-index: 10000; }
+  #h3m-help-overlay.show { display: flex; }
+  .h3m-help-card { background: #0f1419; border: 1px solid #1f2937;
+                   border-radius: 8px; padding: 24px; min-width: 320px;
+                   font-family: var(--font-mono, monospace); font-size: 13px; }
+  .h3m-help-row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .h3m-help-key { background: #1f2937; padding: 2px 8px; border-radius: 4px;
+                  color: #06b6d4; min-width: 32px; text-align: center; }
+  /* Metrics card */
+  .h3m-metrics-card { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+                      padding: 16px; background: rgba(15,20,25,0.6);
+                      border: 1px solid #1f2937; border-radius: 8px; margin: 14px 0; }
+  .h3m-metrics-cell { padding: 8px; }
+  .h3m-metrics-label { font-size: 10px; text-transform: uppercase; color: #9ca3af;
+                       letter-spacing: 0.5px; }
+  .h3m-metrics-value { font-size: 22px; font-weight: 700; margin: 4px 0; color: #06b6d4; }
+  .h3m-metrics-sub   { font-size: 11px; color: #9ca3af; }
+  /* Leaderboard */
+  .h3m-board-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .h3m-board-table th, .h3m-board-table td { text-align: left; padding: 6px 10px;
+                                              border-bottom: 1px solid #1f2937; }
+  .h3m-board-table th { color: #9ca3af; font-weight: 600; font-size: 10px;
+                        text-transform: uppercase; }
+  .h3m-board-medal { font-size: 16px; }
+</style>
+
+<script>
+(function () {
+  if (window._h3mLoaded) return;
+  window._h3mLoaded = true;
+
+  // ─── #8 Diff preview renderer ─────────────────────────────────────
+  window.h3mFetchAndRenderDiff = async function (findingId, targetEl) {
+    if (!targetEl) return;
+    targetEl.innerHTML = '<div style="color:#9ca3af;padding:10px">Loading diff…</div>';
+    // [H3.N.fix9] resolved token from multiple sources (auto-wrapper compatible)
+    const tk = window.TOKEN
+            || (window.localStorage && (localStorage.getItem('token') || localStorage.getItem('vsp_token') || localStorage.getItem('jwt')))
+            || (window.sessionStorage && (sessionStorage.getItem('token') || sessionStorage.getItem('vsp_token')))
+            || '';
+    try {
+      const opts = { credentials: 'include' };
+      if (tk) opts.headers = {'Authorization': 'Bearer ' + tk};
+      const r = await fetch('/api/v1/findings/' + findingId + '/diff', opts);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      targetEl.innerHTML = h3mRenderDiff(d);
+    } catch (e) {
+      targetEl.innerHTML = '<div style="color:#ef4444;padding:10px">Could not load diff: ' + e.message + '</div>';
+    }
+  };
+
+  function h3mRenderDiff(d) {
+    if (!d || !d.file_path) return '<div style="color:#9ca3af">No diff available</div>';
+    let html = '<div style="margin-bottom:8px;font-size:12px">';
+    html += '📂 <code style="color:#06b6d4">' + escape(d.file_path) + ':' + (d.line_start || '?') + '</code>';
+    html += '</div>';
+    html += '<div class="h3m-diff">';
+    let n = (d.line_start || 1) - (d.context_before || []).length;
+    (d.context_before || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-ctx"><span class="h3m-diff-num">' + (n++) + '</span>' + escape(line) + '</span>';
+    });
+    (d.current_code || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-del"><span class="h3m-diff-num">' + (n++) + '</span>- ' + escape(line) + '</span>';
+    });
+    (d.suggested_fix || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-add"><span class="h3m-diff-num">+</span>+ ' + escape(line) + '</span>';
+    });
+    (d.context_after || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-ctx"><span class="h3m-diff-num">' + (n++) + '</span>' + escape(line) + '</span>';
+    });
+    html += '</div>';
+    if (d.rationale) {
+      html += '<div style="margin-top:10px;font-size:12px;color:#9ca3af">';
+      html += '💡 <strong>Why:</strong> ' + escape(d.rationale);
+      html += '</div>';
+    }
+    if (d.confidence) {
+      html += '<div style="margin-top:6px;font-size:11px">';
+      html += 'Confidence: <span class="h3m-confidence-' + d.confidence + '">' + d.confidence.toUpperCase() + '</span>';
+      if (!d.has_template) html += ' <span style="color:#9ca3af">— no auto-template, manual review required</span>';
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function escape(s) {
+    return String(s || '').replace(/[&<>"]/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  // ─── #9 Keyboard shortcuts ────────────────────────────────────────
+  let kbdIndex = 0;
+  function getRows() {
+    return Array.from(document.querySelectorAll('tr[data-finding-id], [data-finding-row]'));
+  }
+  function highlightRow(idx) {
+    const rows = getRows();
+    rows.forEach(r => r.classList.remove('h3m-kbd-focused'));
+    if (rows[idx]) {
+      rows[idx].classList.add('h3m-kbd-focused');
+      rows[idx].scrollIntoView({block: 'center', behavior: 'smooth'});
+    }
+  }
+  document.addEventListener('keydown', function (e) {
+    // Skip if user is typing
+    const t = e.target;
+    if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
+    // Skip if modifier keys
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const rows = getRows();
+    if (rows.length === 0 && e.key !== '?') return;
+    switch (e.key) {
+      case 'j': kbdIndex = Math.min(rows.length - 1, kbdIndex + 1); highlightRow(kbdIndex); e.preventDefault(); break;
+      case 'k': kbdIndex = Math.max(0, kbdIndex - 1); highlightRow(kbdIndex); e.preventDefault(); break;
+      case 'p': clickActionButton(rows[kbdIndex], 'preview'); e.preventDefault(); break;
+      case 'm': clickActionButton(rows[kbdIndex], 'mark');    e.preventDefault(); break;
+      case 'v': clickActionButton(rows[kbdIndex], 'verify');  e.preventDefault(); break;
+      case 'g': openInEditor(rows[kbdIndex]); e.preventDefault(); break;
+      case '?': toggleHelp(true); e.preventDefault(); break;
+      case 'Escape': toggleHelp(false); break;
+    }
+  });
+  function clickActionButton(row, action) {
+    if (!row) return;
+    const btnLabels = {preview: 'Preview fix', mark: 'Mark as applied', verify: 'Verify'};
+    const buttons = row.querySelectorAll('button');
+    for (const b of buttons) {
+      if (b.textContent.trim().toLowerCase().includes(btnLabels[action].toLowerCase())) {
+        b.click();
+        return;
+      }
+    }
+  }
+  function openInEditor(row) {
+    if (!row) return;
+    const path = row.dataset.filePath;
+    const line = row.dataset.fileLine || '1';
+    if (path) window.open('vscode://file/' + path + ':' + line, '_blank');
+  }
+  function toggleHelp(show) {
+    let overlay = document.getElementById('h3m-help-overlay');
+    if (!overlay && show) {
+      overlay = document.createElement('div');
+      overlay.id = 'h3m-help-overlay';
+      overlay.innerHTML = ''
+        + '<div class="h3m-help-card">'
+        + '<div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#06b6d4">Keyboard shortcuts</div>'
+        + helpRow('j', 'Next finding')
+        + helpRow('k', 'Previous finding')
+        + helpRow('p', 'Preview fix')
+        + helpRow('m', 'Mark as applied')
+        + helpRow('v', 'Verify fix')
+        + helpRow('g', 'Open file in editor')
+        + helpRow('?', 'Show this help')
+        + helpRow('Esc', 'Close')
+        + '<div style="margin-top:12px;font-size:11px;color:#6b7280">Click outside or press Esc to close</div>'
+        + '</div>';
+      overlay.addEventListener('click', e => { if (e.target === overlay) toggleHelp(false); });
+      document.body.appendChild(overlay);
+    }
+    if (overlay) overlay.classList.toggle('show', !!show);
+  }
+  function helpRow(key, desc) {
+    return '<div class="h3m-help-row"><span class="h3m-help-key">' + key + '</span>'
+         + '<span style="margin-left:16px;color:#d1d5db">' + desc + '</span></div>';
+  }
+
+  // ─── #11 Leaderboard widget ───────────────────────────────────────
+  window.h3mLoadLeaderboard = async function (period, targetEl) {
+    if (!targetEl) return;
+    targetEl.innerHTML = '<div style="color:#9ca3af">Loading leaderboard…</div>';
+    try {
+      const r = await fetch('/api/v1/autofix/leaderboard?period=' + (period || '30d'), {
+        headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}
+      });
+      const d = await r.json();
+      targetEl.innerHTML = h3mRenderBoard(d);
+    } catch (e) {
+      targetEl.innerHTML = '<div style="color:#ef4444">Could not load: ' + e.message + '</div>';
+    }
+  };
+  function h3mRenderBoard(d) {
+    if (!d.entries || d.entries.length === 0) {
+      return '<div style="color:#9ca3af;text-align:center;padding:20px">'
+           + 'No remediation activity in this period.<br>'
+           + '<span style="font-size:11px">Mark fixes applied + verify to appear on the leaderboard.</span>'
+           + '</div>';
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    let html = '<table class="h3m-board-table"><thead><tr>'
+             + '<th>#</th><th>Engineer</th><th>Verified</th><th>Applied</th><th>Avg MTTR</th>'
+             + '</tr></thead><tbody>';
+    d.entries.forEach(e => {
+      const medal = e.rank <= 3 ? '<span class="h3m-board-medal">' + medals[e.rank-1] + '</span>' : e.rank;
+      html += '<tr>'
+            + '<td>' + medal + '</td>'
+            + '<td><code>' + escape(e.actor) + '</code>'
+            + (e.opted_in ? '' : ' <span style="font-size:10px;color:#6b7280">(masked)</span>')
+            + '</td>'
+            + '<td><strong style="color:#10b981">' + e.verified_count + '</strong></td>'
+            + '<td>' + e.applied_count + '</td>'
+            + '<td>' + (e.avg_mttr_hours ? e.avg_mttr_hours.toFixed(1) + 'h' : '—') + '</td>'
+            + '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="margin-top:8px;font-size:10px;color:#6b7280">'
+         + 'Period: ' + d.period + ' · '
+         + d.total + ' active engineers · '
+         + 'Privacy: opt-in via Settings → Show me on leaderboard</div>';
+    return html;
+  }
+
+  // ─── #12 Metrics card ─────────────────────────────────────────────
+  window.h3mLoadMetrics = async function (period, targetEl) {
+    if (!targetEl) return;
+    try {
+      const r = await fetch('/api/v1/autofix/metrics?period=' + (period || '30d'), {
+        headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}
+      });
+      const d = await r.json();
+      targetEl.innerHTML = h3mRenderMetrics(d);
+    } catch (e) {
+      targetEl.innerHTML = '<div style="color:#ef4444">Could not load metrics</div>';
+    }
+  };
+  function h3mRenderMetrics(d) {
+    const t = d.totals || {}, r = d.rates || {}, m = d.mttr || {};
+    const pct = v => v ? (v * 100).toFixed(0) + '%' : '—';
+    const hrs = v => v ? v.toFixed(1) + 'h' : '—';
+    let html = '<div class="h3m-metrics-card">'
+      + cell('Verified', t.findings_verified || 0, 'last ' + d.period_days + ' days')
+      + cell('Verification rate', pct(r.verification_rate), 'verified / (verified+applied)')
+      + cell('Auto-remediation', pct(r.auto_remediation_rate), 'of all resolved')
+      + cell('MTTR — Critical', hrs(m.critical_hours), 'mean time to remediate')
+      + cell('MTTR — High',     hrs(m.high_hours), '')
+      + cell('First-attempt success', pct(r.first_attempt_success), 'verified / (verified+failed)')
+      + '</div>';
+    if (d.top_rules_remediated && d.top_rules_remediated.length) {
+      html += '<div style="margin-top:8px;font-size:11px;color:#9ca3af">'
+            + 'Top remediated: '
+            + d.top_rules_remediated.slice(0, 3).map(r =>
+                '<code style="color:#06b6d4">' + escape(r.rule_id) + '</code> (' + r.count + '×)'
+              ).join(' · ')
+            + '</div>';
+    }
+    html += '<div style="margin-top:6px;font-size:10px;color:#6b7280">'
+          + 'CMMC mapping: AU-7 (audit reduction) · RA-5 (vuln scanning) · SI-2 (flaw remediation)'
+          + '</div>';
+    return html;
+  }
+  function cell(label, value, sub) {
+    return '<div class="h3m-metrics-cell">'
+         + '<div class="h3m-metrics-label">' + escape(label) + '</div>'
+         + '<div class="h3m-metrics-value">' + escape(String(value)) + '</div>'
+         + '<div class="h3m-metrics-sub">' + escape(sub) + '</div>'
+         + '</div>';
+  }
+
+  // ─── Auto-inject metrics card + leaderboard into Autofix tab ─────
+  function tryInjectMetrics() {
+    if (document.getElementById('h3m-metrics-mount')) return true;
+    let anchor = null;
+    for (const el of document.querySelectorAll('div')) {
+      if (el.offsetWidth > 0 &&
+          el.textContent.includes('Top auto-fixable') &&
+          el.children.length < 25) {
+        anchor = el; break;
+      }
+    }
+    if (!anchor) return false;
+    const card = anchor.closest('.card, .panel, section') || anchor;
+
+    // Metrics mount
+    const metricsMount = document.createElement('div');
+    metricsMount.id = 'h3m-metrics-mount';
+    card.parentNode.insertBefore(metricsMount, card);
+    h3mLoadMetrics('30d', metricsMount);
+
+    // Leaderboard mount (below metrics)
+    const boardMount = document.createElement('div');
+    boardMount.id = 'h3m-board-mount';
+    boardMount.style.cssText = 'background:rgba(15,20,25,0.6);border:1px solid #1f2937;'
+                              + 'border-radius:8px;padding:14px;margin:14px 0';
+    boardMount.innerHTML = '<div style="font-size:12px;font-weight:600;color:#9ca3af;'
+                         + 'text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">'
+                         + 'Leaderboard — last 30 days</div><div id="h3m-board-body"></div>';
+    card.parentNode.insertBefore(boardMount, card);
+    h3mLoadLeaderboard('30d', document.getElementById('h3m-board-body'));
+
+    console.log('[H3.M] Quick wins mounted: metrics + leaderboard');
+    return true;
+  }
+
+  // Retry up to 60s
+  let tries = 0;
+  const tick = setInterval(() => {
+    if (tryInjectMetrics() || ++tries > 120) clearInterval(tick);
+  }, 500);
+  // Also re-mount on tab switches
+  new MutationObserver(() => {
+    if (!document.getElementById('h3m-metrics-mount')) tryInjectMetrics();
+  }).observe(document.body, {childList: true, subtree: true});
+
+  console.log('[H3.M] Autofix Quick Wins loaded — keyboard shortcuts active (press ?)');
+})();
+</script>
+
+
+<!-- [H3.M] previewFix hook — render real diff into modal body when opened -->
+<script>
+(function () {
+  if (window._h3mPreviewHooked) return;
+  window._h3mPreviewHooked = true;
+  // Wait for original previewFix, then wrap it
+  function tryHook() {
+    if (typeof window.previewFix !== 'function') {
+      setTimeout(tryHook, 500); return;
+    }
+    const orig = window.previewFix;
+    window.previewFix = async function (findingId) {
+      const r = await orig.apply(this, arguments);
+      // After modal opens, find body and inject diff
+      setTimeout(() => {
+        const modal = document.getElementById('modal-fix-preview');
+        if (!modal) return;
+        let mount = modal.querySelector('.h3m-diff-mount');
+        if (!mount) {
+          mount = document.createElement('div');
+          mount.className = 'h3m-diff-mount';
+          mount.style.cssText = 'margin:12px 0';
+          // Insert before the action buttons row
+          const body = modal.querySelector('[class*="modal-body"], .modal-content') || modal;
+          body.appendChild(mount);
+        }
+        if (typeof window.h3mFetchAndRenderDiff === 'function') {
+          window.h3mFetchAndRenderDiff(findingId, mount);
+        }
+      }, 100);
+      return r;
+    };
+    console.log('[H3.M] previewFix hooked — diff will render in modal');
+  }
+  tryHook();
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     [H3.N] AI-Powered Autofix — frontend enhancements
+     Adds 🤖 AI badge, rationale, confidence indicator, breaking-change warning
+     to the existing Preview Fix modal (which renders diff via h3mFetchAndRenderDiff).
+════════════════════════════════════════════════════════════════════ -->
+<style>
+  .h3n-source-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; margin-left: 8px;
+  }
+  .h3n-source-llm    { background: rgba(139, 92, 246, 0.18); color: #c4b5fd; }
+  .h3n-source-cache  { background: rgba(139, 92, 246, 0.10); color: #a78bfa; }
+  .h3n-source-template { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+  .h3n-source-manual { background: rgba(120, 120, 120, 0.18); color: #9ca3af; }
+  .h3n-source-llm_failed { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+
+  .h3n-confidence-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; margin-right: 8px;
+  }
+  .h3n-confidence-high   { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+  .h3n-confidence-medium { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+  .h3n-confidence-low    { background: rgba(239, 68, 68, 0.18);  color: #fca5a5; }
+  .h3n-confidence-manual { background: rgba(120, 120, 120, 0.18); color: #9ca3af; }
+
+  .h3n-breaking-warn {
+    background: rgba(245, 158, 11, 0.10); border: 1px solid rgba(245, 158, 11, 0.30);
+    color: #fcd34d; padding: 6px 10px; border-radius: 4px; font-size: 11px;
+    margin: 8px 0;
+  }
+  .h3n-rationale {
+    margin: 10px 0; padding: 10px; background: rgba(15, 20, 25, 0.4);
+    border-left: 3px solid #8b5cf6; border-radius: 4px;
+    font-size: 12px; color: #d1d5db; line-height: 1.5;
+  }
+  .h3n-meta { font-size: 10px; color: #6b7280; margin-top: 6px; }
+</style>
+
+<script>
+(function () {
+  if (window._h3nLoaded) return;
+  window._h3nLoaded = true;
+
+  // Wrap h3mFetchAndRenderDiff (from H3.M) to add AI-aware rendering.
+  function tryHook() {
+    if (typeof window.h3mFetchAndRenderDiff !== 'function') {
+      setTimeout(tryHook, 500); return;
+    }
+    const orig = window.h3mFetchAndRenderDiff;
+    window.h3mFetchAndRenderDiff = async function (findingId, targetEl) {
+      if (!targetEl) return;
+      targetEl.innerHTML = '<div style="color:#9ca3af;padding:10px">Loading diff (DeepSeek may take ~25s on first call)…</div>';
+      // [H3.N.fix9] resolved token from multiple sources (auto-wrapper compatible)
+      const tk = window.TOKEN
+              || (window.localStorage && (localStorage.getItem('token') || localStorage.getItem('vsp_token') || localStorage.getItem('jwt')))
+              || (window.sessionStorage && (sessionStorage.getItem('token') || sessionStorage.getItem('vsp_token')))
+              || '';
+      try {
+        const opts = { credentials: 'include' };
+        if (tk) opts.headers = {'Authorization': 'Bearer ' + tk};
+        const r = await fetch('/api/v1/findings/' + findingId + '/diff', opts);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        targetEl.innerHTML = h3nRenderDiff(d);
+      } catch (e) {
+        targetEl.innerHTML = '<div style="color:#ef4444;padding:10px">Could not load diff: ' + e.message + '</div>';
+      }
+    };
+    console.log('[H3.N] Diff renderer extended — AI badge + rationale + confidence enabled');
+  }
+
+  function h3nRenderDiff(d) {
+    if (!d) return '<div style="color:#9ca3af">No diff available</div>';
+
+    let html = '';
+
+    // Header line — file path + source badge
+    const sourceBadge = h3nSourceBadge(d.source || 'manual');
+    html += '<div style="margin-bottom:10px;font-size:12px;display:flex;align-items:center;flex-wrap:wrap">';
+    if (d.file_path) {
+      html += '📂 <code style="color:#06b6d4;margin-left:4px">'
+            + h3nEsc(d.file_path) + ':' + (d.line_start || '?') + '</code>';
+    }
+    html += sourceBadge;
+    html += '</div>';
+
+    // Diff
+    html += '<div class="h3m-diff">';
+    let n = (d.line_start || 1) - (d.context_before || []).length;
+    (d.context_before || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-ctx"><span class="h3m-diff-num">' + (n++) + '</span>' + h3nEsc(line) + '</span>';
+    });
+    (d.current_code || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-del"><span class="h3m-diff-num">' + (n++) + '</span>- ' + h3nEsc(line) + '</span>';
+    });
+    (d.suggested_fix || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-add"><span class="h3m-diff-num">+</span>+ ' + h3nEsc(line) + '</span>';
+    });
+    (d.context_after || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-ctx"><span class="h3m-diff-num">' + (n++) + '</span>' + h3nEsc(line) + '</span>';
+    });
+    html += '</div>';
+
+    // Rationale (highlighted block for LLM/cache, plain for templates)
+    if (d.rationale) {
+      const isAI = d.source === 'llm' || d.source === 'cache';
+      if (isAI) {
+        html += '<div class="h3n-rationale">';
+        html += '🤖 <strong>AI rationale</strong>';
+        if (d.model) html += ' <span style="color:#6b7280">(' + h3nEsc(d.model) + ')</span>';
+        html += ':<br>' + h3nEsc(d.rationale) + '</div>';
+      } else {
+        html += '<div style="margin-top:10px;font-size:12px;color:#9ca3af">';
+        html += '💡 <strong>Why:</strong> ' + h3nEsc(d.rationale) + '</div>';
+      }
+    }
+
+    // Confidence + breaking change row
+    if (d.confidence) {
+      html += '<div style="margin-top:8px;font-size:11px;display:flex;align-items:center;flex-wrap:wrap">';
+      html += 'Confidence: <span class="h3n-confidence-badge h3n-confidence-' + d.confidence + '">'
+            + d.confidence.toUpperCase() + '</span>';
+      if (d.breaking_change) {
+        html += ' <span style="color:#fcd34d">⚠ Breaking change</span>';
+      } else if (d.source === 'llm' || d.source === 'cache') {
+        html += ' <span style="color:#6ee7b7">✓ Non-breaking</span>';
+      }
+      html += '</div>';
+    }
+
+    // Breaking-change warning block
+    if (d.breaking_change && (d.source === 'llm' || d.source === 'cache')) {
+      html += '<div class="h3n-breaking-warn">';
+      html += '⚠ <strong>This fix may break compatibility.</strong> ';
+      html += 'Test in a non-prod environment before applying.';
+      html += '</div>';
+    }
+
+    // Manual review notice for AI-generated
+    if (d.source === 'llm' || d.source === 'cache') {
+      html += '<div style="margin-top:8px;font-size:11px;color:#fcd34d;font-weight:600">';
+      html += '⚠ AI-generated — REVIEW REQUIRED before applying';
+      html += '</div>';
+    }
+
+    // Meta line
+    if (d.source === 'llm' || d.source === 'cache') {
+      html += '<div class="h3n-meta">';
+      if (d.source === 'cache') html += 'Cached · ';
+      else if (d.latency_ms) html += 'Generated in ' + (d.latency_ms / 1000).toFixed(1) + 's · ';
+      if (d.provider) html += 'Provider: ' + h3nEsc(d.provider) + ' · ';
+      html += 'Cached for 30 days';
+      html += '</div>';
+    }
+
+    return html;
+  }
+
+  function h3nSourceBadge(source) {
+    const labels = {
+      template:   '✓ Template',
+      cache:      '🤖 AI (cached)',
+      llm:        '🤖 AI generated',
+      llm_failed: '⚠ AI unavailable',
+      manual:     'Manual review',
+    };
+    return '<span class="h3n-source-badge h3n-source-' + source + '">' + (labels[source] || source) + '</span>';
+  }
+
+  function h3nEsc(s) {
+    return String(s || '').replace(/[&<>"]/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  tryHook();
+  console.log('[H3.N] AI-Powered Autofix loaded — modal will show AI badge when source=llm');
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     [H3.N.fix4] modal force-rerender
+     Ensures the latest h3mFetchAndRenderDiff (with H3.N AI badge)
+     runs on every modal open, not a stale captured reference.
+═══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3nFix4) return;
+  window._h3nFix4 = true;
+
+  // Find the modal that previewFix opens
+  function findModal() {
+    return document.getElementById('modal-fix-preview');
+  }
+
+  // Find or create the diff render target inside the modal
+  function findDiffMount(modal) {
+    if (!modal) return null;
+    // Try common selectors used by previous H3.M / H2.L code
+    let mount = modal.querySelector('.h3m-diff-container')
+              || modal.querySelector('#fix-preview-diff')
+              || modal.querySelector('[data-h3n-mount]');
+    if (mount) return mount;
+
+    // Last resort: append a fresh div to the modal body
+    const body = modal.querySelector('.modal-body, .modal-content, .modal-inner') || modal;
+    mount = document.createElement('div');
+    mount.setAttribute('data-h3n-mount', '1');
+    mount.style.marginTop = '10px';
+    body.appendChild(mount);
+    return mount;
+  }
+
+  // Cache last finding ID seen via previewFix() call
+  let lastFindingId = null;
+
+  // Wrap previewFix to capture the finding ID being shown
+  function wrapPreviewFix() {
+    if (typeof window.previewFix !== 'function') {
+      setTimeout(wrapPreviewFix, 300);
+      return;
+    }
+    const orig = window.previewFix;
+    if (orig._h3nFix4Wrapped) return;
+    window.previewFix = async function (findingId) {
+      lastFindingId = findingId;
+      // Run original first (it may set up modal markup)
+      try { await orig.apply(this, arguments); } catch (e) { /* ignore */ }
+      // Then re-render with latest H3.N-aware function
+      const modal = findModal();
+      if (!modal) return;
+      const mount = findDiffMount(modal);
+      if (mount && typeof window.h3mFetchAndRenderDiff === 'function') {
+        // Always look up freshly — gets H3.N-extended version
+        window.h3mFetchAndRenderDiff(findingId, mount);
+      }
+    };
+    window.previewFix._h3nFix4Wrapped = true;
+    console.log('[H3.N.fix4] previewFix re-wrapped — modal will always use latest renderer');
+  }
+
+  // Also handle showFixPreviewByIdx (other entry point)
+  function wrapShowByIdx() {
+    if (typeof window.showFixPreviewByIdx !== 'function') {
+      setTimeout(wrapShowByIdx, 300);
+      return;
+    }
+    const orig = window.showFixPreviewByIdx;
+    if (orig._h3nFix4Wrapped) return;
+    window.showFixPreviewByIdx = function (btn) {
+      const result = orig.apply(this, arguments);
+      // Try to extract finding ID from row context
+      try {
+        const row = btn.closest('tr, [data-finding-id]');
+        const fid = row && (row.dataset.findingId || row.getAttribute('data-finding-id'));
+        if (fid) {
+          lastFindingId = fid;
+          setTimeout(() => {
+            const modal = findModal();
+            const mount = modal && findDiffMount(modal);
+            if (mount && typeof window.h3mFetchAndRenderDiff === 'function') {
+              window.h3mFetchAndRenderDiff(fid, mount);
+            }
+          }, 50);
+        }
+      } catch (e) { /* ignore */ }
+      return result;
+    };
+    window.showFixPreviewByIdx._h3nFix4Wrapped = true;
+    console.log('[H3.N.fix4] showFixPreviewByIdx re-wrapped');
+  }
+
+  // Mutation observer fallback: when modal becomes visible, force re-render
+  function installModalObserver() {
+    const modal = findModal();
+    if (!modal) {
+      setTimeout(installModalObserver, 500);
+      return;
+    }
+    const obs = new MutationObserver(() => {
+      if (modal.style.display === 'flex' && lastFindingId) {
+        const mount = findDiffMount(modal);
+        if (mount && typeof window.h3mFetchAndRenderDiff === 'function') {
+          // Tag mount so we can detect re-renders
+          if (mount.dataset.h3nLastId !== lastFindingId) {
+            mount.dataset.h3nLastId = lastFindingId;
+            window.h3mFetchAndRenderDiff(lastFindingId, mount);
+          }
+        }
+      }
+    });
+    obs.observe(modal, { attributes: true, attributeFilter: ['style'] });
+    console.log('[H3.N.fix4] modal observer installed');
+  }
+
+  wrapPreviewFix();
+  wrapShowByIdx();
+  installModalObserver();
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     [H3.N.fix5] showFixPreview hook
+     This is the REAL function called by the Preview Fix button.
+     It overwrites #mfp-body innerHTML with template HTML; we hook
+     AFTER that to append the AI-aware diff renderer.
+═══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3nFix5) return;
+  window._h3nFix5 = true;
+
+  function tryWrap() {
+    if (typeof window.showFixPreview !== 'function') {
+      setTimeout(tryWrap, 300); return;
+    }
+    if (window.showFixPreview._h3nFix5) return;
+
+    const orig = window.showFixPreview;
+    window.showFixPreview = function (finding) {
+      // Resolve the actual finding object (handles button arg, JSON arg, or object arg)
+      let f;
+      if (finding && finding.tagName === 'BUTTON') {
+        const idx = finding.getAttribute('data-fix-idx');
+        f = (window._lastFixable || [])[parseInt(idx) || 0] || {};
+      } else if (typeof finding === 'string') {
+        try { f = JSON.parse(finding); } catch (e) { f = {}; }
+      } else {
+        f = finding || {};
+      }
+
+      // Run original — this writes the modal template into #mfp-body
+      const result = orig.apply(this, arguments);
+
+      // Now inject H3.N AI-aware renderer
+      setTimeout(() => {
+        const body = document.getElementById('mfp-body');
+        if (!body) return;
+        const findingId = f.id || f.finding_id || f.uuid;
+        if (!findingId) {
+          console.warn('[H3.N.fix5] no finding ID in:', f);
+          return;
+        }
+
+        // Avoid double-injection on rapid clicks
+        let mount = body.querySelector('.h3n-mount');
+        if (mount && mount.dataset.h3nLastId === findingId) return;
+
+        if (!mount) {
+          mount = document.createElement('div');
+          mount.className = 'h3n-mount';
+          mount.style.cssText = 'margin:14px 0;padding-top:14px;border-top:1px dashed rgba(139,92,246,.3)';
+
+          // Insert before the action buttons row (last div)
+          const buttonsRow = body.querySelector('div[style*="justify-content:flex-end"]');
+          if (buttonsRow) {
+            body.insertBefore(mount, buttonsRow);
+          } else {
+            body.appendChild(mount);
+          }
+        }
+        mount.dataset.h3nLastId = findingId;
+
+        // Header for the AI section
+        mount.innerHTML = '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🤖 AI-powered diff (H3.N)</div><div class="h3n-diff-target" style="color:#9ca3af;padding:10px;font-size:12px">Loading AI fix from local LLM...</div>';
+
+        // Call the H3.N-extended renderer (looked up dynamically)
+        if (typeof window.h3mFetchAndRenderDiff === 'function') {
+          const target = mount.querySelector('.h3n-diff-target');
+          window.h3mFetchAndRenderDiff(findingId, target);
+        } else {
+          mount.querySelector('.h3n-diff-target').innerHTML =
+            '<div style="color:#ef4444">H3.M renderer not loaded — frontend patch may have failed</div>';
+        }
+      }, 50);
+
+      return result;
+    };
+    window.showFixPreview._h3nFix5 = true;
+    console.log('[H3.N.fix5] showFixPreview hooked — modal will show AI diff after open');
+  }
+
+  tryWrap();
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     [H3.N.fix6] Hook showFixPreviewByIdx (button entry point)
+     The button "Preview fix" in the table calls this directly.
+     We resolve the finding object and invoke showFixPreview which
+     was already hooked by fix5 to render the AI diff section.
+═══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3nFix6) return;
+  window._h3nFix6 = true;
+
+  function tryWrap() {
+    if (typeof window.showFixPreviewByIdx !== 'function') {
+      setTimeout(tryWrap, 300); return;
+    }
+    if (window.showFixPreviewByIdx._h3nFix6) return;
+
+    const orig = window.showFixPreviewByIdx;
+    window.showFixPreviewByIdx = function (btn) {
+      // Original opens modal — let it run first
+      const result = orig.apply(this, arguments);
+
+      // Resolve finding from button + _lastFixable
+      try {
+        const idx = btn && btn.getAttribute && btn.getAttribute('data-fix-idx');
+        if (idx === null || idx === undefined) return result;
+        const f = (window._lastFixable || [])[parseInt(idx) || 0];
+        if (!f || !f.id) {
+          console.warn('[H3.N.fix6] no finding at idx', idx);
+          return result;
+        }
+
+        // Force-inject H3.N AI section after a tick (modal innerHTML done)
+        setTimeout(() => {
+          const body = document.getElementById('mfp-body');
+          if (!body) return;
+
+          // Avoid double-inject
+          let mount = body.querySelector('.h3n-mount');
+          if (mount && mount.dataset.h3nLastId === f.id) return;
+          if (!mount) {
+            mount = document.createElement('div');
+            mount.className = 'h3n-mount';
+            mount.style.cssText = 'margin:14px 0;padding-top:14px;border-top:1px dashed rgba(139,92,246,.3)';
+            const buttonsRow = body.querySelector('div[style*="justify-content:flex-end"]');
+            if (buttonsRow) body.insertBefore(mount, buttonsRow);
+            else body.appendChild(mount);
+          }
+          mount.dataset.h3nLastId = f.id;
+          mount.innerHTML =
+            '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🤖 AI-powered diff (H3.N)</div>' +
+            '<div class="h3n-diff-target" style="color:#9ca3af;padding:10px;font-size:12px">Loading AI fix from local LLM...</div>';
+
+          if (typeof window.h3mFetchAndRenderDiff === 'function') {
+            const target = mount.querySelector('.h3n-diff-target');
+            window.h3mFetchAndRenderDiff(f.id, target);
+          }
+        }, 50);
+      } catch (e) {
+        console.error('[H3.N.fix6] error:', e);
+      }
+      return result;
+    };
+    window.showFixPreviewByIdx._h3nFix6 = true;
+    console.log('[H3.N.fix6] showFixPreviewByIdx hooked — button click will render AI diff');
+  }
+
+  tryWrap();
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     [H3.O] Pre-compute Status Widget
+     Shows progress of background AI fix pre-computation.
+═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3oWidget) return;
+  window._h3oWidget = true;
+
+  function fmtSecs(s) {
+    if (!s || s < 1) return '<1s';
+    if (s < 60) return Math.round(s) + 's';
+    if (s < 3600) return Math.round(s/60) + 'm';
+    return Math.round(s/3600) + 'h';
+  }
+
+  function getToken() {
+    return window.TOKEN
+      || (window.localStorage && (localStorage.getItem('vsp_token') || localStorage.getItem('token')))
+      || '';
+  }
+
+  async function fetchStatus() {
+    try {
+      const tk = getToken();
+      const opts = { credentials: 'include' };
+      if (tk) opts.headers = {'Authorization': 'Bearer ' + tk};
+      const r = await fetch('/api/v1/autofix/precompute/status', opts);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function renderWidget(data) {
+    const widget = document.getElementById('h3o-status-widget');
+    if (!widget) return;
+
+    if (!data || data.status === 'idle') {
+      widget.style.display = 'none';
+      return;
+    }
+
+    widget.style.display = 'block';
+    const isRunning = data.status === 'running';
+    const pct = data.progress_pct || 0;
+    const eta = data.eta_seconds ? fmtSecs(data.eta_seconds) : '—';
+
+    const statusBadge = isRunning
+      ? '<span style="background:rgba(139,92,246,.2);color:#a78bfa;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">⚡ RUNNING</span>'
+      : data.status === 'done'
+      ? '<span style="background:rgba(34,197,94,.2);color:#22c55e;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">✓ DONE</span>'
+      : '<span style="background:rgba(148,163,184,.2);color:#94a3b8;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">' + (data.status||'').toUpperCase() + '</span>';
+
+    widget.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:13px;font-weight:600">🤖 AI Pre-compute Status</span>' +
+          statusBadge +
+        '</div>' +
+        '<div style="font-size:10px;color:var(--t3)">Run: ' + (data.run_label || '—') + '</div>' +
+      '</div>' +
+      '<div style="background:var(--bg0);border-radius:6px;overflow:hidden;height:8px;margin-bottom:8px">' +
+        '<div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#8b5cf6,#a78bfa);transition:width .3s"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:14px;font-size:11px;color:var(--t2);flex-wrap:wrap">' +
+        '<span>Progress: <b style="color:var(--t1)">' + (data.completed + data.failed + data.skipped) + ' / ' + data.total + '</b> (' + pct + '%)</span>' +
+        '<span>✓ Done: <b style="color:#22c55e">' + data.completed + '</b></span>' +
+        (data.failed > 0 ? '<span>⚠ Failed: <b style="color:#ef4444">' + data.failed + '</b></span>' : '') +
+        (data.skipped > 0 ? '<span>— Skipped: <b style="color:#94a3b8">' + data.skipped + '</b></span>' : '') +
+        (isRunning && data.eta_seconds ? '<span>ETA: <b style="color:#a78bfa">~' + eta + '</b></span>' : '') +
+        (data.avg_latency_ms ? '<span>Avg: <b>' + (data.avg_latency_ms/1000).toFixed(1) + 's</b></span>' : '') +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--t3);margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">' +
+        '💾 Cache size: <b>' + (data.total_cached || 0) + '</b> entries · TTL 30 days · Click "Preview fix" on a code finding for instant AI diff' +
+      '</div>';
+  }
+
+  let pollInterval = null;
+  let consecutiveErrors = 0;
+
+  async function tick() {
+    const data = await fetchStatus();
+    if (data === null) {
+      consecutiveErrors++;
+      if (consecutiveErrors > 3) {
+        // Stop polling on repeated errors
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+      }
+      return;
+    }
+    consecutiveErrors = 0;
+    renderWidget(data);
+
+    // Adapt polling rate: 5s when running, 30s when idle/done
+    if (pollInterval && data.status !== 'running') {
+      clearInterval(pollInterval);
+      pollInterval = setInterval(tick, 30000);
+    }
+  }
+
+  function injectWidget() {
+    // Find the Autofix tab content area
+    const autofixTab = document.querySelector('[data-tab="autofix"], #autofix-tab, .autofix-section');
+    let target = document.getElementById('h3o-status-widget');
+    if (target) return; // already injected
+
+    // Fallback: inject before Leaderboard if found
+    const leaderboard = Array.from(document.querySelectorAll('h2, h3, div')).find(
+      el => el.textContent && el.textContent.includes('LEADERBOARD')
+    );
+
+    target = document.createElement('div');
+    target.id = 'h3o-status-widget';
+    target.style.cssText = 'background:var(--bg1);border:1px solid var(--border);border-left:3px solid #8b5cf6;border-radius:8px;padding:14px 16px;margin:14px 0;display:none';
+
+    if (leaderboard && leaderboard.parentElement) {
+      leaderboard.parentElement.insertBefore(target, leaderboard);
+    } else if (autofixTab) {
+      autofixTab.insertBefore(target, autofixTab.firstChild);
+    } else {
+      // Last resort: append to body
+      document.body.appendChild(target);
+    }
+  }
+
+  // Wait for DOM
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  function init() {
+    injectWidget();
+    tick();
+    pollInterval = setInterval(tick, 5000); // start fast (5s) — slows to 30s when idle
+    console.log('[H3.O] Pre-compute status widget loaded');
+  }
+})();
+</script>
+
+<script src="/static/js/vsp_h3_upgrade.js"></script>
 </body>
 </html>
