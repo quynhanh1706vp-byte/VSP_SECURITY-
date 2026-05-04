@@ -49,16 +49,16 @@ func (h *SupplyChain) KPIs(w http.ResponseWriter, r *http.Request) {
 
 // ─── GET /api/v1/supply-chain/signatures ──────────────────────────────────
 type scSignatureRow struct {
-	ID         string    `json:"id"`
-	Artifact   string    `json:"artifact"`
-	Digest     string    `json:"digest"`
-	SignedBy   string    `json:"signed_by"`
-	Algorithm  string    `json:"algorithm"`
-	SignedAt   time.Time `json:"signed_at"`
-	Verified   bool      `json:"verified"`
+	ID         string     `json:"id"`
+	Artifact   string     `json:"artifact"`
+	Digest     string     `json:"digest"`
+	SignedBy   string     `json:"signed_by"`
+	Algorithm  string     `json:"algorithm"`
+	SignedAt   time.Time  `json:"signed_at"`
+	Verified   bool       `json:"verified"`
 	VerifiedAt *time.Time `json:"verified_at,omitempty"`
-	TlogIndex  *int64    `json:"tlog_index,omitempty"`
-	HasCert    bool      `json:"has_cert"`
+	TlogIndex  *int64     `json:"tlog_index,omitempty"`
+	HasCert    bool       `json:"has_cert"`
 }
 
 func (h *SupplyChain) Signatures(w http.ResponseWriter, r *http.Request) {
@@ -138,11 +138,11 @@ func (h *SupplyChain) SignatureDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		row       scSignatureRow
+		row          scSignatureRow
 		signatureB64 string
-		publicKey  string
-		certPEM    *string
-		bundleJSON []byte
+		publicKey    string
+		certPEM      *string
+		bundleJSON   []byte
 	)
 	err := h.DB.Pool().QueryRow(r.Context(),
 		`SELECT id::text, artifact_name, artifact_digest, signed_by, algorithm,

@@ -278,14 +278,14 @@ func (h *CISAAttestation) FormDetail(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal(ssdfJSON, &ssdfAttestations)
 
 	jsonOK(w, map[string]any{
-		"form":               f,
-		"producer_name":      producerName,
-		"producer_website":   producerWebsite,
+		"form":                f,
+		"producer_name":       producerName,
+		"producer_website":    producerWebsite,
 		"product_description": productDesc,
-		"ssdf_attestations":  ssdfAttestations,
-		"signed_by_title":    signedByTitle,
-		"signed_by_email":    signedByEmail,
-		"signature_method":   sigMethod,
+		"ssdf_attestations":   ssdfAttestations,
+		"signed_by_title":     signedByTitle,
+		"signed_by_email":     signedByEmail,
+		"signature_method":    sigMethod,
 	})
 }
 
@@ -446,4 +446,3 @@ func (h *CISAAttestation) CurrentDraft(w http.ResponseWriter, r *http.Request) {
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 // (uses strconv.Itoa via imported package — see attestation_helpers below)
-

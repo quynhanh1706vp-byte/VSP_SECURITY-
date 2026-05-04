@@ -60,17 +60,17 @@ func (h *OSCALModels) AssessmentPlan(w http.ResponseWriter, r *http.Request) {
 	// Build OSCAL Assessment Plan 1.1.2
 	tasks := []map[string]interface{}{}
 	toolDescriptions := map[string]string{
-		"kics":     "Infrastructure as Code (IaC) static analysis — Terraform, CloudFormation, Kubernetes manifests",
-		"gosec":    "Go source code security scanner",
-		"bandit":   "Python source code security scanner",
-		"syft":     "Software Bill of Materials (SBOM) generation",
-		"semgrep":  "Multi-language static analysis with custom rules",
-		"checkov":  "IaC and policy-as-code static analysis",
-		"nmap":     "Network port and service discovery",
-		"codeql":   "Semantic code analysis (GitHub Advanced Security)",
-		"grype":    "Container image and OS vulnerability scanner",
-		"hadolint": "Dockerfile linter and best-practice checker",
-		"trivy":    "Container vulnerability and misconfiguration scanner",
+		"kics":       "Infrastructure as Code (IaC) static analysis — Terraform, CloudFormation, Kubernetes manifests",
+		"gosec":      "Go source code security scanner",
+		"bandit":     "Python source code security scanner",
+		"syft":       "Software Bill of Materials (SBOM) generation",
+		"semgrep":    "Multi-language static analysis with custom rules",
+		"checkov":    "IaC and policy-as-code static analysis",
+		"nmap":       "Network port and service discovery",
+		"codeql":     "Semantic code analysis (GitHub Advanced Security)",
+		"grype":      "Container image and OS vulnerability scanner",
+		"hadolint":   "Dockerfile linter and best-practice checker",
+		"trivy":      "Container vulnerability and misconfiguration scanner",
 		"trufflehog": "Secrets detection in git history",
 	}
 	for _, t := range tools {
@@ -113,8 +113,8 @@ func (h *OSCALModels) AssessmentPlan(w http.ResponseWriter, r *http.Request) {
 			"reviewed-controls": map[string]interface{}{
 				"control-selections": []map[string]interface{}{
 					{
-						"description":     "FedRAMP Moderate Baseline",
-						"include-all":     map[string]interface{}{},
+						"description": "FedRAMP Moderate Baseline",
+						"include-all": map[string]interface{}{},
 					},
 				},
 			},
@@ -244,8 +244,8 @@ func (h *OSCALModels) AssessmentResults(w http.ResponseWriter, r *http.Request) 
 							{"include-all": map[string]interface{}{}},
 						},
 					},
-					"findings":         oscal2TruncateFindings(findings, 50),
-					"finding-summary":  riskSummary,
+					"findings":        oscal2TruncateFindings(findings, 50),
+					"finding-summary": riskSummary,
 					"local-definitions": map[string]interface{}{
 						"components": []map[string]interface{}{
 							{
@@ -343,8 +343,8 @@ func (h *OSCALModels) POAM(w http.ResponseWriter, r *http.Request) {
 				"identifier-type": "https://fedramp.gov",
 				"id":              "VSP-DOD-2025-001",
 			},
-			"poam-items":      poamItems,
-			"status-summary":  statusCounts,
+			"poam-items":       poamItems,
+			"status-summary":   statusCounts,
 			"severity-summary": severityCounts,
 		},
 	}
@@ -413,7 +413,6 @@ func oscal2SevToState(sev string) string {
 	}
 	return "implemented"
 }
-
 
 func oscal2FindingDesc(tool, cwe, path string) string {
 	desc := "Detected by " + tool
