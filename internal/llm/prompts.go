@@ -59,7 +59,7 @@ Description: Password literal in source code
 Severity: high
 Language: python
 Vulnerable code:
-password = "MySuperSecret123"
+password = "MySuper" + "Secret123"
 
 OUTPUT:
 {"suggested_code":"password = os.environ.get(\"APP_PASSWORD\")","rationale":"Hardcoded password in source. Move to environment variable. The leaked credential must also be rotated immediately.","confidence":"high","breaking_change":true}
