@@ -167,3 +167,10 @@ phase4_3_pitch.tar.gz
 NOTES_FIX_*.md
 triggered_via
 internal/threatintel/conflicting_*/
+
+# Editor / script backup files
+*.bak
+*.bak.*
+*.orig
+*.swp
+*~
