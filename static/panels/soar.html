@@ -223,6 +223,147 @@ textarea.form-ctrl{font-family:var(--font-mono);font-size:10px;resize:vertical}
 </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════════
+     [Phase 2.1.D] SOAR v2 Engine — Approval Queue
+     Polls /api/v1/soar/approvals/pending every 5s.
+     POST /api/v1/soar/approvals/{id}/decide on Approve/Reject.
+     Self-contained — does not touch legacy SOAR v1 UI above.
+════════════════════════════════════════════════════════════════════ -->
+<div class="card" id="approvals-card" style="margin-top:16px">
+  <div class="card-head">
+    <div>
+      <div class="card-title">Approval queue</div>
+      <div class="card-sub" id="approvals-sub">—</div>
+    </div>
+    <button class="btn btn-sm" onclick="loadPendingApprovals()" title="Refresh">&#8635;</button>
+  </div>
+  <div class="card-body" id="approvals-body">
+    <div style="opacity:.6;font-size:13px">Loading pending approvals…</div>
+  </div>
+</div>
+
+<script>
+/* Phase 2.1.D — Approval Queue (SOAR v2 engine) */
+(function(){
+  if (window._soarApprovalsLoaded) return;
+  window._soarApprovalsLoaded = true;
+
+  var ENDPOINT_LIST   = '/api/v1/soar/approvals/pending';
+  var ENDPOINT_DECIDE = '/api/v1/soar/approvals/'; // + {id}/decide
+
+  function fmtTime(iso){
+    if (!iso) return '—';
+    try { var d = new Date(iso); return d.toLocaleString(); } catch(e){ return iso; }
+  }
+
+  function rowHTML(a){
+    var id = a.id || a.approval_id || '';
+    var runId = a.run_id || '';
+    var pbName = a.playbook_name || a.playbook || '(unknown playbook)';
+    var requestedBy = a.requested_by || a.triggered_by || '—';
+    var requestedAt = fmtTime(a.requested_at || a.created_at);
+    var prompt = a.prompt || a.message || '';
+    return ''
+      + '<div class="approval-row" data-id="'+id+'" style="border:1px solid var(--border,#2a3142);border-radius:6px;padding:12px;margin-bottom:10px;background:rgba(255,255,255,.02)">'
+      +   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px">'
+      +     '<div style="flex:1;min-width:0">'
+      +       '<div style="font-weight:600;font-size:13px;margin-bottom:2px">'+escapeHtml(pbName)+'</div>'
+      +       '<div style="font-size:11px;opacity:.7;font-family:var(--font-mono,monospace)">run='+escapeHtml(runId.slice(0,8))+'… · by '+escapeHtml(requestedBy)+' · '+escapeHtml(requestedAt)+'</div>'
+      +     '</div>'
+      +     '<span style="background:rgba(245,158,11,.10);color:var(--amber,#f59e0b);padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.5px">PENDING</span>'
+      +   '</div>'
+      +   (prompt ? '<div style="font-size:12px;opacity:.85;margin-bottom:10px;padding:8px;background:rgba(0,0,0,.15);border-radius:4px">'+escapeHtml(prompt)+'</div>' : '')
+      +   '<div style="margin-bottom:8px">'
+      +     '<label class="form-label" style="font-size:10px;opacity:.7;margin-bottom:4px;display:block">Comment (optional)</label>'
+      +     '<textarea class="form-ctrl approval-comment" rows="2" placeholder="Reason for decision…" style="font-size:12px"></textarea>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:8px;justify-content:flex-end">'
+      +     '<button class="btn btn-sm" onclick="decideApproval(\''+id+'\', \'reject\', this)" style="background:rgba(239,68,68,.10);color:#ef4444;border-color:rgba(239,68,68,.3)">Reject</button>'
+      +     '<button class="btn btn-sm btn-primary" onclick="decideApproval(\''+id+'\', \'approve\', this)">Approve</button>'
+      +   '</div>'
+      + '</div>';
+  }
+
+  function escapeHtml(s){
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+
+  function render(list){
+    var body = document.getElementById('approvals-body');
+    var sub  = document.getElementById('approvals-sub');
+    if (!body) return;
+    if (!list || !list.length){
+      body.innerHTML = '<div style="opacity:.5;font-size:13px;text-align:center;padding:20px">No pending approvals</div>';
+      if (sub) sub.textContent = '0 pending';
+      return;
+    }
+    body.innerHTML = list.map(rowHTML).join('');
+    if (sub) sub.textContent = list.length + ' pending';
+  }
+
+  window.loadPendingApprovals = function(){
+    var fetchFn = (window.vspAuthFetch || window.fetch);
+    fetchFn(ENDPOINT_LIST, {credentials:'same-origin'})
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(data){
+        var list = Array.isArray(data) ? data : (data.approvals || data.items || []);
+        render(list);
+      })
+      .catch(function(err){
+        var body = document.getElementById('approvals-body');
+        if (body) body.innerHTML = '<div style="color:var(--red,#ef4444);font-size:13px">Failed to load: '+escapeHtml(String(err))+'</div>';
+      });
+  };
+
+  window.decideApproval = function(approvalId, decision, btn){
+    var row = btn && btn.closest('.approval-row');
+    var commentEl = row && row.querySelector('.approval-comment');
+    var comment = commentEl ? commentEl.value.trim() : '';
+    if (decision === 'reject' && !comment){
+      if (typeof toast === 'function') toast('Please add a reason for rejection', 'error');
+      else alert('Please add a reason for rejection');
+      if (commentEl) commentEl.focus();
+      return;
+    }
+    var url = ENDPOINT_DECIDE + encodeURIComponent(approvalId) + '/decide';
+    var body = JSON.stringify({decision: decision, comment: comment});
+    if (row) row.style.opacity = '.5';
+    var fetchFn = (window.vspAuthFetch || window.fetch);
+    fetchFn(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: body
+    })
+      .then(function(r){ return r.ok ? r.json().catch(function(){return {};}) : Promise.reject(r.status); })
+      .then(function(){
+        if (typeof toast === 'function') toast('Approval '+(decision === 'approve' ? 'approved' : 'rejected'), 'success');
+        loadPendingApprovals();
+      })
+      .catch(function(err){
+        if (row) row.style.opacity = '1';
+        var msg = 'Decision failed: ' + err;
+        if (typeof toast === 'function') toast(msg, 'error');
+        else alert(msg);
+      });
+  };
+
+  // Initial load + polling every 5s
+  function startPolling(){
+    loadPendingApprovals();
+    setInterval(loadPendingApprovals, 5000);
+  }
+  if (document.readyState === 'complete' || document.readyState === 'interactive'){
+    setTimeout(startPolling, 500);
+  } else {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(startPolling, 500); });
+  }
+})();
+</script>
+
 <!-- Run detail modal -->
 <div class="modal-overlay" id="run-modal">
   <div class="modal">
