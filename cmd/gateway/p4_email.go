@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/smtp"
+	"strconv"
 	"os"
 	"strings"
 	"time"
@@ -30,7 +31,7 @@ type EmailRequest struct {
 
 var emailCfg = &EmailConfig{
 	SMTPHost:     getEnvStr("SMTP_HOST", "smtp.gmail.com"),
-	SMTPPort:     587,
+	SMTPPort:     getEnvIntOrDefault("SMTP_PORT", 587),
 	SMTPUser:     os.Getenv("SMTP_USER"),
 	SMTPPassword: os.Getenv("SMTP_PASSWORD"),
 	FromName:     "VSP Security Platform",
@@ -209,3 +210,12 @@ func init() {
 
 // Needed for bytes import
 var _ = bytes.NewReader
+
+func getEnvIntOrDefault(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}

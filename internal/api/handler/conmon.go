@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vsp/platform/internal/auth"
-	"github.com/vsp/platform/internal/conmon"
 	"context"
 	"fmt"
+	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/conmon"
 	"os"
 	"os/exec"
 	"time"

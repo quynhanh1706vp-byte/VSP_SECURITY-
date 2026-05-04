@@ -169,25 +169,77 @@ func handleAlertHistory(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(alerts)
 }
 
+// alertTestRequest — body for POST /api/p4/alerts/test
+type alertTestRequest struct {
+	Channel string `json:"channel"` // "email" | "slack" (default: slack)
+	To      string `json:"to"`      // email address (required if channel=email)
+	Subject string `json:"subject"` // optional override
+	Body    string `json:"body"`    // optional override
+}
+
 func handleAlertTest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Parse body (best-effort — empty body falls back to slack default)
+	var req alertTestRequest
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	if req.Channel == "" {
+		req.Channel = "slack"
+	}
+
+	title := req.Subject
+	if title == "" {
+		title = "VSP Alert System Test"
+	}
+	message := req.Body
+	if message == "" {
+		message = "This is a test alert from VSP P4 Compliance Platform. Alert system is operational."
+	}
+
 	alert := Alert{
 		ID:       fmt.Sprintf("ALT-TEST-%d", time.Now().Unix()),
 		Type:     "test",
-		Title:    "VSP Alert System Test",
-		Message:  "This is a test alert from VSP P4 Compliance Platform. Alert system is operational.",
+		Title:    title,
+		Message:  message,
 		Severity: "INFO",
 		SentAt:   time.Now(),
-		Channel:  "slack",
+		Channel:  req.Channel,
 	}
-	if alertConfig.SlackWebhook != "" {
-		err := sendSlackAlert(alertConfig.SlackWebhook, alert.Title, alert.Message, "#36a64f")
-		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, 500)
+
+	var sendErr error
+	switch req.Channel {
+	case "email":
+		if !emailCfg.Enabled {
+			http.Error(w, `{"error":"email not configured (set SMTP_USER + SMTP_PASSWORD)"}`, 503)
 			return
 		}
+		to := req.To
+		if to == "" {
+			to = alertConfig.EmailTo
+		}
+		if to == "" {
+			http.Error(w, `{"error":"missing recipient: provide \"to\" in body or configure alert email_to"}`, 400)
+			return
+		}
+		// Reuse existing sendSMTP — handles auth + TLS
+		sendErr = sendSMTP(to, alert.Title, alert.Message)
+	case "slack":
+		if alertConfig.SlackWebhook == "" {
+			http.Error(w, `{"error":"slack webhook not configured"}`, 503)
+			return
+		}
+		sendErr = sendSlackAlert(alertConfig.SlackWebhook, alert.Title, alert.Message, "#36a64f")
+	default:
+		http.Error(w, `{"error":"unsupported channel; use \"email\" or \"slack\""}`, 400)
+		return
 	}
+
+	if sendErr != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"send failed: %s"}`, sendErr.Error()), 500)
+		return
+	}
+
 	alertHistory = append([]Alert{alert}, alertHistory...)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "alert": alert})
 }
