@@ -174,3 +174,15 @@ internal/threatintel/conflicting_*/
 *.orig
 *.swp
 *~
+
+# Build artifacts
+cmd/gateway/gateway
+vsp-migrate
+vsp-scanner
+cover.out
+_codeql_detected_source_root
+
+# Large external/derived
+llama.cpp/
+.archive/
+reports/
