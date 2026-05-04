@@ -229,7 +229,6 @@ func (db *DB) BulkUpsertRemediations(ctx context.Context, items []Remediation) e
 	return tx.Commit(ctx)
 }
 
-
 // UpdateRemediationFields applies a partial update to a remediation row.
 // Only the keys present in `fields` are written to SQL — zero-value defaults
 // for omitted keys do NOT clobber existing data. Used by PATCH endpoints
@@ -288,4 +287,80 @@ func (db *DB) UpdateRemediationFields(ctx context.Context, findingID, tenantID s
 		return nil, fmt.Errorf("partial update remediation: %w", err)
 	}
 	return &out, nil
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Phase 1 — History audit + KPIs (added 2026-05-04)
+// ════════════════════════════════════════════════════════════════════
+
+// RemediationHistoryEntry — audit row
+type RemediationHistoryEntry struct {
+	ID        int64     `json:"id"`
+	RemID     string    `json:"rem_id"`
+	Actor     string    `json:"actor"`
+	Action    string    `json:"action"`
+	FromValue string    `json:"from"`
+	ToValue   string    `json:"to"`
+	Note      string    `json:"note"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// WriteRemediationHistory — insert audit row.
+// remID phải là remediations.id (UUID), không phải finding_id.
+func (db *DB) WriteRemediationHistory(ctx context.Context, remID, actor, action, fromV, toV, note string) error {
+	if remID == "" {
+		return fmt.Errorf("rem_id required")
+	}
+	if len(actor) > 200 {
+		actor = actor[:200]
+	}
+	if len(note) > 5000 {
+		note = note[:5000]
+	}
+	_, err := db.pool.Exec(ctx, `
+		INSERT INTO remediation_history(rem_id, actor, action, from_value, to_value, note)
+		VALUES ($1,$2,$3,$4,$5,$6)
+	`, remID, actor, action, fromV, toV, note)
+	return err
+}
+
+// ListRemediationHistory — return audit rows for a remediation, newest first.
+func (db *DB) ListRemediationHistory(ctx context.Context, remID string, limit int) ([]RemediationHistoryEntry, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 200
+	}
+	rows, err := db.pool.Query(ctx, `
+		SELECT id, rem_id, actor, action, from_value, to_value, note, created_at
+		FROM remediation_history
+		WHERE rem_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`, remID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []RemediationHistoryEntry{}
+	for rows.Next() {
+		var e RemediationHistoryEntry
+		if err := rows.Scan(&e.ID, &e.RemID, &e.Actor, &e.Action,
+			&e.FromValue, &e.ToValue, &e.Note, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// CountOverdueRemediations — items có sla_due quá hạn và còn open/in_progress.
+func (db *DB) CountOverdueRemediations(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM remediations
+		WHERE tenant_id = $1
+		  AND status IN ('open','in_progress')
+		  AND sla_due IS NOT NULL AND sla_due < NOW()
+	`, tenantID).Scan(&n)
+	return n, err
 }
