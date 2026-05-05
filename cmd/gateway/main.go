@@ -592,8 +592,25 @@ func main() {
 	})
 
 	r.Get("/vsp_pro_100.js", func(w http.ResponseWriter, r *http.Request) {
-	r.Get("/vsp_pro_cwpp_realapi.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/vsp_pro_100.js")
+	})
+	r.Get("/vsp_pro_cwpp_realapi.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_pro_cwpp_realapi.js")
+	})
+	r.Get("/vsp_pro_supplychain_realapi.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_pro_supplychain_realapi.js")
+	})
+	r.Get("/vsp_sw_inventory_panel.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_sw_inventory_panel.js")
+	})
+	r.Get("/vsp_scheduler_panel.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_scheduler_panel.js")
+	})
+	r.Get("/vsp_email_panel.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_email_panel.js")
+	})
+	r.Get("/vsp_dast_panel.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_dast_panel.js")
 	})
 
 	// Serve JS assets from ./static/js/ (dom-safe.js, vsp_iframe_bootstrap.js, etc.)
