@@ -364,6 +364,296 @@ textarea.form-ctrl{font-family:var(--font-mono);font-size:10px;resize:vertical}
 })();
 </script>
 
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Phase 2.1.D — Secrets Vault Manager
+     Append AFTER the approval queue </script> tag, BEFORE "Run detail modal"
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- Secrets Vault card -->
+<div class="card" style="margin-top:16px">
+  <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div class="card-title">Secrets vault</div>
+      <div class="card-sub" id="secrets-sub">—</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm btn-primary" onclick="openNewSecretModal()" title="Add secret">+ New</button>
+      <button class="btn btn-sm" onclick="loadSecrets()" title="Refresh">&#8635;</button>
+    </div>
+  </div>
+  <div class="card-body" id="secrets-body">
+    <div style="opacity:.6;font-size:13px">Loading secrets…</div>
+  </div>
+</div>
+
+<!-- New secret modal -->
+<div class="modal-overlay" id="secret-new-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
+  <div class="modal" style="background:var(--bg-elev,#1a1f2e);border:1px solid var(--border,#2a3142);border-radius:8px;padding:0;max-width:520px;width:92%;box-shadow:0 12px 40px rgba(0,0,0,.6)">
+    <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border,#2a3142)">
+      <div style="font-weight:600;font-size:14px">Add secret</div>
+      <button class="btn btn-sm" onclick="closeSecretModal()" title="Close" style="background:transparent;border:none">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:18px">
+      <div style="margin-bottom:14px">
+        <label class="form-label" style="font-size:11px;opacity:.7;margin-bottom:4px;display:block">Name <span style="color:var(--red,#ef4444)">*</span></label>
+        <input id="secret-name" class="form-ctrl" type="text" placeholder="SLACK_SOC_WEBHOOK" maxlength="64" autocomplete="off"
+          style="font-family:var(--font-mono,monospace);font-size:13px">
+        <div style="font-size:10px;opacity:.5;margin-top:3px">1–64 chars · letters, digits, <code>_</code>, <code>-</code></div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="form-label" style="font-size:11px;opacity:.7;margin-bottom:4px;display:block">Value <span style="color:var(--red,#ef4444)">*</span></label>
+        <div style="position:relative">
+          <textarea id="secret-value" class="form-ctrl" rows="3" placeholder="https://hooks.slack.com/services/T0/B0/xxx" autocomplete="off"
+            style="font-family:var(--font-mono,monospace);font-size:12px;-webkit-text-security:disc;text-security:disc"></textarea>
+          <button type="button" id="secret-toggle-vis" onclick="toggleSecretVisibility()" title="Show/hide"
+            style="position:absolute;top:6px;right:6px;background:rgba(255,255,255,.06);border:none;color:var(--t2,#9ca3af);cursor:pointer;padding:3px 8px;border-radius:4px;font-size:11px">show</button>
+        </div>
+        <div style="font-size:10px;opacity:.5;margin-top:3px">Encrypted at rest with AES-GCM · master key from VSP_REPO_KEY env</div>
+      </div>
+      <div style="margin-bottom:6px">
+        <label class="form-label" style="font-size:11px;opacity:.7;margin-bottom:4px;display:block">Description</label>
+        <input id="secret-desc" class="form-ctrl" type="text" placeholder="Slack webhook for #soc-alerts" maxlength="200">
+      </div>
+    </div>
+    <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--border,#2a3142)">
+      <button class="btn btn-sm" onclick="closeSecretModal()">Cancel</button>
+      <button class="btn btn-sm btn-primary" id="secret-save-btn" onclick="saveSecret()">Save secret</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div class="modal-overlay" id="secret-del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
+  <div class="modal" style="background:var(--bg-elev,#1a1f2e);border:1px solid var(--border,#2a3142);border-radius:8px;padding:0;max-width:460px;width:92%;box-shadow:0 12px 40px rgba(0,0,0,.6)">
+    <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border,#2a3142)">
+      <div style="font-weight:600;font-size:14px;color:var(--red,#ef4444)">Delete secret</div>
+      <button class="btn btn-sm" onclick="closeSecretDeleteModal()" style="background:transparent;border:none">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:18px">
+      <div style="font-size:13px;margin-bottom:10px">Delete secret <code id="secret-del-name" style="color:var(--cyan,#06b6d4)">—</code>?</div>
+      <div style="font-size:11px;opacity:.7;background:rgba(245,158,11,.10);border-left:3px solid var(--amber,#f59e0b);padding:8px 10px;border-radius:4px">
+        ⚠ This action is audited. Any playbook referencing <code>${this.secret}</code> will fail until the secret is recreated or removed.
+      </div>
+    </div>
+    <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--border,#2a3142)">
+      <button class="btn btn-sm" onclick="closeSecretDeleteModal()">Cancel</button>
+      <button class="btn btn-sm" id="secret-confirm-del-btn" onclick="confirmDeleteSecret()"
+        style="background:rgba(239,68,68,.15);color:#ef4444;border-color:rgba(239,68,68,.4)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Phase 2.1.D — Secrets Vault Manager (SOAR v2 engine) */
+(function(){
+  if (window._soarSecretsLoaded) return;
+  window._soarSecretsLoaded = true;
+
+  var ENDPOINT_LIST   = '/api/v1/soar/secrets';
+  var ENDPOINT_CREATE = '/api/v1/soar/secrets';
+  var ENDPOINT_DELETE = '/api/v1/soar/secrets/'; // + {name}
+
+  var NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+  var pendingDeleteName = null;
+
+  function escapeHtml(s){
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+
+  function fmtTime(iso){
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString(); } catch(e){ return iso; }
+  }
+  function fmtRel(iso){
+    if (!iso) return 'never';
+    try {
+      var diff = Date.now() - new Date(iso).getTime();
+      if (diff < 60e3)         return 'just now';
+      if (diff < 3600e3)       return Math.floor(diff/60e3) + 'm ago';
+      if (diff < 86400e3)      return Math.floor(diff/3600e3) + 'h ago';
+      if (diff < 30*86400e3)   return Math.floor(diff/86400e3) + 'd ago';
+      return new Date(iso).toLocaleDateString();
+    } catch(e){ return iso; }
+  }
+
+  function rowHTML(s){
+    var name      = s.name || '';
+    var desc      = s.description || '';
+    var createdBy = s.created_by || '—';
+    var createdAt = fmtTime(s.created_at);
+    var lastUsed  = fmtRel(s.last_used_at);
+    var useCount  = s.use_count || 0;
+    return ''
+      + '<tr style="border-bottom:1px solid var(--border,#2a3142)">'
+      +   '<td style="padding:8px 6px;font-family:var(--font-mono,monospace);font-size:12px;color:var(--cyan,#06b6d4)">'+escapeHtml(name)+'</td>'
+      +   '<td style="padding:8px 6px;font-size:12px;opacity:.85;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(desc)+'">'+escapeHtml(desc || '—')+'</td>'
+      +   '<td style="padding:8px 6px;font-size:11px;opacity:.7" title="'+escapeHtml(createdAt)+'">'+escapeHtml(createdBy)+'</td>'
+      +   '<td style="padding:8px 6px;font-size:11px;opacity:.7;text-align:right">'+useCount+'×</td>'
+      +   '<td style="padding:8px 6px;font-size:11px;opacity:.7">'+escapeHtml(lastUsed)+'</td>'
+      +   '<td style="padding:8px 6px;text-align:right">'
+      +     '<button class="btn btn-sm" onclick="openSecretDelete(\''+escapeHtml(name).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')" '
+      +       'style="background:rgba(239,68,68,.10);color:#ef4444;border-color:rgba(239,68,68,.3);font-size:10px;padding:3px 8px">Delete</button>'
+      +   '</td>'
+      + '</tr>';
+  }
+
+  function render(list){
+    var body = document.getElementById('secrets-body');
+    var sub  = document.getElementById('secrets-sub');
+    if (!body) return;
+    if (!list || !list.length){
+      body.innerHTML = ''
+        + '<div style="opacity:.5;font-size:13px;text-align:center;padding:24px">'
+        +   'No secrets yet — click <strong>+ New</strong> to add one'
+        + '</div>';
+      if (sub) sub.textContent = '0 secrets';
+      return;
+    }
+    body.innerHTML = ''
+      + '<table style="width:100%;border-collapse:collapse">'
+      +   '<thead>'
+      +     '<tr style="border-bottom:1px solid var(--border,#2a3142);text-align:left">'
+      +       '<th style="padding:6px;font-size:10px;font-weight:600;letter-spacing:.5px;opacity:.6;text-transform:uppercase">Name</th>'
+      +       '<th style="padding:6px;font-size:10px;font-weight:600;letter-spacing:.5px;opacity:.6;text-transform:uppercase">Description</th>'
+      +       '<th style="padding:6px;font-size:10px;font-weight:600;letter-spacing:.5px;opacity:.6;text-transform:uppercase">Created by</th>'
+      +       '<th style="padding:6px;font-size:10px;font-weight:600;letter-spacing:.5px;opacity:.6;text-transform:uppercase;text-align:right">Uses</th>'
+      +       '<th style="padding:6px;font-size:10px;font-weight:600;letter-spacing:.5px;opacity:.6;text-transform:uppercase">Last used</th>'
+      +       '<th style="padding:6px"></th>'
+      +     '</tr>'
+      +   '</thead>'
+      +   '<tbody>' + list.map(rowHTML).join('') + '</tbody>'
+      + '</table>';
+    if (sub) sub.textContent = list.length + ' secret' + (list.length === 1 ? '' : 's');
+  }
+
+  function fetchFn(url, opts){
+    return (window.vspAuthFetch || window.fetch)(url, opts || {credentials:'same-origin'});
+  }
+
+  window.loadSecrets = function(){
+    fetchFn(ENDPOINT_LIST)
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(data){
+        var list = Array.isArray(data) ? data : (data.secrets || data.items || []);
+        render(list);
+      })
+      .catch(function(err){
+        var body = document.getElementById('secrets-body');
+        if (body) body.innerHTML = '<div style="color:var(--red,#ef4444);font-size:13px">Failed to load: '+escapeHtml(String(err))+'</div>';
+      });
+  };
+
+  window.openNewSecretModal = function(){
+    document.getElementById('secret-name').value  = '';
+    document.getElementById('secret-value').value = '';
+    document.getElementById('secret-desc').value  = '';
+    var v = document.getElementById('secret-value');
+    v.style.webkitTextSecurity = 'disc'; v.style.textSecurity = 'disc';
+    document.getElementById('secret-toggle-vis').textContent = 'show';
+    document.getElementById('secret-new-modal').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('secret-name').focus(); }, 50);
+  };
+  window.closeSecretModal = function(){
+    document.getElementById('secret-new-modal').style.display = 'none';
+  };
+
+  window.toggleSecretVisibility = function(){
+    var v = document.getElementById('secret-value');
+    var btn = document.getElementById('secret-toggle-vis');
+    var hidden = (v.style.webkitTextSecurity === 'disc' || v.style.textSecurity === 'disc');
+    if (hidden){
+      v.style.webkitTextSecurity = 'none'; v.style.textSecurity = 'none';
+      btn.textContent = 'hide';
+    } else {
+      v.style.webkitTextSecurity = 'disc'; v.style.textSecurity = 'disc';
+      btn.textContent = 'show';
+    }
+  };
+
+  window.saveSecret = function(){
+    var name  = document.getElementById('secret-name').value.trim();
+    var value = document.getElementById('secret-value').value;
+    var desc  = document.getElementById('secret-desc').value.trim();
+    if (!name || !value){
+      var msg = 'Name and value are required';
+      if (typeof toast === 'function') toast(msg, 'error'); else alert(msg);
+      return;
+    }
+    if (!NAME_RE.test(name)){
+      var msg2 = 'Name must be 1-64 chars [a-zA-Z0-9_-]';
+      if (typeof toast === 'function') toast(msg2, 'error'); else alert(msg2);
+      return;
+    }
+    var btn = document.getElementById('secret-save-btn');
+    if (btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+    fetchFn(ENDPOINT_CREATE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name, value: value, description: desc})
+    })
+      .then(function(r){
+        if (!r.ok) return r.text().then(function(t){ return Promise.reject(t || r.status); });
+        return r.json().catch(function(){ return {}; });
+      })
+      .then(function(){
+        if (typeof toast === 'function') toast('Secret "'+name+'" saved', 'success');
+        closeSecretModal();
+        loadSecrets();
+      })
+      .catch(function(err){
+        var msg3 = 'Save failed: ' + (typeof err === 'string' ? err : err);
+        if (typeof toast === 'function') toast(msg3, 'error'); else alert(msg3);
+      })
+      .then(function(){
+        if (btn){ btn.disabled = false; btn.textContent = 'Save secret'; }
+      });
+  };
+
+  window.openSecretDelete = function(name){
+    pendingDeleteName = name;
+    document.getElementById('secret-del-name').textContent = name;
+    document.getElementById('secret-del-modal').style.display = 'flex';
+  };
+  window.closeSecretDeleteModal = function(){
+    pendingDeleteName = null;
+    document.getElementById('secret-del-modal').style.display = 'none';
+  };
+
+  window.confirmDeleteSecret = function(){
+    var name = pendingDeleteName;
+    if (!name) return;
+    var btn = document.getElementById('secret-confirm-del-btn');
+    if (btn){ btn.disabled = true; btn.textContent = 'Deleting…'; }
+    fetchFn(ENDPOINT_DELETE + encodeURIComponent(name), {
+      method: 'DELETE',
+      credentials: 'same-origin'
+    })
+      .then(function(r){ return r.ok ? r.json().catch(function(){return {};}) : Promise.reject(r.status); })
+      .then(function(){
+        if (typeof toast === 'function') toast('Secret "'+name+'" deleted', 'success');
+        closeSecretDeleteModal();
+        loadSecrets();
+      })
+      .catch(function(err){
+        var msg = 'Delete failed: ' + err;
+        if (typeof toast === 'function') toast(msg, 'error'); else alert(msg);
+        if (btn){ btn.disabled = false; btn.textContent = 'Delete'; }
+      });
+  };
+
+  // Initial load
+  if (document.readyState === 'complete' || document.readyState === 'interactive'){
+    setTimeout(loadSecrets, 600);
+  } else {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(loadSecrets, 600); });
+  }
+})();
+</script>
+
 <!-- Run detail modal -->
 <div class="modal-overlay" id="run-modal">
   <div class="modal">
