@@ -19,16 +19,25 @@ import json
 import re
 import sys
 
-MARKER = "/* fixed-cond */"
+MARKER = "/* fixed-cond-v2 */"
+MARKER_V1 = "/* fixed-cond */"  # legacy from first migration
+
 
 def fix_expr(raw: str) -> str:
     """Convert config_raw of a condition step to a Goja-evaluable JS expr."""
     s = (raw or "").strip()
     if not s:
         return f"true {MARKER}"
-    # Idempotency
+    # Idempotency — already fixed with v2
     if MARKER in s:
         return s
+    # If v1 marker present, this row was rewritten by the previous version
+    # without IIFE wrap. Strip v1 marker and any v1 wrapping artifacts before
+    # re-translating. v1 output was: "<translated-expr> /* fixed-cond */"
+    if MARKER_V1 in s:
+        s = s.replace(MARKER_V1, "").strip()
+        # v1 had no IIFE — single line is the translated expr; wrap it
+        return f'(function(){{try{{return ({s});}}catch(_e){{return false;}}}})() {MARKER}'
 
     # Pattern A/B/C — single-line "expr: <stuff>"
     m = re.match(r"^expr\s*[:=]\s*(.+?)\s*$", s, re.MULTILINE)
@@ -78,7 +87,10 @@ def _translate_expr(expr: str) -> str:
     # =  →  ==   (skip ==, !=, <=, >=)
     expr = re.sub(r'(?<![!<>=])=(?!=)', "==", expr)
 
-    return expr
+    # Defensive wrap: catch ReferenceError on undefined vars → false.
+    # IIFE+try/catch lets engine record step.done with truthy=false instead
+    # of failing the entire run when ec.Vars don't bind a referenced var.
+    return f'(function(){{try{{return ({expr});}}catch(_e){{return false;}}}})()'
 
 
 def main():
