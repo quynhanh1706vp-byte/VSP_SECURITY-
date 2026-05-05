@@ -104,13 +104,11 @@ func runRemediationCycle(ctx context.Context, db *sql.DB) (inserted, resolved, e
 
 func insertNewItems(ctx context.Context, db *sql.DB) (int, error) {
 	res, err := db.ExecContext(ctx, `
-		INSERT INTO remediations
-			(finding_id, run_id, title, severity, status, priority, created_at, updated_at)
+		INSERT INTO remediations  /* H3U-fixed */
+			(finding_id, run_id, status, priority, created_at, updated_at)
 		SELECT
 			f.id,
 			f.run_id,
-			COALESCE(NULLIF(f.message, ''), f.rule_id, 'Untitled finding') AS title,
-			f.severity,
 			'open' AS status,
 			LOWER(f.severity) AS priority,
 			NOW(), NOW()
@@ -145,8 +143,8 @@ func markResolvedItems(ctx context.Context, db *sql.DB) (int, error) {
 		    resolved_at = NOW(),
 		    resolved_by = 'auto-h3u-worker',
 		    updated_at = NOW(),
-		    comment = COALESCE(comment, '') ||
-		              CASE WHEN comment IS NOT NULL AND comment != ''
+		    notes = COALESCE(notes, '') ||
+		              CASE WHEN notes IS NOT NULL AND notes != ''
 		                   THEN E'\n[H3.U] auto-resolved: finding no longer in latest scan'
 		                   ELSE '[H3.U] auto-resolved: finding no longer in latest scan'
 		              END
