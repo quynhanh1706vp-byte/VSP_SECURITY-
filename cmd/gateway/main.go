@@ -38,6 +38,8 @@ import (
 	"github.com/vsp/platform/internal/cache"
 	"github.com/vsp/platform/internal/conmon"
 	"github.com/vsp/platform/internal/handlers"
+	"github.com/vsp/platform/internal/notify"
+	"github.com/vsp/platform/internal/ticket"
 	"github.com/vsp/platform/internal/llm"
 	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/netcap"
@@ -344,7 +346,21 @@ func main() {
 	soarSandbox := soar.NewSandbox()
 	soarDispatcher := soar.NewDispatcher()
 	soarDispatcher.RegisterDefault()
-	soar.RegisterIOExecutors(soarDispatcher, soar.NewSafeHTTPClient(), nil, nil)
+	soarNotifier := notify.New(notify.Config{
+		SlackDefaultWebhook:   viper.GetString("integrations.slack_webhook"),
+		DiscordDefaultWebhook: viper.GetString("integrations.discord_webhook"),
+		TeamsDefaultWebhook:   viper.GetString("integrations.teams_webhook"),
+	})
+	soarTicketer := ticket.New(ticket.Config{
+		JiraBaseURL:         viper.GetString("integrations.jira_url"),
+		JiraEmail:           viper.GetString("integrations.jira_email"),
+		JiraAPIToken:        viper.GetString("integrations.jira_token"),
+		PagerDutyRoutingKey: viper.GetString("integrations.pagerduty_key"),
+		GitHubBaseURL:       viper.GetString("integrations.github_base_url"),
+		GitHubToken:         viper.GetString("integrations.github_token"),
+		GitHubRepo:          viper.GetString("integrations.github_repo"),
+	})
+	soar.RegisterIOExecutors(soarDispatcher, soar.NewSafeHTTPClient(), soarNotifier, soarTicketer)
 	soar.RegisterFlowExecutors(soarDispatcher, soarSandbox, nil, nil)
 
 	// Register 7 SOAR metrics
