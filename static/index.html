@@ -2,6 +2,14 @@
 <html lang="en" data-theme="dark">
 <head>
 <script>
+  // VSP microservice routing — proxy qua nginx (same-origin, không mixed content)
+  window.VSP_COSIGN_API       = '/api/sc';
+  window.VSP_SCHEDULER_API    = '/api/sched';
+  window.VSP_DAST_API         = '/api/dast';
+  window.VSP_SW_INVENTORY_API = '/api/swinv';
+  window.VSP_EMAIL_API        = '/api/email';
+</script>
+<script>
 
 // SEC-R2: XSS helpers — escape HTML for text and attribute contexts
 function __esc(s){
@@ -8809,5 +8817,13 @@ function startMFATimer() {
   }
 })();
 </script>
+
+<script src="/vsp_pro_100.js"></script>
+<script src="/vsp_pro_cwpp_realapi.js"></script>
+    <script src="/vsp_pro_supplychain_realapi.js"></script>
+    <script src="/vsp_sw_inventory_panel.js"></script>
+    <script src="/vsp_scheduler_panel.js"></script>
+    <script src="/vsp_email_panel.js"></script>
+    <script src="/vsp_dast_panel.js"></script>
 </body>
 </html>

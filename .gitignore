@@ -192,3 +192,34 @@ reports/
 *.broken*
 *.before_*
 *.working_*
+
+# === Build artifacts (added 2026-05-05) ===
+/vsp-gateway
+/vsp-scanner
+/vsp-cosign-api
+/vsp-dast-api
+/vsp-email-api
+/vsp-scheduler
+/vsp-sw-agent
+/vsp-sw-inventory
+/vsp-trivy-api
+/vsp-gateway-debug
+
+# === Secrets (NEVER commit) ===
+/cosign.key
+/cosign.pass
+*.pem
+*.p12
+
+# === Build dirs ===
+/bin/
+
+# === Test/temp HTML ===
+/static/panels_test.html
+/static/index.html.bak*
+/static/index.html.before_*
+
+# === Standalone/dev artifacts ===
+/standalone_main.go
+/api.go
+/scanner.go
