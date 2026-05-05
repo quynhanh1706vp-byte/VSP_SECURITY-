@@ -1744,3 +1744,311 @@ loadRunHistory();
 <!-- VSP-UNI-POLISH-END -->
 </body>
 </html>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     Phase 2.1.D — Run Detail live fetch (engine v2)
+
+     Augments the existing #hist-modal (already in soar.html) with:
+       - Real fetch from /api/v1/soar/runs/{full_uuid}
+       - Live polling at 2s interval while status=running
+       - Step results from engine v2 (name/type/status/output/duration_ms/error)
+       - Re-run via /api/v1/soar/playbooks/{pb_id}/run with proper context
+       - KPIs: status pill, step count, total duration, error preview
+
+     APPEND this block at the end of static/panels/soar.html, just before
+     the closing </body> tag (or before any final <script src=...> tags).
+     ════════════════════════════════════════════════════════════════════ -->
+
+<script>
+/* Phase 2.1.D — Run Detail (SOAR v2 engine, live API fetch) */
+(function(){
+  if (window._soarRunDetailLoaded) return;
+  window._soarRunDetailLoaded = true;
+
+  // Map of shortened-ID → full-UUID (built when loadRunHistory fetches API).
+  // The legacy openRunDetail() used 8-char uppercase IDs from RUN_HISTORY;
+  // we hook into RUN_HISTORY.push to capture full UUIDs alongside.
+  var RUN_ID_MAP = {};            // {short_id: full_uuid}
+  var RUN_PB_MAP = {};            // {short_id: playbook_uuid}
+  var pollTimer = null;
+  var currentRunId = null;        // full UUID being viewed
+
+  function escapeHtml(s){
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+  function fmtDuration(ms){
+    if (!ms || ms < 0) return '—';
+    if (ms < 1000)   return ms + 'ms';
+    if (ms < 60000)  return (ms/1000).toFixed(1) + 's';
+    var s = Math.floor(ms/1000);
+    return Math.floor(s/60) + 'm ' + (s%60) + 's';
+  }
+  function fmtTime(iso){
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleTimeString(); } catch(e){ return iso; }
+  }
+  function statusColor(st){
+    return ({success:'var(--green,#10b981)', failed:'var(--red,#ef4444)',
+             running:'var(--cyan,#06b6d4)', waiting_approval:'var(--amber,#f59e0b)',
+             timeout:'var(--red,#ef4444)', cancelled:'var(--t3,#9ca3af)'})[st] || 'var(--t3,#9ca3af)';
+  }
+  function statusPillClass(st){
+    return ({success:'pill-green', failed:'pill-red',
+             running:'pill-cyan', waiting_approval:'pill-amber',
+             timeout:'pill-red',  cancelled:'pill-gray'})[st] || 'pill-gray';
+  }
+
+  function fetchFn(url, opts){
+    return (window.vspAuthFetch || window.fetch)(url, opts || {credentials:'same-origin'});
+  }
+
+  // Hook: monkey-patch RUN_HISTORY.push to capture full ID mapping when
+  // loadRunHistory pushes new rows from the API. The push call site is at
+  // line 1083 with .slice(0,8).toUpperCase(); we intercept by also reading
+  // the original API response separately.
+  // Cleaner approach: provide a parallel fetch + index by short ID.
+  function syncIdMap(){
+    fetchFn('/api/v1/soar/runs?limit=50')
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(d){
+        var rows = d.runs || d.items || (Array.isArray(d) ? d : []);
+        rows.forEach(function(r){
+          var full = r.id || r.ID || '';
+          if (full && full.length >= 8){
+            var short = full.slice(0,8).toUpperCase();
+            RUN_ID_MAP[short] = full;
+            RUN_PB_MAP[short] = r.playbook_id || r.PlaybookID || r.pb_id || '';
+          }
+        });
+      })
+      .catch(function(){ /* silent */ });
+  }
+
+  // Render KPIs row
+  function renderKpis(run){
+    var kpis = [
+      {lbl:'Status',     val:run.status,                    color:statusColor(run.status)},
+      {lbl:'Step count', val:(run.step_results||[]).length, color:'var(--t1,#e5e7eb)'},
+      {lbl:'Duration',   val:fmtDuration(run.duration_ms),  color:'var(--amber,#f59e0b)'},
+    ];
+    if (run.error){
+      kpis.push({lbl:'Error', val:'⚠ See below', color:'var(--red,#ef4444)'});
+    }
+    return kpis.map(function(k){
+      return '<div style="background:rgba(255,255,255,.03);border:1px solid var(--border,#2a3142);border-radius:7px;padding:9px 11px">'
+        + '<div style="font-size:10px;color:var(--t3,#9ca3af);margin-bottom:3px;letter-spacing:.5px;text-transform:uppercase">'+escapeHtml(k.lbl)+'</div>'
+        + '<div style="font-size:14px;font-weight:700;color:'+k.color+';font-family:var(--font-mono,monospace)">'+escapeHtml(String(k.val))+'</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // Render single step row
+  function renderStep(s, i){
+    var typeMap = (window.STEP_TYPES || {});
+    var st = typeMap[s.type] || {label:s.type, color:'var(--t2,#9ca3af)', bg:'rgba(255,255,255,.05)'};
+    var statusKey = s.status || 'pending';
+    var pillCls = ({done:'pill-green', failed:'pill-red',
+                    skip:'pill-gray',  skipped:'pill-gray',
+                    running:'pill-cyan', pending:'pill-gray'})[statusKey] || 'pill-gray';
+    var outRaw = s.output;
+    if (outRaw && typeof outRaw === 'object'){
+      try { outRaw = JSON.stringify(outRaw); } catch(e){ outRaw = String(outRaw); }
+    }
+    outRaw = String(outRaw == null ? '' : outRaw);
+    var preview = outRaw.length > 200 ? outRaw.slice(0,200) + '…' : outRaw;
+    var stepId = 'rdstep-' + i;
+
+    var errBlock = '';
+    if (s.error){
+      errBlock = '<div style="margin-top:6px;padding:6px 8px;background:rgba(239,68,68,.10);border-left:2px solid var(--red,#ef4444);border-radius:3px;font-size:11px;color:var(--red,#ef4444);font-family:var(--font-mono,monospace)">'
+        + escapeHtml(s.error) + '</div>';
+    }
+
+    var meta = [];
+    if (s.duration_ms != null) meta.push(fmtDuration(s.duration_ms));
+    if (s.attempts && s.attempts > 1) meta.push(s.attempts + ' attempts');
+    if (s.node_id) meta.push('node ' + s.node_id);
+    var metaStr = meta.length ? meta.join(' · ') : '';
+
+    return ''
+      + '<div style="display:flex;gap:10px;padding:10px;border:1px solid var(--border,#2a3142);border-radius:6px;margin-bottom:8px;background:rgba(255,255,255,.02);align-items:flex-start">'
+      +   '<div style="background:'+st.bg+';color:'+st.color+';width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">'+(i+1)+'</div>'
+      +   '<div style="flex:1;min-width:0">'
+      +     '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">'
+      +       '<div style="font-weight:600;font-size:12px">'+escapeHtml(s.name || '(unnamed)')+'</div>'
+      +       '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
+      +         '<span style="font-size:9px;color:'+st.color+';background:'+st.bg+';padding:1px 6px;border-radius:3px;letter-spacing:.5px;text-transform:uppercase">'+escapeHtml(s.type || '?')+'</span>'
+      +         '<span class="pill '+pillCls+'" style="font-size:9px">'+escapeHtml(statusKey)+'</span>'
+      +       '</div>'
+      +     '</div>'
+      +     (metaStr ? '<div style="font-size:10px;color:var(--t3,#9ca3af);margin-bottom:4px;font-family:var(--font-mono,monospace)">'+escapeHtml(metaStr)+'</div>' : '')
+      +     (preview ? '<div onclick="window._soarToggleStepOutput(\''+stepId+'\')" style="cursor:pointer;font-size:11px;color:var(--t2,#9ca3af);font-family:var(--font-mono,monospace);background:rgba(0,0,0,.2);padding:6px 8px;border-radius:3px;word-break:break-all" id="'+stepId+'" data-full="'+escapeHtml(outRaw)+'" data-expanded="0">'+escapeHtml(preview)+(outRaw.length > 200 ? ' <span style="color:var(--cyan,#06b6d4)">[click to expand]</span>' : '')+'</div>' : '')
+      +     errBlock
+      +   '</div>'
+      + '</div>';
+  }
+
+  window._soarToggleStepOutput = function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    var expanded = el.getAttribute('data-expanded') === '1';
+    var full = el.getAttribute('data-full') || '';
+    if (expanded){
+      var preview = full.length > 200 ? full.slice(0,200) + '…' : full;
+      el.textContent = preview;
+      if (full.length > 200) el.innerHTML += ' <span style="color:var(--cyan,#06b6d4)">[click to expand]</span>';
+      el.setAttribute('data-expanded', '0');
+    } else {
+      el.textContent = full;
+      el.innerHTML += ' <span style="color:var(--cyan,#06b6d4)">[click to collapse]</span>';
+      el.setAttribute('data-expanded', '1');
+    }
+  };
+
+  // Render full run detail into the existing #hist-modal
+  function renderRun(run){
+    if (!run) return;
+    var titleEl  = document.getElementById('hmod-title');
+    var subEl    = document.getElementById('hmod-sub');
+    var statusEl = document.getElementById('hmod-status');
+    var kpisEl   = document.getElementById('hmod-kpis');
+    var stepsEl  = document.getElementById('hmod-steps');
+    var logEl    = document.getElementById('hmod-log');
+
+    if (titleEl)  titleEl.textContent  = (run.id || '').slice(0,8).toUpperCase() + ' — engine v2';
+    if (subEl)    subEl.textContent    = 'Trigger: ' + (run.trigger_event || run.trigger || '—') + ' · started ' + fmtTime(run.started_at);
+    if (statusEl) statusEl.innerHTML   = '<span class="pill '+statusPillClass(run.status)+'">'+escapeHtml(run.status || '—')+'</span>';
+    if (kpisEl)   kpisEl.innerHTML     = renderKpis(run);
+
+    if (stepsEl){
+      var steps = run.step_results || [];
+      if (!steps.length){
+        stepsEl.innerHTML = '<div style="opacity:.5;font-size:12px;text-align:center;padding:18px">No step results yet'+(run.status === 'running' ? ' — polling…' : '')+'</div>';
+      } else {
+        stepsEl.innerHTML = steps.map(renderStep).join('');
+      }
+    }
+
+    if (logEl){
+      if (run.error){
+        logEl.innerHTML = '<div style="color:var(--red,#ef4444);font-family:var(--font-mono,monospace);font-size:11px;white-space:pre-wrap">'+escapeHtml(run.error)+'</div>';
+      } else {
+        var ctx = run.context;
+        try { if (ctx && typeof ctx === 'object') ctx = JSON.stringify(ctx, null, 2); } catch(e){}
+        logEl.innerHTML = '<div style="font-family:var(--font-mono,monospace);font-size:10px;color:var(--t3,#9ca3af);white-space:pre-wrap">context = '+escapeHtml(String(ctx || '{}'))+'</div>';
+      }
+    }
+
+    // Wire re-run button
+    var rerunBtn = document.getElementById('hmod-rerun-btn');
+    if (rerunBtn){
+      rerunBtn.onclick = function(){
+        var pbId = run.playbook_id || run.PlaybookID;
+        if (!pbId){
+          if (typeof toast === 'function') toast('Cannot re-run: playbook_id missing', 'error');
+          return;
+        }
+        if (typeof closeModal === 'function') closeModal('hist-modal');
+        fetchFn('/api/v1/soar/playbooks/' + encodeURIComponent(pbId) + '/run', {
+          method:'POST',
+          credentials:'same-origin',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({trigger:'manual', context: (run.context || {})}),
+        })
+          .then(function(r){ return r.ok ? r.json().catch(function(){return {};}) : Promise.reject(r.status); })
+          .then(function(){
+            if (typeof toast === 'function') toast('Re-run queued', 'success');
+            if (typeof loadRunHistory === 'function') loadRunHistory();
+          })
+          .catch(function(err){
+            if (typeof toast === 'function') toast('Re-run failed: '+err, 'error');
+          });
+      };
+    }
+  }
+
+  function fetchAndRender(fullId){
+    fetchFn('/api/v1/soar/runs/' + encodeURIComponent(fullId))
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(run){
+        renderRun(run);
+        // Continue polling if still running
+        if (run.status === 'running' || run.status === 'waiting_approval'){
+          // schedule next poll
+          if (currentRunId === fullId && !pollTimer){
+            pollTimer = setTimeout(function(){
+              pollTimer = null;
+              if (currentRunId === fullId) fetchAndRender(fullId);
+            }, 2000);
+          } else if (currentRunId === fullId){
+            // already polling
+          }
+        } else {
+          stopPoll();
+        }
+      })
+      .catch(function(err){
+        var stepsEl = document.getElementById('hmod-steps');
+        if (stepsEl) stepsEl.innerHTML = '<div style="color:var(--red,#ef4444);font-size:12px;padding:12px">Failed to load run: '+escapeHtml(String(err))+'</div>';
+        stopPoll();
+      });
+  }
+  function stopPoll(){
+    if (pollTimer){ clearTimeout(pollTimer); pollTimer = null; }
+  }
+
+  // Override the legacy openRunDetail with one that fetches real data.
+  // Accept either short ID (RUN-XXXX or 8-char) or full UUID.
+  var _legacyOpenRunDetail = window.openRunDetail;
+  window.openRunDetail = function(id){
+    stopPoll();
+    var fullId = id;
+    if (id && id.length < 36){
+      // Look up in our map (built from API on each loadRunHistory)
+      fullId = RUN_ID_MAP[id] || RUN_ID_MAP[id.toUpperCase()] || null;
+      if (!fullId){
+        // Trigger a sync then retry once
+        syncIdMap();
+        setTimeout(function(){
+          var f2 = RUN_ID_MAP[id] || RUN_ID_MAP[id.toUpperCase()];
+          if (f2){
+            window.openRunDetail(f2);
+          } else if (typeof _legacyOpenRunDetail === 'function'){
+            // Fallback to legacy cached render (e.g. seed runs without API row)
+            _legacyOpenRunDetail(id);
+          }
+        }, 400);
+        return;
+      }
+    }
+    currentRunId = fullId;
+    // Open modal immediately with skeleton
+    var modal = document.getElementById('hist-modal');
+    if (modal) modal.classList.add('open');
+    var stepsEl = document.getElementById('hmod-steps');
+    if (stepsEl) stepsEl.innerHTML = '<div style="opacity:.5;font-size:12px;text-align:center;padding:18px">Loading…</div>';
+    fetchAndRender(fullId);
+  };
+
+  // Build the ID map on every loadRunHistory call (poor-man's hook)
+  var origLoadRunHistory = window.loadRunHistory;
+  if (typeof origLoadRunHistory === 'function'){
+    window.loadRunHistory = function(){
+      var ret = origLoadRunHistory.apply(this, arguments);
+      syncIdMap();
+      return ret;
+    };
+  }
+  // First load
+  setTimeout(syncIdMap, 800);
+
+  // Stop polling if user closes the modal
+  var closeBtns = document.querySelectorAll('#hist-modal .modal-close');
+  closeBtns.forEach(function(b){
+    b.addEventListener('click', stopPoll);
+  });
+})();
+</script>
