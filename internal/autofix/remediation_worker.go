@@ -105,10 +105,11 @@ func runRemediationCycle(ctx context.Context, db *sql.DB) (inserted, resolved, e
 func insertNewItems(ctx context.Context, db *sql.DB) (int, error) {
 	res, err := db.ExecContext(ctx, `
 		INSERT INTO remediations  /* H3U-fixed */
-			(finding_id, run_id, status, priority, created_at, updated_at)
+			(finding_id, run_id, tenant_id, status, priority, created_at, updated_at)
 		SELECT
 			f.id,
 			f.run_id,
+			f.tenant_id,
 			'open' AS status,
 			LOWER(f.severity) AS priority,
 			NOW(), NOW()
