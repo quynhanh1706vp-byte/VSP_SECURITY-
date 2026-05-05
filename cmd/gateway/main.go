@@ -1002,7 +1002,7 @@ func main() {
 		r.Get("/api/v1/soar/playbooks", soarH.ListPlaybooks)
 		r.Post("/api/v1/soar/playbooks", soarH.CreatePlaybook)
 		r.Post("/api/v1/soar/playbooks/{id}/toggle", soarH.TogglePlaybook)
-		r.Post("/api/v1/soar/playbooks/{id}/run", soarH.RunPlaybook)
+		r.Post("/api/v1/soar/playbooks/{id}/run", soarV2H.ExecutePlaybook)
 		r.Post("/api/v1/soar/trigger", soarH.Trigger)
 		r.Get("/api/v1/soar/runs", soarH.ListRuns)
 

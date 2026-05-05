@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -57,7 +58,23 @@ func (h *SOARv2) executeImpl(w http.ResponseWriter, r *http.Request, isTest bool
 		Trigger string                 `json:"trigger"`
 	}
 	// Optional body — ignore parse errors
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	bodyBytes, _ := io.ReadAll(r.Body)
+	_ = json.Unmarshal(bodyBytes, &req)
+	// Legacy /run compat: tolerate flat body shape like
+	// {"trigger":"manual","severity":"HIGH","gate":"FAIL"} (no "context" wrapper)
+	if req.Context == nil && len(bodyBytes) > 0 {
+		var flat map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &flat); err == nil && len(flat) > 0 {
+			if t, ok := flat["trigger"].(string); ok && req.Trigger == "" {
+				req.Trigger = t
+			}
+			delete(flat, "trigger")
+			delete(flat, "context")
+			if len(flat) > 0 {
+				req.Context = flat
+			}
+		}
+	}
 	if req.Trigger == "" {
 		if isTest {
 			req.Trigger = "test"
