@@ -71,6 +71,15 @@ func CSRFProtect(next http.Handler) http.Handler {
 			}
 		}
 
+		// X-Agent-Key bypass — endpoint agents authenticate via this header
+		// per request and never carry browser cookies, so double-submit CSRF
+		// doesn't apply. Handler verifies the key against agents.api_key_hash
+		// before doing anything stateful (store.GetAgentByAPIKeyHash).
+		if k := r.Header.Get("X-Agent-Key"); k != "" && len(k) >= 16 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// Bearer token bypass — but only for non-empty tokens.
 		// FIX 2026-04-29: "Bearer " (with empty/whitespace token) previously
 		// bypassed CSRF, allowing attacker to inject empty Authorization header
