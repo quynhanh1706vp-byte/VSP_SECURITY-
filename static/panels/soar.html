@@ -2000,10 +2000,11 @@ loadRunHistory();
     if (pollTimer){ clearTimeout(pollTimer); pollTimer = null; }
   }
 
-  // Override the legacy openRunDetail with one that fetches real data.
-  // Accept either short ID (RUN-XXXX or 8-char) or full UUID.
-  var _legacyOpenRunDetail = window.openRunDetail;
-  window.openRunDetail = function(id){
+  // Phase 2.1.D — defer override v2
+  // The host page (vsp_upgrade_v100.js, vsp_fe_sync_patch_v2.js) may re-define
+  // window.openRunDetail AFTER our IIFE runs at parse time. Capture our impl
+  // here, then re-install it on a delay to win the race.
+  function _newOpenRunDetail(id){
     stopPoll();
     var fullId = id;
     if (id && id.length < 36){
@@ -2033,16 +2034,9 @@ loadRunHistory();
     fetchAndRender(fullId);
   };
 
-  // Build the ID map on every loadRunHistory call (poor-man's hook)
-  var origLoadRunHistory = window.loadRunHistory;
-  if (typeof origLoadRunHistory === 'function'){
-    window.loadRunHistory = function(){
-      var ret = origLoadRunHistory.apply(this, arguments);
-      syncIdMap();
-      return ret;
-    };
-  }
-  // First load
+  // First load — populate ID map immediately, then on a short delay
+  // (after loadRunHistory's first poll). The wrapper for loadRunHistory
+  // is now installed at the end alongside _installOverride.
   setTimeout(syncIdMap, 800);
 
   // Stop polling if user closes the modal
@@ -2050,5 +2044,29 @@ loadRunHistory();
   closeBtns.forEach(function(b){
     b.addEventListener('click', stopPoll);
   });
+
+  // Install override now AND re-install on a delay (defeats vsp_upgrade
+  // and similar scripts that overwrite openRunDetail post-load).
+  var _legacyOpenRunDetail = window.openRunDetail;
+  function _installOverride(){
+    if (window.openRunDetail !== _newOpenRunDetail){
+      _legacyOpenRunDetail = window.openRunDetail;
+      window.openRunDetail = _newOpenRunDetail;
+    }
+  }
+  _installOverride();
+  setTimeout(_installOverride, 500);
+  setTimeout(_installOverride, 1500);
+  setTimeout(_installOverride, 3000);
+  // Also re-install whenever loadRunHistory runs (catches late binders)
+  var _origLoadRH = window.loadRunHistory;
+  if (typeof _origLoadRH === 'function'){
+    window.loadRunHistory = function(){
+      _installOverride();
+      var ret = _origLoadRH.apply(this, arguments);
+      syncIdMap();
+      return ret;
+    };
+  }
 })();
 </script>
