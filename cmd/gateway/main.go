@@ -331,6 +331,7 @@ func main() {
 	// ── UEBA + Assets ────────────────────────────────────────
 	uebaH := &handler.UEBA{DB: db}
 	assetsH := &handler.Assets{DB: db}
+	agentsH := &handler.Agents{DB: db}
 	soarH := &handler.SOAR{DB: db}
 
 	// ───────── SOAR Engine v2 (Phase 2.1.B+C) ─────────
@@ -516,6 +517,12 @@ func main() {
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/mfa/verify", mfaH.Verify)
 	r.With(vspMW.StrictLimiter(5, time.Minute)).Post("/api/v1/auth/password/change", authH.ChangePassword)
 	r.Post("/api/v1/billing/webhook", billingH.Webhook)
+
+	// Endpoint Agent self-auth routes — agents present X-Agent-Key per request.
+	// These are public at the chi level but the handlers themselves verify
+	// the agent key against agents.api_key_hash and reject unknown keys.
+	r.Post("/api/v1/agents/heartbeat", agentsH.Heartbeat)
+	r.Post("/api/v1/agents/inventory", agentsH.Inventory)
 
 	authMw := auth.Middleware(jwtSecret, keyStore)
 	r.With(authMw).Get("/api/v1/auth/check", authH.Check) // session check — validates cookie
@@ -997,6 +1004,12 @@ func main() {
 		r.Post("/api/v1/assets", assetsH.Create)
 		r.Get("/api/v1/assets/summary", assetsH.Summary)
 		r.Get("/api/v1/assets/{id}/findings", assetsH.Findings)
+
+		// Endpoint Agents (JWT-protected — UI manages enrollments)
+		r.Post("/api/v1/agents/enroll", agentsH.Enroll)
+		r.Get("/api/v1/agents", agentsH.List)
+		r.Get("/api/v1/agents/{id}", agentsH.Get)
+		r.Delete("/api/v1/agents/{id}", agentsH.Revoke)
 
 		// ── SOAR playbooks ──────────────────────────────────────
 		r.Get("/api/v1/soar/playbooks", soarH.ListPlaybooks)
