@@ -186,3 +186,9 @@ _codeql_detected_source_root
 llama.cpp/
 .archive/
 reports/
+
+# Local backup files
+*.bak.*
+*.broken*
+*.before_*
+*.working_*
