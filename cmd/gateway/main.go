@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/vsp/platform/internal/autopr"
+	"github.com/vsp/platform/internal/container"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
@@ -54,6 +56,21 @@ import (
 	"path/filepath"
 	"strconv"
 )
+
+
+// init đăng ký MIME types đúng để Chrome strict MIME checking không chặn
+// .js/.css. http.ServeFile và http.FileServer đều dùng mime.TypeByExtension().
+func init() {
+	mime.AddExtensionType(".js",    "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".mjs",   "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".css",   "text/css; charset=utf-8")
+	mime.AddExtensionType(".html",  "text/html; charset=utf-8")
+	mime.AddExtensionType(".json",  "application/json; charset=utf-8")
+	mime.AddExtensionType(".svg",   "image/svg+xml")
+	mime.AddExtensionType(".woff",  "font/woff")
+	mime.AddExtensionType(".woff2", "font/woff2")
+	mime.AddExtensionType(".map",   "application/json")
+}
 
 var startTime = time.Now()
 
@@ -572,6 +589,11 @@ func main() {
 	})
 	r.Get("/vsp_upgrade_v100.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/vsp_upgrade_v100.js")
+	})
+
+	r.Get("/vsp_pro_100.js", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/vsp_pro_cwpp_realapi.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_pro_100.js")
 	})
 
 	// Serve JS assets from ./static/js/ (dom-safe.js, vsp_iframe_bootstrap.js, etc.)
@@ -2315,6 +2337,12 @@ func main() {
 		r.Use(authMw)
 		agenticHandlers.RegisterRoutes(r)
 	})
+
+
+	// VSP PRO — Container scanner (Trivy) — P0 backend
+	containerScanner := container.NewScanner()
+	container.NewAPI(containerScanner).RegisterRoutes(r)
+	log.Info().Msg("container: Trivy scanner API initialized — POST /api/v1/container/seed to start")
 
 	srv := &http.Server{Addr: addr, Handler: r,
 		ReadTimeout: 30 * time.Second, WriteTimeout: 0}
