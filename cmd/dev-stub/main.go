@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -22,6 +23,21 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
+
+
+// init đăng ký MIME types đúng chuẩn để Chrome strict MIME checking không
+// chặn .js/.css. http.FileServer và http.ServeFile đều dùng mime.TypeByExtension().
+func init() {
+	mime.AddExtensionType(".js",    "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".mjs",   "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".css",   "text/css; charset=utf-8")
+	mime.AddExtensionType(".html",  "text/html; charset=utf-8")
+	mime.AddExtensionType(".json",  "application/json; charset=utf-8")
+	mime.AddExtensionType(".svg",   "image/svg+xml")
+	mime.AddExtensionType(".woff",  "font/woff")
+	mime.AddExtensionType(".woff2", "font/woff2")
+	mime.AddExtensionType(".map",   "application/json")
+}
 
 func main() {
 	// ── Logger ────────────────────────────────────────────────
