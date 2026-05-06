@@ -1,3 +1,4 @@
+/* FEAT-15 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -192,6 +193,8 @@ function escapeHtml(s) {
 let currentDraft = null;
 
 async function loadDraft() {
+  const hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX) VSPUXState.skeleton('#draft-body', {rows: 6, kind: 'card'});
   try {
     const res = await fetch('/api/p4/attestation/generate');
     const d = await res.json();
@@ -229,7 +232,13 @@ async function loadDraft() {
         }).join('')}
       </div>
     `;
-  } catch(e) { alert('Generate error: ' + e.message); }
+  } catch(e) {
+    if(typeof VSPUXState !== 'undefined'){
+      VSPUXState.error('#draft-body', 'Generate error: '+e.message, loadDraft);
+    } else {
+      alert('Generate error: ' + e.message);
+    }
+  }
 }
 
 async function signAttestation() {
@@ -269,6 +278,8 @@ async function downloadDraft() {
 }
 
 async function loadForms() {
+  const hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX) VSPUXState.skeleton('#forms-tbody', {rows: 4});
   try {
     const res = await fetch('/api/p4/attestation/list');
     const d = await res.json();
@@ -279,7 +290,11 @@ async function loadForms() {
     
     const tbody = document.getElementById('forms-tbody');
     if (!d.forms || d.forms.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No forms yet — generate first draft</td></tr>';
+      if(hasUX){
+        VSPUXState.empty('#forms-tbody', 'No forms yet — generate first draft', loadForms);
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No forms yet — generate first draft</td></tr>';
+      }
       return;
     }
     tbody.innerHTML = d.forms.map(f => {
@@ -293,7 +308,12 @@ async function loadForms() {
         <td class="mono" style="font-size:10px">${f.signed_at ? new Date(f.signed_at).toLocaleString() : '—'}</td>
       </tr>`;
     }).join('');
-  } catch(e) { console.error(e); }
+  } catch(e) {
+    console.error(e);
+    if(typeof VSPUXState !== 'undefined'){
+      VSPUXState.error('#forms-tbody', 'Failed to load forms: '+(e.message||'network error'), loadForms);
+    }
+  }
 }
 
 loadDraft();
