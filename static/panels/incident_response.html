@@ -3,6 +3,7 @@
 <head>
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
 <script src="/static/js/dom-safe.js"></script>
+<script src="/static/js/vsp_uxstates.js"></script>
 <script>
 (function(){
   if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
@@ -110,6 +111,8 @@ tr.clickable{cursor:pointer}
 .editable-inline:hover{background:var(--bg3)}
 .json-view{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-family:monospace;font-size:10px;color:var(--t2);white-space:pre;overflow:auto;max-height:400px}
 .action-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+.ir-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
 </style>
 </head>
 <body>
@@ -238,44 +241,96 @@ function fmtDT(t){if(!t||String(t).startsWith('0001'))return '—';return new Da
 function hoursLeft(dl){const d=(new Date(dl)-new Date())/3600000;const a=Math.abs(d);const c=d<0?'cd-crit':d<6?'cd-crit':d<24?'cd-warn':'cd-ok';return `<span class="countdown ${c}">${d<0?'OVERDUE ':''}${a.toFixed(1)}h</span>`;}
 function closeModal(n){document.getElementById('modal-'+n).classList.remove('show');}
 
+/* FEAT-32: incident_response L2 UX states (MAX coverage, polish-aware) */
+const IR_KPI_IDS = ['kpi-active', 'kpi-total', 'kpi-sub', 'kpi-ran', 'kpi-circia', 'kpi-circia-met', 'kpi-ev'];
+
+function _irShimmerCells() {
+  IR_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.classList.add('ir-shimmer'); }
+  });
+}
+function _irClearCells() {
+  IR_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('ir-shimmer');
+  });
+}
+function _irDashCells() {
+  IR_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('ir-shimmer'); el.textContent = '—'; }
+  });
+}
+
 async function loadKPIs(){
-  try{const[inc,cir,ev]=await Promise.all([
-    fetch('/api/p4/ir/incidents').then(r=>r.json()),
-    fetch('/api/p4/circia/reports').then(r=>r.json()),
-    fetch('/api/p4/forensics/evidence').then(r=>r.json())]);
-    const s=inc.stats||{};
-    document.getElementById('kpi-active').textContent=(s.by_status?.open||0)+(s.by_status?.investigating||0)+(s.by_status?.contained||0);
-    document.getElementById('kpi-total').textContent=(inc.count||0)+' total';
-    document.getElementById('kpi-sub').textContent=s.substantial||0;
-    document.getElementById('kpi-ran').textContent=s.ransomware||0;
-    document.getElementById('kpi-circia').textContent=cir.count||0;
-    const dc=cir.deadline_compliance||{};
-    document.getElementById('kpi-circia-met').textContent=(dc.met||0)+' met · '+(dc.missed||0)+' missed';
-    document.getElementById('kpi-ev').textContent=ev.count||0;
-  }catch(e){console.error(e);}
+  var hasUX = typeof VSPUXState !== 'undefined';
+  _irShimmerCells();
+  // Per-fetch catch — preserve partial KPIs if some endpoints fail
+  var safe = function(p){ return p.then(function(r){ return r.ok ? r.json() : {}; }).catch(function(){ return {}; }); };
+  try{
+    var res = await Promise.all([
+      safe(fetch('/api/p4/ir/incidents')),
+      safe(fetch('/api/p4/circia/reports')),
+      safe(fetch('/api/p4/forensics/evidence'))
+    ]);
+    var inc = res[0], cir = res[1], ev = res[2];
+    var s = inc.stats || {};
+    _irClearCells();
+    document.getElementById('kpi-active').textContent = (s.by_status?.open||0) + (s.by_status?.investigating||0) + (s.by_status?.contained||0);
+    document.getElementById('kpi-total').textContent = (inc.count||0) + ' total';
+    document.getElementById('kpi-sub').textContent = s.substantial || 0;
+    document.getElementById('kpi-ran').textContent = s.ransomware || 0;
+    document.getElementById('kpi-circia').textContent = cir.count || 0;
+    var dc = cir.deadline_compliance || {};
+    document.getElementById('kpi-circia-met').textContent = (dc.met||0) + ' met · ' + (dc.missed||0) + ' missed';
+    document.getElementById('kpi-ev').textContent = ev.count || 0;
+  }catch(e){
+    _irDashCells();
+    console.error('[FEAT-32] loadKPIs failed:', e);
+  }
 }
 
 async function loadIncidents(){
-  try{const r=await fetch('/api/p4/ir/incidents');const d=await r.json();
-    document.getElementById('inc-count').textContent=(d.count||0)+' incidents · click để xem chi tiết';
-    const tb=document.getElementById('inc-tbody');
-    if(!d.incidents||d.incidents.length===0){tb.innerHTML='<tr><td colspan="8" class="empty">No incidents</td></tr>';return;}
-    tb.innerHTML=d.incidents.map(i=>{
-      const f=[];if(i.is_substantial)f.push('<span class="badge b-warn">72h</span>');
-      if(i.is_ransomware)f.push('<span class="badge b-bad">💰24h</span>');
-      return `<tr class="clickable" onclick="showIncidentDetail('${i.incident_id}')">
-        <td class="mono"><b>${i.incident_id}</b></td>
-        <td>${i.title}</td>
-        <td>${sevBadge(i.severity)}</td>
-        <td><span class="phase-pill">${(i.phase||'').replace('_',' ')}</span></td>
-        <td>${statBadge(i.status)}</td>
-        <td>${f.join(' ')||'—'}</td>
-        <td class="mono">${fmtAgo(i.detected_at)}</td>
-        <td onclick="event.stopPropagation()">
-          ${i.status!=='closed'?`<button class="btn btn-sm" onclick="showTransition('${i.incident_id}','${i.phase}')">▶ Advance</button>`:''}
-        </td>
-      </tr>`;}).join('');
-  }catch(e){console.error(e);}
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tbody = document.getElementById('inc-tbody');
+  var hasData = tbody && tbody.children.length > 0 &&
+                !tbody.querySelector('.empty') &&
+                !tbody.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#inc-tbody', { rows: 5, kind: 'table' });
+
+  try{
+    var r = await fetch('/api/p4/ir/incidents');
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#inc-tbody', 'HTTP ' + r.status, loadIncidents);
+      return;
+    }
+    var d = await r.json();
+    document.getElementById('inc-count').textContent = (d.count||0) + ' incidents · click để xem chi tiết';
+    if (!d.incidents || d.incidents.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">No incidents</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.incidents.map(function(i){
+      var f = []; if (i.is_substantial) f.push('<span class="badge b-warn">72h</span>');
+      if (i.is_ransomware) f.push('<span class="badge b-bad">💰24h</span>');
+      return '<tr class="clickable" onclick="showIncidentDetail(\''+i.incident_id+'\')">'
+        + '<td class="mono"><b>'+i.incident_id+'</b></td>'
+        + '<td>'+i.title+'</td>'
+        + '<td>'+sevBadge(i.severity)+'</td>'
+        + '<td><span class="phase-pill">'+(i.phase||'').replace('_',' ')+'</span></td>'
+        + '<td>'+statBadge(i.status)+'</td>'
+        + '<td>'+(f.join(' ')||'—')+'</td>'
+        + '<td class="mono">'+fmtAgo(i.detected_at)+'</td>'
+        + '<td onclick="event.stopPropagation()">'
+        + (i.status!=='closed' ? '<button class="btn btn-sm" onclick="showTransition(\''+i.incident_id+'\',\''+i.phase+'\')">▶ Advance</button>' : '')
+        + '</td></tr>';
+    }).join('');
+  }catch(e){
+    console.error('[FEAT-32] loadIncidents failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#inc-tbody', 'Network error', loadIncidents);
+  }
 }
 
 async function showIncidentDetail(id){
@@ -459,27 +514,48 @@ async function createIncident(){
 }
 
 async function loadCIRCIA(){
-  try{const r=await fetch('/api/p4/circia/reports');const d=await r.json();
-    const dc=d.deadline_compliance||{};
-    document.getElementById('circia-stats').textContent=`${d.count||0} total · ${dc.met||0} met · ${dc.missed||0} missed · ${dc.pending||0} pending`;
-    const tb=document.getElementById('circia-tbody');
-    if(!d.reports||d.reports.length===0){tb.innerHTML='<tr><td colspan="8" class="empty">No reports</td></tr>';return;}
-    tb.innerHTML=d.reports.map(rp=>{
-      const sbc={draft:'b-neutral',submitted:'b-info',acknowledged:'b-ok'}[rp.status]||'b-neutral';
-      const sv=rp.submitted_at&&!String(rp.submitted_at).startsWith('0001');
-      const dc=sv?fmtDT(rp.submitted_at):hoursLeft(rp.deadline_at)+' left';
-      const mb=sv?(rp.deadline_met?'<span class="badge b-ok">✓ met</span>':'<span class="badge b-bad">✗ missed</span>'):'<span class="badge b-warn">pending</span>';
-      return `<tr class="clickable" onclick="showCIRCIADetail('${rp.report_uuid}')">
-        <td><span class="badge b-info">${(rp.report_type||'').replace(/_/g,' ')}</span></td>
-        <td><b>${rp.incident_id||'—'}</b><br><span class="mono">${(rp.incident_title||'').slice(0,40)}</span></td>
-        <td class="mono">${rp.ci_sector||'—'}</td>
-        <td><span class="badge ${sbc}">${rp.status}</span></td>
-        <td class="mono" style="font-size:10px">${fmtDT(rp.deadline_at)}</td>
-        <td>${dc}</td>
-        <td>${mb}</td>
-        <td class="mono" style="font-size:10px">${rp.cisa_submission_id||'—'}</td>
-      </tr>`;}).join('');
-  }catch(e){console.error(e);}
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tb = document.getElementById('circia-tbody');
+  var hasData = tb && tb.children.length > 0 &&
+                !tb.querySelector('.empty') &&
+                !tb.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#circia-tbody', { rows: 4, kind: 'table' });
+
+  try{
+    var r = await fetch('/api/p4/circia/reports');
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#circia-tbody', 'HTTP ' + r.status, loadCIRCIA);
+      return;
+    }
+    var d = await r.json();
+    var dc = d.deadline_compliance || {};
+    var statsEl = document.getElementById('circia-stats');
+    if (statsEl) statsEl.textContent = (d.count||0)+' total · '+(dc.met||0)+' met · '+(dc.missed||0)+' missed · '+(dc.pending||0)+' pending';
+    if (!d.reports || d.reports.length === 0) {
+      tb.innerHTML = '<tr><td colspan="8" class="empty">No reports</td></tr>';
+      return;
+    }
+    tb.innerHTML = d.reports.map(function(rp){
+      var sbc = {draft:'b-neutral', submitted:'b-info', acknowledged:'b-ok'}[rp.status] || 'b-neutral';
+      var sv = rp.submitted_at && !String(rp.submitted_at).startsWith('0001');
+      var dcText = sv ? fmtDT(rp.submitted_at) : hoursLeft(rp.deadline_at)+' left';
+      var mb = sv ? (rp.deadline_met ? '<span class="badge b-ok">✓ met</span>' : '<span class="badge b-bad">✗ missed</span>') : '<span class="badge b-warn">pending</span>';
+      return '<tr class="clickable" onclick="showCIRCIADetail(\''+rp.report_uuid+'\')">'
+        + '<td><span class="badge b-info">'+(rp.report_type||'').replace(/_/g,' ')+'</span></td>'
+        + '<td><b>'+(rp.incident_id||'—')+'</b><br><span class="mono">'+(rp.incident_title||'').slice(0,40)+'</span></td>'
+        + '<td class="mono">'+(rp.ci_sector||'—')+'</td>'
+        + '<td><span class="badge '+sbc+'">'+rp.status+'</span></td>'
+        + '<td class="mono" style="font-size:10px">'+fmtDT(rp.deadline_at)+'</td>'
+        + '<td>'+dcText+'</td>'
+        + '<td>'+mb+'</td>'
+        + '<td class="mono" style="font-size:10px">'+(rp.cisa_submission_id||'—')+'</td>'
+        + '</tr>';
+    }).join('');
+  }catch(e){
+    console.error('[FEAT-32] loadCIRCIA failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#circia-tbody', 'Network error', loadCIRCIA);
+  }
 }
 
 async function showCIRCIADetail(uuid){
@@ -538,21 +614,40 @@ async function submitCIRCIA(uuid){
 }
 
 async function loadEvidence(){
-  try{const r=await fetch('/api/p4/forensics/evidence');const d=await r.json();
-    const tb=document.getElementById('ev-tbody');
-    if(!d.evidence||d.evidence.length===0){tb.innerHTML='<tr><td colspan="7" class="empty">No evidence</td></tr>';return;}
-    window._evData=d.evidence;
-    tb.innerHTML=d.evidence.map((e,i)=>{
-      const h=(e.file_hash_sha256||'').slice(0,16);
-      return `<tr><td class="mono"><b>${e.evidence_id}</b></td>
-        <td><span class="badge b-info">${e.evidence_type}</span></td>
-        <td>${e.description}</td>
-        <td class="mono">${fmtBytes(e.file_size_bytes)}</td>
-        <td class="mono" style="font-size:10px" title="${e.file_hash_sha256||''}">${h||'—'}…</td>
-        <td class="mono">${fmtAgo(e.collected_at)}</td>
-        <td><button class="btn btn-sm" onclick="showCustody(${i})">${(e.custody_log||[]).length} entries</button></td></tr>`;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tb = document.getElementById('ev-tbody');
+  var hasData = tb && tb.children.length > 0 &&
+                !tb.querySelector('.empty') &&
+                !tb.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#ev-tbody', { rows: 4, kind: 'table' });
+
+  try{
+    var r = await fetch('/api/p4/forensics/evidence');
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#ev-tbody', 'HTTP ' + r.status, loadEvidence);
+      return;
+    }
+    var d = await r.json();
+    if (!d.evidence || d.evidence.length === 0) {
+      tb.innerHTML = '<tr><td colspan="7" class="empty">No evidence</td></tr>';
+      return;
+    }
+    window._evData = d.evidence;
+    tb.innerHTML = d.evidence.map(function(e, i){
+      var h = (e.file_hash_sha256||'').slice(0,16);
+      return '<tr><td class="mono"><b>'+e.evidence_id+'</b></td>'
+        + '<td><span class="badge b-info">'+e.evidence_type+'</span></td>'
+        + '<td>'+e.description+'</td>'
+        + '<td class="mono">'+fmtBytes(e.file_size_bytes)+'</td>'
+        + '<td class="mono" style="font-size:10px" title="'+(e.file_hash_sha256||'')+'">'+(h||'—')+'…</td>'
+        + '<td class="mono">'+fmtAgo(e.collected_at)+'</td>'
+        + '<td><button class="btn btn-sm" onclick="showCustody('+i+')">'+(e.custody_log||[]).length+' entries</button></td></tr>';
     }).join('');
-  }catch(e){console.error(e);}
+  }catch(e){
+    console.error('[FEAT-32] loadEvidence failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#ev-tbody', 'Network error', loadEvidence);
+  }
 }
 
 function showCustody(i){
@@ -620,14 +715,38 @@ async function submitEvidence(){
 }
 
 async function loadPlaybooks(){
-  try{const r=await fetch('/api/p4/ir/playbooks');const d=await r.json();
-    const c=document.getElementById('pb-container');
-    if(!d.playbooks||d.playbooks.length===0){c.innerHTML='<div class="empty">No playbooks</div>';return;}
-    c.innerHTML=d.playbooks.map(pb=>{
-      const ph=(pb.phases||[]).map(p=>`<div style="margin-top:6px"><b class="mono" style="color:var(--accent)">${p.phase.replace('_',' ')}</b><ul style="margin:4px 0 0 20px;font-size:11px">${(p.steps||[]).map(s=>'<li>'+s+'</li>').join('')}</ul></div>`).join('');
-      return `<div class="card"><div class="card-head"><div class="card-title">${pb.playbook_id} — ${pb.name}</div><div class="mono">${(pb.incident_types||[]).join(', ')}</div></div><div class="card-body"><div style="font-size:11px;color:var(--t2);margin-bottom:10px">${pb.description}</div>${ph}</div></div>`;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var c = document.getElementById('pb-container');
+  var hasData = c && c.children.length > 0 &&
+                !c.querySelector('.empty') &&
+                !c.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#pb-container', { rows: 3, kind: 'card' });
+
+  try{
+    var r = await fetch('/api/p4/ir/playbooks');
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#pb-container', 'HTTP ' + r.status, loadPlaybooks);
+      return;
+    }
+    var d = await r.json();
+    if (!d.playbooks || d.playbooks.length === 0) {
+      if (hasUX) VSPUXState.empty('#pb-container', 'No playbooks defined yet', loadPlaybooks);
+      else c.innerHTML = '<div class="empty">No playbooks</div>';
+      return;
+    }
+    c.innerHTML = d.playbooks.map(function(pb){
+      var ph = (pb.phases||[]).map(function(p){
+        return '<div style="margin-top:6px"><b class="mono" style="color:var(--accent)">'+p.phase.replace('_',' ')+'</b><ul style="margin:4px 0 0 20px;font-size:11px">'
+          + (p.steps||[]).map(function(s){ return '<li>'+s+'</li>'; }).join('')
+          + '</ul></div>';
+      }).join('');
+      return '<div class="card"><div class="card-head"><div class="card-title">'+pb.playbook_id+' — '+pb.name+'</div><div class="mono">'+(pb.incident_types||[]).join(', ')+'</div></div><div class="card-body"><div style="font-size:11px;color:var(--t2);margin-bottom:10px">'+pb.description+'</div>'+ph+'</div></div>';
     }).join('');
-  }catch(e){console.error(e);}
+  }catch(e){
+    console.error('[FEAT-32] loadPlaybooks failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#pb-container', 'Network error', loadPlaybooks);
+  }
 }
 
 function refreshAll(){loadKPIs();loadIncidents();}
