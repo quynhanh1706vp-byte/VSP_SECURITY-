@@ -33,6 +33,15 @@
   function authFetch(url, opts) {
     return (window.vspAuthFetch || window.fetch)(url, opts || {});
   }
+  // VSP_F1_CSRF_PATCHED — read vsp_csrf cookie + add to headers (double-submit pattern)
+  function vspCsrfHeaders(base) {
+    base = base || {};
+    try {
+      var m = document.cookie.match(/(?:^|;\s*)vsp_csrf=([^;]+)/);
+      if (m && m[1]) base['X-CSRF-Token'] = decodeURIComponent(m[1]);
+    } catch (e) { /* malformed cookie — let request fail naturally */ }
+    return base;
+  }
 
   // Use Block 2 toast if available, else minimal fallback
   function toast(msg, type) {
@@ -229,7 +238,8 @@
       var self = this;
       authFetch('/api/v1/vulns/bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: vspCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action: action, cve_ids: ids, metadata: metadata })
       }).then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -292,7 +302,8 @@
       // Best-effort backend notify
       authFetch('/api/v1/vulns/bulk/undo', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: vspCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ undo_token: last.undoToken })
       }).catch(function () { /* ignore */ });
 
