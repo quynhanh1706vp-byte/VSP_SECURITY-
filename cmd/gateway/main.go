@@ -629,6 +629,12 @@ func main() {
 	r.Get("/static/js/*", http.StripPrefix("/static/js/",
 		http.FileServer(http.Dir("./static/js/"))).ServeHTTP)
 
+	// FEAT-20c PATCH APPLIED — Serve UX patch scripts from ./static/patches/
+	// Allows monkey-patch JS files (feat-20-ai-analyst.js etc.) to be loaded
+	// without recompiling gateway. Drop new patches into static/patches/.
+	r.Get("/static/patches/*", http.StripPrefix("/static/patches/",
+		http.FileServer(http.Dir("./static/patches/"))).ServeHTTP)
+
 	// Serve panel HTML/JS assets. CSP is set by vspMW.CSPNonce middleware,
 	// which applies PanelCSP() for panel paths. Do NOT override CSP here.
 	// Phase 2 (docs/CSP_HARDENING_ROADMAP.md) will migrate panels to the
