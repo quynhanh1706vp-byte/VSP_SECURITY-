@@ -1,91 +1,40 @@
-# Phase 7D — DAST (nuclei)
+# FEAT-20c — Gateway route for /static/patches/*
 
-VSP Dynamic Application Security Testing microservice (port 8093).
+## Why
+FEAT-20/20b deployed JS patch to ./static/patches/ but gateway returns 404
+because no route catches /static/patches/*. Browser gets MIME type 'text/plain'
+because nginx serves 404 page as text, not the JS file.
 
-Wraps `nuclei` CLI for production-grade DAST scans with async runner,
-JSONL parser, and live progress polling.
+## Method
+Add 1 catch-all route in cmd/gateway/main.go, mirroring existing
+/static/js/* pattern at line ~629.
 
-## Components
+## Files changed
+- `cmd/gateway/main.go` — adds /static/patches/* route after /static/js/* route
 
-| File | Lines | Purpose |
-|---|---|---|
-| `cmd/dast-api/main.go` | 600 | Microservice + nuclei runner |
-| `frontend/vsp_dast_panel.js` | 580 | Full UI w/ live polling |
-| `scripts/start-dast-api.sh` | 60 | Launcher |
+## Apply
+    cd <project-root>
+    ./patches/feat-20c-gateway-patches-route/dryrun.sh    # sandbox first
+    ./patches/feat-20c-gateway-patches-route/apply.sh     # real
+    # then restart gateway (your usual command)
 
-**Total: ~1240 lines, stdlib only.**
+## Verify
+- `curl -k -sI https://vsp.local/static/patches/feat-20-ai-analyst.js` → HTTP 200
+- Reload ai_analyst panel → console shows `[FEAT-20b] ai_analyst loadAllData wrapped...`
+- KPI cards (Score/Gate/Inc/Crit) shimmer briefly before showing real values
 
-## Profiles
+## Rollback
+    ./patches/feat-20c-gateway-patches-route/rollback.sh
+    # rebuild + restart gateway
 
-| Profile | Templates | Severity | Timeout |
-|---|---|---|---|
-| `quick` | CVE only | critical, high | 2 min |
-| `standard` | All | critical, high, medium | 8 min |
-| `deep` | All | all | 30 min |
+## Future use
+After FEAT-20c, any future patch (FEAT-21, 22, 23...) only needs:
+  1. Drop JS file into ./static/patches/feat-XX-<panel>.js
+  2. Inject <script src="/static/patches/feat-XX-<panel>.js"></script>
+     into target panel's HTML
+  3. No gateway changes needed.
 
-## Endpoints
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | /healthz | Liveness + nuclei detection |
-| GET | /tools/check | nuclei version + path |
-| POST | /scan | `{target, profile}` → returns scan_id (async) |
-| GET | /scans | List (without findings — fast) |
-| GET | /scans/{id} | Full detail with findings |
-| GET | /scans/{id}/findings | Findings only |
-| POST | /scans/{id}/cancel | Cancel running |
-| DELETE | /scans/{id} | Delete record |
-| GET | /stats | KPIs |
-
-## Install nuclei first
-
-```bash
-go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-nuclei -update-templates
-which nuclei  # → /home/test/go/bin/nuclei or similar
-```
-
-If `nuclei` not in PATH for the service, set `PATH` in the systemd unit
-or restart your shell after `go install`.
-
-## Install service
-
-```bash
-go build -o vsp-dast-api ./cmd/dast-api
-./scripts/start-dast-api.sh
-curl -s http://127.0.0.1:8093/healthz | jq
-```
-
-## Run a scan
-
-```bash
-# Submit
-curl -s -XPOST http://127.0.0.1:8093/scan \
-     -H 'content-type: application/json' \
-     -d '{"target":"https://scanme.nmap.org","profile":"quick"}' | jq
-# → {"id":"dast-...", "status":"queued"}
-
-# Poll
-SCAN_ID=...
-curl -s http://127.0.0.1:8093/scans/$SCAN_ID | jq '{status, stats, findings: .findings[0:3]}'
-```
-
-## Wire frontend
-
-```bash
-cp frontend/vsp_dast_panel.js static/
-sed -i '/vsp_email_panel\.js/a\    <script src="/vsp_dast_panel.js"></script>' static/index.html
-```
-
-## UI features
-
-- **5 KPI cards**: Scans / Critical / High / Medium / Findings
-- **+ New scan** modal with 3-card profile picker (visual selection)
-- **Live progress**: scan list refreshes every 5s, detail modal polls every 2s
-- **Animated progress bar** for running scans (CSS keyframe pulse)
-- **Finding viewer**: severity pills, CVE badges, CVSS, references, tags
-- **Drill-down**: click finding for full description + reference URLs
-
-## Authorization warning
-
-Built-in: scan modal shows ⚠ banner reminding user to only scan owned/permitted targets. This is **mandatory** for ethical use.
+## Risk
+LOW — adds 1 route, doesn't modify existing behavior.
+Idempotent (marker check + grep guard).
+Compile-checked in apply.sh (rolls back if Go build fails).
