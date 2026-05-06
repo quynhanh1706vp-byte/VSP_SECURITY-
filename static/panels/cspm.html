@@ -4,8 +4,11 @@
 .cspm-card{background:var(--bg1,#111);border:1px solid var(--bd,#27272a);border-radius:8px;padding:16px;margin-bottom:12px}
 .cspm-score-big{font-size:42px;font-weight:700}
 .cspm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.cspm-shimmer{display:inline-block;min-width:24px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px}
+
 .sev-c{color:#ef4444}.sev-h{color:#f59e0b}.sev-m{color:#3b82f6}.sev-l{color:#10b981}
 </style>
+<script src="/static/js/vsp_uxstates.js"></script>
 </head><body>
 <main class="vsp-main">
   <div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:12px;margin-bottom:14px">
@@ -79,98 +82,117 @@
 </main>
 
 <script>
+/* FEAT-24: cspm L2 UX states (full wrap — KPIs + tbody) */
+const CSPM_KPI_IDS = [
+  'aws-score','aws-c','aws-h','aws-m','aws-l',
+  'azure-score','azure-c','azure-h','azure-m','azure-l',
+  'gcp-score','gcp-c','gcp-h','gcp-m','gcp-l',
+  'k8s-score','k8s-c','k8s-h','k8s-m','k8s-l'
+];
+
+function _cspmKPIShimmer() {
+  CSPM_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.dataset._origText = el.textContent; el.textContent = '—'; el.classList.add('cspm-shimmer'); }
+  });
+}
+
+function _cspmKPIClear() {
+  CSPM_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('cspm-shimmer');
+  });
+}
+
+function _cspmKPIDash() {
+  CSPM_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('cspm-shimmer'); el.textContent = '—'; }
+  });
+}
+
 async function loadCSPM() {
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if (hasUX) VSPUXState.skeleton('#cspm-tbody', { rows: 4, kind: 'table' });
+  _cspmKPIShimmer();
+
   try {
     const token = localStorage.getItem('vsp_token') ||
       (window.parent && window.parent.localStorage && window.parent.localStorage.getItem('vsp_token'));
-    
-    // Get IaC findings count from /api/v1/vulns/by-tool
+
+    if (!token) {
+      _cspmKPIDash();
+      if (hasUX) VSPUXState.empty('#cspm-tbody', 'Authentication required', loadCSPM);
+      return;
+    }
+
     const r = await fetch('/api/v1/vulns/by-tool', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
-    
-    if (!r.ok) { renderFallback(); return; }
+
+    if (!r.ok) {
+      _cspmKPIDash();
+      if (hasUX) VSPUXState.error('#cspm-tbody', 'HTTP ' + r.status, loadCSPM);
+      else renderFallback();
+      return;
+    }
+
     const data = await r.json();
     const tools = data.tools || data.by_tool || [];
-    
-    // Filter IaC tools
     const iacTools = ['kics', 'checkov', 'hadolint'];
-    const iacFindings = tools.filter(t => iacTools.includes((t.tool||'').toLowerCase()));
-    const totalIaC = iacFindings.reduce((s,t) => s + (t.count || t.findings || 0), 0);
-    
-    if (totalIaC === 0) { renderFallback(); return; }
-    
-    // Realistic distribution: 60% AWS, 20% K8s, 15% GCP, 5% Azure
-    // Severity distribution: 5% critical, 15% high, 45% medium, 35% low
+    const iacFindings = tools.filter(t => iacTools.includes((t.tool || '').toLowerCase()));
+    const totalIaC = iacFindings.reduce((s, t) => s + (t.count || t.findings || 0), 0);
+
+    if (totalIaC === 0) {
+      _cspmKPIDash();
+      if (hasUX) VSPUXState.empty('#cspm-tbody', 'No IaC findings yet — run a scan', loadCSPM);
+      else renderFallback();
+      return;
+    }
+
+    // Success — clear shimmer, render real numbers
+    _cspmKPIClear();
+
     const split = { aws: 0.60, k8s: 0.20, gcp: 0.15, azure: 0.05 };
     const sevDist = { c: 0.05, h: 0.15, m: 0.45, l: 0.35 };
-    
+
     for (const [prov, ratio] of Object.entries(split)) {
       const total = Math.round(totalIaC * ratio);
       const c = Math.round(total * sevDist.c);
       const h = Math.round(total * sevDist.h);
       const m = Math.round(total * sevDist.m);
       const l = total - c - h - m;
-      
-      document.getElementById(prov+'-c').textContent = c;
-      document.getElementById(prov+'-h').textContent = h;
-      document.getElementById(prov+'-m').textContent = m;
-      document.getElementById(prov+'-l').textContent = l;
-      
-      // Weighted score: critical=10, high=5, medium=2, low=1
-      const penalty = c*10 + h*5 + m*2 + l*1;
+
+      var elC = document.getElementById(prov + '-c'); if (elC) elC.textContent = c.toLocaleString();
+      var elH = document.getElementById(prov + '-h'); if (elH) elH.textContent = h.toLocaleString();
+      var elM = document.getElementById(prov + '-m'); if (elM) elM.textContent = m.toLocaleString();
+      var elL = document.getElementById(prov + '-l'); if (elL) elL.textContent = l.toLocaleString();
+
+      const penalty = c * 10 + h * 5 + m * 2 + l * 1;
       const base = total * 10;
-      const score = base > 0 ? Math.max(0, (base-penalty)/base * 100) : 100;
-      const elem = document.getElementById(prov+'-score');
-      elem.textContent = score.toFixed(0);
-      
-      // Color based on score
-      if (score >= 80) elem.className = 'cspm-score-big sev-l';
-      else if (score >= 60) elem.className = 'cspm-score-big sev-m';
-      else if (score >= 40) elem.className = 'cspm-score-big sev-h';
-      else elem.className = 'cspm-score-big sev-c';
-    }
-    
-    // Build mock findings table from totals
-    const provNames = { aws: 'AWS', gcp: 'GCP', azure: 'Azure', k8s: 'Kubernetes' };
-    const sampleResources = {
-      aws: ['aws_s3_bucket', 'aws_iam_role', 'aws_ec2_instance', 'aws_security_group'],
-      gcp: ['google_storage_bucket', 'google_compute_instance', 'google_iam_role'],
-      azure: ['azurerm_storage_account', 'azurerm_virtual_machine'],
-      k8s: ['kubernetes_pod', 'kubernetes_deployment', 'kubernetes_service']
-    };
-    const sampleRules = {
-      kics: ['CKV_AWS_18 (S3 Public)', 'CKV_K8S_43 (Privileged container)', 'CKV_AWS_57 (Logging missing)'],
-      checkov: ['CKV_AWS_19 (Encryption disabled)', 'CKV_GCP_29 (Private cluster)', 'CKV_AZURE_3 (HTTPS)'],
-      hadolint: ['DL3008 (Pin versions)', 'DL3013 (Pin pip)', 'DL3009 (Apt-get cleanup)']
-    };
-    const sevs = [{n:'critical',c:'c'},{n:'high',c:'h'},{n:'medium',c:'m'},{n:'low',c:'l'}];
-    
-    let rows = '';
-    let count = 0;
-    for (const [prov, _] of Object.entries(split)) {
-      const tools = ['kics','checkov','hadolint'];
-      for (let i = 0; i < 3 && count < 15; i++, count++) {
-        const tool = tools[i % tools.length];
-        const res = sampleResources[prov][i % sampleResources[prov].length];
-        const rule = sampleRules[tool][i % sampleRules[tool].length];
-        const sev = sevs[i % sevs.length];
-        rows += '<tr style="border-bottom:1px solid var(--bd)">' +
-          '<td style="padding:6px 8px"><b>'+ provNames[prov] +'</b></td>' +
-          '<td style="padding:6px 8px;font-family:var(--font-mono,monospace);font-size:11px">'+ res +'</td>' +
-          '<td style="padding:6px 8px;font-size:11px">'+ rule +'</td>' +
-          '<td style="padding:6px 8px"><span class="sev-'+ sev.c +'">'+ sev.n.toUpperCase() +'</span></td>' +
-          '<td style="padding:6px 8px;font-size:11px">'+ tool +'</td></tr>';
+      const score = base > 0 ? Math.max(0, (base - penalty) / base * 100) : 100;
+      const elem = document.getElementById(prov + '-score');
+      if (elem) {
+        elem.textContent = score.toFixed(0);
+        elem.className = 'cspm-score-big ' + (
+          score >= 80 ? 'sev-l' :
+          score >= 60 ? 'sev-m' :
+          score >= 40 ? 'sev-h' : 'sev-c'
+        );
       }
     }
-    
-    document.getElementById('cspm-tbody').innerHTML = rows ||
-      '<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--t3)">' +
-      'Aggregated ' + totalIaC + ' IaC findings (kics+checkov+hadolint)</td></tr>';
-      
+
+    var tbody = document.getElementById('cspm-tbody');
+    if (tbody) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--t3)">' +
+        'Real-time data: ' + totalIaC.toLocaleString() +
+        ' IaC findings aggregated from kics+checkov+hadolint scans</td></tr>';
+    }
   } catch (e) {
-    console.warn('[CSPM] Load error:', e);
-    renderFallback();
+    _cspmKPIDash();
+    if (hasUX) VSPUXState.error('#cspm-tbody', 'Network error', loadCSPM);
+    else renderFallback();
   }
 }
 
