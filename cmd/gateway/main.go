@@ -825,7 +825,8 @@ func main() {
 
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
-		r.Use(vspMW.NewUserRateLimiter(600, time.Minute)) // per-user: 600 req/min
+		// VSP_PATCH_PERF_01 — bumped 600 → 3000 to absorb dashboard burst (panel fan-out ~50 req/3s)
+	r.Use(vspMW.NewUserRateLimiter(3000, time.Minute)) // per-user: 3000 req/min
 
 		// Auth
 		// Sprint 5 Day 1: Public config endpoint — frontend reads auth.mode to decide fetch strategy
