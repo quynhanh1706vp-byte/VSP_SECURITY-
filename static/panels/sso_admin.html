@@ -1,3 +1,4 @@
+/* FEAT-18 PATCH APPLIED */
 <!doctype html>
 <html lang="en">
 <head>
@@ -221,6 +222,7 @@ function escapeHtml(s) {
 }
 
 async function loadProviders() {
+  if(typeof VSPUXState !== 'undefined') VSPUXState.skeleton('#providers-body', {rows: 4});
  const tbody = document.getElementById('providers-body');
  try {
  const r = await fetch('/api/v1/sso/providers', { headers: { ...AUTH_HEADERS } });
@@ -229,7 +231,7 @@ async function loadProviders() {
  const list = d.providers || [];
 
  if (list.length === 0) {
- tbody.innerHTML = '<tr><td colspan="6" class="empty">No SSO providers configured. Click "+ Add Provider" to create one.</td></tr>';
+ if(typeof VSPUXState !== 'undefined'){VSPUXState.empty('#providers-body','No SSO providers — click + Add Provider to create one',loadProviders);}else{tbody.innerHTML = '<tr><td colspan="6" class="empty">No SSO providers.</td></tr>';}
  return;
  }
 
@@ -248,7 +250,7 @@ async function loadProviders() {
  </tr>
  `).join('');
  } catch (e) {
- tbody.innerHTML = `<tr><td colspan="6" class="empty">Error: ${escapeHtml(e.message)}</td></tr>`;
+ if(typeof VSPUXState !== 'undefined'){VSPUXState.error('#providers-body', 'Error: '+e.message, loadProviders);}else{tbody.innerHTML = `<tr><td colspan="6" class="empty">Error: ${escapeHtml(e.message)}</td></tr>`;}
  }
 }
 
