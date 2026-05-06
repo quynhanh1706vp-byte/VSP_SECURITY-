@@ -1,7 +1,4 @@
-/* VSPUXState v1.1 — unified skeleton/empty/error UI states + telemetry.
- * v1.1 (FEAT-35): adds VSPUXState.history()/clearHistory(), 'vsp:ux' CustomEvent,
- *                 and TELEMETRY_BUFFER ring buffer (50 entries, FIFO).
- * v1.0 — unified skeleton/empty/error UI states for all panels.
+/* VSPUXState v1.0 — unified skeleton/empty/error UI states for all panels.
  * Created by FEAT-04. Use this instead of inline helpers.
  *
  * API:
@@ -20,34 +17,6 @@
   if (global.VSPUXState) return; // idempotent
 
   var CSS_INJECTED = false;
-  /* FEAT-35: telemetry ring buffer */
-  var TELEMETRY_BUFFER = [];
-  var TELEMETRY_MAX = 50;
-
-  function _emit(panel, state, meta) {
-    var entry = { ts: Date.now(), panel: panel || "?", state: state, meta: meta || null };
-    TELEMETRY_BUFFER.push(entry);
-    if (TELEMETRY_BUFFER.length > TELEMETRY_MAX) TELEMETRY_BUFFER.shift();
-    try {
-      if (typeof CustomEvent === "function" && global.dispatchEvent) {
-        global.dispatchEvent(new CustomEvent("vsp:ux", { detail: entry }));
-      }
-    } catch (e) { /* dispatch failure non-fatal — buffer still updated */ }
-  }
-
-  function _panelOf(el) {
-    if (!el) return "?";
-    /* Prefer explicit data-vsp-panel attribute on element or ancestor */
-    var p = el.closest && el.closest("[data-vsp-panel]");
-    if (p) return p.getAttribute("data-vsp-panel");
-    /* Fallback: derive from element ID prefix (e.g. "asset-tbody" → "asset") */
-    var id = el.id || "";
-    if (id) {
-      var m = id.match(/^([a-z][a-z0-9]+)[-_]/i);
-      if (m) return m[1];
-    }
-    return "?";
-  }
   var CSS = [
     ".vsp-uxs-shimmer{height:18px;border-radius:4px;",
     "background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);",
@@ -120,7 +89,6 @@
       for (var k = 0; k < rows; k++) html += div;
     }
     el.innerHTML = html;
-    _emit(_panelOf(el), "skeleton", { rows: rows, kind: kind });
   }
 
   function _stateHTML(cls, icon, msg, retryFn, kind, cs) {
@@ -145,7 +113,6 @@
     if (!el) return;
     var kind = detectKind(el);
     el.innerHTML = _stateHTML("vsp-uxs-empty", "∅", msg || "No data", retryFn, kind, colspan(el));
-    _emit(_panelOf(el), "empty", { msg: msg });
   }
 
   function error(target, msg, retryFn) {
@@ -154,28 +121,15 @@
     if (!el) return;
     var kind = detectKind(el);
     el.innerHTML = _stateHTML("vsp-uxs-error", "⚠", msg || "Error", retryFn, kind, colspan(el));
-    _emit(_panelOf(el), "error", { msg: msg });
   }
 
   function clear(target) {
     var el = resolve(target);
     if (el) el.innerHTML = "";
-    if (el) _emit(_panelOf(el), "clear", null);
   }
 
-  global.VSPUXState = {
-    skeleton: skeleton,
-    empty: empty,
-    error: error,
-    clear: clear,
-    history: function (panel) {
-      if (!panel) return TELEMETRY_BUFFER.slice();
-      return TELEMETRY_BUFFER.filter(function (e) { return e.panel === panel; });
-    },
-    clearHistory: function () { TELEMETRY_BUFFER.length = 0; },
-    VERSION: "1.1"
-  };
+  global.VSPUXState = { skeleton: skeleton, empty: empty, error: error, clear: clear, VERSION: "1.0" };
   if (typeof console !== "undefined" && console.log) {
-    console.log("[VSPUXState] v1.1 loaded — VSPUXState.{skeleton,empty,error,clear,history,clearHistory}");
+    console.log("[VSPUXState] v1.0 loaded — VSPUXState.{skeleton,empty,error,clear}");
   }
 })(typeof window !== "undefined" ? window : this);
