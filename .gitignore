@@ -239,6 +239,8 @@ reports/
 
 # Each Sprint 1 F* feature script — explicit per-file allow
 !static/js/vsp_bulk_f1.js
+!static/vsp_uxstates.js
+!static/js/vsp_uxstates.js
 # (future entries: !static/js/vsp_filter_f2.js, vsp_cvss_sort_f3.js, ...)
 
 # Defensive: keep .bak / generated artifacts ignored inside patches/

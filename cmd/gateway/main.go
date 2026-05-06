@@ -619,6 +619,11 @@ func main() {
 		http.ServeFile(w, r, "./static/vsp_dast_panel.js")
 	})
 
+	// FEAT-04: vsp_uxstates.js — shared skeleton/empty/error UI module
+	r.Get("/vsp_uxstates.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_uxstates.js")
+	})
+
 	// Serve JS assets from ./static/js/ (dom-safe.js, vsp_iframe_bootstrap.js, etc.)
 	// These scripts are referenced by index.html and panel HTML files.
 	r.Get("/static/js/*", http.StripPrefix("/static/js/",
