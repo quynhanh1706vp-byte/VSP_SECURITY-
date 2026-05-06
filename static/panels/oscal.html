@@ -65,6 +65,8 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
 .b-partial{background:rgba(250,204,21,.15);color:#facc15}
 .b-na{background:var(--bg3);color:var(--t3)}
 .b-not-impl{background:rgba(239,68,68,.15);color:#ef4444}
+
+.oscal-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
 </style>
 <script>
 function escapeHtml(s) {
@@ -77,6 +79,7 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 </script>
+<script src="/static/js/vsp_uxstates.js"></script>
 </head>
 <body>
 
@@ -184,19 +187,65 @@ function escapeHtml(s) {
 <div class="ssdf-grid" id="ssdf-content">Loading…</div>
 
 <script>
+/* FEAT-26: oscal L2 UX states */
+const OSCAL_KPI_IDS = ['kpi-ssdf-total', 'kpi-ssdf-impl', 'kpi-ssdf-pct'];
+
+function _oscalKPIShimmer() {
+  OSCAL_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.classList.add('oscal-shimmer'); }
+  });
+}
+function _oscalKPIClear() {
+  OSCAL_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('oscal-shimmer');
+  });
+}
+function _oscalKPIDash() {
+  OSCAL_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('oscal-shimmer'); el.textContent = '—'; }
+  });
+}
+
 async function loadKPIs() {
+  _oscalKPIShimmer();
   try {
     const res = await fetch('/api/p4/ssdf/practices');
+    if (!res.ok) {
+      _oscalKPIDash();
+      console.warn('[FEAT-26] loadKPIs HTTP', res.status);
+      return;
+    }
     const d = await res.json();
+    _oscalKPIClear();
     document.getElementById('kpi-ssdf-total').textContent = d.total || '—';
     document.getElementById('kpi-ssdf-impl').textContent = d.by_status?.implemented || '0';
     document.getElementById('kpi-ssdf-pct').textContent = (d.implementation_pct || 0) + '% attestation-ready';
-  } catch(e) { console.error(e); }
+  } catch(e) {
+    _oscalKPIDash();
+    console.error('[FEAT-26] loadKPIs failed:', e);
+  }
 }
 
 async function loadSSDF() {
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var hasData = false;
+  var container = document.getElementById('ssdf-content');
+  if (container && container.children.length > 0 && container.querySelector('.ssdf-group')) {
+    hasData = true;
+  }
+  if (hasUX && !hasData) {
+    VSPUXState.skeleton('#ssdf-content', { rows: 4, kind: 'card' });
+  }
+
   try {
     const res = await fetch('/api/p4/ssdf/practices');
+    if (!res.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#ssdf-content', 'HTTP ' + res.status, loadAll);
+      return;
+    }
     const d = await res.json();
     const groupsMap = {PO: 'Prepare Organization', PS: 'Protect Software', PW: 'Produce Well-Secured', RV: 'Respond to Vulns'};
     const byGroup = {};
@@ -204,7 +253,12 @@ async function loadSSDF() {
       if (!byGroup[p.group_code]) byGroup[p.group_code] = [];
       byGroup[p.group_code].push(p);
     }
-    const container = document.getElementById('ssdf-content');
+
+    if (!d.practices || d.practices.length === 0) {
+      if (hasUX) VSPUXState.empty('#ssdf-content', 'No SSDF practices loaded yet', loadAll);
+      return;
+    }
+
     container.innerHTML = '';
     for (const g of ['PO','PS','PW','RV']) {
       const prac = byGroup[g] || [];
@@ -226,7 +280,10 @@ async function loadSSDF() {
       `;
       container.appendChild(box);
     }
-  } catch(e) { console.error(e); }
+  } catch(e) {
+    console.error('[FEAT-26] loadSSDF failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#ssdf-content', 'Network error', loadAll);
+  }
 }
 
 async function viewModel(path) {
