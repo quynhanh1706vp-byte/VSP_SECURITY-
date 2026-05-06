@@ -1,3 +1,4 @@
+/* FEAT-11 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -226,6 +227,12 @@ async function runDiff(){
   var rid2=document.getElementById('rid2').value;
   if(!rid1||!rid2){alert('Select two runs');return;}
   if(rid1===rid2){alert('Select different runs');return;}
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX){
+    VSPUXState.skeleton('#tbl-new', {rows: 3});
+    VSPUXState.skeleton('#tbl-fixed', {rows: 3});
+    VSPUXState.skeleton('#tbl-persisted', {rows: 3});
+  }
   var btn=document.getElementById('diff-btn');
   btn.textContent='Loading…';btn.disabled=true;
   try{
@@ -254,15 +261,24 @@ async function runDiff(){
     document.getElementById('tc-new').textContent=newItems.length;
     document.getElementById('tc-fixed').textContent=fixedItems.length;
     document.getElementById('tc-persisted').textContent=persistedItems.length;
-    // Tables
-    renderRows(newItems,'tbl-new');
-    renderRows(fixedItems,'tbl-fixed');
-    renderRows(persistedItems,'tbl-persisted');
+    // Tables — use VSPUXState.empty if section empty
+    if(newItems.length===0 && hasUX) VSPUXState.empty('#tbl-new', 'No new findings', runDiff);
+    else renderRows(newItems,'tbl-new');
+    if(fixedItems.length===0 && hasUX) VSPUXState.empty('#tbl-fixed', 'No findings fixed', runDiff);
+    else renderRows(fixedItems,'tbl-fixed');
+    if(persistedItems.length===0 && hasUX) VSPUXState.empty('#tbl-persisted', 'No persistent findings', runDiff);
+    else renderRows(persistedItems,'tbl-persisted');
     // Show
     document.getElementById('kpi-row').style.display='';
     document.getElementById('tabs').style.display='';
   }catch(e){
-    alert('Diff failed: '+e.message);
+    if(hasUX){
+      VSPUXState.error('#tbl-new', 'Diff failed: '+e.message, runDiff);
+      VSPUXState.error('#tbl-fixed', 'Diff failed: '+e.message, runDiff);
+      VSPUXState.error('#tbl-persisted', 'Diff failed: '+e.message, runDiff);
+    } else {
+      alert('Diff failed: '+e.message);
+    }
   }finally{
     btn.textContent='Compare ↗';btn.disabled=false;
   }
