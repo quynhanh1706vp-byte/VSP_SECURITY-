@@ -2,6 +2,8 @@
 # PERF-04: Disable nginx rate limit at edge.
 # Patches BOTH sites-available AND sites-enabled because on this host
 # they are independent files (not symlinked).
+# Backups go to /etc/nginx/ (NOT inside sites-enabled/) to avoid nginx
+# loading them as duplicate configs (would cause "duplicate upstream" emerg).
 set -euo pipefail
 
 CONFS=(
@@ -15,13 +17,13 @@ for NGINX_CONF in "${CONFS[@]}"; do
     echo "skip: $NGINX_CONF not found"
     continue
   fi
-
   if sudo grep -q "PERF-04 PATCH APPLIED" "$NGINX_CONF"; then
     echo "skip: $NGINX_CONF already patched"
     continue
   fi
 
-  BACKUP="${NGINX_CONF}.bak.perf04"
+  BACKUP_NAME="$(basename "$NGINX_CONF").bak.perf04"
+  BACKUP="/etc/nginx/${BACKUP_NAME}"
   sudo cp "$NGINX_CONF" "$BACKUP"
   echo "Backup: $BACKUP"
 
@@ -38,12 +40,11 @@ for NGINX_CONF in "${CONFS[@]}"; do
   echo "Patched: $NGINX_CONF"
 done
 
-# Verify nothing limit_* is still active in resolved config
 ACTIVE=$(sudo nginx -T 2>/dev/null | grep -cE "^\s*limit_(req|conn)(\s|_zone\s|_status\s)" || true)
 echo "Active limit_* directives (resolved nginx -T): $ACTIVE (expect 0)"
 
 if [[ "$ACTIVE" != "0" ]]; then
-  echo "Some directives still active. Inspect with: sudo nginx -T | grep limit_"
+  echo "Some directives still active. Inspect: sudo nginx -T | grep limit_"
   exit 1
 fi
 
