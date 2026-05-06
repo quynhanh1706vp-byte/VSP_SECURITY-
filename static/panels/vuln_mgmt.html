@@ -1,7 +1,42 @@
+/* FEAT-02 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<script src="/static/js/vsp_iframe_bootstrap.js"></script>
+
+<style>
+/* FEAT-02 vuln_mgmt skeleton shimmer */
+@keyframes vm-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+<script src="/static/js/vsp_iframe_bootstrap.js">
+/* FEAT-02 helpers ─ skeleton/empty/error states */
+function _vmShowSkeleton(){
+  var ids=['trend','cves','tools','sla','fixable'];
+  ids.forEach(function(id){var el=document.querySelector('[data-vm="'+id+'"]')||document.getElementById('vm-'+id);if(el)el.innerHTML='<div class="vm-skel" style="height:60px;border-radius:6px;background:linear-gradient(90deg,var(--surface) 0%,var(--border) 50%,var(--surface) 100%);background-size:200% 100%;animation:vm-shimmer 1.2s infinite"></div>';});
+}
+function _vmShowEmpty(which){
+  var el=document.querySelector('[data-vm="'+which+'"]')||document.getElementById('vm-'+which);
+  if(el)el.innerHTML='<div style="text-align:center;padding:32px;color:var(--t3);font-size:12px"><div style="font-size:24px;margin-bottom:6px">∅</div>No '+which+' data</div>';
+}
+function _vmShowError(which,msg){
+  var el=document.querySelector('[data-vm="'+which+'"]')||document.getElementById('vm-'+which);
+  if(el)el.innerHTML='<div style="text-align:center;padding:32px;color:var(--red);font-size:12px"><div style="font-size:24px;margin-bottom:6px">⚠</div>'+(msg||'Error')+'<div style="margin-top:8px"><button class="btn btn-sm" onclick="location.reload()">Reload</button></div></div>';
+}
+async function _vmLoadSLA(){
+  if(typeof TOKEN==='undefined'||!TOKEN){_vmShowEmpty('sla');return;}
+  try{
+    var r=await fetch((typeof API!=='undefined'?API:'')+'/api/v1/vsp/sla_tracker',{headers:{Authorization:'Bearer '+TOKEN}});
+    if(!r.ok){_vmShowError('sla','HTTP '+r.status);return;}
+    var d=await r.json();
+    var rows=[
+      {label:'Critical (24h)',pct:Math.round(((d.critical_met||0)/Math.max(1,d.critical_total||1))*100),color:'var(--red)'},
+      {label:'High (7d)',     pct:Math.round(((d.high_met    ||0)/Math.max(1,d.high_total    ||1))*100),color:'var(--amber)'},
+      {label:'Medium (30d)',  pct:Math.round(((d.medium_met  ||0)/Math.max(1,d.medium_total  ||1))*100),color:'var(--blue)'},
+      {label:'Low (90d)',     pct:Math.round(((d.low_met     ||0)/Math.max(1,d.low_total     ||1))*100),color:'var(--green)'},
+    ];
+    if(typeof renderSLA==='function')renderSLA(rows);
+  }catch(e){_vmShowError('sla','Network error');}
+}
+</script>
 <script>
 /* VSP auth fetch guard v2 — polling retry */
 (function(){
@@ -230,46 +265,12 @@ var _cveData = [];      // single source of truth (FIX B7: removed duplicate ren
 var _toolData = [];
 
 // ── Sample data ────────────────────────────────────────────
-var SAMPLE_TREND = (function() {
-  var days = [], now = new Date();
-  // Simulate declining trend (good security posture)
-  var crit = 12, high = 32, med = 58;
-  for (var i = 29; i >= 0; i--) {
-    var d = new Date(now);
-    d.setDate(d.getDate() - i);
-    // Add some realistic variance
-    crit = Math.max(0, crit + (Math.random() > 0.6 ? -1 : Math.random() > 0.8 ? 1 : 0));
-    high = Math.max(0, high + (Math.random() > 0.55 ? -1 : Math.random() > 0.8 ? 2 : 0));
-    med  = Math.max(0, med  + (Math.random() > 0.5  ? -2 : Math.random() > 0.7 ? 3 : 0));
-    days.push({ date: d.toISOString().slice(0, 10), critical: crit, high: high, medium: med });
-  }
-  return days;
-})();
+var SAMPLE_TREND = [];
+var SAMPLE_CVES = [];
 
-var SAMPLE_CVES = [
-  { cve:'CVE-2023-44487', severity:'CRITICAL', count:12, tools:'semgrep, gosec',     fixable:true,  desc:'HTTP/2 Rapid Reset Attack. Allows remote DoS by resetting streams rapidly.' },
-  { cve:'CVE-2024-21626', severity:'CRITICAL', count:8,  tools:'trivy',              fixable:true,  desc:'runc container escape vulnerability. Allows host filesystem access from container.' },
-  { cve:'CVE-2023-45283', severity:'HIGH',     count:15, tools:'gosec, semgrep',     fixable:false, desc:'Path traversal in filepath.Clean on Windows. Non-critical on Linux hosts.' },
-  { cve:'CVE-2024-24790', severity:'HIGH',     count:9,  tools:'govulncheck',        fixable:true,  desc:'net/netip: unexpected behavior from Is methods for IPv4-mapped IPv6 addresses.' },
-  { cve:'CVE-2023-39325', severity:'HIGH',     count:7,  tools:'trivy, govulncheck', fixable:true,  desc:'golang.org/x/net/http2: rapid stream resets can cause excessive work in http2 server.' },
-  { cve:'CVE-2024-34156', severity:'MEDIUM',   count:22, tools:'semgrep',            fixable:false, desc:'encoding/gob: stack exhaustion in Decoder.Decode.' },
-  { cve:'CVE-2023-48795', severity:'MEDIUM',   count:11, tools:'trivy',              fixable:true,  desc:'Prefix truncation attack on BPP (SSH protocol).' },
-  { cve:'CVE-2024-28180', severity:'LOW',      count:5,  tools:'gosec',              fixable:true,  desc:'jose-go: Decompression bomb vulnerability in JWE (compact serialization).' },
-];
+var SAMPLE_TOOLS = [];
 
-var SAMPLE_TOOLS = [
-  { tool:'semgrep',      critical:3,  high:18, medium:42, low:12, total:75 },
-  { tool:'gosec',        critical:5,  high:12, medium:28, low:8,  total:53 },
-  { tool:'trivy',        critical:4,  high:9,  medium:19, low:6,  total:38 },
-  { tool:'govulncheck',  critical:2,  high:7,  medium:11, low:3,  total:23 },
-];
-
-var SAMPLE_SLA = [
-  { label:'Critical (24h)', pct:62, color:'var(--red)' },
-  { label:'High (7d)',      pct:79, color:'var(--amber)' },
-  { label:'Medium (30d)',   pct:91, color:'var(--blue)' },
-  { label:'Low (90d)',      pct:97, color:'var(--green)' },
-];
+var SAMPLE_SLA = [];
 
 // ── Helpers ────────────────────────────────────────────────
 function sevPill(s) {
@@ -444,12 +445,8 @@ function renderFixable(cves) {
 
 // ── Render all sample data ─────────────────────────────────
 function renderSampleData() {
-  renderTrend(SAMPLE_TREND);
-  renderCVEs(SAMPLE_CVES);
-  renderTools(SAMPLE_TOOLS);
-  renderSLA(SAMPLE_SLA);
-  renderFixable(SAMPLE_CVES);
-  updateKPIs(SAMPLE_CVES, SAMPLE_TOOLS);
+  /* FEAT-02: no initial mock render — loadFromAPI() will populate */
+  _vmShowSkeleton();
 }
 
 // ── Main load ──────────────────────────────────────────────
@@ -469,14 +466,14 @@ async function loadAll() {
     var cd = res[1].cves  || [];
     var ld = res[2].tools || [];
 
-    renderTrend(td.length ? td : SAMPLE_TREND);
-    renderCVEs( cd.length ? cd : SAMPLE_CVES);
-    renderTools(ld.length ? ld : SAMPLE_TOOLS);
-    renderSLA(SAMPLE_SLA);
-    renderFixable(cd.length ? cd : SAMPLE_CVES);
+    if(td.length){renderTrend(td);}else{_vmShowEmpty('trend');}
+    if(cd.length){renderCVEs(cd);}else{_vmShowEmpty('cves');}
+    if(ld.length){renderTools(ld);}else{_vmShowEmpty('tools');}
+    _vmLoadSLA();
+    if(cd.length){renderFixable(cd);}
 
     // FIX B9: use actual CVE list; if empty from API, use sample — but NEVER mix trend sums
-    updateKPIs(cd.length ? cd : SAMPLE_CVES, ld.length ? ld : SAMPLE_TOOLS);
+    updateKPIs(cd, ld);
   } catch(e) {
     renderSampleData();
   }
