@@ -102,6 +102,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 .norm-row{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px}.norm-row:last-child{border-bottom:none}
 .norm-rule{flex:1}.norm-pat{font-family:var(--font-mono);font-size:10px;color:var(--t3)}.norm-badge{flex-shrink:0}
 </style>
+<script src="/static/js/vsp_uxstates.js"></script>
 </head>
 <body>
 <div class="hdr">
@@ -404,18 +405,58 @@ setInterval(function(){
   if(_tab==='throughput')renderThroughput();
   if(_tab==='sources'&&_tick%5===0)renderSources();
 },1000);
+/* FEAT-25: log_pipeline L2 UX states */
 async function loadSources(){
-  if(!TOKEN)return;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var hasData = (typeof SOURCES !== 'undefined' && SOURCES && SOURCES.length > 0);
+
+  // Only show skeleton on initial load, not on re-poll (avoid flicker)
+  if (hasUX && !hasData) {
+    VSPUXState.skeleton('#sources-grid', { rows: 5, kind: 'card' });
+  }
+
+  if (!TOKEN) {
+    if (hasUX && !hasData) {
+      VSPUXState.empty('#sources-grid', 'Authentication required', loadSources);
+    }
+    return;
+  }
+
   var h = {};
-  try{
-    var [sr,st]=await Promise.all([
-      fetch(API+'/api/v1/logs/sources', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-      fetch(API+'/api/v1/logs/stats', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+  try {
+    var [sr, st] = await Promise.all([
+      fetch(API + '/api/v1/logs/sources', { credentials: 'same-origin', headers: h })
+        .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); }),
+      fetch(API + '/api/v1/logs/stats', { credentials: 'same-origin', headers: h })
+        .then(function(r){ return r.json(); })
+        .catch(function(){ return null; }),
     ]);
-    if(sr&&sr.sources&&sr.sources.length){SOURCES=sr.sources.map(function(s){return Object.assign({eps:0,lastEvent:'—',parseRate:100,events:0,status:s.status||'ok'},s);});renderSources();}
-    if(st&&st.eps)document.getElementById('k-eps').textContent=(st.eps||0).toLocaleString();
-    if(st&&st.total_today)document.getElementById('k-today').textContent=((st.total_today||0)/1e6).toFixed(1)+'M';
-  }catch(e){}
+
+    if (sr && sr.sources && sr.sources.length) {
+      SOURCES = sr.sources.map(function(s){
+        return Object.assign({ eps: 0, lastEvent: '—', parseRate: 100, events: 0, status: s.status || 'ok' }, s);
+      });
+      renderSources();
+    } else {
+      SOURCES = [];
+      if (hasUX) VSPUXState.empty('#sources-grid', 'No log sources configured — click + Add source', loadSources);
+      var kSrc = document.getElementById('k-sources'); if (kSrc) kSrc.textContent = '0';
+    }
+
+    if (st && st.eps) {
+      var kEps = document.getElementById('k-eps');
+      if (kEps) kEps.textContent = (st.eps || 0).toLocaleString();
+    }
+    if (st && st.total_today) {
+      var kToday = document.getElementById('k-today');
+      if (kToday) kToday.textContent = ((st.total_today || 0) / 1e6).toFixed(1) + 'M';
+    }
+  } catch (e) {
+    console.error('[FEAT-25] loadSources failed:', e);
+    if (hasUX && !hasData) {
+      VSPUXState.error('#sources-grid', 'Failed to load sources', loadSources);
+    }
+  }
 }
 function _onTokenReady(){}
 window.addEventListener('message', function(e) {
