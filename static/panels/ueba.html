@@ -1,3 +1,4 @@
+/* FEAT-06 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -228,25 +229,9 @@ function esc(s) {
 }
 
 var TOKEN='',API='',ANOMALIES=[];
-var SAMPLE=[
-  {type:'score_spike',severity:'CRITICAL',score:88,baseline:72,current:22,deviation_pct:70,
-   message:'Security score dropped 50pts (baseline 72, now 22)',entity:'security_score',detected_at:'2026-04-02T10:47:00Z',
-   why:'The security score dropped from baseline 72 to 22 — a 70% deviation (4.2 standard deviations below mean). This indicates a significant new vulnerability or policy violation.',
-   history:[{ts:'-14d',val:71},{ts:'-10d',val:74},{ts:'-7d',val:69},{ts:'-5d',val:73},{ts:'-3d',val:75},{ts:'-1d',val:71},{ts:'now',val:22}],
-   recs:[{icon:'◈',label:'Investigate new findings',desc:'Review 82 new HIGH findings introduced in last scan',color:'var(--red2)',tc:'var(--red)'},{icon:'▶',label:'Run Gate FAIL playbook',desc:'Trigger automated response',color:'var(--purple2)',tc:'var(--purple)'}]},
-  {type:'gate_fail_streak',severity:'HIGH',score:72,baseline:0.62,current:3,deviation_pct:50,
-   message:'3 consecutive gate FAILs (baseline pass rate 62%)',entity:'gate_decisions',detected_at:'2026-04-02T09:30:00Z',
-   why:'Three consecutive scans resulted in gate FAIL. Baseline shows 62% pass rate, making three consecutive failures statistically unlikely (p < 0.06).',
-   history:[{ts:'-5',val:1},{ts:'-4',val:0},{ts:'-3',val:1},{ts:'-2',val:0},{ts:'-1',val:0},{ts:'last',val:0}],
-   recs:[{icon:'◈',label:'Review policy thresholds',desc:'Check if gate policy was recently tightened',color:'var(--amber2)',tc:'var(--amber)'}]},
-  {type:'sla_breach',severity:'MEDIUM',score:42,baseline:0,current:3,deviation_pct:100,
-   message:'3 findings exceeded 14-day SLA without remediation',entity:'remediations',detected_at:'2026-04-02T08:10:00Z',
-   why:'Three HIGH severity findings have been open for more than 14 days without assignment, violating the defined SLA policy.',
-   history:[],
-   recs:[{icon:'⊕',label:'Auto-assign to security-oncall',desc:'Assign overdue findings',color:'var(--blue2)',tc:'var(--blue)'}]},
-];
-var SCORE_HIST=[71,74,69,73,68,75,71,74,72,70,73,68,25,22];
-var BL_SCORE=72;
+var SAMPLE=[];
+var SCORE_HIST=[];
+var BL_SCORE=null;
 var CHECKS=[
   {name:'Score spike detection',type:'score_spike',desc:'Alert when score drops >2σ',sensitivity:'high'},
   {name:'Findings surge',type:'findings_surge',desc:'Alert when findings exceed baseline+2σ',sensitivity:'medium'},
@@ -360,15 +345,68 @@ async function runAnalysis(){
   btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Analyzing…';
   badge.textContent='⏳ Running…';badge.className='pill pill-amber';
   if(TOKEN){try{var r=await fetch(API+'/api/v1/ueba/analyze',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:'{}'});if(r.ok){var d=await r.json();if(d.anomalies&&d.anomalies.length)ANOMALIES=d.anomalies;}}catch(e){}}
-  if(!ANOMALIES.length)ANOMALIES=SAMPLE.slice();
+  /* FEAT-06: no mock fallback — empty state shown by VSPUXState */
   renderAnomalies();renderChecks();
   badge.textContent='✓ '+new Date().toLocaleTimeString('en-GB',{hour12:false});badge.className='pill pill-green';
   btn.disabled=false;btn.textContent='▶ Analyze now';
 }
-function loadBaseline(){
-  var def={avg_score:72,std_score:8.4,avg_findings:82,gate_pass_rate:.38,avg_scans_per_day:3.2,period:'30d'};
-  if(!TOKEN){renderBaseline(def);return;}
-  fetch(API+'/api/v1/ueba/baseline',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json();}).then(renderBaseline).catch(function(){renderBaseline(def);});
+async function loadBaseline(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX) VSPUXState.skeleton('#score-bars', {rows: 1, height: 80});
+  if(!TOKEN){
+    if(hasUX) VSPUXState.empty('#score-bars', 'Authentication required', loadBaseline);
+    return;
+  }
+  try{
+    var r = await fetch(API+'/api/v1/ueba/baseline', {headers:{Authorization:'Bearer '+TOKEN}});
+    if(!r.ok){
+      if(hasUX) VSPUXState.error('#score-bars', 'HTTP '+r.status, loadBaseline);
+      return;
+    }
+    var d = await r.json();
+    if(!d || (d.avg_score==null && !d.history)){
+      if(hasUX) VSPUXState.empty('#score-bars', 'No baseline data', loadBaseline);
+      return;
+    }
+    // Apply real data: history -> SCORE_HIST, avg_score -> BL_SCORE
+    if(d.history && d.history.length){
+      SCORE_HIST = d.history.map(function(h){return h.val||h.score||h;});
+    }
+    if(d.avg_score!=null) BL_SCORE = d.avg_score;
+    renderBaseline(d);
+    if(typeof renderScoreBars==='function') renderScoreBars();
+    loadAnomalies();
+  }catch(e){
+    if(hasUX) VSPUXState.error('#score-bars', 'Network error', loadBaseline);
+  }
+}
+
+async function loadAnomalies(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var target = '#anomalies-list';
+  if(hasUX) VSPUXState.skeleton(target, {rows: 3});
+  if(!TOKEN){
+    if(hasUX) VSPUXState.empty(target, 'Authentication required', loadAnomalies);
+    return;
+  }
+  try{
+    var r = await fetch(API+'/api/v1/ueba/analyze', {headers:{Authorization:'Bearer '+TOKEN}});
+    if(!r.ok){
+      if(hasUX) VSPUXState.error(target, 'HTTP '+r.status, loadAnomalies);
+      return;
+    }
+    var d = await r.json();
+    var arr = d.anomalies || d.results || [];
+    if(!arr.length){
+      ANOMALIES = [];
+      if(hasUX) VSPUXState.empty(target, 'No anomalies detected', loadAnomalies);
+      return;
+    }
+    ANOMALIES = arr;
+    if(typeof renderAnomalies==='function') renderAnomalies();
+  }catch(e){
+    if(hasUX) VSPUXState.error(target, 'Network error', loadAnomalies);
+  }
 }
 function _onTokenReady(){}
 window.addEventListener('message', function(e) {
@@ -385,7 +423,8 @@ function _applyTheme(theme){
   renderScoreBars();
 }
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
-renderScoreBars();renderChecks();loadBaseline();
+/* FEAT-06: defer renderScoreBars until loadBaseline returns data */
+renderChecks();loadBaseline();
 </script>
 <script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
