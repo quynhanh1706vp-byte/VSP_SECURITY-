@@ -201,6 +201,32 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 var TOKEN='',API='',_assetFilter='',_activeAsset=null;
 var ASSETS=[];
 var ALL_FINDINGS=[];
+/* FEAT-34: assets L2 UX states (mirror p4_compliance pattern, override-aware) */
+function _assetSkel(target, opts) {
+  if (typeof VSPUXState !== 'undefined') VSPUXState.skeleton(target, opts || { rows: 4, kind: 'row' });
+}
+function _assetEmpty(target, msg, retry) {
+  if (typeof VSPUXState !== 'undefined') VSPUXState.empty(target, msg, retry);
+}
+function _assetErr(target, msg, retry) {
+  if (typeof VSPUXState !== 'undefined') VSPUXState.error(target, msg, retry);
+}
+function _assetHasData(target) {
+  var el = typeof target === 'string' ? document.querySelector(target) : target;
+  if (!el) return false;
+  if (el.children.length === 0) return false;
+  if (el.querySelector('.vsp-uxs-skel-row')) return false;
+  return true;
+}
+function _assetClearFilters() {
+  var sb = document.getElementById('search-box'); if (sb) sb.value = '';
+  var ef = document.getElementById('env-filter'); if (ef) ef.value = '';
+  var sff = document.getElementById('sev-filter'); if (sff) sff.value = '';
+  var stf = document.getElementById('status-filter'); if (stf) stf.value = '';
+  _assetFilter = '';
+  _activeAsset = null;
+  renderAssets();
+}
 function sevClass(s){return {CRITICAL:'crit',HIGH:'high',MEDIUM:'med',LOW:'low'}[(s||'').toUpperCase()]||'';}
 function sevBadge(s){var m={CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'};return '<span class="pill '+(m[(s||'').toUpperCase()]||'pill-gray')+'">'+(s||'?')+'</span>';}
 function sevColor(s){return {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--green)'}[(s||'').toUpperCase()]||'var(--t3)';}
@@ -241,6 +267,18 @@ function renderAssets(){
     return true;
   });
   document.getElementById('asset-count-sub').textContent=list.length+' assets';
+  if (!list.length) {
+    if (typeof VSPUXState !== 'undefined') {
+      var hasFilter = !!(q || env || _assetFilter);
+      _assetEmpty('#asset-tbody',
+        hasFilter ? 'No assets match filter' : 'No assets in inventory',
+        hasFilter ? _assetClearFilters : loadAssets);
+    } else {
+      document.getElementById('asset-tbody').innerHTML='';
+    }
+    renderFindings();
+    return;
+  }
   document.getElementById('asset-tbody').innerHTML=list.map(function(a){
     var sc=a.risk_score||0,rc=riskColor(sc);
     return '<tr data-id="'+a.id+'" onclick="openAssetModal(this.dataset.id)">'
@@ -266,7 +304,18 @@ function renderFindings(){
   });
   document.getElementById('findings-title').textContent=_activeAsset?_activeAsset.name+' findings':'All findings';
   document.getElementById('findings-sub').textContent=list.length+' findings';
-  document.getElementById('findings-list').innerHTML=!list.length?'<div style="text-align:center;padding:16px;color:var(--t3);font-size:11px">No findings match filter</div>':list.map(function(f){
+  if (!list.length) {
+    if (typeof VSPUXState !== 'undefined') {
+      var hasFilter = !!(sf || stf || q);
+      _assetEmpty('#findings-list',
+        hasFilter ? 'No findings match filter' : (_activeAsset ? 'No findings for this asset' : 'No findings yet'),
+        hasFilter ? _assetClearFilters : null);
+    } else {
+      document.getElementById('findings-list').innerHTML='<div style="text-align:center;padding:16px;color:var(--t3);font-size:11px">No findings match filter</div>';
+    }
+    return;
+  }
+  document.getElementById('findings-list').innerHTML=list.map(function(f){
     var sc=sevClass((f.severity||'').toUpperCase());
     return '<div class="finding '+sc+'" data-id="'+f.id+'" onclick="openFindingModal(this.dataset.id)">'
       +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+f.title+'</span><span class="f-ts">'+f.asset+'</span></div>'
@@ -278,6 +327,7 @@ function renderFindings(){
 async function openAssetModal(id){
   var a=ASSETS.find(function(x){return x.id===id;});if(!a)return;
   // Fetch real findings từ API — chỉ dùng UUID thật
+  if (typeof VSPUXState !== 'undefined') _assetSkel('#amod-findings', { rows: 3, kind: 'card' });
   if(TOKEN){
     var isUUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     if(isUUID){
@@ -295,7 +345,9 @@ async function openAssetModal(id){
             a.findings_count=d.findings.length;
           }
         }
-      }catch(e){}
+      }catch(e){
+        console.warn('[FEAT-34] modal fetch failed, using seed:', e.message);
+      }
     }
   }
   document.getElementById('amod-name').textContent=a.name;
@@ -319,7 +371,7 @@ async function openAssetModal(id){
     return '<div class="finding '+sevClass((f.severity||'').toUpperCase())+'" data-fid="'+f.id+'" onclick="openFindingModal(this.dataset.fid)">'
       +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+f.title+'</span></div>'
       +'<div class="f-file">'+f.file+':'+f.line+' · '+f.rule+'</div></div>';
-  }).join(''):'<div style="color:var(--t3);font-size:11px">No findings for this asset</div>';
+  }).join(''):(typeof VSPUXState!=='undefined'?(_assetEmpty('#amod-findings','No findings for this asset',null),''):'<div style=\"color:var(--t3);font-size:11px\">No findings for this asset</div>');
   document.getElementById('amod-all-btn').onclick=function(){closeModal('asset-modal');_activeAsset=a;renderFindings();};
   document.getElementById('asset-modal').classList.add('open');
 }
@@ -345,23 +397,47 @@ function openFindingModal(id){
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 async function loadAssets(){
-  var tbody=document.getElementById('asset-tbody');
-  var setSkel=function(){if(tbody)tbody.innerHTML='<tr class="skel-row"><td colspan="6"><div class="skel"></div></td></tr>'.repeat(5);};
-  var setEmpty=function(msg){if(tbody)tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)"><div style="font-size:32px;margin-bottom:8px">∅</div>'+(msg||'No assets found')+'<div style="margin-top:12px"><button class="btn btn-sm" onclick="loadAssets()">Retry</button></div></td></tr>';};
-  var setError=function(msg){if(tbody)tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--red)"><div style="font-size:32px;margin-bottom:8px">⚠</div>'+(msg||'Failed to load')+'<div style="margin-top:12px"><button class="btn btn-sm" onclick="loadAssets()">Retry</button></div></td></tr>';};
-  if(!TOKEN){setEmpty('Authentication required');return;}
-  setSkel();
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if(!TOKEN){
+    if (hasUX) _assetEmpty('#asset-tbody', 'Authentication required', null);
+    return;
+  }
+  if (hasUX && !_assetHasData('#asset-tbody')) {
+    _assetSkel('#asset-tbody', { rows: 6, kind: 'row' });
+    _assetSkel('#heatmap-wrap', { rows: 3, kind: 'card' });
+  }
   var h={Authorization:'Bearer '+TOKEN};
   try{
     var r=await fetch(API+'/api/v1/assets',{headers:h});
-    if(!r.ok){setError('HTTP '+r.status);return;}
+    if(!r.ok) throw new Error('HTTP '+r.status);
     var d=await r.json();
-    if(!d.assets||!d.assets.length){ASSETS=[];updateKPIs();renderHeatmap();setEmpty('No assets discovered yet');return;}
+    if(!d.assets||!d.assets.length){
+      ASSETS=[];updateKPIs();renderHeatmap();
+      if (hasUX) _assetEmpty('#asset-tbody', 'No assets discovered yet', loadAssets);
+      return;
+    }
     ASSETS=d.assets.map(function(a){return Object.assign({},a,{tool:a.tool||'scanner',findings_count:a.total_findings||a.findings_count||0,risk_score:a.risk_score||Math.round((a.critical||0)*20+(a.high||0)*8+(a.medium||0)*3+(a.low||0)),status:a.critical>0?'critical':a.high>0?'high':a.medium>0?'medium':'clean'});});
-    /* FEAT-01: no initial render — loadAssets() will populate when token ready */ if(TOKEN){loadAssets();}else{var tb=document.getElementById('asset-tbody');if(tb)tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">Waiting for authentication…</td></tr>';}
+    updateKPIs();renderHeatmap();renderAssets();
+    /* FIXME(FEAT-34b): the next line causes self-recursion — kept for backward-compat, see followup commit */
+    if(TOKEN){/* loadAssets(); */}else{var tb=document.getElementById('asset-tbody');if(tb)tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">Waiting for authentication…</td></tr>';}
     // Also load findings
-    try{var rf=await fetch(API+'/api/v1/vsp/findings?limit=500',{headers:h});if(rf.ok){var df=await rf.json();ALL_FINDINGS=(df.findings||df.items||[]).map(function(f){return Object.assign({asset_id:f.asset_id||'',asset:f.asset||''},f);});if(typeof renderFindings==='function')renderFindings();}}catch(e){}
-  }catch(e){setError('Network error');}
+    try{
+      var rf=await fetch(API+'/api/v1/vsp/findings?limit=500',{headers:h});
+      if(rf.ok){
+        var df=await rf.json();
+        ALL_FINDINGS=(df.findings||df.items||[]).map(function(f){return Object.assign({asset_id:f.asset_id||'',asset:f.asset||''},f);});
+        if(typeof renderFindings==='function')renderFindings();
+      }
+    }catch(e){
+      console.warn('[FEAT-34] findings fetch failed (non-fatal):', e.message);
+    }
+  }catch(e){
+    console.error('[FEAT-34] loadAssets failed:', e);
+    if (hasUX) {
+      _assetErr('#asset-tbody', 'Failed to load assets: '+(e.message||'network error'), loadAssets);
+      _assetErr('#heatmap-wrap', 'Failed to load heatmap', loadAssets);
+    }
+  }
 }
 function _onTokenReady(){}
 window.addEventListener('message', function(e) {
