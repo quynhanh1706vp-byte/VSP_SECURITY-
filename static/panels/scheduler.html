@@ -1,4 +1,3 @@
-/* FEAT-03 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -8,22 +7,10 @@
 .sch-shimmer{height:18px;border-radius:4px;background:linear-gradient(90deg,var(--surface) 0%,var(--border) 50%,var(--surface) 100%);background-size:200% 100%;animation:sch-shimmer 1.2s infinite}
 @keyframes sch-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 </style>
-<script src="/static/js/vsp_iframe_bootstrap.js">
-/* FEAT-03 helpers — skeleton/empty/error states for scheduler */
-function _schSetState(which,kind,msg){
-  var sel=which==='schedules'?'#sched-tbody':'#runs-list';
-  var el=document.querySelector(sel);if(!el)return;
-  if(kind==='skeleton'){
-    if(which==='schedules'){el.innerHTML='<tr class="sch-skel"><td colspan="6"><div class="sch-shimmer"></div></td></tr>'.repeat(4);}
-    else{el.innerHTML='<div class="sch-skel"><div class="sch-shimmer" style="height:48px;margin:6px 0"></div></div>'.repeat(3);}
-  } else if(kind==='empty'){
-    var inner='<div style="text-align:center;padding:32px;color:var(--t3);font-size:12px"><div style="font-size:28px;margin-bottom:8px">∅</div>'+(msg||'No data')+'</div>';
-    el.innerHTML=which==='schedules'?'<tr><td colspan="6">'+inner+'</td></tr>':inner;
-  } else if(kind==='error'){
-    var inner='<div style="text-align:center;padding:32px;color:var(--red);font-size:12px"><div style="font-size:28px;margin-bottom:8px">⚠</div>'+(msg||'Error')+'<div style="margin-top:10px"><button class="btn btn-sm" onclick="(typeof loadSchedules===\'function\'&&loadSchedules());(typeof loadRecentRuns===\'function\'&&loadRecentRuns())">Retry</button></div></div>';
-    el.innerHTML=which==='schedules'?'<tr><td colspan="6">'+inner+'</td></tr>':inner;
-  }
-}
+<script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script src="/static/js/vsp_uxstates.js"></script>
+<script>
+/* FEAT-29: legacy _schSetState helper removed — migrated to VSPUXState v1.0 */
 </script>
 <script>
 /* VSP auth fetch guard v2 — polling retry */
@@ -652,13 +639,13 @@ document.addEventListener('keydown', function(e) {
 
 // ── API loaders ────────────────────────────────────────────
 async function loadSchedules() {
-  _schSetState('schedules','skeleton');
-  if (!TOKEN) { _schSetState('schedules','empty','Waiting for authentication'); return; }
+  VSPUXState.skeleton('#sched-list', { rows: 4, kind: 'card' });
+  if (!TOKEN) { VSPUXState.empty('#sched-list', 'Waiting for authentication', loadSchedules); return; }
   try {
     var r = await fetch(API + '/api/v1/schedules', { headers: { Authorization: 'Bearer ' + TOKEN } });
-    if (!r.ok) { _schSetState('schedules','error','HTTP '+r.status); return; }
+    if (!r.ok) { VSPUXState.error('#sched-list', 'HTTP '+r.status, loadSchedules); return; }
     var d = await r.json();
-    if (!d.schedules || !d.schedules.length) { SCHEDULES=[]; renderSchedules(); _schSetState('schedules','empty','No schedules configured'); return; }
+    if (!d.schedules || !d.schedules.length) { SCHEDULES=[]; renderSchedules(); VSPUXState.empty('#sched-list', 'No schedules configured', loadSchedules); return; }
     {
       {
         SCHEDULES = d.schedules.map(function(s) {
@@ -684,18 +671,18 @@ async function loadSchedules() {
 }
 
 async function loadRecentRuns() {
-  _schSetState('runs','skeleton');
-  if (!TOKEN) { _schSetState('runs','empty','Waiting for authentication'); return; }
+  VSPUXState.skeleton('#runs-list', { rows: 5, kind: 'card' });
+  if (!TOKEN) { VSPUXState.empty('#runs-list', 'Waiting for authentication', loadRecentRuns); return; }
   try {
     var r = await fetch(API + '/api/v1/vsp/runs?limit=20', { headers: { Authorization: 'Bearer ' + TOKEN } });
-    if (!r.ok) { _schSetState('runs','error','HTTP '+r.status); return; }
+    if (!r.ok) { VSPUXState.error('#runs-list', 'HTTP '+r.status, loadRecentRuns); return; }
     var d = await r.json();
-    if (!d.runs || !d.runs.length) { RECENT_RUNS=[]; renderRecentRuns(); _schSetState('runs','empty','No runs yet'); return; }
+    if (!d.runs || !d.runs.length) { RECENT_RUNS=[]; renderRecentRuns(); VSPUXState.empty('#runs-list', 'No runs yet', loadRecentRuns); return; }
     RECENT_RUNS = d.runs.map(function(r) {
       return { rid: r.rid||r.id, sched: r.schedule_name||'Manual', status: r.status, gate: r.gate||'—', findings: r.total_findings||0, dur: '—', ts: (r.created_at||'').slice(0,16), mode: r.mode||'' };
     });
     renderRecentRuns();
-  } catch(e) { _schSetState('runs','error','Network error'); }
+  } catch(e) { VSPUXState.error('#runs-list', 'Network error', loadRecentRuns); }
 }
 
 // ── Token / theme message bus ──────────────────────────────
