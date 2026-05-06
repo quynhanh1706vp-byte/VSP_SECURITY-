@@ -234,6 +234,8 @@ reports/
 !patches/findings/**
 !patches/perf/
 !patches/perf/**
+!patches/feat/
+!patches/feat/**
 
 # Each Sprint 1 F* feature script — explicit per-file allow
 !static/js/vsp_bulk_f1.js
