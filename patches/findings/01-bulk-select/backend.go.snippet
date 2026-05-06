@@ -1,0 +1,201 @@
+// =============================================================
+// VSP_PATCH_F1 — Bulk actions for Findings tab
+// Add to cmd/dev-stub/main.go
+// Register with:
+//   mux.HandleFunc("/api/v1/vulns/bulk",      handleVulnsBulk)
+//   mux.HandleFunc("/api/v1/vulns/bulk/undo", handleVulnsBulkUndo)
+// =============================================================
+
+// IMPORTS NEEDED (add to existing import block if missing):
+//   "crypto/rand"
+//   "encoding/hex"
+//   "encoding/json"
+//   "log"
+//   "net/http"
+//   "sync"
+//   "time"
+
+// ─── In-memory undo store (replace with Redis/DB in next sprint) ───
+type bulkActionRecord struct {
+	UndoToken string    `json:"undo_token"`
+	Action    string    `json:"action"`
+	CVEIDs    []string  `json:"cve_ids"`
+	Metadata  any       `json:"metadata"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+var (
+	bulkUndoMu    sync.Mutex
+	bulkUndoStore = make(map[string]*bulkActionRecord)
+)
+
+// Garbage-collect undo records older than 60s. Call once from main():
+//   go cleanupBulkUndoStore()
+func cleanupBulkUndoStore() {
+	t := time.NewTicker(30 * time.Second)
+	defer t.Stop()
+	for range t.C {
+		bulkUndoMu.Lock()
+		cutoff := time.Now().Add(-60 * time.Second)
+		for k, rec := range bulkUndoStore {
+			if rec.CreatedAt.Before(cutoff) {
+				delete(bulkUndoStore, k)
+			}
+		}
+		bulkUndoMu.Unlock()
+	}
+}
+
+func newUndoToken() string {
+	b := make([]byte, 12)
+	_, _ = rand.Read(b)
+	return "und_" + hex.EncodeToString(b)
+}
+
+// ─── Request / Response types ───
+type bulkVulnsReq struct {
+	Action   string         `json:"action"`   // resolve | suppress | assign | create_poam
+	CVEIDs   []string       `json:"cve_ids"`
+	Metadata map[string]any `json:"metadata"`
+}
+
+type bulkVulnsResp struct {
+	OK        bool   `json:"ok"`
+	Affected  int    `json:"affected"`
+	ActionID  string `json:"action_id"`
+	UndoToken string `json:"undo_token"`
+	Message   string `json:"message,omitempty"`
+}
+
+type bulkUndoReq struct {
+	UndoToken string `json:"undo_token"`
+}
+
+// ─── Handlers ───
+
+// POST /api/v1/vulns/bulk
+func handleVulnsBulk(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req bulkVulnsReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	defer r.Body.Close()
+
+	// Validate action
+	switch req.Action {
+	case "resolve", "suppress", "assign", "create_poam":
+		// ok
+	default:
+		writeJSONErr(w, http.StatusBadRequest, "unknown action: "+req.Action)
+		return
+	}
+
+	// Validate IDs (sanity bounds)
+	if len(req.CVEIDs) == 0 {
+		writeJSONErr(w, http.StatusBadRequest, "cve_ids cannot be empty")
+		return
+	}
+	if len(req.CVEIDs) > 1000 {
+		writeJSONErr(w, http.StatusBadRequest, "max 1000 cve_ids per request")
+		return
+	}
+
+	// TODO(F1-DB): wire to real findings store. For now mock-success:
+	//   - 'resolve'    → UPDATE findings SET status='resolved' WHERE cve_id = ANY($1)
+	//   - 'suppress'   → INSERT INTO suppressions ...
+	//   - 'assign'     → UPDATE findings SET assignee = $1 WHERE ...
+	//   - 'create_poam'→ INSERT INTO poam_items ...
+	// Idempotency: dedupe by (action, cve_id, actor_id, current_minute) hash.
+
+	// Generate action ID + undo token
+	actionID := "act_" + hex.EncodeToString(randBytes(8))
+	undoToken := newUndoToken()
+
+	bulkUndoMu.Lock()
+	bulkUndoStore[undoToken] = &bulkActionRecord{
+		UndoToken: undoToken,
+		Action:    req.Action,
+		CVEIDs:    req.CVEIDs,
+		Metadata:  req.Metadata,
+		CreatedAt: time.Now(),
+	}
+	bulkUndoMu.Unlock()
+
+	log.Printf("[bulk-vulns] action=%s n=%d action_id=%s", req.Action, len(req.CVEIDs), actionID)
+
+	writeJSON(w, http.StatusOK, bulkVulnsResp{
+		OK:        true,
+		Affected:  len(req.CVEIDs),
+		ActionID:  actionID,
+		UndoToken: undoToken,
+	})
+}
+
+// POST /api/v1/vulns/bulk/undo
+func handleVulnsBulkUndo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req bulkUndoReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONErr(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	defer r.Body.Close()
+
+	bulkUndoMu.Lock()
+	rec, ok := bulkUndoStore[req.UndoToken]
+	if ok {
+		delete(bulkUndoStore, req.UndoToken)
+	}
+	bulkUndoMu.Unlock()
+
+	if !ok {
+		writeJSONErr(w, http.StatusNotFound, "undo token expired or unknown")
+		return
+	}
+
+	// TODO(F1-DB): reverse the action in DB:
+	//   - resolved → reopen
+	//   - suppressed → unsuppress
+	//   - assigned → revert to previous assignee (need to store prev value!)
+	//   - poam → mark POA&M item as cancelled
+
+	log.Printf("[bulk-vulns] UNDO action=%s n=%d token=%s", rec.Action, len(rec.CVEIDs), rec.UndoToken)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":       true,
+		"reverted": len(rec.CVEIDs),
+		"action":   rec.Action,
+	})
+}
+
+// ─── Helpers (skip if you already have these in main.go) ───
+
+func writeJSON(w http.ResponseWriter, status int, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func writeJSONErr(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]any{"ok": false, "error": msg})
+}
+
+func randBytes(n int) []byte {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return b
+}
+
+// =============================================================
+// END VSP_PATCH_F1
+// =============================================================

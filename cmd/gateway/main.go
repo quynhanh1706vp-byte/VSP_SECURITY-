@@ -877,6 +877,10 @@ func main() {
 		r.Delete("/api/v1/vsp/batch/{batch_id}", batchH.Cancel)
 		r.Get("/api/v1/vsp/findings", findingsH.List)
 		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
+		// VSP_PATCH_F1_ROUTES_BEGIN
+		r.Post("/api/v1/vulns/bulk",      handleVulnsBulk)
+		r.Post("/api/v1/vulns/bulk/undo", handleVulnsBulkUndo)
+		// VSP_PATCH_F1_ROUTES_END
 		// ─── ConMon (Continuous Monitoring) — Phase 4.5.1 ─────────────
 		r.Get("/api/v1/conmon/schedules", conmonH.Schedules)
 		r.Post("/api/v1/conmon/schedules", conmonH.Schedules)

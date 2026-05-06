@@ -114,7 +114,7 @@ vsp-agent
 *.exe
 
 # Claude/AI work artifacts — not part of production repo
-patches/
+patches/*
 *.bak_hotfix
 
 # Sprint 4 — local backups before codemod (DO NOT COMMIT)
@@ -223,3 +223,21 @@ reports/
 /standalone_main.go
 /api.go
 /scanner.go
+
+# === Sprint 1 Findings Pro — F1-F8 whitelist (added by patch) ===
+# Override the broad ignores for production-tracked Sprint 1 deliverables.
+# Note: the original `patches/` rule above was changed to `patches/*` so
+# that re-include rules below can take effect.
+
+# Un-ignore the entire patches/findings/ subtree
+!patches/findings/
+!patches/findings/**
+
+# Each Sprint 1 F* feature script — explicit per-file allow
+!static/js/vsp_bulk_f1.js
+# (future entries: !static/js/vsp_filter_f2.js, vsp_cvss_sort_f3.js, ...)
+
+# Defensive: keep .bak / generated artifacts ignored inside patches/
+patches/findings/**/*.bak
+patches/findings/**/*.bak.*
+patches/findings/**/*.tmp
