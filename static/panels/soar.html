@@ -1,3 +1,4 @@
+/* FEAT-14 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -872,6 +873,14 @@ RUN_HISTORY=DEF_RUNS;
 
 // ── Render sidebar list ────────────────────────────────────
 function renderList(){
+  /* FEAT-14: empty state if PLAYBOOKS empty */
+  if(typeof VSPUXState !== 'undefined' && (!PLAYBOOKS || PLAYBOOKS.length===0)){
+    var el = document.querySelector('#pb-list');
+    if(el){
+      VSPUXState.empty('#pb-list', 'No playbooks configured', function(){location.reload();});
+      return;
+    }
+  }
   var enabled=PLAYBOOKS.filter(function(p){return p.enabled;}).length;
   document.getElementById('k-total').textContent=PLAYBOOKS.length;
   document.getElementById('k-runs').textContent=RUN_HISTORY.length;
@@ -1063,6 +1072,11 @@ function renderDetailWithStatus(pb,statuses,outputs){
 
 // ── Run history ────────────────────────────────────────────
 function loadRunHistory(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX){
+    var el = document.querySelector('#runs-list') || document.querySelector('#run-history');
+    if(el) VSPUXState.skeleton(el, {rows: 4, kind: 'card'});
+  }
   document.getElementById('history-sub').textContent=RUN_HISTORY.length+' runs';
   document.getElementById('run-history').innerHTML=RUN_HISTORY.map(function(r){
     var sc=r.status==='success'?'pill-green':'pill-red';
