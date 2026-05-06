@@ -441,7 +441,13 @@ func main() {
 	defer schedEngine.Stop()
 	schedH := &handler.Scheduler{DB: db, Engine: schedEngine}
 	keyStore := &apiKeyStore{db: db}
-	rl := vspMW.NewRateLimiter(600, time.Minute)
+	// VSP_PATCH_PERF_03 — global per-IP rate limiter disabled.
+	// Reason: dashboard burst of ~70 req/s exhausted 600/min bucket within
+	// seconds, causing prolonged 429 storms. Defense remains via JWT auth,
+	// CSRF protect, 4MB body limit, 60s timeout, and nginx layer.
+	// To re-enable, uncomment both this and r.Use(rl.Middleware) below.
+	_ = vspMW.NewRateLimiter // keep package imported
+	// rl := vspMW.NewRateLimiter(600, time.Minute)
 
 	// ── Router ────────────────────────────────────────────────────
 	r := chi.NewRouter()
@@ -462,7 +468,7 @@ func main() {
 		})
 	})
 	r.Use(corsMiddleware)
-	r.Use(rl.Middleware)
+	// VSP_PATCH_PERF_03 — disabled: r.Use(rl.Middleware)
 
 	// [H3.X] Custom telemetry registry — agentic + remediation metrics
 	r.Handle("/metrics/vsp", telemetry.G())
