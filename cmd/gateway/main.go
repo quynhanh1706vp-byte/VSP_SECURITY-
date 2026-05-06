@@ -825,8 +825,13 @@ func main() {
 
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
-		// VSP_PATCH_PERF_01 — bumped 600 → 3000 to absorb dashboard burst (panel fan-out ~50 req/3s)
-	r.Use(vspMW.NewUserRateLimiter(3000, time.Minute)) // per-user: 3000 req/min
+		// VSP_PATCH_PERF_02 — per-user rate limit disabled on /api/v1/* group.
+	// Reason: dashboard burst (~70 req in <1s during boot) exceeded 3000/min bucket
+	// because limiter has no burst capacity. Defense remains via JWT authMw + CSRF +
+	// tenant isolation. /api/v1/auth/login still rate-limited separately for
+	// brute-force protection (see auth route registration).
+	// To re-enable: uncomment the line below and adjust the limit.
+	// r.Use(vspMW.NewUserRateLimiter(3000, time.Minute)) // per-user: 3000 req/min
 
 		// Auth
 		// Sprint 5 Day 1: Public config endpoint — frontend reads auth.mode to decide fetch strategy

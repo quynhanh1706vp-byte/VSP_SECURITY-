@@ -232,6 +232,8 @@ reports/
 # Un-ignore the entire patches/findings/ subtree
 !patches/findings/
 !patches/findings/**
+!patches/perf/
+!patches/perf/**
 
 # Each Sprint 1 F* feature script — explicit per-file allow
 !static/js/vsp_bulk_f1.js
