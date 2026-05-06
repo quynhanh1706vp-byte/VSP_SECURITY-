@@ -1,91 +1,103 @@
-# Phase 7D — DAST (nuclei)
+# PERF-04 — Disable nginx Edge Rate Limit
 
-VSP Dynamic Application Security Testing microservice (port 8093).
+## Why this exists
 
-Wraps `nuclei` CLI for production-grade DAST scans with async runner,
-JSONL parser, and live progress polling.
+PERF-01, PERF-02, and PERF-03 patched the Go gateway's rate limiting:
 
-## Components
+| Patch    | Change                                            | Effect on 429 |
+|----------|---------------------------------------------------|---------------|
+| PERF-01  | Bump global IP limit 600 → 3000 r/min             | None observed |
+| PERF-02  | Disable per-user RL on `/api/v1`                  | None observed |
+| PERF-03  | Disable global IP rate limiter in `main.go`       | None observed |
 
-| File | Lines | Purpose |
-|---|---|---|
-| `cmd/dast-api/main.go` | 600 | Microservice + nuclei runner |
-| `frontend/vsp_dast_panel.js` | 580 | Full UI w/ live polling |
-| `scripts/start-dast-api.sh` | 60 | Launcher |
+After PERF-03 the gateway was clean — `grep "rate.NewLimiter"` showed only
+commented-out lines plus dead-code keep-import. Yet the browser console
+still flooded with 429s on every endpoint.
 
-**Total: ~1240 lines, stdlib only.**
+## Root cause
 
-## Profiles
+`curl -i https://vsp.local/api/v1/events` revealed:
 
-| Profile | Templates | Severity | Timeout |
-|---|---|---|---|
-| `quick` | CVE only | critical, high | 2 min |
-| `standard` | All | critical, high, medium | 8 min |
-| `deep` | All | all | 30 min |
-
-## Endpoints
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | /healthz | Liveness + nuclei detection |
-| GET | /tools/check | nuclei version + path |
-| POST | /scan | `{target, profile}` → returns scan_id (async) |
-| GET | /scans | List (without findings — fast) |
-| GET | /scans/{id} | Full detail with findings |
-| GET | /scans/{id}/findings | Findings only |
-| POST | /scans/{id}/cancel | Cancel running |
-| DELETE | /scans/{id} | Delete record |
-| GET | /stats | KPIs |
-
-## Install nuclei first
-
-```bash
-go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-nuclei -update-templates
-which nuclei  # → /home/test/go/bin/nuclei or similar
+```
+HTTP/2 401
+server: nginx
 ```
 
-If `nuclei` not in PATH for the service, set `PATH` in the systemd unit
-or restart your shell after `go install`.
+The 429s never reached the Go gateway. nginx was rejecting them at the
+edge. Body of the 429 response was an HTML page (default nginx error
+page), which is the giveaway — Go gateway returns plain text or JSON.
 
-## Install service
+`/etc/nginx/sites-available/vsp` had:
 
-```bash
-go build -o vsp-dast-api ./cmd/dast-api
-./scripts/start-dast-api.sh
-curl -s http://127.0.0.1:8093/healthz | jq
+```nginx
+limit_req_zone $binary_remote_addr zone=api_limit:10m    rate=30r/m;
+limit_req_zone $binary_remote_addr zone=auth_limit:10m   rate=5r/m;
+limit_req_zone $binary_remote_addr zone=scan_limit:10m   rate=10r/m;
+limit_req_zone $binary_remote_addr zone=global_limit:10m rate=100r/m;
+limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
+
+limit_conn conn_limit 20;
+limit_req  zone=global_limit burst=50 nodelay;       # 100 r/min global
+# ... per-route limits on /auth, /scan, /api
 ```
 
-## Run a scan
+100 requests/minute is exhausted on a single dashboard load (KPI cards +
+DoD widgets + SSE polling fire ~25-30 requests; refresh 4× and you're
+out). Burst of 50 is consumed almost instantly, then every subsequent
+request returns 429 until the leaky bucket drains.
 
-```bash
-# Submit
-curl -s -XPOST http://127.0.0.1:8093/scan \
-     -H 'content-type: application/json' \
-     -d '{"target":"https://scanme.nmap.org","profile":"quick"}' | jq
-# → {"id":"dast-...", "status":"queued"}
+## What this patch does
 
-# Poll
-SCAN_ID=...
-curl -s http://127.0.0.1:8093/scans/$SCAN_ID | jq '{status, stats, findings: .findings[0:3]}'
+Comments out every `limit_req`, `limit_conn`, `limit_req_zone`,
+`limit_conn_zone`, and `limit_req_status` directive in
+`/etc/nginx/sites-available/vsp`. Adds a `# PERF-04 PATCH APPLIED` marker
+at the top of the file.
+
+After this patch, all rate limiting decisions live in the Go gateway,
+which is consistent with PERF-01/02/03's intent.
+
+## When to roll this back
+
+This is appropriate for **dev/staging** (which matches the current
+`SERVER_ENV=development` in `00-canonical.conf`).
+
+For **production**, rate limiting at the edge is good defense in depth.
+Roll back and instead **raise the limits** to something realistic:
+
+```nginx
+limit_req_zone $binary_remote_addr zone=global_limit:10m rate=6000r/m;
+limit_req_zone $binary_remote_addr zone=api_limit:10m    rate=3000r/m;
+limit_req  zone=global_limit burst=300 nodelay;
 ```
 
-## Wire frontend
+(Run separately — this patch does not do that.)
+
+## Files
+
+- `apply.sh` — apply patch + nginx -t + auto-rollback on syntax error
+- `rollback.sh` — restore from `.bak.perf04`
+- `README.md` — this file
+
+## Apply
 
 ```bash
-cp frontend/vsp_dast_panel.js static/
-sed -i '/vsp_email_panel\.js/a\    <script src="/vsp_dast_panel.js"></script>' static/index.html
+bash patches/perf/04-disable-nginx-ratelimit/apply.sh
+sudo systemctl reload nginx
 ```
 
-## UI features
+## Verify
 
-- **5 KPI cards**: Scans / Critical / High / Medium / Findings
-- **+ New scan** modal with 3-card profile picker (visual selection)
-- **Live progress**: scan list refreshes every 5s, detail modal polls every 2s
-- **Animated progress bar** for running scans (CSS keyframe pulse)
-- **Finding viewer**: severity pills, CVE badges, CVSS, references, tags
-- **Drill-down**: click finding for full description + reference URLs
+```bash
+# 1. nginx no longer returns 429 (should be 401 without token)
+curl -k -i https://vsp.local/api/v1/events | head -3
+# Expect: HTTP/2 401
 
-## Authorization warning
+# 2. Browser hard reload — console clean of 429
+```
 
-Built-in: scan modal shows ⚠ banner reminding user to only scan owned/permitted targets. This is **mandatory** for ethical use.
+## Rollback
+
+```bash
+bash patches/perf/04-disable-nginx-ratelimit/rollback.sh
+sudo systemctl reload nginx
+```
