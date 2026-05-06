@@ -1,3 +1,4 @@
+/* FEAT-12 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="vi" data-theme="dark">
 <head>
@@ -278,7 +279,19 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height
 var TOKEN='',API='',_assets=[],_eolData=[],_activeFilter='all';
 
 async function loadData(){
-  if(!TOKEN) return;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  // Skeleton on common UI targets — render functions will replace once data ready
+  if(hasUX){
+    var skelTargets = ['#assets-tbody', '#findings-list', '#eol-list', '#heatmap'];
+    skelTargets.forEach(function(t){
+      var el = document.querySelector(t);
+      if(el) VSPUXState.skeleton(t, {rows: 4});
+    });
+  }
+  if(!TOKEN){
+    if(hasUX) VSPUXState.empty('#assets-tbody', 'Authentication required', loadData);
+    return;
+  }
   var h={Authorization:'Bearer '+TOKEN};
   try{
     var sRes=await fetch(API+'/api/v1/software-inventory/stats',{headers:h}).then(r=>r.json()).catch(()=>({}));
@@ -290,13 +303,23 @@ async function loadData(){
     document.getElementById('k-highrisk').textContent=sRes.critical_assets||0;
     document.getElementById('k-clean').textContent=sRes.clean_assets||_assets.filter(function(a){return a.risk_level==='clean';}).length;
     document.getElementById('last-scan-lbl').textContent='Updated '+new Date().toLocaleTimeString();
-    renderHeatmap();
-    renderAssetTable();
-    renderFindings();
+    if(_assets.length===0 && hasUX){
+      VSPUXState.empty('#assets-tbody', 'No software assets discovered', loadData);
+    } else {
+      renderHeatmap();
+      renderAssetTable();
+      renderFindings();
+    }
     var eRes=await fetch(API+'/api/v1/software-inventory/eol-database',{headers:h}).then(r=>r.ok?r.json():null).catch(()=>null);
     if(eRes&&eRes.entries) _eolData=eRes.entries;
     renderEOL();
-  }catch(e){console.error(e);}
+  }catch(e){
+    console.error(e);
+    if(hasUX){
+      VSPUXState.error('#assets-tbody', 'Failed to load: '+(e.message||'network error'), loadData);
+      VSPUXState.error('#findings-list', 'Failed to load', loadData);
+    }
+  }
 }
 
 function renderHeatmap(){
