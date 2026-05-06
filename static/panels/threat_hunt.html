@@ -1,3 +1,4 @@
+/* FEAT-07 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -259,7 +260,8 @@ async function runHunt(){
 
   document.getElementById('hunt-status').textContent='Hunting...';
   document.getElementById('hunt-status').className='pill pill-amber';
-  document.getElementById('results-wrap').innerHTML='<div class="loading">&#9203; Querying log_events...</div>';
+  if(typeof VSPUXState!=='undefined'){VSPUXState.skeleton('#results-wrap',{rows:5,kind:'card'});}
+  else{document.getElementById('results-wrap').innerHTML='<div class="loading">&#9203; Querying log_events...</div>';}
 
   var params=new URLSearchParams();
   if(q)    params.set('q',q);
@@ -286,9 +288,15 @@ async function runHunt(){
     document.getElementById('hunt-status').textContent=_results.length+' results';
     document.getElementById('hunt-status').className='pill pill-'+(d.total>0?'blue':'gray');
 
-    renderResults(q);
+    if(_results.length===0){
+      if(typeof VSPUXState!=='undefined'){VSPUXState.empty('#results-wrap','No events match these filters',runHunt);}
+      else{document.getElementById('results-wrap').innerHTML='<div class="empty">No results</div>';}
+    } else {
+      renderResults(q);
+    }
   }catch(e){
-    document.getElementById('results-wrap').innerHTML='<div class="empty">Error: '+e.message+'</div>';
+    if(typeof VSPUXState!=='undefined'){VSPUXState.error('#results-wrap','Hunt failed: '+e.message,runHunt);}
+    else{document.getElementById('results-wrap').innerHTML='<div class="empty">Error: '+e.message+'</div>';}
     document.getElementById('hunt-status').textContent='Error';
     document.getElementById('hunt-status').className='pill pill-red';
   }
