@@ -1,3 +1,4 @@
+/* FEAT-17 PATCH APPLIED */
 <!doctype html>
 <html lang="en">
 <head>
@@ -257,7 +258,11 @@ async function getAdvice() {
  btn.disabled = true;
  btn.innerHTML = '<span class="spin"></span> Analyzing...';
  result.classList.remove('empty');
- result.innerHTML = '<div style="padding:48px;text-align:center;color:var(--t3)"><span class="spin"></span> Generating remediation...</div>';
+ if(typeof VSPUXState !== 'undefined'){
+   VSPUXState.skeleton('#result', {rows: 4, kind: 'card'});
+ } else {
+   result.innerHTML = '<div style="padding:48px;text-align:center;color:var(--t3)"><span class="spin"></span> Generating remediation...</div>';
+ }
 
  try {
  const r = await fetch('/api/v1/ai/advise', { method: 'POST',
@@ -270,7 +275,11 @@ async function getAdvice() {
  renderResponse(d);
  loadStats();
  } catch (e) {
- result.innerHTML = `<div style="padding:24px;color:var(--red)">Error: ${escapeHtml(e.message)}</div>`;
+   if(typeof VSPUXState !== 'undefined'){
+     VSPUXState.error('#result', 'Error: '+e.message, getAdvice);
+   } else {
+     result.innerHTML = `<div style="padding:24px;color:var(--red)">Error: ${escapeHtml(e.message)}</div>`;
+   }
  }
  btn.disabled = false;
  btn.textContent = 'Get Remediation';
