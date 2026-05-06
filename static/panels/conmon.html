@@ -1,3 +1,4 @@
+/* FEAT-16 PATCH APPLIED */
 <!doctype html>
 <html lang="en">
 <head>
@@ -252,6 +253,7 @@ async function loadCadence() {
 }
 
 async function loadSchedules() {
+  if(typeof VSPUXState !== 'undefined') VSPUXState.skeleton('#schedules-body', {rows: 4});
  const tbody = document.getElementById('schedules-body');
  try {
  const r = await fetch('/api/v1/conmon/schedules', { headers: { ...AUTH_HEADERS } });
@@ -259,7 +261,7 @@ async function loadSchedules() {
  const list = d.schedules || [];
 
  if (list.length === 0) {
- tbody.innerHTML = '<tr><td colspan="7" class="empty">No schedules. Click "+ New Schedule" to create one.</td></tr>';
+ if(typeof VSPUXState !== 'undefined'){VSPUXState.empty('#schedules-body','No schedules — click + New Schedule to create one',loadSchedules);}else{tbody.innerHTML = '<tr><td colspan="7" class="empty">No schedules.</td></tr>';}
  return;
  }
 
@@ -275,11 +277,12 @@ async function loadSchedules() {
  </tr>
  `).join('');
  } catch (e) {
- tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;
+ if(typeof VSPUXState !== 'undefined'){VSPUXState.error('#schedules-body', 'Error: '+e.message, loadSchedules);}else{tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;}
  }
 }
 
 async function loadDeviations() {
+  if(typeof VSPUXState !== 'undefined') VSPUXState.skeleton('#deviations-body', {rows: 4});
  const tbody = document.getElementById('deviations-body');
  try {
  const url = openOnly ? '/api/v1/conmon/deviations?open=1' : '/api/v1/conmon/deviations';
@@ -294,7 +297,7 @@ async function loadDeviations() {
  : 'Action required';
 
  if (list.length === 0) {
- tbody.innerHTML = `<tr><td colspan="7" class="empty">No ${openOnly ? 'open ' : ''}deviations</td></tr>`;
+ if(typeof VSPUXState !== 'undefined'){VSPUXState.empty('#deviations-body', 'No '+(openOnly?'open ':'')+'deviations', loadDeviations);}else{tbody.innerHTML = `<tr><td colspan="7" class="empty">No ${openOnly ? 'open ' : ''}deviations</td></tr>`;}
  return;
  }
 
@@ -312,7 +315,7 @@ async function loadDeviations() {
  </tr>
  `).join('');
  } catch (e) {
- tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;
+ if(typeof VSPUXState !== 'undefined'){VSPUXState.error('#deviations-body', 'Error: '+e.message, loadDeviations);}else{tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;}
  }
 }
 
