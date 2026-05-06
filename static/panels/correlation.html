@@ -1,3 +1,4 @@
+/* FEAT-13 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -326,7 +327,7 @@ select.form-ctrl option{background:var(--bg2)}
 <script>
 var TOKEN='', API='';
 var RULES=[], INCIDENTS=[];
-var SPARK_DATA=[12,18,9,24,31,19,14,28,44,38,21,17];
+var SPARK_DATA=[];
 var SOURCES=[
   {name:'Scan engine',eps:84,status:'ok'},{name:'Auth/IAM',eps:12,status:'ok'},
   {name:'Git/SCM',eps:28,status:'warn'},{name:'Infra/IAC',eps:4,status:'ok'},
@@ -688,6 +689,14 @@ function renderSpark(){
 // ── API load ───────────────────────────────────────────────
 var _apiLoaded=false;
 function loadFromAPI(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX){
+    var skelTargets = ['#rules-tbody', '#incidents-list', '#src-health', '#sev-breakdown'];
+    skelTargets.forEach(function(t){
+      var el = document.querySelector(t);
+      if(el) VSPUXState.skeleton(t, {rows: 4});
+    });
+  }
   if(!TOKEN) return;
   var h={Authorization:'Bearer '+TOKEN};
   Promise.all([
@@ -770,11 +779,14 @@ function _applyTheme(theme){
 if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 
 // ── Init ───────────────────────────────────────────────────
-renderRules();
-renderIncidents();
-renderSevBreakdown();
-renderSpark();
-renderSrcHealth();
+/* FEAT-13: defer mock render — loadFromAPI populates real data */
+renderSrcHealth();  /* SOURCES is config, OK to render immediately */
+if(typeof VSPUXState!=='undefined'){
+  ['#rules-tbody','#incidents-list'].forEach(function(t){
+    var el=document.querySelector(t);
+    if(el)VSPUXState.skeleton(t,{rows:4});
+  });
+}
 </script>
 <script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
