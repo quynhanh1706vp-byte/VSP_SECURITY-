@@ -1,3 +1,4 @@
+/* FEAT-05 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -167,19 +168,8 @@ select.form-ctrl option{background:var(--bg2)}
 </div>
 <script>
 var TOKEN='',API='';
-var USERS=[
-  {id:'u1',name:'Admin User',email:'admin@vsp.local',role:'admin',last_login:'just now',status:'active',mfa:true,clearance:'UNCLASS'},
-  {id:'u2',name:'SOC Analyst',email:'analyst@vsp.local',role:'analyst',last_login:'2h ago',status:'active',mfa:true,clearance:'UNCLASS'},
-  {id:'u3',name:'Security Engineer',email:'sec-eng@vsp.local',role:'analyst',last_login:'1d ago',status:'active',mfa:false,clearance:'UNCLASS'},
-  {id:'u4',name:'Auditor',email:'audit@vsp.local',role:'viewer',last_login:'3d ago',status:'active',mfa:false,clearance:'UNCLASS'},
-  {id:'u5',name:'CI/CD Bot',email:'cicd@vsp.local',role:'api',last_login:'5m ago',status:'active',mfa:false,clearance:'UNCLASS'},
-];
-var ROLES=[
-  {id:'admin',name:'Administrator',color:'var(--red)',desc:'Full access to all features, user management, system config',perms:['scans.*','findings.*','users.*','admin.*','reports.*','policy.*']},
-  {id:'analyst',name:'SOC Analyst',color:'var(--amber)',desc:'Create scans, manage findings, view all data, no user admin',perms:['scans.*','findings.*','reports.read','policy.read']},
-  {id:'viewer',name:'Read-only Viewer',color:'var(--blue)',desc:'View findings and reports, no modifications',perms:['scans.read','findings.read','reports.read']},
-  {id:'api',name:'API Service Account',color:'var(--purple)',desc:'Programmatic access for CI/CD and integrations',perms:['scans.create','findings.read','reports.read']},
-];
+var USERS=[];
+var ROLES=[];
 var AUDIT=[
   {action:'login',user:'admin@vsp.local',detail:'Login from 127.0.0.1',ts:'just now',level:'info'},
   {action:'scan',user:'admin@vsp.local',detail:'Triggered SAST scan on /home/test/Data/GOLANG_VSP',ts:'29m ago',level:'info'},
@@ -283,7 +273,7 @@ function switchTab(idx){
     document.getElementById('tab-'+['users','roles','audit','keys'][i]).classList.toggle('active',i===idx);
     document.getElementById('pane-'+i).style.display=i===idx?'':'none';
   }
-  if(idx===1)renderRoles();
+  if(idx===1){if(!ROLES.length)loadRoles();else renderRoles();}
   if(idx===2)renderAudit();
   if(idx===3)renderKeys();
 }
@@ -385,34 +375,62 @@ function revokeKey(idx){
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
 async function loadUsers(){
-  if(!TOKEN)return;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX) VSPUXState.skeleton('#users-tbody', {rows: 6});
+  if(!TOKEN){
+    if(hasUX) VSPUXState.empty('#users-tbody', 'Authentication required', loadUsers);
+    return;
+  }
   var h={Authorization:'Bearer '+TOKEN};
   try{
     var r=await fetch(API+'/api/v1/admin/users',{headers:h});
-    if(r.ok){
-      var d=await r.json();
-      if(d.users&&d.users.length){
-        // BUG FIX: API /admin/users response has no `name` field (per OpenAPI User schema:
-        // id, email, role, mfa_enabled, last_login, created_at). Without a name,
-        // renderUsers crashes at u.name.toLowerCase() and modal title shows "Edit: undefined".
-        // Derive a display name from email local-part when missing.
-        USERS=d.users.map(function(u){
-          var fallbackName = (u.email||'unknown@unknown').split('@')[0]
-            .replace(/[._-]+/g,' ')
-            .replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-          return Object.assign({
-            name:fallbackName, last_login:'—', status:'active', mfa:false, clearance:'UNCLASS'
-          }, u, {
-            // Ensure name is non-empty even if API returned name:""
-            name: (u.name && u.name.trim()) || fallbackName
-          });
-        });
-        updateKPIs();renderUsers();
-      }
+    if(!r.ok){
+      if(hasUX) VSPUXState.error('#users-tbody', 'HTTP '+r.status, loadUsers);
+      return;
     }
-  }catch(e){}
+    var d=await r.json();
+    if(!d.users||!d.users.length){
+      USERS=[];
+      if(hasUX) VSPUXState.empty('#users-tbody', 'No users found', loadUsers);
+      else { updateKPIs(); renderUsers(); }
+      return;
+    }
+    // Map API users to UI shape; derive name from email local-part if missing
+    USERS=d.users.map(function(u){
+      var fallbackName=(u.email||'unknown@unknown').split('@')[0]
+        .replace(/[._-]+/g,' ')
+        .replace(/\b\w/g, function(c){return c.toUpperCase();});
+      return Object.assign({
+        name:fallbackName, last_login:'—', status:'active', mfa:false, clearance:'UNCLASS'
+      }, u, {
+        name:(u.name && u.name.trim())||fallbackName
+      });
+    });
+    updateKPIs(); renderUsers();
+  }catch(e){
+    if(hasUX) VSPUXState.error('#users-tbody', 'Network error', loadUsers);
+  }
 }
 
+async function loadRoles(){
+  // FEAT-05: Roles are typically static config. Try API first, fall back to defaults.
+  var DEFAULT_ROLES=[
+    {id:'admin',name:'Administrator',color:'var(--red)',desc:'Full access to all features, user management, system config',perms:['scans.*','findings.*','users.*','admin.*','reports.*','policy.*']},
+    {id:'analyst',name:'SOC Analyst',color:'var(--amber)',desc:'Create scans, manage findings, view all data, no user admin',perms:['scans.*','findings.*','reports.read','policy.read']},
+    {id:'viewer',name:'Read-only Viewer',color:'var(--blue)',desc:'View findings and reports, no modifications',perms:['scans.read','findings.read','reports.read']},
+    {id:'api',name:'API Service Account',color:'var(--purple)',desc:'Programmatic access for CI/CD and integrations',perms:['scans.create','findings.read','reports.read']},
+  ];
+  if(!TOKEN){ ROLES=DEFAULT_ROLES; if(typeof renderRoles==='function')renderRoles(); return; }
+  try{
+    var r=await fetch(API+'/api/v1/admin/roles',{headers:{Authorization:'Bearer '+TOKEN}});
+    if(r.ok){
+      var d=await r.json();
+      if(d.roles && d.roles.length){ ROLES=d.roles; }
+      else { ROLES=DEFAULT_ROLES; }
+    } else { ROLES=DEFAULT_ROLES; }
+  }catch(e){ ROLES=DEFAULT_ROLES; }
+  if(typeof renderRoles==='function')renderRoles();
+}
 function _onTokenReady(){}
 window.addEventListener('message',function(e){
   if(!e.data)return;
@@ -422,7 +440,8 @@ window.addEventListener('message',function(e){
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'},'*');
 function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}}
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'},'*');
-updateKPIs();renderUsers();
+/* FEAT-05: no mock initial render — loadUsers() will populate */
+if(typeof VSPUXState!=='undefined'){VSPUXState.skeleton('#users-tbody',{rows:6});}
 </script>
 <script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
