@@ -1,7 +1,30 @@
+/* FEAT-03 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<script src="/static/js/vsp_iframe_bootstrap.js"></script>
+
+<style>
+/* FEAT-03 scheduler skeleton */
+.sch-shimmer{height:18px;border-radius:4px;background:linear-gradient(90deg,var(--surface) 0%,var(--border) 50%,var(--surface) 100%);background-size:200% 100%;animation:sch-shimmer 1.2s infinite}
+@keyframes sch-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+<script src="/static/js/vsp_iframe_bootstrap.js">
+/* FEAT-03 helpers — skeleton/empty/error states for scheduler */
+function _schSetState(which,kind,msg){
+  var sel=which==='schedules'?'#sched-tbody':'#runs-list';
+  var el=document.querySelector(sel);if(!el)return;
+  if(kind==='skeleton'){
+    if(which==='schedules'){el.innerHTML='<tr class="sch-skel"><td colspan="6"><div class="sch-shimmer"></div></td></tr>'.repeat(4);}
+    else{el.innerHTML='<div class="sch-skel"><div class="sch-shimmer" style="height:48px;margin:6px 0"></div></div>'.repeat(3);}
+  } else if(kind==='empty'){
+    var inner='<div style="text-align:center;padding:32px;color:var(--t3);font-size:12px"><div style="font-size:28px;margin-bottom:8px">∅</div>'+(msg||'No data')+'</div>';
+    el.innerHTML=which==='schedules'?'<tr><td colspan="6">'+inner+'</td></tr>':inner;
+  } else if(kind==='error'){
+    var inner='<div style="text-align:center;padding:32px;color:var(--red);font-size:12px"><div style="font-size:28px;margin-bottom:8px">⚠</div>'+(msg||'Error')+'<div style="margin-top:10px"><button class="btn btn-sm" onclick="(typeof loadSchedules===\'function\'&&loadSchedules());(typeof loadRecentRuns===\'function\'&&loadRecentRuns())">Retry</button></div></div>';
+    el.innerHTML=which==='schedules'?'<tr><td colspan="6">'+inner+'</td></tr>':inner;
+  }
+}
+</script>
 <script>
 /* VSP auth fetch guard v2 — polling retry */
 (function(){
@@ -288,25 +311,11 @@ var CRON_PRESETS = [
   { name: 'Monthly 1st',  cron: '0 4 1 * *',    desc: '1st of month at 04:00' },
 ];
 
-var SAMPLE_SCHEDS = [
-  { id:'sc1', name:'Daily production scan',    mode:'SAST',    profile:'STANDARD', cron:'0 2 * * *',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['production','nightly'], next_run:'02:00 UTC', last_run:'yesterday 02:00', last_status:'DONE', last_gate:'FAIL' },
-  { id:'sc2', name:'IAC infrastructure check', mode:'IAC',     profile:'FAST',     cron:'0 6 * * *',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['infra','daily'],        next_run:'06:00 UTC', last_run:'today 06:00',     last_status:'DONE', last_gate:'WARN' },
-  { id:'sc3', name:'Weekly deep scan',         mode:'FULL',    profile:'THOROUGH', cron:'0 3 * * 1',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['weekly','thorough'],    next_run:'Mon 03:00', last_run:'last Mon',        last_status:'DONE', last_gate:'FAIL' },
-  { id:'sc4', name:'Secrets scan (disabled)',   mode:'SECRETS', profile:'FAST',     cron:'0 12 * * *',   src:'/home/test/Data/GOLANG_VSP', enabled:false, tags:['secrets'],              next_run:'—',         last_run:'3d ago',          last_status:'DONE', last_gate:'PASS' },
-  { id:'sc5', name:'SCA dependency audit',     mode:'SCA',     profile:'STANDARD', cron:'0 0 * * 0',    src:'/home/test/Data/GOLANG_VSP', enabled:true,  tags:['deps','weekly'],        next_run:'Sun 00:00', last_run:'last Sun',        last_status:'DONE', last_gate:'WARN' },
-];
+var SAMPLE_SCHEDS = [];
 
-var SAMPLE_RUNS = [
-  { rid:'RID_SCHED_20260402_020013', sched:'Daily production scan',    status:'DONE',   gate:'FAIL', findings:104, dur:'29:51', ts:'today 02:00',      mode:'SAST' },
-  { rid:'RID_SCHED_20260402_060008', sched:'IAC infrastructure check', status:'DONE',   gate:'WARN', findings:13,  dur:'4:22',  ts:'today 06:00',      mode:'IAC'  },
-  { rid:'RID_SCHED_20260401_020011', sched:'Daily production scan',    status:'DONE',   gate:'FAIL', findings:97,  dur:'28:44', ts:'yesterday 02:00',  mode:'SAST' },
-  { rid:'RID_SCHED_20260401_060004', sched:'IAC infrastructure check', status:'DONE',   gate:'PASS', findings:0,   dur:'3:58',  ts:'yesterday 06:00',  mode:'IAC'  },
-  { rid:'RID_SCHED_20260331_030022', sched:'Weekly deep scan',         status:'DONE',   gate:'FAIL', findings:112, dur:'47:13', ts:'Mon 03:00',         mode:'FULL' },
-  { rid:'RID_SCHED_20260330_000018', sched:'SCA dependency audit',     status:'DONE',   gate:'WARN', findings:28,  dur:'6:14',  ts:'Sun 00:00',         mode:'SCA'  },
-];
+var SAMPLE_RUNS = [];
 
-SCHEDULES = SAMPLE_SCHEDS.slice();
-RECENT_RUNS = SAMPLE_RUNS.slice();
+/* FEAT-03: no mock init — start empty, loadSchedules/loadRecentRuns will populate */
 
 // ── Helpers ────────────────────────────────────────────────
 function gateBadge(g) {
@@ -643,12 +652,15 @@ document.addEventListener('keydown', function(e) {
 
 // ── API loaders ────────────────────────────────────────────
 async function loadSchedules() {
-  if (!TOKEN) { renderSchedules(); return; }
+  _schSetState('schedules','skeleton');
+  if (!TOKEN) { _schSetState('schedules','empty','Waiting for authentication'); return; }
   try {
     var r = await fetch(API + '/api/v1/schedules', { headers: { Authorization: 'Bearer ' + TOKEN } });
-    if (r.ok) {
-      var d = await r.json();
-      if (d.schedules && d.schedules.length) {
+    if (!r.ok) { _schSetState('schedules','error','HTTP '+r.status); return; }
+    var d = await r.json();
+    if (!d.schedules || !d.schedules.length) { SCHEDULES=[]; renderSchedules(); _schSetState('schedules','empty','No schedules configured'); return; }
+    {
+      {
         SCHEDULES = d.schedules.map(function(s) {
           return {
             id:          s.id,
@@ -672,19 +684,18 @@ async function loadSchedules() {
 }
 
 async function loadRecentRuns() {
-  if (!TOKEN) { renderRecentRuns(); return; }
+  _schSetState('runs','skeleton');
+  if (!TOKEN) { _schSetState('runs','empty','Waiting for authentication'); return; }
   try {
     var r = await fetch(API + '/api/v1/vsp/runs?limit=20', { headers: { Authorization: 'Bearer ' + TOKEN } });
-    if (r.ok) {
-      var d = await r.json();
-      if (d.runs && d.runs.length) {
-        RECENT_RUNS = d.runs.map(function(r) {
-          return { rid: r.rid||r.id, sched: r.schedule_name||'Manual', status: r.status, gate: r.gate||'—', findings: r.total_findings||0, dur: '—', ts: (r.created_at||'').slice(0,16), mode: r.mode||'' };
-        });
-        renderRecentRuns();
-      }
-    }
-  } catch(e) { renderRecentRuns(); }
+    if (!r.ok) { _schSetState('runs','error','HTTP '+r.status); return; }
+    var d = await r.json();
+    if (!d.runs || !d.runs.length) { RECENT_RUNS=[]; renderRecentRuns(); _schSetState('runs','empty','No runs yet'); return; }
+    RECENT_RUNS = d.runs.map(function(r) {
+      return { rid: r.rid||r.id, sched: r.schedule_name||'Manual', status: r.status, gate: r.gate||'—', findings: r.total_findings||0, dur: '—', ts: (r.created_at||'').slice(0,16), mode: r.mode||'' };
+    });
+    renderRecentRuns();
+  } catch(e) { _schSetState('runs','error','Network error'); }
 }
 
 // ── Token / theme message bus ──────────────────────────────
