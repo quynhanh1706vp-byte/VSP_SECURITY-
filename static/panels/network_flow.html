@@ -1,3 +1,4 @@
+/* FEAT-08 PATCH APPLIED */
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -167,7 +168,20 @@ canvas{display:block}
 var TOKEN='',API='',_showSusOnly=false,_selectedNode=null;
 
 async function loadNetworkFlow(){
-  if(!TOKEN)return;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX){
+    VSPUXState.skeleton('#conn-tbody', {rows: 5});
+    VSPUXState.skeleton('#proto-list', {rows: 4, kind: 'card'});
+    VSPUXState.skeleton('#ndr-alerts', {rows: 3, kind: 'card'});
+  }
+  if(!TOKEN){
+    if(hasUX){
+      VSPUXState.empty('#conn-tbody', 'Authentication required', loadNetworkFlow);
+      VSPUXState.empty('#proto-list', 'Authentication required', loadNetworkFlow);
+      VSPUXState.empty('#ndr-alerts', 'Authentication required', loadNetworkFlow);
+    }
+    return;
+  }
   var h={Authorization:'Bearer '+TOKEN};
   try{
     var d=null;
@@ -175,6 +189,18 @@ async function loadNetworkFlow(){
       var nr=await fetch(API+'/api/v1/logs/network-flow',{headers:h});
       if(nr.ok) d=await nr.json();
     }catch(e){}
+
+    // FEAT-08: populate CONNS/PROTOS/NDR_ALERTS from response if available
+    if(d){
+      if(d.connections && d.connections.length){ CONNS=d.connections; if(typeof renderConns==='function') renderConns(); }
+      else if(hasUX){ VSPUXState.empty('#conn-tbody','No connection history',loadNetworkFlow); }
+
+      if(d.protocols && d.protocols.length){ PROTOS=d.protocols; if(typeof renderProtos==='function') renderProtos(); }
+      else if(hasUX){ VSPUXState.empty('#proto-list','No protocol data',loadNetworkFlow); }
+
+      if(d.alerts && d.alerts.length){ NDR_ALERTS=d.alerts; if(typeof renderAlerts==='function') renderAlerts(); }
+      else if(hasUX){ VSPUXState.empty('#ndr-alerts','No NDR alerts',loadNetworkFlow); }
+    }
 
     if(!d){
       // Fallback: build from log_events
@@ -268,30 +294,9 @@ var EDGES=[
   {from:'k8s', to:'app',bytes:'156MB',suspicious:false,width:1.5,proto:'HTTP'},
   {from:'app', to:'gw',bytes:'48MB', suspicious:false,width:1,proto:'HTTPS'},
 ];
-var CONNS=[
-  {src:'185.220.101.47',dst:'10.0.1.10',proto:'TCP',port:22,   bytes:'28.4MB',pkts:'124K',dur:'2m 14s',status:'suspicious',geo:'RU',asn:'AS1337'},
-  {src:'10.0.1.11',    dst:'0.0.0.0',  proto:'TCP',port:443,  bytes:'1.2GB', pkts:'2.1M', dur:'4h 22m',status:'ok',geo:'—',asn:'—'},
-  {src:'10.0.1.10',    dst:'10.0.1.20',proto:'TCP',port:5432, bytes:'512MB', pkts:'891K', dur:'3h 45m',status:'ok',geo:'—',asn:'—'},
-  {src:'10.0.3.1',     dst:'10.0.1.10',proto:'TCP',port:8080, bytes:'156MB', pkts:'312K', dur:'1h 12m',status:'ok',geo:'—',asn:'—'},
-  {src:'45.142.212.100',dst:'10.0.1.10',proto:'TCP',port:22,  bytes:'12.1MB',pkts:'48K',  dur:'45s',   status:'suspicious',geo:'NL',asn:'AS4242'},
-  {src:'10.0.1.10',    dst:'8.8.8.8',  proto:'UDP',port:53,   bytes:'2.4MB', pkts:'48K',  dur:'ongoing',status:'warn',geo:'US',asn:'AS15169'},
-  {src:'10.0.1.10',    dst:'api.github.com',proto:'TCP',port:443,bytes:'48MB',pkts:'96K', dur:'22m',   status:'ok',geo:'US',asn:'AS36459'},
-];
-var PROTOS=[
-  {name:'HTTPS',pct:42,color:'#3b82f6',bytes:'2.1GB'},
-  {name:'HTTP', pct:18,color:'#06b6d4',bytes:'890MB'},
-  {name:'SSH',  pct:12,color:'#22c55e',bytes:'594MB'},
-  {name:'DNS',  pct:11,color:'#8b5cf6',bytes:'544MB'},
-  {name:'SMTP', pct:8, color:'#f59e0b',bytes:'396MB'},
-  {name:'Other',pct:9, color:'#5a6278',bytes:'446MB'},
-];
-var NDR_ALERTS=[
-  {sev:'crit',msg:'Port scan from 185.220.101.47 — 4,847 ports in 30s',ts:'2m ago'},
-  {sev:'high',msg:'Unusual DNS volume — 10.0.1.10 → 8.8.8.8 (847 q/min)',ts:'5m ago'},
-  {sev:'high',msg:'SSH brute force — 45.142.212.100 → 10.0.1.10:22',ts:'8m ago'},
-  {sev:'info',msg:'New external conn — api.github.com:443 from 10.0.1.10',ts:'12m ago'},
-  {sev:'info',msg:'Large transfer — 10.0.1.20 → 10.0.1.11 (512MB in 5m)',ts:'18m ago'},
-];
+var CONNS=[];
+var PROTOS=[];
+var NDR_ALERTS=[];
 // Canvas map
 var canvas,ctx,W,H;
 function initCanvas(){
