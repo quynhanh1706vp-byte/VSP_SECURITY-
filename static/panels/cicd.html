@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script src="/static/js/vsp_uxstates.js"></script>
 <script>
 
 /* VSP auth fetch guard v2 — polling retry */
@@ -158,6 +159,8 @@ td{padding:7px 10px;vertical-align:middle}
 .form-ctrl:focus{border-color:var(--border2)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .toast{position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);display:none}
+
+.cicd-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
 </style>
 </head>
 <body>
@@ -825,25 +828,62 @@ function switchTab(id,btn){
 }
 
 // ── KPI ──
+/* FEAT-31: cicd L2 UX states (MAX coverage) */
+const CICD_KPI_IDS = ['k-ci-today', 'k-pass-rate', 'k-blocked', 'k-autofixed'];
+const CICD_AF_KPI_IDS = ['af-total', 'af-with-fix', 'af-resolved', 'af-breaches'];
+
+function _cicdShimmerCells(ids) {
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.classList.add('cicd-shimmer'); }
+  });
+}
+function _cicdClearCells(ids) {
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('cicd-shimmer');
+  });
+}
+function _cicdDashCells(ids) {
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('cicd-shimmer'); el.textContent = '—'; }
+  });
+}
+
 async function loadKPIs(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  _cicdShimmerCells(CICD_KPI_IDS);
   await ensureToken();
   try{
-    var r=await fetch('/api/v1/vsp/runs/index?limit=200',{headers:hdr()});
-    var d=await r.json();
-    var runs=d.runs||[];
-    var today=new Date().toISOString().slice(0,10);
-    var todayRuns=runs.filter(x=>x.created_at?.startsWith(today));
-    var pass7=runs.slice(0,50).filter(x=>x.gate==='PASS').length;
-    var total7=Math.min(runs.length,50);
-    document.getElementById('k-ci-today').textContent=todayRuns.length;
-    document.getElementById('k-pass-rate').textContent=total7>0?Math.round(pass7/total7*100)+'%':'—';
-    document.getElementById('k-blocked').textContent=todayRuns.filter(x=>x.gate==='FAIL').length;
-    document.getElementById('k-autofixed').textContent='0';
+    var r = await fetch('/api/v1/vsp/runs/index?limit=200', { headers: hdr() });
+    if (!r.ok) {
+      _cicdDashCells(CICD_KPI_IDS);
+      console.warn('[FEAT-31] loadKPIs HTTP', r.status);
+      return;
+    }
+    var d = await r.json();
+    var runs = d.runs || [];
+    var today = new Date().toISOString().slice(0,10);
+    var todayRuns = runs.filter(x => x.created_at?.startsWith(today));
+    var pass7 = runs.slice(0,50).filter(x => x.gate==='PASS').length;
+    var total7 = Math.min(runs.length, 50);
+    _cicdClearCells(CICD_KPI_IDS);
+    document.getElementById('k-ci-today').textContent = todayRuns.length;
+    document.getElementById('k-pass-rate').textContent = total7>0 ? Math.round(pass7/total7*100) + '%' : '—';
+    document.getElementById('k-blocked').textContent = todayRuns.filter(x => x.gate==='FAIL').length;
+    document.getElementById('k-autofixed').textContent = '0';
   }catch(e){
-    document.getElementById('k-ci-today').textContent='12';
-    document.getElementById('k-pass-rate').textContent='63%';
-    document.getElementById('k-blocked').textContent='4';
-    document.getElementById('k-autofixed').textContent='0';
+    console.error('[FEAT-31] loadKPIs failed:', e);
+    if (hasUX) {
+      _cicdDashCells(CICD_KPI_IDS);
+    } else {
+      // Graceful degradation: old mock fallback
+      document.getElementById('k-ci-today').textContent = '12';
+      document.getElementById('k-pass-rate').textContent = '63%';
+      document.getElementById('k-blocked').textContent = '4';
+      document.getElementById('k-autofixed').textContent = '0';
+    }
   }
 }
 
@@ -851,16 +891,50 @@ async function loadKPIs(){
 // (cleanup) MOCK_SCHEDULES removed — using real API
 
 async function loadSchedules(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var hasData = false;
+  var listEl = document.getElementById('schedules-list');
+  if (listEl && listEl.children.length > 0 && !listEl.querySelector('.vsp-uxs-skel-row')) {
+    hasData = true;
+  }
+  if (hasUX && !hasData) {
+    VSPUXState.skeleton('#schedules-list', { rows: 4, kind: 'card' });
+    VSPUXState.skeleton('#upcoming-tbody', { rows: 3, kind: 'table' });
+  }
+
   await ensureToken();
-  var list=[];
+  var list = [];
+  var fetchErr = null;
   try{
-    var r=await fetch('/api/v1/schedules',{headers:hdr()});
-    if(r.ok){var d=await r.json(); list=d.schedules||(Array.isArray(d)?d:[]);}
-  }catch(e){}
-  var enabled=list.filter(x=>x.enabled).length;
-  document.getElementById('sched-status-bar').textContent=list.length+' schedules · '+enabled+' enabled';
-  var gateColor={PASS:'var(--green)',FAIL:'var(--red)',WARN:'var(--amber)'};
-  document.getElementById('schedules-list').innerHTML=list.map(s=>`
+    var r = await fetch('/api/v1/schedules', { headers: hdr() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    list = d.schedules || (Array.isArray(d) ? d : []);
+  }catch(e){ fetchErr = e; }
+
+  if (fetchErr) {
+    if (hasUX && !hasData) {
+      VSPUXState.error('#schedules-list', 'Failed to load schedules', loadSchedules);
+      VSPUXState.error('#upcoming-tbody', 'Failed to load', loadSchedules);
+    }
+    var sb = document.getElementById('sched-status-bar');
+    if (sb) sb.textContent = '⚠ Failed to load schedules';
+    return;
+  }
+
+  var enabled = list.filter(x => x.enabled).length;
+  var sb = document.getElementById('sched-status-bar');
+  if (sb) sb.textContent = list.length + ' schedules · ' + enabled + ' enabled';
+
+  if (list.length === 0) {
+    if (hasUX) {
+      VSPUXState.empty('#schedules-list', 'No schedules configured — create one above', loadSchedules);
+      VSPUXState.empty('#upcoming-tbody', 'No upcoming runs', loadSchedules);
+    }
+    return;
+  }
+
+  document.getElementById('schedules-list').innerHTML = list.map(s => `
     <div class="sched-row">
       <label class="sw-wrap"><input type="checkbox" ${s.enabled?'checked':''} onchange="toggleSchedule('${s.id}',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
       <div style="flex:1">
@@ -871,14 +945,19 @@ async function loadSchedules(){
       <span class="badge badge-${s.last_gate==='PASS'?'ok':s.last_gate==='FAIL'?'danger':'warn'}">${s.last_gate||'—'}</span>
       <button class="btn btn-sm" style="margin-left:8px" onclick="runScheduleNow('${s.id}','${s.name}')">▶ Now</button>
     </div>`).join('');
-  // upcoming
-  document.getElementById('upcoming-tbody').innerHTML=list.filter(x=>x.enabled).slice(0,5).map(s=>`<tr>
-    <td style="font-weight:500">${s.name}</td>
-    <td><span class="badge badge-info">${s.mode}</span></td>
-    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${s.next_run||'—'}</td>
-    <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron||'—'}</td>
-    <td><span class="badge badge-ok">Enabled</span></td>
-  </tr>`).join('');
+
+  var upcoming = list.filter(x => x.enabled).slice(0,5);
+  if (upcoming.length === 0) {
+    if (hasUX) VSPUXState.empty('#upcoming-tbody', 'No upcoming runs (no enabled schedules)', loadSchedules);
+  } else {
+    document.getElementById('upcoming-tbody').innerHTML = upcoming.map(s => `<tr>
+      <td style="font-weight:500">${s.name}</td>
+      <td><span class="badge badge-info">${s.mode}</span></td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${s.next_run||'—'}</td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron||'—'}</td>
+      <td><span class="badge badge-ok">Enabled</span></td>
+    </tr>`).join('');
+  }
 }
 async function toggleSchedule(id,enabled){
   await ensureToken();
@@ -903,19 +982,30 @@ function openAddSchedule(){
 // (cleanup) MOCK_GATES removed — using real API
 
 async function loadGateHistory(){
-  // FIX: replace MOCK_GATES with real /api/v1/vsp/runs/index data
+  var hasUX = typeof VSPUXState !== 'undefined';
   var tbody = document.getElementById('gate-history-tbody');
-  if(!tbody) return;
+  if (!tbody) return;
+  var hasData = tbody.children.length > 0 && !tbody.querySelector('.vsp-uxs-skel-row') && !tbody.querySelector('td[colspan]');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#gate-history-tbody', { rows: 5, kind: 'table' });
+
   await ensureToken();
   var rows = [];
   try{
-    var r = await fetch('/api/v1/vsp/runs/index?limit=5', {headers: hdr()});
+    var r = await fetch('/api/v1/vsp/runs/index?limit=5', { headers: hdr() });
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#gate-history-tbody', 'HTTP ' + r.status, loadGateHistory);
+      return;
+    }
     var d = await r.json();
     rows = (d.runs || []).slice(0, 5);
-  }catch(e){ rows = []; }
+  }catch(e){
+    if (hasUX && !hasData) VSPUXState.error('#gate-history-tbody', 'Network error', loadGateHistory);
+    return;
+  }
 
-  if(rows.length === 0){
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--t3);font-size:11px">No gate decisions yet</td></tr>';
+  if (rows.length === 0) {
+    if (hasUX) VSPUXState.empty('#gate-history-tbody', 'No gate decisions yet', loadGateHistory);
     return;
   }
 
@@ -939,26 +1029,41 @@ async function loadGateHistory(){
 }
 
 async function loadPRComment(){
-  // FIX: render PR preview from latest FAIL run (or latest run if no FAIL)
+  var hasUX = typeof VSPUXState !== 'undefined';
   var hdrEl = document.getElementById('pr-header');
   var metaEl = document.getElementById('pr-meta');
   var rowsEl = document.getElementById('pr-findings-rows');
   var actEl  = document.getElementById('pr-action');
-  if(!hdrEl || !rowsEl) return;
+  if (!hdrEl || !rowsEl) return;
+
+  // Pre-fetch state
+  hdrEl.textContent = 'Loading PR preview…';
+  metaEl.innerHTML = '&nbsp;';
+  actEl.innerHTML = '&nbsp;';
+  if (hasUX) VSPUXState.skeleton('#pr-findings-rows', { rows: 3, kind: 'table' });
 
   await ensureToken();
   var run = null;
   try{
-    var r = await fetch('/api/v1/vsp/runs/index?limit=20', {headers: hdr()});
+    var r = await fetch('/api/v1/vsp/runs/index?limit=20', { headers: hdr() });
+    if (!r.ok) {
+      hdrEl.textContent = '⚠ Failed to load PR preview (HTTP ' + r.status + ')';
+      if (hasUX) VSPUXState.error('#pr-findings-rows', 'HTTP ' + r.status, loadPRComment);
+      return;
+    }
     var d = await r.json();
     var runs = d.runs || [];
     run = runs.find(function(x){ return x.gate === 'FAIL'; }) || runs[0] || null;
-  }catch(e){}
+  }catch(e){
+    hdrEl.textContent = '⚠ Network error loading PR preview';
+    if (hasUX) VSPUXState.error('#pr-findings-rows', 'Network error', loadPRComment);
+    return;
+  }
 
-  if(!run){
+  if (!run) {
     hdrEl.textContent = '— No runs available';
     metaEl.innerHTML = '&nbsp;';
-    rowsEl.innerHTML = '';
+    if (hasUX) VSPUXState.empty('#pr-findings-rows', 'No runs to preview yet', loadPRComment);
     actEl.innerHTML = '&nbsp;';
     return;
   }
@@ -973,7 +1078,6 @@ async function loadPRComment(){
   hdrEl.textContent = titleDot + ' VSP Security Gate: ' + gate + ' — Score ' + score + '/100';
   metaEl.innerHTML = 'Scan run: <span style="color:var(--cyan)">' + rid + '</span> · Branch: <span style="color:var(--cyan)">' + branch + '</span>';
 
-  // Fetch top finding for each non-empty severity bucket
   var sevOrder = ['CRITICAL', 'HIGH', 'MEDIUM'];
   var rowClass = { CRITICAL: 'pr-row-crit', HIGH: 'pr-row-high', MEDIUM: 'pr-row-med' };
   var dot = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡' };
@@ -984,15 +1088,15 @@ async function loadPRComment(){
   for(var i=0; i<sevOrder.length; i++){
     var s = sevOrder[i];
     var count = sev[s] || 0;
-    if(count === 0) continue;
-    if(!topPainful) topPainful = s;
+    if (count === 0) continue;
+    if (!topPainful) topPainful = s;
 
     var topMsg = '';
     try{
-      var fr = await fetch('/api/v1/vsp/findings?run_id=' + run.id + '&severity=' + s + '&limit=1', {headers: hdr()});
+      var fr = await fetch('/api/v1/vsp/findings?run_id=' + run.id + '&severity=' + s + '&limit=1', { headers: hdr() });
       var fd = await fr.json();
       var top = (fd.findings || [])[0];
-      if(top){
+      if (top){
         var msg = (top.message || '').length > 80 ? top.message.slice(0,77) + '...' : (top.message || '');
         var loc = top.path ? ' in ' + top.path + (top.line ? ':' + top.line : '') : '';
         topMsg = (top.tool || '?') + ' · ' + msg + loc;
@@ -1001,18 +1105,17 @@ async function loadPRComment(){
 
     rowsHtml += '<div class="' + rowClass[s] + '">' + dot[s] + ' ' + s + ' (' + count + ')  ' + (topMsg || '(top finding unavailable)') + '</div>';
   }
-  // LOW row collapsed (count only)
-  if((sev.LOW || 0) > 0){
+  if ((sev.LOW || 0) > 0){
     rowsHtml += '<div style="font-size:11px;color:var(--t3);margin-top:4px">🟢 LOW (' + sev.LOW + ') · collapsed</div>';
   }
   rowsEl.innerHTML = rowsHtml || '<div style="color:var(--t3);font-size:11px">No findings</div>';
 
-  if(gate === 'FAIL'){
+  if (gate === 'FAIL'){
     var blocker = topPainful || 'critical';
     actEl.innerHTML = 'Fix ' + blocker + ' findings to unblock merge. <span style="color:var(--cyan)">→ View all findings in VSP</span>';
-  }else if(gate === 'WARN'){
+  } else if (gate === 'WARN'){
     actEl.innerHTML = 'Review findings before merging. <span style="color:var(--cyan)">→ View all findings in VSP</span>';
-  }else{
+  } else {
     actEl.innerHTML = '<span style="color:var(--green)">✓ All checks passed.</span>';
   }
 }
@@ -1088,51 +1191,71 @@ function _autofixCategorize(findings){
   return result.length ? result : [cats.iac, cats.sast, cats.sca, cats.sec];
 }
 async function loadAutofixStats(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  _cicdShimmerCells(CICD_AF_KPI_IDS);
+  if (hasUX) {
+    var catEl = document.getElementById('fix-categories');
+    var hasCatData = catEl && catEl.children.length > 0;
+    if (!hasCatData) VSPUXState.skeleton('#fix-categories', { rows: 4, kind: 'card' });
+  }
+
   await ensureToken();
   var findings = [];
-  // VSP-CICD-H3.1: fetch all (limit 2000) for accurate KPIs
+  var fetchErr = null;
   try{
-    var r = await fetch('/api/v1/vsp/findings?limit=2000', {headers: hdr()});
-    if(r.ok){ var d = await r.json(); findings = d.findings || []; }
-  }catch(e){}
+    var r = await fetch('/api/v1/vsp/findings?limit=2000', { headers: hdr() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    findings = d.findings || [];
+  }catch(e){ fetchErr = e; }
 
-  // Save raw + filtered for filter pills (H3.3)
+  if (fetchErr) {
+    _cicdDashCells(CICD_AF_KPI_IDS);
+    if (hasUX) {
+      VSPUXState.error('#fix-categories', 'Failed to load: ' + fetchErr.message, loadAutofixStats);
+      VSPUXState.error('#autofix-tbody', 'Failed to load findings', loadAutofixStats);
+    }
+    console.error('[FEAT-31] loadAutofixStats failed:', fetchErr);
+    return;
+  }
+
   window._autofixAllFindings = findings;
 
-  // ─── H3.1: 4 KPI cards (live data) ───
   var open = findings.filter(function(f){ return (f.status||'open') === 'open' || !f.status; });
   var fixable = open.filter(_autofixIsFixable);
   var resolved = findings.filter(function(f){ return f.status === 'verified' || f.status === 'resolved' || f.status === 'fixed'; });
-  // SLA breach: CRITICAL findings open > 7 days (per FedRAMP)
   var now = Date.now();
   var sevenDaysMs = 7 * 24 * 3600 * 1000;
   var breaches = open.filter(function(f){
-    if(f.severity !== 'CRITICAL') return false;
+    if (f.severity !== 'CRITICAL') return false;
     var t = f.created_at || f.detected_at || f.first_seen;
-    if(!t) return false;
+    if (!t) return false;
     return (now - new Date(t).getTime()) > sevenDaysMs;
   });
-  
+
+  _cicdClearCells(CICD_AF_KPI_IDS);
   document.getElementById('af-total').textContent     = open.length.toLocaleString();
   document.getElementById('af-with-fix').textContent  = fixable.length.toLocaleString();
   document.getElementById('af-resolved').textContent  = resolved.length.toLocaleString();
   document.getElementById('af-breaches').textContent  = breaches.length.toLocaleString();
 
-  // ─── Categories card ───
   var cats = _autofixCategorize(open);
-  document.getElementById('fix-categories').innerHTML = cats.map(function(c){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md)">'
-      + '<span style="font-size:11px;flex:1;color:var(--t2)">' + c.label + '</span>'
-      + '<span style="font-family:var(--font-mono);font-size:11px;color:var(--t3)">' + c.count + ' total</span>'
-      + '<span class="badge ' + (c.fixable>0?'badge-ok':'badge-neutral') + '">' + c.fixable + ' fixable</span>'
-      + '</div>';
-  }).join('');
+  if (cats.length === 0) {
+    if (hasUX) VSPUXState.empty('#fix-categories', 'No category data', loadAutofixStats);
+  } else {
+    document.getElementById('fix-categories').innerHTML = cats.map(function(c){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md)">'
+        + '<span style="font-size:11px;flex:1;color:var(--t2)">' + c.label + '</span>'
+        + '<span style="font-family:var(--font-mono);font-size:11px;color:var(--t3)">' + c.count + ' total</span>'
+        + '<span class="badge ' + (c.fixable>0?'badge-ok':'badge-neutral') + '">' + c.fixable + ' fixable</span>'
+        + '</div>';
+    }).join('');
+  }
 
-  // ─── H3.3: Tool filter dropdown (populate) ───
   var allTools = {};
-  open.forEach(function(f){ if(f.tool) allTools[f.tool] = (allTools[f.tool]||0) + 1; });
+  open.forEach(function(f){ if (f.tool) allTools[f.tool] = (allTools[f.tool]||0) + 1; });
   var toolSelect = document.getElementById('af-tool-filter');
-  if(toolSelect && toolSelect.options.length <= 1){
+  if (toolSelect && toolSelect.options.length <= 1){
     Object.keys(allTools).sort().forEach(function(t){
       var opt = document.createElement('option');
       opt.value = t;
@@ -1141,7 +1264,6 @@ async function loadAutofixStats(){
     });
   }
 
-  // ─── Apply filter + render table ───
   renderAutofixTable();
 }
 
@@ -1316,11 +1438,32 @@ window.closeAutoRemediationModal = function(){
 // ── HISTORY ──
 var _histData=[];
 async function loadHistory(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tbody = document.getElementById('history-tbody');
+  var hasData = tbody && tbody.children.length > 0 &&
+                !tbody.querySelector('.vsp-uxs-skel-row') &&
+                !tbody.querySelector('td[colspan]');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#history-tbody', { rows: 6, kind: 'table' });
+
   await ensureToken();
   try{
-    var r=await fetch('/api/v1/vsp/runs/index?limit=50',{headers:hdr()});
-    var d=await r.json(); _histData=d.runs||[];
-  }catch(e){ _histData = []; }
+    var r = await fetch('/api/v1/vsp/runs/index?limit=50', { headers: hdr() });
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#history-tbody', 'HTTP ' + r.status, loadHistory);
+      return;
+    }
+    var d = await r.json();
+    _histData = d.runs || [];
+    if (_histData.length === 0) {
+      if (hasUX) VSPUXState.empty('#history-tbody', 'No runs found', loadHistory);
+      return;
+    }
+  }catch(e){
+    _histData = [];
+    if (hasUX && !hasData) VSPUXState.error('#history-tbody', 'Network error', loadHistory);
+    return;
+  }
   renderHistory();
 }
 function fmtDuration(start, end){
