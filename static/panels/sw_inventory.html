@@ -270,7 +270,10 @@ td{padding:7px 10px;vertical-align:middle}
 /* ── Pagination ── */
 .pager{display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--border);font-size:10px;color:var(--t3);font-family:var(--font-mono)}
 .pager-info{margin-right:auto}
+
+.swinv-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
 </style>
+<script src="/static/js/vsp_uxstates.js"></script>
 </head>
 <body>
 
@@ -775,32 +778,100 @@ function switchTab(tabId, btn) {
 let _invData = [], _invPage = 0;
 const INV_PAGE_SIZE = 8;
 
+/* FEAT-28: sw_inventory L2 UX states (loadInventory + KPI shimmer) */
+const SWINV_KPI_IDS = ['k-total', 'k-approved', 'k-unauth', 'k-crack', 'k-eol'];
+
+function _swinvKPIShimmer() {
+  SWINV_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.classList.add('swinv-shimmer'); }
+  });
+}
+function _swinvKPIClear() {
+  SWINV_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('swinv-shimmer');
+  });
+}
+function _swinvKPIDash() {
+  SWINV_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('swinv-shimmer'); el.textContent = '—'; }
+  });
+}
+
 async function loadInventory() {
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tbody = document.getElementById('inv-tbody');
+  // hasData detection: real rows already rendered (not skeleton, not empty placeholder)
+  var hasData = tbody && tbody.children.length > 0 &&
+                !tbody.querySelector('.empty') &&
+                !tbody.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#inv-tbody', { rows: 5, kind: 'table' });
+  _swinvKPIShimmer();
+
   await ensureToken();
   try {
-    const r = await fetch(API+'/api/v1/assets', {headers:hdr()});
-    if(r.ok) {
-      const d = await r.json();
-      const raw = d.assets || d.items || (Array.isArray(d)?d:[]);
-      if(raw.length) {
-        _invData = raw.map((a,i)=>({
-          id:a.id||i+1, name:a.name||'Unknown', version:a.version||'—',
-          vendor:a.vendor||a.type||'—', host:a.ip||a.name||'—',
-          os:(a.env||a.type||'').toLowerCase().includes('win')?'windows':'linux',
-          status:(a.critical||0)>0?'warning':(a.high||0)>3?'warning':'approved',
-          cves:(a.critical||0)+(a.high||0)+(a.medium||0),
-          license:a.license||'—', eol_date:a.eol_date||null,
-          risk_score:a.risk_score||0, tags:a.tags||[], last_scan:a.last_scan||'—',
-          total_findings:a.total_findings||((a.critical||0)+(a.high||0)+(a.medium||0)+(a.low||0)),
-          env:a.env||'—'
-        }));
-        console.log('[SW] Loaded', _invData.length, 'items from API');
-      } else { throw new Error('empty'); }
+    const r = await fetch(API + '/api/v1/assets', { headers: hdr() });
+    if (!r.ok) {
+      // Real HTTP error — show error state (FEAT-28 behavior change vs old silent mock fallback)
+      if (hasUX) {
+        _swinvKPIDash();
+        VSPUXState.error('#inv-tbody', 'HTTP ' + r.status, loadInventory);
+        return;
+      }
+      // Graceful degradation if VSPUXState missing
+      _invData = MOCK_INVENTORY;
+      _swinvKPIClear();
+      updateKPIs();
+      renderInventory();
+      return;
     }
-    else throw new Error();
-  } catch(e) { _invData = MOCK_INVENTORY; }
-  updateKPIs();
-  renderInventory();
+    const d = await r.json();
+    const raw = d.assets || d.items || (Array.isArray(d) ? d : []);
+    if (!raw.length) {
+      // API success but empty — show empty state with retry
+      if (hasUX) {
+        _swinvKPIDash();
+        VSPUXState.empty('#inv-tbody', 'No inventory found — run a scan to discover assets', loadInventory);
+        return;
+      }
+      _invData = MOCK_INVENTORY;
+      _swinvKPIClear();
+      updateKPIs();
+      renderInventory();
+      return;
+    }
+    // Success path — render real data
+    _invData = raw.map((a, i) => ({
+      id: a.id || i + 1, name: a.name || 'Unknown', version: a.version || '—',
+      vendor: a.vendor || a.type || '—', host: a.ip || a.name || '—',
+      os: (a.env || a.type || '').toLowerCase().includes('win') ? 'windows' : 'linux',
+      status: (a.critical || 0) > 0 ? 'warning' : (a.high || 0) > 3 ? 'warning' : 'approved',
+      cves: (a.critical || 0) + (a.high || 0) + (a.medium || 0),
+      license: a.license || '—', eol_date: a.eol_date || null,
+      risk_score: a.risk_score || 0, tags: a.tags || [], last_scan: a.last_scan || '—',
+      total_findings: a.total_findings || ((a.critical || 0) + (a.high || 0) + (a.medium || 0) + (a.low || 0)),
+      env: a.env || '—'
+    }));
+    console.log('[SW] Loaded', _invData.length, 'items from API');
+    _swinvKPIClear();
+    updateKPIs();
+    renderInventory();
+  } catch(e) {
+    console.error('[FEAT-28] loadInventory failed:', e);
+    if (hasUX) {
+      _swinvKPIDash();
+      VSPUXState.error('#inv-tbody', 'Network error', loadInventory);
+      return;
+    }
+    // Graceful degradation
+    _invData = MOCK_INVENTORY;
+    _swinvKPIClear();
+    updateKPIs();
+    renderInventory();
+  }
 }
 
 function updateKPIs() {
