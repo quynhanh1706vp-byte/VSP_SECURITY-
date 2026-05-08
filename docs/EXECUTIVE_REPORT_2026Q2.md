@@ -446,4 +446,49 @@ curl -OJL -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 **Đề xuất phân phối cho:** CISO / CTO / CFO / Head of Sales / Compliance Officer.
 
-**Phiên bản báo cáo:** v2 (2026-05-08, fix scanner count 19 → 26 sau khi user verify từ UI screenshots).
+**Phiên bản báo cáo:** v3 (2026-05-08).
+
+**Lịch sử phiên bản:**
+- **v3** (2026-05-08, sau Sprint 9) — Thêm Recognition Uplift section: CISA SSDF auto-generator, NIST CSF 2.0 profile, SOC 2 Type I readiness map, ISO 27001:2022 Annex A mapping, Trust Center page tại `/trust/`, OpenSSF Scorecard CI, Rekor publishing endpoint, transparency report, 3PAO readiness packet (SOW + SOT + risk register + engagement guide).
+- **v2** (2026-05-08) — Fix scanner count 19 → 26 sau khi user verify từ UI screenshots.
+- **v1** (2026-05-08) — Phát hành ban đầu sau Sprint 2-8.
+
+\newpage
+
+# Phụ lục — Sprint 9 Recognition Uplift
+
+Sprint 9 không nâng DSOMM (vẫn 3.9 honest) — thay vào đó nâng **mức độ công nhận** từ "self-claimed 3.9" lên "externally-evaluatable 3.9". 3 nhóm deliverable:
+
+## A. Self-attestation packs
+
+| Endpoint | Output |
+|----------|--------|
+| `GET /api/v1/cisa-attestation/ssdf/draft` | CISA SSDF Common Form 2024 với 19/19 practices auto-populated từ tenant evidence — submittable lên saf.cisa.gov sau khi exec ký |
+| `POST /api/v1/cisa-attestation/ssdf/{id}/sign` | Executive signature endpoint, audit-logged |
+| `GET /api/v1/nist-csf/profile` | Organisational Profile NIST CSF 2.0 với 22 categories + maturity tier |
+| `GET /api/v1/recognition/soc2-readiness` | SOC 2 Type I readiness map (AICPA TSC) — 25 criteria CC/A/C/PI/P |
+| `GET /api/v1/recognition/iso27001-mapping` | ISO/IEC 27001:2022 Annex A mapping — 30 highest-impact controls |
+
+## B. Public trust signals
+
+| Artefact | Mục đích |
+|----------|----------|
+| **`/trust/`** Trust Center page | Public-facing single page với attestations, live status, VDP, framework coverage |
+| **`.github/workflows/scorecard.yml`** | Weekly OpenSSF Scorecard run, results upload public DB cho badge |
+| **`POST /api/v1/runs/{rid}/provenance/publish-rekor`** | Publish DSSE attestation lên rekor.sigstore.dev — independently verifiable |
+| **`GET /api/v1/transparency/report`** | Annual / semi-annual transparency aggregates (anon, cache 1h) |
+
+## C. 3PAO readiness packet
+
+| Doc | Vị trí |
+|-----|--------|
+| Statement of Work template | `docs/audit/3PAO_STATEMENT_OF_WORK.md` |
+| Scope of Test | `docs/audit/SCOPE_OF_TEST.md` |
+| Risk register (22 risks) | `docs/audit/RISK_REGISTER.md` |
+| Engagement guide (6 phases) | `docs/audit/AUDIT_ENGAGEMENT_GUIDE.md` |
+
+**Ý nghĩa cho sếp:**
+
+Sau Sprint 9, một CISO khách hàng / auditor 3PAO có thể đánh giá VSP **mà không cần engineering team support** — họ truy cập `/trust/` page, lấy SSDF draft form, đọc risk register, mở audit bundle. Đây là khác biệt giữa "tốt nhưng cần giải thích" và "tự nó nói được".
+
+Code-side: **không còn rào cản nào để engage 3PAO**. Business-side: cần ký SOW + ngân sách $80-150k cho FedRAMP-style assessment.
