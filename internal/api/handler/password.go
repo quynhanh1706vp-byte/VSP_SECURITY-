@@ -59,6 +59,20 @@ func (a *Auth) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "new_password was recently used — choose a different password", http.StatusBadRequest)
 		return
 	}
+	// HIBP breach check (NIST SP 800-63B-3 §5.1.1.2). Permissive by default —
+	// network failures don't block the change. Set VSP_HIBP_REQUIRED=1 to
+	// flip to strict mode.
+	if err := auth.CheckPasswordBreached(r.Context(), req.NewPassword); err != nil {
+		switch err {
+		case auth.ErrPasswordBreached:
+			jsonError(w, "new_password appears in known breach corpus — choose a different password", http.StatusBadRequest)
+		case auth.ErrHIBPUnavailable:
+			jsonError(w, "password breach service unavailable — try again", http.StatusServiceUnavailable)
+		default:
+			// Unexpected — fail closed only when strict mode is forced upstream.
+		}
+		return
+	}
 	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		jsonError(w, "internal error", http.StatusInternalServerError)

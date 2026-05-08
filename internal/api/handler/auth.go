@@ -21,6 +21,11 @@ type Auth struct {
 	JWTSecret  string
 	JWTTTL     time.Duration
 	DefaultTID string // default tenant for single-tenant dev setup
+	// IPLock is a process-wide sliding-window per-IP fail counter. nil-
+	// safe: methods on it tolerate a zero IPLockout, but the gateway
+	// initializes one at startup so the field is always populated in
+	// production.
+	IPLock *auth.IPLockout
 }
 
 // ── POST /api/v1/auth/login ───────────────────────────────────────────────────
@@ -70,6 +75,17 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// IP lockout — defends against credential stuffing across many
+	// usernames from one source. Checked BEFORE user lookup so a locked
+	// IP doesn't get to enumerate emails via timing.
+	clientIP := auth.ClientIP(r)
+	if a.IPLock != nil && a.IPLock.IsLocked(clientIP) {
+		log.Warn().Str("ip", clientIP).Msg("login: IP locked")
+		jsonError(w, "too many failed attempts from this IP — try again later",
+			http.StatusTooManyRequests)
+		return
+	}
+
 	// Lookup user
 	user, err := a.DB.GetUserByEmail(r.Context(), tenantID, req.Email)
 	if err != nil {
@@ -78,6 +94,17 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if user == nil {
+		// Constant-time defense: run a real bcrypt compare against a
+		// dummy hash so the wall-clock time of "user not found" matches
+		// "user found but wrong password". This eliminates the timing
+		// side-channel that previously let attackers enumerate valid
+		// emails.
+		_ = auth.CompareDummyPassword(req.Password)
+		if a.IPLock != nil {
+			if locked, _ := a.IPLock.RecordFail(clientIP); locked {
+				go a.writeAudit(r.Clone(context.Background()), tenantID, nil, "LOGIN_IP_LOCKED", "/auth/login")
+			}
+		}
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
@@ -95,6 +122,14 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		log.Warn().Msg("login: wrong password") // email not logged to prevent user enumeration
 		// Record failed login + possible lockout
 		count, _ := a.DB.RecordFailedLogin(r.Context(), user.ID)
+		// Exponential backoff on the failure path — slows online
+		// guessing without affecting successful logins.
+		auth.BackoffSleep(count)
+		if a.IPLock != nil {
+			if locked, _ := a.IPLock.RecordFail(clientIP); locked {
+				go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_IP_LOCKED", "/auth/login")
+			}
+		}
 		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_FAILED", "/auth/login")
 		if count >= 5 {
 			jsonError(w, "account locked for 15 minutes after too many failed attempts", http.StatusTooManyRequests)
@@ -102,6 +137,11 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		}
 		return
+	}
+	// Successful password compare — clear the IP fail counter so a
+	// legitimate user doesn't carry forward someone else's misses.
+	if a.IPLock != nil {
+		a.IPLock.Clear(clientIP)
 	}
 
 	// Enforce MFA for admin role — admin MUST have MFA enabled (production only).

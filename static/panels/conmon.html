@@ -117,7 +117,7 @@
  <th>Last Verdict</th><th>Next Run</th><th>Status</th>
  </tr>
  </thead>
- <tbody id="schedules-body"><tr><td colspan="7" class="empty">Loading schedules...</td></tr></tbody>
+ <tbody id="schedules-body" data-vsp-paginate="15"><tr><td colspan="7" class="empty">Loading schedules...</td></tr></tbody>
  </table>
  </div>
 
@@ -129,6 +129,16 @@
  <button class="btn btn-ghost btn-sm" onclick="toggleOpenOnly()" id="filter-btn">Open only</button>
  </div>
  </div>
+ <!-- Drift trend: 12-week sparkline computed from deviations list. Lets ops
+      spot posture erosion at a glance — a rising line means drift events
+      are accelerating, often the first signal a control is degrading. -->
+ <div id="drift-trend-card" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:12px;display:none">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+     <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:0.08em">Drift trend · last 12 weeks</div>
+     <div style="font-size:11px" id="drift-trend-summary"></div>
+   </div>
+   <div id="drift-trend-svg-wrap" style="height:60px"></div>
+ </div>
  <table>
  <thead>
  <tr>
@@ -136,7 +146,7 @@
  <th>Transition</th><th>Status</th><th></th>
  </tr>
  </thead>
- <tbody id="deviations-body"><tr><td colspan="7" class="empty">Loading deviations...</td></tr></tbody>
+ <tbody id="deviations-body" data-vsp-paginate="20"><tr><td colspan="7" class="empty">Loading deviations...</td></tr></tbody>
  </table>
  </div>
 </div>
@@ -281,6 +291,54 @@ async function loadSchedules() {
  }
 }
 
+// renderDriftTrend buckets deviations into 12 weekly bins (oldest → newest)
+// and draws an inline SVG sparkline. Hidden when no events fall in the window.
+function renderDriftTrend(list) {
+  const card = document.getElementById('drift-trend-card');
+  const wrap = document.getElementById('drift-trend-svg-wrap');
+  const summary = document.getElementById('drift-trend-summary');
+  if (!card || !wrap) return;
+
+  const W = 7 * 24 * 3600 * 1000;
+  const now = Date.now();
+  const buckets = new Array(12).fill(0);
+  let inWindow = 0;
+  (list || []).forEach(dv => {
+    const t = Date.parse(dv.detected_at || '');
+    if (!isFinite(t)) return;
+    const wk = Math.floor((now - t) / W);
+    if (wk >= 0 && wk < 12) { buckets[11 - wk]++; inWindow++; }
+  });
+
+  if (inWindow === 0) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const max = Math.max(1, ...buckets);
+  const w = 720, h = 60, pad = 4;
+  const stepX = (w - pad * 2) / 11;
+  const pts = buckets.map((v, i) => {
+    const x = pad + i * stepX;
+    const y = pad + (h - pad * 2) * (1 - v / max);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const last = buckets[11], prev = buckets[10] || 0;
+  const delta = last - prev;
+  const pct = prev === 0 ? (last > 0 ? 100 : 0) : Math.round((delta / prev) * 100);
+  const arrow = delta > 0 ? '↑' : (delta < 0 ? '↓' : '·');
+  const colorVar = delta > 0 ? 'var(--err,#e5484d)' : (delta < 0 ? 'var(--ok,#3dd68c)' : 'var(--t3)');
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%;display:block">
+      <polyline fill="none" stroke="var(--accent,#4f8cff)" stroke-width="1.5" points="${pts.join(' ')}"/>
+      ${buckets.map((v, i) => {
+        const x = pad + i * stepX;
+        const y = pad + (h - pad * 2) * (1 - v / max);
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="var(--accent,#4f8cff)"><title>Week -${11 - i}: ${v} event${v === 1 ? '' : 's'}</title></circle>`;
+      }).join('')}
+    </svg>`;
+  summary.innerHTML = `<span style="color:var(--t3)">${inWindow} events · last week</span> <span style="color:${colorVar};font-weight:600">${arrow} ${Math.abs(pct)}%</span>`;
+}
+
 async function loadDeviations() {
   if(typeof VSPUXState !== 'undefined') VSPUXState.skeleton('#deviations-body', {rows: 4});
  const tbody = document.getElementById('deviations-body');
@@ -295,6 +353,8 @@ async function loadDeviations() {
  document.getElementById('m-dev').textContent = list.filter(x => !x.acknowledged_at).length === 0
  ? 'All clear'
  : 'Action required';
+
+ renderDriftTrend(list);
 
  if (list.length === 0) {
  if(typeof VSPUXState !== 'undefined'){VSPUXState.empty('#deviations-body', 'No '+(openOnly?'open ':'')+'deviations', loadDeviations);}else{tbody.innerHTML = `<tr><td colspan="7" class="empty">No ${openOnly ? 'open ' : ''}deviations</td></tr>`;}
@@ -931,5 +991,7 @@ setInterval(loadAll, 60000);
 
 </script>
 <!-- VSP-UNI-POLISH-END -->
+<script src="/panels/vsp_pro_panel_buttons.js?v=1"></script>
+<script src="/panels/vsp_pro_paginate.js?v=1"></script>
 </body>
 </html>

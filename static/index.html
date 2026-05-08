@@ -155,8 +155,8 @@ window.__esc = __esc;
       </div>
 
       <!-- Source path -->
-      <div class="form-group" style="margin-bottom:10px">
-        <label class="form-label">Source path <span style="color:var(--red)">*</span></label>
+      <div class="form-group" id="scanSrcGroup" style="margin-bottom:10px">
+        <label class="form-label">Source path <span id="scanSrcReq" style="color:var(--red)">*</span></label>
         <input id="scanSrc" class="form-ctrl" placeholder="/home/test/Data/GOLANG_VSP" value="/home/test/Data/GOLANG_VSP">
         <div style="font-size:9px;color:var(--t3);margin-top:3px">Local path · Git URL · empty = dùng đường dẫn mặc định</div>
       </div>
@@ -195,7 +195,7 @@ function setScanPreset(mode, profile) {
 // Single source of truth — used by both scan dialog + scan log render
 window.TOOLS_BY_MODE_SCAN = {
   SAST:    ['bandit','semgrep','codeql','gosec'],
-  SCA:     ['trivy','grype','license','osv-scanner','cosign','retire-js','syft','govulncheck'],
+  SCA:     ['trivy','grype','license','syft','govulncheck','osv-scanner','retire-js'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   IAC:     ['kics','checkov','hadolint'],
   DAST:    ['nikto','nuclei','sslscan'],
@@ -260,11 +260,14 @@ function updateScanTools() {
     else noteEl.textContent = '';
   }
 
-  // Show/hide URL field for DAST/NETWORK
+  // Show/hide URL field for DAST/NETWORK and flip the "*" indicator on
+  // Source path — for DAST/NETWORK the URL is required, not the source.
+  var needsURL = (mode === 'DAST' || mode === 'NETWORK');
   if (urlGroup) {
-    var needsURL = (mode === 'DAST' || mode === 'NETWORK');
     urlGroup.style.display = needsURL ? '' : 'none';
   }
+  var srcReq = document.getElementById('scanSrcReq');
+  if (srcReq) srcReq.style.display = needsURL ? 'none' : '';
 }
 
 // Init chips on page load
@@ -377,7 +380,7 @@ window.addEventListener('DOMContentLoaded', function(){
       <button class="nav-item active" onclick="showPanel('dashboard',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></span> Dashboard</button>
       <button class="nav-item" onclick="showPanel('scanlog',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M2 8h8M2 12h10"/><circle cx="13" cy="12" r="2.5"/><path d="M15 14l1.5 1.5"/></svg></span> Scan log</button>
       <button class="nav-item" onclick="showPanel('runs',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,2 13,8 3,14" fill="none"/></svg></span> Runs</button>
-      <button class="nav-item" onclick="showPanel('findings',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5"/><circle cx="8" cy="11.5" r="0.5" fill="currentColor"/></svg></span> Findings <span class="nav-badge" id="badge-findings">104</span></button>
+      <button class="nav-item" onclick="showPanel('findings',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5"/><circle cx="8" cy="11.5" r="0.5" fill="currentColor"/></svg></span> Findings</button>
       <button class="nav-item" onclick="showPanel('remediation',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5A6.5 6.5 0 1 0 14.5 8"/><polyline points="10,1 13,2.5 11.5,5.5"/></svg></span> Remediation</button>
     </div>
 
@@ -393,13 +396,13 @@ window.addEventListener('DOMContentLoaded', function(){
       <button class="nav-item" onclick="showPanel('governance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1l7 4v1H1V5L8 1z"/><rect x="2" y="6" width="2" height="7"/><rect x="7" y="6" width="2" height="7"/><rect x="12" y="6" width="2" height="7"/><path d="M1 13h14"/></svg></span> Governance</button>
       <button class="nav-item" onclick="showPanel('compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1L2 3.5v4C2 11 5 13.5 8 15c3-1.5 6-4 6-7.5v-4L8 1z"/><path d="M5 8l2 2 4-4"/></svg></span> FedRAMP</button>
           <button class="nav-item" onclick="showPanel('p4compliance',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/></svg></span> P4 Compliance</button>
-      <button class="nav-item" onclick="showPanel('conmon',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 1 1 6 6"/><polyline points="2,3 2,8 7,8"/></svg></span> ConMon <span class="nav-badge" style="background:rgba(13,115,119,.25);color:#7fcecf;font-size:8px">NEW</span></button>
-      <button class="nav-item" onclick="showPanel('ai_advisor',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M6 7h.01M10 7h.01M5.5 11c1 .8 2 1 2.5 1s1.5-.2 2.5-1"/></svg></span> AI Advisor <span class="nav-badge" style="background:rgba(13,115,119,.25);color:#7fcecf;font-size:8px">NEW</span></button>
-      <button class="nav-item" onclick="showPanel('sso_admin',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5.5 7V4.5a2.5 2.5 0 0 1 5 0V7"/></svg></span> SSO Admin <span class="nav-badge" style="background:rgba(13,115,119,.25);color:#7fcecf;font-size:8px">NEW</span></button>
-      <button class="nav-item" onclick="showPanel('incident_response',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L1 14h14L8 1z"/><path d="M8 6v4M8 12.5v0.5"/></svg></span> Incident Response <span class="nav-badge" style="background:rgba(239,68,68,.2);color:#ef4444;font-size:8px">NEW</span></button>
-      <button class="nav-item" onclick="showPanel('oscal',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span> OSCAL <span class="nav-badge" style="background:rgba(168,85,247,.2);color:#a855f7;font-size:8px">NEW</span></button>
-      <button class="nav-item" onclick="showPanel('attestation',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v4h3M5 9h6M5 12h4"/></svg></span> Attestation <span class="nav-badge" style="background:rgba(168,85,247,.2);color:#a855f7;font-size:8px">NEW</span></button>
-      <button class="nav-item" onclick="showPanel('supplychain',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 016 0v2"/><circle cx="8" cy="10" r="1" fill="currentColor"/></svg></span> Supply Chain <span class="nav-badge" style="background:rgba(168,85,247,.2);color:#a855f7;font-size:8px">NEW</span></button>
+      <button class="nav-item" onclick="showPanel('conmon',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 1 1 6 6"/><polyline points="2,3 2,8 7,8"/></svg></span> ConMon</button>
+      <button class="nav-item" onclick="showPanel('ai_advisor',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M6 7h.01M10 7h.01M5.5 11c1 .8 2 1 2.5 1s1.5-.2 2.5-1"/></svg></span> AI Advisor</button>
+      <button class="nav-item" onclick="showPanel('sso_admin',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5.5 7V4.5a2.5 2.5 0 0 1 5 0V7"/></svg></span> SSO Admin</button>
+      <button class="nav-item" onclick="showPanel('incident_response',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L1 14h14L8 1z"/><path d="M8 6v4M8 12.5v0.5"/></svg></span> Incident Response</button>
+      <button class="nav-item" onclick="showPanel('oscal',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span> OSCAL</button>
+      <button class="nav-item" onclick="showPanel('attestation',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v4h3M5 9h6M5 12h4"/></svg></span> Attestation</button>
+      <button class="nav-item" onclick="showPanel('supplychain',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 016 0v2"/><circle cx="8" cy="10" r="1" fill="currentColor"/></svg></span> Supply Chain</button>
       <button class="nav-item" onclick="showPanel('sbom',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M5 3V2M8 3V2M11 3V2M4 7h2M4 10h2M8 7h4M8 10h3"/></svg></span> SBOM</button>
       <button class="nav-item" onclick="showPanel('sla',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4 8,8 11,10"/></svg></span> SLA</button>
     </div>
@@ -413,7 +416,6 @@ window.addEventListener('DOMContentLoaded', function(){
       <button class="nav-item" onclick="showPanel('cicd',this)">
         <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 4h2m2 0h0M12 6v2m0 2v0M4 6v5a2 2 0 002 2h2"/></svg></span>
         CI/CD
-        <span style="font-size:9px;background:rgba(6,182,212,.15);color:var(--cyan);padding:1px 5px;border-radius:3px;margin-left:auto;font-family:var(--font-mono)">NEW</span>
       </button>
       <button class="nav-item" onclick="showPanel('integrations',this)">
         <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="5" width="4" height="6" rx="1"/><rect x="11" y="5" width="4" height="6" rx="1"/><path d="M5 8h6"/></svg></span>
@@ -437,7 +439,6 @@ window.addEventListener('DOMContentLoaded', function(){
       <button class="nav-item" onclick="showPanel('ai_analyst',this)" style="background:linear-gradient(135deg,rgba(79,209,197,.08),rgba(159,122,234,.08));border-color:rgba(79,209,197,.2)">
         <span class="nav-icon" style="color:#4fd1c5">&#9672;</span>
         <span style="background:linear-gradient(135deg,#4fd1c5,#9f7aea);-webkit-background-clip:text;-webkit-text-fill-color:transparent">AI Analyst</span>
-        <span style="font-size:9px;background:rgba(79,209,197,.15);color:#4fd1c5;padding:1px 5px;border-radius:3px;margin-left:auto;font-family:var(--font-mono)">NEW</span>
       </button>
       <button class="nav-item" onclick="showPanel('scheduler',this)">
         <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="14" height="11" rx="2"/><path d="M1 7h14M5 1v4M11 1v4"/></svg></span>
@@ -446,7 +447,6 @@ window.addEventListener('DOMContentLoaded', function(){
       <button class="nav-item" onclick="showPanel('correlation',this)">
         <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><path d="M8 6v2M8 8L3 10M8 8l5 2"/></svg></span>
         Correlation
-        <span class="nav-badge" id="badge-incidents">0</span>
       </button>
       <button class="nav-item" onclick="showPanel('soar',this)">
         <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,2 13,8 3,14"/></svg></span>
@@ -506,7 +506,7 @@ window.addEventListener('DOMContentLoaded', function(){
       <span class="qs-key" style="margin-left:auto">⌘K</span>
     </div>
   </div>
-      <button class="nav-item" onclick="showPanel('cspm',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a3 3 0 0 1 .5-5.96A4 4 0 1 1 12 8h.5a3 3 0 0 1 0 6H4z"/></svg></span> CSPM <span class="nav-badge" style="background:rgba(239,68,68,.2);color:#ef4444;font-size:8px">NEW</span></button>
+      <button class="nav-item" onclick="showPanel('cspm',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a3 3 0 0 1 .5-5.96A4 4 0 1 1 12 8h.5a3 3 0 0 1 0 6H4z"/></svg></span> CSPM</button>
 </nav>
 
 <!-- ══════════════════════════════════════════════
@@ -1051,7 +1051,7 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="tbl-wrap">
           <table>
             <thead><tr><th></th><th>Severity</th><th>Tool</th><th>Rule</th><th>Message</th><th>Path</th><th>Line</th><th>CWE</th></tr></thead>
-            <tbody id="findings-table"></tbody>
+            <tbody id="findings-table" data-vsp-paginate="25"></tbody>
           </table>
         </div>
         <div class="pagination">
@@ -1091,7 +1091,7 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="tbl-wrap">
           <table>
             <thead><tr><th>Severity</th><th>Tool</th><th>Rule</th><th>Finding</th><th>Assignee</th><th>Priority</th><th>Status</th><th></th></tr></thead>
-            <tbody id="rem-tbody"></tbody>
+            <tbody id="rem-tbody" data-vsp-paginate="20"></tbody>
           </table>
         </div>
       </div>
@@ -1124,7 +1124,7 @@ window.addEventListener('DOMContentLoaded', function(){
           <div class="rule-header">
             <div class="rule-name">Block Critical Findings</div>
             <span class="rule-tag">BUILT-IN</span>
-            <button class="toggle-btn on" onclick="this.classList.toggle('on');showToast('Rule '+(this.classList.contains('on')?'enabled':'disabled'),'info')"></button>
+            <button class="toggle-btn on" data-rule-toggle="block_critical" onclick="togglePolicyRule(this)"></button>
           </div>
           <div class="rule-desc">Fail gate if any CRITICAL finding exists</div>
           <div class="rule-meta"><span>Fail on: <b>CRITICAL</b></span></div>
@@ -1133,7 +1133,7 @@ window.addEventListener('DOMContentLoaded', function(){
           <div class="rule-header">
             <div class="rule-name">Block Secrets</div>
             <span class="rule-tag">BUILT-IN</span>
-            <button class="toggle-btn on" onclick="this.classList.toggle('on');showToast('Rule '+(this.classList.contains('on')?'enabled':'disabled'),'info')"></button>
+            <button class="toggle-btn on" data-rule-toggle="block_secrets" onclick="togglePolicyRule(this)"></button>
           </div>
           <div class="rule-desc">Fail gate if secrets/credentials detected</div>
           <div class="rule-meta"><span>Fail on: <b>SECRETS</b></span></div>
@@ -1141,7 +1141,7 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="rule-card">
           <div class="rule-header">
             <div class="rule-name">High Threshold</div>
-            <button class="toggle-btn on" onclick="this.classList.toggle('on');showToast('Rule '+(this.classList.contains('on')?'enabled':'disabled'),'info')"></button>
+            <button class="toggle-btn on" data-rule-toggle="high_threshold" onclick="togglePolicyRule(this)"></button>
           </div>
           <div class="rule-desc">Warn if HIGH findings exceed 50</div>
           <div class="rule-meta"><span>Fail on: <b>HIGH &gt; 50</b></span></div>
@@ -1149,7 +1149,7 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="rule-card">
           <div class="rule-header">
             <div class="rule-name">SLA Breach Alert</div>
-            <button class="toggle-btn" onclick="this.classList.toggle('on');showToast('Rule '+(this.classList.contains('on')?'enabled':'disabled'),'info')"></button>
+            <button class="toggle-btn" data-rule-toggle="sla_breach_alert" onclick="togglePolicyRule(this)"></button>
           </div>
           <div class="rule-desc">Warn if SLA breach detected</div>
           <div class="rule-meta"><span>Fail on: <b>SLA</b></span></div>
@@ -1193,7 +1193,7 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="tbl-wrap">
           <table>
             <thead><tr><th>Seq</th><th>Action</th><th>Resource</th><th>IP</th><th>Time</th><th>Hash</th></tr></thead>
-            <tbody id="audit-table">
+            <tbody id="audit-table" data-vsp-paginate="20">
               <tr><td class="mono-sm">1</td><td><span class="pill pill-run" style="font-size:8px">LOGIN</span></td><td class="mono-sm overflow-ellipsis" style="max-width:180px">admin@vsp.local</td><td class="mono-sm">127.0.0.1</td><td class="mono-sm">29/3 09:15</td><td class="mono-sm" style="color:var(--t4)">a3f7c9d1…</td></tr>
               <tr><td class="mono-sm">2</td><td><span class="pill pill-done" style="font-size:8px;background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.25)">SCAN</span></td><td class="mono-sm overflow-ellipsis" style="max-width:180px">RID_SCHED_194714_0</td><td class="mono-sm">127.0.0.1</td><td class="mono-sm">29/3 19:47</td><td class="mono-sm" style="color:var(--t4)">b8e2a4f0…</td></tr>
             </tbody>
@@ -1256,15 +1256,15 @@ window.addEventListener('DOMContentLoaded', function(){
 
       <div class="g2 mb14">
         <div class="card">
-          <div class="card-head"><div class="card-title">Traceability matrix</div></div>
+          <div class="card-head">
+            <div class="card-title">Traceability matrix</div>
+            <span id="gov-trace-count" class="mono-sm" style="color:var(--t3)">—</span>
+          </div>
           <div class="tbl-wrap">
             <table>
               <thead><tr><th>Severity</th><th>Rule</th><th>Control</th><th>Framework</th></tr></thead>
-              <tbody>
-                <tr><td><span class="sev sev-crit">CRITICAL</span></td><td class="mono f10 c-blue">38c5ee0d</td><td class="mono f10 c-purple">SI-3</td><td class="mono-sm">NIST SP 800-53</td></tr>
-                <tr><td><span class="sev sev-high">HIGH</span></td><td class="mono f10 c-blue">4728cd65</td><td class="mono f10 c-purple">SI-3</td><td class="mono-sm">NIST SP 800-53</td></tr>
-                <tr><td><span class="sev sev-high">HIGH</span></td><td class="mono f10 c-blue">CKV_AWS_20</td><td class="mono f10 c-purple">SI-3</td><td class="mono-sm">NIST SP 800-53</td></tr>
-                <tr><td><span class="sev sev-med">MEDIUM</span></td><td class="mono f10 c-blue">65905cec</td><td class="mono f10 c-purple">SI-3</td><td class="mono-sm">NIST SP 800-53</td></tr>
+              <tbody id="gov-trace-tbody" data-vsp-paginate="20">
+                <tr><td colspan="4" class="mono-sm" style="color:var(--t3);text-align:center;padding:14px">Loading findings…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1336,7 +1336,7 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="tbl-wrap">
           <table>
             <thead><tr><th>ID</th><th>Family</th><th>Control</th><th>Tools</th><th>Status</th></tr></thead>
-            <tbody id="comp-tbody">
+            <tbody id="comp-tbody" data-vsp-paginate="25">
               <tr><td class="mono f10 c-blue">AC-1</td><td class="mono-sm">Access Control</td><td class="f12">Access Control Policy and Procedures</td><td class="mono-sm">checkov</td><td><span class="pill pill-pass">assessed</span></td></tr>
               <tr><td class="mono f10 c-blue">SI-3</td><td class="mono-sm">System and Information</td><td class="f12">Malicious Code Protection</td><td class="mono-sm">kics, checkov</td><td><span class="pill pill-pass">assessed</span></td></tr>
               <tr><td class="mono f10 c-blue">IA-5</td><td class="mono-sm">Identification and Auth</td><td class="f12">Authenticator Management</td><td class="mono-sm">gitleaks</td><td><span class="pill pill-pass">assessed</span></td></tr>
@@ -2049,7 +2049,87 @@ async function initGauges() {
   } catch(e) {}
 }
 
+// CWE → NIST SP 800-53 Rev5 control mapping for the most common weaknesses
+// in security scanner output. Used to fill the Governance traceability matrix
+// since /api/v1/vsp/findings returns CWEs but no direct control_id.
+// Aligns with internal/poam/cwe_mapping.go on the backend (same canonical map).
+var GOV_CWE_TO_CONTROL = {
+  'CWE-20': 'SI-10', 'CWE-22': 'AC-3',  'CWE-77': 'SI-10', 'CWE-78': 'SI-10',
+  'CWE-79': 'SI-10', 'CWE-89': 'SI-10', 'CWE-94': 'SI-7',  'CWE-119':'SI-16',
+  'CWE-125':'SI-16', 'CWE-200':'SC-8',  'CWE-209':'SI-11', 'CWE-256':'IA-5',
+  'CWE-259':'IA-5',  'CWE-269':'AC-6',  'CWE-284':'AC-3',  'CWE-285':'AC-3',
+  'CWE-287':'IA-2',  'CWE-295':'SC-8',  'CWE-306':'IA-2',  'CWE-311':'SC-13',
+  'CWE-312':'SC-28', 'CWE-319':'SC-8',  'CWE-326':'SC-13', 'CWE-327':'SC-13',
+  'CWE-352':'SC-23', 'CWE-400':'SC-5',  'CWE-401':'SI-16', 'CWE-416':'SI-16',
+  'CWE-434':'SI-3',  'CWE-476':'SI-16', 'CWE-502':'SI-7',  'CWE-522':'IA-5',
+  'CWE-601':'SC-7',  'CWE-611':'SI-10', 'CWE-732':'AC-3',  'CWE-787':'SI-16',
+  'CWE-798':'IA-5',  'CWE-829':'SC-8',  'CWE-862':'AC-3',  'CWE-863':'AC-3',
+  'CWE-918':'SC-7',  'CWE-1004':'SC-23','CWE-1021':'SC-7'
+};
+function _cweToControl(cwe){
+  if (!cwe) return '—';
+  var k = String(cwe).toUpperCase();
+  if (!k.startsWith('CWE-')) k = 'CWE-' + k.replace(/[^0-9]/g,'');
+  return GOV_CWE_TO_CONTROL[k] || '—';
+}
+
+async function loadGovernanceTrace(){
+  // Build the traceability matrix from real findings. Backend findings have
+  // a `cwe` field but no direct NIST control mapping — we apply the CWE→
+  // 800-53 map (same one POA&M generator on backend uses) to derive control.
+  var tbody = document.getElementById('gov-trace-tbody');
+  var counter = document.getElementById('gov-trace-count');
+  if (!tbody) return;
+  if (!window.TOKEN) {
+    tbody.innerHTML = '<tr><td colspan="4" class="mono-sm" style="color:var(--t3);text-align:center;padding:14px">Login required</td></tr>';
+    return;
+  }
+  try {
+    var r = await fetch('/api/v1/vsp/findings?limit=200', {
+      headers:{Authorization:'Bearer '+window.TOKEN}
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    var d = await r.json();
+    var findings = d.findings || [];
+    var sevOrder = {CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3};
+    // Map each finding to a control and keep ones with a known mapping
+    var withCtl = findings.map(function(f){
+      var ctl = f.control_id || (f.controls && f.controls[0]) || _cweToControl(f.cwe);
+      return Object.assign({}, f, {_control: ctl});
+    }).filter(function(f){ return f._control && f._control !== '—'; });
+    withCtl.sort(function(a,b){
+      var sa = sevOrder[(a.severity||'').toUpperCase()];
+      var sb = sevOrder[(b.severity||'').toUpperCase()];
+      if (sa == null) sa = 9;
+      if (sb == null) sb = 9;
+      return sa - sb;
+    });
+    var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+    var rows = withCtl.slice(0, 50).map(function(f){
+      var sev = (f.severity || '').toUpperCase();
+      var sevClass = sev === 'CRITICAL' ? 'sev-crit' : sev === 'HIGH' ? 'sev-high' : sev === 'MEDIUM' ? 'sev-med' : 'sev-low';
+      var rule = f.rule_id || f.rule || (f.id || '').slice(0, 12);
+      return '<tr>'
+        + '<td><span class="sev '+sevClass+'">'+esc(sev||'—')+'</span></td>'
+        + '<td class="mono f10 c-blue">'+esc(rule)+'</td>'
+        + '<td class="mono f10 c-purple">'+esc(f._control)+'</td>'
+        + '<td class="mono-sm">NIST SP 800-53</td>'
+        + '</tr>';
+    }).join('');
+    if (!withCtl.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="mono-sm" style="color:var(--t3);text-align:center;padding:14px">No findings with CWE→control mapping</td></tr>';
+    } else {
+      tbody.innerHTML = rows;
+    }
+    if (counter) counter.textContent = withCtl.length + ' mapped · ' + findings.length + ' total';
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="4" class="mono-sm" style="color:var(--red);text-align:center;padding:14px">Load error: '+(e.message||e)+'</td></tr>';
+  }
+}
+
 function initGovernance() {
+  // Wire traceability matrix from real findings (was hardcoded 4 rows before).
+  loadGovernanceTrace();
   // Radar chart — fetch real compliance data
   const ctx = document.getElementById('gov-radar')?.getContext('2d');
   if (ctx && window.TOKEN) {
@@ -2109,7 +2189,7 @@ function initGovernance() {
   const maxVal = Math.max(...Object.values(matrix));
   const heatEl = document.getElementById('gov-heatmap');
   if (heatEl) {
-    heatEl.textContent = `
+    heatEl.innerHTML = `
       <div style="display:grid;grid-template-columns:60px repeat(4,1fr);gap:3px;font-size:9px">
         <div></div>
         ${sevs.map(s=>`<div class="heatmap-header" style="color:${SEV_COLORS[s]}">${s.slice(0,4)}</div>`).join('')}
@@ -2247,7 +2327,7 @@ async function saveRemediation() {
   const notes    = document.getElementById('rem-notes').value;
 
   try {
-    if (TOKEN) {
+    if (window.TOKEN) {
       await api('POST', '/remediation/finding/' + _remCurrentId, {status, priority, assignee, ticket_url: ticket, notes});
     }
     closeRemModal();
@@ -2294,50 +2374,151 @@ function exportFindingsCSV() {
 }
 
 /* ─── Policy ─── */
+// runEval v3 — direct fetch with visible status. Bypasses api() helper to
+// eliminate any wrapper/CSRF interference and shows every state inline.
 async function runEval() {
   const el = document.getElementById('eval-result');
-  el.textContent = '⏳ Evaluating…';
+  if (!el) return;
+  const setMsg = (color, text) => {
+    el.replaceChildren(
+      window.safeCreate('span', { style: { color: color, fontWeight: '700' }, text: text })
+    );
+  };
+
+  setMsg('var(--cyan)', '⏳ Evaluating… [v3]');
+  console.log('[runEval v3] start; window.TOKEN length=', (window.TOKEN || '').length);
+
+  const tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
+  if (!tk || tk.length < 20) {
+    setMsg('var(--amber)', '⚠ NOT AUTHENTICATED — please login first');
+    console.warn('[runEval v3] no token');
+    return;
+  }
+
   try {
-    if (TOKEN) {
-      const r = await api('POST', '/policy/evaluate', {repo:'current'});
-      const color = r.decision==='PASS'?'var(--green)':r.decision==='WARN'?'var(--amber)':'var(--red)';
-      // SEC-006 fixed 2026-04-21: r.* from API response are tainted; build with safeCreate
-      el.replaceChildren(
-        window.safeCreate('span', {
-          style: { color: color, fontSize: '16px', fontWeight: '700' },
-          text: String(r.decision || '')
-        }),
-        document.createTextNode(' · score: '),
-        window.safeCreate('b', { text: String(r.score ?? '') }),
-        document.createTextNode(' · posture: '),
-        window.safeCreate('b', { text: String(r.posture ?? '') }),
-        document.createTextNode(' · '),
-        window.safeCreate('span', {
-          style: { color: 'var(--t3)' },
-          text: String(r.reason || '')
-        })
-      );
-    } else {
-      // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
-      el.innerHTML = `<span style="color:var(--red);font-size:16px;font-weight:700">FAIL</span> · score: <b>—</b> · posture: <b>—</b> · <span style="color:var(--t3)">Critical findings detected (Block Critical rule triggered)</span>`;
+    const resp = await fetch('/api/v1/policy/evaluate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + tk
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ repo: 'current' })
+    });
+    console.log('[runEval v3] HTTP', resp.status);
+    const r = await resp.json().catch(() => ({}));
+    console.log('[runEval v3] body:', r);
+
+    if (!resp.ok) {
+      setMsg('var(--red)', '✗ HTTP ' + resp.status + ' — ' + (r.error || resp.statusText));
+      return;
     }
-  } catch(e) {
-    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
-    el.innerHTML = `<span style="color:var(--red)">FAIL</span> · score: — · Block Critical rule triggered`;
+    const color = r.decision==='PASS'?'var(--green)':r.decision==='WARN'?'var(--amber)':'var(--red)';
+    el.replaceChildren(
+      window.safeCreate('span', {
+        style: { color: color, fontSize: '16px', fontWeight: '700' },
+        text: String(r.decision || '?')
+      }),
+      document.createTextNode(' · score: '),
+      window.safeCreate('b', { text: String(r.score ?? '?') }),
+      document.createTextNode(' · posture: '),
+      window.safeCreate('b', { text: String(r.posture ?? '?') }),
+      document.createTextNode(' · '),
+      window.safeCreate('span', {
+        style: { color: 'var(--t3)' },
+        text: String(r.reason || '')
+      })
+    );
+  } catch (e) {
+    console.error('[runEval v3] threw:', e);
+    setMsg('var(--red)', '✗ ' + (e.message || String(e)));
   }
 }
 
 async function loadRules() {
-  showToast('Rules refreshed', 'info');
+  // Hydrate toggle states from settings_general.policy_rules_enabled blob.
+  // Same feature_config sub-key pattern Settings panel + P4 ATO checklist use.
+  try {
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      headers:{Authorization:'Bearer '+window.TOKEN}, credentials:'same-origin'
+    });
+    if (!r.ok) { showToast('Rules refreshed', 'info'); return; }
+    var d = await r.json();
+    var enabled = ((d && d.config) || {}).policy_rules_enabled || {};
+    document.querySelectorAll('[data-rule-toggle]').forEach(function(btn){
+      var id = btn.getAttribute('data-rule-toggle');
+      if (!id) return;
+      // Only override if user has explicitly saved state for this rule
+      if (enabled[id] !== undefined) {
+        btn.classList.toggle('on', !!enabled[id]);
+      }
+    });
+    showToast('Rules synced', 'info');
+  } catch(e) { showToast('Rules refresh failed: '+e.message, 'error'); }
+}
+
+async function togglePolicyRule(btn){
+  var id = btn.getAttribute('data-rule-toggle') || '';
+  if (!id) return;
+  // Optimistic UI flip
+  btn.classList.toggle('on');
+  var nowOn = btn.classList.contains('on');
+  try {
+    var existing = await fetch('/api/v1/features/settings_general/config', {
+      headers:{Authorization:'Bearer '+window.TOKEN}, credentials:'same-origin'
+    });
+    var cfg = {};
+    if (existing.ok) { var j = await existing.json(); cfg = (j && j.config) || {}; }
+    cfg.policy_rules_enabled = cfg.policy_rules_enabled || {};
+    cfg.policy_rules_enabled[id] = nowOn;
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({ config: cfg })
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    showToast('Rule '+id+' '+(nowOn?'enabled':'disabled'),'success');
+  } catch(e) {
+    btn.classList.toggle('on');  // rollback
+    showToast('Save failed: '+(e.message||e), 'error');
+  }
 }
 
 /* ─── Audit ─── */
 async function verifyAudit() {
   const el = document.getElementById('verify-result');
   el.textContent = '⏳ Verifying hash chain…';
-  await new Promise(r => setTimeout(r, 800));
-  // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
-  el.innerHTML = ''; const sp=document.createElement('span'); sp.style.color='var(--green)'; sp.textContent='✓ Chain intact'; el.appendChild(sp); el.appendChild(document.createTextNode(' — all audit entries verified · last verified: '+new Date().toLocaleTimeString()));
+  try {
+    if (!window.TOKEN) {
+      el.innerHTML = '';
+      var w = document.createElement('span');
+      w.style.color = 'var(--amber)';
+      w.textContent = '⚠ Not authenticated — login first';
+      el.appendChild(w);
+      return;
+    }
+    // Backend hashes every audit entry chained to prev — POST /verify
+    // recomputes and reports any tampering.
+    const r = await api('POST', '/audit/verify', {});
+    el.innerHTML = '';
+    // Backend: {ok, checked, broken_at_seq, error}
+    var ok = !!(r && r.ok);
+    var sp = document.createElement('span');
+    sp.style.color = ok ? 'var(--green)' : 'var(--red)';
+    sp.textContent = ok ? '✓ Chain intact' : '✗ Chain tampered';
+    el.appendChild(sp);
+    var details = ' — ' + (r.checked || 0) + ' entries verified';
+    if (!ok && r.broken_at_seq) details += ' · break at seq ' + r.broken_at_seq;
+    details += ' · ' + new Date().toLocaleTimeString();
+    el.appendChild(document.createTextNode(details));
+  } catch (e) {
+    el.innerHTML = '';
+    var sp2 = document.createElement('span');
+    sp2.style.color = 'var(--red)';
+    sp2.textContent = '✗ Verify failed: ' + (e.message || e);
+    el.appendChild(sp2);
+  }
 }
 
 /* ─── Compliance ─── */
@@ -2842,7 +3023,7 @@ function updateTicker() {
       }).catch(function(){
       }).catch(function(){});
   }
-  if (!TOKEN) return;
+  if (!window.TOKEN) return;
   api('GET', '/vsp/run/latest').then(r => {
     const el = document.getElementById('ticker-content');
     if (el) el.textContent = (r.rid||'').slice(-20) + ' · ' + r.mode + ' · ' + r.status + (r.gate?' · '+r.gate:'') + (r.total_findings?' · '+r.total_findings+' findings':'');
@@ -2855,7 +3036,7 @@ function connectSSE() {
   // leaks via access logs, Referer, and browser history. The backend
   // auth middleware reads the JWT from the `vsp_token` HttpOnly cookie,
   // and EventSource attaches it automatically with withCredentials.
-  if (!TOKEN) return;
+  if (!window.TOKEN) return;
   const url = '/api/v1/events';
   const source = new EventSource(url, { withCredentials: true });
   source.onopen = () => {
@@ -2946,10 +3127,10 @@ setTimeout(function() {
 document.addEventListener('DOMContentLoaded', () => {
   // Init dashboard charts immediately
   setTimeout(initDashboardCharts, 300);
-  if (TOKEN) setTimeout(loadLatestLog, 500);
+  if (window.TOKEN) setTimeout(loadLatestLog, 500);
 
   // Try connecting to API if token exists
-  if (TOKEN && TOKEN !== '') {
+  if (window.TOKEN && window.TOKEN !== '') {
     connectSSE();
     if (window.TOKEN) {
       // Validate JWT chưa expired trước khi gọi
@@ -3003,23 +3184,72 @@ window.loadRuns = () => showToast('Runs refreshed','info');
 async function loadDashKPIs() {
   if (!window.TOKEN) return;
   try {
-    const r = await fetch('/api/v1/vsp/findings/summary?scope=all', {
-      headers: { 'Authorization': 'Bearer ' + window.TOKEN }
-    });
-    const d = await r.json();
+    const h = { 'Authorization': 'Bearer ' + window.TOKEN };
+    const [summary, runsResp] = await Promise.all([
+      fetch('/api/v1/vsp/findings/summary?scope=all', { headers: h }).then(r => r.json()),
+      fetch('/api/v1/vsp/runs/index?limit=200', { headers: h }).then(r => r.json()).catch(() => ({runs:[]}))
+    ]);
     const map = {
-      'd-critical': d.critical || 0,
-      'd-high':     d.high || 0,
-      'd-medium':   d.medium || 0,
-      'd-low':      d.low || 0,
+      'd-critical': summary.critical || 0,
+      'd-high':     summary.high || 0,
+      'd-medium':   summary.medium || 0,
+      'd-low':      summary.low || 0,
     };
     Object.entries(map).forEach(([id, val]) => {
       const el = document.getElementById(id);
       if (el) el.textContent = val.toLocaleString();
     });
+    // WoW trend: aggregate per-severity counts from runs.summary, week=7d.
+    // Each kpi-sub gets a delta badge ↑/↓/= so user sees direction at a glance.
+    _renderWoWTrends(runsResp.runs || []);
   } catch(e) { console.warn('loadDashKPIs failed', e); }
 }
 window.loadDashKPIs = loadDashKPIs;
+
+function _renderWoWTrends(runs) {
+  const now = Date.now();
+  const W = 7 * 24 * 3600 * 1000;
+  const buckets = { thisWk: {C:0, H:0, M:0, L:0}, lastWk: {C:0, H:0, M:0, L:0} };
+  runs.forEach(r => {
+    const ts = new Date(r.created_at || r.started_at || 0).getTime();
+    if (isNaN(ts)) return;
+    const age = now - ts;
+    let target = null;
+    if (age <= W) target = buckets.thisWk;
+    else if (age <= 2*W) target = buckets.lastWk;
+    if (!target) return;
+    const s = r.summary || {};
+    target.C += s.CRITICAL || s.Critical || s.critical || 0;
+    target.H += s.HIGH || s.High || s.high || 0;
+    target.M += s.MEDIUM || s.Medium || s.medium || 0;
+    target.L += s.LOW || s.Low || s.low || 0;
+  });
+  const sevMap = {
+    'd-critical': { now: buckets.thisWk.C, prev: buckets.lastWk.C, label: 'findings' },
+    'd-high':     { now: buckets.thisWk.H, prev: buckets.lastWk.H, label: 'findings' },
+    'd-medium':   { now: buckets.thisWk.M, prev: buckets.lastWk.M, label: 'findings' },
+    'd-low':      { now: buckets.thisWk.L, prev: buckets.lastWk.L, label: 'findings' }
+  };
+  Object.entries(sevMap).forEach(([id, b]) => {
+    const valEl = document.getElementById(id);
+    if (!valEl) return;
+    const sub = valEl.parentElement.querySelector('.kpi-sub');
+    if (!sub) return;
+    let delta = '', arrow = '=', color = 'var(--t3)';
+    if (b.prev > 0) {
+      const pct = Math.round((b.now - b.prev) / b.prev * 100);
+      // For severity findings, ↓ is good (fewer issues), ↑ is bad
+      if (pct > 0)      { arrow = '↑'; color = 'var(--red)'; delta = '+' + pct + '%'; }
+      else if (pct < 0) { arrow = '↓'; color = 'var(--green)'; delta = pct + '%'; }
+      else              { arrow = '='; color = 'var(--t3)';   delta = '0%'; }
+    } else if (b.now > 0) {
+      arrow = '↑'; color = 'var(--red)'; delta = 'new';
+    } else {
+      arrow = '='; color = 'var(--t3)'; delta = '—';
+    }
+    sub.innerHTML = b.label + ' · <span style="color:' + color + ';font-weight:600">' + arrow + ' ' + delta + ' WoW</span>';
+  });
+}
 
 window.loadCurrentPanel = loadCurrentPanel;
 window.loadExecutive = loadExecutive;
@@ -3136,6 +3366,7 @@ async function govLoginSubmit() {
 
     var data = await r.json();
     window.TOKEN = data.token;
+    TOKEN = data.token;  // keep `let`-scoped TOKEN in sync with window.TOKEN
     localStorage.setItem('vsp_token', data.token);
 
     // Sync user info to topbar
@@ -3412,7 +3643,12 @@ window.updateTicker = async function() {
       ['d-score','d-score2'].forEach(function(id){
         var e=document.getElementById(id); if(e){e.textContent=score;e.className=(id==='d-score'?'spark-value ':'score-num ')+sc;}
       });
-      // Grade
+      // Grade — Sprint 7.2: SINGLE source of truth is backend (gate.Posture).
+      // We previously computed a JS-side fallback that disagreed with the
+      // backend when critical findings or live secrets were present (the
+      // backend hard-fails to F; the JS band-from-score said "D"). Always
+      // prefer d.posture; fallback ONLY when the backend hasn't populated
+      // it yet (in-flight runs without a finalised gate).
       var grade=score>=90?'A+':score>=80?'A':score>=70?'B':score>=60?'C':score>=40?'D':'F';
       var gr=document.getElementById('d-grade'); if(gr){gr.textContent=d.posture||grade;gr.className='exec-stat-val '+sc;}
       // Gate badge
@@ -3474,64 +3710,148 @@ if (document.readyState !== 'loading') {
 // ── PATCH v2.2 — Scan log fix: tools by mode + load runs dropdown ──────────
 
 const TOOLS_BY_MODE = {
-  IAC:     ['kics','checkov'],
+  IAC:     ['kics','checkov','hadolint'],
   SAST:    ['bandit','semgrep','codeql','gosec'],
   SCA:     ['trivy','grype','license','syft','govulncheck','osv-scanner','retire-js'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
   DAST:    ['nikto','nuclei','sslscan'],
+  NETWORK: ['sslscan','nmap','netcap'],
   FULL: ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','osv-scanner','cosign','retire-js','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','apisec','gofuzz','racedetect'],
+  FULL_SOC: ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','osv-scanner','cosign','retire-js','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','apisec','gofuzz','racedetect'],
 };
 const ALL_TOOLS = ['kics','bandit','semgrep','grype','trivy','gitleaks','checkov','trufflehog','codeql','nuclei'];
 
-// Load runs vào dropdown
+// Load runs vào dropdown. Surfaces failure modes (no token / no runs / fetch
+// error) directly in the UI so user doesn't see stale hardcoded placeholder
+// from initial HTML when JS bootstrap fails.
 async function loadRunsDropdown() {
-  if (!await ensureToken()) return;
+  const sel = document.getElementById('log-run-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">⏳ loading runs…</option>';
+  console.log('[scanlog] loadRunsDropdown start; window.TOKEN=', (window.TOKEN||'').length, 'chars');
+
+  const tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
+  if (!tk || tk.length < 20) {
+    sel.innerHTML = '<option value="">⚠ login required</option>';
+    _scanLogClearStaticData('Not authenticated — please login to view scan logs');
+    return;
+  }
   try {
-    const r = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    const r = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+tk}});
+    if (!r.ok) {
+      sel.innerHTML = '<option value="">✗ HTTP '+r.status+'</option>';
+      _scanLogClearStaticData('Failed to load runs (HTTP '+r.status+')');
+      return;
+    }
     const d = await r.json();
     const runs = d.runs || [];
-    const sel = document.getElementById('log-run-select');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">— select run —</option>' +
-      runs.map(r => `<option value="${r.rid}">${r.rid} · ${r.mode} · ${r.status} · ${r.total||0} findings</option>`).join('');
-    // Auto-select latest
-    if (runs.length > 0) {
-      sel.value = runs[0].rid;
-      loadRunLog(runs[0].rid);
+    console.log('[scanlog] received', runs.length, 'runs');
+    if (runs.length === 0) {
+      sel.innerHTML = '<option value="">— no runs yet —</option>';
+      _scanLogClearStaticData('No scan runs yet. Click + Scan to trigger one.');
+      return;
     }
-  } catch(e) { console.error('loadRunsDropdown', e); }
+    sel.innerHTML = '<option value="">— select run —</option>' +
+      runs.map(r => `<option value="${r.rid}">${r.rid} · ${r.mode} · ${r.status} · ${(r.total_findings||r.total||0)} findings</option>`).join('');
+    // Auto-select latest
+    sel.value = runs[0].rid;
+    loadRunLog(runs[0].rid);
+  } catch(e) {
+    console.error('[scanlog] loadRunsDropdown', e);
+    sel.innerHTML = '<option value="">✗ error</option>';
+    _scanLogClearStaticData('Network error loading runs: ' + (e.message || e));
+  }
 }
 
-// Load log + tools cho 1 run
-async function loadRunLog(rid) {
+// Clear the hardcoded HTML placeholder (kics 475 findings, RID_SCHED_2026032…
+// log lines) when there's no real run to display. Without this the user sees
+// fake data from page-load default.
+function _scanLogClearStaticData(reason) {
+  const grid = document.querySelector('.log-tool-grid');
+  if (grid) {
+    grid.innerHTML = Array.from(grid.children).slice(0,8).map(c => {
+      const name = (c.querySelector('.log-tool-name') || {textContent:'—'}).textContent;
+      return '<div class="log-tool-cell"><div class="log-tool-name">'+name+'</div><div class="log-tool-status f10 fmono" style="color:var(--t4)">—</div></div>';
+    }).join('') || grid.innerHTML;
+  }
+  const stream = document.getElementById('log-stream');
+  if (stream) {
+    stream.innerHTML = '<div class="log-line" style="color:var(--t3);font-style:italic">'+reason+'</div>';
+  }
+  const cnt = document.getElementById('log-count');
+  if (cnt) cnt.textContent = '0 lines';
+  const info = document.getElementById('log-run-info');
+  if (info) info.textContent = '';
+}
+
+// Live-tail polling state — only one timer at a time. When user switches run
+// or status hits a terminal state, the previous timer is cancelled.
+window._scanLogTailTimer = null;
+function _stopScanLogTail(){
+  if (window._scanLogTailTimer) {
+    clearTimeout(window._scanLogTailTimer);
+    window._scanLogTailTimer = null;
+  }
+  var dot = document.getElementById('log-live-dot');
+  var lbl = document.getElementById('log-live-lbl');
+  if (dot) dot.className = 'sse-dot sse-dead';
+  if (lbl) lbl.textContent = 'IDLE';
+}
+function _startScanLogTail(rid){
+  _stopScanLogTail();
+  var dot = document.getElementById('log-live-dot');
+  var lbl = document.getElementById('log-live-lbl');
+  if (dot) dot.className = 'sse-dot sse-live';
+  if (lbl) lbl.textContent = 'LIVE TAIL';
+  // Re-fetch every 3s while run is RUNNING. loadRunLog itself decides whether
+  // to schedule the next tick based on response status.
+  window._scanLogTailTimer = setTimeout(function(){ loadRunLog(rid, true); }, 3000);
+}
+
+// Load log + tools cho 1 run. When called with isPoll=true the function is
+// running inside the live-tail loop — it skips the toast on error to avoid
+// spamming and reschedules itself if status is still RUNNING.
+async function loadRunLog(rid, isPoll) {
   if (!rid) return;
+  // Stop any pending tail timer when user manually picks a different run
+  if (!isPoll) _stopScanLogTail();
   await ensureToken();
   try {
-    // Lấy thông tin run
     const r = await fetch('/api/v1/vsp/run/' + rid, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const run = await r.json();
     const mode = run.mode || 'FULL';
     const tools = TOOLS_BY_MODE[mode] || ALL_TOOLS;
     const summary = run.summary || {};
 
-    // Cập nhật tool cells
     renderToolCells(tools, summary, run);
 
-    // Cập nhật log info
     const infoEl = document.getElementById('log-run-info');
-    if (infoEl) infoEl.textContent = run.status + ' · ' + (run.total_findings||0) + ' findings · ' + tools.length + ' tools';
+    if (infoEl) {
+      var liveBadge = run.status === 'RUNNING' ? ' · <span style="color:var(--cyan)">⏺ LIVE</span>' : '';
+      infoEl.innerHTML = run.status + ' · ' + (run.total_findings||0) + ' findings · ' + tools.length + ' tools' + liveBadge;
+    }
 
-    // Lấy findings để tạo log lines
     const f = await fetch('/api/v1/vsp/findings?rid='+rid+'&limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}});
     const fd = await f.json();
     const findings = fd.findings || [];
 
-    // Build log từ findings
     buildLogFromFindings(run, tools, findings, summary);
 
+    // Auto-tail decision: keep polling iff status=RUNNING and panel still
+    // showing this run (user hasn't navigated away).
+    var stillScanlog = document.getElementById('panel-scanlog')
+      && document.getElementById('panel-scanlog').classList.contains('active');
+    if (run.status === 'RUNNING' && stillScanlog) {
+      _startScanLogTail(rid);
+    } else {
+      _stopScanLogTail();
+    }
   } catch(e) {
-    console.error('loadRunLog', e);
-    showToast && showToast('Error loading run log', 'error');
+    if (!isPoll) {
+      console.error('loadRunLog', e);
+      showToast && showToast('Error loading run log', 'error');
+    }
+    _stopScanLogTail();
   }
 }
 
@@ -3568,7 +3888,7 @@ function buildLogFromFindings(run, tools, findings, summary) {
 
   // Header
   lines.push({ts:ts(t++), tool:'scanner', level:'INFO', msg:'Run started: '+run.rid});
-  lines.push({ts:ts(t++), tool:'scanner', level:'INFO', msg:'Mode: '+run.mode+' · Profile: '+run.profile+' · Source: '+(run.src||'—')+' · Source: '+run.src});
+  lines.push({ts:ts(t++), tool:'scanner', level:'INFO', msg:'Mode: '+run.mode+' · Profile: '+run.profile+' · Source: '+(run.src||'—')});
 
   // Per-tool log từ findings
   const byTool = {};
@@ -3618,16 +3938,18 @@ window.loadLatestLog = async function() {
 // Override loadRunLog global
 window.loadRunLog = loadRunLog;
 
-console.log('VSP Patch v2.2 loaded ✓');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.2 loaded ✓');
 </script>
 
 
 <script>
 // ── PATCH v2.3 — Fix tools by actual findings + gate line + source ─────────
 
-// Override TOOLS_BY_MODE — dùng tools thật từ findings thay vì hardcode
+// Mirror of internal/pipeline/profiles.go ToolNamesForMode — must stay in
+// sync, otherwise the Scan log progress bar shows tools the worker never ran
+// or hides tools that did.
 const TOOLS_BY_MODE_V2 = {
-  IAC:     ['kics','checkov','hadolint','trivy','gitleaks'],
+  IAC:     ['kics','checkov','hadolint'],
   SAST:    ['bandit','semgrep','codeql','gosec'],
   SCA:     ['trivy','grype','license','syft','govulncheck','osv-scanner','retire-js'],
   SECRETS: ['gitleaks','secretcheck','trufflehog'],
@@ -3730,23 +4052,49 @@ async function loadRunLog(rid) {
 }
 window.loadRunLog = loadRunLog;
 
-console.log('VSP Patch v2.3 loaded ✓');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.3 loaded ✓');
 </script>
 
 
 <script>
 // ── PATCH v2.4 — Fix tool cells N/A + gate line + log chỉ dùng findings thật ──
-async function loadRunLog(rid) {
+// + Sprint 1.2 live tail: polls every 3s while run.status=RUNNING.
+window._scanLogTailTimer = window._scanLogTailTimer || null;
+function _stopScanLogTail(){
+  if (window._scanLogTailTimer) { clearTimeout(window._scanLogTailTimer); window._scanLogTailTimer = null; }
+  var dot = document.getElementById('log-live-dot');
+  var lbl = document.getElementById('log-live-lbl');
+  if (dot) dot.className = 'sse-dot sse-dead';
+  if (lbl) lbl.textContent = 'IDLE';
+}
+function _startScanLogTail(rid){
+  _stopScanLogTail();
+  var dot = document.getElementById('log-live-dot');
+  var lbl = document.getElementById('log-live-lbl');
+  if (dot) dot.className = 'sse-dot sse-live';
+  if (lbl) lbl.textContent = 'LIVE TAIL';
+  window._scanLogTailTimer = setTimeout(function(){ if (typeof loadRunLog==='function') loadRunLog(rid, true); }, 3000);
+}
+
+async function loadRunLog(rid, isPoll) {
   if (!rid) return;
+  if (!isPoll) _stopScanLogTail();
   await ensureToken();
   try {
     const run = await fetch('/api/v1/vsp/run/'+rid, {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const mode = run.mode || 'FULL';
+    // Mirror of internal/pipeline/profiles.go ToolNamesForMode — must stay in
+    // sync. Drift here causes Scan log to under-report dispatched tools (e.g.
+    // IAC was missing hadolint, NETWORK + FULL_SOC were missing entirely).
     const TOOLS_BY_MODE = {
-      IAC:['kics','checkov'], SAST:    ['bandit','semgrep','codeql','gosec'],
-      SCA:     ['trivy','grype','license','syft','govulncheck'], SECRETS: ['gitleaks','secretcheck','trufflehog'],
+      IAC:     ['kics','checkov','hadolint'],
+      SAST:    ['bandit','semgrep','codeql','gosec'],
+      SCA:     ['trivy','grype','license','syft','govulncheck','osv-scanner','retire-js'],
+      SECRETS: ['gitleaks','secretcheck','trufflehog'],
       DAST:    ['nikto','nuclei','sslscan'],
+      NETWORK: ['sslscan','nmap','netcap'],
       FULL: ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','osv-scanner','cosign','retire-js','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','apisec','gofuzz','racedetect'],
+      FULL_SOC: ['kics','checkov','hadolint','bandit','semgrep','codeql','gosec','trivy','grype','license','osv-scanner','cosign','retire-js','syft','govulncheck','gitleaks','secretcheck','trufflehog','nikto','nuclei','sslscan','nmap','netcap','apisec','gofuzz','racedetect'],
     };
     const expectedTools = TOOLS_BY_MODE[mode] || ['kics','checkov'];
 
@@ -3822,10 +4170,23 @@ async function loadRunLog(rid) {
     const cnt = document.getElementById('log-count');
     if (cnt) cnt.textContent = lines.length+' lines';
 
-  } catch(e) { console.error('loadRunLog v2.4',e); }
+    // Live tail: keep polling iff run is still RUNNING and panel still active.
+    var stillScanlog = document.getElementById('panel-scanlog')
+      && document.getElementById('panel-scanlog').classList.contains('active');
+    if (run.status === 'RUNNING' && stillScanlog) {
+      if (infoEl) infoEl.innerHTML = run.status+' · '+run.total_findings+' findings · '+expectedTools.length+' tools · <span style="color:var(--cyan)">⏺ LIVE</span>';
+      _startScanLogTail(rid);
+    } else {
+      _stopScanLogTail();
+    }
+
+  } catch(e) {
+    if (!isPoll) console.error('loadRunLog v2.4', e);
+    _stopScanLogTail();
+  }
 }
 window.loadRunLog = loadRunLog;
-console.log('VSP Patch v2.4 loaded ✓');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.4 loaded ✓ (with live tail)');
 </script>
 
 
@@ -3918,7 +4279,7 @@ window.showPanel = function(name, btn) {
 };
 
 window.loadRuns = loadRuns;
-console.log('VSP Patch v2.5 loaded ✓');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.5 loaded ✓');
 </script>
 
 
@@ -3950,7 +4311,7 @@ window.loadRuns = async function() {
     const kpiRow = panel?.querySelector('.runs-kpi-row');
     if (kpiRow) {
       const scoreColor = avgScore>=70?'c-green':avgScore>=40?'c-amber':'c-red';
-      kpiRow.textContent = `
+      kpiRow.innerHTML = `
         <div class="spark-card">
           <div class="spark-label">Total Runs</div>
           <div class="spark-value c-cyan">${runs.length}</div>
@@ -4022,7 +4383,7 @@ window.loadRuns = async function() {
     showToast && showToast(runs.length+' runs loaded','info');
   } catch(e) { console.error('loadRuns v2.6',e); }
 };
-console.log('VSP Patch v2.6 loaded ✓');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.6 loaded ✓');
 </script>
 
 
@@ -4142,7 +4503,7 @@ window.downloadRunReport = async function(fmt) {
     showToast&&showToast('SARIF generated','success');
   }
 };
-console.log('VSP Patch v2.7b loaded OK');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.7b loaded OK');
 </script>
 
 <script>
@@ -4399,7 +4760,7 @@ function injectFindingsUI() {
   if (card) card.before(toolTabsDiv);
 }
 
-console.log('VSP Patch v2.8 loaded OK');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.8 loaded OK');
 </script>
 
 <script>
@@ -4496,7 +4857,7 @@ function injectFindingsKPI(bySev, total, findings) {
     +'<div class="kpi-sub">'+topCount+' findings</div></div>';
 }
 
-console.log('VSP Patch v2.9 loaded OK');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.9 loaded OK');
 </script>
 
 <script>
@@ -4584,7 +4945,7 @@ window.showPanel = function(name, btn) {
   }
 };
 
-console.log('VSP Patch v2.10 loaded OK');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.10 loaded OK');
 </script>
 
 <script>
@@ -4670,7 +5031,7 @@ window.showPanel = function(name, btn) {
   }
 };
 
-console.log('VSP Patch v2.11 loaded OK');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.11 loaded OK');
 </script>
 
 <script>
@@ -4759,7 +5120,7 @@ window.showPanel = function(name, btn) {
   }
 };
 
-console.log('VSP Patch v2.12 loaded OK');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.12 loaded OK');
 </script>
 
 <script>
@@ -4842,7 +5203,7 @@ window.showFindingDetail = function(idx) {
   modal.classList.add('open');
 };
 
-console.log('VSP Patch v2.13 loaded OK');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.13 loaded OK');
 </script>
 
 <script>
@@ -4932,7 +5293,7 @@ function updateFindingsKPIDirect(crit, high, med, low, total) {
     +'<div class="kpi-sub">of '+total+' total</div></div>';
 }
 
-console.log('VSP Patch v2.14 loaded OK');
+if (window.VSP_DEBUG) console.log('VSP Patch v2.14 loaded OK');
 </script>
 
 
@@ -4986,26 +5347,43 @@ console.log('VSP Patch v2.14 loaded OK');
 // Policy: Evaluate + New Rule Modal + Load Rules from API
 (function() {
 
-// 1. Fix Evaluate button
+// 1. Fix Evaluate button (v4 — direct token, no ensureToken hang risk)
 window.runEval = async function() {
   var el = document.getElementById('eval-result');
   if (!el) return;
-  el.innerHTML = '<span style="color:var(--t3)">Evaluating...</span>';
-  await ensureToken();
+  el.innerHTML = '<span style="color:var(--cyan)">⏳ Evaluating… [v4]</span>';
+  console.log('[runEval v4] start; token len=', (window.TOKEN || '').length);
+  var tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
+  if (!tk || tk.length < 20) {
+    el.innerHTML = '<span style="color:var(--amber);font-weight:700">⚠ NOT AUTHENTICATED — please login first</span>';
+    return;
+  }
   try {
     var r = await fetch('/api/v1/policy/evaluate', {
       method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':'Bearer '+window.TOKEN},
-      body: JSON.stringify({})
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+tk},
+      credentials: 'same-origin',
+      body: JSON.stringify({repo:'current'})
     });
-    var d = await r.json();
+    console.log('[runEval v4] HTTP', r.status);
+    var d = await r.json().catch(function(){ return {}; });
+    console.log('[runEval v4] body:', d);
+    if (!r.ok) {
+      el.innerHTML = '<span style="color:var(--red);font-weight:700">✗ HTTP '+r.status+'</span> · '+(d.error || r.statusText || '');
+      return;
+    }
     var color = d.decision==='PASS'?'var(--green)':d.decision==='WARN'?'var(--amber)':'var(--red)';
-    el.innerHTML = '<span style="color:'+color+';font-size:16px;font-weight:700">'+d.decision+'</span>'
+    el.innerHTML = '<span style="color:'+color+';font-size:16px;font-weight:700">'+(d.decision||'?')+'</span>'
       +' &middot; score: <b>'+(d.score||0)+'</b>'
       +' &middot; posture: <b>'+(d.posture||'?')+'</b>'
       +' &middot; <span style="color:var(--t3)">'+(d.reason||'')+'</span>';
   } catch(e) {
-    el.innerHTML = ''; const sp=document.createElement('span'); sp.style.color='var(--red)'; sp.textContent='Error: '+String(e && e.message || e || ''); el.appendChild(sp);
+    console.error('[runEval v4] threw:', e);
+    el.innerHTML = '';
+    var sp=document.createElement('span');
+    sp.style.color='var(--red)';
+    sp.textContent='✗ Error: '+String(e && e.message || e || '');
+    el.appendChild(sp);
   }
 };
 
@@ -5151,6 +5529,9 @@ window.showPanel = function(name, btn) {
   if (name === 'policy') {
     setTimeout(function() {
       loadRulesFromAPI();
+      // Hydrate built-in toggle state from feature_config (loadRules handles
+      // built-ins; loadRulesFromAPI handles user-created backend rules).
+      if (typeof loadRules === 'function') loadRules();
       // Patch + New rule button
       document.querySelectorAll('#panel-policy .btn').forEach(function(b) {
         if (b.textContent.trim().indexOf('New rule') >= 0) {
@@ -5244,10 +5625,15 @@ async function loadSOCv2() {
   var h = {'Authorization':'Bearer '+window.TOKEN};
 
   try {
-    var [runsD, summaryD, remD] = await Promise.all([
+    // Pull authoritative ZT pillars + framework scorecard from the SAME
+    // endpoints the P4 Compliance panel uses, so SOC and P4 never disagree.
+    // Fall back to local recompute below if either is unavailable.
+    var [runsD, summaryD, remD, ztAuth, fwAuth] = await Promise.all([
       fetch('/api/v1/vsp/runs/index?limit=100',{headers:h}).then(r=>r.json()),
       fetch('/api/v1/vsp/findings/summary?scope=all',{headers:h}).then(r=>r.json()),
       fetch('/api/v1/remediation/stats',{headers:h}).then(r=>r.json()),
+      fetch('/api/p4/zt/status',{headers:h}).then(r=>r.json()).catch(function(){return null;}),
+      fetch('/api/v1/soc/framework-scorecard',{headers:h}).then(r=>r.json()).catch(function(){return null;}),
     ]);
 
     var runs = runsD.runs || [];
@@ -5296,6 +5682,16 @@ async function loadSOCv2() {
     var ztAuto = Math.min(98, 30 + Math.round(schedCount/total*100)*0.6 + (total>=30?8:0));
 
     var ztScores = [ztUser, ztDevice, ztNetwork, ztApp, ztData, ztVis, ztAuto].map(Math.round);
+    // Override with authoritative values from /api/p4/zt/status when reachable
+    // — keeps SOC and P4 panel pillar numbers in sync (no two-source-of-truth).
+    if (ztAuth && ztAuth.pillars) {
+      var P = ztAuth.pillars;
+      var pickScore = function(k){ return P[k] && P[k].score != null ? P[k].score : null; };
+      var authMap = [pickScore('user'), pickScore('device'), pickScore('network'),
+                     pickScore('application'), pickScore('data'),
+                     pickScore('visibility'), pickScore('automation')];
+      ztScores = ztScores.map(function(v, i){ return authMap[i] != null ? authMap[i] : v; });
+    }
     var ztAvg = Math.round(ztScores.reduce((a,b)=>a+b,0)/7);
 
     // Update pillar cards
@@ -5378,6 +5774,24 @@ async function loadSOCv2() {
       cis:   Math.min(90, Math.round(base * 0.95)),
       zt:    ztAvg,
     };
+    // Override with authoritative scorecard from /api/v1/soc/framework-scorecard
+    // when available — keeps SOC panel framework % aligned with what other
+    // tabs (Executive, Compliance) read from the same endpoint.
+    // Backend returns {frameworks:[{framework, score, domains:[...]}]}
+    var fwArr = (fwAuth && (fwAuth.frameworks || fwAuth.scorecards)) || [];
+    if (Array.isArray(fwArr) && fwArr.length) {
+      var byName = {};
+      fwArr.forEach(function(s){ if (s.framework) byName[s.framework.toUpperCase()] = s; });
+      var pick = function(needle){
+        for (var k in byName) { if (k.indexOf(needle) !== -1) return byName[k]; }
+        return null;
+      };
+      var n = pick('NIST'); if (n && n.score != null) fw.nist = n.score;
+      var i = pick('ISO');  if (i && i.score != null) fw.iso  = i.score;
+      var s2 = pick('SOC');  if (s2 && s2.score != null) fw.soc2 = s2.score;
+      var d = pick('DOD') || pick('RMF'); if (d && d.score != null) fw.dod = d.score;
+      var c = pick('CIS');  if (c && c.score != null) fw.cis  = c.score;
+    }
 
     var scorecard = panel.querySelector('.card .card-body');
     if (scorecard && scorecard.querySelector('.comp-row')) {
@@ -6539,10 +6953,40 @@ function _renderRemTable(list) {
       +'<td class="overflow-ellipsis" style="max-width:220px;font-size:12px" title="'+(r.description||'')+'">'+( r.description||'—')+'</td>'
       +'<td class="c-t3 f11">'+(r.assignee||'—')+'</td>'
       +'<td class="'+pc+' fw7 f11">'+(r.priority||'—')+'</td>'
-      +'<td><span class="pill '+sp+'" style="font-size:9px">'+r.status+'</span></td>'
+      +'<td><span class="pill '+sp+'" style="font-size:9px">'+r.status+'</span> '+_remSLABadge(r)+'</td>'
       +'<td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="event.stopPropagation();_openRemDetail('+i+')">Edit</button></td>'
       +'</tr>';
   }).join('');
+}
+
+// SLA countdown badge — green/amber/red based on time remaining vs severity
+// SLA window. Only shown for open + in_progress. Closed states get no badge.
+function _remSLABadge(r) {
+  var status = (r.status || '').toLowerCase();
+  if (status !== 'open' && status !== 'in_progress') return '';
+  if (!r.created_at) return '';
+  var slaHours = {CRITICAL: 72, HIGH: 336, MEDIUM: 720, LOW: 2160}[(r.severity||'').toUpperCase()] || 720;
+  var created = new Date(r.created_at).getTime();
+  if (isNaN(created)) return '';
+  var deadline = created + slaHours * 3600 * 1000;
+  var msLeft = deadline - Date.now();
+  var hoursLeft = msLeft / (3600 * 1000);
+  var label, color;
+  if (hoursLeft < 0) {
+    var hOver = Math.abs(Math.round(hoursLeft));
+    label = '⛔ ' + (hOver > 48 ? Math.round(hOver/24)+'d' : hOver+'h') + ' overdue';
+    color = 'var(--red)';
+  } else if (hoursLeft < 24) {
+    label = '⚠ ' + Math.round(hoursLeft) + 'h left';
+    color = 'var(--amber)';
+  } else if (hoursLeft < slaHours * 0.25) {
+    label = '⏰ ' + Math.round(hoursLeft/24) + 'd left';
+    color = 'var(--amber)';
+  } else {
+    label = '⏰ ' + Math.round(hoursLeft/24) + 'd left';
+    color = 'var(--green)';
+  }
+  return '<span style="display:inline-block;margin-left:4px;font-size:9px;font-family:var(--font-mono);color:'+color+';font-weight:600">'+label+'</span>';
 }
 
 function _openRemDetail(idx) {
@@ -6666,15 +7110,30 @@ async function updateExportRID() {
   await ensureToken();
   var h = {'Authorization':'Bearer '+window.TOKEN};
   try {
-    var d = await fetch('/api/v1/vsp/findings?run_id='+_exportRID+'&limit=1000', {headers:h}).then(function(r){return r.json();});
+    // FIX 2026-05-07: bump limit to 5000 (some runs have >1000 findings —
+    // header showed 2032 but old limit=1000 capped the preview), and
+    // normalize severity to uppercase before the bySev lookup. The DB
+    // mixes case (semgrep emits "WARNING/ERROR", trivy emits "HIGH",
+    // bandit emits "high") so the strict CRITICAL/HIGH key match was
+    // dropping every lowercase finding to 0.
+    var d = await fetch('/api/v1/vsp/findings?run_id='+_exportRID+'&limit=5000', {headers:h}).then(function(r){return r.json();});
     var findings = d.findings || [];
-    var bySev = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0};
-    findings.forEach(function(f){ if(bySev[f.severity]!==undefined) bySev[f.severity]++; });
+    var bySev = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0,INFO:0};
+    findings.forEach(function(f){
+      var sev = (f.severity || '').toUpperCase();
+      // Map common scanner aliases to the four canonical severities so the
+      // KPI cards reflect the actual run, not just the lucky-case rows.
+      if (sev === 'WARNING')      sev = 'MEDIUM';
+      else if (sev === 'ERROR')   sev = 'HIGH';
+      else if (sev === 'NOTE')    sev = 'INFO';
+      if (bySev[sev] !== undefined) bySev[sev]++;
+    });
     var card = document.getElementById('export-preview-card');
     var body = document.getElementById('export-preview-body');
     var info = document.getElementById('export-preview-info');
     if (card) card.style.display = '';
-    if (info) info.textContent = d.total+' findings · '+_exportRID.slice(-8);
+    var sumShown = bySev.CRITICAL + bySev.HIGH + bySev.MEDIUM + bySev.LOW + bySev.INFO;
+    if (info) info.textContent = (d.total||sumShown)+' findings · '+(sumShown < (d.total||0) ? 'first '+findings.length+' shown · ':'')+_exportRID.slice(-8);
     if (body) body.innerHTML =
       '<div class="kpi kpi-crit" style="padding:10px;text-align:center"><div class="kpi-label">Critical</div><div class="kpi-value c-red" style="font-size:22px">'+bySev.CRITICAL+'</div></div>'
       +'<div class="kpi kpi-high" style="padding:10px;text-align:center"><div class="kpi-label">High</div><div class="kpi-value c-orange" style="font-size:22px">'+bySev.HIGH+'</div></div>'
@@ -7751,7 +8210,7 @@ function _openNewRuleModal() {
   var overlay = document.createElement('div');
   overlay.id = 'new-rule-modal-gov';
   overlay.className = 'modal-overlay';
-  overlay.textContent = `
+  overlay.innerHTML = `
     <div class="modal" style="width:min(500px,95vw)">
       <div class="modal-head">
         <div class="modal-title">Create policy rule</div>
@@ -8821,11 +9280,16 @@ function startMFATimer() {
 <script src="/vsp_pro_100.js"></script>
 <script src="/vsp_pro_cwpp_realapi.js"></script>
     <script src="/vsp_pro_supplychain_realapi.js"></script>
+    <script src="/vsp_pro_realapi.js"></script>
+    <script src="/vsp_sidebar_collapse.js"></script>
     <script src="/vsp_sw_inventory_panel.js"></script>
     <script src="/vsp_scheduler_panel.js"></script>
     <script src="/vsp_email_panel.js"></script>
     <script src="/vsp_dast_panel.js"></script>
     <!-- FEAT-04: VSPUXState shared module -->
     <script src="/vsp_uxstates.js"></script>
+    <script src="/panels/vsp_pro_paginate.js?v=1"></script>
+    <!-- VSP Advanced Features v7 Patch -->
+    <script src="/static/patches/vsp_advanced_features_v7.js"></script>
 </body>
 </html>

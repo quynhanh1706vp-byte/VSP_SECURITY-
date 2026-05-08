@@ -28,6 +28,10 @@ func New(ctx context.Context, dsn string) (*DB, error) {
 	cfg.MaxConnLifetime = 30 * time.Minute
 	cfg.MaxConnIdleTime = 5 * time.Minute
 	cfg.ConnConfig.Tracer = otelpgx.NewTracer()
+	// RLS: set the per-request tenant GUC on connection acquire and clear
+	// it on release so subsequent acquires can't observe stale scope.
+	cfg.BeforeAcquire = PoolBeforeAcquire
+	cfg.AfterRelease = PoolAfterRelease
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

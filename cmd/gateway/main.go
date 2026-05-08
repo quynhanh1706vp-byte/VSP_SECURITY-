@@ -5,16 +5,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/vsp/platform/internal/autopr"
-	"github.com/vsp/platform/internal/container"
 	"io"
 	"mime"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/vsp/platform/internal/autopr"
+	"github.com/vsp/platform/internal/container"
 
 	"database/sql"
 
@@ -29,6 +32,9 @@ import (
 
 	"crypto/tls"
 
+	"path/filepath"
+	"strconv"
+
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/vsp/platform/internal/agentic"
@@ -40,36 +46,35 @@ import (
 	"github.com/vsp/platform/internal/cache"
 	"github.com/vsp/platform/internal/conmon"
 	"github.com/vsp/platform/internal/handlers"
-	"github.com/vsp/platform/internal/notify"
-	"github.com/vsp/platform/internal/ticket"
+	"github.com/vsp/platform/internal/i18n"
 	"github.com/vsp/platform/internal/llm"
 	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/netcap"
+	"github.com/vsp/platform/internal/notify"
 	"github.com/vsp/platform/internal/pipeline"
 	"github.com/vsp/platform/internal/poam"
 	"github.com/vsp/platform/internal/safe"
 	"github.com/vsp/platform/internal/scheduler"
+	"github.com/vsp/platform/internal/secrets"
 	"github.com/vsp/platform/internal/siem"
 	"github.com/vsp/platform/internal/soar"
 	"github.com/vsp/platform/internal/store"
 	"github.com/vsp/platform/internal/telemetry"
-	"path/filepath"
-	"strconv"
+	"github.com/vsp/platform/internal/ticket"
 )
-
 
 // init đăng ký MIME types đúng để Chrome strict MIME checking không chặn
 // .js/.css. http.ServeFile và http.FileServer đều dùng mime.TypeByExtension().
 func init() {
-	mime.AddExtensionType(".js",    "application/javascript; charset=utf-8")
-	mime.AddExtensionType(".mjs",   "application/javascript; charset=utf-8")
-	mime.AddExtensionType(".css",   "text/css; charset=utf-8")
-	mime.AddExtensionType(".html",  "text/html; charset=utf-8")
-	mime.AddExtensionType(".json",  "application/json; charset=utf-8")
-	mime.AddExtensionType(".svg",   "image/svg+xml")
-	mime.AddExtensionType(".woff",  "font/woff")
+	mime.AddExtensionType(".js", "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".mjs", "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".css", "text/css; charset=utf-8")
+	mime.AddExtensionType(".html", "text/html; charset=utf-8")
+	mime.AddExtensionType(".json", "application/json; charset=utf-8")
+	mime.AddExtensionType(".svg", "image/svg+xml")
+	mime.AddExtensionType(".woff", "font/woff")
 	mime.AddExtensionType(".woff2", "font/woff2")
-	mime.AddExtensionType(".map",   "application/json")
+	mime.AddExtensionType(".map", "application/json")
 }
 
 var startTime = time.Now()
@@ -191,7 +196,18 @@ func main() {
 
 	ctx, shutdown := context.WithCancel(context.Background())
 	defer shutdown()
-	db, err := store.New(ctx, viper.GetString("database.url"))
+	// DSN: prefer secrets provider when configured. The secrets package
+	// returns the env-loaded value when VSP_SECRETS_PROVIDER is unset, so
+	// this is a no-op in dev. In production with VSP_SECRETS_PROVIDER=vault
+	// the DSN comes from Vault rather than .env on the host.
+	dsn := viper.GetString("database.url")
+	if sp, sErr := secrets.Default(); sErr == nil {
+		if v, err := sp.Get("db_url"); err == nil && v != "" {
+			dsn = v
+			log.Info().Str("source", sp.Source()).Msg("db_url loaded from secrets provider")
+		}
+	}
+	db, err := store.New(ctx, dsn)
 	if err != nil {
 		log.Fatal().Err(err).Msg("database connect failed")
 	}
@@ -269,7 +285,24 @@ func main() {
 	}
 	defaultTID := getDefaultTenantID(ctx, db)
 
+	// JWT secret: prefer the configured secrets provider (Vault if
+	// VSP_SECRETS_PROVIDER=vault). Falls back to the viper-loaded value
+	// (which itself reads JWT_SECRET env). The provider abstraction lets
+	// production deployments centralise rotation in Vault without code
+	// changes — see internal/secrets/.
 	jwtSecret := viper.GetString("auth.jwt_secret")
+	if sp, sErr := secrets.Default(); sErr == nil {
+		if v, err := sp.Get("jwt"); err == nil && v != "" {
+			jwtSecret = v
+			log.Info().Str("source", sp.Source()).Msg("jwt secret loaded from secrets provider")
+		}
+		// If running on Vault, kick off the rotator so subsequent KV
+		// writes flow into the cache without restart. Other providers
+		// (env) are no-ops for rotation by definition.
+		if vp, ok := sp.(*secrets.VaultProvider); ok {
+			vp.StartRotator(ctx, 15*time.Minute)
+		}
+	}
 	// No silent fallback — fail fast if secret is weak or default
 	if jwtSecret == "" || jwtSecret == "change-me-in-production" || jwtSecret == "dev-secret-change-in-prod" {
 		if viper.GetString("server.env") == "production" {
@@ -330,7 +363,18 @@ func main() {
 	auth.SetBlacklist(tokenBlacklist)
 	log.Info().Str("redis", redisAddr).Msg("token blacklist initialized (Redis DB 1)")
 
-	authH := &handler.Auth{DB: db, JWTSecret: jwtSecret, JWTTTL: jwtTTL, DefaultTID: defaultTID}
+	// Anomaly-driven session revocation: scans audit_log every minute for
+	// impossible-travel + rapid-IP-rotation patterns and revokes all
+	// tokens for the affected user.
+	go auth.NewAnomalyDetector(db.Pool(), tokenBlacklist, time.Minute).Run(ctx)
+
+	authH := &handler.Auth{
+		DB:         db,
+		JWTSecret:  jwtSecret,
+		JWTTTL:     jwtTTL,
+		DefaultTID: defaultTID,
+		IPLock:     auth.NewIPLockout(),
+	}
 	handler.SetJWTSecret(jwtSecret)
 	usersH := &handler.Users{DB: db}
 	mfaH := &handler.MFA{DB: db}
@@ -455,6 +499,7 @@ func main() {
 	r.Use(chimw.StripSlashes)
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
+	r.Use(i18n.Middleware) // resolves locale from query/header/accept-language
 	r.Use(vspMW.CSPNonce)
 	r.Use(vspMW.CSRFProtect)
 	r.Use(vspMW.RequestLogger)
@@ -547,7 +592,36 @@ func main() {
 	r.Post("/api/v1/agents/heartbeat", agentsH.Heartbeat)
 	r.Post("/api/v1/agents/inventory", agentsH.Inventory)
 
-	authMw := auth.Middleware(jwtSecret, keyStore)
+	authMwBase := auth.Middleware(jwtSecret, keyStore)
+	residencyMw := vspMW.Residency(db.Pool())
+	// Wrap the auth middleware so the resolved tenant UUID is propagated
+	// onto the request context. The pgxpool's BeforeAcquire hook reads
+	// this and sets `vsp.tenant_id` GUC for RLS policies (see
+	// migration 037 + internal/store/rls.go). Then apply residency
+	// enforcement which needs the tenant context to look up the
+	// configured region.
+	authMw := func(next http.Handler) http.Handler {
+		return authMwBase(residencyMw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if c, ok := auth.FromContext(r.Context()); ok && c.TenantID != "" {
+				tid := c.TenantID
+				if !looksLikeUUIDLocal(tid) {
+					if u := resolveTenantUUIDLocal(r.Context(), db, tid); u != "" {
+						tid = u
+					}
+				}
+				r = r.WithContext(store.SetTenantContext(r.Context(), tid))
+			}
+			next.ServeHTTP(w, r)
+		})))
+	}
+
+	// PRO plan gating — reads tenants.plan with a 5-min cache.
+	// Apply requirePro to any route that should be reserved for paid tiers
+	// (PRO + Enterprise). Returns 402 with {required_plan, current_plan} JSON
+	// so the frontend overlay can prompt the upgrade flow.
+	proResolver := vspMW.NewDBPlanResolver(db.Pool(), 5*time.Minute)
+	requirePro := vspMW.RequirePro(proResolver)
+
 	r.With(authMw).Get("/api/v1/auth/check", authH.Check) // session check — validates cookie
 
 	// SSE — cookie-based auth (no ?token= in URL — prevents log leakage)
@@ -606,6 +680,21 @@ func main() {
 	r.Get("/vsp_pro_supplychain_realapi.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/vsp_pro_supplychain_realapi.js")
 	})
+	// realapi companion for cspm / secrets_vault / tenants / observe panels.
+	// Adds 402-aware fetch + "Upgrade to PRO" overlay + Configure sub-panel.
+	r.Get("/vsp_pro_realapi.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_pro_realapi.js")
+	})
+	// Sidebar collapsible sections — chevron toggle per nav-section.
+	r.Get("/vsp_sidebar_collapse.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_sidebar_collapse.js")
+	})
+	// SIEM panel companion — runs inside each /panels/<id>.html iframe and
+	// reaches back into the parent VSP_PRO via same-origin window.parent
+	// to render Configure / Notifications buttons. Schemas live in the JS.
+	r.Get("/vsp_siem_companion.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/vsp_siem_companion.js")
+	})
 	r.Get("/vsp_sw_inventory_panel.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/vsp_sw_inventory_panel.js")
 	})
@@ -634,6 +723,15 @@ func main() {
 	// without recompiling gateway. Drop new patches into static/patches/.
 	r.Get("/static/patches/*", http.StripPrefix("/static/patches/",
 		http.FileServer(http.Dir("./static/patches/"))).ServeHTTP)
+
+	// Serve general static assets from ./static/ (inject_ux_v1.1.js, inject_ux_v1.1.css, etc.)
+	r.Get("/static/*", http.StripPrefix("/static/",
+		http.FileServer(http.Dir("./static/"))).ServeHTTP)
+
+	// RFC 9116 — security.txt at /.well-known/security.txt + the
+	// disclosure policy doc. Anonymous, no rate-limit.
+	r.Get("/.well-known/*", http.StripPrefix("/.well-known/",
+		http.FileServer(http.Dir("./static/.well-known/"))).ServeHTTP)
 
 	// Serve panel HTML/JS assets. CSP is set by vspMW.CSPNonce middleware,
 	// which applies PanelCSP() for panel paths. Do NOT override CSP here.
@@ -843,12 +941,12 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
 		// VSP_PATCH_PERF_02 — per-user rate limit disabled on /api/v1/* group.
-	// Reason: dashboard burst (~70 req in <1s during boot) exceeded 3000/min bucket
-	// because limiter has no burst capacity. Defense remains via JWT authMw + CSRF +
-	// tenant isolation. /api/v1/auth/login still rate-limited separately for
-	// brute-force protection (see auth route registration).
-	// To re-enable: uncomment the line below and adjust the limit.
-	// r.Use(vspMW.NewUserRateLimiter(3000, time.Minute)) // per-user: 3000 req/min
+		// Reason: dashboard burst (~70 req in <1s during boot) exceeded 3000/min bucket
+		// because limiter has no burst capacity. Defense remains via JWT authMw + CSRF +
+		// tenant isolation. /api/v1/auth/login still rate-limited separately for
+		// brute-force protection (see auth route registration).
+		// To re-enable: uncomment the line below and adjust the limit.
+		// r.Use(vspMW.NewUserRateLimiter(3000, time.Minute)) // per-user: 3000 req/min
 
 		// Auth
 		// Sprint 5 Day 1: Public config endpoint — frontend reads auth.mode to decide fetch strategy
@@ -874,13 +972,16 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireRole("admin"))
 			r.Get("/api/v1/admin/users", usersH.List)
-			r.Post("/api/v1/admin/users", usersH.Create)
-			r.Delete("/api/v1/admin/users/{id}", usersH.Delete)
+			// PRO gating — adding/removing users is a tenant-management
+			// concern, free tier stays read-only.
+			r.With(requirePro).Post("/api/v1/admin/users", usersH.Create)
+			r.With(requirePro).Delete("/api/v1/admin/users/{id}", usersH.Delete)
 			r.Get("/api/v1/admin/api-keys", apiKeysH.List)
 			r.Post("/api/v1/admin/api-keys", apiKeysH.Create)
 			r.Delete("/api/v1/admin/api-keys/{id}", apiKeysH.Delete)
 			r.Get("/api/v1/admin/tenants", usersH.ListAllTenants)
 			r.Post("/api/v1/admin/tenants", usersH.CreateTenant)
+			r.Put("/api/v1/admin/tenants/{id}/plan", usersH.UpdatePlan)
 		})
 
 		// Scan
@@ -889,6 +990,7 @@ func main() {
 		r.Get("/api/v1/vsp/run/latest", runsH.Latest)
 		r.Get("/api/v1/vsp/run/{rid}", runsH.Get)
 		r.Get("/api/v1/vsp/run/{rid}/log", runsH.Log)
+		r.Get("/api/v1/vsp/run/{rid}/tail", runsH.Tail) // SSE live-tail
 		r.Get("/api/v1/vsp/runs", runsH.List)
 		r.Get("/api/v1/vsp/runs/index", runsH.Index)
 		r.With(ca.Middleware("runs-index", 10*time.Second)).Get("/api/v1/vsp/runs/index", runsH.Index)
@@ -901,7 +1003,7 @@ func main() {
 		r.Get("/api/v1/vsp/findings", findingsH.List)
 		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
 		// VSP_PATCH_F1_ROUTES_BEGIN
-		r.Post("/api/v1/vulns/bulk",      handleVulnsBulk)
+		r.Post("/api/v1/vulns/bulk", handleVulnsBulk)
 		r.Post("/api/v1/vulns/bulk/undo", handleVulnsBulkUndo)
 		// VSP_PATCH_F1_ROUTES_END
 		// ─── ConMon (Continuous Monitoring) — Phase 4.5.1 ─────────────
@@ -911,15 +1013,36 @@ func main() {
 		r.Get("/api/v1/conmon/cadence", conmonH.CadenceStatus)
 		r.Post("/api/v1/conmon/deviations/{id}/acknowledge", conmonH.AckDeviation)
 		// ─── AI Compliance Advisor — Phase 4.5.2 ─────────────────────
-		r.Post("/api/v1/ai/advise", aiH.Advise)
+		// LLM-backed answer endpoint: PRO-gated (every call costs LLM tokens).
+		// Read-only endpoints (mode + cache stats + feedback) stay free so
+		// the panel can render even on the starter plan.
+		r.With(requirePro).Post("/api/v1/ai/advise", aiH.Advise)
 		r.Get("/api/v1/ai/mode", aiH.Mode)
 		r.Get("/api/v1/ai/cache/stats", aiH.CacheStats)
 		r.Post("/api/v1/ai/feedback/{id}", aiH.Feedback)
 		// ─── SSO Provider Admin — Phase 4.5.3 ─────────────────────────
+		// PRO feature: SSO / SAML provider configuration.
+		// Reading existing providers is allowed for any auth'd user (so the
+		// login screen can render available IdPs); mutations require PRO.
 		r.Get("/api/v1/sso/providers", ssoOIDCH.Providers)
-		r.Post("/api/v1/sso/providers", ssoOIDCH.Providers)
-		r.Put("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
-		r.Delete("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.With(requirePro).Post("/api/v1/sso/providers", ssoOIDCH.Providers)
+		r.With(requirePro).Put("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.With(requirePro).Delete("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+
+		// ─── Cloud Security Posture Management — PRO feature ────────────
+		// Real persistence in cspm_accounts / cspm_findings / cspm_config
+		// (migration 020). Replaces the prior in-memory aggregator mock.
+		cspmH := handler.NewCSPM(db)
+		r.With(requirePro).Get("/api/v1/cspm/accounts", cspmH.ListAccounts)
+		r.With(requirePro).Post("/api/v1/cspm/accounts", cspmH.CreateAccount)
+		r.With(requirePro).Delete("/api/v1/cspm/accounts/{id}", cspmH.DeleteAccount)
+		r.With(requirePro).Post("/api/v1/cspm/accounts/{id}/sync", cspmH.SyncAccount)
+		r.With(requirePro).Get("/api/v1/cspm/findings", cspmH.ListFindings)
+		r.With(requirePro).Get("/api/v1/cspm/findings/{id}", cspmH.GetFinding)
+		r.With(requirePro).Post("/api/v1/cspm/findings/{id}/status", cspmH.UpdateFindingStatus)
+		r.With(requirePro).Get("/api/v1/cspm/posture", cspmH.Posture)
+		r.With(requirePro).Get("/api/v1/cspm/config", cspmH.GetConfig)
+		r.With(requirePro).Put("/api/v1/cspm/config", cspmH.UpdateConfig)
 		r.Get("/api/v1/vsp/findings/by-tool", findingsH.ByTool)
 
 		// Gate + Policy
@@ -934,27 +1057,68 @@ func main() {
 		r.Get("/api/v1/audit/log", auditH.List)
 		r.Get("/api/v1/notifications", auditH.Notifications)
 		r.Get("/api/v1/tenants", usersH.ListTenants)
+		// PRO panels — tenant quota + observability config (view-details overlays).
+		proPanels := handler.NewProPanels(db)
+		r.With(requirePro).Get("/api/v1/tenants/quota", proPanels.TenantQuota)
+		r.With(requirePro).Get("/api/v1/observability/config", proPanels.ObservabilityConfigGet)
+		r.With(requirePro).Put("/api/v1/observability/config", proPanels.ObservabilityConfigPut)
+		// Per-tenant config endpoints for the remaining PRO sidebar panels.
+		// Each panel's "Configure" overlay reads/writes one of these.
+		r.With(requirePro).Get("/api/v1/cwpp/config", proPanels.CWPPConfigGet)
+		r.With(requirePro).Put("/api/v1/cwpp/config", proPanels.CWPPConfigPut)
+		r.With(requirePro).Get("/api/v1/autofix/config", proPanels.AutofixConfigGet)
+		r.With(requirePro).Put("/api/v1/autofix/config", proPanels.AutofixConfigPut)
+		r.With(requirePro).Get("/api/v1/supply-chain/config", proPanels.SupplyChainConfigGet)
+		r.With(requirePro).Put("/api/v1/supply-chain/config", proPanels.SupplyChainConfigPut)
+		r.With(requirePro).Get("/api/v1/sbom/config", proPanels.SBOMConfigGet)
+		r.With(requirePro).Put("/api/v1/sbom/config", proPanels.SBOMConfigPut)
+		r.With(requirePro).Get("/api/v1/sso/config", proPanels.SSOConfigGet)
+		r.With(requirePro).Put("/api/v1/sso/config", proPanels.SSOConfigPut)
+		// Cross-panel notifications: Slack/Teams/webhook/email/PagerDuty.
+		// Configure once per tenant; every PRO panel can reference these channels.
+		r.With(requirePro).Get("/api/v1/notifications/config", proPanels.NotificationConfigGet)
+		r.With(requirePro).Put("/api/v1/notifications/config", proPanels.NotificationConfigPut)
+		r.With(requirePro).Post("/api/v1/notifications/test", proPanels.NotificationTest)
+		r.With(requirePro).Get("/api/v1/notifications/log", proPanels.NotificationLog)
+		r.With(requirePro).Get("/api/v1/notifications/dlq", proPanels.NotificationDLQ)
+		r.With(requirePro).Post("/api/v1/notifications/dlq/retry", proPanels.NotificationDLQRetry)
+
+		// Generic per-tenant config store for the 12 SIEM panels.
+		// Each panel's Configure form serialises into feature_config.config
+		// (JSONB). PRO-gated so business tier customers can persist tuning
+		// (UEBA thresholds, hunt queries, etc.) while free tier reads defaults.
+		featureCfgH := handler.NewFeatureConfig(db)
+		r.With(requirePro).Get("/api/v1/features/{id}/config", featureCfgH.Get)
+		r.With(requirePro).Put("/api/v1/features/{id}/config", featureCfgH.Put)
+
+		// Analytics summary — server-side aggregation for the Analytics panel.
+		// Free tier keeps the client-side fallback (loops over /vsp/runs/index);
+		// PRO offloads heavy aggregation to Postgres + serves trend data
+		// without shipping thousands of run rows over the wire.
+		analyticsH := handler.NewAnalytics(db)
+		r.With(requirePro).Get("/api/v1/analytics/summary", analyticsH.Summary)
 		// Billing
 		r.Get("/api/v1/billing/status", billingH.Status)
 		r.With(vspMW.StrictLimiter(5, time.Minute)).Post("/api/v1/billing/checkout", billingH.CreateCheckout)
 		r.Post("/api/v1/audit/verify", auditH.Verify)
+		r.Post("/api/v1/audit/repair", auditH.Repair)
 
-		// SIEM
-		r.Get("/api/v1/siem/webhooks", siemH.List)
+		// SIEM (PRO)
+		r.With(requirePro).Get("/api/v1/siem/webhooks", siemH.List)
 
-		// ── Correlation engine ─────────────────────────────────
-		r.Get("/api/v1/correlation/rules", corrH.ListRules)
-		r.Post("/api/v1/correlation/rules", corrH.CreateRule)
-		r.Post("/api/v1/correlation/rules/{id}/toggle", corrH.ToggleRule)
-		r.Delete("/api/v1/correlation/rules/{id}", corrH.DeleteRule)
-		r.Get("/api/v1/correlation/incidents", corrH.ListIncidents)
-		r.Get("/api/v1/correlation/incidents/{id}", corrH.GetIncident)
-		r.Post("/api/v1/correlation/incidents/{id}/resolve", corrH.ResolveIncident)
-		r.Patch("/api/v1/correlation/incidents/{id}/status", corrH.ResolveIncident)
-		r.Post("/api/v1/correlation/incidents", corrH.CreateIncident)
+		// ── Correlation engine (PRO) ─────────────────────────────────
+		r.With(requirePro).Get("/api/v1/correlation/rules", corrH.ListRules)
+		r.With(requirePro).Post("/api/v1/correlation/rules", corrH.CreateRule)
+		r.With(requirePro).Post("/api/v1/correlation/rules/{id}/toggle", corrH.ToggleRule)
+		r.With(requirePro).Delete("/api/v1/correlation/rules/{id}", corrH.DeleteRule)
+		r.With(requirePro).Get("/api/v1/correlation/incidents", corrH.ListIncidents)
+		r.With(requirePro).Get("/api/v1/correlation/incidents/{id}", corrH.GetIncident)
+		r.With(requirePro).Post("/api/v1/correlation/incidents/{id}/resolve", corrH.ResolveIncident)
+		r.With(requirePro).Patch("/api/v1/correlation/incidents/{id}/status", corrH.ResolveIncident)
+		r.With(requirePro).Post("/api/v1/correlation/incidents", corrH.CreateIncident)
 
-		// ── AI Analyst smart mock ────────────────────────────────
-		r.Post("/api/v1/ai/analyze", func(w http.ResponseWriter, r *http.Request) {
+		// ── AI Analyst smart mock ──────────────────────────────── (PRO-gated)
+		r.With(requirePro).Post("/api/v1/ai/analyze", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
 			var req struct {
 				Messages []map[string]string `json:"messages"`
@@ -1013,15 +1177,37 @@ func main() {
 			_ = json.NewEncoder(w).Encode(map[string]any{"content": []map[string]string{{"type": "text", "text": reply}}, "model": "vsp-mock"})
 		})
 
-		// ── AI Analyst proxy ──────────────────────────────────── ────────────────────────────────────
-		r.Post("/api/v1/ai/chat", func(w http.ResponseWriter, r *http.Request) {
+		// ── AI Analyst proxy ──────────────────────────────────── (PRO-gated)
+		r.With(requirePro).Post("/api/v1/ai/chat", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			// Forward to Anthropic API
 			body, err := io.ReadAll(io.LimitReader(r.Body, 10<<20)) // 10MB limit
 			if err != nil {
 				http.Error(w, "bad request", 400)
 				return
 			}
+
+			// Offline / no-key fallback. Without ANTHROPIC_API_KEY the proxy
+			// would forward the request and Anthropic returns 401 — which
+			// looks like an auth failure to the user. Serve a graceful
+			// canned response that the panel renders inline so the iframe
+			// is usable in air-gapped deployments and demo environments.
+			apiKey := viper.GetString("anthropic.api_key")
+			// Treat the placeholder value as unset — env files in dev/demo
+			// envs ship with `ANTHROPIC_API_KEY=REPLACE_WITH_REAL_KEY`, which
+			// is non-empty so the old check let the request fly to Anthropic
+			// and get rejected with a confusing 401 "invalid x-api-key".
+			if apiKey == "" || strings.HasPrefix(apiKey, "REPLACE_") || apiKey == "your-key-here" {
+				_ = body // body intentionally read above for size validation
+				offline := `{"id":"vsp-offline","type":"message","role":"assistant",` +
+					`"model":"vsp-offline-fallback","content":[{"type":"text",` +
+					`"text":"VSP AI Analyst — offline mode\n\nANTHROPIC_API_KEY is not configured on the gateway. ` +
+					`Set it in /etc/vsp/env.production and restart vsp-gateway to enable live LLM responses.\n\n` +
+					`Tenant data (findings, incidents, SIEM context) is still streaming live from Postgres — see the panel sidebar for current state."}],` +
+					`"stop_reason":"end_turn","usage":{"input_tokens":0,"output_tokens":0}}`
+				_, _ = w.Write([]byte(offline))
+				return
+			}
+
 			req, err := http.NewRequestWithContext(r.Context(), "POST",
 				"https://api.anthropic.com/v1/messages",
 				bytes.NewReader(body))
@@ -1031,10 +1217,7 @@ func main() {
 			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("anthropic-version", "2023-06-01")
-			apiKey := viper.GetString("anthropic.api_key")
-			if apiKey != "" {
-				req.Header.Set("x-api-key", apiKey)
-			}
+			req.Header.Set("x-api-key", apiKey)
 			client := &http.Client{Timeout: 60 * time.Second}
 			resp, err := client.Do(req)
 			if err != nil {
@@ -1060,10 +1243,22 @@ func main() {
 		})
 
 		// ── UEBA ────────────────────────────────────────────────
-		r.Get("/api/v1/ueba/anomalies", uebaH.ListAnomalies)
-		r.Post("/api/v1/ueba/analyze", uebaH.Analyze)
-		r.Get("/api/v1/ueba/baseline", uebaH.Baseline)
-		r.Get("/api/v1/ueba/timeline", uebaH.Timeline)
+		// /analyze runs the full ML re-baseline (expensive) — PRO-gated.
+		// Read-only endpoints stay free so the panel renders even on starter.
+		r.With(requirePro).Get("/api/v1/ueba/anomalies", uebaH.ListAnomalies)
+		r.With(requirePro).Post("/api/v1/ueba/analyze", uebaH.Analyze)
+		r.With(requirePro).Get("/api/v1/ueba/baseline", uebaH.Baseline)
+		r.With(requirePro).Get("/api/v1/ueba/timeline", uebaH.Timeline)
+
+		// ── Threat Hunt — saved queries + result history (PRO) ───────────
+		// Free-tier ad-hoc search via /api/v1/logs/hunt remains available;
+		// these endpoints add the persistence layer for repeat hunting.
+		threatHuntH := handler.NewThreatHunt(db)
+		r.With(requirePro).Get("/api/v1/threat-hunt/queries", threatHuntH.ListQueries)
+		r.With(requirePro).Post("/api/v1/threat-hunt/queries", threatHuntH.CreateQuery)
+		r.With(requirePro).Delete("/api/v1/threat-hunt/queries/{id}", threatHuntH.DeleteQuery)
+		r.With(requirePro).Post("/api/v1/threat-hunt/queries/{id}/run", threatHuntH.RunQuery)
+		r.With(requirePro).Get("/api/v1/threat-hunt/results", threatHuntH.ListResults)
 
 		// ── Asset inventory ─────────────────────────────────────
 		r.Get("/api/v1/assets", assetsH.List)
@@ -1077,26 +1272,39 @@ func main() {
 		r.Get("/api/v1/agents/{id}", agentsH.Get)
 		r.Delete("/api/v1/agents/{id}", agentsH.Revoke)
 
-		// ── SOAR playbooks ──────────────────────────────────────
-		r.Get("/api/v1/soar/playbooks", soarH.ListPlaybooks)
-		r.Post("/api/v1/soar/playbooks", soarH.CreatePlaybook)
-		r.Post("/api/v1/soar/playbooks/{id}/toggle", soarH.TogglePlaybook)
-		r.Post("/api/v1/soar/playbooks/{id}/run", soarV2H.ExecutePlaybook)
-		r.Post("/api/v1/soar/trigger", soarH.Trigger)
-		r.Get("/api/v1/soar/runs", soarH.ListRuns)
+		// ── SOAR playbooks (PRO) ────────────────────────────────
+		r.With(requirePro).Get("/api/v1/soar/playbooks", soarH.ListPlaybooks)
+		r.With(requirePro).Post("/api/v1/soar/playbooks", soarH.CreatePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/toggle", soarH.TogglePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/run", soarV2H.ExecutePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/trigger", soarH.Trigger)
+		r.With(requirePro).Get("/api/v1/soar/runs", soarH.ListRuns)
 
 		// ── SOAR engine v2 (Phase 2.1.C) ────────────────────────
-		r.Post("/api/v1/soar/playbooks/{id}/execute", soarV2H.ExecutePlaybook)
-		r.Post("/api/v1/soar/playbooks/{id}/test", soarV2H.TestPlaybook)
-		r.Get("/api/v1/soar/runs/{id}", soarV2H.GetRun)
-		r.Post("/api/v1/soar/runs/{id}/cancel", soarV2H.CancelRun)
-		r.Get("/api/v1/soar/playbooks/{id}/versions", soarV2H.ListPlaybookVersions)
-		r.Post("/api/v1/soar/playbooks/{id}/version/{n}/rollback", soarV2H.RollbackVersion)
-		r.Get("/api/v1/soar/approvals/pending", soarV2H.ListPendingApprovals)
-		r.Post("/api/v1/soar/approvals/{id}/decide", soarV2H.DecideApproval)
-		r.Get("/api/v1/soar/secrets", soarV2H.ListSecrets)
-		r.Post("/api/v1/soar/secrets", soarV2H.CreateSecret)
-		r.Delete("/api/v1/soar/secrets/{name}", soarV2H.DeleteSecret)
+		// PRO gating — playbook execution is the expensive path (sandbox spin-up,
+		// outbound HTTP, secret resolution). Test mode is also gated since it
+		// runs the same engine in dry-run mode.
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/execute", soarV2H.ExecutePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/test", soarV2H.TestPlaybook)
+		r.With(requirePro).Get("/api/v1/soar/runs/{id}", soarV2H.GetRun)
+		r.With(requirePro).Post("/api/v1/soar/runs/{id}/cancel", soarV2H.CancelRun)
+		r.With(requirePro).Get("/api/v1/soar/playbooks/{id}/versions", soarV2H.ListPlaybookVersions)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/version/{n}/rollback", soarV2H.RollbackVersion)
+		r.With(requirePro).Get("/api/v1/soar/approvals/pending", soarV2H.ListPendingApprovals)
+		r.With(requirePro).Post("/api/v1/soar/approvals/{id}/decide", soarV2H.DecideApproval)
+		// PRO feature: Secret Vault.
+		// Basic CRUD + new "view details" endpoints (rotate, audit log,
+		// per-tenant config, summary). All gated by requirePro so starter
+		// tenants get 402 Payment Required.
+		r.With(requirePro).Get("/api/v1/soar/secrets", soarV2H.ListSecrets)
+		r.With(requirePro).Post("/api/v1/soar/secrets", soarV2H.CreateSecret)
+		r.With(requirePro).Delete("/api/v1/soar/secrets/{name}", soarV2H.DeleteSecret)
+		r.With(requirePro).Get("/api/v1/soar/secrets/audit", soarV2H.SecretAuditLog)
+		r.With(requirePro).Get("/api/v1/soar/secrets/summary", soarV2H.VaultSummary)
+		r.With(requirePro).Get("/api/v1/soar/secrets/config", soarV2H.GetVaultConfig)
+		r.With(requirePro).Put("/api/v1/soar/secrets/config", soarV2H.UpdateVaultConfig)
+		r.With(requirePro).Get("/api/v1/soar/secrets/{name}", soarV2H.GetSecretMeta)
+		r.With(requirePro).Post("/api/v1/soar/secrets/{name}/rotate", soarV2H.RotateSecret)
 
 		// ── Vulnerability management ───────────────────────────────
 		r.Get("/api/v1/vulns/trend", func(w http.ResponseWriter, r *http.Request) {
@@ -1409,7 +1617,9 @@ func main() {
 		r.Get("/api/v1/ti/feeds", tiH.ListFeeds)
 		r.Get("/api/v1/ti/matches", tiH.Matches)
 		r.Get("/api/v1/ti/mitre", tiH.MITRE)
-		r.Post("/api/v1/ti/feeds/sync", tiH.SyncFeeds)
+		// PRO gating — pulling external feeds + CISA KEV refresh costs egress
+		// bandwidth and rate-limit budget against upstream providers.
+		r.With(requirePro).Post("/api/v1/ti/feeds/sync", tiH.SyncFeeds)
 		r.Get("/api/v1/ti/enrich", tiH.Enrich)
 		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/ti/enrich/batch", tiH.EnrichBatch)
 		r.Get("/api/v1/vsp/findings/dedup", tiH.DedupFindings)
@@ -1442,16 +1652,117 @@ func main() {
 		r.Post("/api/v1/integrations/{provider}/test-pr-comment", tiH.UISTubIntegrationsTest)
 		r.Post("/api/v1/integrations/{provider}/test-ticket", tiH.UISTubIntegrationsTest)
 		r.Post("/api/v1/sw/report", tiH.UISTubSwReport)
-		r.Post("/api/v1/ti/kev/refresh", tiH.RefreshKEV)
-		r.Post("/api/v1/siem/webhooks", siemH.Create)
-		r.Delete("/api/v1/siem/webhooks/{id}", siemH.Delete)
-		r.Post("/api/v1/siem/webhooks/{id}/test", siemH.Test)
+		r.With(requirePro).Post("/api/v1/ti/kev/refresh", tiH.RefreshKEV)
+		r.With(requirePro).Post("/api/v1/siem/webhooks", siemH.Create)
+		r.With(requirePro).Delete("/api/v1/siem/webhooks/{id}", siemH.Delete)
+		r.With(requirePro).Post("/api/v1/siem/webhooks/{id}/test", siemH.Test)
 
 		// Compliance
 		r.Get("/api/v1/compliance/fedramp", complianceH.FedRAMP)
 		r.Get("/api/v1/compliance/cmmc", complianceH.CMMC)
 		r.Get("/api/v1/compliance/oscal/ar", complianceH.OSCALAR)
 		r.Get("/api/v1/compliance/oscal/poam", complianceH.OSCALPOAM)
+
+		// Compliance evidence file storage
+		evidenceH := handler.NewComplianceEvidence(db)
+		r.Post("/api/v1/compliance/evidence", evidenceH.Upload)
+		r.Get("/api/v1/compliance/evidence", evidenceH.List)
+		r.Get("/api/v1/compliance/evidence/{id}", evidenceH.Download)
+		r.Delete("/api/v1/compliance/evidence/{id}", evidenceH.Delete)
+
+		// DORA metrics (DevOps Research & Assessment) — derived from runs/autofix_pr/ir_incidents
+		doraH := handler.NewDORA(db)
+		r.With(requirePro).Get("/api/v1/dora", doraH.Get)
+
+		// cATO (continuous Authority To Operate) — posture + admin toggle
+		catoH := handler.NewCATO(db)
+		r.With(requirePro).Get("/api/v1/cato", catoH.Get)
+		r.With(requirePro).Post("/api/v1/cato/toggle", catoH.Toggle)
+
+		// MITRE ATT&CK heatmap — coverage view from finding signatures
+		attackH := handler.NewAttack(db)
+		r.With(requirePro).Get("/api/v1/attack/heatmap", attackH.Heatmap)
+
+		// SLSA L3 readiness — signed run provenance (DSSE / in-toto v1)
+		r.Post("/api/v1/runs/{rid}/provenance", handleRunProvenanceGenerate)
+		r.Get("/api/v1/runs/{rid}/provenance", handleRunProvenanceGet)
+		r.Get("/api/v1/runs/{rid}/provenance/verify", handleRunProvenanceVerify)
+
+		// External Grafana embed — config + iframe URL builder
+		grafanaH := handler.NewGrafana(db)
+		r.With(requirePro).Get("/api/v1/grafana/config", grafanaH.GetConfig)
+		r.With(requirePro).Post("/api/v1/grafana/config", grafanaH.SetConfig)
+		r.With(requirePro).Get("/api/v1/grafana/embed-url", grafanaH.EmbedURL)
+
+		// i18n locale preference
+		localeH := handler.NewLocale(db)
+		r.Get("/api/v1/locale", localeH.Get)
+		r.Post("/api/v1/locale", localeH.Set)
+
+		// Data residency (Decree 53/2022 + GDPR)
+		residencyH := handler.NewResidency(db)
+		r.Get("/api/v1/residency/config", residencyH.Get)
+		r.Post("/api/v1/residency/config", residencyH.Set)
+		r.Get("/api/v1/residency/violations", residencyH.Violations)
+
+		// ConMon Score — real per-tenant continuous-monitoring score.
+		// Replaces the demo "94/100" hardcoded in p4_compliance.html.
+		conmonScoreH := handler.NewConMonScore(db)
+		r.Get("/api/v1/conmon/score", conmonScoreH.Get)
+
+		// KPI internal-consistency assertions (Sprint 7.5). CI scripts
+		// poll this endpoint and treat HTTP 409 as a release blocker.
+		kpiH := handler.NewKPISanity(db)
+		r.Get("/api/v1/kpi/sanity", kpiH.Get)
+
+		// Sprint 8 — 4.0 attainability scaffolding ────────────────────
+		// VDP intake (anonymous POST, admin GET/transition)
+		discloseH := handler.NewDisclosure(db)
+		r.Post("/api/v1/security/disclose", discloseH.Submit) // anon
+		r.Get("/api/v1/security/disclosures", discloseH.List)
+		r.Post("/api/v1/security/disclosures/{id}/transition", discloseH.Transition)
+
+		// Public status — anon, cached 30s
+		statusH := handler.NewStatusPublic(db)
+		r.Get("/api/v1/status", statusH.Get)
+
+		// Quarterly improvement metrics (DSOMM L4 trend evidence)
+		impH := handler.NewImprovement(db)
+		r.Get("/api/v1/improvement/quarters", impH.Quarters)
+
+		// Tabletop exercise registry
+		tabH := handler.NewTabletop(db)
+		r.Post("/api/v1/tabletop/exercises", tabH.Record)
+		r.Get("/api/v1/tabletop/exercises", tabH.List)
+		r.Get("/api/v1/tabletop/cadence", tabH.Cadence)
+
+		// Auditor evidence bundle (admin only)
+		bundleH := handler.NewAuditBundle(db)
+		r.Get("/api/v1/audit/bundle", bundleH.Get)
+
+		// WebAuthn / FIDO2 / Passkey
+		// Wires up only when VSP_WEBAUTHN_RP_ID is configured. Otherwise we
+		// log a one-line skip and continue — operators not yet running on
+		// HTTPS shouldn't be forced to deal with WebAuthn errors.
+		if waH, err := handler.NewWebAuthnHandler(db); err == nil && waH != nil {
+			r.With(authMw).Post("/api/v1/auth/webauthn/register/begin", waH.RegisterBegin)
+			r.With(authMw).Post("/api/v1/auth/webauthn/register/finish", waH.RegisterFinish)
+			r.Post("/api/v1/auth/webauthn/login/begin", waH.LoginBegin)
+			r.Post("/api/v1/auth/webauthn/login/finish", waH.LoginFinish)
+			r.With(authMw).Get("/api/v1/auth/webauthn/credentials", waH.ListCredentials)
+			r.With(authMw).Post("/api/v1/auth/webauthn/credentials/{id}/revoke", waH.RevokeCredential)
+		} else {
+			log.Info().Msg("webauthn: VSP_WEBAUTHN_RP_ID not set — passkey routes disabled")
+		}
+
+		// DSAR (GDPR Art. 15) + Right-to-Erasure (Art. 17 / PDPA Decree 13/2023)
+		dsrH := handler.NewDSR(db)
+		r.Post("/api/v1/data/export", dsrH.RequestExport)
+		r.Get("/api/v1/data/exports/{id}", dsrH.GetExport)
+		r.Post("/api/v1/data/erasure", dsrH.RequestErasure)
+		r.Post("/api/v1/data/erasure/{id}/confirm", dsrH.ConfirmErasure)
+		r.Post("/api/v1/data/erasure/{id}/cancel", dsrH.CancelErasure)
+		r.Get("/api/v1/data/requests", dsrH.List)
 
 		// Governance (all implemented now)
 		r.Get("/api/v1/governance/risk-register", govH.RiskRegister)
@@ -1757,13 +2068,15 @@ func main() {
 		r.Get("/api/v1/autofix/validation/stats", autofix.HandlerValidationStats(p4DB))
 		r.Post("/api/v1/autofix/validation/run", autofix.HandlerRunValidation(p4DB))
 		r.Get("/api/v1/autofix/validation/{cacheKey}", autofix.HandlerGetValidation(p4DB))
-		// ── H3.S Auto-PR endpoints ────────────────────────────────
-		r.Post("/api/v1/autofix/pr/create", autopr.HandlerCreatePR(p4DB))
-		r.Get("/api/v1/autofix/pr/list", autopr.HandlerListPR(p4DB))
-		r.Get("/api/v1/autofix/pr/{id}/status", autopr.HandlerPRStatus(p4DB))
-		r.Post("/api/v1/autofix/repo/register", autopr.HandlerRegisterRepo(p4DB))
-		r.Get("/api/v1/autofix/repo/list", autopr.HandlerListRepos(p4DB))
-		// Webhook: NOT under auth middleware (signature-verified instead)
+		// ── H3.S Auto-PR endpoints — PRO feature: PR / repo bot ───────
+		r.With(requirePro).Post("/api/v1/autofix/pr/create", autopr.HandlerCreatePR(p4DB))
+		r.With(requirePro).Get("/api/v1/autofix/pr/list", autopr.HandlerListPR(p4DB))
+		r.With(requirePro).Get("/api/v1/autofix/pr/{id}/status", autopr.HandlerPRStatus(p4DB))
+		r.With(requirePro).Post("/api/v1/autofix/repo/register", autopr.HandlerRegisterRepo(p4DB))
+		r.With(requirePro).Get("/api/v1/autofix/repo/list", autopr.HandlerListRepos(p4DB))
+		// Webhook: NOT under auth/PRO middleware (signature-verified instead).
+		// Inbound provider webhooks must always succeed regardless of plan;
+		// otherwise GitHub/GitLab will retry forever and pollute audit logs.
 		r.Post("/api/v1/autofix/pr/webhook/{repoID}", autopr.HandlerWebhook(p4DB))
 		// ─── End H3.O ────────────────────────────────────────────────────
 
@@ -1776,18 +2089,20 @@ func main() {
 		r.Get("/api/v1/sbom/{rid}/grype", sbomH.Grype)
 		r.Get("/api/v1/sbom/{rid}/diff", sbomH.Diff)
 		// PHASE3-ROUTES-BEGIN
-		// ─── Supply Chain (Sigstore/SLSA/VEX) — Phase 3A ─────────────
-		r.Get("/api/v1/supply-chain/kpis", supplyChainH.KPIs)
-		r.Get("/api/v1/supply-chain/signatures", supplyChainH.Signatures)
-		r.Get("/api/v1/supply-chain/signatures/{id}", supplyChainH.SignatureDetail)
-		r.Post("/api/v1/supply-chain/signatures/{id}/verify", supplyChainH.Verify)
-		r.Post("/api/v1/supply-chain/sign", supplyChainH.Sign)
-		r.Get("/api/v1/supply-chain/provenance", supplyChainH.Provenance)
-		r.Post("/api/v1/supply-chain/provenance/generate", supplyChainH.GenerateProvenance)
-		r.Get("/api/v1/supply-chain/vex", supplyChainH.VEX)
+		// ─── Supply Chain (Sigstore/SLSA/VEX) — Phase 3A — PRO feature
+		r.With(requirePro).Get("/api/v1/supply-chain/kpis", supplyChainH.KPIs)
+		r.With(requirePro).Get("/api/v1/supply-chain/signatures", supplyChainH.Signatures)
+		r.With(requirePro).Get("/api/v1/supply-chain/signatures/{id}", supplyChainH.SignatureDetail)
+		r.With(requirePro).Post("/api/v1/supply-chain/signatures/{id}/verify", supplyChainH.Verify)
+		r.With(requirePro).Post("/api/v1/supply-chain/sign", supplyChainH.Sign)
+		r.With(requirePro).Get("/api/v1/supply-chain/provenance", supplyChainH.Provenance)
+		r.With(requirePro).Post("/api/v1/supply-chain/provenance/generate", supplyChainH.GenerateProvenance)
+		r.With(requirePro).Get("/api/v1/supply-chain/vex", supplyChainH.VEX)
+		// Public keys are non-sensitive verification material — keep open so
+		// downstream verifiers can fetch without a paid plan.
 		r.Get("/api/v1/supply-chain/key", supplyChainH.Key)
 		r.Get("/api/v1/supply-chain/public-key", supplyChainH.Key)
-		r.Post("/api/v1/supply-chain/verify", supplyChainH.VerifyBundle)
+		r.With(requirePro).Post("/api/v1/supply-chain/verify", supplyChainH.VerifyBundle)
 		// ─── CISA Secure Software Self-Attestation — Phase 3A ────────
 		r.Get("/api/v1/cisa-attestation/kpis", cisaAttestH.KPIs)
 		r.Get("/api/v1/cisa-attestation/practices", cisaAttestH.Practices)
@@ -2338,7 +2653,9 @@ func main() {
 		})
 		r.Get("/api/v1/vsp/tt13_report_pdf/{rid}", reportH.TT13PDF)
 		r.Get("/api/v1/reports/conmon_pdf", reportH.ConMonPDF)
-		r.Get("/api/v1/vsp/executive_report_pdf/{rid}", reportH.ExecutivePDF)
+		// PRO gating — PDF rendering uses headless Chromium (~2s CPU + 200MB
+		// memory) per call; gate it so free tier can't DoS the runner.
+		r.With(requirePro).Get("/api/v1/vsp/executive_report_pdf/{rid}", reportH.ExecutivePDF)
 		r.Get("/api/v1/vsp/executive_report_html/{rid}", reportH.ExecutiveHTML)
 		// SLA + Sandbox + Imports
 		r.Get("/api/v1/vsp/sla_tracker", slaH.Tracker)
@@ -2354,8 +2671,10 @@ func main() {
 			_, _ = w.Write([]byte(`{"status":"ok","message":"session timeout updated"}`))
 		})
 		// Export
+		// PRO gating — large exports are bandwidth + DB-IO heavy. SARIF stays
+		// free for IDE extensions (small payloads); CSV/full export is gated.
 		r.Get("/api/v1/export/sarif/{rid}", exportH.SARIF)
-		r.Get("/api/v1/export/csv/{rid}", exportH.CSV)
+		r.With(requirePro).Get("/api/v1/export/csv/{rid}", exportH.CSV)
 		r.Get("/api/v1/export/json/{rid}", exportH.JSON)
 
 		// Software Inventory routes (read-only — under CSRF group)
@@ -2382,11 +2701,41 @@ func main() {
 		agenticHandlers.RegisterRoutes(r)
 	})
 
-
-	// VSP PRO — Container scanner (Trivy) — P0 backend
+	// VSP PRO — Container scanner (Trivy) — P0 backend.
+	// PRO feature: gated by authMw + requirePro so starter tenants
+	// can't trigger expensive Trivy scans. Routes: /api/v1/container/{images,scan,scan/{id},seed}.
 	containerScanner := container.NewScanner()
-	container.NewAPI(containerScanner).RegisterRoutes(r)
-	log.Info().Msg("container: Trivy scanner API initialized — POST /api/v1/container/seed to start")
+	container.NewAPI(containerScanner).RegisterRoutes(r, authMw, requirePro)
+	log.Info().Msg("container: Trivy scanner API initialized (PRO-gated) — POST /api/v1/container/seed to start")
+
+	// ─── Microservice reverse proxies ───────────────────────────────────────
+	// Frontend panels in static/index.html are configured to hit these prefixes
+	// (window.VSP_COSIGN_API='/api/sc', etc.) so the gateway must transparently
+	// forward to the corresponding microservice. The microservices live on
+	// 8091-8095 as their own systemd units; the prefix is stripped before
+	// forwarding so /api/sc/healthz → http://127.0.0.1:8091/healthz.
+	mountMicroProxy := func(prefix, target string) {
+		u, err := url.Parse(target)
+		if err != nil {
+			log.Fatal().Err(err).Str("target", target).Msg("invalid microservice proxy target")
+		}
+		proxy := httputil.NewSingleHostReverseProxy(u)
+		// Swallow microservice-down errors with a short JSON 502 instead of
+		// the default plaintext "EOF" so frontend panels can render a clean
+		// error state.
+		proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"error":"microservice unreachable","upstream":"` + target + `"}`))
+		}
+		r.Mount(prefix, http.StripPrefix(prefix, proxy))
+		log.Info().Str("prefix", prefix).Str("target", target).Msg("microservice proxy mounted")
+	}
+	mountMicroProxy("/api/sc",    "http://127.0.0.1:8091") // cosign-api
+	mountMicroProxy("/api/sched", "http://127.0.0.1:8092") // scheduler-api
+	mountMicroProxy("/api/dast",  "http://127.0.0.1:8093") // dast-api
+	mountMicroProxy("/api/swinv", "http://127.0.0.1:8094") // sw-inventory
+	mountMicroProxy("/api/email", "http://127.0.0.1:8095") // email-api
 
 	srv := &http.Server{Addr: addr, Handler: r,
 		ReadTimeout: 30 * time.Second, WriteTimeout: 0}
@@ -2511,6 +2860,30 @@ func main() {
 	// G38: POAM auto-gen worker (every 5 min)
 	go poam.New(p4DB, 5*time.Minute).Start(ctx)
 	log.Info().Msg("poam: auto-gen worker scheduled")
+
+	// Notification fan-out worker — drains notification_log entries written
+	// by every PRO panel (CSPM finding alerts, supply-chain admission denial,
+	// etc.) and POSTs them to the per-tenant Slack/Teams/generic webhook
+	// configured in the Notifications panel. Tick = 5 s.
+	// Notification fan-out worker. Webhook body signing pulls the HMAC
+	// secret from the configured secrets provider — empty string when
+	// not configured, in which case signatures are simply not added
+	// (backward compatible).
+	whSign := ""
+	if sp, sErr := secrets.Default(); sErr == nil {
+		if v, err := sp.Get("webhook_signing"); err == nil {
+			whSign = v
+		}
+	}
+	go notify.NewFanout(db.Pool(), 5*time.Second).WithSigningKey(whSign).Run(ctx)
+	// Erasure worker: scans every 5 min for confirmed DSR-erasure requests
+	// whose grace window has elapsed, and runs the cascading deletion.
+	go handler.RunErasureWorker(ctx, db, 5*time.Minute)
+
+	// KPI watchdog (Sprint 8.7) — re-runs the kpi/sanity invariants
+	// every 5 min and writes KPI_SANITY_FAILED to audit_log on regression.
+	go handler.RunKPIWatchdog(ctx, db, 5*time.Minute)
+	log.Info().Msg("notification fan-out worker scheduled")
 
 	log.Info().Msg("Incident email alerter started — interval: 30s")
 

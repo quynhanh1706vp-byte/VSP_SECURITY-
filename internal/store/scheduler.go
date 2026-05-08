@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // StoreSchedule — local type, không import scheduler package
@@ -36,11 +38,7 @@ type StoreDriftEvent struct {
 }
 
 func (db *DB) ListStoreSchedules(ctx context.Context, tenantID ...string) ([]StoreSchedule, error) {
-	var rows interface {
-		Next() bool
-		Close()
-		Scan(...any) error
-	}
+	var rows pgx.Rows
 	var err error
 	if len(tenantID) > 0 && tenantID[0] != "" {
 		rows, err = db.pool.Query(ctx,

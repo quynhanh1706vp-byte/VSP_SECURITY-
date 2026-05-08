@@ -3,28 +3,28 @@
 // VSP Cosign / Supply-Chain microservice
 // ──────────────────────────────────────────────────────────────────────────
 // Mirrors the design of cmd/trivy-api/main.go:
-//   • stdlib only (no external deps)
-//   • single global mutex serialises every cosign invocation
+//   - stdlib only (no external deps)
+//   - single global mutex serialises every cosign invocation
 //     (cosign keyring / OCI registry token cache races otherwise)
-//   • CORS enabled for :8080 → :8091 cross-origin calls
-//   • password is read ONCE from /etc/vsp/cosign.pass at startup
+//   - CORS enabled for :8080 → :8091 cross-origin calls
+//   - password is read ONCE from /etc/vsp/cosign.pass at startup
 //     (file must be 0640 or stricter (no other perms), owned by service user)
-//   • all results persisted to /var/lib/vsp/sigs.json so signatures
+//   - all results persisted to /var/lib/vsp/sigs.json so signatures
 //     survive restarts
 //
 // Endpoints
-//   POST /sign                    → cosign sign --key cosign.key {image}
-//   POST /verify                  → cosign verify --key cosign.pub {image}
-//   GET  /signatures              → list every signature this service has produced
-//   GET  /signatures/{id}         → single record
-//   POST /attest                  → SLSA / in-toto provenance attestation
-//   GET  /attestations/{image}    → cosign download attestation
-//   POST /sbom/diff               → diff two CycloneDX/SPDX JSON SBOMs
-//   GET  /healthz                 → liveness
+//
+//	POST /sign                    → cosign sign --key cosign.key {image}
+//	POST /verify                  → cosign verify --key cosign.pub {image}
+//	GET  /signatures              → list every signature this service has produced
+//	GET  /signatures/{id}         → single record
+//	POST /attest                  → SLSA / in-toto provenance attestation
+//	GET  /attestations/{image}    → cosign download attestation
+//	POST /sbom/diff               → diff two CycloneDX/SPDX JSON SBOMs
+//	GET  /healthz                 → liveness
 //
 // Build:  go build -o vsp-cosign-api ./cmd/cosign-api
 // Run:    ./vsp-cosign-api -addr :8091 -keydir /etc/vsp -store /var/lib/vsp
-//
 package main
 
 import (
@@ -72,15 +72,67 @@ var (
 // ─── types ────────────────────────────────────────────────────────────────
 
 type Signature struct {
-	ID        string    `json:"id"`
-	Image     string    `json:"image"`
-	Digest    string    `json:"digest,omitempty"`
-	Status    string    `json:"status"` // signed | failed | verified | tampered
+	ID     string `json:"id"`
+	Image  string `json:"image"`
+	Digest string `json:"digest,omitempty"`
+	// Status taxonomy — these have distinct security implications and
+	// must NOT be conflated. Pre-Sprint-7, every verify failure was
+	// labelled "tampered" which was alarming + wrong.
+	//
+	//   signed       sign call succeeded — local artefact written
+	//   verified     verify call succeeded — sig matches the configured key
+	//   tampered     verify ran, signature exists, but DOES NOT match key
+	//                (this is the actual security incident — escalate)
+	//   unsigned     image has no signature attached at the registry
+	//                (not necessarily a problem in dev / public images)
+	//   not_found    image / registry unreachable (network problem)
+	//   unavailable  cosign binary missing or unrunnable (ops problem)
+	//   failed       sign-side failure (write / push to registry)
+	Status    string    `json:"status"`
 	Bundle    string    `json:"bundle,omitempty"`
 	Reason    string    `json:"reason,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	Predicate string    `json:"predicate,omitempty"` // for attestations: slsaprovenance | spdx | cyclonedx
 	Output    string    `json:"output,omitempty"`    // raw cosign stdout/stderr (truncated)
+}
+
+// classifyVerifyFailure inspects cosign's combined output and returns the
+// most specific status that fits. Order matters — we prefer "unavailable"
+// over "not_found" so an ops problem isn't mis-tagged as a registry one.
+func classifyVerifyFailure(combined string, runErr error) (status, reason string) {
+	out := strings.ToLower(combined)
+	switch {
+	case runErr == nil:
+		return "verified", ""
+	case strings.Contains(out, "executable file not found") ||
+		strings.Contains(out, "no such file or directory") ||
+		strings.Contains(out, "permission denied"):
+		return "unavailable", "cosign binary not runnable"
+	case strings.Contains(out, "no signatures found") ||
+		strings.Contains(out, "no matching signatures"):
+		return "unsigned", "registry has no signature for this image"
+	case strings.Contains(out, "manifest unknown") ||
+		strings.Contains(out, "manifest_unknown") ||
+		strings.Contains(out, "name unknown") ||
+		strings.Contains(out, "name_unknown") ||
+		strings.Contains(out, "no such host") ||
+		strings.Contains(out, "connection refused") ||
+		strings.Contains(out, "dial tcp") ||
+		strings.Contains(out, "404"):
+		return "not_found", "image or registry unreachable"
+	case strings.Contains(out, "signature verification failed") ||
+		strings.Contains(out, "invalid signature") ||
+		strings.Contains(out, "could not verify signature"):
+		// THIS is the real security event — signature exists but does
+		// not match the configured key.
+		return "tampered", "signature does not match configured public key"
+	}
+	// Fallback: cosign returned non-zero but we can't classify. Tag as
+	// "failed" rather than "tampered" — refusing to cry wolf.
+	if runErr != nil {
+		return "failed", runErr.Error()
+	}
+	return "failed", ""
 }
 
 type signReq struct {
@@ -110,12 +162,12 @@ type sbomDiffResp struct {
 	Removed   []sbomComp `json:"removed"`
 	Persisted []sbomComp `json:"persisted"`
 	Stats     struct {
-		ASize     int `json:"a_size"`
-		BSize     int `json:"b_size"`
-		AddedN    int `json:"added"`
-		RemovedN  int `json:"removed"`
-		PersistN  int `json:"persisted"`
-		ChurnPct  int `json:"churn_pct"`
+		ASize    int `json:"a_size"`
+		BSize    int `json:"b_size"`
+		AddedN   int `json:"added"`
+		RemovedN int `json:"removed"`
+		PersistN int `json:"persisted"`
+		ChurnPct int `json:"churn_pct"`
 	} `json:"stats"`
 }
 
@@ -301,16 +353,9 @@ func handleVerify(w http.ResponseWriter, r *http.Request) {
 
 	stdout, stderr, err := runCosign(r.Context(), args...)
 	sig.Output = clip(stdout+"\n"+stderr, 4096)
-	if err != nil {
-		sig.Status = "tampered"
-		sig.Reason = err.Error()
-		saveSig(sig)
-		writeJSON(w, 200, sig) // 200 — verification ran, just failed
-		return
-	}
-	sig.Status = "verified"
+	sig.Status, sig.Reason = classifyVerifyFailure(stdout+"\n"+stderr, err)
 	saveSig(sig)
-	writeJSON(w, 200, sig)
+	writeJSON(w, 200, sig) // 200 always — verification ran, status carries the result
 }
 
 func handleAttest(w http.ResponseWriter, r *http.Request) {

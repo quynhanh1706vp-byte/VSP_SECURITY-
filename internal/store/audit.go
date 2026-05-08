@@ -3,9 +3,11 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/vsp/platform/internal/audit"
 )
 
@@ -50,7 +52,13 @@ func (db *DB) GetLastAuditHash(ctx context.Context, tenantID string) (string, er
 		`SELECT hash FROM audit_log WHERE tenant_id=$1 ORDER BY seq DESC LIMIT 1`,
 		tenantID).Scan(&hash)
 	if err != nil {
-		return "", nil
+		// First audit entry for this tenant — no rows is expected, not
+		// an error. Any other DB error gets surfaced so callers can
+		// log / fail rather than silently chain off an empty hash.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("get last audit hash: %w", err)
 	}
 	return hash, nil
 }
@@ -105,4 +113,38 @@ func (db *DB) ListAuditByTenant(ctx context.Context, tenantID string) ([]AuditEn
 		entries = append(entries, e)
 	}
 	return entries, rows.Err()
+}
+
+// UpdateAuditHashes rewrites the hash + prev_hash for a contiguous tail of
+// audit entries (typically after a chain integrity break). Transactional —
+// either all updates land or none. Implements the audit.Repairer interface.
+//
+// The caller (audit.RepairChain) is responsible for ensuring the rebuilt
+// hashes form a valid chain and for writing a follow-up CHAIN_REPAIRED audit
+// entry recording who triggered the repair.
+func (db *DB) UpdateAuditHashes(ctx context.Context, tenantID string, entries []audit.Entry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("repair: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	for _, e := range entries {
+		// Defense in depth: only update rows belonging to the requesting tenant
+		// to prevent cross-tenant tampering even if a bug routed a wrong list.
+		_, err := tx.Exec(ctx,
+			`UPDATE audit_log SET hash=$1, prev_hash=$2
+			 WHERE seq=$3 AND tenant_id=$4`,
+			e.StoredHash, e.PrevHash, e.Seq, tenantID)
+		if err != nil {
+			return fmt.Errorf("repair: update seq %d: %w", e.Seq, err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("repair: commit: %w", err)
+	}
+	return nil
 }
