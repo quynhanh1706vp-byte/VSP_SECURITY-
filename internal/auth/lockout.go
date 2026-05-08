@@ -110,6 +110,31 @@ func (l *IPLockout) Clear(ip string) {
 	delete(l.buckets, ip)
 }
 
+// FailCount returns the number of fails currently in the IP's
+// sliding window. Used by the missing-user login path to apply
+// proportional backoff so attackers can't distinguish "no such
+// email" from "email exists but wrong password" by latency
+// (Sprint 12.7 timing-oracle fix).
+func (l *IPLockout) FailCount(ip string) int {
+	if ip == "" {
+		return 0
+	}
+	cutoff := time.Now().Add(-ipWindow)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	b, ok := l.buckets[ip]
+	if !ok {
+		return 0
+	}
+	n := 0
+	for _, t := range b.fails {
+		if t.After(cutoff) {
+			n++
+		}
+	}
+	return n
+}
+
 // ClientIP extracts the best-effort source IP. Honours X-Forwarded-For
 // when running behind a trusted reverse proxy (chi.RealIP middleware
 // already populates RemoteAddr from XFF, so we just split off the port).

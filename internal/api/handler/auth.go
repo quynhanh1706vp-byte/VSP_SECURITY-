@@ -105,6 +105,17 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 				go a.writeAudit(r.Clone(context.Background()), tenantID, nil, "LOGIN_IP_LOCKED", "/auth/login")
 			}
 		}
+		// Sprint 12.7: backoff also on missing-user path. Pre-12.7 the
+		// found-user path slept exponentially via BackoffSleep(count)
+		// while missing-user returned immediately — a 1-2s timing diff
+		// the L3 user-enum probe caught. Match the sleep using the
+		// same per-IP fail counter (best proxy when there's no per-
+		// account state to read).
+		var ipFails int
+		if a.IPLock != nil {
+			ipFails = a.IPLock.FailCount(clientIP)
+		}
+		auth.BackoffSleep(ipFails)
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
