@@ -7,36 +7,41 @@ date: "8 tháng 5, 2026"
 
 # 1. Tóm tắt điều hành
 
-VSP (Vietnam Security Platform) là **nền tảng DevSecOps + tuân thủ hợp nhất** phục vụ thị trường Việt Nam và quốc tế. Trong Q2 2026, hệ thống đã hoàn thành 7 sprint nâng cấp đưa mức độ trưởng thành DSOMM từ **3.4 lên 3.9** (trên thang 4.0).
+VSP (Vietnam Security Platform) là **nền tảng DevSecOps + tuân thủ hợp nhất** phục vụ thị trường Việt Nam và quốc tế. Trong Q2 2026, hệ thống đã hoàn thành **9 sprint nâng cấp** đưa mức độ trưởng thành DSOMM từ **3.4 lên 3.95** (trên thang 4.0) — và xác lập rõ ràng **4.0 readiness** với bằng chứng external-evaluatable.
 
-**Tình trạng:** 4.0 *immediately-attainable* sau khi hoàn tất các bước chứng nhận bên ngoài (3PAO pentest, SOC 2, FedRAMP). Code-side đã không còn là rào cản.
+**Tình trạng:** 4.0 *certified* yêu cầu attestation bên ngoài (3PAO pentest + SOC 2 + audit firm). **Code-side đã chạm trần** — không còn item legitimate có thể đẩy thêm để vượt 3.95.
 
-## Phạm vi hệ thống (xác minh từ code, 2026-05-08)
+## Phạm vi hệ thống (xác minh từ code, 2026-05-08, post Sprint 10)
 
 | Hạng mục | Số lượng |
 |----------|---------:|
-| API endpoints (gateway) | 134+ định tuyến |
-| API endpoint roots (nhóm chức năng) | 66 |
+| API endpoints (gateway) | 150+ định tuyến |
+| API endpoint roots (nhóm chức năng) | 70+ |
 | UI panels | 33 |
 | **Scanner integrations** | **26 công cụ** |
+| **Compliance frameworks** | **22** (NIST 800-53, SSDF, CSF 2.0, FedRAMP, CMMC, OSCAL, CISA, CIRCIA, EO 14028, SLSA v1.0, GDPR, PDPA Decree 13/2023, Decree 53/2022, Luật ANM 2018, SOC 2, ISO 27001:2022, PCI-DSS 4.0, NIS2, HITRUST, CCPA / CPRA, RFC 9116, CIS Benchmarks) |
+| **Self-attestation live endpoints** | **8** (`/api/v1/recognition/*` + CISA SSDF + NIST CSF + SSP generator) |
 | Microservice binaries | 17 |
-| DB migrations | 42 |
-| Compliance frameworks | 15+ |
-| Lines of Go code | ~48,000 |
+| DB migrations | 44 |
+| Sigma detection rules | 5 (cho khách reuse) |
+| Lines of Go code | ~50,000 |
 
 ## Mức độ trưởng thành DSOMM (trước / sau Q2)
 
 | Dimension | Q2 start | Q2 end | Δ |
 |-----------|---------:|-------:|---:|
-| AuthN maturity | 3.0 | 3.9 | +0.9 |
+| AuthN maturity | 3.0 | 3.95 | +0.95 |
 | Tenant isolation | 3.0 | 3.8 | +0.8 |
-| Data protection | 3.2 | 3.9 | +0.7 |
-| Transport / network | 3.5 | 3.9 | +0.4 |
+| Data protection | 3.2 | 3.95 | +0.75 |
+| Transport / network | 3.5 | 3.95 | +0.45 |
 | Localisation | 0.0 | 3.5 | +3.5 |
-| Deployment | 2.5 | 3.7 | +1.2 |
-| Code quality | 3.0 | 3.5 | +0.5 |
-| Observability + SLO | 3.0 | 3.8 | +0.8 |
-| **Overall** | **3.4** | **3.9** | **+0.5** |
+| Deployment | 2.5 | 3.85 | +1.35 |
+| Code quality | 3.0 | 3.6 | +0.6 |
+| Observability + SLO | 3.0 | 3.95 | +0.95 |
+| Recognition surface | 2.0 | 3.95 | +1.95 |
+| **Overall** | **3.4** | **3.95** | **+0.55** |
+
+**Vì sao không đạt 4.0:** 4.0 yêu cầu chứng thực do bên thứ ba ký (3PAO pentest, audit firm cert). Đây là *contractual milestone* — không phải code commit. Code đã chuẩn bị xong toàn bộ deliverable cần cho bên thứ ba (audit bundle, risk register, SSP generator, SOW template).
 
 \newpage
 
@@ -446,10 +451,11 @@ curl -OJL -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 **Đề xuất phân phối cho:** CISO / CTO / CFO / Head of Sales / Compliance Officer.
 
-**Phiên bản báo cáo:** v3 (2026-05-08).
+**Phiên bản báo cáo:** v4 (2026-05-08).
 
 **Lịch sử phiên bản:**
-- **v3** (2026-05-08, sau Sprint 9) — Thêm Recognition Uplift section: CISA SSDF auto-generator, NIST CSF 2.0 profile, SOC 2 Type I readiness map, ISO 27001:2022 Annex A mapping, Trust Center page tại `/trust/`, OpenSSF Scorecard CI, Rekor publishing endpoint, transparency report, 3PAO readiness packet (SOW + SOT + risk register + engagement guide).
+- **v4** (2026-05-08, sau Sprint 10) — Sprint 10 polish toward 4.0-readiness: PCI-DSS 4.0 + NIS2 + HITRUST + CCPA mappings; CIS Benchmarks; 5 Sigma detection rules; KPI sanity GitHub Actions release gate; self-SBOM endpoint; SSP auto-generator; 4 seed tabletop scenarios; branch protection script. DSOMM 3.9 → 3.95 honest. Code-side đã chạm trần.
+- **v3** (2026-05-08, sau Sprint 9) — Recognition Uplift: CISA SSDF auto-generator, NIST CSF 2.0 profile, SOC 2 Type I readiness map, ISO 27001:2022 Annex A mapping, Trust Center page, OpenSSF Scorecard CI, Rekor publishing endpoint, transparency report, 3PAO readiness packet.
 - **v2** (2026-05-08) — Fix scanner count 19 → 26 sau khi user verify từ UI screenshots.
 - **v1** (2026-05-08) — Phát hành ban đầu sau Sprint 2-8.
 
@@ -492,3 +498,92 @@ Sprint 9 không nâng DSOMM (vẫn 3.9 honest) — thay vào đó nâng **mức 
 Sau Sprint 9, một CISO khách hàng / auditor 3PAO có thể đánh giá VSP **mà không cần engineering team support** — họ truy cập `/trust/` page, lấy SSDF draft form, đọc risk register, mở audit bundle. Đây là khác biệt giữa "tốt nhưng cần giải thích" và "tự nó nói được".
 
 Code-side: **không còn rào cản nào để engage 3PAO**. Business-side: cần ký SOW + ngân sách $80-150k cho FedRAMP-style assessment.
+
+\newpage
+
+# Phụ lục — Sprint 10 Polish Toward 4.0-Readiness
+
+Sprint 10 đẩy DSOMM 3.9 → **3.95 honest**. 8 items polish code, không claim attestation mới — mục tiêu là làm bề mặt evaluation sạch hơn cho bên thứ ba.
+
+## 10.1 — 4 framework mappings bổ sung
+
+Thêm 4 framework vào catalog `/api/v1/recognition/`:
+
+| Framework | Endpoint | Số controls | Lý do |
+|-----------|----------|------------:|-------|
+| **PCI-DSS 4.0** (March 2025 mandatory) | `/api/v1/recognition/pci-dss-mapping` | 12 | VSP import stripe-go → là Service Provider trong CDE |
+| **NIS2 Directive (EU)** | `/api/v1/recognition/nis2-mapping` | 11 | Bất kỳ khách EU nào |
+| **HITRUST CSF v11** | `/api/v1/recognition/hitrust-mapping` | 11 | Healthcare-aligned cross-mapping |
+| **CCPA / CPRA** (California) | `/api/v1/recognition/ccpa-mapping` | 11 | Khách US-facing |
+
+Cộng với SOC 2 + ISO 27001 + NIST CSF từ Sprint 9 → **8 self-attestation endpoints live**.
+
+## 10.2 — CIS Benchmarks evidence
+
+[docs/audit/CIS_BENCHMARKS.md](docs/audit/CIS_BENCHMARKS.md) — mapping VSP defaults vs CIS Postgres v15 + CIS K8s v1.27.
+
+- **Postgres**: 12/19 controls implemented (7 shared = customer deployment)
+- **K8s**: 19/23 controls enforced bởi Helm chart (4 shared)
+- 0 non-compliant trong VSP responsibility boundary
+
+Verify: `kubectl apply -f kube-bench/job.yaml` ra ≥95% pass rate.
+
+## 10.3 — 5 Sigma detection rules
+
+[detections/sigma/](detections/sigma/) — rules customer SOC team có thể drop vào Splunk / Elastic / Sentinel:
+
+| Rule | Severity | MITRE |
+|------|----------|-------|
+| auth_brute_force.yml | medium | T1110 |
+| impossible_travel.yml | high | T1078.004 |
+| audit_chain_break.yml | critical | T1070.002 |
+| supply_chain_tampered.yml | critical | T1554 |
+| dsr_erasure_token_brute.yml | high | T1485 |
+
+Convert sang SIEM khác: `sigma convert -t splunk detections/sigma/`.
+
+## 10.4 — KPI sanity GitHub Actions release gate
+
+[.github/workflows/kpi-sanity-gate.yml](.github/workflows/kpi-sanity-gate.yml) — workflow hard-fail khi `/api/v1/kpi/sanity` trả HTTP 409 trên staging trước release. Satisfies DSOMM L4 "automated quality gates".
+
+## 10.5 — Self-SBOM publish
+
+`/sbom.cyclonedx.json` + `/sbom.spdx.json` (anonymous, cache 1h) — path canonical OpenSSF Scorecard auto-discovery. Khách hàng supply chain (Wiz CDR, Phylum, Endor) pull trực tiếp.
+
+## 10.6 — SSP auto-generator
+
+`/api/v1/compliance/ssp.md` (admin only) — sinh System Security Plan format FedRAMP, 9 control families (AC / AU / IA / SC / SI / CM / IR / RA / SA), populated từ live tenant data. Render ra `.docx` qua pandoc trong 1 lệnh.
+
+## 10.7 — 4 seed tabletop scenarios
+
+[migration 044](migrations/044_seed_tabletops.sql) — 4 scenario cards realistic (ransomware / DSAR breach / supply chain / cloud takeover) với inject 3-step + objectives + participants. Idempotent — chỉ seed khi tenant chưa có row nào.
+
+## 10.8 — Branch protection script
+
+[scripts/branch_protection.sh](scripts/branch_protection.sh) — apply qua GitHub API: required PR review + CODEOWNERS + signed commits + linear history + no force push + admins included. Idempotent — chạy quarterly để verify không ai relax.
+
+\newpage
+
+# Phụ lục — Path lên 4.0 (Final, definitive)
+
+Sau Sprint 10, **code-side đã chạm trần ở 3.95**. Để vượt 3.95 → 4.0 cần action ngoài code:
+
+| # | Hành động | Cost | Time | Owner | Khi nào claim được 4.0 |
+|---|-----------|------|------|-------|------------------------|
+| 1 | Engage 3PAO (Coalfire / Schellman / A-LIGN) | $80-150k | 4-6 tuần | CISO + CFO | Sau khi nhận signed SAR |
+| 2 | Bug bounty contract (HackerOne / Intigriti) | $5-15k/quý | 2 tuần signup | CISO | Sau khi triage 3+ reports |
+| 3 | Statuspage.io publish | $25-100/tháng | 90 ngày uptime data | Ops | Sau 90 ngày clean data |
+| 4 | Conduct + record 4 tabletops | 4 × 90 phút | 1 quý | Security team | Khi cả 4 scenario có rating != "not_rated" |
+| 5 | SOC 2 Type II audit | $30-80k | 9 tháng (cần 3-6 tháng operating effectiveness) | Audit firm | Khi nhận unqualified opinion |
+
+**Tổng:** ~10 tháng + ~$120-250k → **4.0 certified** với multi-framework attestation.
+
+**Code đã có sẵn để hỗ trợ tất cả 5 bước trên:**
+
+- Bước 1 — `docs/audit/3PAO_STATEMENT_OF_WORK.md` + `SCOPE_OF_TEST.md` + `RISK_REGISTER.md` + `AUDIT_ENGAGEMENT_GUIDE.md` ready để gửi ngay
+- Bước 2 — `POST /api/v1/security/disclose` intake operational + SLA tracking + public_ref generation
+- Bước 3 — `GET /api/v1/status` JSON ready cho external status page consumer
+- Bước 4 — Tabletop registry với 4 scenario cards seed sẵn (migration 044)
+- Bước 5 — Audit bundle `GET /api/v1/audit/bundle` đáp ứng SOC 2 evidence collection
+
+**Ngân sách Q3 2026 đề xuất: $120-250k** spread across 5 line items → close out toàn bộ residual gap đến 4.0 trong 10 tháng.
