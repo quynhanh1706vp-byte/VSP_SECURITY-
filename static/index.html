@@ -3031,12 +3031,24 @@ function updateTicker() {
 }
 
 /* ─── SSE connection ─── */
+// Sprint 12.3: respects window.VSP_TOGGLES.sse_live_enabled set at boot
+// from /api/v1/features/system_toggles/config. Default true if missing.
 function connectSSE() {
   // SEC-009 (2026-04-23): token previously sent as ?token= query param
   // leaks via access logs, Referer, and browser history. The backend
   // auth middleware reads the JWT from the `vsp_token` HttpOnly cookie,
   // and EventSource attaches it automatically with withCredentials.
   if (!window.TOKEN) return;
+  // Honour the admin toggle. When OFF: hide the live badge, skip the
+  // EventSource entirely. The 5s backend poller still runs server-side
+  // (cheap query); only the streaming endpoint is gated here.
+  if (window.VSP_TOGGLES && window.VSP_TOGGLES.sse_live_enabled === false) {
+    var badge = document.querySelector('.live-badge');
+    if (badge) badge.style.display = 'none';
+    var dot = document.getElementById('sse-dot'); if (dot) dot.style.display = 'none';
+    var lbl = document.getElementById('sse-label'); if (lbl) lbl.textContent = 'SSE off';
+    return;
+  }
   const url = '/api/v1/events';
   const source = new EventSource(url, { withCredentials: true });
   source.onopen = () => {
@@ -3131,7 +3143,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Try connecting to API if token exists
   if (window.TOKEN && window.TOKEN !== '') {
-    connectSSE();
+    // Sprint 12.3: fetch system toggles before opening SSE so the
+    // sse_live_enabled flag is honoured. Best-effort — on failure
+    // we proceed with defaults (all-on), which is the previous
+    // behaviour. Defensive against tenants without the row yet.
+    (async function loadTogglesThenConnect() {
+      try {
+        const r = await fetch('/api/v1/features/system_toggles/config', {
+          headers: { 'Authorization': 'Bearer ' + window.TOKEN }
+        });
+        if (r.ok) {
+          const j = await r.json();
+          window.VSP_TOGGLES = (j && j.config) ? j.config : (j || {});
+        }
+      } catch (e) { /* defaults preserved */ }
+      connectSSE();
+    })();
     if (window.TOKEN) {
       // Validate JWT chưa expired trước khi gọi
       try {
@@ -7778,12 +7805,23 @@ window.loadFindings = async function(offset) {
   }
 })();
 
-// Session countdown timer (30 min session, resets on activity)
+// Session countdown timer (resets on activity).
+// Sprint 12.3: now respects window.VSP_TOGGLES set at boot from
+// /api/v1/features/system_toggles/config:
+//   • session_timer_enabled: false → hide widget, skip ticker
+//   • session_timer_minutes: N → use N instead of hardcoded 30
+// Defaults preserved (true / 30) when toggles not configured.
 (function() {
-  var SESSION_MINUTES = 30;
-  var expiry = Date.now() + SESSION_MINUTES * 60 * 1000;
-  var timerEl = document.getElementById('session-countdown');
+  var t = window.VSP_TOGGLES || {};
   var timerWrap = document.getElementById('session-timer');
+  var timerEl = document.getElementById('session-countdown');
+  if (t.session_timer_enabled === false) {
+    if (timerWrap) timerWrap.style.display = 'none';
+    return; // do not start the ticker at all
+  }
+  var SESSION_MINUTES = (typeof t.session_timer_minutes === 'number' && t.session_timer_minutes > 0)
+                        ? t.session_timer_minutes : 30;
+  var expiry = Date.now() + SESSION_MINUTES * 60 * 1000;
   function resetTimer() { expiry = Date.now() + SESSION_MINUTES * 60 * 1000; }
   ['click','keydown','mousemove'].forEach(function(e){
     document.addEventListener(e, resetTimer, {passive:true});

@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script>
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500; var waited = 0;
+    while (waited < maxWait) {
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      try { tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || ""; if (tk && tk.length >= 20) { window.TOKEN = tk; try { localStorage.setItem("vsp_token", tk); } catch(e){} return tk; } } catch(e) {}
+      await new Promise(r=>setTimeout(r, 100)); waited += 100;
+    }
+    return "";
+  }
+  var _origFetch = window.fetch;
+  window.vspAuthFetch = async function(url, opts){ opts = opts || {}; var tk = await getToken(); if (tk) opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk}); return _origFetch(url, opts); };
+  window.fetch = function(url, opts){ if (typeof url==="string" && url.indexOf("/api/")>=0){ if (opts && opts.headers && (opts.headers.Authorization||opts.headers.authorization)) return _origFetch(url,opts); return window.vspAuthFetch(url,opts); } return _origFetch(url,opts); };
+})();
+</script>
+<meta charset="utf-8">
+<title>System Toggles — VSP</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+  body { margin:0; background:var(--bg0); color:var(--t1); font:13px/1.5 var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif); }
+  .wrap { max-width:760px; margin:0 auto; padding:32px 24px; }
+  h1 { font:400 32px/1.2 Georgia, serif; margin:0 0 6px; }
+  .lede { color:var(--t3); font-size:13px; margin-bottom:24px; }
+  .card { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:20px 24px; margin-bottom:14px; }
+  .row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); }
+  .row:last-child { border-bottom:none; }
+  .row .info { flex:1; padding-right:20px; }
+  .row .label { font-weight:500; font-size:14px; }
+  .row .desc { color:var(--t3); font-size:12px; margin-top:4px; line-height:1.5; }
+  .switch {
+    position:relative; width:44px; height:24px; flex-shrink:0;
+    background:var(--bg3); border-radius:12px; cursor:pointer;
+    transition:background .15s; border:1px solid var(--border);
+  }
+  .switch.on { background:var(--green, #3dd68c); border-color:var(--green, #3dd68c); }
+  .switch::after {
+    content:''; position:absolute; top:2px; left:2px;
+    width:18px; height:18px; border-radius:50%;
+    background:#fff; transition:transform .15s;
+  }
+  .switch.on::after { transform:translateX(20px); }
+  .num-input {
+    width:100px; padding:6px 10px; font:13px monospace;
+    background:var(--bg3); border:1px solid var(--border);
+    color:var(--t1); border-radius:4px;
+  }
+  .num-input:disabled { opacity:0.4; cursor:not-allowed; }
+  .save-bar { display:flex; gap:10px; margin-top:18px; align-items:center; }
+  button.save {
+    background:var(--accent, #4f8cff); color:#fff; border:none;
+    padding:9px 18px; border-radius:5px; font:13px monospace; cursor:pointer;
+  }
+  button.save:hover { filter:brightness(1.1); }
+  button.save:disabled { opacity:0.5; cursor:not-allowed; }
+  .hint { font-size:11px; color:var(--t3); }
+  .toast {
+    position:fixed; right:24px; top:24px; padding:10px 16px;
+    border-radius:6px; font-size:13px; box-shadow:0 4px 12px rgba(0,0,0,.3);
+    transform:translateX(120%); transition:transform .25s; z-index:50;
+  }
+  .toast.show { transform:translateX(0); }
+  .toast.ok  { background:var(--green, #3dd68c); color:#000; }
+  .toast.err { background:var(--red, #e5484d); color:#fff; }
+  .footnote { color:var(--t3); font-size:11px; margin-top:18px; line-height:1.6; }
+  .footnote code { background:var(--bg3); padding:1px 6px; border-radius:3px; font-size:11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>System Toggles</h1>
+  <div class="lede">
+    Bật/tắt UI behaviour cấp tenant — không cần edit code, không cần
+    deploy. Áp dụng ngay sau khi save (refresh page khác để thấy).
+  </div>
+
+  <div class="card" id="loading-state">
+    <div style="text-align:center;color:var(--t3);padding:24px">Loading…</div>
+  </div>
+
+  <div class="card" id="form" style="display:none">
+    <div class="row">
+      <div class="info">
+        <div class="label">SSE Live Stream</div>
+        <div class="desc">
+          Real-time push của scan complete events vào dashboard. Khi tắt:
+          dashboard không auto-update khi có scan mới (user phải refresh
+          tay). Backend poller 5s vẫn chạy server-side.
+        </div>
+      </div>
+      <div class="switch on" id="sw-sse" onclick="toggleSwitch('sw-sse')"></div>
+    </div>
+
+    <div class="row">
+      <div class="info">
+        <div class="label">Session Timer</div>
+        <div class="desc">
+          Counter "30:00" trên topbar + auto-logout khi hết thời gian.
+          Reset on activity (click/key/mouse). Tắt = không có visual
+          countdown + không auto-logout (vẫn có JWT expiry server-side).
+        </div>
+      </div>
+      <div class="switch on" id="sw-session" onclick="toggleSwitch('sw-session')"></div>
+    </div>
+
+    <div class="row">
+      <div class="info">
+        <div class="label">Session Duration (phút)</div>
+        <div class="desc">
+          Thời gian session timer (chỉ hiệu lực khi Session Timer = ON).
+          Hợp lệ: 5–240 phút. Mặc định: 30.
+        </div>
+      </div>
+      <input type="number" class="num-input" id="num-minutes"
+             min="5" max="240" value="30" />
+    </div>
+
+    <div class="save-bar">
+      <button class="save" id="btn-save" onclick="saveToggles()">Save</button>
+      <span class="hint">Admin role required</span>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <strong>Storage:</strong> Per-tenant trong <code>feature_config</code> table với
+    <code>feature_id='system_toggles'</code>. JSON shape:
+    <code>{sse_live_enabled, session_timer_enabled, session_timer_minutes}</code>.<br>
+    <strong>Audit:</strong> Mỗi save ghi <code>FEATURE_CONFIG_UPDATED</code> vào audit_log.<br>
+    <strong>Defaults:</strong> Mặc định all-on, 30 phút khi row chưa tồn tại.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const AUTH_HEADERS = {};
+let cfg = { sse_live_enabled: true, session_timer_enabled: true, session_timer_minutes: 30 };
+
+function toast(msg, kind) {
+  const t = document.getElementById('toast');
+  t.className = 'toast show ' + (kind || 'ok');
+  t.textContent = msg;
+  setTimeout(() => t.className = 'toast ' + (kind || 'ok'), 2500);
+}
+
+function toggleSwitch(id) {
+  document.getElementById(id).classList.toggle('on');
+  updateNumInputDisabled();
+}
+
+function updateNumInputDisabled() {
+  const sessionOn = document.getElementById('sw-session').classList.contains('on');
+  document.getElementById('num-minutes').disabled = !sessionOn;
+}
+
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/v1/features/system_toggles/config', { headers: AUTH_HEADERS });
+    if (r.ok) {
+      const j = await r.json();
+      const c = (j && j.config) ? j.config : (j || {});
+      if (c && Object.keys(c).length) cfg = Object.assign(cfg, c);
+    }
+  } catch (e) { /* defaults */ }
+  document.getElementById('sw-sse').classList.toggle('on', cfg.sse_live_enabled !== false);
+  document.getElementById('sw-session').classList.toggle('on', cfg.session_timer_enabled !== false);
+  document.getElementById('num-minutes').value = cfg.session_timer_minutes || 30;
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('form').style.display = 'block';
+  updateNumInputDisabled();
+}
+
+async function saveToggles() {
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const minutes = parseInt(document.getElementById('num-minutes').value, 10);
+  if (!(minutes >= 5 && minutes <= 240)) {
+    toast('Session Duration phải 5–240 phút', 'err');
+    btn.disabled = false; btn.textContent = 'Save';
+    return;
+  }
+  const body = {
+    sse_live_enabled: document.getElementById('sw-sse').classList.contains('on'),
+    session_timer_enabled: document.getElementById('sw-session').classList.contains('on'),
+    session_timer_minutes: minutes,
+  };
+  try {
+    const r = await fetch('/api/v1/features/system_toggles/config', {
+      method: 'PUT',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: body }),
+    });
+    if (r.status === 403) { toast('Admin role required', 'err'); }
+    else if (!r.ok) { toast('Save failed: HTTP ' + r.status, 'err'); }
+    else {
+      toast('Saved ✓ — refresh other tabs to apply', 'ok');
+      cfg = body;
+    }
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+loadConfig();
+</script>
+</body>
+</html>
