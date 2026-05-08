@@ -41,7 +41,17 @@ func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/audit/verify
 func (h *Audit) Verify(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	result := audit.Verify(r.Context(), &auditStoreAdapter{db: h.DB}, claims.TenantID)
+	// Sprint 12.6: resolve tenant slug → UUID before passing to the
+	// audit chain walker. Pre-12.6 dev JWTs carrying tenant_id="default"
+	// (slug, not UUID) caused SQLSTATE 22P02 (invalid uuid syntax) and
+	// the verify reported ok=false with a parse error instead of an
+	// honest chain-integrity result.
+	tenantID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantID == "" {
+		jsonError(w, "tenant not found", http.StatusForbidden)
+		return
+	}
+	result := audit.Verify(r.Context(), &auditStoreAdapter{db: h.DB}, tenantID)
 	// Always return 200: the request itself succeeded — `ok:false` in body
 	// expresses the negative result. Returning 4xx for "valid request with
 	// negative outcome" makes generic FE fetch wrappers swallow the body and

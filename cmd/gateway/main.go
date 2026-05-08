@@ -736,11 +736,23 @@ func main() {
 	// Public Trust Center page (Sprint 9.B1). Anonymous, cached at
 	// the static layer; consumes anonymous /api/v1/status endpoint
 	// for live operational status.
+	//
+	// Serve both /trust and /trust/* — chimw.StripSlashes strips the
+	// trailing slash so /trust/ becomes /trust, and a redirect-back
+	// would create an infinite loop. Instead /trust serves index.html
+	// directly.
+	r.Get("/trust", func(w http.ResponseWriter, req *http.Request) {
+		http.ServeFile(w, req, "./static/trust/index.html")
+	})
 	r.Get("/trust/*", http.StripPrefix("/trust/",
 		http.FileServer(http.Dir("./static/trust/"))).ServeHTTP)
-	r.Get("/trust", func(w http.ResponseWriter, req *http.Request) {
-		http.Redirect(w, req, "/trust/", http.StatusMovedPermanently)
-	})
+
+	// Sprint 8.3 status endpoint — anonymous, top-level so
+	// external status-page consumers (Statuspage.io, Cachet,
+	// Atlassian Statuspage) can poll without credentials.
+	// Caching (30s Cache-Control) handled inside the handler.
+	publicStatusH := handler.NewStatusPublic(db)
+	r.Get("/api/v1/status", publicStatusH.Get)
 
 	// VSP own-SBOM (Sprint 10.5) — anonymous, cached 1h.
 	// Path convention matches OpenSSF Scorecard auto-discovery.
@@ -1768,9 +1780,11 @@ func main() {
 		r.Get("/api/v1/security/disclosures", discloseH.List)
 		r.Post("/api/v1/security/disclosures/{id}/transition", discloseH.Transition)
 
-		// Public status — anon, cached 30s
-		statusH := handler.NewStatusPublic(db)
-		r.Get("/api/v1/status", statusH.Get)
+		// Public status moved out of auth group — see line ~735 for
+		// the anonymous registration. Sprint 8.3 originally registered
+		// here by mistake which made external status-page consumers
+		// (Statuspage, Cachet) get 401 instead of the JSON they expect.
+		_ = handler.NewStatusPublic // keep symbol referenced
 
 		// Quarterly improvement metrics (DSOMM L4 trend evidence)
 		impH := handler.NewImprovement(db)

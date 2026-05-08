@@ -94,13 +94,17 @@ func mustClaimTenant(r *http.Request) string {
 // catches code paths that re-introduce a separate grader returning
 // stale labels (the pre-Sprint-7.2 bug).
 func (h *KPISanity) checkGradeUnification() sanityAssertion {
+	// Sprint 12.6: probe expectations updated to match Sprint 7.3
+	// sqrt-based scoring. {High:1} → score 92 → A+ (band ≥ 90),
+	// not A. Pre-12.6 the assertion expected "A" which made KPI
+	// sanity always 409 in healthy clusters.
 	probes := []scanner.Summary{
-		{},                         // expect A+
-		{High: 1},                  // expect A
-		{Critical: 1},              // expect F (hard-fail)
-		{HasSecrets: true},         // expect F (hard-fail)
+		{},                         // score 100 → A+
+		{High: 1},                  // 100 - 8 = 92 → A+
+		{Critical: 1},              // hard-fail dominates score → F
+		{HasSecrets: true},         // hard-fail dominates score → F
 	}
-	expected := []string{"A+", "A", "F", "F"}
+	expected := []string{"A+", "A+", "F", "F"}
 	for i, s := range probes {
 		got := gate.Posture(s)
 		if got != expected[i] {
