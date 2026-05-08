@@ -112,6 +112,47 @@ gate · Self-SBOM endpoint (`/sbom.cyclonedx.json`) · SSP auto-generator
 4. **Statuspage.io migration plan** 1-tuần timeline
 5. **Tabletop schedule** Q3-Q4 2026 (4 sessions)
 
+## Sprint 12 — Close 4 điểm yếu từ external review (2 items)
+
+External use-case review v1.0 (2026-05-08) flagged 4 weaknesses. Verify
+xong: **3/4 đã được fix từ Sprint 4-6**, chỉ còn 2 thật sự thiếu.
+Sprint 12 đẩy nốt 2 cái còn lại:
+
+| # | Điểm yếu báo cáo | Reality | Sprint |
+|---|------------------|---------|--------|
+| 1a | Stage Deploy: thiếu Helm | ✅ DONE — `deploy/helm/` | Sprint 6.6 |
+| 1b | K8s admission controller | 🆕 **NEW** — `deploy/admission/` | **Sprint 12** |
+| 2 | Stage Code: chưa có IDE plugin | 🆕 **NEW** — `ide/vscode-vsp/` | **Sprint 12** |
+| 3 | Stage Test: load test + chaos | ✅ DONE — `tests/load/k6_*.js` | Sprint 6.8 |
+| 4 | Cross-cutting: secrets ở env | ✅ DONE — `internal/secrets/` | Sprint 4.1+5.8 |
+
+### 12.1 K8s admission controller
+
+`deploy/admission/` với 2 lựa chọn engine:
+
+- **Kyverno** (4 ClusterPolicies) — declarative YAML, easier read
+- **OPA Gatekeeper** (ConstraintTemplate + Constraint) — Rego-based
+
+Enforces 8 controls: signed-images-only, non-root, read-only FS,
+drop-ALL-caps, RuntimeDefault seccomp, no host namespaces, resource
+limits required, Vault required trong prod namespaces.
+
+Maps to CIS K8s Benchmark 5.2.x + 5.7.x.
+
+### 12.2 VSCode IDE extension
+
+`ide/vscode-vsp/` — TypeScript scaffold ~330 LOC, stdlib HTTP only.
+
+4 commands (Scan workspace / Open findings / Open latest run / Sign in)
++ status-bar gate badge (PASS/WARN/FAIL + finding count) + scan-on-save
++ Diagnostic API integration (findings → Problems panel) + SecretStorage
+cho token.
+
+Build: `cd ide/vscode-vsp && npm install && npm run package` →
+`vsp-security-0.1.0.vsix` để publish lên Marketplace.
+
+**Sau Sprint 12: 0 điểm yếu còn lại trong external review v1.0.**
+
 \newpage
 
 # 3. DSOMM trajectory chi tiết

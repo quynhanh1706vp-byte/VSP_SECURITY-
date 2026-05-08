@@ -1,0 +1,90 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: vsppodsecurity
+  annotations:
+    description: |
+      Enforces VSP Pod Security Baseline matching the Kyverno
+      vsp-pod-security-baseline policy. Use when your cluster
+      already runs OPA Gatekeeper; otherwise prefer the Kyverno
+      flavour (deploy/admission/kyverno/02_pod_security.yaml).
+spec:
+  crd:
+    spec:
+      names:
+        kind: VSPPodSecurity
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowPrivileged:
+              type: boolean
+              default: false
+            requiredSeccompProfile:
+              type: string
+              default: RuntimeDefault
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package vsppodsecurity
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Pod"
+          c := input.review.object.spec.containers[_]
+          not c.securityContext.runAsNonRoot
+          msg := sprintf("container %q must set runAsNonRoot: true (CIS K8s 5.2.5)", [c.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Pod"
+          c := input.review.object.spec.containers[_]
+          c.securityContext.readOnlyRootFilesystem != true
+          msg := sprintf("container %q must set readOnlyRootFilesystem: true (CIS K8s 5.2.x)", [c.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Pod"
+          c := input.review.object.spec.containers[_]
+          not has_drop_all_capabilities(c)
+          msg := sprintf("container %q must drop ALL capabilities (CIS K8s 5.2.7)", [c.name])
+        }
+
+        has_drop_all_capabilities(c) {
+          drops := c.securityContext.capabilities.drop
+          some i
+          drops[i] == "ALL"
+        }
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Pod"
+          c := input.review.object.spec.containers[_]
+          c.securityContext.privileged == true
+          not input.parameters.allowPrivileged
+          msg := sprintf("container %q must not be privileged (CIS K8s 5.2.13)", [c.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Pod"
+          input.review.object.spec.hostNetwork == true
+          msg := "hostNetwork is forbidden (CIS K8s 5.2.3)"
+        }
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Pod"
+          input.review.object.spec.hostPID == true
+          msg := "hostPID is forbidden (CIS K8s 5.2.3)"
+        }
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Pod"
+          input.review.object.spec.hostIPC == true
+          msg := "hostIPC is forbidden (CIS K8s 5.2.3)"
+        }
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Pod"
+          required := input.parameters.requiredSeccompProfile
+          actual := input.review.object.spec.securityContext.seccompProfile.type
+          actual != required
+          msg := sprintf("seccompProfile.type must be %q, got %q (CIS K8s 5.7.2)", [required, actual])
+        }

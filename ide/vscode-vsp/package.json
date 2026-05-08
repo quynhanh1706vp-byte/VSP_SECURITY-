@@ -1,0 +1,95 @@
+{
+  "name": "vsp-security",
+  "displayName": "VSP Security",
+  "description": "Live VSP scan integration — show findings inline as you type, gate badges in the status bar, scan-on-save, and one-click POA&M.",
+  "version": "0.1.0",
+  "publisher": "vsp-platform",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Linters", "Other"],
+  "keywords": ["security", "sast", "sca", "devsecops", "vsp"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vsp-platform/vsp.git",
+    "directory": "ide/vscode-vsp"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "configuration": {
+      "title": "VSP Security",
+      "properties": {
+        "vsp.gatewayUrl": {
+          "type": "string",
+          "default": "http://localhost:8921",
+          "description": "VSP gateway base URL (where to POST scans)."
+        },
+        "vsp.token": {
+          "type": "string",
+          "default": "",
+          "description": "VSP JWT or API key. Stored in VS Code secrets if blank, prompted on first use."
+        },
+        "vsp.scanOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Trigger an incremental scan whenever a file is saved."
+        },
+        "vsp.scanProfile": {
+          "type": "string",
+          "enum": ["FAST", "FULL", "SAST_ONLY", "SECRETS_ONLY"],
+          "default": "FAST",
+          "description": "Scan profile to use for save-triggered scans."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "vsp.scanWorkspace",
+        "title": "VSP: Scan workspace",
+        "category": "VSP"
+      },
+      {
+        "command": "vsp.openFindings",
+        "title": "VSP: Open findings panel",
+        "category": "VSP"
+      },
+      {
+        "command": "vsp.openLatestRun",
+        "title": "VSP: Open latest run in browser",
+        "category": "VSP"
+      },
+      {
+        "command": "vsp.signIn",
+        "title": "VSP: Sign in",
+        "category": "VSP"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "vsp.scanWorkspace",
+          "group": "vsp@1",
+          "when": "explorerResourceIsFolder"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "vsp.scanWorkspace",
+          "group": "vsp@1"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

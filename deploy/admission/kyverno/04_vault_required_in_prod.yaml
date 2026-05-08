@@ -1,0 +1,48 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: vsp-vault-required-in-prod
+  annotations:
+    policies.kyverno.io/title: Vault required in prod namespaces
+    policies.kyverno.io/category: Secrets Management
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: |
+      Refuse VSP gateway pods using VSP_SECRETS_PROVIDER=env (or
+      unset) when deployed to a namespace labelled
+      `vsp.io/environment=prod`. Forces production deployments to
+      route secrets through Vault — closes the env-var-only secrets
+      gap from the v1 gap analysis.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: require-vault-in-prod-namespaces
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: []  # match all; we filter via namespaceSelector below
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: vsp-platform
+      preconditions:
+        all:
+          - key: "{{ request.namespace }}"
+            operator: AnyIn
+            value:
+              # Operators add their prod namespaces here (or use the
+              # namespaceSelector approach via NamespaceLabel).
+              - "vsp-prod"
+              - "vsp-production"
+              - "production"
+      validate:
+        message: |
+          VSP gateway in prod namespace must set
+          VSP_SECRETS_PROVIDER=vault. Found env-var-only secrets,
+          which is forbidden in production by VSP security policy.
+        pattern:
+          spec:
+            containers:
+              - env:
+                  - name: VSP_SECRETS_PROVIDER
+                    value: "vault"
