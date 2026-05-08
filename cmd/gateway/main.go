@@ -733,6 +733,15 @@ func main() {
 	r.Get("/.well-known/*", http.StripPrefix("/.well-known/",
 		http.FileServer(http.Dir("./static/.well-known/"))).ServeHTTP)
 
+	// Public Trust Center page (Sprint 9.B1). Anonymous, cached at
+	// the static layer; consumes anonymous /api/v1/status endpoint
+	// for live operational status.
+	r.Get("/trust/*", http.StripPrefix("/trust/",
+		http.FileServer(http.Dir("./static/trust/"))).ServeHTTP)
+	r.Get("/trust", func(w http.ResponseWriter, req *http.Request) {
+		http.Redirect(w, req, "/trust/", http.StatusMovedPermanently)
+	})
+
 	// Serve panel HTML/JS assets. CSP is set by vspMW.CSPNonce middleware,
 	// which applies PanelCSP() for panel paths. Do NOT override CSP here.
 	// Phase 2 (docs/CSP_HARDENING_ROADMAP.md) will migrate panels to the
@@ -1714,6 +1723,28 @@ func main() {
 		// poll this endpoint and treat HTTP 409 as a release blocker.
 		kpiH := handler.NewKPISanity(db)
 		r.Get("/api/v1/kpi/sanity", kpiH.Get)
+
+		// Sprint 9 — Recognition uplift ────────────────────────────────
+		// CISA SSDF self-attestation form auto-generator + executive sign
+		ssdfH := handler.NewSSDFAttest(db)
+		r.Get("/api/v1/cisa-attestation/ssdf/draft", ssdfH.Draft)
+		r.Post("/api/v1/cisa-attestation/ssdf/{id}/sign", ssdfH.Sign)
+
+		// NIST CSF 2.0 organisational profile
+		csfH := handler.NewNISTCSF(db)
+		r.Get("/api/v1/nist-csf/profile", csfH.Profile)
+
+		// SOC 2 + ISO 27001 readiness mappings
+		recH := handler.NewRecognition(db)
+		r.Get("/api/v1/recognition/soc2-readiness", recH.SOC2Readiness)
+		r.Get("/api/v1/recognition/iso27001-mapping", recH.ISO27001Mapping)
+
+		// Annual / semi-annual transparency report (anon-readable)
+		trH := handler.NewTransparency(db)
+		r.Get("/api/v1/transparency/report", trH.Report)
+
+		// Sigstore Rekor public attestation publish (admin only)
+		r.Post("/api/v1/runs/{rid}/provenance/publish-rekor", handleRekorPublish)
 
 		// Sprint 8 — 4.0 attainability scaffolding ────────────────────
 		// VDP intake (anonymous POST, admin GET/transition)

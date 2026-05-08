@@ -136,7 +136,7 @@ Auditors reading this doc can click through to actual code. That's the point.
 | PW.5.1 | Comply with secure coding practices | Go standard + golangci-lint 18 | ✅ |
 | PW.5.2 | Peer review of code | 2-person review for security paths (CONTRIBUTING.md) | 🟡 (policy set; solo-dev enforces via pre-commit + self-review for now) |
 | PW.6.1 | Configure compilation/build for security | `-trimpath`, `-ldflags="-w -s"`, CGO sanity check in Dockerfile | ✅ |
-| PW.7.1 | Review and/or analyze code | **19 scanner integrations**: 5 SAST (gosec, semgrep, bandit, codeql, hadolint), 3 SCA (trivy, grype, license), 2 IaC (checkov, kics), 2 DAST (nuclei, nikto), 2 secrets (gitleaks, secretcheck), 3 network (nmap, sslscan, netcap) | ✅ |
+| PW.7.1 | Review and/or analyze code | **26 scanner integrations** (verified 2026-05-08): 5 SAST (gosec, semgrep, bandit, codeql, hadolint), 7 SCA (trivy, grype, syft, license, govulncheck, osvscanner, retirejs), 2 IaC (checkov, kics), 3 DAST (nuclei, nikto, apisec), 3 secrets (gitleaks, secretcheck, trufflehog), 3 network (nmap, sslscan, netcap), 1 supply chain (cosign), 2 fuzz/runtime (gofuzz, racedetect) | ✅ |
 | PW.7.2 | Dynamic analysis | Nuclei DAST in CI | ✅ |
 | PW.8.1 | Test executables | Integration tests with real Postgres/Redis in CI | ✅ |
 | PW.8.2 | Perform negative testing | Table-driven tests with failure cases | 🟡 (not standardized) |
@@ -167,7 +167,7 @@ See **DSOMM_ASSESSMENT.md** for full self-assessment. Summary:
 | Build & Deploy | 2.6/4 | 154 scripts debt; Deployment at L4 (attestation + SBOM) |
 | Culture & Org | 3.0/4 | Docs complete post PR #25 |
 | Implementation | 3.45/4 | 254 endpoints, RASP in prod, ECDSA attestation, ZT |
-| Test & Verification | 3.5/4 | 19 scanner integrations, Supply Chain at L4 |
+| Test & Verification | 3.5/4 | 26 scanner integrations, Supply Chain at L4 |
 | **Overall** | **3.14/4** | Target 3.7 Q2 2026 |
 
 ---

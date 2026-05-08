@@ -19,7 +19,7 @@ across 4 categories, each rated 1-4.
 
 | Category | Average Level | Evidence |
 |----------|--------------:|----------|
-| Test & Verification | **3.5 / 4** | 19 scanner integrations (not 12), SLSA L2-ready |
+| Test & Verification | **3.5 / 4** | 26 scanner integrations (verified 2026-05-08), SLSA L3-ready |
 | Implementation | **3.5 / 4** | 254 endpoints, ZT RASP in prod, ECDSA attestation |
 | Culture & Organization | **3.2 / 4** | PR #25 docs burst closes gap |
 | Build & Deploy | **2.6 / 4** | Deployment at L4 (attestation+SBOM), hygiene debt remains |
@@ -263,7 +263,7 @@ automation.
 ### 4.1 Static Application Test (SAST) — **3.5 / 4** (was 2.5 pre-Sprint 3.5)
 
 **Evidence:**
-- ✅ **19 scanner integrations** in internal/scanner/ (gosec, semgrep, bandit, codeql, trivy, grype, hadolint, checkov, kics, nuclei, nikto, gitleaks, secretcheck, nmap, sslscan, netcap, plus license, enrich, runner orchestration)
+- ✅ **26 scanner integrations** in internal/scanner/ (verified 2026-05-08): gosec, semgrep, bandit, codeql, hadolint (SAST); trivy, grype, syft, license, govulncheck, osvscanner, retirejs (SCA); checkov, kics (IaC); nuclei, nikto, apisec (DAST); gitleaks, secretcheck, trufflehog (secrets); nmap, sslscan, netcap (network); cosign (supply chain); gofuzz, racedetect (fuzz/runtime)
 - ✅ 18 linters active via golangci-lint v2 (`gosec`, `bodyclose`,
   `sqlclosecheck`, `rowserrcheck`, `noctx`, `contextcheck`, `errorlint`,
   `nilerr`, `wastedassign`, `exhaustive`, `gocritic`, `misspell`, `unconvert`,
@@ -337,7 +337,7 @@ would require hermetic builds and provenance generation.
 - ⚠️ Findings from gosec, Trivy, Nuclei, Dependabot are in 4 different
   GitHub UI views — correlation manual
 
-**Revised assessment:** VSP itself IS the consolidation layer. The P4 module aggregates findings across 19 scanners into unified OSCAL-formatted Assessment Results (`/api/p4/oscal/assessment-results`). The SIEM correlator cross-references findings from multiple tools. This is what Consolidation Level 3 asks for.
+**Revised assessment:** VSP itself IS the consolidation layer. The P4 module aggregates findings across 26 scanners into unified OSCAL-formatted Assessment Results (`/api/p4/oscal/assessment-results`). The SIEM correlator cross-references findings from multiple tools. This is what Consolidation Level 3 asks for.
 
 **Gap to Level 4:** Publish unified dashboard externally (Grafana/embed).
 
@@ -357,7 +357,7 @@ would require hermetic builds and provenance generation.
 
 **Revision reason:** Original assessment completed before full code inventory.
 After cross-checking against `cmd/gateway/main.go` (254 endpoints),
-`internal/scanner/` (19 tools), and P4 compliance module (40+ endpoints),
+`internal/scanner/` (26 tools), and P4 compliance module (40+ endpoints),
 all four categories revised upward. See `docs/FEATURE_INVENTORY.md`.
 
 **Position on DSOMM scale:**
