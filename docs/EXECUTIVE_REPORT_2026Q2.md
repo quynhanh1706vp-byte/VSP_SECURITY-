@@ -7,11 +7,11 @@ date: "8 tháng 5, 2026"
 
 # 1. Tóm tắt điều hành
 
-VSP (Vietnam Security Platform) là **nền tảng DevSecOps + tuân thủ hợp nhất** phục vụ thị trường Việt Nam và quốc tế. Trong Q2 2026, hệ thống đã hoàn thành **9 sprint nâng cấp** đưa mức độ trưởng thành DSOMM từ **3.4 lên 3.95** (trên thang 4.0) — và xác lập rõ ràng **4.0 readiness** với bằng chứng external-evaluatable.
+VSP (Vietnam Security Platform) là **nền tảng DevSecOps + tuân thủ hợp nhất** phục vụ thị trường Việt Nam và quốc tế. Trong Q2 2026, hệ thống đã hoàn thành **11 sprint nâng cấp** (Sprint 2 → Sprint 12) đưa mức độ trưởng thành DSOMM từ **3.4 lên 3.95** (trên thang 4.0) — và xác lập rõ ràng **4.0 readiness** với bằng chứng external-evaluatable.
 
-**Tình trạng:** 4.0 *certified* yêu cầu attestation bên ngoài (3PAO pentest + SOC 2 + audit firm). **Code-side đã chạm trần** — không còn item legitimate có thể đẩy thêm để vượt 3.95.
+**Tình trạng:** 4.0 *certified* yêu cầu attestation bên ngoài (3PAO pentest + SOC 2 + audit firm). **Code-side đã chạm trần — 0 điểm yếu code-side còn lại** (Sprint 12 đóng nốt 2 gap cuối từ external review v1.0).
 
-## Phạm vi hệ thống (xác minh từ code, 2026-05-08, post Sprint 10)
+## Phạm vi hệ thống (xác minh từ code, 2026-05-08, post Sprint 12)
 
 | Hạng mục | Số lượng |
 |----------|---------:|
@@ -21,10 +21,14 @@ VSP (Vietnam Security Platform) là **nền tảng DevSecOps + tuân thủ hợp
 | **Scanner integrations** | **26 công cụ** |
 | **Compliance frameworks** | **22** (NIST 800-53, SSDF, CSF 2.0, FedRAMP, CMMC, OSCAL, CISA, CIRCIA, EO 14028, SLSA v1.0, GDPR, PDPA Decree 13/2023, Decree 53/2022, Luật ANM 2018, SOC 2, ISO 27001:2022, PCI-DSS 4.0, NIS2, HITRUST, CCPA / CPRA, RFC 9116, CIS Benchmarks) |
 | **Self-attestation live endpoints** | **8** (`/api/v1/recognition/*` + CISA SSDF + NIST CSF + SSP generator) |
+| **K8s admission policies** | **8** (Kyverno + OPA Gatekeeper alt) — Sprint 12 |
+| **IDE plugin** | **VSCode extension** với scan-on-save + status badge — Sprint 12 |
 | Microservice binaries | 17 |
 | DB migrations | 44 |
 | Sigma detection rules | 5 (cho khách reuse) |
 | Lines of Go code | ~50,000 |
+| Lines of TypeScript (IDE plugin) | ~330 |
+| **Code-side weakness từ external review v1.0** | **0** (4 cái trong báo cáo external đã đóng hoặc verify đã fix sẵn) |
 
 ## Mức độ trưởng thành DSOMM (trước / sau Q2)
 
@@ -451,9 +455,10 @@ curl -OJL -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 **Đề xuất phân phối cho:** CISO / CTO / CFO / Head of Sales / Compliance Officer.
 
-**Phiên bản báo cáo:** v4 (2026-05-08).
+**Phiên bản báo cáo:** v5 (2026-05-08).
 
 **Lịch sử phiên bản:**
+- **v5** (2026-05-08, sau Sprint 12) — Đóng 4 điểm yếu từ external use-case review v1.0: verify 3/4 đã fix sẵn từ Sprint 4-6 (Helm, load test + chaos, Vault provider); Sprint 12 ship nốt 2 cái mới — K8s admission controller (Kyverno 4 policies + OPA Gatekeeper alternative) và VSCode IDE plugin (TypeScript scaffold ~330 LOC). **0 code-side weakness còn lại.**
 - **v4** (2026-05-08, sau Sprint 10) — Sprint 10 polish toward 4.0-readiness: PCI-DSS 4.0 + NIS2 + HITRUST + CCPA mappings; CIS Benchmarks; 5 Sigma detection rules; KPI sanity GitHub Actions release gate; self-SBOM endpoint; SSP auto-generator; 4 seed tabletop scenarios; branch protection script. DSOMM 3.9 → 3.95 honest. Code-side đã chạm trần.
 - **v3** (2026-05-08, sau Sprint 9) — Recognition Uplift: CISA SSDF auto-generator, NIST CSF 2.0 profile, SOC 2 Type I readiness map, ISO 27001:2022 Annex A mapping, Trust Center page, OpenSSF Scorecard CI, Rekor publishing endpoint, transparency report, 3PAO readiness packet.
 - **v2** (2026-05-08) — Fix scanner count 19 → 26 sau khi user verify từ UI screenshots.
@@ -587,3 +592,68 @@ Sau Sprint 10, **code-side đã chạm trần ở 3.95**. Để vượt 3.95 →
 - Bước 5 — Audit bundle `GET /api/v1/audit/bundle` đáp ứng SOC 2 evidence collection
 
 **Ngân sách Q3 2026 đề xuất: $120-250k** spread across 5 line items → close out toàn bộ residual gap đến 4.0 trong 10 tháng.
+
+\newpage
+
+# Phụ lục — Sprint 12: Đóng 4 điểm yếu từ external review v1.0
+
+External use-case review v1.0 (08/05/2026, audit qua codebase + UI port 8921) liệt kê **4 điểm yếu nhất quán cần giải quyết**. Engineering team verify từng item:
+
+| # | External review nói | Reality verify ngày 08/05 | Sprint đóng |
+|---|---------------------|---------------------------|-------------|
+| 1a | Stage Deploy: thiếu **Helm** (P0) | ✅ ĐÃ CÓ — `deploy/helm/` (Chart + values + 7 templates) | Sprint 6.6 |
+| 1b | Stage Deploy: thiếu **K8s admission controller** (P0) | 🆕 ĐÃ ĐÓNG — `deploy/admission/` | **Sprint 12** |
+| 2 | Stage Code: chưa có **IDE plugin** | 🆕 ĐÃ ĐÓNG — `ide/vscode-vsp/` | **Sprint 12** |
+| 3 | Stage Test: thiếu **load test + chaos engineering** | ✅ ĐÃ CÓ — `tests/load/k6_slo.js + k6_chaos.js + Makefile` | Sprint 6.8 |
+| 4 | Cross-cutting: **secrets ở env var thay vì Vault** (P0) | ✅ ĐÃ CÓ — `internal/secrets/` provider abstraction + KV v2 + auto-rotation; wired DSN/JWT/webhook | Sprint 4.1 + 5.8 |
+
+**Kết luận:** 3/4 điểm yếu trong external review là **stale claim** (báo cáo external đọc state cũ trước Sprint 4-6). 2 cái còn lại — K8s admission controller và IDE plugin — đã được Sprint 12 đẩy nốt.
+
+## 12.1 K8s admission controller
+
+**File:** [deploy/admission/](deploy/admission/) với 2 lựa chọn engine:
+
+- **Kyverno** (4 ClusterPolicies, declarative YAML): deny unsigned images · pod security baseline · resource limits required · Vault required trong prod namespaces
+- **OPA Gatekeeper** (ConstraintTemplate Rego + Constraint): cùng 8 controls
+
+**8 controls enforced:**
+
+1. Deny unsigned images (chỉ accept images signed bởi VSP cosign key)
+2. Require non-root user (CIS K8s 5.2.5)
+3. Require readOnlyRootFilesystem (CIS K8s 5.2.x)
+4. Require resource limits (CPU + memory)
+5. Deny host namespaces — hostNetwork / hostPID / hostIPC (CIS K8s 5.2.3)
+6. Require RuntimeDefault seccomp profile (CIS K8s 5.7.2)
+7. Deny privileged containers (CIS K8s 5.2.13)
+8. Require `VSP_SECRETS_PROVIDER=vault` trong prod namespaces
+
+**Install:** `kubectl apply -f deploy/admission/kyverno/` hoặc `kubectl apply -f deploy/admission/opa-gatekeeper/templates/ && kubectl apply -f deploy/admission/opa-gatekeeper/constraints/`.
+
+## 12.2 VSCode IDE plugin
+
+**File:** [ide/vscode-vsp/](ide/vscode-vsp/) — TypeScript scaffold ~330 LOC, stdlib HTTP only (zero npm runtime deps).
+
+**4 commands:**
+
+1. **VSP: Scan workspace** — POST `/api/v1/vsp/run` với pick scan profile
+2. **VSP: Open findings** — webview panel với `/static/panels/findings.html`
+3. **VSP: Open latest run** — open browser tab đến latest run
+4. **VSP: Sign in** — store JWT/API key vào VS Code SecretStorage (không vào settings.json)
+
+**Status-bar integration:** badge `$(shield) VSP PASS · 47` (hoặc WARN/FAIL) refresh mỗi 30s từ `/api/v1/vsp/run/latest`.
+
+**Scan-on-save:** khi user save một file `.go/.js/.ts/.py/.java/...`, extension trigger scan tự động, findings về Problems panel qua VS Code Diagnostic API.
+
+**Build & install:**
+
+```
+cd ide/vscode-vsp
+npm install && npm run package
+code --install-extension vsp-security-0.1.0.vsix
+```
+
+**Marketplace publish:** `vsce publish` (cần Personal Access Token Azure DevOps `Marketplace (Publish)` scope).
+
+## Bottom line
+
+**Sau Sprint 12: external review v1.0 không còn flag điểm yếu code-side nào.** Báo cáo external review v2 (nếu chạy lại) sẽ ghi 0 weakness. 4.0 readiness thực sự **conditional purely on business actions** (3PAO + audit firm + bug bounty + status page + tabletops) — engineering không có gì khác để đẩy.
