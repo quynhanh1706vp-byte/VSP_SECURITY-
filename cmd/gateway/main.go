@@ -376,6 +376,27 @@ func main() {
 		IPLock:     auth.NewIPLockout(),
 	}
 	handler.SetJWTSecret(jwtSecret)
+	// L5 fix: SSE subscribers must scope by tenant UUID, not slug. Wire
+	// a slug→UUID resolver so JWT claims (which carry "default") match
+	// broadcast messages (which carry the UUID). Inline lookup here —
+	// resolveTenantUUID lives in package handler so we replicate the
+	// 1-line query rather than exporting it.
+	handler.SetSSETenantResolver(func(claim string) string {
+		if claim == "" {
+			return ""
+		}
+		// Heuristic: 36-char hyphenated string is already a UUID.
+		if len(claim) == 36 && strings.Count(claim, "-") == 4 {
+			return claim
+		}
+		var id string
+		_ = db.Pool().QueryRow(context.Background(),
+			`SELECT id::text FROM tenants WHERE slug=$1 LIMIT 1`, claim).Scan(&id)
+		if id == "" {
+			return claim
+		}
+		return id
+	})
 	usersH := &handler.Users{DB: db}
 	mfaH := &handler.MFA{DB: db}
 	apiKeysH := &handler.APIKeys{DB: db}

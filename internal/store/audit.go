@@ -25,31 +25,82 @@ type AuditEntry struct {
 }
 
 func (db *DB) InsertAudit(ctx context.Context, p AuditWriteParams) (int64, string, error) {
+	// L5 2026-05-09: this used to be a naive INSERT-then-UPDATE pattern
+	// that briefly wrote hash='pending' between statements. Any concurrent
+	// caller that entered InsertAudit during that window would call
+	// GetLastAuditHash and read 'pending' as the previous tip — when its
+	// own UPDATE then committed, the chain was broken (verify reports
+	// "prev_hash mismatch at seq N"). Real prod break observed at seq 1932.
+	//
+	// Fix: serialize per-tenant via pg_advisory_xact_lock. The lock is
+	// scoped to the transaction, auto-released on commit/rollback, and
+	// gives us atomic "read tip → insert chained row → write final hash"
+	// semantics without a schema change. Per-tenant key keeps cross-
+	// tenant writes parallel.
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return 0, "", fmt.Errorf("audit tx begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// Use the high 32 bits of an md5 over tenant_id as the lock key.
+	// hashtext() is built into Postgres and good enough — the key only
+	// has to be stable per tenant; collisions just mean two tenants
+	// briefly serialize, not a correctness issue.
+	if _, err = tx.Exec(ctx,
+		`SELECT pg_advisory_xact_lock(hashtext('vsp_audit_chain_'||$1)::bigint)`,
+		p.TenantID); err != nil {
+		return 0, "", fmt.Errorf("audit advisory lock: %w", err)
+	}
+
+	// Re-read the tip INSIDE the lock so the prev_hash we chain off is
+	// guaranteed to be the finalized hash of the previous row.
+	var tipHash string
+	err = tx.QueryRow(ctx,
+		`SELECT COALESCE(hash,'') FROM audit_log
+		 WHERE tenant_id=$1 ORDER BY seq DESC LIMIT 1`,
+		p.TenantID).Scan(&tipHash)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return 0, "", fmt.Errorf("audit re-read tip: %w", err)
+	}
+	// Caller passed a hint; trust the in-tx read over it.
+	prevHash := tipHash
+
 	var seq int64
-	err := db.pool.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`INSERT INTO audit_log (tenant_id, user_id, action, resource, ip, payload, hash, prev_hash)
 		 VALUES ($1,$2,$3,$4,$5,$6,'pending',$7)
 		 RETURNING seq`,
-		p.TenantID, p.UserID, p.Action, p.Resource, p.IP, p.Payload, p.PrevHash,
+		p.TenantID, p.UserID, p.Action, p.Resource, p.IP, p.Payload, prevHash,
 	).Scan(&seq)
 	if err != nil {
 		return 0, "", fmt.Errorf("insert audit: %w", err)
 	}
 	h := audit.Hash(audit.Entry{
 		Seq: seq, TenantID: p.TenantID,
-		Action: p.Action, Resource: p.Resource, PrevHash: p.PrevHash,
+		Action: p.Action, Resource: p.Resource, PrevHash: prevHash,
 	})
-	if _, err = db.pool.Exec(ctx,
+	if _, err = tx.Exec(ctx,
 		`UPDATE audit_log SET hash=$1 WHERE seq=$2`, h, seq); err != nil {
 		return seq, h, fmt.Errorf("update audit hash: %w", err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return seq, h, fmt.Errorf("audit tx commit: %w", err)
 	}
 	return seq, h, nil
 }
 
 func (db *DB) GetLastAuditHash(ctx context.Context, tenantID string) (string, error) {
 	var hash string
+	// L5 2026-05-09 defense in depth: skip 'pending' rows (a transient
+	// state another writer is mid-finalising). The advisory-lock fix in
+	// InsertAudit makes this filter mostly redundant, but callers that
+	// pre-read prev_hash before InsertAudit (e.g. handlers that compute
+	// the hash themselves for Entry.StoredHash) still benefit.
 	err := db.pool.QueryRow(ctx,
-		`SELECT hash FROM audit_log WHERE tenant_id=$1 ORDER BY seq DESC LIMIT 1`,
+		`SELECT hash FROM audit_log
+		   WHERE tenant_id=$1 AND hash <> 'pending'
+		   ORDER BY seq DESC LIMIT 1`,
 		tenantID).Scan(&hash)
 	if err != nil {
 		// First audit entry for this tenant — no rows is expected, not
