@@ -3051,6 +3051,10 @@ function connectSSE() {
   }
   const url = '/api/v1/events';
   const source = new EventSource(url, { withCredentials: true });
+  // Sprint 12.5: expose for hot-reload — sister tab toggle save fires
+  // a 'storage' event; the listener uses this handle to close the
+  // stream when SSE is toggled off without requiring page reload.
+  window._vspSseSource = source;
   source.onopen = () => {
     document.getElementById('sse-dot').className = 'sse-dot sse-live';
     document.getElementById('sse-label').textContent = 'SSE live';
@@ -3159,6 +3163,43 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) { /* defaults preserved */ }
       connectSSE();
     })();
+
+    // Sprint 12.5: hot-reload toggles when sister tab saves them.
+    // The system_toggles.html page writes to localStorage on Save;
+    // every other open VSP tab gets a 'storage' event and reapplies
+    // without page refresh. SSE: open or close the EventSource.
+    // Session timer: hide widget + reload page (timer IIFE only
+    // runs once at boot, simplest is to reload — at least the
+    // dashboard tab does it gracefully).
+    window.addEventListener('storage', function(ev) {
+      if (ev.key !== 'vsp:toggles:applied' || !ev.newValue) return;
+      var newCfg = {};
+      try { newCfg = JSON.parse(ev.newValue).config || {}; } catch (e) { return; }
+      window.VSP_TOGGLES = newCfg;
+
+      // SSE: was on → if now off, close stream + hide badge.
+      // Was off → if now on, reload to (re)open the stream cleanly.
+      var sseWasOn = !!window._vspSseSource;
+      var sseShouldBe = newCfg.sse_live_enabled !== false;
+      if (sseWasOn && !sseShouldBe) {
+        try { window._vspSseSource.close(); } catch (e) {}
+        var badge = document.querySelector('.live-badge');
+        if (badge) badge.style.display = 'none';
+        var lbl = document.getElementById('sse-label'); if (lbl) lbl.textContent = 'SSE off';
+      } else if (!sseWasOn && sseShouldBe) {
+        location.reload();
+        return;
+      }
+
+      // Session timer: simplest correct behaviour is reload (the
+      // IIFE at bottom only runs once). UX cost is one Ctrl+R every
+      // toggle change which is acceptable.
+      if (typeof showToast === 'function') {
+        showToast('System toggles updated — reloading…', 'success');
+      }
+      setTimeout(function() { location.reload(); }, 800);
+    });
+
     if (window.TOKEN) {
       // Validate JWT chưa expired trước khi gọi
       try {

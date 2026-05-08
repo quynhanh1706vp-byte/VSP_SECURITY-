@@ -200,7 +200,16 @@ async function saveToggles() {
     if (r.status === 403) { toast('Admin role required', 'err'); }
     else if (!r.ok) { toast('Save failed: HTTP ' + r.status, 'err'); }
     else {
-      toast('Saved ✓ — refresh other tabs to apply', 'ok');
+      // Hot-reload sister tabs: write to localStorage so other open
+      // VSP tabs receive a 'storage' event and can apply toggles
+      // without manual refresh. The sister-tab handler in index.html
+      // listens for key='vsp:toggles:applied' and reapplies SSE +
+      // session timer state.
+      try {
+        localStorage.setItem('vsp:toggles:applied',
+          JSON.stringify({ ts: Date.now(), config: body }));
+      } catch (e) { /* private mode etc — ignore */ }
+      toast('Saved ✓ — sister tabs auto-applied', 'ok');
       cfg = body;
     }
   } catch (e) {
