@@ -198,7 +198,16 @@ async function saveToggles() {
       body: JSON.stringify({ config: body }),
     });
     if (r.status === 403) { toast('Admin role required', 'err'); }
-    else if (!r.ok) { toast('Save failed: HTTP ' + r.status, 'err'); }
+    else if (!r.ok) {
+      // Pull the server's actual error message so the user / dev
+      // doesn't have to dig in DevTools. HTTP 400 alone is unhelpful;
+      // common cases: "unknown feature_id" (gateway not rebuilt after
+      // migration 045), "config must be a JSON object", "config too
+      // large (max 64KB)".
+      var detail = '';
+      try { const j = await r.json(); detail = j && (j.error || j.message) || ''; } catch (e) {}
+      toast('Save failed: HTTP ' + r.status + (detail ? ' — ' + detail : ''), 'err');
+    }
     else {
       // Hot-reload sister tabs: write to localStorage so other open
       // VSP tabs receive a 'storage' event and can apply toggles
