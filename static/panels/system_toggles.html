@@ -132,7 +132,7 @@
     <strong>Storage:</strong> Per-tenant trong <code>feature_config</code> table với
     <code>feature_id='system_toggles'</code>. JSON shape:
     <code>{sse_live_enabled, session_timer_enabled, session_timer_minutes}</code>.<br>
-    <strong>Audit:</strong> Mỗi save ghi <code>FEATURE_CONFIG_UPDATED</code> vào audit_log.<br>
+    <strong>Audit:</strong> Mỗi save ghi <code>CONFIG_UPDATE:system_toggles</code> vào audit_log.<br>
     <strong>Defaults:</strong> Mặc định all-on, 30 phút khi row chưa tồn tại.
   </div>
 </div>
