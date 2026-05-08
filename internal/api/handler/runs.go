@@ -76,17 +76,11 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		now.Format("20060102_150405"),
 		now.UnixNano()&0xFFFFFFFF)
 
-	// Tools total depends on mode
-	toolsTotal := map[string]int{
-		"SAST":     4,  // bandit + semgrep + codeql + gosec
-		"SCA":      3,  // grype + trivy + license
-		"SECRETS":  3,  // gitleaks + secretcheck + trufflehog
-		"IAC":      2,  // kics + checkov
-		"DAST":     3,  // nikto + nuclei + sslscan (nmap moved to NETWORK)
-		"NETWORK":  3,  // sslscan + nmap + netcap
-		"FULL":     17, // 16 base + nmap (+netcap when engine live = 18)
-		"FULL_SOC": 18, // FULL + netcap packet inspection
-	}[req.Mode]
+	// tools_total drives the FE progress bar and must equal the actual number
+	// of tools the worker will dispatch — which is owned by
+	// pipeline.ToolNamesForMode. Prior to 2026-05-07 we had a hand-maintained
+	// map here that drifted (e.g. FULL=17 vs real 26 → progress >100%).
+	toolsTotal := len(pipeline.ToolNamesForMode(pipeline.Mode(req.Mode)))
 	if toolsTotal == 0 {
 		toolsTotal = 3
 	}
@@ -164,7 +158,15 @@ func (h *Runs) List(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 20)
 	offset := queryInt(r, "offset", 0)
 
-	runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, limit, offset)
+	// L4-B 2026-05-08: dev-mint tokens carry slug "default"; ListRuns
+	// queries a UUID column. Without resolution the call returns 0
+	// rows silently (no error, no leak — but UI shows empty).
+	tenantUUID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
+
+	runs, err := h.DB.ListRuns(r.Context(), tenantUUID, limit, offset)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
@@ -187,7 +189,11 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 		limit = 500
 	}
 	offset := queryInt(r, "offset", 0)
-	runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, limit, offset)
+	tenantUUID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
+	runs, err := h.DB.ListRuns(r.Context(), tenantUUID, limit, offset)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
