@@ -742,6 +742,12 @@ func main() {
 		http.Redirect(w, req, "/trust/", http.StatusMovedPermanently)
 	})
 
+	// VSP own-SBOM (Sprint 10.5) — anonymous, cached 1h.
+	// Path convention matches OpenSSF Scorecard auto-discovery.
+	selfSBOMH := handler.NewSelfSBOM()
+	r.Get("/sbom.cyclonedx.json", selfSBOMH.CycloneDX)
+	r.Get("/sbom.spdx.json", selfSBOMH.SPDX)
+
 	// Serve panel HTML/JS assets. CSP is set by vspMW.CSPNonce middleware,
 	// which applies PanelCSP() for panel paths. Do NOT override CSP here.
 	// Phase 2 (docs/CSP_HARDENING_ROADMAP.md) will migrate panels to the
@@ -1745,6 +1751,15 @@ func main() {
 
 		// Sigstore Rekor public attestation publish (admin only)
 		r.Post("/api/v1/runs/{rid}/provenance/publish-rekor", handleRekorPublish)
+
+		// Sprint 10 — additional framework mappings + SSP generator
+		r.Get("/api/v1/recognition/pci-dss-mapping", recH.PCIDSSMapping)
+		r.Get("/api/v1/recognition/nis2-mapping", recH.NIS2Mapping)
+		r.Get("/api/v1/recognition/hitrust-mapping", recH.HITRUSTMapping)
+		r.Get("/api/v1/recognition/ccpa-mapping", recH.CCPAMapping)
+
+		sspH := handler.NewSSPGenerator(db)
+		r.Get("/api/v1/compliance/ssp.md", sspH.Markdown)
 
 		// Sprint 8 — 4.0 attainability scaffolding ────────────────────
 		// VDP intake (anonymous POST, admin GET/transition)
