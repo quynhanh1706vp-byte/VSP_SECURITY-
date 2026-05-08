@@ -2022,8 +2022,22 @@ func main() {
 				absFile, ferr = filepath.Abs(filepath.Join(absRepo, path))
 			}
 			var beforeLines, currLines, afterLines []string
-			// Security: ensure resolved path is within repoRoot OR within /tmp (for IaC test paths)
-			pathOK := ferr == nil && (strings.HasPrefix(absFile, absRepo) || strings.HasPrefix(absFile, "/tmp/"))
+			// Security: resolved path must be INSIDE absRepo (or /tmp/).
+			//
+			// L6-C 2026-05-09: gosec G703 caught a HasPrefix bug here.
+			// HasPrefix("/repo-other/secret", "/repo") returns true if
+			// absRepo lacks a trailing separator — a tenant who can plant
+			// a finding with path="../sibling/.." escapes the workspace.
+			// Fix: require absRepo to end in os.PathSeparator before the
+			// prefix check; or use filepath.Rel and reject paths starting
+			// with "..".
+			repoBoundary := absRepo
+			if !strings.HasSuffix(repoBoundary, string(os.PathSeparator)) {
+				repoBoundary += string(os.PathSeparator)
+			}
+			pathOK := ferr == nil && (absFile == absRepo ||
+				strings.HasPrefix(absFile, repoBoundary) ||
+				strings.HasPrefix(absFile, "/tmp/"))
 			if pathOK {
 				if data, rerr := os.ReadFile(absFile); rerr == nil && len(data) < 5*1024*1024 {
 					lines := strings.Split(string(data), "\n")
