@@ -247,3 +247,9 @@ reports/
 patches/findings/**/*.bak
 patches/findings/**/*.bak.*
 patches/findings/**/*.tmp
+
+# L28 2026-05-09: defense-in-depth — block any future secrets/ dir
+secrets/
+secrets.yaml
+secrets.yml
+*.key

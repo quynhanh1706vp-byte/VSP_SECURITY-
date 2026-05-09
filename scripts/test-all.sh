@@ -145,6 +145,10 @@ run_level "L23 trust-boundary"  "$ROOT/scripts/test-l23-trust-boundary.sh"
 run_level "L24 input-validation" "$ROOT/scripts/test-l24-input-validation.sh"
 run_level "L25 race-toctou"     "$ROOT/scripts/test-l25-race-toctou.sh"
 run_level "L26 resource-cleanup" "$ROOT/scripts/test-l26-resource-cleanup.sh"
+run_level "L27 observability"   "$ROOT/scripts/test-l27-observability.sh"
+run_level "L28 secrets"         "$ROOT/scripts/test-l28-secrets.sh"
+run_level "L29 time-correctness" "$ROOT/scripts/test-l29-time-correctness.sh"
+run_level "L30 container-deploy" "$ROOT/scripts/test-l30-container-deploy.sh"
 
 # L12 chaos and L14 perf are gated — they mutate the live environment
 # (stop redis, kill PG conns, sustained burst). Enable explicitly

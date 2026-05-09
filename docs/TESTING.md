@@ -169,6 +169,47 @@ don't 5xx. Numeric `?limit=999999999` clamped. Malformed UUID in path
 returns 400 not 500. Static watchdog: every JSON-decoding handler
 has at least one length check.
 
+### L27 — Observability completeness
+
+`scripts/test-l27-observability.sh` — 10 cases, ≈ 2 s.
+
+`/metrics` parseable + go runtime / process / vsp_app domains have
+metrics; structured log output (JSON or zerolog console kv) majority
+of lines; chimw.Recoverer wired so panics don't crash the process.
+Watchdog: domain counters for auth, audit, and HTTP request
+volume/latency are absent — operator can't observe these from
+Prometheus until they're wired (compliance debt).
+
+### L28 — Hardcoded secrets scan
+
+`scripts/test-l28-secrets.sh` — 6 cases, ≈ 1 s.
+
+Source-code grep for credential-shaped string literals (after
+filtering REPLACE_ME / env-ref / dev-secret-please-change false
+positives), no PEM private keys committed, config/*.yaml has no
+high-entropy non-placeholder values, `.gitignore` covers `.env /
+*.pem / secrets`, no real `.env` or `*.pem` tracked.
+
+### L29 — Time correctness
+
+`scripts/test-l29-time-correctness.sh` — 6 cases, ≈ 1 s.
+
+Every tenant-scoped timestamp column is `timestamptz` (no naive
+local times), JWT `exp` boundary respected (expired-by-1s rejected,
+60s-future accepted), no future-dated rows in `audit_log` / `runs`
+(clock-skew detector), locale-invariant status across `vi/en`,
+no `time.Local` references in auth/audit code (ensures UTC consistency).
+
+### L30 — Container / deploy security
+
+`scripts/test-l30-container-deploy.sh` — 8 cases, ≈ 1 s.
+
+Dockerfile final stage is non-root, has HEALTHCHECK, no `ADD url://`,
+apt cache cleaned. Helm values declares resources + probes. systemd
+unit has NoNewPrivileges + ProtectSystem + PrivateTmp (a hardened
+`deploy/systemd/vsp-gateway.service` is shipped in the repo).
+`.env.example` tracked, real `.env` not.
+
 ### L25 — Race conditions / TOCTOU
 
 `scripts/test-l25-race-toctou.sh` — 5 cases, ≈ 15 s.
