@@ -557,10 +557,29 @@ func main() {
 	r.Get("/health/remediation", healthH.Remediation)
 	r.Get("/health/deep", healthH.DeepCheck(p4DB))
 
-	// pprof — chỉ enable trong dev mode
+	// pprof + expvar — gated by source IP. Pre-L15 the comment claimed
+	// "protected by authMw + network policy" but neither was actually
+	// applied: r.Mount("/debug", ...) sits in the no-auth public group,
+	// so /debug/pprof/heap, /goroutine, /vars were anonymous-readable
+	// in every non-production deploy. pprof leaks goroutine stacks
+	// (which contain in-flight JWT tokens, request bodies, and tenant
+	// data); expvar leaks process command line + memstats. Same
+	// loopback gate as /metrics below — only the host itself can scrape.
 	if viper.GetString("server.env") != "production" {
-		// pprof restricted to internal network only
-		r.Mount("/debug", http.DefaultServeMux) //nolint:gosec // G108: protected by authMw + network policy
+		debugMux := http.DefaultServeMux
+		r.HandleFunc("/debug/*", func(w http.ResponseWriter, req *http.Request) {
+			ip := req.RemoteAddr
+			if idx := strings.LastIndex(ip, ":"); idx >= 0 {
+				ip = ip[:idx]
+			}
+			ip = strings.Trim(ip, "[]")
+			if ip != "127.0.0.1" && ip != "::1" && !strings.HasPrefix(ip, "10.") &&
+				!strings.HasPrefix(ip, "192.168.") && !strings.HasPrefix(ip, "172.16.") {
+				http.Error(w, "forbidden — /debug/* restricted to loopback/internal", http.StatusForbidden)
+				return
+			}
+			debugMux.ServeHTTP(w, req)
+		})
 	}
 	// /metrics: restrict to localhost or internal network only
 	r.Handle("/metrics", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

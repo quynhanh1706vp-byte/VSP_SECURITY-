@@ -133,6 +133,9 @@ run_level "L9 lifecycle"        "$ROOT/scripts/test-l9-lifecycle.sh"
 run_level "L10 openapi"         "$ROOT/scripts/test-l10-openapi.sh"
 run_level "L11 mutation"        "$ROOT/scripts/test-l11-mutation.sh"
 run_level "L13 frontend"        "$ROOT/scripts/test-l13-frontend.sh"
+run_level "L15 http-hygiene"    "$ROOT/scripts/test-l15-http-hygiene.sh"
+run_level "L16 info-disclosure" "$ROOT/scripts/test-l16-info-disclosure.sh"
+run_level "L17 ratelimit"       "$ROOT/scripts/test-l17-ratelimit.sh"
 
 # L12 chaos and L14 perf are gated — they mutate the live environment
 # (stop redis, kill PG conns, sustained burst). Enable explicitly

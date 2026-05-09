@@ -103,6 +103,42 @@ Run `gosec` against our own codebase the same way scanners run against
 customer code. Gates on HIGH-severity findings only — Medium-severity
 findings are reviewed manually. Wired into a separate workflow.
 
+### L15 — HTTP hygiene (response headers, cookies, CORS)
+
+`scripts/test-l15-http-hygiene.sh` — 19 cases, ≈ 2 s.
+
+Six phases: required security headers (CSP, HSTS, X-Frame-Options,
+X-Content-Type-Options, Referrer-Policy, Permissions-Policy),
+cookie-attribute audit (HttpOnly + SameSite + Secure-under-HTTPS for
+session cookies; SameSite for double-submit CSRF), CORS no-foreign-
+origin reflection, no stack-trace leak in 5xx bodies, debug-route
+gating (loopback-only IP allow-list verified in source + behavior),
+TRACE/CONNECT method rejection.
+
+### L16 — Information disclosure
+
+`scripts/test-l16-info-disclosure.sh` — 7 cases, ≈ 2 s.
+
+Beyond L15's stack-trace check, walks broader surface for: file
+paths / package paths / internal CIDRs in error bodies, SQL syntax
+or SQLSTATE markers in DB-error responses, Server / X-Powered-By
+stack disclosure, 404-vs-403 IDOR oracle (foreign-tenant fetch must
+return same status as nonexistent), HTML comment leakage of TODO /
+FIXME / secret markers, build-version / git-SHA exposure.
+
+### L17 — Rate-limit / abuse-vector coverage
+
+`scripts/test-l17-ratelimit.sh` — 5 cases, ≈ 60 s.
+
+The gateway intentionally disabled the global per-IP rate limiter
+(dashboard polling triggered 429 storms). This level confirms each
+remaining defense layer works: per-IP login lockout fires across
+distinct usernames (credential-stuffing defense), 4 MB body cap on
+JSON POSTs, slowloris read-timeout under 75 s, expensive endpoint
+(audit/verify) survives 50-way concurrent burst without 5xx, and
+per-tenant lockout isolation (tenant B not affected by tenant A
+bursts).
+
 ### L11 — Mutation testing (hand-rolled)
 
 `scripts/test-l11-mutation.sh` — 8 cases, ≈ 30 s.
