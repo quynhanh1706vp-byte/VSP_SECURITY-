@@ -103,6 +103,55 @@ Run `gosec` against our own codebase the same way scanners run against
 customer code. Gates on HIGH-severity findings only — Medium-severity
 findings are reviewed manually. Wired into a separate workflow.
 
+### L11 — Mutation testing (hand-rolled)
+
+`scripts/test-l11-mutation.sh` — 8 cases, ≈ 30 s.
+
+Applies six semantically-meaningful mutations to `internal/gate/engine.go`
+(boundary tighten, hard-fail relaxed, sign flip, floor/ceiling neutered,
+hard-fail OR→AND) and runs `go test ./internal/gate/...` after each. A
+mutation that PASSES the test suite is a vacuous test — it claims a
+property the suite doesn't actually pin. Original source restored on
+`EXIT` via trap. Score reported as N/M killed.
+
+### L12 — Chaos / fault injection
+
+`scripts/test-l12-chaos.sh` — 5 cases, ≈ 20 s. Gated by `RUN_CHAOS=1`
+because every probe transiently mutates the live environment.
+
+- **14.1 Redis stop**, gateway must fall through to DB.
+- **14.2 Body too large**, 20 MB POST must be rejected with 4xx, not OOM.
+- **14.3 Malformed-JSON storm**, 200 concurrent broken-JSON POSTs must
+  not crash the process.
+- **14.4 PG connection kill**, `pg_terminate_backend` on every gateway
+  conn — pool reconnect path must engage in seconds.
+- **14.5 Slow upstream** (gated separately by `RUN_L12_TC=1`), `tc qdisc`
+  netem 200 ms loopback delay — gateway must complete within max-time.
+
+### L13 — Frontend smoke (curl-based)
+
+`scripts/test-l13-frontend.sh` — 6 cases, ≈ 5 s.
+
+Trades Playwright fidelity for breadth: hits `/`, `/trust`, every panel
+under `static/panels/*.html`, and every `<script src=...>` reference
+on the landing page. Asserts:
+
+- Entry points serve `text/html` with a sane DOM.
+- Every panel returns 200 (catches deploy-time route drift).
+- No bare `{{ identifier }}` template placeholders survive into
+  rendered output (tag-stripped + script-stripped before grep).
+- No `Uncaught TypeError` / `Cannot read prop` / `ReferenceError`
+  visible in shipped HTML.
+- Every JS bundle referenced by `<script src="…">` resolves to 200.
+
+### L14 — Perf smoke (vegeta)
+
+`scripts/test-l14-perf.sh` — 6 cases, ≈ 30 s. Gated by `RUN_PERF=1`.
+
+Sustained 50 RPS for 15-30 s against `/findings/summary`, `/audit/stats`,
+`/kpi/sanity`. Asserts P99 ≤ 500 ms, success rate ≥ 99%, RSS drift ≤ 30%,
+goroutine drift ≤ 50 over the burst window.
+
 ### L8 — Advanced security depth
 
 `scripts/test-l8-security-depth.sh` — 11 cases, ≈ 5 s.

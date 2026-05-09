@@ -181,6 +181,39 @@ func TestProp_EmptyIsAPlus(t *testing.T) {
 	}
 }
 
+// Property 9b: Score=90 exactly is A+ (band lower-boundary). The
+// random property tests only check that Posture returns A VALID
+// letter; they don't pin the exact band threshold. L11 mutation
+// testing surfaced this as a vacuous coverage gap — `>= 90` could
+// be silently weakened to `> 90` and every property test still
+// passed. This test fails the moment that boundary moves.
+//
+// Construction: Medium=25 → penalty = 2 * sqrt(25) = 10. Score = 90.
+func TestProp_BandBoundaryAt90(t *testing.T) {
+	s := scanner.Summary{Medium: 25}
+	score := Score(s)
+	if score != 90 {
+		t.Fatalf("test fixture drift: expected score=90 for Medium=25, got %d", score)
+	}
+	if got := Posture(s); got != "A+" {
+		t.Errorf("score=90 must be A+ (>= boundary), got %s", got)
+	}
+}
+
+// Property 9c: Score with DAST bonus on a clean run must still be
+// ceiling-clamped to 100. L11 mutation testing surfaced this as a
+// vacuous coverage gap — the random property test rarely produced a
+// Summary that triggered the bonus path with otherwise zero penalty,
+// so the `> 100 → 100` clamp could be silently raised to `> 200` and
+// every property test still passed.
+func TestProp_DASTBonusCeilingClamp(t *testing.T) {
+	// Empty Summary + DAST clean → 100 + 3 → must clamp to 100.
+	s := scanner.Summary{DASTRan: true, DASTConfirmed: 0}
+	if got := Score(s); got != 100 {
+		t.Errorf("clean DAST should ceiling-clamp to 100, got %d", got)
+	}
+}
+
 // Property 10: Hard-fail dominates DAST bonus.
 // Pre-Sprint-7.3 a clean DAST run could push score above the hard-fail
 // threshold; this property locks the precedence.

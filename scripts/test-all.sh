@@ -131,9 +131,15 @@ run_level "L5 advanced"         "$ROOT/scripts/test-l5-advanced.sh"
 run_level "L8 security-depth"   "$ROOT/scripts/test-l8-security-depth.sh"
 run_level "L9 lifecycle"        "$ROOT/scripts/test-l9-lifecycle.sh"
 run_level "L10 openapi"         "$ROOT/scripts/test-l10-openapi.sh"
+run_level "L11 mutation"        "$ROOT/scripts/test-l11-mutation.sh"
+run_level "L13 frontend"        "$ROOT/scripts/test-l13-frontend.sh"
 
-# L14 perf — disabled by default (15s burst at 50 RPS adds wall-clock
-# and pprof scraping. Enable with RUN_PERF=1 to include in CI gate).
+# L12 chaos and L14 perf are gated — they mutate the live environment
+# (stop redis, kill PG conns, sustained burst). Enable explicitly
+# in the contexts where that's acceptable.
+if [[ "${RUN_CHAOS:-0}" == "1" ]]; then
+  run_level "L12 chaos"         "$ROOT/scripts/test-l12-chaos.sh"
+fi
 if [[ "${RUN_PERF:-0}" == "1" ]]; then
   run_level "L14 perf-smoke"    "$ROOT/scripts/test-l14-perf.sh"
 fi
