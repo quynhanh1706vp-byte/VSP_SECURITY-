@@ -22,7 +22,18 @@ func (u *Users) List(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 50)
 	offset := queryInt(r, "offset", 0)
 
-	users, total, err := u.DB.ListUsers(r.Context(), claims.TenantID, limit, offset)
+	// L8 2026-05-09: 7th occurrence of the slug→UUID pattern (after
+	// audit/verify, audit/log, findings/summary, runs.List, runs.Index,
+	// kpi sanity). Caller's tenant_id may be a slug; ListUsers queries
+	// a uuid column. Without this resolve the endpoint silently returns
+	// 0 users for the entire tenant, which then masquerades as "no
+	// users to show" in the dashboard.
+	tenantUUID := resolveTenantUUID(r.Context(), u.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
+
+	users, total, err := u.DB.ListUsers(r.Context(), tenantUUID, limit, offset)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return

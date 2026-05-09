@@ -106,5 +106,11 @@ func (h *MFA) Disable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// L8 2026-05-09: MFA disable is a high-risk auth state change.
+	// SOC 2 CC6.1 + NIST 800-63B require it be logged. Without this
+	// an attacker who steals a session and downgrades MFA leaves no
+	// trace of the privilege change.
+	logAudit(r, h.DB, "MFA_DISABLED", "users/"+claims.UserID)
+
 	jsonOK(w, map[string]string{"message": "MFA disabled", "status": "disabled"})
 }

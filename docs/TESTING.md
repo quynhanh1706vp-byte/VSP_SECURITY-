@@ -103,6 +103,27 @@ Run `gosec` against our own codebase the same way scanners run against
 customer code. Gates on HIGH-severity findings only — Medium-severity
 findings are reviewed manually. Wired into a separate workflow.
 
+### L8 — Advanced security depth
+
+`scripts/test-l8-security-depth.sh` — 11 cases, ≈ 5 s.
+
+Five phases:
+
+- **9.1 Mass assignment.** PUT/PATCH bodies with extra fields
+  (`tenant_id`, `role`, `id`) must be ignored, not honored.
+- **9.2 Audit completeness.** Static analysis: every mutation route
+  in `cmd/gateway/main.go` is mapped to its handler symbol, and the
+  handler source is grepped for an audit emitter (`writeAudit`,
+  `logAudit`, `InsertAudit`). Compliance watchdog — fails until every
+  state-changing handler emits a row.
+- **9.3 JWT lifecycle.** alg confusion (RS256 token with HS256
+  verifier), wrong-signature, future-iat probes.
+- **9.4 Crypto sanity.** `JWT_SECRET` length ≥ 32, bcrypt cost ≥ 10
+  in source, no `math/rand` in `internal/auth`.
+- **9.5 Cross-tenant admin.** Tenant-A admin must NOT mutate
+  tenant-B's resources. Catches horizontal privilege escalation that
+  L5's RBAC matrix (single-tenant scope) misses.
+
 ### L7 — DSR right-to-erasure residue
 
 `scripts/test-l7-dsr-residue.sh` — 3 cases, ≈ 20 s static / 1 min live.

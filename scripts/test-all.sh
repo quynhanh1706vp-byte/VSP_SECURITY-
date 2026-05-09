@@ -128,6 +128,7 @@ run_level "L4-B multi-tenant"   "$ROOT/scripts/test-l4-tenant-isolation.sh"
 run_level "L6-A db-integrity"   "$ROOT/scripts/test-l6-db-integrity.sh"
 run_level "L3 comprehensive"    "$ROOT/scripts/test-l3-comprehensive.sh" all
 run_level "L5 advanced"         "$ROOT/scripts/test-l5-advanced.sh"
+run_level "L8 security-depth"   "$ROOT/scripts/test-l8-security-depth.sh"
 
 # L7 (DSR erasure) only runs when explicitly enabled — it mutates DB
 # state and is destructive in a way the others aren't.

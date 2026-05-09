@@ -287,6 +287,12 @@ func (a *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// L8 2026-05-09: emit audit. Token refresh is a security event —
+	// without an audit row a stolen-token scenario where the attacker
+	// keeps renewing has no signal. SOC 2 CC6.1 also requires session
+	// re-issuance be logged.
+	tenantUUID := resolveTenantUUID(r.Context(), a.DB, claims.TenantID)
+	go a.writeAudit(r.Clone(context.Background()), tenantUUID, &claims.UserID, "TOKEN_REFRESHED", "/auth/refresh")
 	jsonOK(w, map[string]any{
 		"token":      token,
 		"expires_at": time.Now().Add(ttl),
@@ -348,6 +354,12 @@ func (a *Auth) CreateAPIToken(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "token generation failed", http.StatusInternalServerError)
 		return
 	}
+	// L8 2026-05-09: API token issuance must be audited. NIST 800-63B
+	// + OWASP ASVS V3.4.3 — every credential creation event leaves a
+	// trace so a compromised account's token activity is forensically
+	// reconstructable.
+	tenantUUID := resolveTenantUUID(r.Context(), a.DB, claims.TenantID)
+	go a.writeAudit(r.Clone(context.Background()), tenantUUID, &claims.UserID, "API_TOKEN_CREATED", "/auth/api-token")
 	jsonOK(w, map[string]any{
 		"token":      token,
 		"expires_in": 3600,
