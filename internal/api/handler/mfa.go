@@ -31,6 +31,9 @@ func (h *MFA) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uri := auth.TOTPProvisioningURI(secret, claims.Email, "VSP Security Platform")
+	// L8 fix: MFA secret generation is a security-sensitive event.
+	// SOC 2 CC6.1 + NIST 800-63B require it logged.
+	logAudit(r, h.DB, "MFA_SETUP", "users/"+claims.UserID)
 	jsonOK(w, map[string]any{
 		"secret":           secret,
 		"provisioning_uri": uri,
@@ -69,6 +72,10 @@ func (h *MFA) Verify(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: MFA enrollment confirmation must be audited so a
+	// reviewer can correlate "user X enabled MFA at T" with later
+	// activity. NIST 800-63B + SOC 2 CC6.1.
+	logAudit(r, h.DB, "MFA_ENABLED", "users/"+claims.UserID)
 
 	jsonOK(w, map[string]string{
 		"message": "MFA enabled successfully",

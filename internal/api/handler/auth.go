@@ -102,7 +102,8 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		_ = auth.CompareDummyPassword(req.Password)
 		if a.IPLock != nil {
 			if locked, _ := a.IPLock.RecordFail(clientIP); locked {
-				go a.writeAudit(r.Clone(context.Background()), tenantID, nil, "LOGIN_IP_LOCKED", "/auth/login")
+				LoginAttempts.WithLabelValues("ip_locked").Inc()
+			go a.writeAudit(r.Clone(context.Background()), tenantID, nil, "LOGIN_IP_LOCKED", "/auth/login")
 			}
 		}
 		// Sprint 12.7: backoff also on missing-user path. Pre-12.7 the
@@ -123,7 +124,8 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	// Check account lockout
 	if user.LockedUntil != nil && time.Now().Before(*user.LockedUntil) {
 		log.Warn().Str("email", req.Email).Msg("login: account locked")
-		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_LOCKED", "/auth/login")
+		LoginAttempts.WithLabelValues("locked").Inc()
+	go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_LOCKED", "/auth/login")
 		jsonError(w, "account temporarily locked — too many failed attempts", http.StatusTooManyRequests)
 		return
 	}
@@ -141,6 +143,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 				go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_IP_LOCKED", "/auth/login")
 			}
 		}
+		LoginAttempts.WithLabelValues("failed").Inc()
 		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_FAILED", "/auth/login")
 		if count >= 5 {
 			jsonError(w, "account locked for 15 minutes after too many failed attempts", http.StatusTooManyRequests)
@@ -182,6 +185,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		}
 		if !auth.VerifyTOTP(user.MFASecret, req.MFACode) {
 			log.Warn().Str("email", req.Email).Msg("login: invalid MFA code")
+			LoginAttempts.WithLabelValues("mfa_failed").Inc()
 			go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_MFA_FAILED", "/auth/login")
 			jsonError(w, "invalid MFA code", http.StatusUnauthorized)
 			return
@@ -213,6 +217,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	go a.DB.UpdateLastLogin(r.Context(), user.ID) //nolint:errcheck
 
 	// Write audit log (best-effort)
+	LoginAttempts.WithLabelValues("success").Inc()
 	go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_OK", "/auth/login")
 
 	// Set httpOnly cookie for browser clients (OWASP A07 — prevents XSS token theft)

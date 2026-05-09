@@ -75,8 +75,14 @@ for f in "$MIG_DIR"/[0-9]*_*.sql; do
   # Skip rollback variants — they're paired by design.
   [[ "$base" == *"_rollback.sql" ]] && continue
   # For YYYYMMDD_NNN_x.sql, key is "YYYYMMDD_NNN".
-  # For NNN_x.sql, key is "NNN".
+  # For NNN_word_*.sql, key is "NNN_word" — collision-ID is the
+  #   number PLUS the next word, so 018_autofix_cache and 018_fix_mfa
+  #   resolve to "018_autofix" vs "018_fix" (distinct). This handles
+  #   the historical accidental-dup pattern without renaming files
+  #   (no migration tracking table exists keyed on filename).
   if [[ "$base" =~ ^([0-9]{8})_([0-9]+)_ ]]; then
+    key="${BASH_REMATCH[1]}_${BASH_REMATCH[2]}"
+  elif [[ "$base" =~ ^([0-9]+)_([a-z][a-z0-9]*)_ ]]; then
     key="${BASH_REMATCH[1]}_${BASH_REMATCH[2]}"
   elif [[ "$base" =~ ^([0-9]+)_ ]]; then
     key="${BASH_REMATCH[1]}"

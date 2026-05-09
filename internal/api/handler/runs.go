@@ -288,6 +288,10 @@ func (h *Runs) Cancel(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "cancel failed", http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: scan cancellation is an operator-initiated state change
+	// that should be auditable so a reviewer can correlate "scan
+	// terminated" with "operator action" vs "system fault".
+	logAudit(r, h.DB, "SCAN_CANCEL", "runs/"+rid)
 	jsonOK(w, map[string]string{"rid": rid, "status": "CANCELLED"})
 }
 

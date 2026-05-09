@@ -546,6 +546,26 @@ func main() {
 	r.Use(vspMW.CSPNonce)
 	r.Use(vspMW.CSRFProtect)
 	r.Use(vspMW.RequestLogger)
+	// L27 2026-05-09: per-request latency + outcome metrics. Wires
+	// vsp_api_request_duration_seconds histogram (declared in
+	// internal/api/handler/metrics.go) so operators can see RPS, P99,
+	// status mix per route. Path label is intentionally coarse
+	// (chi RoutePattern, not raw URL) to keep cardinality bounded.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			start := time.Now()
+			ww := chimw.NewWrapResponseWriter(w, req.ProtoMajor)
+			next.ServeHTTP(ww, req)
+			rctx := chi.RouteContext(req.Context())
+			path := req.URL.Path
+			if rctx != nil && rctx.RoutePattern() != "" {
+				path = rctx.RoutePattern()
+			}
+			handler.APIRequestDuration.WithLabelValues(
+				req.Method, path, fmt.Sprintf("%d", ww.Status()),
+			).Observe(time.Since(start).Seconds())
+		})
+	})
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(60 * time.Second))
 	// Limit request body to 4MB để chặn DoS

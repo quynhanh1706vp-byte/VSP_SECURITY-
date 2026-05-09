@@ -68,6 +68,7 @@ func (h *Audit) Verify(w http.ResponseWriter, r *http.Request) {
 	// surface a misleading "request failed" UX. Convention matches
 	// /api/v1/health and /api/v1/compliance/* which use ok-in-body.
 	if !result.OK {
+		AuditChainBreaks.Inc()
 		errMsg := ""
 		if result.Err != nil {
 			errMsg = result.Err.Error()

@@ -90,6 +90,10 @@ func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// L8 fix: API key issuance is a long-lived credential creation
+	// event. NIST 800-63B + OWASP ASVS V3.4 require it logged.
+	logAudit(r, h.DB, "API_KEY_CREATED", "api_keys/"+key.ID+":role="+req.Role)
+
 	// Return full key ONCE — never stored in plain text
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{

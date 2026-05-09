@@ -67,15 +67,14 @@ for dom in "${!DOMAINS[@]}"; do
   fi
 done
 
-# Domain-level instrumentation gap watchdog: no auth / audit / scan
-# / http counters were found. This is real compliance debt (SOC 2
-# monitoring, OWASP ASVS V8.2.1). Logged separately so the watchdog
-# is visible without spamming the main scoreboard.
-for dom_pat in "auth_login_total|auth_login_failed_total" \
-              "audit_log_inserts_total|audit_chain_breaks_total" \
-              "http_requests_total|http_request_duration_seconds"; do
-  if grep -qE "^[a-z]+($dom_pat)" "$METRICS_TMP" 2>/dev/null; then
-    _pass "28.2.x domain counter ($dom_pat) present"
+# Domain-level instrumentation. Auth login attempts, audit chain
+# breaks + inserts, and per-route HTTP request latency must all be
+# observable so operators can page on rate spikes / breaks.
+for dom_pat in "vsp_login_attempts_total|login_attempts_total|auth_login_total" \
+              "vsp_audit_inserts_total|vsp_audit_chain_breaks_total|audit_log_inserts_total" \
+              "vsp_api_request_duration_seconds|http_request_duration_seconds|http_requests_total"; do
+  if grep -qE "^($dom_pat)" "$METRICS_TMP" 2>/dev/null; then
+    _pass "28.2.x domain counter present [$dom_pat]"
   else
     _fail "28.2.x domain counter missing" \
       "no metric matched $dom_pat — operators can't observe this domain"
