@@ -45,8 +45,7 @@ func (h *ConMonHandler) Schedules(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var sch conmon.Schedule
-		if err := json.NewDecoder(r.Body).Decode(&sch); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		if !decodeJSON(w, r, &sch) {
 			return
 		}
 		sch.TenantID = tenantID
@@ -118,6 +117,7 @@ func (h *ConMonHandler) AckDeviation(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Notes string `json:"notes"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	_ = json.NewDecoder(r.Body).Decode(&body)
 
 	ackBy := "system"

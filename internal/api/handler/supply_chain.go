@@ -217,8 +217,7 @@ type signRequest struct {
 func (h *SupplyChain) Sign(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	var req signRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid json", http.StatusBadRequest)
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 	req.Artifact = strings.TrimSpace(req.Artifact)
@@ -334,8 +333,7 @@ type provReq struct {
 func (h *SupplyChain) GenerateProvenance(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	var req provReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid json", http.StatusBadRequest)
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 	if req.Artifact == "" || req.Digest == "" || req.BuilderID == "" {
@@ -483,8 +481,7 @@ type verifyBundleReq struct {
 
 func (h *SupplyChain) VerifyBundle(w http.ResponseWriter, r *http.Request) {
 	var req verifyBundleReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid json", http.StatusBadRequest)
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 	if req.Bundle == nil {

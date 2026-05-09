@@ -81,6 +81,12 @@ func (h *Audit) Verify(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	// L8 fix: who-verified-when is itself a compliance-relevant
+	// event. SOC 2 CC4.1 expects an audit trail of integrity checks,
+	// not just integrity-check failures. Logging on the OK path
+	// matches that expectation.
+	logAudit(r, h.DB, "CHAIN_VERIFY_OK",
+		"audit_log/checked="+itoa(result.Checked))
 	jsonOK(w, map[string]any{
 		"ok":      true,
 		"checked": result.Checked,

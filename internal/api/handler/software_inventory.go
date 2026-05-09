@@ -64,9 +64,7 @@ func calcRiskScore(crackCount, eolCount, suspCount int) (int, string) {
 func (h *SoftwareInventoryHandler) ReceiveReport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var payload SWReportPayload
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": "invalid json"})
+	if !decodeJSON(w, r, &payload) {
 		return
 	}
 	if payload.Hostname == "" {

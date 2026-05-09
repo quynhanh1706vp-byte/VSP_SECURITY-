@@ -135,17 +135,47 @@ while IFS= read -r line; do
   # Strip the route portion, keep handler symbol.
   symbol=$(echo "$line" | sed 's/.*,[[:space:]]*//')
   method=$(echo "$symbol" | cut -d. -f2)
+  obj=$(echo "$symbol" | cut -d. -f1)
   # Skip routes that are inherently not state-changing (telemetry,
   # streaming, idempotent actions) — the audit-required set is the
   # mutation API surface excluding these.
   case "$method" in
     Tail|Stream|Heartbeat|Webhook|Test)  ROUTE_TOTAL=$((ROUTE_TOTAL-1)); continue ;;
   esac
-  # Look for audit emitter inside the body of `func ... $method(`.
-  body=$(printf '%s' "$ALL_HANDLER_SRC" | awk -v m="$method" '
+  # Determine receiver TYPE so we don't conflate methods that share
+  # names across receivers (Audit.Verify vs MFA.Verify both bare-
+  # match "Verify"). Two patterns in main.go to handle:
+  #   xH := &handler.Type{...}          (struct literal)
+  #   xH := handler.NewType(...)        (constructor — extract Type
+  #                                       from "NewType")
+  # Try struct-literal pattern first: `obj := &handler.Type{...}`.
+  # The trailing `{` is required so we don't match function calls.
+  receiver=$(grep -E "${obj}\s*:?=\s*&?handler\.[A-Z][a-zA-Z0-9_]+\s*\{" "$GATEWAY_FILE" \
+    | head -1 | grep -oE 'handler\.[A-Z][a-zA-Z0-9_]+' | head -1 | cut -d. -f2)
+  if [[ -z "$receiver" ]]; then
+    # Fall back to constructor: `obj := handler.NewType(...)` →
+    # the receiver is the substring AFTER "New".
+    receiver=$(grep -E "${obj}\s*:?=\s*handler\.New[A-Z][a-zA-Z0-9_]+\s*\(" "$GATEWAY_FILE" \
+      | head -1 | grep -oE 'handler\.New[A-Z][a-zA-Z0-9_]+' | head -1 \
+      | sed 's/^handler\.New//')
+  fi
+  # Look for audit emitter inside the body of `func (h *Type) Method(`.
+  # If we couldn't determine the type, fall back to bare-method match
+  # (less precise but still useful).
+  body=$(printf '%s' "$ALL_HANDLER_SRC" | awk -v m="$method" -v t="$receiver" '
     BEGIN { capture=0; depth=0 }
     {
-      if (capture==0 && match($0, "func[[:space:]]+\\([^)]*\\)[[:space:]]+" m "[[:space:]]*\\(")) {
+      if (t != "") {
+        pat = "func[[:space:]]+\\([^)]*\\*" t "[^)]*\\)[[:space:]]+" m "[[:space:]]*\\("
+      } else {
+        pat = "func[[:space:]]+\\([^)]*\\)[[:space:]]+" m "[[:space:]]*\\("
+      }
+      # Reset capture state after a function block ends so we can
+      # match LATER occurrences of methods sharing names across files.
+      if (capture==2 && match($0, pat)) {
+        capture=0
+      }
+      if (capture==0 && match($0, pat)) {
         capture=1; depth=0
       }
       if (capture==1) {

@@ -56,8 +56,7 @@ func (h *Tabletop) Record(w http.ResponseWriter, r *http.Request) {
 		ActionItems  []map[string]any         `json:"action_items"`
 		Rating       string                   `json:"rating"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonError(w, "invalid body", http.StatusBadRequest)
+	if !decodeJSON(w, r, &body) {
 		return
 	}
 	body.ScenarioKind = strings.ToLower(strings.TrimSpace(body.ScenarioKind))

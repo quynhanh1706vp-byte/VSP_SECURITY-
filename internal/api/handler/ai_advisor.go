@@ -33,8 +33,7 @@ func (h *AIAdvisorHandler) Advise(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req ai.AdviseRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONHelper(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 
@@ -105,8 +104,7 @@ func (h *AIAdvisorHandler) Feedback(w http.ResponseWriter, r *http.Request) {
 		Rating string `json:"rating"`
 		Notes  string `json:"notes"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSONHelper(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+	if !decodeJSON(w, r, &body) {
 		return
 	}
 

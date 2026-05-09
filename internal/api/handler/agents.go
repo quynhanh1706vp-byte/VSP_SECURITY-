@@ -247,6 +247,11 @@ func (h *Agents) Inventory(w http.ResponseWriter, r *http.Request) {
 	// Touch agent on inventory submission too (counts as activity)
 	_ = h.DB.TouchAgent(r.Context(), a.ID, ip, "")
 
+	// L8 fix: agent inventory submissions are SBOM/SCA-relevant data
+	// changes — auditing them lets a reviewer correlate a finding
+	// burst with a specific agent ingest.
+	logAudit(r, h.DB, "AGENT_INVENTORY", "agents/"+a.ID+":pkgs="+itoa(count))
+
 	jsonOK(w, map[string]interface{}{
 		"ok":            true,
 		"agent_id":      a.ID,

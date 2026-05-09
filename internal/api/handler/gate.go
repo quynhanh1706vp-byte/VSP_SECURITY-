@@ -149,6 +149,10 @@ func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: gate-policy mutations directly affect release decisions;
+	// reviewer must be able to trace "build was suddenly blocked /
+	// allowed" back to a specific rule edit.
+	logAudit(r, h.DB, "POLICY_RULE_CREATED", "policy_rules/"+rule.ID+":"+rule.Name)
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, rule)
 }

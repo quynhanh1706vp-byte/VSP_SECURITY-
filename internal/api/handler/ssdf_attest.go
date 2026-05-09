@@ -5,9 +5,10 @@
 // Form structure follows CISA SSDF Common Form v2024.
 //
 // Endpoints:
-//   GET  /api/v1/cisa-attestation/ssdf/draft       — auto-populate draft from tenant evidence
-//   POST /api/v1/cisa-attestation/ssdf/{id}/sign   — executive signature (admin only)
-//   GET  /api/v1/cisa-attestation/ssdf/{id}.pdf    — render submittable PDF
+//
+//	GET  /api/v1/cisa-attestation/ssdf/draft       — auto-populate draft from tenant evidence
+//	POST /api/v1/cisa-attestation/ssdf/{id}/sign   — executive signature (admin only)
+//	GET  /api/v1/cisa-attestation/ssdf/{id}.pdf    — render submittable PDF
 //
 // The "auto-populate" endpoint walks our existing controls (audit chain,
 // SLSA provenance, scanner inventory, supply-chain signing) and produces
@@ -16,7 +17,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -35,12 +35,12 @@ func NewSSDFAttest(db *store.DB) *SSDFAttest { return &SSDFAttest{DB: db} }
 // statement + the VSP evidence that supports it. Statement field
 // follows CISA's prescribed wording; evidence is VSP-specific.
 type ssdfPractice struct {
-	ID          string `json:"id"`           // e.g. "PO.1.1"
-	Family      string `json:"family"`       // PO | PS | PW | RV
-	Statement   string `json:"statement"`    // CISA-prescribed language
-	Compliant   bool   `json:"compliant"`
-	Evidence    string `json:"evidence"`     // VSP file path / endpoint
-	Caveats     string `json:"caveats,omitempty"` // operator notes
+	ID        string `json:"id"`        // e.g. "PO.1.1"
+	Family    string `json:"family"`    // PO | PS | PW | RV
+	Statement string `json:"statement"` // CISA-prescribed language
+	Compliant bool   `json:"compliant"`
+	Evidence  string `json:"evidence"`          // VSP file path / endpoint
+	Caveats   string `json:"caveats,omitempty"` // operator notes
 }
 
 // Draft auto-populates the SSDF form from tenant evidence. The output
@@ -156,17 +156,17 @@ func (h *SSDFAttest) Draft(w http.ResponseWriter, r *http.Request) {
 	}
 
 	form := map[string]any{
-		"form_version":      "CISA SSDF Common Form 2024",
-		"generated_at":      time.Now().UTC().Format(time.RFC3339),
-		"draft":             true,
-		"signed":            false,
-		"product_name":      "VSP — Vietnam Security Platform",
-		"product_version":   "1.4.0",
-		"producer_name":     "VSP Platform",
-		"practices":         practices,
+		"form_version":    "CISA SSDF Common Form 2024",
+		"generated_at":    time.Now().UTC().Format(time.RFC3339),
+		"draft":           true,
+		"signed":          false,
+		"product_name":    "VSP — Vietnam Security Platform",
+		"product_version": "1.4.0",
+		"producer_name":   "VSP Platform",
+		"practices":       practices,
 		"summary": map[string]any{
-			"total":       len(practices),
-			"compliant":   compliantCount,
+			"total":          len(practices),
+			"compliant":      compliantCount,
 			"compliance_pct": (compliantCount * 100) / len(practices),
 		},
 		"submission_hint": "Review draft, then POST /api/v1/cisa-attestation/ssdf/{id}/sign with executive credentials. Submitted forms upload to https://saf.cisa.gov.",
@@ -201,8 +201,7 @@ func (h *SSDFAttest) Sign(w http.ResponseWriter, r *http.Request) {
 		SignerEmail string `json:"signer_email"`
 		Method      string `json:"signature_method"` // electronic | physical | digital
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonError(w, "invalid body", http.StatusBadRequest)
+	if !decodeJSON(w, r, &body) {
 		return
 	}
 	if body.SignerName == "" || body.SignerTitle == "" || body.SignerEmail == "" {

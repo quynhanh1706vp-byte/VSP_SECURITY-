@@ -9,7 +9,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/vsp/platform/internal/auth"
@@ -51,8 +50,7 @@ func (h *Locale) Set(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Locale string `json:"locale"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonError(w, "invalid body", http.StatusBadRequest)
+	if !decodeJSON(w, r, &body) {
 		return
 	}
 	if !i18nIsSupported(body.Locale) && body.Locale != "" {

@@ -105,8 +105,7 @@ func (h *CATO) Toggle(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Enabled bool `json:"enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonError(w, "invalid body", http.StatusBadRequest)
+	if !decodeJSON(w, r, &body) {
 		return
 	}
 	cfg := map[string]any{

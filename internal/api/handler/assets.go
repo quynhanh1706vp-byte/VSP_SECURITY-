@@ -219,6 +219,10 @@ func (h *Assets) Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: asset creation expands the tenant's monitored surface;
+	// log so a reviewer can correlate "new asset added" with later
+	// finding burst on it.
+	logAudit(r, h.DB, "ASSET_CREATED", "log_sources/"+id+":"+req.Name)
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{"id": id, "name": req.Name})
 }
