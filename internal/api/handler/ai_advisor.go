@@ -9,12 +9,25 @@ import (
 
 	"github.com/vsp/platform/internal/ai"
 	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/store"
 )
 
 // AIAdvisorHandler exposes AI Compliance Advisor endpoints.
+//
+// L8 2026-05-09: AuditDB (a *store.DB ref) is OPTIONAL — when non-nil
+// the handler emits audit_log rows via logAudit on Feedback. The
+// orchestrator/cache layer uses *sql.DB; audit writes through the
+// main store.DB to keep the chain integrated with everything else.
 type AIAdvisorHandler struct {
 	DB           *sql.DB
 	Orchestrator *ai.Orchestrator
+	AuditDB      *store.DB
+}
+
+// SetAuditDB wires the main store.DB so write paths can emit audit
+// rows. Idempotent.
+func (h *AIAdvisorHandler) SetAuditDB(db *store.DB) {
+	h.AuditDB = db
 }
 
 func NewAIAdvisorHandler(db *sql.DB, apiKey string, airGap bool) *AIAdvisorHandler {
@@ -117,6 +130,10 @@ func (h *AIAdvisorHandler) Feedback(w http.ResponseWriter, r *http.Request) {
 	if err := ai.SubmitFeedback(r.Context(), h.DB, cacheID, tenantID, userEmail, body.Rating, body.Notes); err != nil {
 		writeJSONHelper(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
+	}
+	if h.AuditDB != nil {
+		logAudit(r, h.AuditDB, "AI_FEEDBACK_SUBMITTED",
+			"ai_advisor_feedback/"+strconv.FormatInt(cacheID, 10)+":"+body.Rating)
 	}
 	writeJSONHelper(w, http.StatusOK, map[string]string{"status": "recorded"})
 }

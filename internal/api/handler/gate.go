@@ -95,6 +95,13 @@ func (h *Gate) Evaluate(w http.ResponseWriter, r *http.Request) {
 	s := runSummary(run)
 	result := gate.Evaluate(policyRule, s)
 
+	// L8 fix: gate evaluation drives release decisions in CI/CD; an
+	// auditable record of "who asked, what decision came back, on
+	// which run/commit" lets a reviewer trace deploy outcomes back
+	// to the gate that approved/blocked them.
+	logAudit(r, h.DB, "GATE_EVALUATED",
+		"runs/"+run.RID+":decision="+string(result.Decision))
+
 	jsonOK(w, map[string]any{
 		"decision": result.Decision,
 		"reason":   result.Reason,

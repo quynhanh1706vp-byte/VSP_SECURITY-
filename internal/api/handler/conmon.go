@@ -11,19 +11,33 @@ import (
 	"fmt"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/conmon"
+	"github.com/vsp/platform/internal/store"
 	"os"
 	"os/exec"
 	"time"
 )
 
 // ConMonHandler exposes ConMon REST endpoints.
+//
+// L8 2026-05-09: AuditDB (a *store.DB ref) is OPTIONAL — when non-nil
+// the handler emits audit_log rows on schedule create / deviation ack
+// via logAudit. ConMon uses *sql.DB for its own queries (legacy
+// p4 connection pool); audit lives on the main store layer. Decoupled
+// to avoid a wholesale DB-layer migration just for audit.
 type ConMonHandler struct {
-	DB *sql.DB
+	DB      *sql.DB
+	AuditDB *store.DB
 }
 
 // NewConMonHandler constructs a handler with the given database.
 func NewConMonHandler(db *sql.DB) *ConMonHandler {
 	return &ConMonHandler{DB: db}
+}
+
+// SetAuditDB wires the main *store.DB so write paths can emit audit
+// rows. Idempotent; safe to call before any request lands.
+func (h *ConMonHandler) SetAuditDB(db *store.DB) {
+	h.AuditDB = db
 }
 
 // Schedules: GET list, POST create
@@ -56,6 +70,10 @@ func (h *ConMonHandler) Schedules(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
+		}
+		if h.AuditDB != nil {
+			logAudit(r, h.AuditDB, "CONMON_SCHEDULE_CREATED",
+				"conmon_schedules/"+strconv.FormatInt(id, 10))
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"id": id})
 
@@ -132,6 +150,10 @@ func (h *ConMonHandler) AckDeviation(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
+	}
+	if h.AuditDB != nil {
+		logAudit(r, h.AuditDB, "CONMON_DEVIATION_ACK",
+			"conmon_deviations/"+strconv.FormatInt(id, 10)+":by="+ackBy)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "acknowledged"})
 }

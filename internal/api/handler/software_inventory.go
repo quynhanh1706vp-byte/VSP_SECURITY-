@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -204,6 +205,12 @@ func (h *SoftwareInventoryHandler) ReceiveReport(w http.ResponseWriter, r *http.
 			`, tenantID, title, sev, sourceRefs)
 		}
 	}
+
+	// L8 fix: SBOM/inventory ingest reshapes the tenant's software
+	// posture — auditing each receipt lets a reviewer correlate a
+	// finding burst with a specific report.
+	logAudit(r, h.DB, "SW_INVENTORY_RECEIVED",
+		"software_findings:"+payload.Hostname+":pkgs="+strconv.Itoa(len(payload.Packages)))
 
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"ok": true, "hostname": payload.Hostname,

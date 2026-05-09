@@ -1021,6 +1021,7 @@ func main() {
 	r.With(authMw).Get("/api/v1/ws", handler.WSUpgradeHandler) // cookie-based auth
 	// ConMon handler (used inside auth route group below)
 	conmonH := handler.NewConMonHandler(p4DB)
+	conmonH.SetAuditDB(db) // L8: enable audit emit on ConMon write paths
 
 	// G37: ConMon FedRAMP template routes
 	r.Get("/api/p4/conmon/template/asr", p4AuthMiddleware(conmonH.RenderASR))
@@ -1048,6 +1049,7 @@ func main() {
 	aiH := handler.NewAIAdvisorHandler(p4DB,
 		viper.GetString("anthropic.api_key"),
 		viper.GetBool("airgap.enabled"))
+	aiH.SetAuditDB(db) // L8: enable audit emit on Feedback
 	ssoOIDCH := handler.NewSSOOIDCHandler(p4DB,
 		jwtSecret,
 		jwtTTL,
