@@ -302,9 +302,38 @@ func (a *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func (a *Auth) writeAudit(r *http.Request, tenantID string, userID *string, action, resource string) {
-	prevHash, _ := a.DB.GetLastAuditHash(r.Context(), tenantID)
+	// L9 2026-05-09: callers historically passed claims.TenantID
+	// directly which is often the slug "default" not a UUID. The
+	// audit_log.tenant_id column is uuid; the slug-typed bind silently
+	// errored ("invalid input syntax for type uuid"), the //nolint
+	// errcheck dropped it, and the row never landed. Logout, refresh,
+	// and the API-token issuance handlers all hit this. Fix once at
+	// the helper so every caller is automatically covered.
+	tid := tenantID
+	if tid != "" && !looksLikeUUID(tid) {
+		tid = resolveTenantUUID(r.Context(), a.DB, tid)
+	}
+	if tid == "" {
+		// Last-ditch fallback so an unresolved slug doesn't silently
+		// drop the row — pin to the gateway's default tenant.
+		tid = a.DefaultTID
+	}
+	// L9 2026-05-09: dev-mint tokens carry sub=email which becomes
+	// claims.UserID. Real login flow sets UserID = users.id (uuid)
+	// before calling writeAudit, so production is fine; dev probes
+	// that pass through here would otherwise fail with
+	// "invalid input syntax for type uuid". Resolve email → UUID;
+	// fall back to NULL (the column is nullable) if no match.
+	if userID != nil && *userID != "" && !looksLikeUUID(*userID) {
+		if uid := resolveUserUUID(r.Context(), a.DB, *userID); uid != "" {
+			userID = &uid
+		} else {
+			userID = nil
+		}
+	}
+	prevHash, _ := a.DB.GetLastAuditHash(r.Context(), tid)
 	e := audit.Entry{
-		TenantID: tenantID,
+		TenantID: tid,
 		UserID:   derefStr(userID),
 		Action:   action,
 		Resource: resource,
@@ -312,7 +341,7 @@ func (a *Auth) writeAudit(r *http.Request, tenantID string, userID *string, acti
 		PrevHash: prevHash,
 	}
 	e.StoredHash = audit.Hash(e)
-	a.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: tenantID, UserID: userID, Action: action, Resource: resource, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
+	a.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: tid, UserID: userID, Action: action, Resource: resource, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 }
 
 func derefStr(s *string) string {

@@ -376,6 +376,17 @@ func main() {
 		IPLock:     auth.NewIPLockout(),
 	}
 	handler.SetJWTSecret(jwtSecret)
+	// L9 2026-05-09: wire the slug→UUID resolver auth middleware uses
+	// to canonicalise Claims.TenantID before handlers see it.
+	auth.SetClaimsTenantResolver(func(ctx context.Context, raw string) string {
+		if raw == "" {
+			return ""
+		}
+		var id string
+		_ = db.Pool().QueryRow(ctx,
+			`SELECT id::text FROM tenants WHERE slug=$1 LIMIT 1`, raw).Scan(&id)
+		return id
+	})
 	// L5 fix: SSE subscribers must scope by tenant UUID, not slug. Wire
 	// a slug→UUID resolver so JWT claims (which carry "default") match
 	// broadcast messages (which carry the UUID). Inline lookup here —

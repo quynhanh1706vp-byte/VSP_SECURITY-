@@ -129,6 +129,14 @@ run_level "L6-A db-integrity"   "$ROOT/scripts/test-l6-db-integrity.sh"
 run_level "L3 comprehensive"    "$ROOT/scripts/test-l3-comprehensive.sh" all
 run_level "L5 advanced"         "$ROOT/scripts/test-l5-advanced.sh"
 run_level "L8 security-depth"   "$ROOT/scripts/test-l8-security-depth.sh"
+run_level "L9 lifecycle"        "$ROOT/scripts/test-l9-lifecycle.sh"
+run_level "L10 openapi"         "$ROOT/scripts/test-l10-openapi.sh"
+
+# L14 perf — disabled by default (15s burst at 50 RPS adds wall-clock
+# and pprof scraping. Enable with RUN_PERF=1 to include in CI gate).
+if [[ "${RUN_PERF:-0}" == "1" ]]; then
+  run_level "L14 perf-smoke"    "$ROOT/scripts/test-l14-perf.sh"
+fi
 
 # L7 (DSR erasure) only runs when explicitly enabled — it mutates DB
 # state and is destructive in a way the others aren't.

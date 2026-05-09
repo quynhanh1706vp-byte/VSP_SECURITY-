@@ -23,6 +23,23 @@ type Runs struct {
 	asynq *asynq.Client
 }
 
+// tenantUUID returns the caller's tenant as a canonical UUID. JWT
+// claims may carry the slug ("default") instead of the UUID; every
+// runs.* DB call expects UUID. L9 2026-05-09: this used to be open-
+// coded at every call site (and missed at half of them — Get, Latest,
+// Cancel — causing 500s). Centralising here ensures all subsequent
+// methods get the resolve for free.
+func (h *Runs) tenantUUID(r *http.Request) string {
+	c, _ := auth.FromContext(r.Context())
+	if looksLikeUUID(c.TenantID) {
+		return c.TenantID
+	}
+	if u := resolveTenantUUID(r.Context(), h.DB, c.TenantID); u != "" {
+		return u
+	}
+	return c.TenantID
+}
+
 // POST /api/v1/vsp/run
 func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
@@ -85,31 +102,54 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		toolsTotal = 3
 	}
 
+	// L9 2026-05-09: 8th occurrence of the slug→UUID pattern. CreateRun
+	// inserts into a uuid column; without resolution the dev-mint
+	// "default" slug raises "invalid input syntax for type uuid" and
+	// every Trigger call returns 500.
+	tenantUUID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
+
 	run, err := h.DB.CreateRun(r.Context(),
-		rid, claims.TenantID, req.Mode, req.Profile,
+		rid, tenantUUID, req.Mode, req.Profile,
 		req.Src, req.URL, toolsTotal)
 	if err != nil {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	go h.enqueueOrLog(run.RID, claims.TenantID, pipeline.Mode(req.Mode), pipeline.Profile(req.Profile), req.Src, req.URL)
+	go h.enqueueOrLog(run.RID, tenantUUID, pipeline.Mode(req.Mode), pipeline.Profile(req.Profile), req.Src, req.URL)
 	// Audit: log scan trigger
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) //nolint:gosec // G118: intentional
 		defer cancel()
-		prevHash, _ := h.DB.GetLastAuditHash(ctx, claims.TenantID)
+		// Same defensive resolve for the audit row — claims.UserID may
+		// be an email when dev-mint tokens carry sub=email rather than
+		// sub=UUID. nil-out if not resolvable so the row still lands.
+		uid := claims.UserID
+		if uid != "" && !looksLikeUUID(uid) {
+			if r := resolveUserUUID(ctx, h.DB, uid); r != "" {
+				uid = r
+			} else {
+				uid = ""
+			}
+		}
+		var uidPtr *string
+		if uid != "" {
+			uidPtr = &uid
+		}
+		prevHash, _ := h.DB.GetLastAuditHash(ctx, tenantUUID)
 		e := audit.Entry{
-			TenantID: claims.TenantID,
-			UserID:   claims.UserID,
+			TenantID: tenantUUID,
+			UserID:   uid,
 			Action:   "SCAN_TRIGGER",
 			Resource: run.RID,
 			IP:       r.RemoteAddr,
 			PrevHash: prevHash,
 		}
 		e.StoredHash = audit.Hash(e)
-		uid := claims.UserID
-		h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: claims.TenantID, UserID: &uid, Action: "SCAN_TRIGGER", Resource: run.RID, IP: r.RemoteAddr, PrevHash: prevHash})
+		h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: tenantUUID, UserID: uidPtr, Action: "SCAN_TRIGGER", Resource: run.RID, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 	}()
 
 	w.WriteHeader(http.StatusAccepted)
@@ -127,8 +167,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/vsp/run/latest
 func (h *Runs) Latest(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
-	run, err := h.DB.GetLatestRun(r.Context(), claims.TenantID)
+	run, err := h.DB.GetLatestRun(r.Context(), h.tenantUUID(r))
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
@@ -142,9 +181,8 @@ func (h *Runs) Latest(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/vsp/run/{rid}
 func (h *Runs) Get(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
-	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
+	run, err := h.DB.GetRunByRID(r.Context(), h.tenantUUID(r), rid)
 	if err != nil || run == nil {
 		jsonError(w, "run not found", http.StatusNotFound)
 		return
@@ -245,9 +283,8 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/vsp/run/{rid}/cancel
 func (h *Runs) Cancel(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
-	if err := h.DB.UpdateRunStatus(r.Context(), claims.TenantID, rid, "CANCELLED", 0); err != nil {
+	if err := h.DB.UpdateRunStatus(r.Context(), h.tenantUUID(r), rid, "CANCELLED", 0); err != nil {
 		jsonError(w, "cancel failed", http.StatusInternalServerError)
 		return
 	}
@@ -256,9 +293,8 @@ func (h *Runs) Cancel(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/vsp/run/{rid}/log
 func (h *Runs) Log(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
-	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
+	run, err := h.DB.GetRunByRID(r.Context(), h.tenantUUID(r), rid)
 	if err != nil || run == nil {
 		jsonError(w, "run not found", http.StatusNotFound)
 		return
@@ -279,7 +315,7 @@ func (h *Runs) Log(w http.ResponseWriter, r *http.Request) {
 		       COUNT(*) FILTER (WHERE severity='MEDIUM'),
 		       COUNT(*) FILTER (WHERE severity='LOW')
 		FROM findings WHERE run_id=$1 AND tenant_id=$2
-		GROUP BY tool ORDER BY COUNT(*) DESC`, run.ID, claims.TenantID)
+		GROUP BY tool ORDER BY COUNT(*) DESC`, run.ID, h.tenantUUID(r))
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
@@ -355,13 +391,17 @@ func (h *Runs) Log(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/vsp/findings/by-tool?rid=
 func (h *Findings) ByTool(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
+	tenantUUID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
 	rid := r.URL.Query().Get("rid")
 	runID := r.URL.Query().Get("run_id")
 	if rid != "" && runID == "" {
 		var id string
 		h.DB.Pool().QueryRow(r.Context(),
 			`SELECT id::text FROM runs WHERE rid=$1 AND tenant_id=$2 LIMIT 1`,
-			rid, claims.TenantID).Scan(&id)
+			rid, tenantUUID).Scan(&id)
 		runID = id
 	}
 
@@ -377,7 +417,7 @@ func (h *Findings) ByTool(w http.ResponseWriter, r *http.Request) {
 			       COUNT(*) FILTER (WHERE severity='MEDIUM'),
 			       COUNT(*) FILTER (WHERE severity='LOW')
 			FROM findings WHERE tenant_id=$1
-			GROUP BY tool ORDER BY COUNT(*) DESC`, claims.TenantID)
+			GROUP BY tool ORDER BY COUNT(*) DESC`, tenantUUID)
 	} else {
 		rows, err = h.DB.Pool().Query(r.Context(), `
 			SELECT tool, COUNT(*),
@@ -386,7 +426,7 @@ func (h *Findings) ByTool(w http.ResponseWriter, r *http.Request) {
 			       COUNT(*) FILTER (WHERE severity='MEDIUM'),
 			       COUNT(*) FILTER (WHERE severity='LOW')
 			FROM findings WHERE run_id=$1::uuid AND tenant_id=$2
-			GROUP BY tool ORDER BY COUNT(*) DESC`, runID, claims.TenantID)
+			GROUP BY tool ORDER BY COUNT(*) DESC`, runID, tenantUUID)
 	}
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)

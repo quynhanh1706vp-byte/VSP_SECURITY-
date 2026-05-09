@@ -2,6 +2,12 @@ module github.com/vsp/platform
 
 go 1.25.9
 
+// L10-A 2026-05-09: pin to 1.25.10 to pick up stdlib fixes for
+// GO-2026-4918, 4971, 4976, 4977, 4980, 4981, 4982, 4986. The base
+// `go` directive stays at 1.25.9 so older toolchains can still parse
+// this module; `toolchain` only forces the BUILD-time version up.
+toolchain go1.25.10
+
 require (
 	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
 	github.com/exaring/otelpgx v0.10.0
