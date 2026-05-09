@@ -140,6 +140,9 @@ run_level "L18 migration"       "$ROOT/scripts/test-l18-migration-safety.sh"
 run_level "L19 redos"           "$ROOT/scripts/test-l19-redos.sh"
 run_level "L20 deps-license"    "$ROOT/scripts/test-l20-deps-license.sh"
 run_level "L21 upload-safety"   "$ROOT/scripts/test-l21-upload-safety.sh"
+run_level "L22 sqli"            "$ROOT/scripts/test-l22-sqli.sh"
+run_level "L23 trust-boundary"  "$ROOT/scripts/test-l23-trust-boundary.sh"
+run_level "L24 input-validation" "$ROOT/scripts/test-l24-input-validation.sh"
 
 # L12 chaos and L14 perf are gated — they mutate the live environment
 # (stop redis, kill PG conns, sustained burst). Enable explicitly

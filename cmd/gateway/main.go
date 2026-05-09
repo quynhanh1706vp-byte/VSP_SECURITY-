@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -530,7 +531,17 @@ func main() {
 	// Strip trailing slash before route matching (so /api/x/ → /api/x)
 	r.Use(chimw.StripSlashes)
 	r.Use(chimw.RequestID)
-	r.Use(chimw.RealIP)
+	// L23 2026-05-09: chimw.RealIP blindly trusts X-Forwarded-For /
+	// X-Real-IP and rewrites r.RemoteAddr. That lets a direct attacker
+	// (no proxy in front) set XFF: 127.0.0.1 and impersonate loopback,
+	// bypassing every IP-based gate downstream — /debug/* loopback gate,
+	// /metrics localhost gate, IPLockout (each request appears to come
+	// from a different IP). Wrap RealIP so it only fires when the
+	// IMMEDIATE TCP source is in a trusted-proxy allow-list.
+	//
+	// Default trusted proxies: loopback. Operators behind a LB extend
+	// via VSP_TRUSTED_PROXIES (comma-separated CIDRs).
+	r.Use(trustedRealIP(viper.GetString("server.trusted_proxies")))
 	r.Use(i18n.Middleware) // resolves locale from query/header/accept-language
 	r.Use(vspMW.CSPNonce)
 	r.Use(vspMW.CSRFProtect)
@@ -3056,6 +3067,75 @@ func main() {
 	db.Close()
 	_ = asynqClient.Close()
 	log.Info().Msg("stopped ✓")
+}
+
+// splitCSV is a tolerant comma-separated splitter (handles spaces).
+func splitCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// trustedRealIP returns a middleware that rewrites r.RemoteAddr from
+// X-Forwarded-For / X-Real-IP ONLY when the immediate TCP source is
+// in the trusted-proxy allow-list. For any other source, the headers
+// are stripped so they can't influence downstream IP gates.
+//
+// trustedCIDRs is a comma-separated list of CIDRs (e.g.
+// "10.0.0.0/8,172.16.0.0/12"). Empty defaults to loopback only.
+func trustedRealIP(trustedCIDRs string) func(http.Handler) http.Handler {
+	defaults := []string{"127.0.0.0/8", "::1/128"}
+	var nets []*net.IPNet
+	for _, c := range append(defaults, splitCSV(trustedCIDRs)...) {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		_, n, err := net.ParseCIDR(c)
+		if err == nil {
+			nets = append(nets, n)
+		}
+	}
+	isTrusted := func(addr string) bool {
+		host := addr
+		if i := strings.LastIndex(host, ":"); i >= 0 {
+			host = host[:i]
+		}
+		host = strings.Trim(host, "[]")
+		ip := net.ParseIP(host)
+		if ip == nil {
+			return false
+		}
+		for _, n := range nets {
+			if n.Contains(ip) {
+				return true
+			}
+		}
+		return false
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !isTrusted(r.RemoteAddr) {
+				// Source isn't a trusted proxy — discard any forwarding
+				// headers an attacker may have set so chi.RealIP (or
+				// downstream code) can't be tricked.
+				r.Header.Del("X-Forwarded-For")
+				r.Header.Del("X-Real-IP")
+				r.Header.Del("X-Forwarded-Host")
+				r.Header.Del("X-Forwarded-Proto")
+			}
+			chimw.RealIP(next).ServeHTTP(w, r)
+		})
+	}
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

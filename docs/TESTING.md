@@ -139,6 +139,36 @@ JSON POSTs, slowloris read-timeout under 75 s, expensive endpoint
 per-tenant lockout isolation (tenant B not affected by tenant A
 bursts).
 
+### L22 — SQL injection active probe
+
+`scripts/test-l22-sqli.sh` — 6 cases, ≈ 5 s.
+
+Fires 8 classic SQLi payloads × 5 query-param endpoints (40 probes),
+asserts no SQL state markers in any response body. Plus boolean-blind
+invariant (true/false tautology payloads return same row count) and
+time-based probe (`pg_sleep(3)` payload doesn't actually sleep).
+Final phase tests ORDER BY column-name allow-listing.
+
+### L23 — Trust boundary / proxy header
+
+`scripts/test-l23-trust-boundary.sh` — 7 cases, ≈ 5 s.
+
+Watchdog for the proxy-header-trust fix landed in main.go:
+asserts `trustedRealIP` middleware is wired (not raw `chimw.RealIP`),
+behavioural confirms loopback rewrite still works, IPLockout fires
+per forwarded IP, fresh forwarded IP starts at 0 counter,
+`X-Forwarded-Proto` stripped from non-trusted sources.
+
+### L24 — Input validation completeness
+
+`scripts/test-l24-input-validation.sh` — 10 cases, ≈ 3 s.
+
+Behavioral and static input-validation audit: 100KB string,
+100-deep JSON, unicode confusables, NUL bytes, and negative numerics
+don't 5xx. Numeric `?limit=999999999` clamped. Malformed UUID in path
+returns 400 not 500. Static watchdog: every JSON-decoding handler
+has at least one length check.
+
 ### L18 — Schema migration safety
 
 `scripts/test-l18-migration-safety.sh` — 6 cases, ≈ 1 s.
