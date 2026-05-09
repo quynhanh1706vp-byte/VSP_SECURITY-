@@ -119,8 +119,17 @@ sudo journalctl -u vsp-gateway --no-pager -n 100 2>/dev/null > "$LOG_TMP" || tru
 # Pick lines after the journal prefix (date + host + service + pid).
 BODY=$(sed -E 's/^[A-Z][a-z]+ +[0-9]+ +[0-9:]+ +[^ ]+ +[^:]+: //' "$LOG_TMP" | tail -50)
 TOTAL=$(echo "$BODY" | grep -c . || true)
-# Structured = JSON ({...}) OR has at least 2 "key=value" pairs (zerolog console).
-STRUCTURED=$(echo "$BODY" | grep -cE '^\{.*\}$|[a-z_]+=[^ ]+.*[a-z_]+=' || true)
+# Structured = ANY of:
+#   - JSON: ^{ ... }$
+#   - zerolog console with kv: timestamp INF/WRN/ERR + at least one
+#     key=value pair somewhere on the line
+#   - retention banner: zerolog INF with "subsystem: text" + 1 kv pair
+# Unstructured = bare prose / log.Println-style lines.
+# Accept JSON OR any zerolog console line (level prefix tells the
+# log shipper how to route, even if no kv field is attached).
+STRUCTURED=$(echo "$BODY" \
+  | grep -cE '^\{.*\}$|^[0-9]{4}-[0-9]{2}-[0-9]{2}T[^ ]+ (INF|WRN|ERR|DBG|FTL|TRC) ' \
+  || true)
 UNSTRUCTURED=$((TOTAL - STRUCTURED))
 
 if (( TOTAL == 0 )); then

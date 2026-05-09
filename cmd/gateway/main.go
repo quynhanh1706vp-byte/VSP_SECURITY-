@@ -377,6 +377,16 @@ func main() {
 		IPLock:     auth.NewIPLockout(),
 	}
 	handler.SetJWTSecret(jwtSecret)
+	// L27 2026-05-09: warm Prometheus CounterVec series at startup so
+	// /metrics exposes them from boot. CounterVec doesn't emit a
+	// series until at least one label combination has been Inc()'d,
+	// so a freshly-restarted gateway has no auth/login metric until
+	// someone tries to log in. Operators alerting on rate(...) or
+	// increase(...) over a window need the series to exist immediately.
+	for _, r := range []string{"success", "failed", "locked", "ip_locked", "mfa_failed"} {
+		handler.LoginAttempts.WithLabelValues(r).Add(0)
+	}
+	handler.AuditChainBreaks.Add(0)
 	// L9 2026-05-09: wire the slug→UUID resolver auth middleware uses
 	// to canonicalise Claims.TenantID before handlers see it.
 	auth.SetClaimsTenantResolver(func(ctx context.Context, raw string) string {

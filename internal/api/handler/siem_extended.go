@@ -100,12 +100,14 @@ func (h *Correlation) ToggleRule(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	logAudit(r, h.DB, "CORRELATION_RULE_TOGGLED", "correlation_rules/toggle")
 	jsonOK(w, map[string]any{"id": id, "enabled": enabled})
 }
 
 func (h *Correlation) DeleteRule(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	h.DB.DeleteCorrelationRule(r.Context(), claims.TenantID, chi.URLParam(r, "id")) //nolint:errcheck
+	logAudit(r, h.DB, "CORRELATION_RULE_DELETED", "correlation_rules/delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -168,6 +170,7 @@ func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logAudit(r, h.DB, "INCIDENT_CREATED", "incidents/create")
 	jsonOK(w, map[string]any{"id": id, "status": "created"})
 }
 
@@ -258,6 +261,7 @@ func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logAudit(r, h.DB, "PLAYBOOK_CREATED", "playbooks/create")
 	jsonOK(w, map[string]any{"id": id, "name": req.Name, "status": "created"})
 }
 
@@ -269,6 +273,7 @@ func (h *SOAR) TogglePlaybook(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	logAudit(r, h.DB, "PLAYBOOK_TOGGLED", "playbooks/toggle")
 	jsonOK(w, map[string]any{"id": id, "enabled": enabled})
 }
 
@@ -445,12 +450,14 @@ func (h *LogSources) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logAudit(r, h.DB, "LOG_SOURCE_CREATED", "log_sources/create")
 	jsonOK(w, map[string]any{"id": id, "name": req.Name, "status": "created"})
 }
 
 func (h *LogSources) Delete(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	h.DB.DeleteLogSource(r.Context(), claims.TenantID, chi.URLParam(r, "id")) //nolint:errcheck
+	logAudit(r, h.DB, "LOG_SOURCE_DELETED", "log_sources/delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 

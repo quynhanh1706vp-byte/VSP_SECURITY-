@@ -38,5 +38,6 @@ func (h *Remediation) AutoResolve(w http.ResponseWriter, r *http.Request) {
 		Str("tenant", claims.TenantID).
 		Msg("auto-resolved orphan remediations (per-mode, fingerprint-based)")
 
+	logAudit(r, h.DB, "REMEDIATION_AUTO_RESOLVE", "remediations/auto_resolve")
 	jsonOK(w, res)
 }

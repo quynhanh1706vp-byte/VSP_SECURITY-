@@ -126,6 +126,7 @@ func (h *Remediation) AddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logAudit(r, h.DB, "REMEDIATION_COMMENT", "remediations/comment")
 	jsonOK(w, c)
 }
 

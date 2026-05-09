@@ -64,6 +64,8 @@ func (h *Agents) Enroll(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "enroll: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: agent enrollment is identity creation — must be audited.
+	logAudit(r, h.DB, "AGENT_ENROLLED", "agents/"+res.Agent.ID+":"+req.Hostname)
 
 	// Return raw key ONCE; subsequent List/Get calls only return hint.
 	jsonOK(w, map[string]interface{}{
@@ -148,6 +150,8 @@ func (h *Agents) Revoke(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: agent revocation is identity destruction — must be audited.
+	logAudit(r, h.DB, "AGENT_REVOKED", "agents/"+id)
 	jsonOK(w, map[string]interface{}{"id": id, "revoked": true})
 }
 

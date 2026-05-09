@@ -130,6 +130,7 @@ func (h *Disclosure) Submit(w http.ResponseWriter, r *http.Request) {
 	// Ack receipt — researchers don't need internal IDs but they want
 	// confirmation the report landed.
 	w.WriteHeader(http.StatusAccepted)
+	logAudit(r, h.DB, "DISCLOSURE_SUBMITTED", "vdr/submit")
 	jsonOK(w, map[string]any{
 		"status":          "received",
 		"ack_due_at":      now.Add(ackSLA).Format(time.RFC3339),

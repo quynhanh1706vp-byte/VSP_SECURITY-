@@ -166,6 +166,7 @@ func (h *CISAAttestation) UpdatePractice(w http.ResponseWriter, r *http.Request)
 		jsonError(w, "practice not found", http.StatusNotFound)
 		return
 	}
+	logAudit(r, h.DB, "ATTEST_PRACTICE_UPDATED", "cisa_attestation/practices")
 	jsonOK(w, map[string]any{"practice_id": id, "updated": true})
 }
 
@@ -344,6 +345,7 @@ func (h *CISAAttestation) GenerateDraft(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	logAudit(r, h.DB, "ATTEST_DRAFT_GENERATED", "cisa_attestation/draft")
 	jsonOK(w, map[string]any{
 		"form_uuid":         formUUID,
 		"id":                newID,
@@ -401,6 +403,7 @@ func (h *CISAAttestation) SignForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logAudit(r, h.DB, "ATTEST_FORM_SIGNED", "cisa_attestation/sign")
 	jsonOK(w, map[string]any{
 		"form_uuid":        uuidStr,
 		"signed":           true,

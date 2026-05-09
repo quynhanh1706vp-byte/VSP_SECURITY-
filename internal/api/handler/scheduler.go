@@ -91,6 +91,7 @@ func (h *Scheduler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logAudit(r, h.DB, "SCHEDULE_CREATED", "scan_schedules/create")
 	jsonOK(w, s)
 }
 
@@ -126,6 +127,7 @@ func (h *Scheduler) RunNow(w http.ResponseWriter, r *http.Request) {
 		if s.ID == id && s.TenantID == claims.TenantID {
 			// Trigger immediately
 			h.Engine.TriggerNow(r.Context(), s)
+	logAudit(r, h.DB, "SCHEDULE_RUN_NOW", "scan_schedules/run_now")
 			jsonOK(w, map[string]string{"status": "triggered", "schedule": s.Name})
 			return
 		}
@@ -161,6 +163,7 @@ func (h *Scheduler) Update(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
+	logAudit(r, h.DB, "SCHEDULE_UPDATED", "scan_schedules/update")
 	jsonOK(w, map[string]string{"id": id, "status": "updated"})
 }
 
@@ -174,6 +177,7 @@ func (h *Scheduler) Toggle(w http.ResponseWriter, r *http.Request) {
 			s.Enabled = !s.Enabled
 			h.DB.UpdateScheduleEnabled(r.Context(), claims.TenantID, id, s.Enabled) //nolint
 			// engine reloads on next tick
+	logAudit(r, h.DB, "SCHEDULE_TOGGLED", "scan_schedules/toggle")
 			jsonOK(w, map[string]any{"id": id, "enabled": s.Enabled})
 			return
 		}

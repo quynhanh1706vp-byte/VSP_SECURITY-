@@ -76,7 +76,7 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 			log.Warn().
 				Str("rid", payload.RID).Str("src", payload.Src).Str("mode", string(payload.Mode)).
 				Msg("scan aborted: src missing")
-			return nil
+			return nil //nolint:nilerr
 		}
 		entries, _ := os.ReadDir(payload.Src)
 		if len(entries) == 0 {
@@ -89,7 +89,6 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 			return nil
 		}
 	}
-
 
 	// Execute — apply profile filtering + timeout per profile
 	profileRunners := RunnersForProfile(payload.Mode, payload.Profile)
@@ -222,9 +221,16 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		"SCORE":       eval.Score,
 	})
 
+	// L6-A 7.3.1 fix (2026-05-09): use the POST-dedup count
+	// (`len(saved)`) instead of the pre-storage scanner-emit count
+	// (`len(result.Findings)`). The findings table dedups on
+	// fingerprint UNIQUE (tool|rule|path|line) so the stored row count
+	// is always ≤ the emit count. The L6-A db-integrity watchdog
+	// caught the drift at every dashboard refresh: total_findings
+	// reported by the scoreboard differed from what /findings returned.
 	h.DB.UpdateRunResult(dbCtx, payload.TenantID, payload.RID,
 		string(eval.Decision), eval.Posture,
-		len(result.Findings), summaryJSON)
+		len(saved), summaryJSON)
 	// Store gate reason for audit trail
 	h.DB.UpdateRunGateReason(dbCtx, payload.TenantID, payload.RID, eval.Reason)
 

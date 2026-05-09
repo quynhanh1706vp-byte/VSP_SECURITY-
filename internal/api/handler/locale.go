@@ -67,6 +67,7 @@ func (h *Locale) Set(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	logAudit(r, h.DB, "LOCALE_SET", "users/locale")
 	jsonOK(w, map[string]any{"saved": body.Locale})
 }
 

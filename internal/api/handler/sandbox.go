@@ -81,6 +81,7 @@ func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
 	}
 	h.mu.Unlock()
 
+	logAudit(r, h.DB, "SANDBOX_TEST_FIRE", "sandbox/test_fire")
 	jsonOK(w, map[string]any{
 		"status": "fired",
 		"rid":    event.RID,
@@ -100,5 +101,6 @@ func (h *Sandbox) Clear(w http.ResponseWriter, r *http.Request) {
 	}
 	h.events = keep
 	h.mu.Unlock()
+	logAudit(r, h.DB, "SANDBOX_CLEAR", "sandbox/clear")
 	w.WriteHeader(http.StatusNoContent)
 }
