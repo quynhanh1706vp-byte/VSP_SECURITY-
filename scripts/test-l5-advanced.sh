@@ -27,10 +27,9 @@ TENANT_A_UUID="1bdf7f20-dbb3-4116-815f-26b4dc747e76"
 TENANT_B_SLUG="acme-corp"
 TENANT_B_UUID="8bb9a716-fd14-4eba-92e8-681dc5bdb718"
 
-_secret_file="${VSP_JWT_SECRET_FILE:-/etc/vsp/env.production}"
-JWT_SECRET=$(sudo grep '^JWT_SECRET=' "$_secret_file" 2>/dev/null | cut -d= -f2-)
+JWT_SECRET=$(resolve_jwt_secret)
 if [[ -z "$JWT_SECRET" ]]; then
-  printf "%s✗%s JWT_SECRET not available\n" "$C_RED" "$C_RESET" >&2
+  printf "%s✗%s JWT_SECRET not available; export JWT_SECRET or VSP_JWT_SECRET_FILE\n" "$C_RED" "$C_RESET" >&2
   exit 2
 fi
 
@@ -243,8 +242,17 @@ phase_open "6.3 Concurrency — cache stampede + tenant correctness"
 # concurrently). Catches the same key-collision bug we just fixed
 # under load.
 
-# First flush the cache so we get a clean miss.
-REDIS_PASS=$(sudo grep -E '^REDIS_PASSWORD|^REDIS_PASS' "$_secret_file" 2>/dev/null | head -1 | cut -d= -f2-)
+# First flush the cache so we get a clean miss. Redis password is
+# resolved via env first (CI), file second (operator path).
+REDIS_PASS="${REDIS_PASSWORD:-${REDIS_PASS:-}}"
+if [[ -z "$REDIS_PASS" ]]; then
+  _redis_file="${VSP_JWT_SECRET_FILE:-/etc/vsp/env.production}"
+  if [[ -r "$_redis_file" ]]; then
+    REDIS_PASS=$(grep -E '^REDIS_PASSWORD|^REDIS_PASS' "$_redis_file" 2>/dev/null | head -1 | cut -d= -f2-)
+  elif command -v sudo &>/dev/null && sudo -n true 2>/dev/null; then
+    REDIS_PASS=$(sudo grep -E '^REDIS_PASSWORD|^REDIS_PASS' "$_redis_file" 2>/dev/null | head -1 | cut -d= -f2-)
+  fi
+fi
 if [[ -n "$REDIS_PASS" ]]; then
   redis-cli -a "$REDIS_PASS" --no-auth-warning DEL $(redis-cli -a "$REDIS_PASS" --no-auth-warning KEYS 'vsp:api:findings-summary:*' 2>/dev/null) >/dev/null 2>&1 || true
 fi

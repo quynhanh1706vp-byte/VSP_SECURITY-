@@ -242,3 +242,36 @@ require_env() {
     fi
   done
 }
+
+# resolve_jwt_secret — return JWT_SECRET in priority order:
+#   1. $JWT_SECRET env (CI sets this from a GitHub secret)
+#   2. $VSP_JWT_SECRET_FILE if file is readable without sudo
+#   3. /etc/vsp/env.production with sudo (local dev/operator path)
+#
+# Echoes the secret to stdout. Caller does:
+#   JWT_SECRET=$(resolve_jwt_secret) || exit 2
+#
+# Designed so the same scripts work in three contexts:
+#   - GitHub Actions (env set)
+#   - Operator's laptop (sudo + canonical file path)
+#   - Hermetic test rig (a custom file path with no sudo needed)
+resolve_jwt_secret() {
+  if [[ -n "${JWT_SECRET:-}" ]]; then
+    printf '%s' "$JWT_SECRET"
+    return 0
+  fi
+  local f="${VSP_JWT_SECRET_FILE:-/etc/vsp/env.production}"
+  # Try without sudo first (works in CI when secret is mounted as a
+  # plain file, or when running as root).
+  if [[ -r "$f" ]]; then
+    grep '^JWT_SECRET=' "$f" 2>/dev/null | cut -d= -f2- | head -1
+    return 0
+  fi
+  # Fall back to sudo (operator path on a host where the file is
+  # 0600 root). If sudo isn't available or prompts, this fails fast.
+  if command -v sudo &>/dev/null && sudo -n true 2>/dev/null; then
+    sudo grep '^JWT_SECRET=' "$f" 2>/dev/null | cut -d= -f2- | head -1
+    return 0
+  fi
+  return 1
+}

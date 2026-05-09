@@ -353,6 +353,21 @@ func RunErasureWorker(ctx context.Context, db *store.DB, tickInterval time.Durat
 	}
 }
 
+// eraseTableExclude lists tenant_id-bearing tables that must SURVIVE an
+// erasure. The DSR request itself stays so the audit trail of the
+// deletion is preserved; residency/billing config persists because it
+// belongs to the operator's compliance posture, not the data subject.
+// The dated backup table is informational and self-cleaning.
+//
+// Keep in sync with scripts/test-l7-dsr-residue.sh's EXCLUDE_FROM_ERASURE
+// list — L7 8.1 will fail loudly if a table appears in one but not the
+// other.
+var eraseTableExclude = map[string]bool{
+	"data_subject_requests":           true,
+	"tenant_residency":                true,
+	"scan_schedules_backup_20260428":  true,
+}
+
 // processOneDueErasure picks at most one due request per tick and runs
 // the deletion. Single-shot keeps blast radius bounded — if a deletion
 // breaks something, the next tick still lets the operator intervene.
@@ -375,18 +390,41 @@ func processOneDueErasure(ctx context.Context, db *store.DB) {
 		return // no work or transient
 	}
 
-	// Cascading delete. The schema's ON DELETE CASCADE on tenants(id) does
-	// the heavy lifting for the dozens of dependent tables. For safety we
-	// don't delete the tenants row itself (an operator may want to keep
-	// the tenant ID for audit) — instead we delete child rows directly.
-	// Tenants row deletion is a separate manual step, documented in the
-	// erasure runbook.
-	tables := []string{
-		"findings", "runs", "compliance_evidence", "audit_log",
-		"siem_webhooks", "policy_rules", "feature_config",
-		"slsa_provenance", "users", "ir_incidents", "circia_reports",
+	// L7 2026-05-09: erase from EVERY tenant_id-bearing table, not a
+	// hardcoded subset. The pre-L7 list covered 11 tables; the schema
+	// has 77, so 62 tables retained tenant PII after "erasure" — a
+	// clear GDPR Art.17 / PDPA Decree 13/2023 violation that compounds
+	// every time a migration adds a new tenant-scoped table.
+	//
+	// We enumerate from information_schema in the same tx so a writer
+	// adding a new tenant_id column can't slip past us. Some tables
+	// must SURVIVE the erasure — the request log itself
+	// (data_subject_requests) so the audit trail of the deletion
+	// exists, and a few residency/billing config tables tracked
+	// separately. eraseTableExclude lists those.
+	rows, err := tx.Query(ctx,
+		`SELECT table_name FROM information_schema.columns
+		  WHERE column_name='tenant_id' AND table_schema='public'
+		  ORDER BY table_name`)
+	if err != nil {
+		return
 	}
-	for _, tbl := range tables {
+	var allTables []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err == nil {
+			allTables = append(allTables, t)
+		}
+	}
+	rows.Close()
+	for _, tbl := range allTables {
+		if eraseTableExclude[tbl] {
+			continue
+		}
+		// Identifier comes from information_schema (server-side) so it's
+		// safe to interpolate; no user-controllable input reaches here.
+		// Use IF EXISTS-ish behavior by ignoring errors — a per-table
+		// failure shouldn't abort the whole erasure (we re-tick later).
 		_, _ = tx.Exec(ctx, "DELETE FROM "+tbl+" WHERE tenant_id = $1", tenantID)
 	}
 	if _, err := tx.Exec(ctx,

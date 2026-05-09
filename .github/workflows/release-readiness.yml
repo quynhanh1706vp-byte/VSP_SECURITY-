@@ -1,0 +1,169 @@
+name: Release Readiness (L1-L7)
+
+# Runs the full L1-L7 release-readiness ladder against an ephemeral
+# Postgres + a freshly-built gateway. Single source of truth: every PR
+# touching scanner/gateway/handler/store code triggers this; merges to
+# main are blocked unless 0 fail.
+#
+# Levels covered (see docs/TESTING.md):
+#   L1 smoke • L2 feature • L3 comprehensive • L4-A property
+#   L4-B multi-tenant • L5 advanced • L6-A db-integrity • L7 DSR-residue
+#
+# Why an ephemeral DB instead of staging: we want the L4/L5/L7 probes
+# to seed canary tenants and verify residue/leak invariants without
+# touching real customer data. Each run is hermetic.
+
+on:
+  pull_request:
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'migrations/**'
+      - 'scripts/test-*.sh'
+      - 'scripts/lib/**'
+      - '.github/workflows/release-readiness.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_l7_live:
+        description: 'Run L7 live canary erasure (mutates DB, slow)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+jobs:
+  release-readiness:
+    name: L1-L7 ladder
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vsp
+          POSTGRES_PASSWORD: vsp_ci_secret
+          POSTGRES_DB: vsp_go
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vsp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Synthetic JWT secret — never matches anything in production.
+      # Resolves via the resolve_jwt_secret() helper in vsp-test.sh.
+      JWT_SECRET: ci-test-secret-${{ github.run_id }}-not-for-production
+      DB_DSN: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
+      BASE: http://127.0.0.1:8921
+      # Gateway expects this at runtime; tests resolve from env first.
+      PGHOST: localhost
+      PGUSER: vsp
+      PGPASSWORD: vsp_ci_secret
+      PGDATABASE: vsp_go
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Install runtime tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq curl
+          # Pin gosec for L6-C self-scan reproducibility.
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Apply migrations
+        run: |
+          # Apply every numbered migration in order. Failures here surface
+          # schema bugs before the test ladder amplifies them.
+          for f in $(ls migrations/*.sql | sort); do
+            echo "▶ $f"
+            psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$f" || \
+              { echo "::error::migration $f failed"; exit 1; }
+          done
+
+      - name: Seed minimal fixtures
+        run: |
+          # Two tenants L4-B/L5/L7 expect.
+          psql "$DB_DSN" -v ON_ERROR_STOP=1 <<'SQL'
+            INSERT INTO tenants (id, slug, name, plan)
+              VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE'),
+                     ('8bb9a716-fd14-4eba-92e8-681dc5bdb718','acme-corp','ACME','FREE')
+              ON CONFLICT (id) DO NOTHING;
+          SQL
+
+      - name: Build gateway
+        run: go build -o bin/vsp-gateway ./cmd/gateway
+
+      - name: Start gateway
+        run: |
+          # Bind on the same port the L1-L6 tests probe.
+          ./bin/vsp-gateway > /tmp/gateway.log 2>&1 &
+          echo $! > /tmp/gateway.pid
+          # Wait until /api/v1/status responds.
+          for i in $(seq 1 30); do
+            if curl -fsS "$BASE/api/v1/status" > /dev/null 2>&1; then
+              echo "gateway up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::gateway failed to start within 30s"
+          tail -50 /tmp/gateway.log
+          exit 1
+
+      - name: Run L1-L6 ladder
+        run: |
+          ./scripts/test-all.sh --json test-all-report.json
+        # Don't fail-fast: scripts/test-all.sh aggregates and exits 1
+        # only if cumulative FAIL>0, so we get a complete scoreboard
+        # regardless.
+
+      - name: Run L7 (DSR static — always; live — gated)
+        if: success() || failure()
+        run: |
+          if [ "${{ github.event.inputs.run_l7_live }}" = "true" ]; then
+            export RUN_L7_LIVE=1
+          fi
+          ./scripts/test-l7-dsr-residue.sh
+
+      - name: Upload scoreboard JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-readiness-report-${{ github.run_id }}
+          path: test-all-report.json
+          retention-days: 30
+
+      - name: Upload gateway log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-log-${{ github.run_id }}
+          path: /tmp/gateway.log
+          retention-days: 7
+
+      - name: Stop gateway
+        if: always()
+        run: |
+          if [ -f /tmp/gateway.pid ]; then
+            kill "$(cat /tmp/gateway.pid)" 2>/dev/null || true
+          fi

@@ -41,15 +41,9 @@ fi
 
 # ── token mint ─────────────────────────────────────────────────────────────
 
-# Read JWT_SECRET fresh from the canonical file every time. We deliberately
-# do NOT fall back to the env value — that masked a real bug in iter 1
-# (a stale exported $JWT_SECRET from an earlier shell session signed
-# tokens with a rotated-out key, every probe got 401). Running env can
-# override via $VSP_JWT_SECRET_FILE if that file path moves.
-_secret_file="${VSP_JWT_SECRET_FILE:-/etc/vsp/env.production}"
-JWT_SECRET=$(sudo grep '^JWT_SECRET=' "$_secret_file" 2>/dev/null | cut -d= -f2-)
+JWT_SECRET=$(resolve_jwt_secret)
 if [[ -z "$JWT_SECRET" ]]; then
-  printf "%s✗%s JWT_SECRET not available; set VSP_JWT_SECRET_FILE or put in /etc/vsp/env.production\n" "$C_RED" "$C_RESET" >&2
+  printf "%s✗%s JWT_SECRET not available; export JWT_SECRET, point VSP_JWT_SECRET_FILE at a readable file, or run from a host with sudo + /etc/vsp/env.production\n" "$C_RED" "$C_RESET" >&2
   exit 2
 fi
 
