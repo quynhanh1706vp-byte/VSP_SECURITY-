@@ -139,6 +139,47 @@ JSON POSTs, slowloris read-timeout under 75 s, expensive endpoint
 per-tenant lockout isolation (tenant B not affected by tenant A
 bursts).
 
+### L18 — Schema migration safety
+
+`scripts/test-l18-migration-safety.sh` — 6 cases, ≈ 1 s.
+
+Static + idempotency probes against `migrations/*.sql`: filename
+layout conformance, duplicate-prefix detection (with forward+rollback
+pair allow-list), non-empty content, `DROP` always uses `IF EXISTS`,
+re-applying the latest migration succeeds (idempotency contract),
+no `SET search_path` that would clobber RLS context.
+
+### L19 — ReDoS static scan
+
+`scripts/test-l19-redos.sh` — 4 cases, ≈ 1 s.
+
+Hand-rolled regex pattern audit. Asserts: no external regex engine
+is imported (RE2/stdlib only), no nested-quantifier / greedy-chain /
+alternation-with-prefix-overlap shapes in any compiled pattern,
+every regex compiled from a string literal (never user-controllable
+input), every regex inside `internal/api/handler/` is hoisted to
+package level rather than re-compiled per request.
+
+### L20 — Dependency license + supply-chain audit
+
+`scripts/test-l20-deps-license.sh` — 4 cases, ≈ 30 s.
+
+Runs `go-licenses csv ./cmd/gateway/...`, then asserts: every
+THIRD-PARTY dep has a recognised SPDX license, no GPL / AGPL / SSPL
+deps that would force open-sourcing, every license is on the
+commercial-friendly allow-list (MIT, Apache-2.0, BSD-2/3, ISC, MPL-
+2.0), `go mod verify` clean.
+
+### L21 — File-upload safety
+
+`scripts/test-l21-upload-safety.sh` — 6 cases, ≈ 5 s.
+
+Active probes against `POST /compliance/evidence`: path-traversal
+filename sanitised on download, MIME confusion blocked (attachment
+disposition or `nosniff`), oversized (50 MB) rejected, zero-byte
+non-fatal, CRLF in filename neutralised, no archive extraction in
+upload handlers (zip slip structurally N/A).
+
 ### L11 — Mutation testing (hand-rolled)
 
 `scripts/test-l11-mutation.sh` — 8 cases, ≈ 30 s.

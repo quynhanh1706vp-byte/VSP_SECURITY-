@@ -14,6 +14,12 @@ import (
 	"github.com/vsp/platform/internal/store"
 )
 
+// L19 2026-05-09: hoisted from inside Report.PDF where MustCompile was
+// called on every request. Compile-once at package init avoids the
+// pattern parser cost per call AND removes the function-scope regex
+// that L19 ReDoS scan flags as a hot-loop pattern.
+var ridSafePattern = regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
+
 // GET /api/v1/vsp/run_report_pdf/{rid}
 // Renders HTML report to PDF using wkhtmltopdf or weasyprint
 func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +65,7 @@ func (h *Report) PDF(w http.ResponseWriter, r *http.Request) {
 
 	// Try wkhtmltopdf first, then weasyprint, then fallback to HTML
 	// Sanitize rid — chặn path traversal
-	ridSafe := regexp.MustCompile(`[^a-zA-Z0-9_\-]`).ReplaceAllString(rid, "")
+	ridSafe := ridSafePattern.ReplaceAllString(rid, "")
 	if ridSafe == "" {
 		ridSafe = "unknown"
 	}

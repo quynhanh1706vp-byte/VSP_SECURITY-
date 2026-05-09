@@ -136,6 +136,10 @@ run_level "L13 frontend"        "$ROOT/scripts/test-l13-frontend.sh"
 run_level "L15 http-hygiene"    "$ROOT/scripts/test-l15-http-hygiene.sh"
 run_level "L16 info-disclosure" "$ROOT/scripts/test-l16-info-disclosure.sh"
 run_level "L17 ratelimit"       "$ROOT/scripts/test-l17-ratelimit.sh"
+run_level "L18 migration"       "$ROOT/scripts/test-l18-migration-safety.sh"
+run_level "L19 redos"           "$ROOT/scripts/test-l19-redos.sh"
+run_level "L20 deps-license"    "$ROOT/scripts/test-l20-deps-license.sh"
+run_level "L21 upload-safety"   "$ROOT/scripts/test-l21-upload-safety.sh"
 
 # L12 chaos and L14 perf are gated — they mutate the live environment
 # (stop redis, kill PG conns, sustained burst). Enable explicitly
