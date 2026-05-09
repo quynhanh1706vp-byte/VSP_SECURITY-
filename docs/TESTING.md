@@ -169,6 +169,27 @@ don't 5xx. Numeric `?limit=999999999` clamped. Malformed UUID in path
 returns 400 not 500. Static watchdog: every JSON-decoding handler
 has at least one length check.
 
+### L25 — Race conditions / TOCTOU
+
+`scripts/test-l25-race-toctou.sh` — 5 cases, ≈ 15 s.
+
+Business-logic race probes: 5 concurrent DSR submissions don't
+corrupt rows; 5 concurrent plan UPDATEs converge to one of the
+attempted values; refresh+logout race correctly invalidates the
+old token; 5 concurrent tool-config PUTs leave coherent JSON;
+audit-verify during a 30-event insert burst returns ok=true.
+
+### L26 — Resource cleanup audit
+
+`scripts/test-l26-resource-cleanup.sh` — 6 cases, ≈ 5 s.
+
+Static + behavioural cleanup audit: every `os.Open / os.Create`
+has a matching Close in its function; every `http.Response.Body`
+has a near-by Close; every DB `rows.Query` has a `rows.Close`
+within 60 lines; every multipart `FormFile` has a Close; every
+`tx.Begin` is paired with Commit or Rollback. Behavioural: open-FD
+count bounded after a 100-burst.
+
 ### L18 — Schema migration safety
 
 `scripts/test-l18-migration-safety.sh` — 6 cases, ≈ 1 s.
