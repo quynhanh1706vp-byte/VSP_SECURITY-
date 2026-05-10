@@ -81,7 +81,22 @@ phase_open "35.2 SIEM webhook URL — block internal/metadata SSRF"
 #   - localhost / 127.0.0.1 / ::1
 #   - private RFC 1918 / link-local
 #   - non-http(s) schemes (gopher, dict, file, ftp)
+# Also probe 8 alternate encodings of 127.0.0.1 — a partial allowlist
+# that string-matches "127.0.0.1" / "localhost" but not "0177.0.0.1"
+# is a classic SSRF bypass pattern.
 
+# _probe_webhook URL → returns HTTP code from POST /api/v1/siem/webhooks.
+_probe_webhook() {
+  local body
+  body=$(printf '{"name":"l35-probe","url":"%s","provider":"generic"}' "$1")
+  curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+    -X POST -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ADMIN" \
+    -d "$body" \
+    "$BASE/api/v1/siem/webhooks" 2>/dev/null || echo "000"
+}
+
+# 35.2.A baseline — all canonical SSRF targets.
 for ssrf_url in \
     "http://169.254.169.254/latest/meta-data/" \
     "http://169.254.169.254/computeMetadata/v1/" \
@@ -93,20 +108,60 @@ for ssrf_url in \
     "file:///etc/passwd" \
     "dict://127.0.0.1:11211/stat" \
   ; do
-  body=$(printf '{"name":"l35-probe","url":"%s","provider":"generic"}' "$ssrf_url")
-  status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    -X POST -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $ADMIN" \
-    -d "$body" \
-    "$BASE/api/v1/siem/webhooks" 2>/dev/null || echo "000")
-
+  status=$(_probe_webhook "$ssrf_url")
   if [[ "$status" =~ ^4 ]]; then
-    _pass "35.2 webhook rejects '$ssrf_url' [HTTP $status]"
+    _pass "35.2.A webhook rejects '$ssrf_url' [HTTP $status]"
   elif [[ "$status" == "404" || "$status" == "405" || "$status" == "501" ]]; then
-    # Endpoint not mounted in this build — skip rather than false-pass.
-    _skip "35.2 webhook URL $ssrf_url" "endpoint not available [HTTP $status]"
+    _skip "35.2.A webhook URL $ssrf_url" "endpoint not available [HTTP $status]"
   else
-    _fail "35.2 webhook accepted SSRF URL '$ssrf_url'" "HTTP $status"
+    _fail "35.2.A webhook accepted SSRF URL '$ssrf_url'" "HTTP $status"
+  fi
+done
+
+# 35.2.B IP-encoding bypass — 8 forms that all resolve to 127.0.0.1.
+# Each must be rejected just as cleanly as the canonical form.
+for variant in \
+    "http://127.1/" \
+    "http://127.0.1/" \
+    "http://0177.0.0.1/" \
+    "http://0x7f.0.0.1/" \
+    "http://0x7f000001/" \
+    "http://2130706433/" \
+    "http://[::ffff:127.0.0.1]/" \
+    "http://[::1]/" \
+  ; do
+  status=$(_probe_webhook "$variant")
+  if [[ "$status" =~ ^4 ]]; then
+    _pass "35.2.B IP-encoding '$variant' rejected [HTTP $status]"
+  elif [[ "$status" == "404" || "$status" == "405" || "$status" == "501" ]]; then
+    _skip "35.2.B IP-encoding $variant" "endpoint not available [HTTP $status]"
+  elif [[ "$status" =~ ^2 ]]; then
+    _fail "35.2.B IP-encoding bypass '$variant'" \
+      "HTTP $status — allowlist matches 127.0.0.1 literal but missed encoding"
+  else
+    _skip "35.2.B IP-encoding $variant" "unexpected HTTP $status"
+  fi
+done
+
+# 35.2.C Embedded-credentials bypass — http://attacker@127.0.0.1/.
+# Some URL parsers extract attacker.com as host, others 127.0.0.1.
+for cred_variant in \
+    "http://attacker.com@127.0.0.1/" \
+    "http://attacker.com@127.0.0.1:6379/" \
+    "http://attacker.com@169.254.169.254/" \
+    "http://allowed.com#@127.0.0.1/" \
+    "http://allowed.com?@127.0.0.1/" \
+  ; do
+  status=$(_probe_webhook "$cred_variant")
+  if [[ "$status" =~ ^4 ]]; then
+    _pass "35.2.C embedded-cred '$cred_variant' rejected [HTTP $status]"
+  elif [[ "$status" == "404" || "$status" == "405" || "$status" == "501" ]]; then
+    _skip "35.2.C embedded-cred" "endpoint not available [HTTP $status]"
+  elif [[ "$status" =~ ^2 ]]; then
+    _fail "35.2.C embedded-cred bypass '$cred_variant'" \
+      "HTTP $status — host-extraction inconsistency"
+  else
+    _skip "35.2.C embedded-cred" "unexpected HTTP $status"
   fi
 done
 

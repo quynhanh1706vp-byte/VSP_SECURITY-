@@ -44,22 +44,59 @@ ADMIN="${TOKEN_ADMIN:-$($ROOT/scripts/mint_jwt_local.sh admin "${JWT_SECRET:-dev
 
 phase_open "29.1 Email PII — request payloads aren't logged"
 
-CANARY_EMAIL="l38-pii-canary-$(date +%s%N | sha256sum | head -c 12)@vsp-pii-probe.test"
+# A unique sentinel per channel so we can pinpoint WHICH input vector
+# leaked, not just that something did.
+CANARY_BASE="l38-pii-$(date +%s%N | sha256sum | head -c 10)"
+CANARY_BODY="${CANARY_BASE}-body@vsp-pii.test"
+CANARY_FORM="${CANARY_BASE}-form@vsp-pii.test"
+CANARY_QUERY="${CANARY_BASE}-query@vsp-pii.test"
+CANARY_HEADER="${CANARY_BASE}-header@vsp-pii.test"
+CANARY_UPPER="L38-PII-${CANARY_BASE^^}-CASE@VSP-PII.TEST"
 
-# Probe several handlers that might log request body.
+# Channel 1: JSON body via /auth/login (auth handler) and /data/erasure
 curl -s -o /dev/null --max-time 5 -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN" \
-  -d "{\"email\":\"$CANARY_EMAIL\",\"password\":\"l38-NEVER-LOG-pwd\"}" \
+  -d "{\"email\":\"$CANARY_BODY\",\"password\":\"l38-NEVER-LOG-pwd\"}" \
   "$BASE/api/v1/auth/login" 2>/dev/null || true
 
 curl -s -o /dev/null --max-time 5 -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN" \
-  -d "{\"email\":\"$CANARY_EMAIL\",\"reason\":\"l38 probe\"}" \
+  -d "{\"email\":\"$CANARY_BODY\",\"reason\":\"l38 probe\"}" \
   "$BASE/api/v1/data/erasure" 2>/dev/null || true
 
-# Give async log writers ~1.5s to flush.
+# Channel 2: form-encoded body
+curl -s -o /dev/null --max-time 5 -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "Authorization: Bearer $ADMIN" \
+  --data-urlencode "email=$CANARY_FORM" \
+  --data-urlencode "password=l38-NEVER-LOG-pwd" \
+  "$BASE/api/v1/auth/login" 2>/dev/null || true
+
+# Channel 3: query parameter — many access logs include the query string
+curl -s -o /dev/null --max-time 5 \
+  -H "Authorization: Bearer $ADMIN" \
+  "$BASE/api/v1/audit/log?email=$(printf '%s' "$CANARY_QUERY" | jq -sRr @uri)&limit=1" \
+  2>/dev/null || true
+
+# Channel 4: custom request header
+curl -s -o /dev/null --max-time 5 \
+  -H "Authorization: Bearer $ADMIN" \
+  -H "X-Forwarded-Email: $CANARY_HEADER" \
+  -H "X-Original-User: $CANARY_HEADER" \
+  "$BASE/api/v1/kpi/sanity" 2>/dev/null || true
+
+# Channel 5: UPPERCASE/MIXED case sentinel — confirms the grep below
+# is case-insensitive. A logger that lowercases payloads would otherwise
+# evade a case-sensitive search.
+curl -s -o /dev/null --max-time 5 -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN" \
+  -d "{\"email\":\"$CANARY_UPPER\"}" \
+  "$BASE/api/v1/auth/login" 2>/dev/null || true
+
+# Give async log writers ~2s to flush.
 sleep 2
 
 # Refresh the log capture so we see what just got written.
@@ -69,11 +106,48 @@ elif command -v journalctl &>/dev/null; then
   sudo journalctl -u vsp-gateway --no-pager -n 500 2>/dev/null > "$LOG_TMP" || true
 fi
 
-if grep -qF "$CANARY_EMAIL" "$LOG_TMP"; then
-  HIT=$(grep -nF "$CANARY_EMAIL" "$LOG_TMP" | head -1)
-  _fail "29.1.1 canary email leaked into log" "first hit: $HIT"
+# Search for ANY of the channel sentinels — case-insensitive so a
+# lowercased log line containing l38-PII-ABCDEF-CASE@vsp-pii.test
+# (case fold) still triggers the failure.
+declare -A LEAK_BY_CHANNEL=(
+  [body]="$CANARY_BODY"
+  [form]="$CANARY_FORM"
+  [query]="$CANARY_QUERY"
+  [header]="$CANARY_HEADER"
+  [upper-case]="$CANARY_UPPER"
+)
+LEAKS=""
+for chan in "${!LEAK_BY_CHANNEL[@]}"; do
+  needle="${LEAK_BY_CHANNEL[$chan]}"
+  if grep -iqF "$needle" "$LOG_TMP" 2>/dev/null; then
+    LEAKS+="$chan "
+  fi
+done
+
+if [[ -n "$LEAKS" ]]; then
+  HIT=$(grep -inF "$CANARY_BASE" "$LOG_TMP" | head -1)
+  _fail "29.1.1 canary email leaked into log" \
+    "channels with leak: ${LEAKS}— first hit: $HIT"
 else
-  _pass "29.1.1 canary email not in log [$(wc -l <"$LOG_TMP") lines scanned]"
+  _pass "29.1.1 no canary email across 5 channels [$(wc -l <"$LOG_TMP") lines scanned]"
+fi
+
+# 29.1.2 — Validation-error body must NOT echo the email back. Some
+# JSON validators include the offending value in the error message
+# ("invalid email: <user-input>"), which surfaces in error pages and
+# log lines indexed by SRE tooling.
+ERR_CANARY="${CANARY_BASE}-error-echo@vsp-pii.test"
+err_body=$(curl -s --max-time 5 -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN" \
+  -d "{\"email\":\"$ERR_CANARY\",\"reason\":\"\"}" \
+  "$BASE/api/v1/data/erasure" 2>/dev/null || true)
+
+if echo "$err_body" | grep -iqF "$ERR_CANARY"; then
+  _fail "29.1.2 validation error echoed PII back" \
+    "response body contains the input email — review error formatting"
+else
+  _pass "29.1.2 validation error doesn't echo input email"
 fi
 
 # ── 29.2 Password / secret literals never logged ──────────────────────────
