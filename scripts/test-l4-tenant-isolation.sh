@@ -258,7 +258,13 @@ PROBE_FINDINGS_A=$(curl -s --max-time 10 -H "Authorization: Bearer $TOKEN_A" "$B
 PROBE_FINDINGS_B=$(curl -s --max-time 10 -H "Authorization: Bearer $TOKEN_B" "$BASE/api/v1/vsp/findings/summary" 2>/dev/null | jq -r '.total // .total_findings // empty' 2>/dev/null || echo "")
 
 if [[ -n "$PROBE_FINDINGS_A" && -n "$PROBE_FINDINGS_B" ]]; then
-  if [[ "$PROBE_FINDINGS_A" == "$PROBE_FINDINGS_B" ]]; then
+  # Both tenants reporting 0 in a clean DB is *expected*, not a leak —
+  # the cache-blind bug this catches only manifests when there ARE
+  # findings and both tenants get the same count. Skip if both are 0.
+  if [[ "$PROBE_FINDINGS_A" == "0" && "$PROBE_FINDINGS_B" == "0" ]]; then
+    _skip "5.4.1 findings/summary tenant-scoped" \
+      "no findings seeded in either tenant — assertion needs data"
+  elif [[ "$PROBE_FINDINGS_A" == "$PROBE_FINDINGS_B" ]]; then
     _fail "5.4.1 findings/summary differs per tenant" \
       "both tenants reported total=$PROBE_FINDINGS_A — looks tenant-blind"
   else

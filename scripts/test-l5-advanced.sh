@@ -247,10 +247,13 @@ phase_open "6.3 Concurrency — cache stampede + tenant correctness"
 REDIS_PASS="${REDIS_PASSWORD:-${REDIS_PASS:-}}"
 if [[ -z "$REDIS_PASS" ]]; then
   _redis_file="${VSP_JWT_SECRET_FILE:-/etc/vsp/env.production}"
+  # `|| true` on the assignments below: when the file isn't there
+  # (CI), grep exits 2; under `set -euo pipefail` that propagates and
+  # killed L5 silently. The empty REDIS_PASS is the intended outcome.
   if [[ -r "$_redis_file" ]]; then
-    REDIS_PASS=$(grep -E '^REDIS_PASSWORD|^REDIS_PASS' "$_redis_file" 2>/dev/null | head -1 | cut -d= -f2-)
+    REDIS_PASS=$(grep -E '^REDIS_PASSWORD|^REDIS_PASS' "$_redis_file" 2>/dev/null | head -1 | cut -d= -f2- || true)
   elif command -v sudo &>/dev/null && sudo -n true 2>/dev/null; then
-    REDIS_PASS=$(sudo grep -E '^REDIS_PASSWORD|^REDIS_PASS' "$_redis_file" 2>/dev/null | head -1 | cut -d= -f2-)
+    REDIS_PASS=$(sudo grep -E '^REDIS_PASSWORD|^REDIS_PASS' "$_redis_file" 2>/dev/null | head -1 | cut -d= -f2- || true)
   fi
 fi
 if [[ -n "$REDIS_PASS" ]]; then
