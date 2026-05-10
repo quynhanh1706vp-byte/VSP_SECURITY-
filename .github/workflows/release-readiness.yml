@@ -5,19 +5,20 @@ name: Release Readiness (L1-L34)
 # every PR touching scanner/gateway/handler/store/migration code
 # triggers this; merges to main are blocked unless cumulative FAIL=0.
 #
-# Levels covered (32 levels — see docs/TESTING.md):
-#   L1  smoke           L11 mutation         L22 sqli
-#   L2  feature         L13 frontend         L23 trust-boundary
-#   L3  comprehensive   L14 perf-smoke       L24 input-validation
-#   L4-A property       L15 http-hygiene     L25 race-toctou
-#   L4-B multi-tenant   L16 info-disclosure  L26 resource-cleanup
-#   L5  advanced        L17 ratelimit        L27 observability
-#   L6-A db-integrity   L18 migration        L28 secrets
-#   L6-C gosec dogfood  L19 redos            L29 time-correctness
-#   L7  DSR-residue     L20 deps-license     L30 container-deploy
-#   L8  security-depth  L21 upload-safety    L32 bypass
-#   L9  lifecycle       L33 semgrep          L34 fuzz
-#   L10 openapi
+# Levels covered (34 levels — see docs/TESTING.md):
+#   L1  smoke           L13 frontend         L25 race-toctou
+#   L2  feature         L14 perf-smoke       L26 resource-cleanup
+#   L3  comprehensive   L15 http-hygiene     L27 observability
+#   L4-A property       L16 info-disclosure  L28 secrets
+#   L4-B multi-tenant   L17 ratelimit        L29 time-correctness
+#   L5  advanced        L18 migration        L30 container-deploy
+#   L6-A db-integrity   L19 redos            L31 jwt-attacks
+#   L6-C gosec dogfood  L20 deps-license     L32 bypass
+#   L7  DSR-residue     L21 upload-safety    L33 semgrep
+#   L8  security-depth  L22 sqli             L34 fuzz
+#   L9  lifecycle       L23 trust-boundary   L35 redirect-ssrf
+#   L10 openapi         L24 input-validation L38 log-pii-leak
+#   L11 mutation
 #
 # Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
 # canary tenants and verify residue/leak invariants without touching
