@@ -130,18 +130,33 @@ jobs:
 
       - name: Apply migrations
         run: |
-          # Apply every numbered migration in order. Several historical
-          # migrations expect tables that the gateway creates at runtime
-          # (store-layer auto-init), so individual failures are
-          # SOFT-failures here — we log them and continue. The gateway's
-          # own boot will create missing tables; if a migration was
-          # genuinely broken in a way that blocks the gateway, the
-          # subsequent "Start gateway" step will catch it.
+          # Migrations are written in goose format with both `+goose Up`
+          # and `+goose Down` sections in the same file. `psql -f` is
+          # NOT goose-aware — it runs the whole file, so the Down block
+          # drops every table the Up block just created. Production
+          # uses a real goose runner; CI strips the Down section with
+          # awk so psql only sees the forward migration.
+          #
+          # Several historical migrations also depend on tables that
+          # the gateway creates at runtime (store-layer auto-init), so
+          # individual failures are SOFT-failures — we log and continue.
+          # The "Start gateway" step is the hard gate: if a migration
+          # was genuinely broken, the gateway will fail to boot.
           mkdir -p /tmp/migrations
           fail_count=0
           for f in $(ls migrations/*.sql | sort); do
             echo "▶ $f"
-            if ! psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$f" \
+            up_only="/tmp/migrations/$(basename "$f").up.sql"
+            # Keep everything from `-- +goose Up` up to (but excluding)
+            # `-- +goose Down`. If neither marker is present, take the
+            # whole file — non-goose migrations are unaffected.
+            awk '
+              /-- \+goose Down/ { stop=1 }
+              /-- \+goose Up/   { keep=1; next }
+              keep && !stop     { print }
+              !/-- \+goose/ && !keep && !stop { print }
+            ' "$f" > "$up_only"
+            if ! psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$up_only" \
                  > "/tmp/migrations/$(basename "$f").out" 2>&1; then
               echo "::warning::migration $(basename "$f") failed (soft) — gateway boot will retry"
               tail -3 "/tmp/migrations/$(basename "$f").out"
