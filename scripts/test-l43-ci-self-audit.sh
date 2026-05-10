@@ -107,48 +107,46 @@ phase_open "43.4 No `echo \${{ secrets.* }}` patterns"
 #   echo "..." | helm registry login ... --password-stdin
 #   echo "..." | crane auth login ... --password-stdin
 #   echo "..." | cosign login ... --password-stdin
-SECRET_ECHO=$(grep -rEn 'echo[[:space:]]*"?\$\{\{[[:space:]]*secrets\.|cat.*<<.*secrets\.' \
-  "$WF_DIR" 2>/dev/null \
-  | grep -v '^\s*#' \
-  | grep -vE 'docker[[:space:]]+login.*--password-stdin|--password-stdin.*docker[[:space:]]+login|gh[[:space:]]+auth[[:space:]]+login.*--with-token|helm[[:space:]]+registry[[:space:]]+login.*--password-stdin|crane[[:space:]]+auth[[:space:]]+login.*--password-stdin|cosign[[:space:]]+login.*--password-stdin' \
-  | head -3 || true)
-
-# Some workflows split the echo and the consumer across two lines via
-# trailing backslash. Re-scan with a 2-line window to catch
-#   echo "${{ secrets.X }}" | \
-#     docker login ... --password-stdin
-SECRET_ECHO_MULTILINE=""
+# Multi-line aware scan: an `echo "${{ secrets.X }}"` line continued
+# with `\` and piped to a known credential-stdin tool on the NEXT
+# line is the canonical safe pattern (docker login --password-stdin
+# etc.). Single-line `echo "${{ secrets.X }}" | docker login --password-stdin`
+# is also safe. Both must be allowlisted.
+LEAK=""
 for f in "$WF_DIR"/*.yml; do
   [[ -r "$f" ]] || continue
-  LEAK=$(awk '
-    /echo[[:space:]]+"?\$\{\{[[:space:]]*secrets\./ { hold=$0; held=1; next }
-    held {
-      combined=hold " " $0
-      if (combined ~ /docker[[:space:]]+login.*--password-stdin/ ||
-          combined ~ /gh[[:space:]]+auth[[:space:]]+login.*--with-token/ ||
-          combined ~ /helm[[:space:]]+registry[[:space:]]+login.*--password-stdin/ ||
-          combined ~ /crane[[:space:]]+auth[[:space:]]+login.*--password-stdin/ ||
-          combined ~ /cosign[[:space:]]+login.*--password-stdin/) {
-        held=0; next
+  HIT=$(awk '
+    function safe(s) {
+      return (s ~ /docker[[:space:]]+login.*--password-stdin/ ||
+              s ~ /gh[[:space:]]+auth[[:space:]]+login.*--with-token/ ||
+              s ~ /helm[[:space:]]+registry[[:space:]]+login.*--password-stdin/ ||
+              s ~ /crane[[:space:]]+auth[[:space:]]+login.*--password-stdin/ ||
+              s ~ /cosign[[:space:]]+login.*--password-stdin/)
+    }
+    /^[[:space:]]*#/ { next }
+    /echo[[:space:]]+"?\$\{\{[[:space:]]*secrets\./ {
+      # Look ahead one line if this line ends with `\` continuation,
+      # OR examine same line if no continuation.
+      combined = $0
+      if ($0 ~ /\\[[:space:]]*$/) {
+        getline next_line
+        combined = combined " " next_line
       }
-      print FILENAME ":" NR-1 ": " hold
-      held=0
+      if (!safe(combined)) {
+        print FILENAME ":" NR ": " $0
+      }
     }
   ' "$f" 2>/dev/null | head -1 || true)
-  if [[ -n "$LEAK" ]]; then
-    SECRET_ECHO_MULTILINE="$LEAK"
+  if [[ -n "$HIT" ]]; then
+    LEAK="$HIT"
     break
   fi
 done
 
-if [[ -n "$SECRET_ECHO" ]]; then
-  _fail "43.4.1 secrets potentially echoed in workflow" \
-    "$(echo "$SECRET_ECHO" | head -1)"
-elif [[ -n "$SECRET_ECHO_MULTILINE" ]]; then
-  _fail "43.4.1 secrets echoed (multi-line, not piped to safe consumer)" \
-    "$SECRET_ECHO_MULTILINE"
+if [[ -n "$LEAK" ]]; then
+  _fail "43.4.1 secrets echoed without safe stdin consumer" "$LEAK"
 else
-  _pass "43.4.1 no unsafe `echo \${{ secrets.* }}` patterns (safe stdin-pipes allowlisted)"
+  _pass "43.4.1 no unsafe \`echo \${{ secrets.* }}\` patterns (single-line + multi-line safe pipes allowlisted)"
 fi
 
 # 43.4.2 No printenv / env that would dump all env including secrets.
