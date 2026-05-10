@@ -115,7 +115,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client jq curl python3 \
-            python3-yaml redis-tools netcat-openbsd
+            python3-yaml redis-tools netcat-openbsd libpcap-dev
           # gosec for L6-C dogfood + go-licenses for L20 dep audit.
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           go install github.com/google/go-licenses@latest
