@@ -189,24 +189,26 @@ jobs:
           done
           echo "supplemental migrations: $fail_count soft-fail(s)"
           # Verify the SOAR secret tables that L10 depends on actually
-          # exist. They're created by 20260504_011_soar_extend.sql,
-          # which silently fails if `playbooks` doesn't exist.
+          # exist. They're created by 20260504_011_soar_extend.sql.
+          # Wrapped in `|| true` so a diagnostic query failure can't
+          # abort the whole step.
           echo "── current_user / schemas / search_path ──"
-          psql "$DB_DSN" -tAc "
-            SELECT current_user, current_database(),
-                   current_setting('search_path');"
-          echo "── ALL playbook_* relations across schemas ──"
-          psql "$DB_DSN" -tAc "
-            SELECT n.nspname || '.' || c.relname || ' (' || c.relkind || ')'
+          psql "$DB_DSN" -tAc \
+            "SELECT current_user, current_database(), current_setting('search_path');" \
+            || true
+          echo "── ALL playbook_* relations across schemas (relkind cast to text) ──"
+          psql "$DB_DSN" -tAc \
+            "SELECT n.nspname || '.' || c.relname || ' (' || c.relkind::text || ')'
               FROM pg_class c
               JOIN pg_namespace n ON n.oid = c.relnamespace
              WHERE c.relname LIKE 'playbook%'
-             ORDER BY n.nspname, c.relname;"
+             ORDER BY n.nspname, c.relname;" \
+            || true
           for t in playbook_secrets playbook_secret_audit; do
-            found=$(psql "$DB_DSN" -tAc "SELECT to_regclass('public.$t')")
+            found=$(psql "$DB_DSN" -tAc "SELECT to_regclass('public.$t')" 2>/dev/null || true)
             if [ -z "$found" ]; then
               echo "::warning::table $t MISSING — full 011 migration log:"
-              cat "/tmp/migrations/20260504_011_soar_extend.sql.out" 2>/dev/null
+              cat "/tmp/migrations/20260504_011_soar_extend.sql.out" 2>/dev/null || true
               echo "── re-running migration with verbose output ──"
               psql "$DB_DSN" -v ON_ERROR_STOP=1 -f \
                 "/tmp/migrations/20260504_011_soar_extend.sql.up.sql" 2>&1 \
