@@ -37,6 +37,9 @@ vsp_*.js
 !static/vsp_sw_inventory_panel.js
 !static/vsp_scheduler_panel.js
 !static/vsp_email_panel.js
+!static/vsp_dast_panel.js
+!static/panels/vsp_pro_paginate.js
+!static/patches/vsp_advanced_features_v7.js
 vsp_features_patch.js
 static/vsp_features_patch.js
 
