@@ -125,12 +125,21 @@ fi
 
 phase_open "29.4 Common PII patterns (credit card / SSN / phone)"
 
-# Luhn-shaped 13-19 digit sequences — credit cards.
-CC_HITS=$(grep -oE '\b[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}\b' "$LOG_TMP" 2>/dev/null | head -1 || true)
+# Luhn-shaped 13-19 digit sequences — credit cards. Exclude lines
+# that contain a UUID anywhere (uuids look like 4-4-4-4 from the
+# middle of an 8-4-4-4-12 string, which causes a false positive).
+# Strip UUIDs from each log line FIRST, then look for CC-shape on
+# what remains.
+UUID_RE='[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+CC_RE='\b[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}\b'
+CC_HITS=$(sed -E "s/$UUID_RE//g" "$LOG_TMP" 2>/dev/null \
+          | grep -oE "$CC_RE" \
+          | grep -v '^0000' \
+          | head -1 || true)
 if [[ -n "$CC_HITS" ]]; then
   _fail "29.4.1 credit-card-shaped digits in log" "$CC_HITS"
 else
-  _pass "29.4.1 no credit-card-shaped digits"
+  _pass "29.4.1 no plausible credit-card digits [UUIDs stripped, all-zero runs ignored]"
 fi
 
 # Vietnamese phone numbers (10-11 digits starting 0).
