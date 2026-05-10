@@ -1,0 +1,146 @@
+name: Nightly Deep Test
+
+# Runs the heavier-weight probes that aren't suitable for every-PR
+# CI: 60-second-per-target fuzz exploration, perf soak under
+# sustained load, chaos (mutates upstream services), L7 live-canary
+# erasure. Cron-scheduled so a regression that would slip past the
+# fast lane gets caught within 24 hours.
+#
+# Trigger manually via workflow_dispatch when you want a deeper run
+# on a specific PR (paste the PR's commit SHA into the input).
+
+on:
+  schedule:
+    # 03:00 UTC daily — well outside business-hours pressure.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Commit / branch to test (default: main)'
+        required: false
+        default: 'main'
+      fuzztime:
+        description: 'L34 fuzz budget per target (default 60s)'
+        required: false
+        default: '60s'
+
+permissions:
+  contents: read
+
+jobs:
+  deep-soak:
+    name: deep-soak (L7 live + L12 chaos + L14 perf + L34 60s fuzz)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vsp
+          POSTGRES_PASSWORD: vsp_ci_secret
+          POSTGRES_DB: vsp_go
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vsp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      JWT_SECRET: ci-nightly-${{ github.run_id }}
+      DB_DSN: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
+      BASE: http://127.0.0.1:8921
+      PGHOST: localhost
+      PGUSER: vsp
+      PGPASSWORD: vsp_ci_secret
+      PGDATABASE: vsp_go
+      RUN_L7: '1'
+      RUN_L7_LIVE: '1'
+      RUN_PERF: '1'
+      RUN_CHAOS: '1'
+      PERF_DUR: '60s'
+      FUZZTIME: ${{ github.event.inputs.fuzztime || '60s' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || 'main' }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq curl python3 \
+            python3-yaml redis-tools netcat-openbsd
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/google/go-licenses@latest
+          go install github.com/tsenart/vegeta/v12@latest
+          pip install --user semgrep || pip3 install --user semgrep
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Migrate + seed
+        run: |
+          for f in $(ls migrations/*.sql | sort); do
+            psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$f"
+          done
+          psql "$DB_DSN" <<'SQL'
+            INSERT INTO tenants (id, slug, name, plan)
+              VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE'),
+                     ('8bb9a716-fd14-4eba-92e8-681dc5bdb718','acme-corp','ACME','FREE')
+              ON CONFLICT (id) DO NOTHING;
+          SQL
+
+      - name: Build + start gateway
+        run: |
+          go build -o bin/vsp-gateway ./cmd/gateway
+          ./bin/vsp-gateway > /tmp/gateway.log 2>&1 &
+          echo $! > /tmp/gateway.pid
+          for i in $(seq 1 30); do
+            curl -fsS "$BASE/api/v1/status" > /dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          tail -80 /tmp/gateway.log; exit 1
+
+      - name: Full ladder + heavy probes
+        run: |
+          ./scripts/test-all.sh --json /tmp/nightly-report.json
+
+      - name: Upload nightly scoreboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-deep-${{ github.run_id }}
+          path: |
+            /tmp/nightly-report.json
+            /tmp/gateway.log
+          retention-days: 60
+
+      - name: Upload fuzz corpus expansion
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-nightly-${{ github.run_id }}
+          path: |
+            internal/auth/testdata/fuzz/**
+            internal/api/handler/testdata/fuzz/**
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Stop gateway
+        if: always()
+        run: kill "$(cat /tmp/gateway.pid 2>/dev/null)" 2>/dev/null || true

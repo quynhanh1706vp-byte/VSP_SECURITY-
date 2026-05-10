@@ -383,12 +383,50 @@ test rig (custom file path).
 
 ## CI integration
 
-`.github/workflows/release-readiness.yml` runs L1-L7 (8.1 always,
-8.2 only on workflow_dispatch with `run_l7_live=true`) against an
-ephemeral Postgres+Redis on every PR that touches gateway/handler/
-store/migration code. The aggregate scoreboard is uploaded as a
-`release-readiness-report-<run_id>.json` artifact. Cumulative FAIL>0
-blocks merge.
+Two GitHub Actions workflows back the ladder:
+
+### Per-PR fast lane — `.github/workflows/release-readiness.yml`
+
+Runs the full 32-level ladder against an ephemeral Postgres + Redis
+on every PR that touches `cmd/`, `internal/`, `migrations/`,
+`scripts/test-*.sh`, or `go.mod`. Cumulative FAIL > 0 blocks merge.
+
+Inputs (via `workflow_dispatch`):
+
+- `run_l7_live` — enable L7's live canary erasure (mutates DB).
+- `run_perf` — enable L14 vegeta burst (default 15s).
+- `run_chaos` — enable L12 chaos probes (Redis stop, PG conn kill).
+- `fuzztime` — L34 budget per target (default 8s).
+
+Artifacts uploaded:
+
+- `release-readiness-report-<run_id>.json` — aggregate scoreboard.
+- `gateway-log-<run_id>` — gateway stdout/stderr (only on failure).
+- `fuzz-corpus-<run_id>` — `testdata/fuzz/**` if a fuzz target found
+  a regression seed (only on failure).
+
+L6-C runs **out-of-band** as a separate gate step: `gosec` HIGH-
+severity findings fail the workflow even if the rest of the ladder
+passes (defense in depth — gosec evolves rule packs).
+
+### Nightly deep — `.github/workflows/nightly-deep.yml`
+
+Cron-runs at 03:00 UTC daily with all heavy switches enabled:
+`RUN_L7=1 RUN_L7_LIVE=1 RUN_PERF=1 RUN_CHAOS=1 PERF_DUR=60s
+FUZZTIME=60s`. Catches the regression class fast-lane budgets are
+too short to surface — memory / goroutine drift under sustained
+load, slow-emerging fuzz panics, chaos cascades.
+
+Failure attribution: when a nightly fails, the per-PR fast lane
+between the last green nightly and the first red nightly is the
+likely culprit window. Use `git log` between those commits to
+narrow.
+
+Both workflows upload fuzz corpus on failure — the
+`internal/auth/testdata/fuzz/` and
+`internal/api/handler/testdata/fuzz/` paths gather any panic-
+producing input, which a follow-up commit replays as a deterministic
+regression test.
 
 ## Adding a new level
 

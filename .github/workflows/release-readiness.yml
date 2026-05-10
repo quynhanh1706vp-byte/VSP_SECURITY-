@@ -1,17 +1,27 @@
-name: Release Readiness (L1-L7)
+name: Release Readiness (L1-L34)
 
-# Runs the full L1-L7 release-readiness ladder against an ephemeral
-# Postgres + a freshly-built gateway. Single source of truth: every PR
-# touching scanner/gateway/handler/store code triggers this; merges to
-# main are blocked unless 0 fail.
+# Runs the full release-readiness ladder against an ephemeral
+# Postgres + Redis + a freshly-built gateway. Single source of truth:
+# every PR touching scanner/gateway/handler/store/migration code
+# triggers this; merges to main are blocked unless cumulative FAIL=0.
 #
-# Levels covered (see docs/TESTING.md):
-#   L1 smoke • L2 feature • L3 comprehensive • L4-A property
-#   L4-B multi-tenant • L5 advanced • L6-A db-integrity • L7 DSR-residue
+# Levels covered (32 levels — see docs/TESTING.md):
+#   L1  smoke           L11 mutation         L22 sqli
+#   L2  feature         L13 frontend         L23 trust-boundary
+#   L3  comprehensive   L14 perf-smoke       L24 input-validation
+#   L4-A property       L15 http-hygiene     L25 race-toctou
+#   L4-B multi-tenant   L16 info-disclosure  L26 resource-cleanup
+#   L5  advanced        L17 ratelimit        L27 observability
+#   L6-A db-integrity   L18 migration        L28 secrets
+#   L6-C gosec dogfood  L19 redos            L29 time-correctness
+#   L7  DSR-residue     L20 deps-license     L30 container-deploy
+#   L8  security-depth  L21 upload-safety    L32 bypass
+#   L9  lifecycle       L33 semgrep          L34 fuzz
+#   L10 openapi
 #
-# Why an ephemeral DB instead of staging: we want the L4/L5/L7 probes
-# to seed canary tenants and verify residue/leak invariants without
-# touching real customer data. Each run is hermetic.
+# Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
+# canary tenants and verify residue/leak invariants without touching
+# real customer data. Each run is hermetic.
 
 on:
   pull_request:
@@ -21,6 +31,8 @@ on:
       - 'migrations/**'
       - 'scripts/test-*.sh'
       - 'scripts/lib/**'
+      - 'go.mod'
+      - 'go.sum'
       - '.github/workflows/release-readiness.yml'
   push:
     branches: [main]
@@ -30,15 +42,27 @@ on:
         description: 'Run L7 live canary erasure (mutates DB, slow)'
         required: false
         default: 'false'
+      run_perf:
+        description: 'Run L14 perf-smoke (vegeta 15s burst)'
+        required: false
+        default: 'false'
+      run_chaos:
+        description: 'Run L12 chaos (mutates upstream services)'
+        required: false
+        default: 'false'
+      fuzztime:
+        description: 'L34 fuzz budget per target (default 8s; bump to 60s for deeper)'
+        required: false
+        default: '8s'
 
 permissions:
   contents: read
 
 jobs:
   release-readiness:
-    name: L1-L7 ladder
+    name: L1-L34 ladder
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -69,11 +93,15 @@ jobs:
       JWT_SECRET: ci-test-secret-${{ github.run_id }}-not-for-production
       DB_DSN: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
       BASE: http://127.0.0.1:8921
-      # Gateway expects this at runtime; tests resolve from env first.
       PGHOST: localhost
       PGUSER: vsp
       PGPASSWORD: vsp_ci_secret
       PGDATABASE: vsp_go
+      # Pass dispatch inputs through to test-all.sh.
+      RUN_L7: ${{ github.event.inputs.run_l7_live == 'true' && '1' || '0' }}
+      RUN_PERF: ${{ github.event.inputs.run_perf == 'true' && '1' || '0' }}
+      RUN_CHAOS: ${{ github.event.inputs.run_chaos == 'true' && '1' || '0' }}
+      FUZZTIME: ${{ github.event.inputs.fuzztime || '8s' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -86,9 +114,19 @@ jobs:
       - name: Install runtime tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client jq curl
-          # Pin gosec for L6-C self-scan reproducibility.
+          sudo apt-get install -y -qq postgresql-client jq curl python3 \
+            python3-yaml redis-tools netcat-openbsd
+          # gosec for L6-C dogfood + go-licenses for L20 dep audit.
           go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/google/go-licenses@latest
+          # vegeta for L14 perf (only used when RUN_PERF=1).
+          if [ "${RUN_PERF:-0}" = "1" ]; then
+            go install github.com/tsenart/vegeta/v12@latest
+          fi
+          # semgrep for L33 (pip is the supported install path).
+          pip install --user semgrep || pip3 install --user semgrep
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Apply migrations
         run: |
@@ -102,7 +140,7 @@ jobs:
 
       - name: Seed minimal fixtures
         run: |
-          # Two tenants L4-B/L5/L7 expect.
+          # Two tenants L4-B/L5/L7/L25/L32 expect.
           psql "$DB_DSN" -v ON_ERROR_STOP=1 <<'SQL'
             INSERT INTO tenants (id, slug, name, plan)
               VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE'),
@@ -110,12 +148,14 @@ jobs:
               ON CONFLICT (id) DO NOTHING;
           SQL
 
-      - name: Build gateway
-        run: go build -o bin/vsp-gateway ./cmd/gateway
+      - name: Build gateway + scanner
+        run: |
+          go build -o bin/vsp-gateway ./cmd/gateway
+          go build -o bin/vsp-scanner ./cmd/scanner
 
       - name: Start gateway
         run: |
-          # Bind on the same port the L1-L6 tests probe.
+          # Bind on the same port the L1-L33 tests probe.
           ./bin/vsp-gateway > /tmp/gateway.log 2>&1 &
           echo $! > /tmp/gateway.pid
           # Wait until /api/v1/status responds.
@@ -127,30 +167,42 @@ jobs:
             sleep 1
           done
           echo "::error::gateway failed to start within 30s"
-          tail -50 /tmp/gateway.log
+          tail -80 /tmp/gateway.log
           exit 1
 
-      - name: Run L1-L6 ladder
+      - name: Run release-readiness ladder
         run: |
+          # test-all.sh aggregates 32 levels and exits 1 only if
+          # cumulative FAIL>0, so we get a complete scoreboard
+          # regardless of which level(s) fail.
           ./scripts/test-all.sh --json test-all-report.json
-        # Don't fail-fast: scripts/test-all.sh aggregates and exits 1
-        # only if cumulative FAIL>0, so we get a complete scoreboard
-        # regardless.
 
-      - name: Run L7 (DSR static — always; live — gated)
-        if: success() || failure()
+      - name: L6-C gosec dogfood (out-of-band severity gate)
+        if: always()
         run: |
-          if [ "${{ github.event.inputs.run_l7_live }}" = "true" ]; then
-            export RUN_L7_LIVE=1
+          # Run gosec against our own source. HIGH severity gates merge.
+          mkdir -p /tmp/l6c
+          gosec -fmt=json -severity=high -confidence=medium \
+            -exclude-dir=cmd/dev-stub \
+            -exclude-dir=internal/scanner \
+            ./... 2>/dev/null > /tmp/l6c/gosec.json || true
+          high_count=$(jq '[.Issues[] | select(.severity == "HIGH")] | length' /tmp/l6c/gosec.json 2>/dev/null || echo 0)
+          if [ "$high_count" -gt 0 ]; then
+            echo "::error::gosec found $high_count HIGH-severity issues"
+            jq '.Issues[] | select(.severity == "HIGH") | "\(.rule_id) \(.file):\(.line) \(.details)"' \
+              /tmp/l6c/gosec.json | head -20
+            exit 1
           fi
-          ./scripts/test-l7-dsr-residue.sh
+          echo "gosec clean: 0 HIGH-severity findings"
 
       - name: Upload scoreboard JSON
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: release-readiness-report-${{ github.run_id }}
-          path: test-all-report.json
+          path: |
+            test-all-report.json
+            /tmp/l6c/gosec.json
           retention-days: 30
 
       - name: Upload gateway log on failure
@@ -160,6 +212,17 @@ jobs:
           name: gateway-log-${{ github.run_id }}
           path: /tmp/gateway.log
           retention-days: 7
+
+      - name: Upload fuzz crash corpus on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-${{ github.run_id }}
+          path: |
+            internal/auth/testdata/fuzz/**
+            internal/api/handler/testdata/fuzz/**
+          retention-days: 30
+          if-no-files-found: ignore
 
       - name: Stop gateway
         if: always()

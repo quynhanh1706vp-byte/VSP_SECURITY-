@@ -1,8 +1,61 @@
-# Changes to CSP policy require explicit review.
-# VSP-CSP-001 guardrails — modifications to these files affect production security.
+# VSP CODEOWNERS — enforces 2-person review on security-critical paths.
+# Aligns with DSOMM 2.3 (Process) gap closure: Sprint 2 commit 2026-05-07.
+#
+# How GitHub uses this file:
+#   PRs touching these paths automatically request review from the listed
+#   owner(s). Branch protection on `main` blocks merge until at least one
+#   owner approves. Combined with `branch-protection.yml`, this enforces
+#   2-person review without manual coordination.
+
+# ── Authentication, crypto, middleware ────────────────────────────────────
+# These touch every request and any mistake is a CVE. Mandatory review.
+/internal/auth/                          @quynhanh1706vp-byte
+/internal/crypto/                        @quynhanh1706vp-byte
+/internal/api/middleware/                @quynhanh1706vp-byte
+
+# ── Audit log + chain integrity ──────────────────────────────────────────
+# FedRAMP AU-2/AU-9: audit log changes need 2-person review.
+/internal/audit/                         @quynhanh1706vp-byte
+/internal/api/handler/audit.go           @quynhanh1706vp-byte
+/internal/api/handler/audit_helper.go    @quynhanh1706vp-byte
+/internal/store/audit.go                 @quynhanh1706vp-byte
+
+# ── CSP policy (VSP-CSP-001 guardrails) ──────────────────────────────────
 /internal/api/middleware/csp.go          @quynhanh1706vp-byte
 /docs/CSP_HARDENING_ROADMAP.md           @quynhanh1706vp-byte
 /docs/csp_handler_baseline.txt           @quynhanh1706vp-byte
 /.github/workflows/csp-guard.yml         @quynhanh1706vp-byte
+
+# ── Gateway routing + admin endpoints ────────────────────────────────────
+# main.go controls every route; admin handlers grant elevated privilege.
 /cmd/gateway/main.go                     @quynhanh1706vp-byte
 /cmd/soc-shell/main.go                   @quynhanh1706vp-byte
+/internal/api/handler/admin_tenants.go   @quynhanh1706vp-byte
+/internal/api/handler/apikeys.go         @quynhanh1706vp-byte
+/internal/api/handler/users.go           @quynhanh1706vp-byte
+
+# ── Threat model + compliance docs ───────────────────────────────────────
+# Any change here must be paired with a code change OR explicit risk accept.
+/THREAT_MODEL.md                         @quynhanh1706vp-byte
+/docs/DSOMM_ASSESSMENT.md                @quynhanh1706vp-byte
+/docs/COMPLIANCE_MATRIX.md               @quynhanh1706vp-byte
+/SECURITY.md                             @quynhanh1706vp-byte
+
+# ── Database migrations ──────────────────────────────────────────────────
+# Schema changes affect every tenant; rollback is hard once deployed.
+/migrations/                             @quynhanh1706vp-byte
+
+# ── CODEOWNERS itself ────────────────────────────────────────────────────
+# Lock the lock — changes to ownership rules need owner approval.
+/.github/CODEOWNERS                      @quynhanh1706vp-byte
+
+# ── CI workflows ─────────────────────────────────────────────────────────
+# Disabling a check or relaxing a ratchet must go through a code owner.
+/.github/workflows/                      @quynhanh1706vp-byte
+
+# ── Test ladder ──────────────────────────────────────────────────────────
+# Loosening a test or muting a level needs owner approval — these
+# tests are the safety net every release depends on.
+/scripts/test-*.sh                       @quynhanh1706vp-byte
+/scripts/lib/                            @quynhanh1706vp-byte
+/scripts/test-all.sh                     @quynhanh1706vp-byte
