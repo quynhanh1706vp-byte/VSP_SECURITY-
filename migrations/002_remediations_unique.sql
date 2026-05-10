@@ -1,11 +1,20 @@
 -- +goose Up
 -- +goose StatementBegin
--- Fix 2026-05-10: Postgres has no `ADD CONSTRAINT IF NOT EXISTS`
--- syntax. Wrap in a DO block that checks pg_constraint for the
--- target name first. Caught by CI when the workflow re-applied
--- migrations on a fresh DB.
+-- Fix 2026-05-10: two issues caught by CI:
+--   (1) Postgres has no `ADD CONSTRAINT IF NOT EXISTS` syntax.
+--   (2) The `remediations` table itself isn't created by any
+--       migration — historically it was created on first startup
+--       by store-layer code. On a fresh CI DB the table doesn't
+--       exist when this migration runs.
+-- Both fixed: skip cleanly when the table is missing, and use a
+-- pg_constraint check + plain ADD CONSTRAINT once it does exist.
 DO $$
 BEGIN
+  IF to_regclass('public.remediations') IS NULL THEN
+    -- Table will be created later (by store init / a downstream
+    -- migration). Nothing to do.
+    RETURN;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
      WHERE conname = 'remediations_finding_id_key'
