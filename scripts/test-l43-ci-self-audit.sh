@@ -153,7 +153,10 @@ if [[ ! -r "$TEST_ALL" ]]; then
 else
   # Look for run_level lines that are commented out OR conditional on
   # something other than a known ENV var (RUN_*, L*_*).
-  COMMENTED=$(grep -nE '^\s*#\s*run_level' "$TEST_ALL" 2>/dev/null | head -3 || true)
+  # Exclude usage-doc comments — `# run_level NAME SCRIPT [ARGS...]`
+  # is the API doc, not a disabled call. Real disabled calls have a
+  # specific script path: `# run_level "L7..." "$ROOT/scripts/...`.
+  COMMENTED=$(grep -nE '^\s*#\s*run_level\s+"L' "$TEST_ALL" 2>/dev/null | head -3 || true)
   if [[ -n "$COMMENTED" ]]; then
     _fail "43.6.1 commented-out run_level entries" \
       "$(echo "$COMMENTED" | head -1)"

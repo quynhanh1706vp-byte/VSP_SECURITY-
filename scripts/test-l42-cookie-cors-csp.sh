@@ -146,12 +146,18 @@ phase_open "42.3 Content-Security-Policy on HTML pages"
 
 # Probe the dashboard root and a panel.
 for page in "/" "/static/index.html" "/static/panels/incident_response.html"; do
-  HEADERS=$(curl -s -i --max-time 5 \
+  # -L follows the redirect /static/index.html → /static/ that Go's
+  # FileServer emits as canonicalisation. Without -L the test reads
+  # CSP headers off the 301 stub, where they're absent.
+  HEADERS=$(curl -s -i -L --max-time 5 \
     -H "Authorization: Bearer $ADMIN" \
     "$BASE$page" 2>/dev/null \
     | tr -d '\r' || true)
-  status=$(echo "$HEADERS" | head -1 | awk '{print $2}')
-  csp=$(echo "$HEADERS" | grep -i '^Content-Security-Policy:' | head -1 || true)
+  # `|| true` on the pipelines below — under set -euo pipefail a
+  # SIGPIPE from `head -1` propagates and aborts the script. The
+  # broken-pipe in CI was hitting exactly here.
+  status=$(echo "$HEADERS" | head -1 | awk '{print $2}' || true)
+  csp=$(echo "$HEADERS" | grep -i '^Content-Security-Policy:' | head -1 2>/dev/null || true)
 
   if [[ "$status" == "404" || "$status" == "401" || "$status" == "403" ]]; then
     _skip "42.3 page $page" "HTTP $status — page not served / requires session login"

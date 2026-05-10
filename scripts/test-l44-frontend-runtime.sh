@@ -44,7 +44,10 @@ PANELS=(
 
 for panel in "${PANELS[@]}"; do
   body=$(mktemp)
-  status=$(curl -s -o "$body" -w "%{http_code}" --max-time 5 \
+  # -L follows redirects: Go's http.FileServer 301-redirects from
+  # /foo/index.html to /foo/ as a canonicalisation. We want the FINAL
+  # response, not the redirect-stub.
+  status=$(curl -s -L -o "$body" -w "%{http_code}" --max-time 5 \
     -H "Authorization: Bearer $ADMIN" \
     "$BASE$panel" 2>/dev/null || echo "000")
 
@@ -76,7 +79,7 @@ done
 phase_open "44.2 HTML hygiene — title / charset / viewport"
 
 body=$(mktemp)
-curl -s -o "$body" --max-time 5 \
+curl -s -L -o "$body" --max-time 5 \
   -H "Authorization: Bearer $ADMIN" \
   "$BASE/static/index.html" 2>/dev/null || true
 
@@ -106,9 +109,9 @@ HAZARDS=$(grep -rnE '^\s*await\s+fetch\(' "$ROOT/static/" 2>/dev/null \
   | head -50 || true)
 HAZARD_COUNT=$(echo "$HAZARDS" | grep -c . || echo 0)
 if [[ "$HAZARD_COUNT" -lt 5 ]]; then
-  _pass "44.3.1 only $HAZARD_COUNT top-level `await fetch` references"
+  _pass "44.3.1 only $HAZARD_COUNT top-level 'await fetch' references"
 else
-  _skip "44.3.1 unguarded `await fetch`" \
+  _skip "44.3.1 unguarded 'await fetch'" \
     "$HAZARD_COUNT references — manual review recommended"
 fi
 
@@ -119,7 +122,7 @@ TOP_THROW=$(grep -rnE '^throw new Error\(' "$ROOT/static/" 2>/dev/null \
   | grep -v '\.bak\.\|\.bak_' \
   | head -3 || true)
 if [[ -n "$TOP_THROW" ]]; then
-  _fail "44.3.2 top-level `throw new Error(` in static asset" \
+  _fail "44.3.2 top-level 'throw new Error(' in static asset" \
     "$(echo "$TOP_THROW" | head -1)"
 else
   _pass "44.3.2 no module-top-level throws"
@@ -138,7 +141,7 @@ fi
 
 # ── 44.4 Mixed content — no plain http:// to third parties ───────────────
 
-phase_open "44.4 Mixed content — no plain `http://` to third parties"
+phase_open "44.4 Mixed content — no plain 'http://' to third parties"
 
 # Match `http://` followed by a domain that ISN'T 127.0.0.1 / localhost.
 # Excludes the canonical service-discovery URLs the gateway proxies.

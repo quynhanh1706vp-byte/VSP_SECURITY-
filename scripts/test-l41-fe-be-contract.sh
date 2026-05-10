@@ -54,17 +54,25 @@ fi
 
 phase_open "41.2 No bare-slash / unsubstituted-template paths"
 
-# Pattern: a fetch URL that ends in `/` followed by quote — means an
-# ID or path-segment was supposed to be appended but wasn't.
-# Or contains literal `${variable}` unrendered (Go template leak).
+# Pattern: a fetch URL that ends in `/` followed by IMMEDIATE quote
+# AND the call has NO concatenation/template — i.e. truly a bare
+# slash. The shape we want to flag:
+#     fetch('/api/v1/foo/bar/')
+#     fetch("/api/v1/foo/bar/")
+# But NOT:
+#     fetch('/api/v1/foo/bar/' + id)
+#     fetch(`/api/v1/foo/bar/${id}`)
+# A `'+`, `\`+`, or `${` after the trailing slash means an ID is
+# being appended — that's a separate bug class (the empty-ID case
+# was already caught by the L13 / 15.6.1 probe).
 BARE_SLASH=$(grep -rEhn \
-  "fetch\((['\"\`])/api/v1/[a-zA-Z0-9_/-]+/(['\"\`])" \
+  "fetch\((['\"])/api/v1/[a-zA-Z0-9_/-]+/\1[[:space:]]*[,)]" \
   "$ROOT/static/" 2>/dev/null \
-  | grep -v "encodeURIComponent\|//.*comment" \
+  | grep -v "encodeURIComponent" \
   | head -5 || true)
 
 if [[ -n "$BARE_SLASH" ]]; then
-  _fail "41.2.1 bare trailing-slash fetch URL" \
+  _fail "41.2.1 bare trailing-slash fetch URL (no concat)" \
     "$(echo "$BARE_SLASH" | head -1)"
 else
   _pass "41.2.1 no bare-slash fetch URLs"
