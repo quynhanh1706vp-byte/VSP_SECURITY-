@@ -126,7 +126,10 @@ fi
 # Pick lines after the journal prefix (date + host + service + pid).
 # Strip journal sentinels like "-- No entries --" — they're meta
 # markers, not real log lines, and should count as 0 lines (skip).
+# Also strip ANSI colour codes — zerolog ConsoleWriter emits them by
+# default, which would break the timestamp/level regex below.
 BODY=$(sed -E 's/^[A-Z][a-z]+ +[0-9]+ +[0-9:]+ +[^ ]+ +[^:]+: //' "$LOG_TMP" \
+        | sed -E 's/\x1b\[[0-9;]*m//g' \
         | grep -vE '^-- (No entries|Logs begin|Reboot)' \
         | tail -50)
 TOTAL=$(echo "$BODY" | grep -c . || true)

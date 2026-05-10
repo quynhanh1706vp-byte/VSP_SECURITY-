@@ -193,7 +193,15 @@ func main() {
 
 	level, _ := zerolog.ParseLevel(viper.GetString("log.level"))
 	zerolog.SetGlobalLevel(level)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+	// NoColor when stderr isn't a TTY (CI, journald, file redirects).
+	// ANSI colour codes break structured-log shippers (and L27.28.4.1).
+	stderrFI, _ := os.Stderr.Stat()
+	stderrIsTTY := stderrFI != nil && (stderrFI.Mode()&os.ModeCharDevice) != 0
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: time.RFC3339,
+		NoColor:    !stderrIsTTY,
+	})
 
 	ctx, shutdown := context.WithCancel(context.Background())
 	defer shutdown()
