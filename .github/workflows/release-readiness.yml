@@ -218,6 +218,10 @@ jobs:
           # test-all.sh aggregates 32 levels and exits 1 only if
           # cumulative FAIL>0, so we get a complete scoreboard
           # regardless of which level(s) fail.
+          # Test scripts may not carry +x in the repo (Linux dev,
+          # Windows clones, etc.) — make the whole tree executable.
+          chmod +x scripts/test-*.sh scripts/test-all.sh \
+                   scripts/lib/*.sh 2>/dev/null || true
           ./scripts/test-all.sh --json test-all-report.json
 
       - name: L6-C gosec dogfood (ratchet — fail on regression)
