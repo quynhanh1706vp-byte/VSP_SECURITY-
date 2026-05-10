@@ -149,6 +149,8 @@ run_level "L27 observability"   "$ROOT/scripts/test-l27-observability.sh"
 run_level "L28 secrets"         "$ROOT/scripts/test-l28-secrets.sh"
 run_level "L29 time-correctness" "$ROOT/scripts/test-l29-time-correctness.sh"
 run_level "L30 container-deploy" "$ROOT/scripts/test-l30-container-deploy.sh"
+run_level "L32 bypass"          "$ROOT/scripts/test-l32-bypass.sh"
+run_level "L33 semgrep"         "$ROOT/scripts/test-l33-semgrep.sh"
 
 # L12 chaos and L14 perf are gated — they mutate the live environment
 # (stop redis, kill PG conns, sustained burst). Enable explicitly

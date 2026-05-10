@@ -5,6 +5,25 @@ import (
 	"time"
 )
 
+// L31 2026-05-09: pin the lockout calibration. The mutations
+// "ipFailLimit 20 → 200" and "ipLockoutTime 15m → 1s" survived the
+// pre-L31 test suite — every behavioural test passed regardless of
+// the exact constants. Vacuous coverage for compliance: SOC 2 + ISO
+// 27001 expect specific lockout thresholds, and a silent loosening
+// would be invisible until an audit. These tests fail the moment
+// either constant moves.
+func TestIPLockout_CalibrationPinned(t *testing.T) {
+	if ipFailLimit != 20 {
+		t.Errorf("ipFailLimit = %d, expected 20 (credential-stuffing threshold pinned at 20)", ipFailLimit)
+	}
+	if ipLockoutTime != 15*time.Minute {
+		t.Errorf("ipLockoutTime = %v, expected 15m (compliance pin)", ipLockoutTime)
+	}
+	if ipWindow != 10*time.Minute {
+		t.Errorf("ipWindow = %v, expected 10m (sliding window pin)", ipWindow)
+	}
+}
+
 func TestIPLockout_TripsAtLimit(t *testing.T) {
 	l := NewIPLockout()
 	ip := "1.2.3.4"

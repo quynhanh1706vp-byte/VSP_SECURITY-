@@ -30,15 +30,28 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 require_command go sed diff
 
 TARGET="$ROOT/internal/gate/engine.go"
-if [[ ! -f "$TARGET" ]]; then
-  printf "%s✗%s target file %s missing\n" "$C_RED" "$C_RESET" "$TARGET" >&2
-  exit 2
-fi
+TARGET_AUDIT="$ROOT/internal/audit/chain.go"
+TARGET_AUTH="$ROOT/internal/auth/lockout.go"
+for f in "$TARGET" "$TARGET_AUDIT" "$TARGET_AUTH"; do
+  if [[ ! -f "$f" ]]; then
+    printf "%s✗%s target %s missing\n" "$C_RED" "$C_RESET" "$f" >&2
+    exit 2
+  fi
+done
 
-# Save original; restore on EXIT no matter how we leave.
+# Save originals; restore on EXIT.
 ORIG=$(mktemp)
-cp "$TARGET" "$ORIG"
-restore() { cp "$ORIG" "$TARGET"; rm -f "$ORIG"; }
+ORIG_AUDIT=$(mktemp)
+ORIG_AUTH=$(mktemp)
+cp "$TARGET"       "$ORIG"
+cp "$TARGET_AUDIT" "$ORIG_AUDIT"
+cp "$TARGET_AUTH"  "$ORIG_AUTH"
+restore() {
+  cp "$ORIG"       "$TARGET"
+  cp "$ORIG_AUDIT" "$TARGET_AUDIT"
+  cp "$ORIG_AUTH"  "$TARGET_AUTH"
+  rm -f "$ORIG" "$ORIG_AUDIT" "$ORIG_AUTH"
+}
 trap restore EXIT
 
 # Verify baseline tests pass before mutating. If they don't, every
@@ -57,32 +70,33 @@ rm -f /tmp/l11_base.log
 
 # Helper: apply a mutation, run tests, report kill/survive, restore source.
 #
-#   apply_mutation NAME DESCRIPTION SED_EXPR [LINE_FILTER]
+#   mutate          NAME DESCRIPTION SED_EXPR  → gate package
+#   mutate_audit    NAME DESCRIPTION SED_EXPR  → internal/audit
+#   mutate_auth     NAME DESCRIPTION SED_EXPR  → internal/auth/lockout
 #
-# The mutation kills if `go test` exits non-zero (a test caught the change).
-# It survives if tests still pass — meaning the regression would ship.
+# Each variant operates on its own target file + tests against its own
+# package only. Original is restored before each mutation.
 KILLS=0
 SURVIVORS=()
-mutate() {
-  local name="$1" desc="$2" sed_expr="$3"
-  cp "$ORIG" "$TARGET"   # always start from pristine
-  if ! sed -i "$sed_expr" "$TARGET"; then
+
+_run_mutation() {
+  local name="$1" desc="$2" sed_expr="$3" target="$4" pkg="$5" pristine="$6"
+  cp "$pristine" "$target"
+  if ! sed -i "$sed_expr" "$target"; then
     _fail "13.2.$name" "sed expression failed: $sed_expr"
     return
   fi
-  # Did the mutation actually change anything?
-  if diff -q "$ORIG" "$TARGET" > /dev/null 2>&1; then
+  if diff -q "$pristine" "$target" > /dev/null 2>&1; then
     _skip "13.2.$name" "mutation no-op (pattern didn't match): $desc"
     return
   fi
-  # Compile check first — uncompilable mutations are not interesting.
-  if ! go build ./internal/gate/... > /tmp/l11_build.log 2>&1; then
+  if ! go build "$pkg/..." > /tmp/l11_build.log 2>&1; then
     _skip "13.2.$name" "mutation breaks compile: $desc"
     rm -f /tmp/l11_build.log
     return
   fi
   rm -f /tmp/l11_build.log
-  if go test -count=1 -timeout 60s ./internal/gate/... > /tmp/l11_run.log 2>&1; then
+  if go test -count=1 -timeout 60s "$pkg/..." > /tmp/l11_run.log 2>&1; then
     SURVIVORS+=("$name: $desc")
     _fail "13.2.$name" "MUTATION SURVIVED — no test caught: $desc"
   else
@@ -91,6 +105,10 @@ mutate() {
   fi
   rm -f /tmp/l11_run.log
 }
+
+mutate()       { _run_mutation "$1" "$2" "$3" "$TARGET"       "./internal/gate"  "$ORIG";       }
+mutate_audit() { _run_mutation "$1" "$2" "$3" "$TARGET_AUDIT" "./internal/audit" "$ORIG_AUDIT"; }
+mutate_auth()  { _run_mutation "$1" "$2" "$3" "$TARGET_AUTH"  "./internal/auth"  "$ORIG_AUTH";  }
 
 # ── 13.2 mutations ─────────────────────────────────────────────────────────
 
@@ -137,6 +155,47 @@ mutate "M5_ceiling_raised" \
 mutate "M6_hardfail_and" \
        "Critical||HasSecrets → Critical&&HasSecrets" \
        's/s\.Critical > 0 || s\.HasSecrets/s.Critical > 0 \&\& s.HasSecrets/'
+
+# ── 13.2.audit_* — internal/audit chain.go mutations ──────────────────────
+#
+# Hash chain math is the integrity backbone: any mutation here would let
+# an attacker forge audit entries while keeping verify ok=true. Every
+# mutation here MUST be killed by audit's tests.
+
+# A1: drop Seq from the hash input — hash becomes order-independent,
+# attacker can swap rows without breaking chain.
+mutate_audit "A1_seq_dropped" \
+  "Hash() drops Seq from inputs" \
+  's/"%d|%s|%s|%s|%s",[[:space:]]*$/"%s|%s|%s|%s",/; s/e\.Seq, e\.TenantID, e\.Action, e\.Resource, e\.PrevHash/e.TenantID, e.Action, e.Resource, e.PrevHash/'
+
+# A2: drop PrevHash — chain becomes a flat set, no ordering.
+mutate_audit "A2_prevhash_dropped" \
+  "Hash() drops PrevHash from inputs" \
+  's/, e\.PrevHash)/)/; s/"%d|%s|%s|%s|%s"/"%d|%s|%s|%s"/'
+
+# A3: TenantID dropped — cross-tenant rows would chain together.
+mutate_audit "A3_tenant_dropped" \
+  "Hash() drops TenantID — cross-tenant chain merge" \
+  's/e\.Seq, e\.TenantID, e\.Action/e.Seq, e.Action/; s/"%d|%s|%s|%s|%s"/"%d|%s|%s|%s"/'
+
+# ── 13.2.auth_* — internal/auth/lockout.go mutations ──────────────────────
+
+# AU1: per-IP threshold relaxed (20 → 200) — credential stuffing
+# defense neutered.
+mutate_auth "AU1_threshold_relaxed" \
+  "ipFailLimit 20 → 200" \
+  's/ipFailLimit[[:space:]]*=[[:space:]]*20$/ipFailLimit   = 200/'
+
+# AU2: lockout duration shrunk (15min → 1s) — attacker waits 1s
+# between bursts.
+mutate_auth "AU2_lockout_shortened" \
+  "ipLockoutTime 15 minutes → 1 second" \
+  's/ipLockoutTime = 15 \* time\.Minute/ipLockoutTime = 1 * time.Second/'
+
+# AU3: BackoffSleep returns immediately — no exponential delay.
+mutate_auth "AU3_backoff_neutered" \
+  "BackoffSleep early return — no delay applied" \
+  's/^func BackoffSleep(failedCount int) {/func BackoffSleep(failedCount int) { return; if false {/'
 
 # ── 13.3 summary ───────────────────────────────────────────────────────────
 
