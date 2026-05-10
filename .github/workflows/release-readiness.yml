@@ -167,12 +167,17 @@ jobs:
 
       - name: Seed minimal fixtures
         run: |
-          # Two tenants L4-B/L5/L7/L25/L32 expect.
+          # Two tenants L4-B/L5/L7/L25/L32 expect. Some migrations (and
+          # the gateway boot) already seed a `default` tenant — use
+          # constraint-agnostic ON CONFLICT so a slug collision OR an
+          # id collision both no-op cleanly.
           psql "$DB_DSN" -v ON_ERROR_STOP=1 <<'SQL'
             INSERT INTO tenants (id, slug, name, plan)
-              VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE'),
-                     ('8bb9a716-fd14-4eba-92e8-681dc5bdb718','acme-corp','ACME','FREE')
-              ON CONFLICT (id) DO NOTHING;
+              VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE')
+              ON CONFLICT DO NOTHING;
+            INSERT INTO tenants (id, slug, name, plan)
+              VALUES ('8bb9a716-fd14-4eba-92e8-681dc5bdb718','acme-corp','ACME','FREE')
+              ON CONFLICT DO NOTHING;
           SQL
 
       - name: Build gateway + scanner
