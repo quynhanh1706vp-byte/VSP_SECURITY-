@@ -96,6 +96,16 @@ run_level() {
   total=$(grep -E "^\s*Total:" "$out" | tail -1 | grep -Eo '[0-9]+' | tail -1)
   pass=${pass:-0}; fail=${fail:-0}; skip=${skip:-0}; total=${total:-0}
 
+  # Diagnostic: if a level produced zero probes (likely aborted before
+  # reaching final_summary), dump the full output so the cause is
+  # visible in CI logs instead of being silently truncated by tail -25.
+  if (( total == 0 )); then
+    printf "\n%s⚠ %s produced 0 probes — full output below%s\n" \
+      "$C_AMBER" "$key" "$C_RESET"
+    cat "$out"
+    printf "%s── end %s ──%s\n" "$C_AMBER" "$key" "$C_RESET"
+  fi
+
   LEVEL_RESULT["$key"]="$pass:$fail:$skip:$total:$elapsed"
   rm -f "$out"
 }
