@@ -79,20 +79,27 @@ done
 phase_open "44.2 HTML hygiene — title / charset / viewport"
 
 body=$(mktemp)
+# Probe the canonical entrypoint that the gateway actually processes
+# through CSP / nonce injection — that's "/" not "/static/index.html".
+# /static/index.html follows a 301→/static/ redirect chain that may
+# serve a different (stripped or templated) body via http.FileServer.
 curl -s -L -o "$body" --max-time 5 \
   -H "Authorization: Bearer $ADMIN" \
-  "$BASE/static/index.html" 2>/dev/null || true
+  "$BASE/" 2>/dev/null || true
 
 if [[ -s "$body" ]]; then
   for tag in 'meta charset' '<title' 'meta name="viewport"' ; do
     if grep -qi "$tag" "$body"; then
       _pass "44.2 $tag present"
     else
-      _fail "44.2 $tag missing" "static/index.html has no $tag"
+      # Show the head of the body so we can see WHAT was returned
+      # instead of guessing.
+      _fail "44.2 $tag missing" \
+        "first 80 chars: $(head -c 80 "$body" | tr '\n\r' ' ')"
     fi
   done
 else
-  _skip "44.2 head meta" "couldn't fetch /static/index.html"
+  _skip "44.2 head meta" "couldn't fetch /"
 fi
 rm -f "$body"
 
