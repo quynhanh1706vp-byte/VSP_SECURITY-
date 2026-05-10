@@ -94,6 +94,9 @@ jobs:
       # Both names: tests/scripts read DB_DSN, gateway reads DATABASE_URL.
       DB_DSN: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
       DATABASE_URL: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
+      # Synthetic 32-byte key for SOAR secrets vault (AES-256). Real
+      # deployments inject from a sealed secret manager.
+      VSP_REPO_KEY: ci-soar-vault-key-do-not-reuse-32b
       BASE: http://127.0.0.1:8921
       PGHOST: localhost
       PGUSER: vsp
