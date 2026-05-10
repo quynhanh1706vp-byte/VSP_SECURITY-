@@ -201,6 +201,63 @@ else
   _fail "15.5.1 missing JS bundles" "${MLIST%, }"
 fi
 
+# ── 15.6 Bare-concat URL bugs — '/.../id/' + (var||'') without guard ─────
+
+phase_open "15.6 No bare-concat URL fetches with possibly-empty ID"
+
+# Pattern bug found 2026-05-10: index.html line 3611 had
+#   fetch('/api/v1/remediation/finding/' + (window._remCurrentId||''), ...)
+# When _remCurrentId is unset, the URL becomes '/finding/' (trailing
+# slash, no ID), which 404s at chi's router and surfaces a confusing
+# error in the UI without explanation. Same anti-pattern appeared in
+# 4 other call sites (each saveRemediation variant + _saveRemediation).
+#
+# Defence: any concat of `/api/v1/.../<resource>/' + (varOrEmpty||'')`
+# without a non-empty guard above it is a regression.
+HTML="$ROOT/static/index.html"
+if [[ ! -r "$HTML" ]]; then
+  _skip "15.6.1 bare-concat URL scan" "static/index.html not readable"
+else
+  # Look for fetches like
+  #   /api/v1/<word>/<word>/' + (foo||'')
+  # without an `if (!foo)` guard within the preceding 8 lines.
+  HITS=$(awk '
+    BEGIN { window=8 }
+    /\/api\/v1\/[a-z_]+\/[a-z_]+\/.* \+ \(.*\|\|.""..*\)/ {
+      # Look back `window` lines for an early-return guard.
+      guard=0
+      for (i = NR - window; i < NR && i > 0; i++) {
+        if (lines[i] ~ /if \(!.*\)/ || lines[i] ~ /\.trim\(\)/) { guard=1; break }
+      }
+      if (!guard) print NR ": " $0
+    }
+    { lines[NR] = $0 }
+  ' "$HTML" | head -3)
+  if [[ -n "$HITS" ]]; then
+    _fail "15.6.1 bare-concat URL without empty-ID guard" "$(echo "$HITS" | head -1)"
+  else
+    _pass "15.6.1 no bare-concat URL fetches with un-guarded variables"
+  fi
+fi
+
+# 15.6.2 — Live probe: POST to a route that requires {id} with an
+# EMPTY id should return 404 (not 200, not 500). Confirms the
+# router still enforces the path param.
+ADMIN="${TOKEN_ADMIN:-$($ROOT/scripts/mint_jwt_local.sh admin "${JWT_SECRET:-dev-secret-please-change}")}"
+status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+  -X POST -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN" \
+  -d '{}' \
+  "$BASE/api/v1/remediation/finding/" 2>/dev/null || echo "000")
+if [[ "$status" =~ ^(404|405)$ ]]; then
+  _pass "15.6.2 empty-ID POST /api/v1/remediation/finding/ rejected [HTTP $status]"
+elif [[ "$status" =~ ^5 ]]; then
+  _fail "15.6.2 empty-ID POST caused 5xx" \
+    "HTTP $status — router/handler should refuse cleanly with 404, not crash"
+else
+  _skip "15.6.2 empty-ID POST" "unexpected HTTP $status"
+fi
+
 # ── final ──────────────────────────────────────────────────────────────────
 
 final_summary

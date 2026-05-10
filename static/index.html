@@ -2320,6 +2320,15 @@ function closeRemModal() {
 }
 
 async function saveRemediation() {
+  // Pre-flight: refuse the call if no finding is selected. The trailing
+  // slash on `/remediation/finding/` 404s at the chi router (the route
+  // requires `{finding_id}` to be non-empty) and the user reports a
+  // failure in the UI without any indication of WHY.
+  if (!_remCurrentId) {
+    showToast('No finding selected — open a finding first','error');
+    closeRemModal();
+    return;
+  }
   const status   = document.getElementById('rem-status').value;
   const priority = document.getElementById('rem-priority').value;
   const assignee = document.getElementById('rem-assignee').value;
@@ -2328,7 +2337,7 @@ async function saveRemediation() {
 
   try {
     if (window.TOKEN) {
-      await api('POST', '/remediation/finding/' + _remCurrentId, {status, priority, assignee, ticket_url: ticket, notes});
+      await api('POST', '/remediation/finding/' + encodeURIComponent(_remCurrentId), {status, priority, assignee, ticket_url: ticket, notes});
     }
     closeRemModal();
     showToast('Remediation saved → ' + status.replace('_',' '), 'success');
@@ -3609,6 +3618,18 @@ window.applyFindingsFilter = applyFindingsFilter;
 // ── Remediation save gọi API thật ─────────────────────────────────────────
 const _origSaveRem = window.saveRemediation;
 window.saveRemediation = async function() {
+  // Pre-flight: must have a finding ID to assign remediation against.
+  // Prior bug: fetch fired POST /api/v1/remediation/finding/ with no ID
+  // (chi router 404'd) when the modal was opened without a valid finding.
+  const fid = (window._remCurrentId || '').trim();
+  if (!fid) {
+    if (typeof showToast === 'function') {
+      showToast('No finding selected — open a finding first', 'error');
+    }
+    if (typeof closeRemModal === 'function') closeRemModal();
+    console.warn('[VSP-REM] saveRemediation aborted: empty _remCurrentId');
+    return;
+  }
   await ensureToken();
   const status   = document.getElementById('rem-status')?.value;
   const priority = document.getElementById('rem-priority')?.value;
@@ -3616,7 +3637,7 @@ window.saveRemediation = async function() {
   const ticket   = document.getElementById('rem-ticket')?.value;
   const notes    = document.getElementById('rem-notes')?.value;
   try {
-    const r = await fetch('/api/v1/remediation/finding/' + (window._remCurrentId||''), {
+    const r = await fetch('/api/v1/remediation/finding/' + encodeURIComponent(fid), {
       method: 'POST',
       headers: {'Content-Type':'application/json','Authorization':'Bearer '+window.TOKEN},
       body: JSON.stringify({status,priority,assignee,ticket_url:ticket,notes})
@@ -4734,7 +4755,7 @@ window.showFindingDetail = function(idx) {
     +'<div class="exec-stat"><span class="exec-stat-lbl">Fix signal</span><span class="f12 c-cyan">'+(f.fix_signal||'—')+'</span></div>'
     +'</div>'
     +'<div style="display:flex;gap:8px">'
-    +'<button class="btn btn-primary" onclick="openRemModal(\''+(f.id||'')+'_rem\',\''+((f.message||'').slice(0,40).replace(/\'/g,''))+'\',\''+f.severity+'\');document.getElementById(\'finding-detail-modal\').classList.remove(\'open\')">Assign remediation &#8594;</button>'
+    +'<button class="btn btn-primary" onclick="openRemModal(\''+(f.id||'')+'\',\''+((f.message||'').slice(0,40).replace(/\'/g,''))+'\',\''+f.severity+'\');document.getElementById(\'finding-detail-modal\').classList.remove(\'open\')">Assign remediation &#8594;</button>'
     +(f.cwe?'<button class="btn btn-ghost" onclick="window.open(\'https://cwe.mitre.org/data/definitions/'+f.cwe.replace(/[^0-9]/g,'')+'.html\')">CWE ref &#8599;</button>':'')
     +'</div>';
   document.getElementById('finding-detail-modal').classList.add('open');
@@ -5263,7 +5284,7 @@ window.showFindingDetail = function(idx) {
     +'<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;letter-spacing:.04em">FIX SIGNAL</div>'
     +'<div class="f12" style="color:var(--t2);line-height:1.6">'+f.fix_signal+'</div></div>' : '')
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +'<button class="btn btn-primary" onclick="openRemModal(\''+(f.id||'')+'_r\',\''+((f.message||'').slice(0,50).replace(/\'/g,'\\\''))+'\',\''+f.severity+'\');document.getElementById(\'finding-detail-modal\').classList.remove(\'open\')">Assign remediation &#8594;</button>'
+    +'<button class="btn btn-primary" onclick="openRemModal(\''+(f.id||'')+'\',\''+((f.message||'').slice(0,50).replace(/\'/g,'\\\''))+'\',\''+f.severity+'\');document.getElementById(\'finding-detail-modal\').classList.remove(\'open\')">Assign remediation &#8594;</button>'
     +(f.cwe?'<button class="btn btn-ghost" onclick="window.open(\'https://cwe.mitre.org/data/definitions/'+f.cwe.replace(/[^0-9]/g,'')+'.html\')">CWE ref &#8599;</button>':'')
     +'<button class="btn btn-ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+f.rule_id+'\');showToast&&showToast(\'Rule ID copied\',\'info\')">Copy rule ID</button>'
     +'</div>';
@@ -7118,6 +7139,13 @@ function _openRemEditModal(r) {
 }
 
 async function _saveRemediation(findingId) {
+  // Pre-flight: same trailing-slash 404 bug as the global override.
+  var fid = (findingId || '').trim();
+  if (!fid) {
+    showToast('No finding selected — cannot save remediation','error');
+    document.getElementById('rem-edit-modal').classList.remove('open');
+    return;
+  }
   await ensureToken();
   var status   = (document.getElementById('rem-em-status')||{}).value||'open';
   var priority = (document.getElementById('rem-em-priority')||{}).value||'P3';
@@ -7129,7 +7157,7 @@ async function _saveRemediation(findingId) {
     showToast('Ticket URL must start with http:// or https://','error'); return;
   }
   try {
-    await fetch('/api/v1/remediation/finding/'+findingId, {
+    await fetch('/api/v1/remediation/finding/'+encodeURIComponent(fid), {
       method:'POST',
       headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
       body: JSON.stringify({status,priority,assignee,ticket_url:ticket,notes})
