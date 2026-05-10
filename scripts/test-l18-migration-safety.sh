@@ -153,8 +153,15 @@ phase_open "19.5 Idempotency — latest migration safe to re-apply"
 if [[ -z "${DB_DSN:-}" ]]; then
   _skip "19.5.1 idempotency probe" "DB_DSN not set"
 else
-  # Pick the highest-numbered migration to re-apply.
-  LATEST=$(ls "$MIG_DIR"/[0-9]*_*.sql 2>/dev/null | sort -V | tail -1)
+  # Pick the highest-numbered FORWARD migration to re-apply. Crucially
+  # skip *_rollback.sql variants — those are designed to UNDO their
+  # paired forward migration, so re-applying drops tables and breaks
+  # downstream tests that depend on the schema. Lesson learned the
+  # hard way: pre-fix this test was silently re-rolling-back the
+  # soar_extend migration on every run, making /soar/secrets/audit
+  # 5xx in L10 immediately after L18 ran.
+  LATEST=$(ls "$MIG_DIR"/[0-9]*_*.sql 2>/dev/null \
+    | grep -v "_rollback\.sql$" | sort -V | tail -1)
   if [[ -z "$LATEST" ]]; then
     _skip "19.5.1 idempotency probe" "no numbered migrations found"
   else

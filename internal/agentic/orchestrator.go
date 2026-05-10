@@ -36,11 +36,11 @@ import (
 )
 
 const (
-	defaultMaxTurns   = 5
-	hardMaxTurns      = 10 // matches DB CHECK constraint
-	llmTimeout        = 300 * time.Second
-	tokenSoftBudget   = 8000 // total prompt + reply tokens per session
-	traceOutputCapKB  = 4
+	defaultMaxTurns  = 5
+	hardMaxTurns     = 10 // matches DB CHECK constraint
+	llmTimeout       = 300 * time.Second
+	tokenSoftBudget  = 8000 // total prompt + reply tokens per session
+	traceOutputCapKB = 4
 )
 
 // Telemetry — minimal interface so orchestrator doesn't import H3.W package
@@ -54,8 +54,8 @@ type Telemetry interface {
 // noopTelemetry — used when H3.W is disabled
 type noopTelemetry struct{}
 
-func (noopTelemetry) CounterInc(string, map[string]string)                     {}
-func (noopTelemetry) HistogramObserve(string, float64, map[string]string)      {}
+func (noopTelemetry) CounterInc(string, map[string]string)                {}
+func (noopTelemetry) HistogramObserve(string, float64, map[string]string) {}
 func (noopTelemetry) StartSpan(ctx context.Context, op string, _ map[string]any) (context.Context, func(int, error)) {
 	return ctx, func(int, error) {}
 }
@@ -98,7 +98,7 @@ type RunRequest struct {
 	FindingID  string `json:"finding_id"`
 	RuleID     string `json:"rule_id"`
 	Severity   string `json:"severity"`
-	Tool       string `json:"tool"`         // sast/sca/secrets/iac
+	Tool       string `json:"tool"` // sast/sca/secrets/iac
 	Message    string `json:"message"`
 	FilePath   string `json:"file_path,omitempty"`
 	LineNumber int    `json:"line_number,omitempty"`
@@ -107,14 +107,14 @@ type RunRequest struct {
 
 // RunResult — what /agentic/run returns
 type RunResult struct {
-	SessionID    string  `json:"session_id"`
-	Turns        int     `json:"turns"`
-	Converged    bool    `json:"converged"`
-	FinalAnswer  string  `json:"final_answer"`
-	TotalTokens  int     `json:"total_tokens"`
-	DurationMS   int64   `json:"duration_ms"`
-	Confidence   float64 `json:"confidence,omitempty"`
-	Error        string  `json:"error,omitempty"`
+	SessionID   string  `json:"session_id"`
+	Turns       int     `json:"turns"`
+	Converged   bool    `json:"converged"`
+	FinalAnswer string  `json:"final_answer"`
+	TotalTokens int     `json:"total_tokens"`
+	DurationMS  int64   `json:"duration_ms"`
+	Confidence  float64 `json:"confidence,omitempty"`
+	Error       string  `json:"error,omitempty"`
 }
 
 // =====================================================================
@@ -130,11 +130,11 @@ func (o *Orchestrator) Run(ctx context.Context, req RunRequest) (*RunResult, err
 	startWall := time.Now()
 
 	ctx, endSpan := o.Telem.StartSpan(ctx, "agentic.session", map[string]any{
-		"session_id":  sessionID,
-		"finding_id":  req.FindingID,
-		"rule_id":     req.RuleID,
-		"severity":    req.Severity,
-		"max_turns":   o.MaxTurns,
+		"session_id": sessionID,
+		"finding_id": req.FindingID,
+		"rule_id":    req.RuleID,
+		"severity":   req.Severity,
+		"max_turns":  o.MaxTurns,
 	})
 	defer func() { endSpan(0, nil) }()
 
@@ -294,10 +294,10 @@ check_imports). When you have enough context, emit a final_answer.`,
 // =====================================================================
 
 type ollamaReq struct {
-	Model    string                 `json:"model"`
-	Messages []map[string]string    `json:"messages"`
-	Stream   bool                   `json:"stream"`
-	Options  map[string]any         `json:"options,omitempty"`
+	Model    string              `json:"model"`
+	Messages []map[string]string `json:"messages"`
+	Stream   bool                `json:"stream"`
+	Options  map[string]any      `json:"options,omitempty"`
 }
 
 type ollamaResp struct {

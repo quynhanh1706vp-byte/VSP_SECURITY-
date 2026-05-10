@@ -81,10 +81,10 @@ func (c *Cache) evict() {
 // ── Client ─────────────────────────────────────────────────────────────────
 
 type Client struct {
-	http   *http.Client
-	cache  *Cache
-	kevSet map[string]bool // KEV CVE IDs
-	kevMu  sync.RWMutex
+	http        *http.Client
+	cache       *Cache
+	kevSet      map[string]bool // KEV CVE IDs
+	kevMu       sync.RWMutex
 	mu          sync.RWMutex
 	kevLoadedAt time.Time
 	kevSource   string
@@ -601,13 +601,12 @@ func (f *VNThreatFeed) AddIOC(ioc *VNFeedIOC) {
 // GlobalVNFeed is the singleton VN threat feed
 var GlobalVNFeed = NewVNThreatFeed()
 
-
 // ClientStats provides observability into the threat intel client.
 type ClientStats struct {
-	KEVCount      int       `json:"kev_count"`
-	KEVLoadedAt   time.Time `json:"kev_loaded_at,omitempty"`
-	KEVSource     string    `json:"kev_source,omitempty"`
-	CacheSize     int       `json:"cache_size"`
+	KEVCount    int       `json:"kev_count"`
+	KEVLoadedAt time.Time `json:"kev_loaded_at,omitempty"`
+	KEVSource   string    `json:"kev_source,omitempty"`
+	CacheSize   int       `json:"cache_size"`
 }
 
 // Stats returns observability info about the client state.
@@ -630,4 +629,3 @@ func (c *Client) Stats() ClientStats {
 func (c *Client) RefreshKEV(ctx context.Context) error {
 	return c.LoadKEV(ctx)
 }
-

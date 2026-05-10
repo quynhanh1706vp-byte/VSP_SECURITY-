@@ -10,12 +10,12 @@ import (
 )
 
 type Finding struct {
-	Tool     string `json:"tool"`
-	Severity string `json:"severity"`
-	Title    string `json:"title"`
-	File     string `json:"file"`
-	Line     int    `json:"line"`
-	Details  string `json:"details"`
+	Tool      string `json:"tool"`
+	Severity  string `json:"severity"`
+	Title     string `json:"title"`
+	File      string `json:"file"`
+	Line      int    `json:"line"`
+	Details   string `json:"details"`
 	Goroutine string `json:"goroutine,omitempty"`
 }
 

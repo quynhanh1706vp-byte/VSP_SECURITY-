@@ -6,20 +6,22 @@
 // Switch to real SMTP via /config endpoint or env vars.
 //
 // Storage:
-//   /var/lib/vsp/email-config.json    SMTP creds + templates
-//   /var/lib/vsp/email-history.json   send history (rolling 1000)
+//
+//	/var/lib/vsp/email-config.json    SMTP creds + templates
+//	/var/lib/vsp/email-history.json   send history (rolling 1000)
 //
 // Endpoints:
-//   GET  /healthz
-//   GET  /config                  (password masked)
-//   POST /config                  update SMTP
-//   GET  /config/health           TCP-test SMTP server
-//   POST /test                    {"to":"…"} send fixed test email
-//   POST /send                    {"to":"…","subject":"…","body":"…","template":"name","vars":{...}}
-//   GET  /templates               list pre-seeded + custom
-//   POST /templates/{name}        upsert template
-//   DELETE /templates/{name}      remove
-//   GET  /history?limit=N         rolling send log
+//
+//	GET  /healthz
+//	GET  /config                  (password masked)
+//	POST /config                  update SMTP
+//	GET  /config/health           TCP-test SMTP server
+//	POST /test                    {"to":"…"} send fixed test email
+//	POST /send                    {"to":"…","subject":"…","body":"…","template":"name","vars":{...}}
+//	GET  /templates               list pre-seeded + custom
+//	POST /templates/{name}        upsert template
+//	DELETE /templates/{name}      remove
+//	GET  /history?limit=N         rolling send log
 //
 // Build: go build -o vsp-email-api ./cmd/email-api
 package main
@@ -53,15 +55,15 @@ var (
 // ── types ──────────────────────────────────────────────────────────────
 
 type SMTPConfig struct {
-	Host       string `json:"host"`
-	Port       int    `json:"port"`
-	Username   string `json:"username,omitempty"`
-	Password   string `json:"password,omitempty"`     // server-side only
-	From       string `json:"from"`
-	FromName   string `json:"from_name,omitempty"`
-	UseTLS     bool   `json:"use_tls"`
-	UseSTARTTLS bool  `json:"use_starttls"`
-	UpdatedAt  time.Time `json:"updated_at,omitempty"`
+	Host        string    `json:"host"`
+	Port        int       `json:"port"`
+	Username    string    `json:"username,omitempty"`
+	Password    string    `json:"password,omitempty"` // server-side only
+	From        string    `json:"from"`
+	FromName    string    `json:"from_name,omitempty"`
+	UseTLS      bool      `json:"use_tls"`
+	UseSTARTTLS bool      `json:"use_starttls"`
+	UpdatedAt   time.Time `json:"updated_at,omitempty"`
 }
 
 type Template struct {
@@ -130,8 +132,8 @@ func newID(prefix string) string {
 // ── persistence ────────────────────────────────────────────────────────
 
 type configFile struct {
-	SMTP      SMTPConfig            `json:"smtp"`
-	Templates map[string]*Template  `json:"templates"`
+	SMTP      SMTPConfig           `json:"smtp"`
+	Templates map[string]*Template `json:"templates"`
 }
 
 func loadConfig() {
@@ -140,11 +142,11 @@ func loadConfig() {
 		// First boot: defaults
 		cfgMu.Lock()
 		cfg = SMTPConfig{
-			Host: envOr("VSP_SMTP_HOST", "127.0.0.1"),
-			Port: envInt("VSP_SMTP_PORT", 1025),
-			From: envOr("VSP_SMTP_FROM", "vsp@vsp.local"),
+			Host:     envOr("VSP_SMTP_HOST", "127.0.0.1"),
+			Port:     envInt("VSP_SMTP_PORT", 1025),
+			From:     envOr("VSP_SMTP_FROM", "vsp@vsp.local"),
 			FromName: envOr("VSP_SMTP_FROM_NAME", "VSP DevSecOps"),
-			UseTLS: false, UseSTARTTLS: false,
+			UseTLS:   false, UseSTARTTLS: false,
 		}
 		cfgMu.Unlock()
 		seedTemplates()
@@ -191,7 +193,9 @@ func loadHistory() {
 	if err != nil {
 		return
 	}
-	var s struct{ History []SendRecord `json:"history"` }
+	var s struct {
+		History []SendRecord `json:"history"`
+	}
 	if json.Unmarshal(b, &s) == nil {
 		histMu.Lock()
 		history = s.History
@@ -201,7 +205,9 @@ func loadHistory() {
 
 func persistHistory() {
 	histMu.RLock()
-	out := struct{ History []SendRecord `json:"history"` }{History: history}
+	out := struct {
+		History []SendRecord `json:"history"`
+	}{History: history}
 	histMu.RUnlock()
 	b, _ := json.MarshalIndent(out, "", "  ")
 	tmp := *historyPath + ".tmp"

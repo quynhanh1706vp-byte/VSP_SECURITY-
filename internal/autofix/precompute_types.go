@@ -8,15 +8,15 @@ import (
 // tied to one VSP scan run. Tracked in autofix_precompute_jobs table so the
 // UI can show progress and admins can debug stuck jobs.
 type PrecomputeJob struct {
-	ID         string     // uuid
-	RunID      string     // uuid (FK runs.id)
-	TenantID   string     // uuid
-	Status     string     // pending|running|done|failed|cancelled
-	Total      int        // findings eligible for pre-compute
-	Completed  int        // successfully cached
-	Failed     int        // LLM call errors / timeouts
-	Skipped    int        // policy blocked or already cached
-	AvgLatency int        // ms, average of successful calls
+	ID         string // uuid
+	RunID      string // uuid (FK runs.id)
+	TenantID   string // uuid
+	Status     string // pending|running|done|failed|canceled
+	Total      int    // findings eligible for pre-compute
+	Completed  int    // successfully cached
+	Failed     int    // LLM call errors / timeouts
+	Skipped    int    // policy blocked or already cached
+	AvgLatency int    // ms, average of successful calls
 	StartedAt  *time.Time
 	FinishedAt *time.Time
 	CreatedAt  time.Time

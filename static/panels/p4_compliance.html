@@ -554,7 +554,6 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
 </head>
 <body>
 
-<div style="position:fixed;top:10px;right:10px;z-index:9999"><button type="button" onclick="history.back()" style="font-family:monospace;font-size:11px;padding:6px 12px;background:rgba(6,182,212,.15);color:#06b6d4;border:1px solid rgba(6,182,212,.4);border-radius:6px;cursor:pointer;">← Back to VSP</button></div>
 <div class="shell">
   <!-- Sidebar -->
   <nav class="sidenav">
@@ -632,10 +631,10 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
     </div>
   </div>
 </div>
+        <button class="btn btn-ghost btn-sm" onclick="openP4Configure()" title="Panel display + alert thresholds">⚙ Configure</button>
+        <button class="btn btn-ghost btn-sm" onclick="openP4Notifications()" title="Compliance event notifications">🔔 Notifications</button>
         <button class="btn btn-ghost btn-sm" onclick="openAIAdvisor(null)" style="color:#8b5cf6;border-color:rgba(139,92,246,.4)">🤖 AI</button>
-        <button class="btn btn-ghost btn-sm" onclick="startDemoMode()">▶ Demo</button>
         <button class="btn btn-ghost btn-sm" onclick="exportPDF()">⬇ PDF</button>
-        <button class="btn btn-primary btn-sm" onclick="refreshAll()">↺ Refresh</button>
       </div>
     </div>
 
@@ -644,25 +643,25 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
       <!-- OVERVIEW TAB -->
       <div id="tab-overview" class="tab-panel active">
         <div class="hero-grid">
-          <div class="score-card">
+          <div class="score-card" onclick="switchTab('zerotrust',null)" style="cursor:pointer" title="View Zero Trust detail">
             <div class="score-label">P4 READINESS</div>
             <div class="score-val" id="ov-p4" style="color:var(--amber)">—</div>
             <div class="score-sub">DoD ZT Architecture v2.0</div>
             <div class="score-bar"><div class="score-bar-fill" id="ov-p4-bar" style="background:var(--amber)"></div></div>
           </div>
-          <div class="score-card">
+          <div class="score-card" onclick="switchTab('rmf',null)" style="cursor:pointer" title="View FedRAMP / RMF detail">
             <div class="score-label">FEDRAMP MODERATE</div>
             <div class="score-val" id="ov-fedramp" style="color:var(--cyan)">—</div>
             <div class="score-sub" id="ov-fedramp-sub">loading...</div>
             <div class="score-bar"><div class="score-bar-fill" id="ov-fedramp-bar" style="width:0%;background:var(--cyan)"></div></div>
           </div>
-          <div class="score-card">
+          <div class="score-card" onclick="switchTab('rmf',null)" style="cursor:pointer" title="View CMMC / RMF detail">
             <div class="score-label">CMMC LEVEL 2</div>
             <div class="score-val" id="ov-cmmc" style="color:var(--amber)">—</div>
             <div class="score-sub" id="ov-cmmc-sub">loading...</div>
             <div class="score-bar"><div class="score-bar-fill" id="ov-cmmc-bar" style="width:0%;background:var(--amber)"></div></div>
           </div>
-          <div class="score-card">
+          <div class="score-card" onclick="switchTab('ato-expiry',null)" style="cursor:pointer" title="View ATO Expiry detail">
             <div class="score-label">ATO STATUS</div>
             <div class="score-val" id="ov-ato" style="color:var(--t3);font-size:14px;padding-top:6px">Loading...</div>
             <div class="score-sub" id="ov-ato-sub">—</div>
@@ -1290,8 +1289,17 @@ async function api(path) {
 }
 
 async function post(path, body) {
+  // Mirror the auth-token discovery the GET helper does. Prior version sent
+  // POST without Authorization → every write (RMF task update, pipeline
+  // trigger, microseg add, VN-standards update) silently 401'd.
+  var tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
+  if (!tk || tk.length < 20) {
+    try { tk = window.parent.TOKEN || ''; } catch(e) {}
+  }
   try {
-    const r = await fetch(API + path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    var hdr = {'Content-Type':'application/json'};
+    if (tk) hdr['Authorization'] = 'Bearer ' + tk;
+    const r = await fetch(API + path, { method:'POST', headers:hdr, body:JSON.stringify(body) });
     return await r.json();
   } catch(e) { return null; }
 }
@@ -1324,20 +1332,27 @@ async function loadOverview() {
   }
   // Per-fetch safe: preserve partial KPIs if some endpoints fail
   var safe = function(p){ return Promise.resolve(p).then(function(r){ return r || {}; }).catch(function(){ return {}; }); };
-  var zt, pipe, rmf;
+  var zt, pipe, rmf, fed, cmmc, ato;
   try {
     var res = await Promise.all([
       safe(api('/api/p4/zt/status')),
       safe(api('/api/p4/pipeline/latest')),
-      safe(api('/api/p4/rmf'))
+      safe(api('/api/p4/rmf')),
+      // Pull the same compliance endpoints the inline dashboard tile and
+      // FedRAMP/CMMC detail panel use, so the % shown on this Overview tab
+      // always matches what the user sees on the home dashboard.
+      safe(api('/api/v1/compliance/fedramp')),
+      safe(api('/api/v1/compliance/cmmc')),
+      safe(api('/api/p4/ato/expiry'))
     ]);
-    zt = res[0]; pipe = res[1]; rmf = res[2];
+    zt = res[0]; pipe = res[1]; rmf = res[2]; fed = res[3]; cmmc = res[4]; ato = res[5];
   } catch(e) {
     console.error('[FEAT-33] loadOverview failed:', e);
     if (hasUX) _p4Err('#ov-pillars', 'Network error loading overview', loadOverview);
     return;
   }
 
+  // P4 readiness
   if (zt && zt.p4_readiness != null) {
     var p4 = zt.p4_readiness;
     var p4El = document.getElementById('ov-p4');
@@ -1371,6 +1386,233 @@ async function loadOverview() {
   } else if (hasUX && !zt) {
     _p4Err('#ov-pillars', 'Failed to load Zero Trust status', loadOverview);
   }
+
+  // FedRAMP card — coverage_pct matches dashboard gauge + inline detail panel.
+  // Sub-line shows passed/assessed so user can see real compliance state since
+  // coverage_pct=100% just means assessment was run, not that controls pass.
+  var fedPct = (fed && fed.coverage_pct != null) ? fed.coverage_pct : 0;
+  var fedEl = document.getElementById('ov-fedramp');
+  var fedSub = document.getElementById('ov-fedramp-sub');
+  var fedBar = document.getElementById('ov-fedramp-bar');
+  if (fedEl) fedEl.textContent = fedPct + '%';
+  if (fedBar) fedBar.style.width = fedPct + '%';
+  if (fedSub) {
+    var fp = (fed && fed.passed) || 0;
+    var fa = (fed && fed.assessed) || 0;
+    fedSub.textContent = fa ? (fp + '/' + fa + ' controls passed') : 'no data';
+  }
+
+  // CMMC card — same convention
+  var cmmcPct = (cmmc && cmmc.coverage_pct != null) ? cmmc.coverage_pct : 0;
+  var cmmcEl = document.getElementById('ov-cmmc');
+  var cmmcSub = document.getElementById('ov-cmmc-sub');
+  var cmmcBar = document.getElementById('ov-cmmc-bar');
+  if (cmmcEl) cmmcEl.textContent = cmmcPct + '%';
+  if (cmmcBar) cmmcBar.style.width = cmmcPct + '%';
+  if (cmmcSub) {
+    var cp = (cmmc && cmmc.passed) || 0;
+    var ca = (cmmc && cmmc.assessed) || 0;
+    cmmcSub.textContent = ca ? (cp + '/' + ca + ' practices passed') : 'no data';
+  }
+
+  // ATO card — pulls from /api/p4/ato/expiry, same data the ATO Expiry tab uses
+  var atoEl = document.getElementById('ov-ato');
+  var atoSub = document.getElementById('ov-ato-sub');
+  if (ato && ato.ato_status) {
+    var st = ato.ato_status.toUpperCase();
+    var stColor = st === 'AUTHORIZED' ? 'var(--green)' : st === 'PENDING' ? 'var(--amber)' : 'var(--red)';
+    if (atoEl) {
+      atoEl.textContent = st;
+      atoEl.style.color = stColor;
+      atoEl.style.fontSize = '20px';
+      atoEl.style.paddingTop = '0';
+    }
+    if (atoSub) {
+      var days = ato.days_remaining;
+      atoSub.textContent = days != null ? (days + ' days until expiry') : (ato.expiration_date || '—');
+    }
+  }
+
+  // Pipeline summary card — links into Pipeline tab for full detail
+  var pipeBox = document.getElementById('ov-pipeline-summary');
+  if (pipeBox) {
+    if (pipe && pipe.id) {
+      var pStatus = (pipe.status || 'unknown').toLowerCase();
+      var pColor = pStatus === 'pass' ? 'var(--green)' : pStatus === 'fail' ? 'var(--red)' : 'var(--amber)';
+      pipeBox.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+        + '<div><div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">' + escHtml(pipe.id) + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px">' + escHtml(pipe.trigger_type || '') + ' · ' + escHtml(pipe.branch || '') + '</div></div>'
+        + '<div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:' + pColor + '">' + pStatus.toUpperCase() + '</div>'
+        + '<div style="font-size:10px;color:var(--t3)">' + escHtml(pipe.completed_at || pipe.started_at || '') + '</div>'
+        + '</div>';
+    } else {
+      pipeBox.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:11px;padding:8px">No pipeline runs yet</div>';
+    }
+  }
+
+  // Open POA&M (Critical/High) — pulled from /api/p4/rmf, same data POA&M tab uses
+  var poamBox = document.getElementById('ov-poam');
+  if (poamBox) {
+    var items = (rmf && Array.isArray(rmf.poam_items)) ? rmf.poam_items : [];
+    var open = items.filter(function(p){
+      var sev = (p.severity || '').toUpperCase();
+      var st = (p.status || '').toLowerCase();
+      return (sev === 'CRITICAL' || sev === 'HIGH') && st !== 'closed' && st !== 'resolved';
+    }).slice(0, 5);
+    if (open.length === 0) {
+      poamBox.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:11px;padding:8px">No open Critical/High POA&amp;M items</div>';
+    } else {
+      poamBox.innerHTML = open.map(function(p){
+        var sev = (p.severity || '').toUpperCase();
+        var sevColor = sev === 'CRITICAL' ? 'var(--red)' : 'var(--amber)';
+        // API fields: weakness_name (not title), control_id, finding_id,
+        // mitigation_plan, status, severity, closed_date (only when closed).
+        // Open items have no due_date in this schema; show control_id instead.
+        var label = p.weakness_name || p.title || p.id || '(no description)';
+        var meta = p.control_id ? p.control_id : (p.finding_id || '');
+        return '<div style="display:flex;gap:10px;padding:8px 12px;border-left:2px solid ' + sevColor + ';background:rgba(255,255,255,.02);margin-bottom:4px">'
+          + '<span style="font-family:var(--font-mono);font-size:10px;color:' + sevColor + ';font-weight:700;width:60px;flex-shrink:0">' + sev + '</span>'
+          + '<span style="font-size:11px;color:var(--t2);flex:1">' + escHtml(label) + '</span>'
+          + '<span style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">' + escHtml(meta) + '</span>'
+          + '</div>';
+      }).join('');
+    }
+  }
+}
+
+function escHtml(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+// PRO-grade Configure + Notifications buttons. Delegate to the parent shell
+// (vsp_pro_realapi.js) so the form modal styling matches other PRO panels.
+// Settings stored under feature_config[settings_general] / panel_p4 sub-key,
+// alongside other panel-specific config — same convention the Settings panel
+// uses for its sub-tabs.
+async function openP4Configure(){
+  var parentPRO = null;
+  try { parentPRO = window.parent && window.parent.VSP_PRO_FORM_MODAL; } catch(e) {}
+  if (!parentPRO) {
+    toast('Configure requires the parent shell — open from the main app');
+    return;
+  }
+  // Load existing settings_general blob and pull our subkey
+  var existing = {};
+  try {
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      headers:{Authorization:'Bearer '+(window.TOKEN||'')}, credentials:'same-origin'
+    });
+    if (r.ok) { var j = await r.json(); existing = (j && j.config) || {}; }
+  } catch(e) {}
+  var p4cfg = existing.panel_p4 || {};
+  parentPRO({
+    title: 'P4 Compliance — panel preferences',
+    sub: 'Display + alert thresholds for the P4 dashboard. Stored per tenant.',
+    submitLabel: 'Save',
+    fields: [
+      { id: 'fedramp_target', label: 'FedRAMP coverage target (%)', type: 'number',
+        value: p4cfg.fedramp_target || 80, hint: 'Score below this triggers amber on Overview' },
+      { id: 'cmmc_target', label: 'CMMC coverage target (%)', type: 'number',
+        value: p4cfg.cmmc_target || 80 },
+      { id: 'ato_warn_days', label: 'ATO expiry warning threshold (days)', type: 'number',
+        value: p4cfg.ato_warn_days || 90, hint: 'When days_remaining drops below, ATO card turns amber' },
+      { id: 'poam_show_only_open', label: 'Overview POA&M: show only open Critical/High', type: 'checkbox',
+        value: p4cfg.poam_show_only_open !== false },
+      { id: 'auto_refresh_secs', label: 'Auto-refresh interval (seconds, 0 = off)', type: 'number',
+        value: p4cfg.auto_refresh_secs || 0 }
+    ],
+    commit: function(v){
+      existing.panel_p4 = v;
+      return fetch('/api/v1/features/settings_general/config', {
+        method: 'PUT',
+        headers:{'Authorization':'Bearer '+(window.TOKEN||''),'Content-Type':'application/json'},
+        credentials:'same-origin',
+        body: JSON.stringify({ config: existing })
+      }).then(function(r){ if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
+    }
+  }).then(function(saved){ if (saved) toast('P4 preferences saved ✓'); })
+    .catch(function(e){ toast('Save failed: ' + (e.message||e)); });
+}
+
+function openP4Notifications(){
+  // Delegate to parent's existing cross-panel notifications modal — same one
+  // CWPP/CSPM/Supply Chain etc all use, so notification config is global.
+  try {
+    if (window.parent && window.parent.VSP_PRO && window.parent.VSP_PRO.openNotifications) {
+      window.parent.VSP_PRO.openNotifications();
+      return;
+    }
+  } catch(e) {}
+  toast('Notifications require the parent shell — open from the main app');
+}
+
+// ATO renewal checklist overrides — stored under settings_general blob so we
+// don't need a new feature_config whitelist entry or migration. Read at render
+// time and merged onto the backend's hardcoded done flags. Only the user's
+// changes ride in the override map; defaults stay in Go.
+async function _loadATOOverrides(){
+  try {
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      headers:{Authorization:'Bearer '+(window.TOKEN||'')}, credentials:'same-origin'
+    });
+    if (!r.ok) return {};
+    var j = await r.json();
+    return ((j && j.config) || {}).p4_ato_checklist_overrides || {};
+  } catch(e) { return {}; }
+}
+
+async function toggleATOTask(id, newDone){
+  // Optimistic UI: flip the row immediately so user sees feedback even on slow
+  // network. Roll back on save failure.
+  var row = document.querySelector('[data-rc-id="'+id+'"]');
+  var prevHtml = row ? row.innerHTML : null;
+  if (row) {
+    var label = row.textContent.replace(/^[✓○]\s*/, '');
+    row.innerHTML = (newDone ? '✓ ' : '○ ') + escHtml(label);
+    row.style.color = newDone ? 'var(--t2)' : 'var(--t3)';
+    row.dataset.rcDone = newDone ? '1' : '0';
+    row.setAttribute('onclick', "toggleATOTask('"+id+"',"+(!newDone)+")");
+  }
+  try {
+    var existing = await fetch('/api/v1/features/settings_general/config', {
+      headers:{Authorization:'Bearer '+(window.TOKEN||'')}, credentials:'same-origin'
+    });
+    var cfg = {};
+    if (existing.ok) { var j = await existing.json(); cfg = (j && j.config) || {}; }
+    cfg.p4_ato_checklist_overrides = cfg.p4_ato_checklist_overrides || {};
+    cfg.p4_ato_checklist_overrides[id] = !!newDone;
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+(window.TOKEN||''),'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({ config: cfg })
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    // Update the "done/total" counter card without full reload
+    _refreshATOCounter();
+    toast('Task '+id+' marked '+(newDone?'done ✓':'pending'));
+  } catch(e) {
+    if (row && prevHtml != null) {
+      row.innerHTML = prevHtml;
+      row.dataset.rcDone = newDone ? '0' : '1';
+      row.setAttribute('onclick', "toggleATOTask('"+id+"',"+newDone+")");
+    }
+    toast('Save failed: '+(e.message||e));
+  }
+}
+
+function _refreshATOCounter(){
+  var rows = document.querySelectorAll('[data-rc-id]');
+  if (!rows.length) return;
+  var done = 0;
+  rows.forEach(function(r){ if (r.dataset.rcDone === '1') done++; });
+  // The counter card is the 4th hero card with cyan number; locate by label.
+  var labels = document.querySelectorAll('#ato-expiry-content .score-label, #ato-expiry-content [style*="text-transform:uppercase"]');
+  labels.forEach(function(l){
+    if (/RENEWAL TASKS/i.test(l.textContent || '')) {
+      var num = l.previousElementSibling;
+      if (num) num.textContent = done + '/' + rows.length;
+    }
+  });
 }
 
 // ---- RMF ----
@@ -1549,6 +1791,23 @@ async function loadZeroTrust() {
       }).join('');
     }
   }
+
+  // SBOM mini-card on Zero Trust tab — same data the SBOM View tab shows so
+  // numbers match. Click the card to jump to full SBOM tab.
+  try {
+    var sbom = await api('/api/p4/sbom/view-db');
+    var totalEl = document.getElementById('sbom-total');
+    var critEl = document.getElementById('sbom-crit');
+    if (sbom && totalEl) totalEl.textContent = (sbom.total_components != null) ? sbom.total_components : (sbom.components ? sbom.components.length : 0);
+    if (sbom && critEl) critEl.textContent = (sbom.critical != null) ? sbom.critical : 0;
+    var sbomBox = document.getElementById('sbom-box');
+    if (sbomBox && sbom && !sbomBox.dataset.clickWired) {
+      sbomBox.style.cursor = 'pointer';
+      sbomBox.title = 'View full SBOM';
+      sbomBox.addEventListener('click', function(){ switchTab('sbom-view', null); });
+      sbomBox.dataset.clickWired = '1';
+    }
+  } catch(e) { /* leave default — */ }
 }
 
 // ---- Pipeline ----
@@ -2441,6 +2700,15 @@ async function loadATOExpiry() {
     return;
   }
 
+  // Backend serves a fixed default checklist with hardcoded done flags. To let
+  // the user mark items complete, we layer per-tenant overrides stored under
+  // settings_general.p4_ato_checklist_overrides (no migration needed — same
+  // feature_config blob the Settings panel uses).
+  var overrides = await _loadATOOverrides();
+  (res.renewal_checklist||[]).forEach(function(c){
+    if (overrides[c.id] !== undefined) c.done = !!overrides[c.id];
+  });
+
   var days = res.days_remaining;
   var pct = Math.min(100, Math.round((days / 1095) * 100));
   var col = res.expiry_level==='ok'?'var(--green)':res.expiry_level==='warning'?'var(--amber)':'var(--red)';
@@ -2475,8 +2743,19 @@ async function loadATOExpiry() {
     + '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px">'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;text-transform:uppercase">Renewal checklist</div>'
       + checklist.map(function(c) {
-          return '<div style="font-size:11px;padding:3px 0;color:'+(c.done?'var(--t2)':'var(--t3)')+'">'+
-            (c.done?'✓ ':'○ ')+c.name+'</div>';
+          var label = c.task || c.name || c.title || c.id || '(unnamed task)';
+          var due = (c.due_weeks_before_expiry != null)
+            ? ' <span style="color:var(--t3);font-size:10px">· due '+c.due_weeks_before_expiry+'w before expiry</span>'
+            : '';
+          // Each row is a clickable toggle. Click flips done state and PUTs
+          // the new value to settings_general.p4_ato_checklist_overrides.
+          return '<div data-rc-id="'+escHtml(c.id)+'" data-rc-done="'+(c.done?'1':'0')
+            +'" onclick="toggleATOTask(\''+escHtml(c.id)+'\','+(c.done?'false':'true')+')"'
+            +' style="font-size:11px;padding:5px 6px;margin:1px 0;cursor:pointer;border-radius:4px;color:'
+            +(c.done?'var(--t2)':'var(--t3)')+'" '
+            +'onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" '
+            +'onmouseout="this.style.background=\'transparent\'">'
+            +(c.done?'✓ ':'○ ')+escHtml(label)+due+'</div>';
         }).join('')
     + '</div>';
 }
@@ -2741,7 +3020,7 @@ function switchTenant(id) {
 }
 
 </script>
-<script src="/panels/vsp_compliance_table_patch.js?v=3"></script>
+<script src="/panels/vsp_compliance_table_patch.js?v=4"></script>
 
 <script>
 (function() {

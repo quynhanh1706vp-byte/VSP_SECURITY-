@@ -12,9 +12,10 @@
 //   - pacman   (Arch — best-effort)
 //
 // Run:
-//   ./vsp-sw-agent -api http://VSP_HOST:8094 -key $(cat /etc/vsp/sw-agent.key)
-//   ./vsp-sw-agent -once   # single submission then exit (cron-friendly)
-//   ./vsp-sw-agent         # daemon mode, every 30 min
+//
+//	./vsp-sw-agent -api http://VSP_HOST:8094 -key $(cat /etc/vsp/sw-agent.key)
+//	./vsp-sw-agent -once   # single submission then exit (cron-friendly)
+//	./vsp-sw-agent         # daemon mode, every 30 min
 package main
 
 import (

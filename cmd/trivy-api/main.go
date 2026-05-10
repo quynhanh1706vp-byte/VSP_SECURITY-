@@ -25,9 +25,9 @@ import (
 )
 
 const (
-	listenAddr = ":8090"
+	listenAddr  = ":8090"
 	scanTimeout = 5 * time.Minute
-	trivyBin   = "trivy"
+	trivyBin    = "trivy"
 )
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -257,7 +257,9 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	var req struct{ Ref string `json:"ref"` }
+	var req struct {
+		Ref string `json:"ref"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Ref == "" {
 		writeJSON(w, 400, map[string]string{"error": "ref required"})
 		return

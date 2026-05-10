@@ -65,7 +65,7 @@ type osvOutput struct {
 }
 
 type osvResult struct {
-	Source   osvSource   `json:"source"`
+	Source   osvSource    `json:"source"`
 	Packages []osvPackage `json:"packages"`
 }
 

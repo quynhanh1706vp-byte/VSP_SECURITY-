@@ -92,8 +92,8 @@ func TestCreateJira_HTTPError(t *testing.T) {
 	defer srv.Close()
 
 	tk := New(Config{
-		JiraBaseURL:  srv.URL,
-		JiraEmail:    "x", JiraAPIToken: "y",
+		JiraBaseURL: srv.URL,
+		JiraEmail:   "x", JiraAPIToken: "y",
 	})
 	_, _, err := tk.Create(context.Background(), "jira", "SEC", "s", "d", nil)
 	if err == nil || !strings.Contains(err.Error(), "http 401") {

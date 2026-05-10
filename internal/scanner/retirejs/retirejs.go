@@ -62,14 +62,14 @@ type retireOutput struct {
 }
 
 type retireFile struct {
-	File    string           `json:"file"`
-	Results []retireResult   `json:"results"`
+	File    string         `json:"file"`
+	Results []retireResult `json:"results"`
 }
 
 type retireResult struct {
-	Component       string            `json:"component"`
-	Version         string            `json:"version"`
-	Vulnerabilities []retireVulnInfo  `json:"vulnerabilities"`
+	Component       string           `json:"component"`
+	Version         string           `json:"version"`
+	Vulnerabilities []retireVulnInfo `json:"vulnerabilities"`
 }
 
 type retireVulnInfo struct {

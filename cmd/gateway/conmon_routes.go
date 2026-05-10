@@ -10,9 +10,9 @@ import (
 // Caller must pass the same db pointer used by the rest of the gateway,
 // and an authentication middleware to wrap the handlers.
 func registerConMonRoutes(mux *http.ServeMux, h *handler.ConMonHandler, withAuth func(http.HandlerFunc) http.HandlerFunc) {
-	mux.HandleFunc("/api/v1/conmon/schedules",   withAuth(h.Schedules))
-	mux.HandleFunc("/api/v1/conmon/deviations",  withAuth(h.Deviations))
-	mux.HandleFunc("/api/v1/conmon/cadence",     withAuth(h.CadenceStatus))
+	mux.HandleFunc("/api/v1/conmon/schedules", withAuth(h.Schedules))
+	mux.HandleFunc("/api/v1/conmon/deviations", withAuth(h.Deviations))
+	mux.HandleFunc("/api/v1/conmon/cadence", withAuth(h.CadenceStatus))
 
 	// Acknowledgement uses a path with an embedded id:
 	//   POST /api/v1/conmon/deviations/{id}/acknowledge

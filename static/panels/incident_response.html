@@ -147,7 +147,7 @@ tr.clickable{cursor:pointer}
     <div class="card-body">
       <table>
         <thead><tr><th>ID</th><th>Title</th><th>Severity</th><th>Phase</th><th>Status</th><th>Flags</th><th>Detected</th><th>Actions</th></tr></thead>
-        <tbody id="inc-tbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+        <tbody id="inc-tbody" data-vsp-paginate="20"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -204,7 +204,7 @@ tr.clickable{cursor:pointer}
     <div class="card-body">
       <table>
         <thead><tr><th>ID</th><th>Type</th><th>Description</th><th>Size</th><th>Hash</th><th>Collected</th><th>Custody</th></tr></thead>
-        <tbody id="ev-tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+        <tbody id="ev-tbody" data-vsp-paginate="25"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -934,8 +934,14 @@ loadKPIs();loadIncidents();
     const tbody = tab.querySelector('tbody, table');
     if (!tbody) return;
     const card = tbody.closest('div[class*="card"]') || tbody.parentNode;
-    const headSection = card && card.querySelector('div:first-child');
+    if (!card) return;
+    const headSection = card.querySelector('div:first-child');
     if (!headSection) return;
+    // Safe insertion: only call insertBefore when both nodes share a parent.
+    // The previous version assumed `tbody.parentNode` was a direct child of
+    // `headSection.parentNode`, which throws NotFoundError when the table is
+    // wrapped (common with <tbl-wrap><table>...). The interval re-fires the
+    // init every 1s × 5 → spammed the console with the same exception.
 
     const bar = document.createElement('div');
     bar.className = 'vsp-ir-filter';
@@ -957,7 +963,19 @@ loadKPIs();loadIncidents();
       + '</div>'
       + '<button class="btn btn-sm" onclick="window._vspIR.exportCSV()" style="font-size:10px">↓ CSV</button>'
       + '<span id="ir-fcount" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
-    headSection.parentNode.insertBefore(bar, tbody.parentNode);
+    // Insert the filter bar right after the head section. If both share a
+    // parent we use insertBefore(headSection.nextSibling); otherwise fall
+    // back to appending into the card (always succeeds).
+    try {
+      if (headSection.parentNode) {
+        headSection.parentNode.insertBefore(bar, headSection.nextSibling);
+      } else {
+        card.appendChild(bar);
+      }
+    } catch (e) {
+      // DOM shape changed mid-poll — append at end as last-resort fallback
+      try { card.appendChild(bar); } catch (_) {}
+    }
 
     if (!$id('ir-pill-css')) {
       const css = document.createElement('style'); css.id = 'ir-pill-css';
@@ -2118,5 +2136,7 @@ window.submitCustodyEntry = async function(evidenceId){
 
 <!-- VSP-IR-G1-END -->
 
+<script src="/panels/vsp_pro_panel_buttons.js?v=1"></script>
+<script src="/panels/vsp_pro_paginate.js?v=1"></script>
 </body>
 </html>

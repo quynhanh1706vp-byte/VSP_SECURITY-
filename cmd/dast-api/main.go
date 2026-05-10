@@ -5,27 +5,29 @@
 // Wraps `nuclei` CLI for dynamic security testing.
 //
 // Architecture:
-//   • Async scans: POST /scan → returns scan_id immediately, scan runs
+//   - Async scans: POST /scan → returns scan_id immediately, scan runs
 //     in background goroutine, results visible via GET /scans/{id}.
-//   • One scan at a time (scanMutex). Concurrent requests queue (limited).
-//   • Parser converts nuclei JSONL output → unified Finding[].
-//   • JSON store atomic-rename pattern.
+//   - One scan at a time (scanMutex). Concurrent requests queue (limited).
+//   - Parser converts nuclei JSONL output → unified Finding[].
+//   - JSON store atomic-rename pattern.
 //
 // Profiles:
-//   quick    nuclei -t cves/ -severity high,critical    (~30s)
-//   standard nuclei -t cves/ -severity medium,high,critical  (~3m)
-//   deep     nuclei -t cves/,vulnerabilities/,exposures/  (~10m+)
+//
+//	quick    nuclei -t cves/ -severity high,critical    (~30s)
+//	standard nuclei -t cves/ -severity medium,high,critical  (~3m)
+//	deep     nuclei -t cves/,vulnerabilities/,exposures/  (~10m+)
 //
 // Endpoints:
-//   GET    /healthz                liveness + tools detected
-//   GET    /tools/check            which DAST tools available
-//   POST   /scan                   {"target":"https://x","profile":"quick"}
-//   GET    /scans                  list (sort by started_at desc)
-//   GET    /scans/{id}             detail (status + findings)
-//   GET    /scans/{id}/findings    findings only
-//   POST   /scans/{id}/cancel      cancel running scan
-//   DELETE /scans/{id}             delete record
-//   GET    /stats                  KPIs
+//
+//	GET    /healthz                liveness + tools detected
+//	GET    /tools/check            which DAST tools available
+//	POST   /scan                   {"target":"https://x","profile":"quick"}
+//	GET    /scans                  list (sort by started_at desc)
+//	GET    /scans/{id}             detail (status + findings)
+//	GET    /scans/{id}/findings    findings only
+//	POST   /scans/{id}/cancel      cancel running scan
+//	DELETE /scans/{id}             delete record
+//	GET    /stats                  KPIs
 package main
 
 import (
@@ -51,49 +53,49 @@ import (
 // ── flags ──────────────────────────────────────────────────────────────
 
 var (
-	addr       = flag.String("addr", ":8093", "listen address")
-	storePath  = flag.String("store", "/var/lib/vsp/dast-scans.json", "scan store path")
-	maxScans   = flag.Int("max-scans", 200, "rolling window")
-	nucleiBin  = flag.String("nuclei", "nuclei", "nuclei binary path or 'nuclei' to use $PATH")
+	addr        = flag.String("addr", ":8093", "listen address")
+	storePath   = flag.String("store", "/var/lib/vsp/dast-scans.json", "scan store path")
+	maxScans    = flag.Int("max-scans", 200, "rolling window")
+	nucleiBin   = flag.String("nuclei", "nuclei", "nuclei binary path or 'nuclei' to use $PATH")
 	maxParallel = flag.Int("parallel", 1, "max concurrent scans")
 )
 
 // ── types ──────────────────────────────────────────────────────────────
 
 type Scan struct {
-	ID         string     `json:"id"`
-	Target     string     `json:"target"`
-	Profile    string     `json:"profile"`
-	Status     string     `json:"status"` // queued | running | done | failed | cancelled
-	StartedAt  time.Time  `json:"started_at"`
-	FinishedAt time.Time  `json:"finished_at,omitempty"`
-	DurationMs int64      `json:"duration_ms"`
-	Tool       string     `json:"tool"` // nuclei
-	Findings   []Finding  `json:"findings,omitempty"`
-	Stats      ScanStats  `json:"stats"`
-	Error      string     `json:"error,omitempty"`
-	RawOutput  string     `json:"raw_output,omitempty"` // truncated stderr/stdout for debug
+	ID         string    `json:"id"`
+	Target     string    `json:"target"`
+	Profile    string    `json:"profile"`
+	Status     string    `json:"status"` // queued | running | done | failed | cancelled
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at,omitempty"`
+	DurationMs int64     `json:"duration_ms"`
+	Tool       string    `json:"tool"` // nuclei
+	Findings   []Finding `json:"findings,omitempty"`
+	Stats      ScanStats `json:"stats"`
+	Error      string    `json:"error,omitempty"`
+	RawOutput  string    `json:"raw_output,omitempty"` // truncated stderr/stdout for debug
 
 	// runtime
 	cancel context.CancelFunc `json:"-"`
 }
 
 type Finding struct {
-	Tool          string `json:"tool"`
-	TemplateID    string `json:"template_id"`
-	TemplateName  string `json:"template_name"`
-	Severity      string `json:"severity"` // critical | high | medium | low | info
-	Type          string `json:"type"`     // http | dns | tcp | ...
-	URL           string `json:"url"`
-	Host          string `json:"host"`
-	Matched       string `json:"matched,omitempty"`
-	Description   string `json:"description,omitempty"`
-	Reference     []string `json:"reference,omitempty"`
-	CVE           []string `json:"cve,omitempty"`
-	CWE           []string `json:"cwe,omitempty"`
-	CVSS          float64  `json:"cvss,omitempty"`
-	Tags          []string `json:"tags,omitempty"`
-	Timestamp     time.Time `json:"timestamp"`
+	Tool         string    `json:"tool"`
+	TemplateID   string    `json:"template_id"`
+	TemplateName string    `json:"template_name"`
+	Severity     string    `json:"severity"` // critical | high | medium | low | info
+	Type         string    `json:"type"`     // http | dns | tcp | ...
+	URL          string    `json:"url"`
+	Host         string    `json:"host"`
+	Matched      string    `json:"matched,omitempty"`
+	Description  string    `json:"description,omitempty"`
+	Reference    []string  `json:"reference,omitempty"`
+	CVE          []string  `json:"cve,omitempty"`
+	CWE          []string  `json:"cwe,omitempty"`
+	CVSS         float64   `json:"cvss,omitempty"`
+	Tags         []string  `json:"tags,omitempty"`
+	Timestamp    time.Time `json:"timestamp"`
 }
 
 type ScanStats struct {
@@ -113,10 +115,10 @@ type errEnv struct {
 // ── globals ────────────────────────────────────────────────────────────
 
 var (
-	mu       sync.RWMutex
-	scans    = map[string]*Scan{}
+	mu    sync.RWMutex
+	scans = map[string]*Scan{}
 
-	scanSem  = make(chan struct{}, 4) // bounded queue (init in main from -parallel)
+	scanSem = make(chan struct{}, 4) // bounded queue (init in main from -parallel)
 )
 
 // ── helpers ────────────────────────────────────────────────────────────
@@ -206,10 +208,12 @@ func saveScan(s *Scan) {
 			times = append(times, v.StartedAt)
 		}
 		// remove oldest
-		oldest := ids[0]; oldestTime := times[0]
+		oldest := ids[0]
+		oldestTime := times[0]
 		for i, t := range times {
 			if t.Before(oldestTime) {
-				oldest = ids[i]; oldestTime = t
+				oldest = ids[i]
+				oldestTime = t
 			}
 		}
 		delete(scans, oldest)
@@ -576,12 +580,12 @@ func finishWithError(s *Scan, msg string) {
 func buildNucleiArgs(s *Scan) []string {
 	args := []string{
 		"-u", s.Target,
-		"-jsonl",                  // JSON-lines output
-		"-silent",                 // no banner
+		"-jsonl",  // JSON-lines output
+		"-silent", // no banner
 		"-disable-update-check",
 		"-no-interactsh",
 		"-rate-limit", "150",
-		"-c", "25",                // concurrency
+		"-c", "25", // concurrency
 	}
 	switch s.Profile {
 	case "quick":
@@ -611,23 +615,23 @@ func profileTimeout(profile string) time.Duration {
 // ── nuclei JSON parser ─────────────────────────────────────────────────
 
 type nucleiEvent struct {
-	TemplateID  string `json:"template-id"`
-	Info        struct {
-		Name        string   `json:"name"`
-		Severity    string   `json:"severity"`
-		Description string   `json:"description"`
-		Reference   []string `json:"reference"`
-		Tags        []string `json:"tags"`
+	TemplateID string `json:"template-id"`
+	Info       struct {
+		Name           string   `json:"name"`
+		Severity       string   `json:"severity"`
+		Description    string   `json:"description"`
+		Reference      []string `json:"reference"`
+		Tags           []string `json:"tags"`
 		Classification struct {
 			CVE  []string `json:"cve-id"`
 			CWE  []string `json:"cwe-id"`
 			CVSS float64  `json:"cvss-score"`
 		} `json:"classification"`
 	} `json:"info"`
-	Type     string    `json:"type"`
-	Host     string    `json:"host"`
-	URL      string    `json:"url"`
-	MatchedAt string   `json:"matched-at"`
+	Type      string    `json:"type"`
+	Host      string    `json:"host"`
+	URL       string    `json:"url"`
+	MatchedAt string    `json:"matched-at"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -680,12 +684,12 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz",      cors(handleHealth))
-	mux.HandleFunc("/tools/check",  cors(handleToolsCheck))
-	mux.HandleFunc("/scan",         cors(handleScan))
-	mux.HandleFunc("/scans",        cors(handleScansList))
-	mux.HandleFunc("/scans/",       cors(handleScanOne))
-	mux.HandleFunc("/stats",        cors(handleStats))
+	mux.HandleFunc("/healthz", cors(handleHealth))
+	mux.HandleFunc("/tools/check", cors(handleToolsCheck))
+	mux.HandleFunc("/scan", cors(handleScan))
+	mux.HandleFunc("/scans", cors(handleScansList))
+	mux.HandleFunc("/scans/", cors(handleScanOne))
+	mux.HandleFunc("/stats", cors(handleStats))
 
 	srv := &http.Server{
 		Addr:              *addr,

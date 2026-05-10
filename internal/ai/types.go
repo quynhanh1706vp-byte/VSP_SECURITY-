@@ -54,9 +54,9 @@ func (r AdviseRequest) CacheKey() string {
 // same cache key. It also bumps last_used_at and use_count.
 func CacheLookup(ctx context.Context, db *sql.DB, key string) (*AdviseResponse, int64, error) {
 	var (
-		id        int64
-		respJSON  []byte
-		mode      string
+		id       int64
+		respJSON []byte
+		mode     string
 	)
 	err := db.QueryRowContext(ctx, `
 		SELECT id, response_json, mode FROM ai_advisor_cache WHERE cache_key = $1

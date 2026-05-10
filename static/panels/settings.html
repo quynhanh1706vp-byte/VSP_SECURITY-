@@ -210,9 +210,7 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card">
     <div class="card-head"><div class="card-title">DAST targets</div><div class="card-sub">URLs to scan in DAST mode — Nuclei/ZAP/nikto</div></div>
     <div class="card-body">
-      <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-md);padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--amber)">
-        ⚠ DAST hiện có 6 runs nhưng 0 findings — vì chưa có target URL. Config ở đây để fix.
-      </div>
+      <div id="dast-orphan-banner" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-md);padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--amber)"></div>
       <div id="dast-targets-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
       <div style="display:flex;gap:8px;align-items:flex-end">
         <div style="flex:1">
@@ -497,7 +495,12 @@ function sw(id,btn){
   // Lazy-load tab data
   if (id === 'tab-apikeys' && typeof loadAPIKeysFromBackend === 'function') loadAPIKeysFromBackend();
   if (id === 'tab-health' && typeof loadHealth === 'function') loadHealth();
-  if (id === 'tab-scan' && typeof loadToolConfig === 'function') loadToolConfig();
+  if (id === 'tab-scan') {
+    if (typeof loadToolConfig === 'function') loadToolConfig();
+    if (typeof loadDastTargets === 'function') loadDastTargets();
+    if (typeof loadScanDefaults === 'function') loadScanDefaults();
+  }
+  if (id === 'tab-alerts' && typeof loadAlertRules === 'function') loadAlertRules();
 }
 async function apiPost(path,data){
   await ensureToken();
@@ -506,33 +509,187 @@ async function apiPost(path,data){
     return r.ok;
   }catch(e){return false;}
 }
-function saveGeneral(){showToast('General settings saved','success');}
-function saveFeat(f,v){showToast('Feature '+f+' '+(v?'enabled':'disabled'),'success');}
-function saveScanDefaults(){
-  var cfg={gate:document.getElementById('gate-threshold')?.value||'70',concurrent: document.getElementById('max-scans')?.value||'3'};
-  localStorage.setItem('vsp_scan_defaults',JSON.stringify(cfg));
-  apiPost('/api/v1/settings/scan-config',cfg);
-  showToast('Scan defaults saved ✓','success');
+// FIX 2026-05-07: Save handlers used to fire-and-forget POST to endpoints
+// that didn\'t exist (405). Now they persist via the generic
+// /api/v1/features/settings_<section>/config endpoint backed by the
+// feature_config JSONB table — same pattern every other PRO panel uses.
+async function saveSection(sectionId, data){
+  try {
+    var r = await fetch('/api/v1/features/settings_' + sectionId + '/config', {
+      method: 'PUT',
+      headers: {'Authorization':'Bearer '+TOKEN, 'Content-Type':'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({ config: data })
+    });
+    if (r.status === 402) { showToast('Saving settings requires PRO plan','error'); return false; }
+    if (!r.ok) { showToast('Save failed: HTTP '+r.status,'error'); return false; }
+    return true;
+  } catch(e) { showToast('Save error: '+e.message,'error'); return false; }
 }
-function loadScanDefaults(){
-  try{var cfg=JSON.parse(localStorage.getItem('vsp_scan_defaults')||'null');if(!cfg)return;var gt=document.getElementById('gate-threshold');var m2=document.getElementById('def-mode'); var p2=document.getElementById('def-profile'); var mc=document.getElementById('max-scans');if(gt&&cfg.gate)gt.value=cfg.gate;if(mc&&cfg.concurrent)mc.value=cfg.concurrent;}catch(e){}
-}
-function saveAuth(){showToast('Auth settings saved','success');}
-function saveCSRF(){
-  var exempt=document.getElementById('csrf-exempt')?.checked;
-  // Backend endpoint not available — save to localStorage
-  localStorage.setItem('vsp_csrf_config', JSON.stringify({exempt_sw_agent:exempt}));
-  showToast('CSRF config saved locally ✓','success');
-}
-function saveRetention(){showToast('Retention policy saved','success');}
-function saveJWT(){showToast('JWT config saved','success');}
-function saveSLARules(){showToast('SLA rules saved','success');}
-function saveAllSettings(){showToast('All settings saved','success');}
 
-// ── DAST targets ──
+async function loadSection(sectionId){
+  try {
+    var r = await fetch('/api/v1/features/settings_' + sectionId + '/config', {
+      headers: {'Authorization':'Bearer '+TOKEN}, credentials:'same-origin'
+    });
+    if (!r.ok) return {};
+    var d = await r.json();
+    return (d && d.config) || {};
+  } catch(e) { return {}; }
+}
+
+// Sections like settings_security carry several independent forms (Auth /
+// CSRF / JWT) — each Save button owns a sub-tree. Without merge, every PUT
+// would clobber the others.
+async function saveSubsection(sectionId, subKey, data){
+  var existing = await loadSection(sectionId);
+  existing[subKey] = data;
+  return saveSection(sectionId, existing);
+}
+
+async function saveGeneral(){
+  var data = {
+    system_name:    (document.getElementById('sys-name')||{}).value || '',
+    organization:   (document.getElementById('sys-org')||{}).value || '',
+    system_id:      (document.getElementById('sys-id')||{}).value || '',
+    authorizing:    (document.getElementById('sys-aoff')||{}).value || '',
+    pao_assessor:   (document.getElementById('sys-3pao')||{}).value || '',
+    platform_url:   (document.getElementById('sys-url')||{}).value || ''
+  };
+  if (await saveSubsection('general', 'platform', data)) showToast('General settings saved ✓','success');
+}
+
+async function saveFeat(f, v){
+  var existing = await loadSection('general');
+  var feats = existing.features || {};
+  feats[f] = v;
+  if (await saveSubsection('general', 'features', feats)) {
+    showToast('Feature '+f+' '+(v?'enabled':'disabled'),'success');
+  }
+}
+
+async function saveScanDefaults(){
+  var cfg = {
+    gate_threshold: parseInt((document.getElementById('gate-threshold')||{}).value||'70', 10),
+    max_concurrent: parseInt((document.getElementById('max-scans')||{}).value||'3', 10),
+    default_mode:   (document.getElementById('def-mode')||{}).value || '',
+    default_profile:(document.getElementById('def-profile')||{}).value || ''
+  };
+  localStorage.setItem('vsp_scan_defaults', JSON.stringify(cfg));
+  if (await saveSubsection('scan', 'defaults', cfg)) showToast('Scan defaults saved ✓','success');
+}
+
+async function loadScanDefaults(){
+  var section = await loadSection('scan');
+  // New layout: settings_scan.defaults; legacy: flat fields. Accept both.
+  var cfg = section.defaults || section || {};
+  if (!Object.keys(cfg).length) {
+    try { cfg = JSON.parse(localStorage.getItem('vsp_scan_defaults')||'null') || {}; } catch(e) {}
+  }
+  var gt = document.getElementById('gate-threshold');
+  var mc = document.getElementById('max-scans');
+  var dm = document.getElementById('def-mode');
+  var dp = document.getElementById('def-profile');
+  if (gt && cfg.gate_threshold) gt.value = cfg.gate_threshold;
+  if (mc && cfg.max_concurrent) mc.value = cfg.max_concurrent;
+  if (dm && cfg.default_mode)   dm.value = cfg.default_mode;
+  if (dp && cfg.default_profile) dp.value = cfg.default_profile;
+}
+
+async function saveAuth(){
+  var data = {
+    require_mfa:        !!(document.getElementById('auth-mfa')||{}).checked,
+    session_max_hours:  parseInt((document.getElementById('auth-session')||{}).value||'8', 10),
+    allowed_idps:       (document.getElementById('auth-idps')||{}).value || ''
+  };
+  if (await saveSubsection('security', 'auth', data)) showToast('Auth settings saved ✓','success');
+}
+
+async function saveCSRF(){
+  var data = {
+    exempt_sw_agent: !!(document.getElementById('csrf-exempt')||{}).checked
+  };
+  localStorage.setItem('vsp_csrf_config', JSON.stringify(data));
+  if (await saveSubsection('security', 'csrf', data)) showToast('CSRF config saved ✓','success');
+}
+
+async function saveRetention(){
+  var data = {
+    findings_days:    parseInt((document.getElementById('ret-findings')||{}).value||'365', 10),
+    runs_days:        parseInt((document.getElementById('ret-runs')||{}).value||'90', 10),
+    audit_days:       parseInt((document.getElementById('ret-audit')||{}).value||'2555', 10),
+    notification_days: parseInt((document.getElementById('ret-notif')||{}).value||'30', 10)
+  };
+  if (await saveSubsection('retention', 'policy', data)) showToast('Retention policy saved ✓','success');
+}
+
+async function saveJWT(){
+  var data = {
+    secret_rotated_at: new Date().toISOString(),
+    rotation_days: parseInt((document.getElementById('jwt-rotation')||{}).value||'90', 10)
+  };
+  if (await saveSubsection('security', 'jwt', data)) showToast('JWT config saved ✓','success');
+}
+
+async function saveSLARules(){
+  var data = {
+    critical_hours: parseInt((document.getElementById('sla-crit')||{}).value||'24', 10),
+    high_hours:     parseInt((document.getElementById('sla-high')||{}).value||'168', 10),
+    medium_hours:   parseInt((document.getElementById('sla-med')||{}).value||'720', 10)
+  };
+  if (await saveSubsection('alerts', 'sla', data)) showToast('SLA rules saved ✓','success');
+}
+
+async function saveAllSettings(){
+  showToast('Saving all sections…','info');
+  var results = await Promise.all([
+    saveGeneral(),
+    saveScanDefaults(),
+    saveSLARules(),
+    saveAuth(),
+    saveRetention()
+  ]);
+  showToast('All settings saved ✓','success');
+}
+
+// ── DAST targets — persisted as settings_scan.dast_targets sub-key ──
 var _dastTargets=[
   {url:'http://127.0.0.1:8921',env:'dev',status:'active'},
 ];
+async function loadDastTargets(){
+  var cfg = await loadSection('scan');
+  if (Array.isArray(cfg.dast_targets)) {
+    _dastTargets = cfg.dast_targets;
+    renderDastTargets();
+  }
+  loadDastOrphanBanner();
+}
+
+// Banner shows DAST run count (not tool count) — clarified after a user
+// reported confusion when the hardcoded "6 runs" mismatched the 3-tool DAST
+// preset on the +Scan modal. Now pulls live data and explains both numbers.
+async function loadDastOrphanBanner(){
+  var el = document.getElementById('dast-orphan-banner');
+  if (!el) return;
+  try {
+    var r = await fetch('/api/v1/vsp/runs/index?limit=500', {
+      headers:{'Authorization':'Bearer '+TOKEN}, credentials:'same-origin'
+    });
+    if (!r.ok) { el.style.display='none'; return; }
+    var d = await r.json();
+    var runs = (d && d.runs) || [];
+    var dast = runs.filter(function(x){ return (x.mode||'').toUpperCase()==='DAST'; });
+    var zero = dast.filter(function(x){ return !(x.total_findings>0); });
+    if (zero.length === 0) { el.style.display='none'; return; }
+    el.style.display='block';
+    el.innerHTML = '⚠ ' + zero.length + ' / ' + dast.length + ' DAST run(s) returned 0 findings — '
+      + 'thường do thiếu target URL. DAST mode dispatch 3 tools (nikto + nuclei + sslscan) '
+      + 'nhưng cần ít nhất 1 URL ở dưới để chạy.';
+  } catch(e) { el.style.display='none'; }
+}
+async function saveDastTargets(){
+  return saveSubsection('scan', 'dast_targets', _dastTargets);
+}
 function renderDastTargets(){
   document.getElementById('dast-targets-list').innerHTML=_dastTargets.map((t,i)=>`
     <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
@@ -542,7 +699,7 @@ function renderDastTargets(){
       <button class="btn btn-sm" onclick="removeDastTarget(${i})">✕</button>
     </div>`).join('');
 }
-function addDastTarget(){
+async function addDastTarget(){
   var url=document.getElementById('dast-new-url').value.trim();
   var env=document.getElementById('dast-new-env').value;
   if(!url){showToast('Enter a URL','error');return;}
@@ -550,18 +707,28 @@ function addDastTarget(){
   _dastTargets.push({url,env,status:'active'});
   document.getElementById('dast-new-url').value='';
   renderDastTargets();
-  apiPost('/api/v1/settings/dast-targets',{targets:_dastTargets});
-  showToast('DAST target added: '+url,'success');
+  if (await saveDastTargets()) showToast('DAST target added: '+url,'success');
 }
-function removeDastTarget(i){_dastTargets.splice(i,1);renderDastTargets();showToast('Target removed','success');}
+async function removeDastTarget(i){
+  _dastTargets.splice(i,1);
+  renderDastTargets();
+  if (await saveDastTargets()) showToast('Target removed','success');
+}
 
-// ── Alert rules ──
+// ── Alert rules — persisted as settings_alerts.rules sub-key ──
 var _alertRules=[
   {trigger:'gate_fail',sev:'any',channels:['slack','email'],enabled:true},
   {trigger:'critical_finding',sev:'CRITICAL',channels:['slack','pagerduty'],enabled:true},
   {trigger:'sla_breach',sev:'any',channels:['email'],enabled:true},
   {trigger:'secret_detected',sev:'CRITICAL',channels:['slack','email','pagerduty'],enabled:true},
 ];
+async function loadAlertRules(){
+  var cfg = await loadSection('alerts');
+  if (Array.isArray(cfg.rules)) {
+    _alertRules = cfg.rules;
+    renderAlertRules();
+  }
+}
 function renderAlertRules(){
   document.getElementById('alert-rules-tbody').innerHTML=_alertRules.map((r,i)=>`<tr>
     <td style="font-size:11px;color:var(--cyan)">${r.trigger}</td>
@@ -570,8 +737,13 @@ function renderAlertRules(){
     <td>
       <label class="sw-wrap"><input type="checkbox" ${r.enabled?'checked':''} onchange="_alertRules[${i}].enabled=this.checked;saveAlertRules()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
     </td>
-    <td><button class="btn btn-sm btn-danger" onclick="_alertRules.splice(${i},1);renderAlertRules()">✕</button></td>
+    <td><button class="btn btn-sm btn-danger" onclick="deleteAlertRule(${i})">✕</button></td>
   </tr>`).join('');
+}
+async function deleteAlertRule(i){
+  _alertRules.splice(i,1);
+  renderAlertRules();
+  if (await saveAlertRules()) showToast('Rule removed','success');
 }
 function addAlertRule(){
   var body = `
@@ -610,7 +782,7 @@ function addAlertRule(){
   window._vspUNI4.showModal({title:'+ Add notification rule', body:body, footer:footer, width:'480px'});
 }
 
-function submitAlertRule(){
+async function submitAlertRule(){
   var trigger = document.getElementById('ar-trigger').value;
   var sev = document.getElementById('ar-sev').value;
   var channels = [];
@@ -626,12 +798,13 @@ function submitAlertRule(){
     return;
   }
   _alertRules.push({trigger:trigger, sev:sev, channels:channels, enabled:true});
-  saveAlertRules();
   renderAlertRules();
   window._vspUNI4.close();
-  showToast('Alert rule added','success');
+  if (await saveAlertRules()) showToast('Alert rule added','success');
 }
-function saveAlertRules(){showToast('Alert rules saved','success');}
+async function saveAlertRules(){
+  return saveSubsection('alerts', 'rules', _alertRules);
+}
 
 // ── API Keys ──
 var _apiKeys=[
@@ -802,9 +975,55 @@ async function loadAPIKeysFromBackend(){
     }
   } catch(e) { /* keep stub data on error */ }
 }
-function rotateKey(id){showToast('Key rotated — copy new key from modal','success');}
-async function revokeKey(id){
-  if (!confirm('Revoke this API key? This cannot be undone.')) return;
+function rotateKey(id){
+  // Rotate = revoke + regenerate with same label/role. We can't read the old
+  // key's secret (only hash is stored), so we ask the user to confirm and
+  // hand them a brand-new key.
+  var k = _apiKeys.find(function(x){return x.id===id;});
+  if (!k) { showToast('Key not found','error'); return; }
+  var body = '<div style="font-size:12px;color:var(--t2);line-height:1.6">'
+    + 'Rotating <b>' + (k.name||'this key') + '</b> will:<br>'
+    + '&bull; Revoke the current key immediately<br>'
+    + '&bull; Generate a fresh key with the same label and role<br>'
+    + '&bull; Show the new secret <b>once</b> &mdash; you must copy it then'
+    + '</div>';
+  var footer = '<button class="btn" onclick="window._vspUNI4.close()">Cancel</button>'
+    + '<button class="btn btn-primary" onclick="confirmRotateKey(\'' + id + '\')">Rotate now</button>';
+  window._vspUNI4.showModal({title:'Rotate API key', body:body, footer:footer, width:'440px'});
+}
+async function confirmRotateKey(id){
+  var k = _apiKeys.find(function(x){return x.id===id;});
+  if (!k) { window._vspUNI4.close(); return; }
+  var token = (typeof window.vspToken === 'string' && window.vspToken)
+    ? window.vspToken : (localStorage.getItem('vsp_token') || '');
+  try {
+    await fetch('/api/v1/admin/api-keys/'+encodeURIComponent(id), {
+      method:'DELETE', headers:{'Authorization':'Bearer '+token}
+    });
+    var r = await fetch('/api/v1/admin/api-keys', {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body: JSON.stringify({label:k.name, role:k.perms || 'analyst', expiry_days:90})
+    });
+    if (!r.ok) { showToast('Rotate failed: HTTP '+r.status,'error'); return; }
+    var data = await r.json();
+    window._vspUNI4.close();
+    showAPIKeySecret(data, k.name);
+    loadAPIKeysFromBackend();
+  } catch(e) { showToast('Rotate error: '+e.message,'error'); }
+}
+function revokeKey(id){
+  var k = _apiKeys.find(function(x){return x.id===id;});
+  var label = (k && k.name) ? k.name : 'this key';
+  var body = '<div style="font-size:12px;color:var(--t2);line-height:1.6">'
+    + 'Revoke <b>' + label + '</b>? This cannot be undone &mdash; any service '
+    + 'using it will start receiving 401 immediately.</div>';
+  var footer = '<button class="btn" onclick="window._vspUNI4.close()">Cancel</button>'
+    + '<button class="btn btn-danger" onclick="confirmRevokeKey(\'' + id + '\')">Revoke</button>';
+  window._vspUNI4.showModal({title:'Revoke API key', body:body, footer:footer, width:'440px'});
+}
+async function confirmRevokeKey(id){
+  window._vspUNI4.close();
   try {
     var token = (typeof window.vspToken === 'string' && window.vspToken)
       ? window.vspToken
@@ -1431,5 +1650,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <!-- VSP-UNI4-POLISH-END -->
 <!-- FEAT-21 PATCH APPLIED --><script src="/static/patches/feat-21-settings.js"></script>
+<!-- VSP-SIEM-COMPANION -->
+<script src="/vsp_siem_companion.js"></script>
 </body>
 </html>

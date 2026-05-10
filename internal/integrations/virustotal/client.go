@@ -33,14 +33,14 @@ var ErrNotConfigured = errors.New("virustotal: VSP_VT_API_KEY not set")
 // Only includes fields useful for the SW inventory display.
 type FileReport struct {
 	SHA256       string    `json:"sha256"`
-	Malicious    int       `json:"malicious"`     // # AV engines flagging as malicious
-	Suspicious   int       `json:"suspicious"`    // # flagging as suspicious
-	Undetected   int       `json:"undetected"`    // # not detecting threats
-	Harmless     int       `json:"harmless"`      // # explicitly clean
-	TypeTag      string    `json:"type_tag"`      // e.g. "exe", "elf", "pdf"
+	Malicious    int       `json:"malicious"`  // # AV engines flagging as malicious
+	Suspicious   int       `json:"suspicious"` // # flagging as suspicious
+	Undetected   int       `json:"undetected"` // # not detecting threats
+	Harmless     int       `json:"harmless"`   // # explicitly clean
+	TypeTag      string    `json:"type_tag"`   // e.g. "exe", "elf", "pdf"
 	LastAnalysis time.Time `json:"last_analysis"`
-	Permalink    string    `json:"permalink"`     // https://www.virustotal.com/gui/file/{sha256}
-	Verdict      string    `json:"verdict"`       // computed: clean / suspicious / malicious
+	Permalink    string    `json:"permalink"` // https://www.virustotal.com/gui/file/{sha256}
+	Verdict      string    `json:"verdict"`   // computed: clean / suspicious / malicious
 }
 
 // Client wraps VirusTotal API v3.

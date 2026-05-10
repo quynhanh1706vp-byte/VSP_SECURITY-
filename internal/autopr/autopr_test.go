@@ -114,10 +114,10 @@ func TestH3S_RedactToken(t *testing.T) {
 
 func TestH3S_ParsePgArray(t *testing.T) {
 	cases := map[string][]string{
-		"{critical,high}":          {"critical", "high"},
-		`{"critical","high"}`:      {"critical", "high"},
-		"{}":                       {},
-		"{single}":                 {"single"},
+		"{critical,high}":     {"critical", "high"},
+		`{"critical","high"}`: {"critical", "high"},
+		"{}":                  {},
+		"{single}":            {"single"},
 	}
 	for input, want := range cases {
 		got := parsePgArray(input)

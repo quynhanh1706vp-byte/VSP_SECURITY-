@@ -35,13 +35,13 @@ type Aggregator struct {
 }
 
 type Finding struct {
-	Tool      string `json:"tool"`     // kics / checkov / hadolint
-	Severity  string `json:"severity"` // critical / high / medium / low
-	Resource  string `json:"resource"` // e.g., aws_s3_bucket
-	Provider  CloudProvider `json:"provider"`
-	RuleID    string `json:"rule_id"`
-	Message   string `json:"message"`
-	File      string `json:"file"`
+	Tool     string        `json:"tool"`     // kics / checkov / hadolint
+	Severity string        `json:"severity"` // critical / high / medium / low
+	Resource string        `json:"resource"` // e.g., aws_s3_bucket
+	Provider CloudProvider `json:"provider"`
+	RuleID   string        `json:"rule_id"`
+	Message  string        `json:"message"`
+	File     string        `json:"file"`
 }
 
 // New creates an aggregator from raw scanner findings.

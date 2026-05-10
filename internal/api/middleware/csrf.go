@@ -12,10 +12,11 @@ const csrfCookie = "vsp_csrf"
 
 // csrfExemptPaths lists endpoints that bypass CSRF entirely.
 // Reason for each:
-//   /auth/login              — no auth context yet, sets the cookie
-//   /auth/refresh            — refresh tokens are origin-bound by SameSite
-//   /software-inventory/report — agent endpoint (Bearer + HMAC, no browser)
-//   /siem/                   — SIEM ingestion (Bearer + IP allowlist)
+//
+//	/auth/login              — no auth context yet, sets the cookie
+//	/auth/refresh            — refresh tokens are origin-bound by SameSite
+//	/software-inventory/report — agent endpoint (Bearer + HMAC, no browser)
+//	/siem/                   — SIEM ingestion (Bearer + IP allowlist)
 var csrfExemptPaths = []string{
 	"/api/v1/auth/login",
 	"/api/v1/auth/refresh",

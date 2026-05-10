@@ -188,10 +188,10 @@ func checkImage(ctx context.Context, image string) scanner.Finding {
 			FixSignal: "Sign image with `cosign sign` or use signed base image",
 			Category:  scanner.SourceSCA,
 			Raw: map[string]any{
-				"image":          image,
-				"signatures":     sigCount,
-				"attestations":   attCount,
-				"sboms":          sbomCount,
+				"image":        image,
+				"signatures":   sigCount,
+				"attestations": attCount,
+				"sboms":        sbomCount,
 			},
 		}
 	}

@@ -8,6 +8,7 @@ package handler
 import (
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/pipeline"
@@ -163,10 +164,31 @@ func (h *ToolConfig) Update(w http.ResponseWriter, r *http.Request) {
 		clean[tool] = enabled
 	}
 
-	if err := h.DB.BulkSetToolEnabled(r.Context(), claims.TenantID, claims.UserID, clean); err != nil {
+	// Both columns in tool_config are UUID. Dev JWTs carry slug/email, so
+	// resolve before insert (same fix the audit helper applies).
+	tenantID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantID == "" {
+		jsonError(w, "tenant not found", http.StatusForbidden)
+		return
+	}
+	userID := resolveUserUUID(r.Context(), h.DB, claims.UserID)
+	if err := h.DB.BulkSetToolEnabled(r.Context(), tenantID, userID, clean); err != nil {
 		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Capture which tools changed so the audit entry is searchable later
+	// without having to diff before/after blobs.
+	changed := make([]string, 0, len(clean))
+	for t := range clean {
+		changed = append(changed, t)
+	}
+	sort.Strings(changed)
+	resource := "tool_config:" + strings.Join(changed, ",")
+	if len(resource) > 240 {
+		resource = resource[:237] + "..."
+	}
+	logAudit(r, h.DB, "TOOL_CONFIG_UPDATE", resource)
 
 	jsonOK(w, map[string]any{
 		"ok":      true,
@@ -183,9 +205,15 @@ func (h *ToolConfig) Reset(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "unauthenticated", http.StatusUnauthorized)
 		return
 	}
-	if err := h.DB.ResetToolConfig(r.Context(), claims.TenantID); err != nil {
+	tenantID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantID == "" {
+		jsonError(w, "tenant not found", http.StatusForbidden)
+		return
+	}
+	if err := h.DB.ResetToolConfig(r.Context(), tenantID); err != nil {
 		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	logAudit(r, h.DB, "TOOL_CONFIG_RESET", "tool_config:all")
 	jsonOK(w, map[string]any{"ok": true, "message": "all tools reset to default-on"})
 }

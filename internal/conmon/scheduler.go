@@ -17,22 +17,22 @@ import (
 // Schedule represents a single ConMon entry — a target/mode pair that
 // will be re-scanned on the configured cadence.
 type Schedule struct {
-	ID               int64     `json:"id"`
-	TenantID         string     `json:"tenant_id"`
-	Name             string    `json:"name"`
-	Cadence          string    `json:"cadence"` // 30d / 60d / 90d / daily / weekly / custom
-	CronExpr         string    `json:"cron_expr,omitempty"`
-	Mode             string    `json:"mode"`
-	TargetPath       string    `json:"target_path"`
-	Enabled          bool      `json:"enabled"`
-	LastRunAt        *time.Time `json:"last_run_at,omitempty"`
-	LastRunID        *int64    `json:"last_run_id,omitempty"`
-	LastVerdict      string    `json:"last_verdict,omitempty"`
-	NextRunAt        time.Time `json:"next_run_at"`
-	ConsecutivePass  int       `json:"consecutive_pass"`
-	ConsecutiveFail  int       `json:"consecutive_fail"`
-	CreatedAt        time.Time `json:"created_at"`
-	CreatedBy        string    `json:"created_by,omitempty"`
+	ID              int64      `json:"id"`
+	TenantID        string     `json:"tenant_id"`
+	Name            string     `json:"name"`
+	Cadence         string     `json:"cadence"` // 30d / 60d / 90d / daily / weekly / custom
+	CronExpr        string     `json:"cron_expr,omitempty"`
+	Mode            string     `json:"mode"`
+	TargetPath      string     `json:"target_path"`
+	Enabled         bool       `json:"enabled"`
+	LastRunAt       *time.Time `json:"last_run_at,omitempty"`
+	LastRunID       *int64     `json:"last_run_id,omitempty"`
+	LastVerdict     string     `json:"last_verdict,omitempty"`
+	NextRunAt       time.Time  `json:"next_run_at"`
+	ConsecutivePass int        `json:"consecutive_pass"`
+	ConsecutiveFail int        `json:"consecutive_fail"`
+	CreatedAt       time.Time  `json:"created_at"`
+	CreatedBy       string     `json:"created_by,omitempty"`
 }
 
 // Scheduler runs as a background goroutine, polling the conmon_schedules
@@ -56,7 +56,7 @@ func NewScheduler(db *sql.DB, trigger RunTriggerFunc) *Scheduler {
 	}
 }
 
-// Start runs until ctx is cancelled. Each tick, all due schedules are
+// Start runs until ctx is canceled. Each tick, all due schedules are
 // triggered. Run failures are logged but do not stop the scheduler.
 func (s *Scheduler) Start(ctx context.Context) {
 	ticker := time.NewTicker(s.TickInterval)

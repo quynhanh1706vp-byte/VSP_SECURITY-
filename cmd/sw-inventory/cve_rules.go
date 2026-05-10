@@ -5,7 +5,8 @@
 // without needing a network call to NVD/Trivy DB on every host report.
 //
 // Format: package name substring (lowercased), version prefix to match,
-//         severity, CVE id, fixed-in version, CVSS score, short title.
+//
+//	severity, CVE id, fixed-in version, CVSS score, short title.
 //
 // Matching uses strings.Contains on the lowercased package name and
 // strings.HasPrefix on the raw version. This is intentionally fuzzy —
@@ -15,13 +16,13 @@ package main
 import "strings"
 
 type vulnRule struct {
-	pkgSubstr  string
-	verPrefix  string
-	severity   string
-	cve        string
-	fixedIn    string
-	cvss       float64
-	title      string
+	pkgSubstr string
+	verPrefix string
+	severity  string
+	cve       string
+	fixedIn   string
+	cvss      float64
+	title     string
 }
 
 var vulnRules = []vulnRule{

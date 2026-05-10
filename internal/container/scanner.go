@@ -41,22 +41,22 @@ type Image struct {
 	Medium     int       `json:"med"`
 	Low        int       `json:"low"`
 	TotalCVE   int       `json:"total_cve"`
-	Signed     bool      `json:"signed"`         // cosign signature present
-	SBOMAttest bool      `json:"sbom_attested"`  // SBOM attestation present
+	Signed     bool      `json:"signed"`        // cosign signature present
+	SBOMAttest bool      `json:"sbom_attested"` // SBOM attestation present
 	ScannedAt  time.Time `json:"scanned_at"`
 	Status     string    `json:"status"` // ok | failed | scanning
 }
 
 // Vulnerability represents a single CVE found by Trivy.
 type Vulnerability struct {
-	CVE          string `json:"cve"`
-	Severity     string `json:"severity"`
-	Library      string `json:"library"`
-	Installed    string `json:"installed_version"`
-	FixedIn      string `json:"fixed_version,omitempty"`
-	Title        string `json:"title"`
-	URL          string `json:"url,omitempty"`
-	Status       string `json:"status,omitempty"` // fixed | will_not_fix | affected
+	CVE       string `json:"cve"`
+	Severity  string `json:"severity"`
+	Library   string `json:"library"`
+	Installed string `json:"installed_version"`
+	FixedIn   string `json:"fixed_version,omitempty"`
+	Title     string `json:"title"`
+	URL       string `json:"url,omitempty"`
+	Status    string `json:"status,omitempty"` // fixed | will_not_fix | affected
 }
 
 // ScanResult is the full result for one image scan.
@@ -72,8 +72,8 @@ type ScanResult struct {
 type trivyOutput struct {
 	Metadata struct {
 		OS struct {
-			Family  string `json:"Family"`
-			Name    string `json:"Name"`
+			Family string `json:"Family"`
+			Name   string `json:"Name"`
 		} `json:"OS"`
 		ImageConfig struct {
 			Architecture string `json:"architecture"`
@@ -89,14 +89,14 @@ type trivyOutput struct {
 		Class           string `json:"Class"`
 		Type            string `json:"Type"`
 		Vulnerabilities []struct {
-			VulnerabilityID  string   `json:"VulnerabilityID"`
-			PkgName          string   `json:"PkgName"`
-			InstalledVersion string   `json:"InstalledVersion"`
-			FixedVersion     string   `json:"FixedVersion,omitempty"`
-			Severity         string   `json:"Severity"`
-			Title            string   `json:"Title,omitempty"`
-			PrimaryURL       string   `json:"PrimaryURL,omitempty"`
-			Status           string   `json:"Status,omitempty"`
+			VulnerabilityID  string `json:"VulnerabilityID"`
+			PkgName          string `json:"PkgName"`
+			InstalledVersion string `json:"InstalledVersion"`
+			FixedVersion     string `json:"FixedVersion,omitempty"`
+			Severity         string `json:"Severity"`
+			Title            string `json:"Title,omitempty"`
+			PrimaryURL       string `json:"PrimaryURL,omitempty"`
+			Status           string `json:"Status,omitempty"`
 		} `json:"Vulnerabilities,omitempty"`
 	} `json:"Results"`
 }

@@ -1,10 +1,10 @@
 package semgrep
 
 import (
-	"os"
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/vsp/platform/internal/scanner"
 )

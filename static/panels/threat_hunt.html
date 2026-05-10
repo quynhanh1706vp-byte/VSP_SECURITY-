@@ -247,6 +247,153 @@ function renderSavedQueries(){
     };
     wrap.appendChild(btn);
   });
+
+  // ── PRO saved queries (FEAT-07b) — loaded from /api/v1/threat-hunt/queries.
+  // These persist per-tenant so analysts can build a hunt library.
+  // The "+ Save" button stores the current input as a new saved query.
+  var saveBtn=document.createElement('button');
+  saveBtn.className='sq-btn';
+  saveBtn.style.cssText='border-color:rgba(34,211,238,.4);color:#22d3ee';
+  saveBtn.textContent='+ Save current query';
+  saveBtn.onclick=saveCurrentQuery;
+  wrap.appendChild(saveBtn);
+
+  loadProSavedQueries();
+}
+
+async function loadProSavedQueries(){
+  try{
+    var r=await fetch('/api/v1/threat-hunt/queries',{credentials:'same-origin'});
+    if(!r.ok) return;
+    var d=await r.json();
+    if(!d.queries || d.queries.length===0) return;
+    var wrap=document.getElementById('saved-queries');
+    // Separator pill
+    var sep=document.createElement('span');
+    sep.style.cssText='font-size:10px;color:#22d3ee;align-self:center;padding:0 4px';
+    sep.textContent='Saved:';
+    wrap.appendChild(sep);
+    d.queries.forEach(function(q){
+      var btn=document.createElement('button');
+      btn.className='sq-btn';
+      btn.style.cssText='border-color:rgba(34,211,238,.3)';
+      btn.title=(q.description||'')+' · query: '+q.query;
+      btn.textContent=q.name;
+      btn.onclick=function(){
+        document.getElementById('hunt-q').value=q.query||'';
+        runHunt();
+      };
+      // Right-click → run via PRO endpoint (uses substring match against findings).
+      btn.oncontextmenu=function(e){
+        e.preventDefault();
+        runProSavedQuery(q.id, q.name);
+      };
+      // Tiny delete (×) appended next to button label
+      var del=document.createElement('span');
+      del.textContent=' ×';
+      del.style.cssText='color:#ef4444;cursor:pointer;font-weight:bold;padding-left:4px';
+      del.title='Delete saved query';
+      del.onclick=function(e){
+        e.stopPropagation();
+        deleteProSavedQuery(q.id, q.name);
+      };
+      btn.appendChild(del);
+      wrap.appendChild(btn);
+    });
+  }catch(e){ console.warn('[VSP] saved queries load failed:', e); }
+}
+
+async function saveCurrentQuery(){
+  var q=document.getElementById('hunt-q').value.trim();
+  if(!q){
+    if(window.parent && window.parent.VSP_PRO_OPEN_MODAL){
+      window.parent.VSP_PRO_OPEN_MODAL({
+        title:'No query to save',
+        body:'Type a hunt expression in the search box first, then click Save.',
+        submitLabel:'OK', cancelLabel:''
+      });
+    } else { alert('Type a hunt expression first, then Save.'); }
+    return;
+  }
+  // Reach the parent shell's themed form modal so we don't fall back to
+  // the native browser prompt (which looks out of place vs the rest of the
+  // PRO UI). If parent isn't available (debug mode), still degrade.
+  var formModal = (window.parent && window.parent.VSP_PRO_FORM_MODAL) || null;
+  if(!formModal){
+    var name=prompt('Name this saved query:');
+    if(!name) return;
+    var desc=prompt('Description (optional):','')||'';
+    return doSaveQuery(name, desc, q);
+  }
+  formModal({
+    title:'Save hunt query',
+    sub:'Persist this query to /api/v1/threat-hunt/queries — runs on demand or on a cadence.',
+    submitLabel:'Save',
+    fields:[
+      { id:'name', label:'Name', type:'text', required:true,
+        placeholder:'e.g. detect-ssh-brute-force',
+        hint:'1–200 chars. Must be unique within the tenant.' },
+      { id:'description', label:'Description', type:'text',
+        placeholder:'Optional context for SOC analysts.' },
+      { id:'query', label:'Query expression', type:'readonly', value:q,
+        hint:'Captured from the hunt input — edit there before saving.' },
+      { id:'min_match_severity', label:'Surface results at', type:'select',
+        value:'medium', required:true,
+        options:[
+          {value:'critical', label:'CRITICAL only'},
+          {value:'high',     label:'HIGH and above'},
+          {value:'medium',   label:'MEDIUM and above (default)'},
+          {value:'low',      label:'LOW and above (noisy)'}
+        ] }
+    ],
+    validate:function(v){
+      if(!v.name || v.name.length<1 || v.name.length>200) return 'Name 1–200 chars';
+      return null;
+    },
+    commit:function(v){ return doSaveQuery(v.name, v.description, q, v.min_match_severity); }
+  }).then(function(v){
+    if(v){
+      // Reload saved queries
+      var wrap=document.getElementById('saved-queries');
+      Array.from(wrap.querySelectorAll('span,button')).slice(SAVED_QUERIES.length+2).forEach(function(el){ el.remove(); });
+      loadProSavedQueries();
+    }
+  });
+}
+
+async function doSaveQuery(name, desc, q, sev){
+  var r=await fetch('/api/v1/threat-hunt/queries',{
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name, description:desc||'', query:q, min_match_severity:sev||'medium'})
+  });
+  if(r.status===402){ throw new Error('Saved-query persistence requires a PRO plan.'); }
+  if(!r.ok){ throw new Error('Save failed: HTTP '+r.status); }
+  return r.json();
+}
+
+async function runProSavedQuery(id, name){
+  try{
+    var r=await fetch('/api/v1/threat-hunt/queries/'+encodeURIComponent(id)+'/run',{
+      method:'POST', credentials:'same-origin'});
+    if(!r.ok){ alert('Run failed: '+r.status); return; }
+    var d=await r.json();
+    alert('Saved hunt "'+name+'" ran:\n  '+d.match_count+' matches in '+d.duration_ms+'ms\n\n(See result in DB; UI display TODO)');
+  }catch(e){ alert('Run error: '+e.message); }
+}
+
+async function deleteProSavedQuery(id, name){
+  if(!confirm('Delete saved query "'+name+'"?')) return;
+  try{
+    var r=await fetch('/api/v1/threat-hunt/queries/'+encodeURIComponent(id),{
+      method:'DELETE', credentials:'same-origin'});
+    if(!r.ok && r.status!==204){ alert('Delete failed: '+r.status); return; }
+    // Reload
+    var wrap=document.getElementById('saved-queries');
+    Array.from(wrap.querySelectorAll('span,button')).slice(SAVED_QUERIES.length+2).forEach(function(el){ el.remove(); });
+    loadProSavedQueries();
+  }catch(e){ alert('Delete error: '+e.message); }
 }
 
 async function runHunt(){
@@ -1210,5 +1357,7 @@ if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, 
 
 </script>
 <!-- VSP-TH-SMART-END -->
+<!-- VSP-SIEM-COMPANION -->
+<script src="/vsp_siem_companion.js"></script>
 </body>
 </html>

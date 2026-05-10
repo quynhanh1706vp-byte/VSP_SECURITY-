@@ -4,34 +4,36 @@
 // ─────────────────────────────────────────────────────────────────────
 // Pure-Go cron scheduler that dispatches jobs to other VSP microservices.
 // Production-grade pattern, mirrors cosign-api / sw-inventory:
-//   • JSON store, atomic rename
-//   • setsid-launchable, no systemd dependency
-//   • CORS on, stdlib only
-//   • Per-job mutex to prevent overlapping runs of same job
+//   - JSON store, atomic rename
+//   - setsid-launchable, no systemd dependency
+//   - CORS on, stdlib only
+//   - Per-job mutex to prevent overlapping runs of same job
 //
 // Job types
-//   scan_image    → POST trivy-api :8090/scan      {"image":target}
-//   sign_image    → POST cosign-api :8091/sign     {"image":target}
-//   verify_image  → POST cosign-api :8091/verify   {"image":target}
-//   attest_image  → POST cosign-api :8091/attest   {"image":target,"predicate":"slsaprovenance"}
-//   cve_recheck   → POST sw-inventory :8094/cve-match
-//   sbom_export   → emit CycloneDX JSON to /var/lib/vsp/sbom-exports/<ts>.json
-//   webhook       → POST arbitrary URL with payload {target}
+//
+//	scan_image    → POST trivy-api :8090/scan      {"image":target}
+//	sign_image    → POST cosign-api :8091/sign     {"image":target}
+//	verify_image  → POST cosign-api :8091/verify   {"image":target}
+//	attest_image  → POST cosign-api :8091/attest   {"image":target,"predicate":"slsaprovenance"}
+//	cve_recheck   → POST sw-inventory :8094/cve-match
+//	sbom_export   → emit CycloneDX JSON to /var/lib/vsp/sbom-exports/<ts>.json
+//	webhook       → POST arbitrary URL with payload {target}
 //
 // Endpoints
-//   GET  /healthz                  liveness + counts
-//   GET  /jobs                     list with computed next_run + last_status
-//   GET  /jobs/{id}                detail
-//   POST /jobs                     create
-//   PUT  /jobs/{id}                update
-//   DELETE /jobs/{id}              delete
-//   POST /jobs/{id}/run            trigger now (returns run_id)
-//   POST /jobs/{id}/toggle         enable/disable
-//   GET  /jobs/{id}/runs?limit=N   run history per job
-//   GET  /runs?limit=N             all runs (for activity heatmap)
-//   GET  /runs/{id}                single run detail (full output)
-//   GET  /preview?expr=...&n=5     parse cron, return next N fires + description
-//   GET  /stats                    KPIs
+//
+//	GET  /healthz                  liveness + counts
+//	GET  /jobs                     list with computed next_run + last_status
+//	GET  /jobs/{id}                detail
+//	POST /jobs                     create
+//	PUT  /jobs/{id}                update
+//	DELETE /jobs/{id}              delete
+//	POST /jobs/{id}/run            trigger now (returns run_id)
+//	POST /jobs/{id}/toggle         enable/disable
+//	GET  /jobs/{id}/runs?limit=N   run history per job
+//	GET  /runs?limit=N             all runs (for activity heatmap)
+//	GET  /runs/{id}                single run detail (full output)
+//	GET  /preview?expr=...&n=5     parse cron, return next N fires + description
+//	GET  /stats                    KPIs
 package main
 
 import (
@@ -66,10 +68,10 @@ var (
 // ── targets of dispatch (defaults can be overridden by env) ───────────
 
 var (
-	trivyAPI    = envOr("VSP_TRIVY_API", "http://127.0.0.1:8090")
-	cosignAPI   = envOr("VSP_COSIGN_API", "http://127.0.0.1:8091")
-	swInvAPI    = envOr("VSP_SWINV_API", "http://127.0.0.1:8094")
-	sbomDir     = envOr("VSP_SBOM_DIR", "/var/lib/vsp/sbom-exports")
+	trivyAPI  = envOr("VSP_TRIVY_API", "http://127.0.0.1:8090")
+	cosignAPI = envOr("VSP_COSIGN_API", "http://127.0.0.1:8091")
+	swInvAPI  = envOr("VSP_SWINV_API", "http://127.0.0.1:8094")
+	sbomDir   = envOr("VSP_SBOM_DIR", "/var/lib/vsp/sbom-exports")
 )
 
 func envOr(k, d string) string {
@@ -86,7 +88,7 @@ type Job struct {
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
 	CronExpr  string    `json:"cron_expr"`
-	Target    string    `json:"target"`        // e.g. image name, URL, params
+	Target    string    `json:"target"` // e.g. image name, URL, params
 	Enabled   bool      `json:"enabled"`
 	Owner     string    `json:"owner,omitempty"`
 	Notes     string    `json:"notes,omitempty"`
@@ -94,27 +96,27 @@ type Job struct {
 	UpdatedAt time.Time `json:"updated_at"`
 
 	// Cached / computed
-	LastRunID     string    `json:"last_run_id,omitempty"`
-	LastRunAt     time.Time `json:"last_run_at,omitempty"`
-	LastStatus    string    `json:"last_status,omitempty"`     // pass | fail | warn | running
-	LastDuration  string    `json:"last_duration,omitempty"`
-	RunCount      int       `json:"run_count"`
-	SuccessCount  int       `json:"success_count"`
+	LastRunID    string    `json:"last_run_id,omitempty"`
+	LastRunAt    time.Time `json:"last_run_at,omitempty"`
+	LastStatus   string    `json:"last_status,omitempty"` // pass | fail | warn | running
+	LastDuration string    `json:"last_duration,omitempty"`
+	RunCount     int       `json:"run_count"`
+	SuccessCount int       `json:"success_count"`
 }
 
 type Run struct {
-	ID          string    `json:"id"`
-	JobID       string    `json:"job_id"`
-	JobName     string    `json:"job_name"`
-	JobType     string    `json:"job_type"`
-	StartedAt   time.Time `json:"started_at"`
-	FinishedAt  time.Time `json:"finished_at,omitempty"`
-	DurationMs  int64     `json:"duration_ms"`
-	Status      string    `json:"status"`        // pass | fail | warn | running
-	Output      string    `json:"output,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	HTTPCode    int       `json:"http_code,omitempty"`
-	Triggered   string    `json:"triggered"`     // schedule | manual
+	ID         string    `json:"id"`
+	JobID      string    `json:"job_id"`
+	JobName    string    `json:"job_name"`
+	JobType    string    `json:"job_type"`
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at,omitempty"`
+	DurationMs int64     `json:"duration_ms"`
+	Status     string    `json:"status"` // pass | fail | warn | running
+	Output     string    `json:"output,omitempty"`
+	Error      string    `json:"error,omitempty"`
+	HTTPCode   int       `json:"http_code,omitempty"`
+	Triggered  string    `json:"triggered"` // schedule | manual
 }
 
 type errEnv struct {
@@ -371,25 +373,25 @@ func jobToMap(j *Job) map[string]any {
 		desc = c.Describe()
 	}
 	return map[string]any{
-		"id":             j.ID,
-		"name":           j.Name,
-		"type":           j.Type,
-		"cron_expr":      j.CronExpr,
-		"cron_describe":  desc,
-		"target":         j.Target,
-		"enabled":        j.Enabled,
-		"owner":          j.Owner,
-		"notes":          j.Notes,
-		"created_at":     j.CreatedAt,
-		"updated_at":     j.UpdatedAt,
-		"last_run_id":    j.LastRunID,
-		"last_run_at":    j.LastRunAt,
-		"last_status":    j.LastStatus,
-		"last_duration":  j.LastDuration,
-		"next_run":       nextRun,
-		"run_count":      j.RunCount,
-		"success_count":  j.SuccessCount,
-		"success_rate":   computeRate(j),
+		"id":            j.ID,
+		"name":          j.Name,
+		"type":          j.Type,
+		"cron_expr":     j.CronExpr,
+		"cron_describe": desc,
+		"target":        j.Target,
+		"enabled":       j.Enabled,
+		"owner":         j.Owner,
+		"notes":         j.Notes,
+		"created_at":    j.CreatedAt,
+		"updated_at":    j.UpdatedAt,
+		"last_run_id":   j.LastRunID,
+		"last_run_at":   j.LastRunAt,
+		"last_status":   j.LastStatus,
+		"last_duration": j.LastDuration,
+		"next_run":      nextRun,
+		"run_count":     j.RunCount,
+		"success_count": j.SuccessCount,
+		"success_rate":  computeRate(j),
 	}
 }
 
@@ -659,16 +661,16 @@ func handlePreview(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(nexts))
 	for _, t := range nexts {
 		out = append(out, map[string]any{
-			"time":      t.Format(time.RFC3339),
-			"in":        t.Sub(now).Round(time.Second).String(),
-			"weekday":   t.Weekday().String(),
+			"time":    t.Format(time.RFC3339),
+			"in":      t.Sub(now).Round(time.Second).String(),
+			"weekday": t.Weekday().String(),
 		})
 	}
 	writeJSON(w, 200, map[string]any{
-		"expr":      expr,
-		"valid":     true,
-		"describe":  c.Describe(),
-		"next":      out,
+		"expr":     expr,
+		"valid":    true,
+		"describe": c.Describe(),
+		"next":     out,
 	})
 }
 
@@ -706,15 +708,15 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		rate = float64(pass24) / float64(pass24+fail24+warn24) * 100.0
 	}
 	writeJSON(w, 200, map[string]any{
-		"jobs":         total,
-		"enabled":      enabled,
-		"runs":         totalRuns,
-		"runs_24h":     pass24 + fail24 + warn24,
-		"pass_24h":     pass24,
-		"fail_24h":     fail24,
-		"warn_24h":     warn24,
-		"pass_rate":    rate,
-		"server_time":  time.Now().UTC(),
+		"jobs":        total,
+		"enabled":     enabled,
+		"runs":        totalRuns,
+		"runs_24h":    pass24 + fail24 + warn24,
+		"pass_24h":    pass24,
+		"fail_24h":    fail24,
+		"warn_24h":    warn24,
+		"pass_rate":   rate,
+		"server_time": time.Now().UTC(),
 	})
 }
 
@@ -884,10 +886,10 @@ func runSBOMExport(j *Job) (string, string, string, int) {
 		target = "all-signed-images"
 	}
 	out := map[string]any{
-		"bomFormat":   "CycloneDX",
-		"specVersion": "1.4",
+		"bomFormat":    "CycloneDX",
+		"specVersion":  "1.4",
 		"serialNumber": "urn:uuid:" + newID("sbom"),
-		"version":     1,
+		"version":      1,
 		"metadata": map[string]any{
 			"timestamp": time.Now().UTC(),
 			"tools": []map[string]any{

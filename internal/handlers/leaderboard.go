@@ -11,7 +11,7 @@ import (
 // Email is masked unless user has opted into visibility.
 type LeaderboardEntry struct {
 	Rank          int     `json:"rank"`
-	Actor         string  `json:"actor"`           // masked or full per opt-in
+	Actor         string  `json:"actor"` // masked or full per opt-in
 	VerifiedCount int     `json:"verified_count"`
 	AppliedCount  int     `json:"applied_count"`
 	AvgMTTRHours  float64 `json:"avg_mttr_hours"`
@@ -35,9 +35,13 @@ type LeaderboardResponse struct {
 func LeaderboardHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		period := r.URL.Query().Get("period")
-		if period == "" { period = "30d" }
+		if period == "" {
+			period = "30d"
+		}
 		tenantID := r.URL.Query().Get("tenant_id")
-		if tenantID == "" { tenantID = "default" }
+		if tenantID == "" {
+			tenantID = "default"
+		}
 
 		intervalSQL := map[string]string{
 			"7d":  "7 days",
@@ -45,7 +49,9 @@ func LeaderboardHandler(db *sql.DB) http.HandlerFunc {
 			"90d": "90 days",
 			"all": "100 years",
 		}[period]
-		if intervalSQL == "" { intervalSQL = "30 days" }
+		if intervalSQL == "" {
+			intervalSQL = "30 days"
+		}
 
 		// Query audit_log for status transitions to verified/fix_applied.
 		// Falls back gracefully if audit_log table doesn't exist (returns empty list).
@@ -117,7 +123,9 @@ func isOptedIn(db *sql.DB, actor string) bool {
 // maskEmail turns "cuong@vsp.local" into "c***@vsp.local".
 func maskEmail(email string) string {
 	at := strings.Index(email, "@")
-	if at <= 1 { return "***" }
+	if at <= 1 {
+		return "***"
+	}
 	return email[:1] + strings.Repeat("*", 3) + email[at:]
 }
 

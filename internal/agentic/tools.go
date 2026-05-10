@@ -435,7 +435,7 @@ func truncate(s string, n int) (string, bool) {
 }
 
 // AST extractors (lightweight, full impl uses go/ast — we use names only)
-func extractImports(file any) []string  { return astStrings(file, "imports") }
+func extractImports(file any) []string         { return astStrings(file, "imports") }
 func extractFuncs(file any, fset any) []string { return astStrings(file, "funcs") }
 func extractTypes(file any, fset any) []string { return astStrings(file, "types") }
 

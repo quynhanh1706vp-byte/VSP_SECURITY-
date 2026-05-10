@@ -11,8 +11,8 @@ package sso
 
 import (
 	"context"
-	"crypto/elliptic"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"

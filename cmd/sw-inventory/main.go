@@ -10,20 +10,22 @@
 // with /etc/vsp/ui.key (Bearer auth).
 //
 // Storage: atomic JSON file at /var/lib/vsp/sw-inventory.json
-//          (same pattern as cosign-api, no CGO/SQLite needed).
+//
+//	(same pattern as cosign-api, no CGO/SQLite needed).
 //
 // Endpoints
-//   POST /agent/report                — agent push (X-Agent-Key required)
-//   GET  /healthz                     — liveness + counts
-//   GET  /hosts                       — list (?os=&search=&min_risk=)
-//   GET  /hosts/{name}                — host detail
-//   GET  /hosts/{name}/packages       — package list
-//   GET  /hosts/{name}/cves           — CVE matches
-//   DELETE /hosts/{name}              — remove host
-//   GET  /stats                       — KPIs (dashboard)
-//   GET  /audit                       — agent submission audit log
-//   POST /cve-match                   — re-run CVE correlation
-//   GET  /export/csv                  — CSV export of hosts + risk
+//
+//	POST /agent/report                — agent push (X-Agent-Key required)
+//	GET  /healthz                     — liveness + counts
+//	GET  /hosts                       — list (?os=&search=&min_risk=)
+//	GET  /hosts/{name}                — host detail
+//	GET  /hosts/{name}/packages       — package list
+//	GET  /hosts/{name}/cves           — CVE matches
+//	DELETE /hosts/{name}              — remove host
+//	GET  /stats                       — KPIs (dashboard)
+//	GET  /audit                       — agent submission audit log
+//	POST /cve-match                   — re-run CVE correlation
+//	GET  /export/csv                  — CSV export of hosts + risk
 //
 // Build: go build -o vsp-sw-inventory ./cmd/sw-inventory
 package main
@@ -59,7 +61,7 @@ var (
 // ── globals ────────────────────────────────────────────────────────────
 
 var (
-	store    = struct {
+	store = struct {
 		sync.RWMutex
 		Hosts map[string]*Host `json:"hosts"`
 	}{Hosts: map[string]*Host{}}

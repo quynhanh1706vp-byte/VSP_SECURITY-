@@ -35,14 +35,14 @@ var aggrTools = map[string]bool{
 	"trivy": true, "grype": true, "license": true,
 	"gitleaks": true, "secretcheck": true,
 	"nikto": true, "nuclei": true, "sslscan": true,
-	"gosec": true,
-	"trufflehog": true,
-	"nmap": true,
-	"syft": true,
+	"gosec":       true,
+	"trufflehog":  true,
+	"nmap":        true,
+	"syft":        true,
 	"govulncheck": true,
 	"osv-scanner": true,
-	"cosign": true,
-	"retire-js": true,
+	"cosign":      true,
+	"retire-js":   true,
 }
 
 func filterRunners(runners []scanner.Runner, allowed map[string]bool) []scanner.Runner {

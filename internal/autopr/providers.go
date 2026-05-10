@@ -21,23 +21,23 @@ import (
 
 // PRRequest — input to provider for creating PR
 type PRRequest struct {
-	RepoOwner    string
-	RepoName     string
-	Title        string
-	Body         string
-	HeadBranch   string // your branch name (e.g. vsp-autofix/foo-2026...)
-	BaseBranch   string // target branch (e.g. main)
-	Labels       []string
-	DraftPR      bool
+	RepoOwner  string
+	RepoName   string
+	Title      string
+	Body       string
+	HeadBranch string // your branch name (e.g. vsp-autofix/foo-2026...)
+	BaseBranch string // target branch (e.g. main)
+	Labels     []string
+	DraftPR    bool
 }
 
 // PRResponse — output from provider
 type PRResponse struct {
-	Number   int    `json:"number"`
-	URL      string `json:"url"`
-	HTMLURL  string `json:"html_url"`
-	State    string `json:"state"`
-	NodeID   string `json:"node_id,omitempty"`
+	Number  int    `json:"number"`
+	URL     string `json:"url"`
+	HTMLURL string `json:"html_url"`
+	State   string `json:"state"`
+	NodeID  string `json:"node_id,omitempty"`
 }
 
 // Provider — abstract platform interface

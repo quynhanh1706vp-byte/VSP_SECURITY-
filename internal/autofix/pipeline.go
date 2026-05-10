@@ -18,15 +18,15 @@ import (
 
 // PipelineResult — aggregate output of running all validators on a fix.
 type PipelineResult struct {
-	CacheKey         string             `json:"cache_key"`
-	FindingID        string             `json:"finding_id"`
-	OverallStatus    string             `json:"overall_status"`     // "pass" | "fail" | "partial"
-	Score            int                `json:"score"`              // 0-100
-	ConfidenceIn     string             `json:"confidence_in"`
-	ConfidenceFinal  string             `json:"confidence_final"`   // possibly downgraded
-	Results          []ValidationResult `json:"results"`
-	TotalDurationMs  int                `json:"total_duration_ms"`
-	ValidatedAt      time.Time          `json:"validated_at"`
+	CacheKey        string             `json:"cache_key"`
+	FindingID       string             `json:"finding_id"`
+	OverallStatus   string             `json:"overall_status"` // "pass" | "fail" | "partial"
+	Score           int                `json:"score"`          // 0-100
+	ConfidenceIn    string             `json:"confidence_in"`
+	ConfidenceFinal string             `json:"confidence_final"` // possibly downgraded
+	Results         []ValidationResult `json:"results"`
+	TotalDurationMs int                `json:"total_duration_ms"`
+	ValidatedAt     time.Time          `json:"validated_at"`
 }
 
 // Pipeline — orchestrates validators and persists results.
@@ -206,10 +206,11 @@ func aggregateStatus(results []ValidationResult) (string, int) {
 
 // applyConfidenceGate — downgrade LLM-reported confidence based on validation outcome.
 // Rules:
-//   pass + score≥90  → keep
-//   pass + score<90  → downgrade by 1 step
-//   partial          → downgrade by 1 step (cap at "low")
-//   fail             → "low" regardless of input
+//
+//	pass + score≥90  → keep
+//	pass + score<90  → downgrade by 1 step
+//	partial          → downgrade by 1 step (cap at "low")
+//	fail             → "low" regardless of input
 func applyConfidenceGate(in, status string, score int) string {
 	in = strings.ToLower(strings.TrimSpace(in))
 	if in == "" {
@@ -293,16 +294,16 @@ func (p *Pipeline) LookupByCacheKey(ctx context.Context, cacheKey string) (*Pipe
 	pr := &PipelineResult{CacheKey: cacheKey, Results: []ValidationResult{}}
 	seen := map[string]bool{}
 	var (
-		findingID string
+		findingID   string
 		validatedAt time.Time
 	)
 	for rows.Next() {
 		var (
-			r          ValidationResult
-			status     string
-			mdRaw      []byte
-			confIn     sql.NullString
-			confOut    sql.NullString
+			r       ValidationResult
+			status  string
+			mdRaw   []byte
+			confIn  sql.NullString
+			confOut sql.NullString
 		)
 		if err := rows.Scan(&r.Validator, &status, &r.DurationMs, &r.ErrorMsg,
 			&mdRaw, &confIn, &confOut, &findingID, &validatedAt); err != nil {

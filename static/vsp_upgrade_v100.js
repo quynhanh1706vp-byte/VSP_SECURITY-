@@ -1241,41 +1241,43 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
       var cntEl = document.getElementById('rem-count');
       if(cntEl) cntEl.textContent = total+' remediations · '+rate+'% resolved';
 
-      // Render table — fetch findings để get severity/tool/rule
-      var fdResp = await fetch('/api/v1/vsp/findings?limit=5000', {headers:h}).then(r=>r.json()).catch(()=>({findings:[]}));
-      var findMap = {};
-      (fdResp.findings||[]).forEach(function(f){ findMap[f.id]=f; });
-      
-      var sevClass={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
+      // Backend API `/api/v1/remediation` already JOINs findings server-side
+      // and returns severity/tool/rule_id/title inline on each remediation row.
+      // Earlier this code did a 2nd /findings fetch + client-side findMap which
+      // dropped to `—` whenever the lookup missed (most rows). Now: use API
+      // fields directly. Skipping the extra fetch also halves load time.
+      var sevClass={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low',INFO:'sev-info'};
       var statusPill={open:'pill-fail',in_progress:'pill-warn',resolved:'pill-pass',accepted:'pill-done',false_positive:'pill-queue',suppressed:''};
       var priColor={P1:'c-red',P2:'c-orange',P3:'c-amber',P4:'c-t2'};
-      
+
       var tbody = document.getElementById('rem-tbody');
       if(!tbody) return;
-      
+
       if(!rems.length){ tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No remediations yet</td></tr>'; return; }
-      
+
+      var __esc = function(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
       tbody.innerHTML = rems.map(function(r,i){
-        var f = findMap[r.finding_id]||{};
-        var sc=sevClass[f.severity]||'';
+        var sev=(r.severity||'').toUpperCase();
+        var sc=sevClass[sev]||'';
         var sp=statusPill[r.status]||'';
         var pc=priColor[r.priority]||'';
+        var title=r.title||r.message||r.finding_id||'—';
+        var slaBadge = (typeof window._remSLABadge==='function') ? window._remSLABadge(r) : '';
         return '<tr style="cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'var(--surface2)\'" onmouseleave="this.style.background=\'\'" onclick="_openRemDetail('+i+')">'
-          +'<td>'+(f.severity?'<span class="sev '+sc+'">'+f.severity+'</span>':'—')+'</td>'
-          +'<td class="c-t3 f11">'+(f.tool||'—')+'</td>'
-          +'<td class="mono c-purple f10" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(f.rule_id||'—')+'</td>'
-          +'<td class="f12" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(f.message||'')+'">'+( f.message||r.finding_id||'—')+'</td>'
-          +'<td class="c-t3 f11">'+(r.assignee||'—')+'</td>'
+          +'<td>'+(sev?'<span class="sev '+sc+'">'+sev+'</span>':'—')+'</td>'
+          +'<td class="c-t3 f11">'+__esc(r.tool||'—')+'</td>'
+          +'<td class="mono c-purple f10" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+__esc(r.rule_id||'')+'">'+__esc((r.rule_id||'').slice(0,8)||'—')+'</td>'
+          +'<td class="f12" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+__esc(title)+'">'+__esc(title)+'</td>'
+          +'<td class="f11">'+(r.assignee?'<span class="c-t2">'+__esc(r.assignee)+'</span>':'<span class="c-t4" style="font-style:italic">unassigned</span>')+'</td>'
           +'<td class="'+pc+' fw7 f11">'+(r.priority||'—')+'</td>'
-          +'<td><span class="pill '+sp+'" style="font-size:9px">'+r.status+'</span></td>'
+          +'<td><span class="pill '+sp+'" style="font-size:9px">'+r.status+'</span> '+slaBadge+'</td>'
           +'<td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="event.stopPropagation();_openRemDetail('+i+')">Edit</button></td>'
           +'</tr>';
       }).join('');
-      
-      // Store for _openRemDetail
+
+      // Store original rem rows for _openRemDetail (with API-provided fields).
       window._remData = rems.map(function(r){
-        var f=findMap[r.finding_id]||{};
-        return Object.assign({},r,{severity:f.severity,tool:f.tool,rule_id:f.rule_id,description:f.message});
+        return Object.assign({}, r, { description: r.title || r.message });
       });
       
       // Update rate KPI
@@ -1896,19 +1898,41 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
             +'<span class="mono-sm c-t3">'+kv[1]+'</span></div>';
         }).join('')+'</div>' : '')
 
-        // CVE list top 5
-        +(cveFindings.length ? '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--t2);margin-bottom:8px">TOP CVEs</div>'
-        +'<div style="display:grid;gap:3px">'
-        +cveFindings.slice(0,5).map(function(f){
-          var sc={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'}[f.severity]||'';
-          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--b2);border-radius:6px">'
-            +'<span class="sev '+sc+'" style="flex-shrink:0">'+f.severity+'</span>'
-            +'<span class="mono f10 c-blue" style="flex-shrink:0">'+f.rule_id+'</span>'
-            +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.message+'</span>'
+        // CVE list top 5 — dedup by rule_id (was rendering same CVE 4× when
+        // it appeared in multiple findings/files). Keep highest-severity
+        // sample of each unique CVE and show occurrence count.
+        +(function(){
+          var sevRank = {CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3, INFO:4};
+          var byCVE = {};
+          cveFindings.forEach(function(f){
+            var k = f.rule_id;
+            if (!byCVE[k] || (sevRank[f.severity]||9) < (sevRank[byCVE[k].severity]||9)) {
+              byCVE[k] = Object.assign({}, f, { _count: (byCVE[k]?byCVE[k]._count:0) + 1 });
+            } else {
+              byCVE[k]._count = (byCVE[k]._count||1) + 1;
+            }
+          });
+          var unique = Object.values(byCVE).sort(function(a,b){
+            var sa = sevRank[a.severity]||9, sb = sevRank[b.severity]||9;
+            if (sa !== sb) return sa - sb;
+            return (b._count||1) - (a._count||1);
+          });
+          if (!unique.length) return '';
+          return '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--t2);margin-bottom:8px">TOP CVEs</div>'
+            +'<div style="display:grid;gap:3px">'
+            +unique.slice(0,5).map(function(f){
+              var sc={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'}[f.severity]||'';
+              var countTag = (f._count||1) > 1 ? '<span style="font-size:9px;color:var(--t3);flex-shrink:0">×'+f._count+'</span>' : '';
+              return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--b2);border-radius:6px">'
+                +'<span class="sev '+sc+'" style="flex-shrink:0">'+f.severity+'</span>'
+                +'<span class="mono f10 c-blue" style="flex-shrink:0">'+f.rule_id+'</span>'
+                +countTag
+                +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.message+'</span>'
+                +'</div>';
+            }).join('')
+            +(unique.length>5?'<div style="font-size:10px;color:var(--t3);padding:4px 8px">...và '+(unique.length-5)+' CVEs khác (unique)</div>':'')
             +'</div>';
-        }).join('')
-        +(cveFindings.length>5?'<div style="font-size:10px;color:var(--t3);padding:4px 8px">...và '+(cveFindings.length-5)+' CVEs khác</div>':'')
-        +'</div>' : '');
+        })();
 
       showToast('Standards loaded: '+findings.length+' findings analyzed','info');
     } catch(e) { 
@@ -3345,10 +3369,36 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
   // ---- Bootstrap ------------------------------------------------------------
   async function bootstrap() {
     if (!renderSkeleton()) return;
-    // Ẩn nav SBOM Diff cũ (do VSP-G2 inject) nếu có
-    Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function(a){
-      if (/sbom\s*diff/i.test((a.textContent||'').trim()) || /sbomdiff/i.test(a.getAttribute('onclick')||'')) a.style.display='none';
-    });
+    // Ẩn nav SBOM Diff cũ (do VSP-G2 inject) nếu có — retry ngắn nếu menu được inject muộn
+    (function hideOldSBOMNav(){
+      try {
+        var matcher = function(a){
+          try{
+            var t = (a.textContent||'').trim();
+            if (/sbom\s*diff/i.test(t)) return true;
+            var oc = a.getAttribute && a.getAttribute('onclick') || '';
+            if (/sbomdiff/i.test(oc)) return true;
+          }catch(e){}
+          return false;
+        };
+        Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function(a){ if (matcher(a)) a.style.display='none'; });
+        try {
+          if (!hideOldSBOMNav._obs) {
+            hideOldSBOMNav._obs = new MutationObserver(function(muts){
+              muts.forEach(function(m){
+                Array.prototype.forEach.call(m.addedNodes || [], function(n){
+                  if (!n || n.nodeType !== 1) return;
+                  if (n.matches && n.matches('.nav-item') && matcher(n)) n.style.display='none';
+                  var found = n.querySelectorAll && n.querySelectorAll('.nav-item') || [];
+                  Array.prototype.forEach.call(found, function(a){ if (matcher(a)) a.style.display='none'; });
+                });
+              });
+            });
+            hideOldSBOMNav._obs.observe(document.body, { childList: true, subtree: true });
+          }
+        } catch(e) {}
+      } catch(e) {}
+    })();
     try {
       await fetchRuns();
       // Apply default view từ config (chỉ lần đầu, không override nếu user đã chuyển tab)

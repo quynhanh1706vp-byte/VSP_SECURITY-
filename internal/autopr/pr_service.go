@@ -26,10 +26,10 @@ import (
 
 // PRService — main orchestrator
 type PRService struct {
-	DB           *sql.DB
-	RepoRootEnv  string // VSP_REPO_ROOT — used for in-place patches if no remote
-	EncKeyEnv    string // VSP_REPO_KEY — base for AES key
-	mu           sync.Mutex
+	DB          *sql.DB
+	RepoRootEnv string // VSP_REPO_ROOT — used for in-place patches if no remote
+	EncKeyEnv   string // VSP_REPO_KEY — base for AES key
+	mu          sync.Mutex
 }
 
 // NewPRService — constructor with env-based config
@@ -49,16 +49,16 @@ type CreatePRInput struct {
 	TriggerType  string // "manual" | "sla"
 	CreatedBy    string // user uid OR "sla_scheduler"
 	// Override (optional)
-	BaseBranch   string
+	BaseBranch string
 }
 
 // PRResult — output to caller
 type PRResult struct {
-	PRID           int64  `json:"pr_id"`
-	PRNumber       int    `json:"pr_number"`
-	PRURL          string `json:"pr_url"`
-	BranchName     string `json:"branch_name"`
-	Status         string `json:"status"`
+	PRID            int64  `json:"pr_id"`
+	PRNumber        int    `json:"pr_number"`
+	PRURL           string `json:"pr_url"`
+	BranchName      string `json:"branch_name"`
+	Status          string `json:"status"`
 	ValidationScore int    `json:"validation_score"`
 }
 
@@ -235,19 +235,19 @@ type cacheRow struct {
 }
 
 type repoCfg struct {
-	ID              string
-	TenantID        sql.NullString
-	Platform        string
-	BaseURL         string
-	APIURL          string
-	RepoOwner       string
-	RepoName        string
-	DefaultBranch   string
-	TokenEncrypted  []byte
-	TokenUser       string
-	Enabled         bool
-	SLAMinScore     int16
-	SLAMaxPerDay    int32
+	ID             string
+	TenantID       sql.NullString
+	Platform       string
+	BaseURL        string
+	APIURL         string
+	RepoOwner      string
+	RepoName       string
+	DefaultBranch  string
+	TokenEncrypted []byte
+	TokenUser      string
+	Enabled        bool
+	SLAMinScore    int16
+	SLAMaxPerDay   int32
 }
 
 func (s *PRService) loadCache(ctx context.Context, key string) (*cacheRow, error) {
@@ -384,7 +384,7 @@ func (s *PRService) checkSLARate(ctx context.Context, repoConfigID string, max i
 		 AND created_at > NOW() - INTERVAL '24 hours'`,
 		repoConfigID).Scan(&count)
 	if err != nil {
-		return nil // fail-open on rate check error
+		return nil // fail-open on rate check error //nolint:nilerr
 	}
 	if count >= max {
 		return fmt.Errorf("SLA rate limit: %d PRs in last 24h (max %d)", count, max)

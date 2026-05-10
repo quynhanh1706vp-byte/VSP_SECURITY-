@@ -33,7 +33,7 @@ cwpp.render = function(root){
     '<div style="margin-top:8px;font-size:10px">Fetching real CVE data from /api/v1/container/images</div>' +
     '</div>';
 
-  fetchAPI('http://127.0.0.1:8090/api/v1/container/images')
+  fetchAPI('/api/v1/container/images')
     .then(function(images){
       if (!Array.isArray(images) || images.length === 0){
         // No data yet — offer seed
@@ -140,15 +140,24 @@ function esc(s){
 
 // Action handlers — attach to global PRO object
 PRO.cwppRefresh = function(){
-  var host = document.querySelector('.pro-overlay-body');
+  var host = document.getElementById('pro-body');
   if (host) cwpp.render(host);
 };
 
+// FIX 2026-05-07: do NOT pre-fill Authorization with an empty token.
+// The auto-wrapper in vsp_upgrade_v100.js only injects a real Bearer token
+// when the request has NO existing Authorization header. Sending "Bearer "
+// (empty) blocks that wrapper AND falls through CSRF bypass → 403.
+// Same fix applies to cwppShowCVEs further below.
 PRO.cwppSeed = function(){
-  fetch('http://127.0.0.1:8090/api/v1/container/seed', {
+  fetch('/api/v1/container/seed', {
     method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('TOKEN') || ''), 'Content-Type': 'application/json' }
-  }).then(function(r){ return r.json(); }).then(function(data){
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }
+  }).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(data){
     alert('Seeded: ' + (data.images || []).join(', ') + '\nScans running. Click Refresh in 30s.');
     setTimeout(PRO.cwppRefresh, 5000);
   }).catch(function(err){
@@ -159,11 +168,15 @@ PRO.cwppSeed = function(){
 PRO.cwppScanNew = function(){
   var ref = prompt('Image to scan (e.g. nginx:1.25-alpine):');
   if (!ref) return;
-  fetch('http://127.0.0.1:8090/api/v1/container/scan', {
+  fetch('/api/v1/container/scan', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('TOKEN') || '') },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ref: ref })
-  }).then(function(r){ return r.json(); }).then(function(data){
+  }).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(data){
     alert('Scan started: ' + ref + '\nID: ' + data.id + '\nClick Refresh in 30-60s.');
     setTimeout(PRO.cwppRefresh, 5000);
   }).catch(function(err){
@@ -172,12 +185,12 @@ PRO.cwppScanNew = function(){
 };
 
 PRO.cwppShowMock = function(){
-  var host = document.querySelector('.pro-overlay-body');
+  var host = document.getElementById('pro-body');
   if (host) origRender.call(cwpp, host);
 };
 
 PRO.cwppShowCVEs = function(imageID){
-  fetch('http://127.0.0.1:8090/api/v1/container/scan/' + encodeURIComponent(imageID))
+  fetch('/api/v1/container/scan/' + encodeURIComponent(imageID))
     .then(function(r){ return r.json(); })
     .then(function(data){
       var vulns = data.vulnerabilities || [];

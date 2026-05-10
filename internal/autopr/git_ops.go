@@ -27,12 +27,12 @@ import (
 
 // GitWorkspace — sandboxed clone for one PR operation. NOT thread-safe.
 type GitWorkspace struct {
-	Dir         string // /tmp/vsp-pr-xxxx
-	RepoURL     string // base URL without auth
-	Token       string // PAT (held in memory only)
-	TokenUser   string // bot user, e.g. "vsp-autofix-bot"
-	DefaultBr   string
-	Cleaned     bool
+	Dir       string // /tmp/vsp-pr-xxxx
+	RepoURL   string // base URL without auth
+	Token     string // PAT (held in memory only)
+	TokenUser string // bot user, e.g. "vsp-autofix-bot"
+	DefaultBr string
+	Cleaned   bool
 }
 
 // NewWorkspace clones repo into temp dir with token-based auth.

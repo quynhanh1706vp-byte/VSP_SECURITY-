@@ -1033,10 +1033,16 @@ renderSampleData();
 
   // ─── PANEL: vuln_mgmt ────────────────────────────────────────────────────
   function initVulnMgmt() {
-    // Add filter bar trên main content
+    // Add filter bar on main content. Skip cards that already have a native
+    // .search-bar (e.g. the Top-CVEs card with #cve-search at line 165) —
+    // otherwise the user gets two filter rows on the same table.
     setTimeout(() => {
       const main = $('main') || $('.main') || document.body;
-      const cards = $$('div').filter(d => d.querySelector('table') && !d.querySelector('.vsp-uni-filter'));
+      const cards = $$('div').filter(d =>
+        d.querySelector('table') &&
+        !d.querySelector('.vsp-uni-filter') &&
+        !d.querySelector('.search-bar') &&
+        !d.querySelector('#cve-search'));
       cards.slice(0, 1).forEach(card => {
         const tableContainer = card.querySelector('table') ? card : null;
         if (!tableContainer) return;
@@ -1858,5 +1864,7 @@ renderSampleData();
 <!-- F1 Bulk Select Hub — additive feature (Sprint 1, patch 1/8) -->
 <script src="/static/js/vsp_bulk_f1.js" defer></script>
 <!-- VSP_F1_SCRIPT_END -->
+<!-- VSP-SIEM-COMPANION -->
+<script src="/vsp_siem_companion.js"></script>
 </body>
 </html>

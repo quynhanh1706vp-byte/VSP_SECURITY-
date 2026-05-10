@@ -2,13 +2,13 @@
 //
 // Pure-Go cron expression parser. No external deps.
 // Supports the standard 5-field format (minute hour dom month dow) with:
-//   • Specific values:    0,15,30,45
-//   • Ranges:             1-5
-//   • Steps:              */15, 0-30/5
-//   • Lists:              0,15,30
-//   • Wildcards:          *
-//   • Day names:          Sun,Mon,...,Sat (case-insensitive)
-//   • Month names:        Jan,Feb,...,Dec (case-insensitive)
+//   - Specific values:    0,15,30,45
+//   - Ranges:             1-5
+//   - Steps:              */15, 0-30/5
+//   - Lists:              0,15,30
+//   - Wildcards:          *
+//   - Day names:          Sun,Mon,...,Sat (case-insensitive)
+//   - Month names:        Jan,Feb,...,Dec (case-insensitive)
 package main
 
 import (

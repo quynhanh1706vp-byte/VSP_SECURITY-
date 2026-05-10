@@ -171,10 +171,10 @@ func (s *Scanner) checkSecurityHeaders(ctx context.Context, endpoint string) *Fi
 
 	missing := []string{}
 	required := map[string]string{
-		"X-Content-Type-Options": "nosniff",
-		"X-Frame-Options":        "DENY",
+		"X-Content-Type-Options":    "nosniff",
+		"X-Frame-Options":           "DENY",
 		"Strict-Transport-Security": "",
-		"Content-Security-Policy": "",
+		"Content-Security-Policy":   "",
 	}
 	for h, _ := range required {
 		if resp.Header.Get(h) == "" {

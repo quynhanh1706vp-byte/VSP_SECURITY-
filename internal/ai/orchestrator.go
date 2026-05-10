@@ -16,12 +16,12 @@ import (
 // Orchestrator selects between LLM and local-rules sources based on
 // configuration, and handles caching transparently.
 type Orchestrator struct {
-	DB           *sql.DB
-	APIKey       string
-	AirGapMode   bool
-	HTTPClient   *http.Client
-	Model        string
-	MaxTokens    int
+	DB         *sql.DB
+	APIKey     string
+	AirGapMode bool
+	HTTPClient *http.Client
+	Model      string
+	MaxTokens  int
 }
 
 // NewOrchestrator constructs an Orchestrator. If apiKey is empty or
@@ -69,11 +69,11 @@ func (o *Orchestrator) Advise(ctx context.Context, req AdviseRequest) (AdviseRes
 
 	// Fresh call
 	var (
-		resp     AdviseResponse
-		tokIn    int
-		tokOut   int
-		model    string
-		callErr  error
+		resp    AdviseResponse
+		tokIn   int
+		tokOut  int
+		model   string
+		callErr error
 	)
 
 	if o.Mode() == "claude" {

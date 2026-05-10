@@ -205,7 +205,7 @@ func guardSSRF(rawURL string) error {
 	ips, err := net.LookupIP(host)
 	if err != nil {
 		// DNS failure is not necessarily SSRF; let the HTTP client surface it.
-		return nil
+		return nil //nolint:nilerr
 	}
 	for _, ip := range ips {
 		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {

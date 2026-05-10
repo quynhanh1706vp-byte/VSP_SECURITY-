@@ -237,10 +237,10 @@ func HandlerValidationStats(db *sql.DB) http.HandlerFunc {
 		resp := map[string]any{
 			"validators": out,
 			"summary": map[string]any{
-				"cache_entries_30d": totalCacheRows,
-				"validated":         validatedRows,
-				"pass":              passRows,
-				"fail":              failRows,
+				"cache_entries_30d":       totalCacheRows,
+				"validated":               validatedRows,
+				"pass":                    passRows,
+				"fail":                    failRows,
 				"validation_coverage_pct": pct(validatedRows, totalCacheRows),
 			},
 			"generated_at": time.Now().UTC().Format(time.RFC3339),

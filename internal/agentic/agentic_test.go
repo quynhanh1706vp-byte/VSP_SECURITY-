@@ -25,13 +25,13 @@ func TestSafePath_RejectsTraversal(t *testing.T) {
 	bad := []string{
 		"../etc/passwd",
 		"foo/../../etc",
-		"/etc/passwd",     // absolute
-		"foo\x00bar",      // null byte
-		"foo;rm -rf /",    // shell metacharacters
-		"foo bar",         // space
-		"",                // empty
-		"foo$(whoami)",    // command substitution
-		"foo|cat",         // pipe
+		"/etc/passwd",  // absolute
+		"foo\x00bar",   // null byte
+		"foo;rm -rf /", // shell metacharacters
+		"foo bar",      // space
+		"",             // empty
+		"foo$(whoami)", // command substitution
+		"foo|cat",      // pipe
 	}
 	for _, p := range bad {
 		if safePath(p) {
@@ -279,11 +279,11 @@ func TestLooksLikeUUID(t *testing.T) {
 	}
 	bad := []string{
 		"not-a-uuid",
-		"7ec296546ff745438810-30b346af5200",                // missing dashes
-		"7ec29654-6ff7-4543-8810-30b346af520",              // 35 chars
-		"7ec29654-6ff7-4543-8810-30b346af52000",            // 37 chars
-		"GGGGGGGG-6ff7-4543-8810-30b346af5200",             // non-hex
-		"7ec29654 6ff7 4543 8810 30b346af5200",             // spaces
+		"7ec296546ff745438810-30b346af5200",     // missing dashes
+		"7ec29654-6ff7-4543-8810-30b346af520",   // 35 chars
+		"7ec29654-6ff7-4543-8810-30b346af52000", // 37 chars
+		"GGGGGGGG-6ff7-4543-8810-30b346af5200",  // non-hex
+		"7ec29654 6ff7 4543 8810 30b346af5200",  // spaces
 	}
 	for _, s := range good {
 		if !looksLikeUUID(s) {

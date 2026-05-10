@@ -21,14 +21,14 @@ func LoadPolicy(path string) *Policy {
 		GlobalEnabled: true,
 		BlockedRules: map[string]string{
 			// Defaults — secrets/CVE rules where LLM is unhelpful or risky
-			"gitleaks-aws-access-key":     "Hardcoded credentials must be rotated, not auto-generated",
-			"gitleaks-private-key":        "Private keys must be rotated, not auto-generated",
-			"gitleaks-jwt-token":          "Tokens must be rotated, not auto-generated",
-			"gitleaks-generic-api-key":    "API keys must be rotated, not auto-generated",
-			"bandit-hardcoded-password":   "Hardcoded credentials must be rotated, not auto-generated",
-			"trivy-cve-go-mod":            "Use trivy report to find patched versions",
-			"trivy-cve-package-json":      "Use npm audit fix or vendor advisory",
-			"kics-tls-min-version":        "Cryptographic config — manual review",
+			"gitleaks-aws-access-key":   "Hardcoded credentials must be rotated, not auto-generated",
+			"gitleaks-private-key":      "Private keys must be rotated, not auto-generated",
+			"gitleaks-jwt-token":        "Tokens must be rotated, not auto-generated",
+			"gitleaks-generic-api-key":  "API keys must be rotated, not auto-generated",
+			"bandit-hardcoded-password": "Hardcoded credentials must be rotated, not auto-generated",
+			"trivy-cve-go-mod":          "Use trivy report to find patched versions",
+			"trivy-cve-package-json":    "Use npm audit fix or vendor advisory",
+			"kics-tls-min-version":      "Cryptographic config — manual review",
 		},
 	}
 
@@ -66,12 +66,13 @@ func (p *Policy) BlockReason(ruleID string) string {
 
 // parseSimpleYAML handles the limited subset of YAML our policy file uses.
 // Looks for:
-//   global:
-//     llm_enabled: false   ← optional kill switch
-//   rules:
-//     <rule_id>:
-//       llm_allowed: false ← block list entries
-//       note: "..."        ← optional reason
+//
+//	global:
+//	  llm_enabled: false   ← optional kill switch
+//	rules:
+//	  <rule_id>:
+//	    llm_allowed: false ← block list entries
+//	    note: "..."        ← optional reason
 func parseSimpleYAML(p *Policy, data string) {
 	lines := strings.Split(data, "\n")
 	inGlobal := false

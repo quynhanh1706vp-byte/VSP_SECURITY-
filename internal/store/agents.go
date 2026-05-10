@@ -32,19 +32,19 @@ var ErrAgentNotFound = errors.New("agent not found")
 
 // Agent — public-safe agent metadata.
 type Agent struct {
-	ID          string     `json:"id"`
-	TenantID    string     `json:"tenant_id"`
-	Hostname    string     `json:"hostname"`
-	OSFamily    string     `json:"os_family,omitempty"`
-	OSVersion   string     `json:"os_version,omitempty"`
-	Arch        string     `json:"arch,omitempty"`
-	AssetID     *string    `json:"asset_id,omitempty"`
-	APIKeyHint  string     `json:"api_key_hint"`
-	EnrolledAt  time.Time  `json:"enrolled_at"`
-	LastSeenAt  *time.Time `json:"last_seen_at,omitempty"`
-	LastIP      string     `json:"last_ip,omitempty"`
-	Status      string     `json:"status"`
-	Version     string     `json:"version,omitempty"`
+	ID         string     `json:"id"`
+	TenantID   string     `json:"tenant_id"`
+	Hostname   string     `json:"hostname"`
+	OSFamily   string     `json:"os_family,omitempty"`
+	OSVersion  string     `json:"os_version,omitempty"`
+	Arch       string     `json:"arch,omitempty"`
+	AssetID    *string    `json:"asset_id,omitempty"`
+	APIKeyHint string     `json:"api_key_hint"`
+	EnrolledAt time.Time  `json:"enrolled_at"`
+	LastSeenAt *time.Time `json:"last_seen_at,omitempty"`
+	LastIP     string     `json:"last_ip,omitempty"`
+	Status     string     `json:"status"`
+	Version    string     `json:"version,omitempty"`
 }
 
 // SoftwarePackage — single software inventory entry.
@@ -63,8 +63,8 @@ type SoftwarePackage struct {
 // EnrollAgentResult — returned from EnrollAgent so the caller can show the
 // raw API key exactly once.
 type EnrollAgentResult struct {
-	Agent      *Agent
-	RawAPIKey  string // SHOW ONCE — never persisted
+	Agent     *Agent
+	RawAPIKey string // SHOW ONCE — never persisted
 }
 
 // generateAPIKey — 32 random bytes → 64 hex chars. Deterministic prefix

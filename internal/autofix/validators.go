@@ -32,11 +32,11 @@ const (
 
 // ValidationResult — one validator output row.
 type ValidationResult struct {
-	Validator    string           `json:"validator"`
-	Status       ValidationStatus `json:"status"`
-	DurationMs   int              `json:"duration_ms"`
-	ErrorMsg     string           `json:"error_msg,omitempty"`
-	Metadata     map[string]any   `json:"metadata,omitempty"`
+	Validator  string           `json:"validator"`
+	Status     ValidationStatus `json:"status"`
+	DurationMs int              `json:"duration_ms"`
+	ErrorMsg   string           `json:"error_msg,omitempty"`
+	Metadata   map[string]any   `json:"metadata,omitempty"`
 }
 
 // FixCandidate — input to validators.
@@ -67,8 +67,8 @@ type SyntaxValidator struct {
 	Timeout time.Duration // default 5s
 }
 
-func (v *SyntaxValidator) Name() string                    { return "syntax" }
-func (v *SyntaxValidator) Applies(c *FixCandidate) bool    { return c.SuggestedCode != "" }
+func (v *SyntaxValidator) Name() string                 { return "syntax" }
+func (v *SyntaxValidator) Applies(c *FixCandidate) bool { return c.SuggestedCode != "" }
 
 func (v *SyntaxValidator) Run(ctx context.Context, c *FixCandidate) ValidationResult {
 	start := time.Now()
@@ -420,10 +420,10 @@ func NewLintValidator() *LintValidator {
 	return &LintValidator{
 		Patterns: map[string]*regexp.Regexp{
 			// Secrets — gitleaks rules
-			"generic-api-key":     regexp.MustCompile(`(?i)(api[_-]?key|apikey)\s*[:=]\s*["'][A-Za-z0-9_\-]{20,}["']`),
-			"aws-access-key":      regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
-			"private-key":         regexp.MustCompile(`-----BEGIN (RSA|OPENSSH|EC) PRIVATE KEY-----`),
-			"generic-password":    regexp.MustCompile(`(?i)password\s*[:=]\s*["'][^"']{4,}["']`),
+			"generic-api-key":  regexp.MustCompile(`(?i)(api[_-]?key|apikey)\s*[:=]\s*["'][A-Za-z0-9_\-]{20,}["']`),
+			"aws-access-key":   regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
+			"private-key":      regexp.MustCompile(`-----BEGIN (RSA|OPENSSH|EC) PRIVATE KEY-----`),
+			"generic-password": regexp.MustCompile(`(?i)password\s*[:=]\s*["'][^"']{4,}["']`),
 			// IaC — kics rules
 			"s3-public-acl":       regexp.MustCompile(`(?i)acl\s*=\s*["'](public-read|public-read-write|authenticated-read)["']`),
 			"sg-open-ingress":     regexp.MustCompile(`cidr_blocks\s*=\s*\[?\s*["']0\.0\.0\.0/0["']`),
@@ -539,12 +539,12 @@ func truncErr(s string, n int) string {
 // Default validator set (pipeline order matters — fast → slow)
 func DefaultValidators() []Validator {
 	return []Validator{
-		&LineScopeValidator{},   // <1ms
+		&LineScopeValidator{}, // <1ms
 		&LintValidator{Patterns: NewLintValidator().Patterns}, // <1ms
-		&IdempotentValidator{},  // <1ms
-		&ASTDiffValidator{},     // <5ms
-		&SyntaxValidator{},      // 50-500ms
-		&CompileValidator{},     // 1-30s (rarely runs — needs full Go file)
+		&IdempotentValidator{},                                // <1ms
+		&ASTDiffValidator{},                                   // <5ms
+		&SyntaxValidator{},                                    // 50-500ms
+		&CompileValidator{},                                   // 1-30s (rarely runs — needs full Go file)
 	}
 }
 

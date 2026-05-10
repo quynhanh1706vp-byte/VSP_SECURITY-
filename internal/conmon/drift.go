@@ -10,29 +10,29 @@ import (
 // in the previous run but is now failing (or transitioning from FAIL→PASS,
 // which is not a deviation but is recorded for completeness).
 type Deviation struct {
-	ID              int64      `json:"id"`
-	TenantID         string      `json:"tenant_id"`
-	ScheduleID      int64      `json:"schedule_id"`
-	RunID           int64      `json:"run_id"`
-	GateName        string     `json:"gate_name"`
-	Framework       string     `json:"framework"`
-	PrevVerdict     string     `json:"prev_verdict"`
-	CurrVerdict     string     `json:"curr_verdict"`
-	Severity        string     `json:"severity"`
-	DetectedAt      time.Time  `json:"detected_at"`
-	AcknowledgedAt  *time.Time `json:"acknowledged_at,omitempty"`
-	AcknowledgedBy  string     `json:"acknowledged_by,omitempty"`
-	POAMID          *int64     `json:"poam_id,omitempty"`
-	Notes           string     `json:"notes,omitempty"`
+	ID             int64      `json:"id"`
+	TenantID       string     `json:"tenant_id"`
+	ScheduleID     int64      `json:"schedule_id"`
+	RunID          int64      `json:"run_id"`
+	GateName       string     `json:"gate_name"`
+	Framework      string     `json:"framework"`
+	PrevVerdict    string     `json:"prev_verdict"`
+	CurrVerdict    string     `json:"curr_verdict"`
+	Severity       string     `json:"severity"`
+	DetectedAt     time.Time  `json:"detected_at"`
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
+	AcknowledgedBy string     `json:"acknowledged_by,omitempty"`
+	POAMID         *int64     `json:"poam_id,omitempty"`
+	Notes          string     `json:"notes,omitempty"`
 }
 
 // VerdictRecord is the minimal interface the drift detector needs from
 // a pipeline run — gate name, framework, and verdict.
 type VerdictRecord struct {
-	GateName    string
-	Framework   string
-	Verdict     string // PASS / FAIL / WAIVE
-	Severity    string
+	GateName  string
+	Framework string
+	Verdict   string // PASS / FAIL / WAIVE
+	Severity  string
 }
 
 // DetectDrift compares verdicts from the current run against the most
@@ -247,12 +247,12 @@ func AcknowledgeDeviation(ctx context.Context, db *sql.DB,
 // CadenceStatus represents how a tenant is tracking against a framework's
 // re-scan cadence (e.g. FedRAMP Moderate 30-day requirement).
 type CadenceStatus struct {
-	Framework      string    `json:"framework"`
-	CadenceDays    int       `json:"cadence_days"`
+	Framework      string     `json:"framework"`
+	CadenceDays    int        `json:"cadence_days"`
 	LastScanAt     *time.Time `json:"last_scan_at,omitempty"`
-	NextDueAt      time.Time `json:"next_due_at"`
-	IsOverdue      bool      `json:"is_overdue"`
-	ConsecutiveMet int       `json:"consecutive_met"`
+	NextDueAt      time.Time  `json:"next_due_at"`
+	IsOverdue      bool       `json:"is_overdue"`
+	ConsecutiveMet int        `json:"consecutive_met"`
 }
 
 // GetCadenceStatus returns FedRAMP-style compliance status across the

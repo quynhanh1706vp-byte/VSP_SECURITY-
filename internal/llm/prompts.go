@@ -6,7 +6,7 @@ import (
 )
 
 // SystemPrompt instructs the LLM to behave as a security remediation assistant.
-// Emphasises JSON-only output, schema compliance, and conservative confidence.
+// Emphasizes JSON-only output, schema compliance, and conservative confidence.
 const SystemPrompt = `You are a security code remediation assistant.
 Your task: given vulnerable code and a security rule violation, output
 a JSON object with a precise fix.

@@ -17,10 +17,10 @@ func TestCSRFProtect_EmptyBearerDoesNotBypass(t *testing.T) {
 	handler := CSRFProtect(next)
 
 	cases := []string{
-		"Bearer ",          // single space
-		"Bearer  ",         // multiple spaces
-		"Bearer\t",         // tab
-		"Bearer ",          // raw empty
+		"Bearer ",  // single space
+		"Bearer  ", // multiple spaces
+		"Bearer\t", // tab
+		"Bearer ",  // raw empty
 	}
 	for _, authValue := range cases {
 		called = false

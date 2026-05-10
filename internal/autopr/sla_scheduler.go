@@ -26,7 +26,7 @@ type SLAScheduler struct {
 	DB         *sql.DB
 	Service    *PRService
 	Interval   time.Duration // default 5 minutes
-	BatchLimit int            // max PRs per tick (default 5)
+	BatchLimit int           // max PRs per tick (default 5)
 
 	stopCh chan struct{}
 	wg     sync.WaitGroup

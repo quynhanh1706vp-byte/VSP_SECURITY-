@@ -390,7 +390,10 @@ async function loadAnomalies(){
     return;
   }
   try{
-    var r = await fetch(API+'/api/v1/ueba/analyze', {headers:{Authorization:'Bearer '+TOKEN}});
+    // FIX 2026-05-07: route is POST in main.go; do not pre-set Authorization
+    // (let the page-level vspAuthFetch wrapper poll the real token, otherwise
+    // we send `Bearer undefined` and get 401).
+    var r = await fetch(API+'/api/v1/ueba/analyze', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
     if(!r.ok){
       if(hasUX) VSPUXState.error(target, 'HTTP '+r.status, loadAnomalies);
       return;
@@ -977,5 +980,11 @@ renderChecks();loadBaseline();
 
 </script>
 <!-- VSP-UNI2-POLISH-END -->
+<!-- INJECTED_BY_INJECT_UX_V1.1 -->
+<link rel="stylesheet" href="/static/inject_ux_v1.1.css">
+<div id="inject-toast" style="display:none"></div>
+<script src="/static/inject_ux_v1.1.js"></script>
+<!-- VSP-SIEM-COMPANION -->
+<script src="/vsp_siem_companion.js"></script>
 </body>
 </html>

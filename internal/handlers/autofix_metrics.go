@@ -10,19 +10,19 @@ import (
 // MetricsTotals are absolute counts of findings per status.
 // Maps to CMMC AU-7 (Audit Reduction & Report Generation).
 type MetricsTotals struct {
-	Open         int `json:"findings_open"`
-	Applied      int `json:"findings_applied"`
-	Verified     int `json:"findings_verified"`
-	Failed       int `json:"findings_failed"`
-	Accepted     int `json:"findings_accepted"`
+	Open          int `json:"findings_open"`
+	Applied       int `json:"findings_applied"`
+	Verified      int `json:"findings_verified"`
+	Failed        int `json:"findings_failed"`
+	Accepted      int `json:"findings_accepted"`
 	FalsePositive int `json:"findings_false_pos"`
 }
 
 // MetricsRates are derived ratios useful for SI-2 (Flaw Remediation) reporting.
 type MetricsRates struct {
-	VerificationRate     float64 `json:"verification_rate"`      // verified / (verified + applied)
-	FirstAttemptSuccess  float64 `json:"first_attempt_success"`  // verified / (verified + failed)
-	AutoRemediationRate  float64 `json:"auto_remediation_rate"`  // applied / (applied + manual_resolved)
+	VerificationRate    float64 `json:"verification_rate"`     // verified / (verified + applied)
+	FirstAttemptSuccess float64 `json:"first_attempt_success"` // verified / (verified + failed)
+	AutoRemediationRate float64 `json:"auto_remediation_rate"` // applied / (applied + manual_resolved)
 }
 
 // MetricsMTTR is mean time to remediate per severity, in hours.
@@ -56,6 +56,7 @@ type cachedMetrics struct {
 	data    MetricsResponse
 	expires time.Time
 }
+
 var (
 	metricsCache = map[string]cachedMetrics{}
 	metricsMu    sync.RWMutex
@@ -66,9 +67,13 @@ var (
 func AutofixMetricsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		period := r.URL.Query().Get("period")
-		if period == "" { period = "30d" }
+		if period == "" {
+			period = "30d"
+		}
 		tenant := r.URL.Query().Get("tenant_id")
-		if tenant == "" { tenant = "default" }
+		if tenant == "" {
+			tenant = "default"
+		}
 
 		cacheKey := period + ":" + tenant
 		metricsMu.RLock()
@@ -81,9 +86,12 @@ func AutofixMetricsHandler(db *sql.DB) http.HandlerFunc {
 
 		days := 30
 		switch period {
-		case "7d": days = 7
-		case "90d": days = 90
-		case "all": days = 36500
+		case "7d":
+			days = 7
+		case "90d":
+			days = 90
+		case "all":
+			days = 36500
 		}
 
 		resp := MetricsResponse{

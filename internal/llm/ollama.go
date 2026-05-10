@@ -74,10 +74,10 @@ type ollamaGenerateRequest struct {
 }
 
 type ollamaGenerateResponse struct {
-	Model    string `json:"model"`
-	Response string `json:"response"`
-	Done     bool   `json:"done"`
-	EvalCount int   `json:"eval_count"`
+	Model     string `json:"model"`
+	Response  string `json:"response"`
+	Done      bool   `json:"done"`
+	EvalCount int    `json:"eval_count"`
 }
 
 // GenerateFix calls Ollama /api/generate, parses the JSON response, and

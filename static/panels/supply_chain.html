@@ -219,7 +219,7 @@ tr:hover td{background:var(--bg3)}
         <thead><tr>
           <th>Artifact</th><th>Digest</th><th>Signed by</th><th>Algorithm</th><th>Signed at</th>
         </tr></thead>
-        <tbody id="sig-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        <tbody id="sig-tbody" data-vsp-paginate="20"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -278,7 +278,7 @@ tr:hover td{background:var(--bg3)}
         <thead><tr>
           <th>Artifact</th><th>Level</th><th>Builder</th><th>Source commit</th><th>Created</th>
         </tr></thead>
-        <tbody id="prov-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        <tbody id="prov-tbody" data-vsp-paginate="20"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -362,7 +362,7 @@ tr:hover td{background:var(--bg3)}
         <thead><tr>
           <th>CVE</th><th>Component</th><th>Status</th><th>Justification</th><th>Author</th><th>Analyzed</th>
         </tr></thead>
-        <tbody id="vex-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+        <tbody id="vex-tbody" data-vsp-paginate="20"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1432,5 +1432,7 @@ loadSignatures();
 
 </script>
 <!-- VSP-SC-POLISH-END -->
+<script src="/panels/vsp_pro_panel_buttons.js?v=1"></script>
+<script src="/panels/vsp_pro_paginate.js?v=1"></script>
 </body>
 </html>

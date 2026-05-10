@@ -7,11 +7,11 @@ import (
 
 func TestDetectProvider(t *testing.T) {
 	tests := map[string]CloudProvider{
-		"aws_s3_bucket":      AWS,
-		"google_storage":     GCP,
-		"azurerm_storage":    Azure,
-		"kubernetes_pod":     K8s,
-		"docker_container":   Other,
+		"aws_s3_bucket":    AWS,
+		"google_storage":   GCP,
+		"azurerm_storage":  Azure,
+		"kubernetes_pod":   K8s,
+		"docker_container": Other,
 	}
 	for input, expected := range tests {
 		got := DetectProvider(input)

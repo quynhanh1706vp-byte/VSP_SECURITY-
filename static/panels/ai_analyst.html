@@ -932,9 +932,16 @@ async function sendMessage() {
         : [{role:'user',content:text}]
     };
     try {
+      // FIX 2026-05-07: do NOT pre-set Authorization here.
+      // window.TOKEN can be undefined while the iframe-bootstrap postMessage
+      // handshake is still in flight, producing a stub `Bearer ` header that
+      // makes the auth middleware return 401 without falling back to the
+      // vsp_token cookie (see internal/auth/middleware.go:95). Letting the
+      // wrapper installed at line 55-64 above call vspAuthFetch handles
+      // token polling correctly and unblocks both quickAction() and chat.
       const gwResp = await fetch((window.API_BASE||'') + '/api/v1/ai/chat', {
         method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+(window.TOKEN||window.parent?.TOKEN||'')},
+        headers:{'Content-Type':'application/json'},
         body: JSON.stringify(gwPayload)
       });
       if (gwResp.ok) { resp = gwResp; }
@@ -1703,5 +1710,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 </script>
 <!-- VSP-UNI3-POLISH-END -->
 <!-- FEAT-20 PATCH APPLIED --><script src="/static/patches/feat-20-ai-analyst.js"></script>
+<!-- VSP-SIEM-COMPANION — Configure + Notifications buttons (per-panel) -->
+<script src="/vsp_siem_companion.js"></script>
 </body>
 </html>

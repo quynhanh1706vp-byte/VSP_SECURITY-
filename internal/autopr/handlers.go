@@ -310,21 +310,21 @@ func HandlerRegisterRepo(db *sql.DB) http.HandlerFunc {
 		}
 
 		var body struct {
-			TenantID       string   `json:"tenant_id,omitempty"`
-			Nickname       string   `json:"nickname"`
-			Platform       string   `json:"platform"`
-			BaseURL        string   `json:"base_url"`
-			APIURL         string   `json:"api_url,omitempty"`
-			RepoOwner      string   `json:"repo_owner"`
-			RepoName       string   `json:"repo_name"`
-			DefaultBranch  string   `json:"default_branch,omitempty"`
-			Token          string   `json:"token"`
-			TokenUser      string   `json:"token_user"`
-			AutoPREnabled  bool     `json:"auto_pr_enabled"`
-			SLASeverity    []string `json:"sla_severity,omitempty"`
-			SLAMinScore    int      `json:"sla_min_score,omitempty"`
-			SLAMaxPerDay   int      `json:"sla_max_per_day,omitempty"`
-			WebhookSecret  string   `json:"webhook_secret,omitempty"`
+			TenantID      string   `json:"tenant_id,omitempty"`
+			Nickname      string   `json:"nickname"`
+			Platform      string   `json:"platform"`
+			BaseURL       string   `json:"base_url"`
+			APIURL        string   `json:"api_url,omitempty"`
+			RepoOwner     string   `json:"repo_owner"`
+			RepoName      string   `json:"repo_name"`
+			DefaultBranch string   `json:"default_branch,omitempty"`
+			Token         string   `json:"token"`
+			TokenUser     string   `json:"token_user"`
+			AutoPREnabled bool     `json:"auto_pr_enabled"`
+			SLASeverity   []string `json:"sla_severity,omitempty"`
+			SLAMinScore   int      `json:"sla_min_score,omitempty"`
+			SLAMaxPerDay  int      `json:"sla_max_per_day,omitempty"`
+			WebhookSecret string   `json:"webhook_secret,omitempty"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 16*1024)).Decode(&body); err != nil {
 			http.Error(w, "bad json", http.StatusBadRequest)
@@ -458,9 +458,9 @@ func HandlerWebhook(db *sql.DB) http.HandlerFunc {
 		var p struct {
 			Action      string `json:"action"`
 			PullRequest struct {
-				Number int    `json:"number"`
-				State  string `json:"state"`
-				Merged bool   `json:"merged"`
+				Number  int    `json:"number"`
+				State   string `json:"state"`
+				Merged  bool   `json:"merged"`
 				HTMLURL string `json:"html_url"`
 			} `json:"pull_request"`
 		}

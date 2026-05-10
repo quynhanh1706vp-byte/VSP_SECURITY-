@@ -1756,22 +1756,19 @@ loadRunHistory();
 
 </script>
 <!-- VSP-UNI-POLISH-END -->
+<!-- INJECTED_BY_INJECT_UX_V1.1 -->
+<link rel="stylesheet" href="/static/inject_ux_v1.1.css">
+<div id="inject-toast" style="display:none"></div>
+<script src="/static/inject_ux_v1.1.js"></script>
+<!-- INJECTED_BY_INJECT_UX_V1.1 -->
+<link rel="stylesheet" href="/static/inject_ux_v1.1.css">
+<div id="inject-toast" style="display:none"></div>
+<script src="/static/inject_ux_v1.1.js"></script>
+
+<!-- VSP-SIEM-COMPANION — Configure + Notifications buttons (per-panel) -->
+<script src="/vsp_siem_companion.js"></script>
 </body>
 </html>
-
-<!-- ════════════════════════════════════════════════════════════════════
-     Phase 2.1.D — Run Detail live fetch (engine v2)
-
-     Augments the existing #hist-modal (already in soar.html) with:
-       - Real fetch from /api/v1/soar/runs/{full_uuid}
-       - Live polling at 2s interval while status=running
-       - Step results from engine v2 (name/type/status/output/duration_ms/error)
-       - Re-run via /api/v1/soar/playbooks/{pb_id}/run with proper context
-       - KPIs: status pill, step count, total duration, error preview
-
-     APPEND this block at the end of static/panels/soar.html, just before
-     the closing </body> tag (or before any final <script src=...> tags).
-     ════════════════════════════════════════════════════════════════════ -->
 
 <script>
 /* Phase 2.1.D — Run Detail (SOAR v2 engine, live API fetch) */

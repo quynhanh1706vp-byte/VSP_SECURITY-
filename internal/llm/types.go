@@ -18,12 +18,12 @@ type Provider interface {
 type FixRequest struct {
 	RuleID          string `json:"rule_id"`
 	RuleDescription string `json:"rule_description"`
-	FilePath        string `json:"file_path"`        // for language detection
-	Language        string `json:"language"`         // go|yaml|tf|py|...
+	FilePath        string `json:"file_path"` // for language detection
+	Language        string `json:"language"`  // go|yaml|tf|py|...
 	CodeBefore      string `json:"code_before"`
 	VulnerableCode  string `json:"vulnerable_code"`
 	CodeAfter       string `json:"code_after"`
-	Severity        string `json:"severity"`         // critical|high|medium|low
+	Severity        string `json:"severity"` // critical|high|medium|low
 }
 
 // FixResponse is what the LLM produces (parsed from JSON in model output).
@@ -31,7 +31,7 @@ type FixRequest struct {
 type FixResponse struct {
 	SuggestedCode  string `json:"suggested_code"`
 	Rationale      string `json:"rationale"`
-	Confidence     string `json:"confidence"`     // high|medium|low
+	Confidence     string `json:"confidence"` // high|medium|low
 	BreakingChange bool   `json:"breaking_change"`
 
 	Provider   string `json:"-"`
@@ -51,7 +51,7 @@ func LanguageFromPath(path string) string {
 		".json": "json", ".toml": "toml",
 		".sh": "bash", ".bash": "bash",
 		".dockerfile": "dockerfile",
-		".sql": "sql",
+		".sql":        "sql",
 	}
 	// Find last . in path
 	for i := len(path) - 1; i >= 0; i-- {

@@ -15,14 +15,17 @@ func NewAPI(scanner *Scanner) *API {
 	return &API{scanner: scanner}
 }
 
-// RegisterRoutes wires the container API under a NEW chi router group with
-// NO authentication middleware. Pass the parent router (r in main.go).
+// RegisterRoutes wires the container API under a NEW chi router group.
+// Pass any middleware (auth, PRO gating, etc.) in mws — they are applied
+// to this isolated group, leaving the rest of the parent router untouched.
 //
-// We use r.Group(func(...){}) to create an isolated middleware stack that
-// inherits NOTHING from parent — so JWT middleware doesn't apply here.
-func (a *API) RegisterRoutes(r chi.Router) {
+// Calling with no middleware preserves the legacy "fully public" behaviour
+// used by dev-stub and earlier builds.
+func (a *API) RegisterRoutes(r chi.Router, mws ...func(http.Handler) http.Handler) {
 	r.Group(func(g chi.Router) {
-		// No middleware — public endpoints for VSP PRO container scanner
+		for _, mw := range mws {
+			g.Use(mw)
+		}
 		g.Get("/api/v1/container/images", a.handleListImages)
 		g.Post("/api/v1/container/scan", a.handleScan)
 		g.Get("/api/v1/container/scan/{id}", a.handleGetScan)

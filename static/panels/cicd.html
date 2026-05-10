@@ -726,7 +726,7 @@ td{padding:7px 10px;vertical-align:middle}
         <button class="btn btn-sm" onclick="afExportCSV()" title="Export CSV">↓ CSV</button>
       </div>
     </div>
-    <!-- VSP-CICD-H3.3: Filter bar -->
+    <!-- VSP-CICD-H3.3: Filter bar (PRO upgrade — search + pagination) -->
     <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-right:4px">Filter:</span>
       <button class="btn btn-sm af-sev-pill active" data-sev="" onclick="afFilterSeverity(this,'')">All</button>
@@ -742,6 +742,8 @@ td{padding:7px 10px;vertical-align:middle}
         <input type="checkbox" id="af-fixable-only" onchange="renderAutofixTable()">
         Auto-fixable only
       </label>
+      <input id="af-search" type="search" placeholder="🔍 Search rule / message / file…" oninput="renderAutofixTable()"
+        style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px;margin-left:6px" />
     </div>
     <style>
       .af-sev-pill { font-size:10px; padding:4px 11px; opacity:.6 }
@@ -1267,37 +1269,60 @@ async function loadAutofixStats(){
   renderAutofixTable();
 }
 
+// PRO upgrade — paginated render. Defaults: 25/page; user can pick 50/100/all.
+window._afPage = window._afPage || 0;
+window._afPageSize = window._afPageSize || 25;
+
 function renderAutofixTable(){
   // VSP-CICD-H3.3: client-side filter
   var all = (window._autofixAllFindings || []).filter(function(f){ return (f.status||'open')==='open' || !f.status; });
   var sevFilter = (document.querySelector('.af-sev-pill.active')||{}).dataset?.sev || '';
   var toolFilter = (document.getElementById('af-tool-filter')||{value:''}).value || '';
   var fixableOnly = (document.getElementById('af-fixable-only')||{checked:false}).checked;
-  
+  var searchQ = ((document.getElementById('af-search')||{value:''}).value || '').toLowerCase().trim();
+
   var filtered = all.filter(function(f){
     if(sevFilter && f.severity !== sevFilter) return false;
     if(toolFilter && f.tool !== toolFilter) return false;
     if(fixableOnly && !_autofixIsFixable(f)) return false;
+    if(searchQ){
+      var hay = ((f.rule_id||'') + ' ' + (f.message||'') + ' ' + (f.path||'') + ' ' + (f.tool||'')).toLowerCase();
+      if(hay.indexOf(searchQ) === -1) return false;
+    }
     return true;
   });
-  
+
   var sevOrder = {CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3, INFO:4};
-  var sortedFixable = filtered
-    .sort(function(a,b){ return (sevOrder[a.severity]||9) - (sevOrder[b.severity]||9); })
-    .slice(0, 50);
-  window._lastFixable = sortedFixable;
-  
+  var sorted = filtered.sort(function(a,b){ return (sevOrder[a.severity]||9) - (sevOrder[b.severity]||9); });
+
+  // Pagination — slice to current page.
+  var pageSize = window._afPageSize === 0 ? sorted.length : window._afPageSize;
+  var totalPages = Math.max(1, Math.ceil(sorted.length / Math.max(1, pageSize)));
+  if(window._afPage >= totalPages) window._afPage = 0;
+  var pageStart = window._afPage * pageSize;
+  var sortedFixable = sorted.slice(pageStart, pageStart + pageSize);
+  window._lastFixable = sorted; // CSV export covers entire filtered set, not just current page
+
   var sevClass = {CRITICAL:'sev-crit', HIGH:'sev-high', MEDIUM:'sev-med', LOW:'sev-low', INFO:''};
   var tbody = document.getElementById('autofix-tbody');
-  
+
   // Update count display
   var countEl = document.getElementById('af-result-count');
-  if(countEl) countEl.textContent = filtered.length + ' shown · ' + sortedFixable.length + ' top';
-  
+  if(countEl){
+    if(sorted.length === 0){
+      countEl.textContent = '0 of ' + all.length + ' total';
+    } else {
+      var endIdx = Math.min(pageStart + pageSize, sorted.length);
+      countEl.textContent = (pageStart+1) + '–' + endIdx + ' of ' + sorted.length +
+        (filtered.length < all.length ? ' (filtered from ' + all.length + ')' : '');
+    }
+  }
+
   if(sortedFixable.length === 0){
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3);font-size:11px">'
       + (filtered.length === 0 ? 'No findings match current filters' : 'No fixable findings in current filter')
       + '</td></tr>';
+    renderAutofixPager(totalPages);
     return;
   }
   
@@ -1320,6 +1345,53 @@ function renderAutofixTable(){
       + '<td><button class="btn btn-sm" data-fix-idx="' + fIdx + '" onclick="showFixPreviewByIdx(this)">Preview fix</button></td>'
       + '</tr>';
   }).join('');
+
+  renderAutofixPager(totalPages);
+}
+
+// PRO upgrade — pagination footer below the autofix table. Idempotent:
+// builds the bar once and just rewrites text/disabled state on subsequent
+// renders. Keeps the CSV export aligned with the FILTERED set, not the
+// visible page, so users get the full export they expect.
+function renderAutofixPager(totalPages){
+  var tbl = document.getElementById('autofix-tbody');
+  if(!tbl) return;
+  var card = tbl.closest('.card');
+  if(!card) return;
+  var pager = card.querySelector('[data-af-pager]');
+  if(!pager){
+    pager = document.createElement('div');
+    pager.setAttribute('data-af-pager','1');
+    pager.style.cssText =
+      'display:flex;justify-content:flex-end;align-items:center;gap:10px;' +
+      'padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--t3)';
+    pager.innerHTML =
+      '<span class="af-pager-info"></span>' +
+      '<label style="display:flex;align-items:center;gap:6px">Per page ' +
+        '<select class="af-pager-size" style="font-size:11px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px">' +
+          '<option value="25">25</option><option value="50">50</option>' +
+          '<option value="100">100</option><option value="0">All</option>' +
+        '</select></label>' +
+      '<button class="btn btn-sm af-pager-prev" style="font-size:10px">‹ Prev</button>' +
+      '<button class="btn btn-sm af-pager-next" style="font-size:10px">Next ›</button>';
+    card.appendChild(pager);
+    pager.querySelector('.af-pager-prev').addEventListener('click', function(){
+      if(window._afPage > 0){ window._afPage--; renderAutofixTable(); }
+    });
+    pager.querySelector('.af-pager-next').addEventListener('click', function(){
+      window._afPage++; renderAutofixTable();
+    });
+    pager.querySelector('.af-pager-size').addEventListener('change', function(e){
+      window._afPageSize = parseInt(e.target.value, 10) || 0;
+      window._afPage = 0;
+      renderAutofixTable();
+    });
+  }
+  pager.querySelector('.af-pager-info').textContent =
+    'Page ' + (window._afPage+1) + ' / ' + totalPages;
+  pager.querySelector('.af-pager-prev').disabled = window._afPage <= 0;
+  pager.querySelector('.af-pager-next').disabled = window._afPage >= totalPages-1;
+  pager.querySelector('.af-pager-size').value = String(window._afPageSize);
 }
 
 // VSP-CICD-H3.3: filter pill click handler
@@ -2748,10 +2820,14 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
       + 'margin:14px 0;padding:14px;background:var(--card,#0f1419);'
       + 'border:1px solid var(--border,#1f2937);border-radius:8px';
     bar.innerHTML = ''
-      + kpiCell('Open',         'h3l-kpi-open',     'var(--orange)', 'awaiting fix')
-      + kpiCell('Fix applied',  'h3l-kpi-applied',  'var(--amber)',  'awaiting rescan')
-      + kpiCell('Verified',     'h3l-kpi-verified', 'var(--green)',  'rescan confirmed ✓')
-      + kpiCell('Fix failed',   'h3l-kpi-failed',   'var(--red)',    'rescan still finds');
+      // FIX 2026-05-07: clarify scope — these counts are tenant-wide
+      // across all runs, not the current scan only. The "Auto-remediation
+      // engine" KPIs below show CURRENT-SCAN counts which is why the two
+      // numbers don\'t match (e.g. 41,587 open vs 934 in current run).
+      + kpiCell('Open',         'h3l-kpi-open',     'var(--orange)', 'awaiting fix · all runs')
+      + kpiCell('Fix applied',  'h3l-kpi-applied',  'var(--amber)',  'awaiting rescan · all runs')
+      + kpiCell('Verified',     'h3l-kpi-verified', 'var(--green)',  'rescan confirmed ✓ · all runs')
+      + kpiCell('Fix failed',   'h3l-kpi-failed',   'var(--red)',    'rescan still finds · all runs');
     anchor.parentNode.insertBefore(bar, anchor);
   }
 
@@ -3097,14 +3173,17 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
   };
   function h3mRenderMetrics(d) {
     const t = d.totals || {}, r = d.rates || {}, m = d.mttr || {};
-    const pct = v => v ? (v * 100).toFixed(0) + '%' : '—';
-    const hrs = v => v ? v.toFixed(1) + 'h' : '—';
+    // FIX 2026-05-07: descriptive empty state instead of bare "—".
+    // Tells the SOC analyst WHY a metric is blank so they don't have
+    // to file a "is this broken?" support ticket.
+    const pct = v => v != null && v > 0 ? (v * 100).toFixed(0) + '%' : 'No data yet';
+    const hrs = v => v != null && v > 0 ? v.toFixed(1) + 'h' : 'No data yet';
     let html = '<div class="h3m-metrics-card">'
       + cell('Verified', t.findings_verified || 0, 'last ' + d.period_days + ' days')
       + cell('Verification rate', pct(r.verification_rate), 'verified / (verified+applied)')
       + cell('Auto-remediation', pct(r.auto_remediation_rate), 'of all resolved')
       + cell('MTTR — Critical', hrs(m.critical_hours), 'mean time to remediate')
-      + cell('MTTR — High',     hrs(m.high_hours), '')
+      + cell('MTTR — High',     hrs(m.high_hours), 'apply + verify a fix to populate')
       + cell('First-attempt success', pct(r.first_attempt_success), 'verified / (verified+failed)')
       + '</div>';
     if (d.top_rules_remediated && d.top_rules_remediated.length) {
@@ -3822,5 +3901,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
 </script>
 
 <script src="/static/js/vsp_h3_upgrade.js"></script>
+<!-- VSP-SIEM-COMPANION -->
+<script src="/vsp_siem_companion.js"></script>
 </body>
 </html>

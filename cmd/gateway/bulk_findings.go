@@ -4,8 +4,9 @@
 // two routes inside the authenticated /api/v1 group of main.go.
 //
 // Routes (registered by patcher in main.go, not here):
-//   POST /api/v1/vulns/bulk      → handleVulnsBulk
-//   POST /api/v1/vulns/bulk/undo → handleVulnsBulkUndo
+//
+//	POST /api/v1/vulns/bulk      → handleVulnsBulk
+//	POST /api/v1/vulns/bulk/undo → handleVulnsBulkUndo
 //
 // Refs: ROADMAP_PRO_100.md
 package main
