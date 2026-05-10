@@ -586,11 +586,49 @@ func main() {
 	})
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(60 * time.Second))
-	// Limit request body to 4MB để chặn DoS
+	// L17.18.3.1 slowloris hard kill: srv.ReadTimeout in some chi
+	// configurations doesn't fire reliably during slow-body streaming
+	// because middlewares can buffer or hijack the body. Belt-and-
+	// braces: pre-read the entire request body into memory with a
+	// short context deadline, then hand a buffered NopCloser to the
+	// handler. A client trickling 1 byte/sec gets cut off here, not
+	// after the handler returns.
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.Body = http.MaxBytesReader(w, r.Body, 4<<20) // 4MB
-			next.ServeHTTP(w, r)
+			// Limit request body to 4MB to block DoS (was the previous
+			// middleware in this slot).
+			r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+			// Skip body pre-read for streaming methods / SSE / proxy
+			// passthroughs — they need the live body.
+			if r.Method == http.MethodGet || r.Method == http.MethodHead ||
+				r.Method == http.MethodOptions || r.ContentLength <= 0 ||
+				strings.HasPrefix(r.URL.Path, "/api/sc") ||
+				strings.HasPrefix(r.URL.Path, "/api/dast") ||
+				strings.HasPrefix(r.URL.Path, "/api/swinv") ||
+				strings.HasPrefix(r.URL.Path, "/api/email") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			done := make(chan struct{})
+			var (
+				buf []byte
+				err error
+			)
+			go func() {
+				buf, err = io.ReadAll(r.Body)
+				close(done)
+			}()
+			select {
+			case <-done:
+				if err != nil {
+					http.Error(w, "request body read failed", http.StatusBadRequest)
+					return
+				}
+				r.Body = io.NopCloser(bytes.NewReader(buf))
+				next.ServeHTTP(w, r)
+			case <-time.After(15 * time.Second):
+				http.Error(w, "request body read timed out", http.StatusRequestTimeout)
+			}
 		})
 	})
 	r.Use(corsMiddleware)
