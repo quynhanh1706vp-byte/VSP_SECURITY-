@@ -284,6 +284,12 @@ if [[ "$A_DISTINCT" -gt 1 ]]; then
 elif [[ "$B_DISTINCT" -gt 1 ]]; then
   _fail "6.3.3 cache stampede tenant-stable B" \
     "tenant B saw multiple totals under stampede ($B_DISTINCT distinct: $TOTAL_B)"
+elif [[ "$TOTAL_A" == "0," && "$TOTAL_B" == "0," ]]; then
+  # Empty DB in CI — both tenants legitimately have 0 findings, so
+  # the equality means "no data", not "cache leak". Skip rather than
+  # false-flag.
+  _skip "6.3.3 cache stampede tenant-isolated" \
+    "both tenants reported total=0 under stampede — no data to differentiate"
 elif [[ -n "$TOTAL_A" && "$TOTAL_A" == "$TOTAL_B" ]]; then
   _fail "6.3.3 cache stampede A/B distinct" \
     "both tenants returned identical total $TOTAL_A under 50-way stampede — cache leak under contention"
