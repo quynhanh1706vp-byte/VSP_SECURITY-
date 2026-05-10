@@ -146,7 +146,13 @@ jobs:
           # was genuinely broken, the gateway will fail to boot.
           mkdir -p /tmp/migrations
           fail_count=0
-          for f in $(ls migrations/*.sql | sort); do
+          # Only NUMBERED migrations (NNN_name.sql or NNNN_name.sql).
+          # Loose helper SQLs like migrations/siem_tables.sql are
+          # superseded by the gateway's embedded goose set in
+          # internal/migrate/sql/* — applying them here creates older
+          # table shapes (e.g. iocs without tenant_id) that then trip
+          # the embedded migrations on `CREATE INDEX … ON iocs(tenant_id)`.
+          for f in $(ls migrations/[0-9]*.sql | sort); do
             echo "▶ $f"
             up_only="/tmp/migrations/$(basename "$f").up.sql"
             # Keep everything from `-- +goose Up` up to (but excluding)
