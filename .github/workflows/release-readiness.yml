@@ -191,21 +191,42 @@ jobs:
           # Verify the SOAR secret tables that L10 depends on actually
           # exist. They're created by 20260504_011_soar_extend.sql,
           # which silently fails if `playbooks` doesn't exist.
+          echo "── playbook_* relations visible to vsp@vsp_go ──"
+          psql "$DB_DSN" -tAc "
+            SELECT n.nspname || '.' || c.relname
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE c.relname LIKE 'playbook%'
+             ORDER BY c.relname;"
           for t in playbook_secrets playbook_secret_audit; do
-            if ! psql "$DB_DSN" -tAc "SELECT to_regclass('public.$t')" \
-                 | grep -q "$t"; then
-              echo "::warning::table $t MISSING after migrations — dumping 20260504_011 log"
-              cat /tmp/migrations/20260504_011_soar_extend.sql.out 2>/dev/null \
-                | head -30
+            found=$(psql "$DB_DSN" -tAc "SELECT to_regclass('public.$t')")
+            if [ -z "$found" ]; then
+              echo "::warning::table $t MISSING — last 40 lines of 011 migration log:"
+              tail -40 "/tmp/migrations/20260504_011_soar_extend.sql.out" 2>/dev/null
+            else
+              echo "✓ $t exists ($found)"
             fi
           done
 
       - name: Seed minimal fixtures
         run: |
-          # Two tenants L4-B/L5/L7/L25/L32 expect. The gateway already
-          # seeds a `default` tenant on first boot; constraint-agnostic
-          # ON CONFLICT so id OR slug collisions both no-op cleanly.
+          # Many test scripts hardcode tenant_id='1bdf7f20-…' (default)
+          # and '8bb9a716-…' (acme-corp) when querying audit_log /
+          # data_subject_requests etc. The gateway's embedded
+          # internal/migrate/sql/001_init.sql seeds `default` with a
+          # *random* UUID via gen_random_uuid(), so the test queries
+          # would otherwise return 0 rows even when the audit
+          # actually fires.
+          #
+          # Canonicalise: rewrite the default tenant's UUID to the
+          # fixture value after the gateway boots. This early in the
+          # run no FK references exist yet (no users created, no
+          # audit rows for this tenant), so the UPDATE is safe.
           psql "$DB_DSN" -v ON_ERROR_STOP=1 <<'SQL'
+            UPDATE tenants
+               SET id = '1bdf7f20-dbb3-4116-815f-26b4dc747e76'
+             WHERE slug = 'default'
+               AND id  <> '1bdf7f20-dbb3-4116-815f-26b4dc747e76';
             INSERT INTO tenants (id, slug, name, plan)
               VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE')
               ON CONFLICT DO NOTHING;
@@ -213,6 +234,8 @@ jobs:
               VALUES ('8bb9a716-fd14-4eba-92e8-681dc5bdb718','acme-corp','ACME','FREE')
               ON CONFLICT DO NOTHING;
           SQL
+          echo "── tenants after seed ──"
+          psql "$DB_DSN" -tAc "SELECT id, slug FROM tenants ORDER BY slug;"
 
       - name: Run release-readiness ladder
         run: |

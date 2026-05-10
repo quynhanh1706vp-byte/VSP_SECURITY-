@@ -2905,8 +2905,18 @@ func main() {
 	mountMicroProxy("/api/swinv", "http://127.0.0.1:8094") // sw-inventory
 	mountMicroProxy("/api/email", "http://127.0.0.1:8095") // email-api
 
+	// L17.18.3 slowloris mitigation: bound every phase of the request
+	// lifecycle so a slow client can't tie up a goroutine indefinitely.
+	//   ReadHeaderTimeout — caps the HTTP header read (slow-header attack)
+	//   ReadTimeout       — caps header + body together (slow-body attack)
+	//   IdleTimeout       — caps keep-alive idle between requests
+	//   WriteTimeout=0    — keep streaming responses (SSE, long polls) unbounded
 	srv := &http.Server{Addr: addr, Handler: r,
-		ReadTimeout: 30 * time.Second, WriteTimeout: 0}
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		WriteTimeout:      0,
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
