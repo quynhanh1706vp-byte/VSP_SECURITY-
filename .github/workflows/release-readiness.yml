@@ -191,18 +191,26 @@ jobs:
           # Verify the SOAR secret tables that L10 depends on actually
           # exist. They're created by 20260504_011_soar_extend.sql,
           # which silently fails if `playbooks` doesn't exist.
-          echo "── playbook_* relations visible to vsp@vsp_go ──"
+          echo "── current_user / schemas / search_path ──"
           psql "$DB_DSN" -tAc "
-            SELECT n.nspname || '.' || c.relname
+            SELECT current_user, current_database(),
+                   current_setting('search_path');"
+          echo "── ALL playbook_* relations across schemas ──"
+          psql "$DB_DSN" -tAc "
+            SELECT n.nspname || '.' || c.relname || ' (' || c.relkind || ')'
               FROM pg_class c
               JOIN pg_namespace n ON n.oid = c.relnamespace
              WHERE c.relname LIKE 'playbook%'
-             ORDER BY c.relname;"
+             ORDER BY n.nspname, c.relname;"
           for t in playbook_secrets playbook_secret_audit; do
             found=$(psql "$DB_DSN" -tAc "SELECT to_regclass('public.$t')")
             if [ -z "$found" ]; then
-              echo "::warning::table $t MISSING — last 40 lines of 011 migration log:"
-              tail -40 "/tmp/migrations/20260504_011_soar_extend.sql.out" 2>/dev/null
+              echo "::warning::table $t MISSING — full 011 migration log:"
+              cat "/tmp/migrations/20260504_011_soar_extend.sql.out" 2>/dev/null
+              echo "── re-running migration with verbose output ──"
+              psql "$DB_DSN" -v ON_ERROR_STOP=1 -f \
+                "/tmp/migrations/20260504_011_soar_extend.sql.up.sql" 2>&1 \
+                | head -60 || true
             else
               echo "✓ $t exists ($found)"
             fi
@@ -238,6 +246,11 @@ jobs:
           psql "$DB_DSN" -tAc "SELECT id, slug FROM tenants ORDER BY slug;"
 
       - name: Run release-readiness ladder
+        env:
+          # L27 reads journalctl by default; in CI we run the gateway
+          # as a foreground process (no systemd unit) so the test
+          # falls back to LOG_FALLBACK when journalctl is empty.
+          LOG_FALLBACK: /tmp/gateway.log
         run: |
           # test-all.sh aggregates 32 levels and exits 1 only if
           # cumulative FAIL>0, so we get a complete scoreboard

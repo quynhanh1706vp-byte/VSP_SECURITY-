@@ -115,9 +115,20 @@ phase_open "28.4 Log lines — structured (JSON or zerolog console kv)"
 # What we DON'T accept is freeform "thing happened" prose.
 LOG_TMP=$(mktemp)
 sudo journalctl -u vsp-gateway --no-pager -n 100 2>/dev/null > "$LOG_TMP" || true
+# Fallback for non-systemd environments (CI containers, dev machines):
+# the gateway often runs as a foreground process or under nohup and
+# its stdout/stderr go to a file. Honour LOG_FALLBACK if set.
+if [[ ! -s "$LOG_TMP" || $(grep -cE '^-- (No entries|Logs begin)' "$LOG_TMP") -gt 0 ]] \
+   && [[ -n "${LOG_FALLBACK:-}" && -r "$LOG_FALLBACK" ]]; then
+  tail -100 "$LOG_FALLBACK" > "$LOG_TMP" 2>/dev/null || true
+fi
 
 # Pick lines after the journal prefix (date + host + service + pid).
-BODY=$(sed -E 's/^[A-Z][a-z]+ +[0-9]+ +[0-9:]+ +[^ ]+ +[^:]+: //' "$LOG_TMP" | tail -50)
+# Strip journal sentinels like "-- No entries --" — they're meta
+# markers, not real log lines, and should count as 0 lines (skip).
+BODY=$(sed -E 's/^[A-Z][a-z]+ +[0-9]+ +[0-9:]+ +[^ ]+ +[^:]+: //' "$LOG_TMP" \
+        | grep -vE '^-- (No entries|Logs begin|Reboot)' \
+        | tail -50)
 TOTAL=$(echo "$BODY" | grep -c . || true)
 # Structured = ANY of:
 #   - JSON: ^{ ... }$
