@@ -168,6 +168,10 @@ run_level "L36 path-encoding"   "$ROOT/scripts/test-l36-path-encoding.sh"
 run_level "L37 method-tamper"   "$ROOT/scripts/test-l37-method-tampering.sh"
 run_level "L38 log-pii-leak"    "$ROOT/scripts/test-l38-log-pii.sh"
 run_level "L40 idempotency"     "$ROOT/scripts/test-l40-idempotency.sh"
+run_level "L41 fe-be-contract"  "$ROOT/scripts/test-l41-fe-be-contract.sh"
+run_level "L42 cookie-cors-csp" "$ROOT/scripts/test-l42-cookie-cors-csp.sh"
+run_level "L43 ci-self-audit"   "$ROOT/scripts/test-l43-ci-self-audit.sh"
+run_level "L44 fe-runtime"      "$ROOT/scripts/test-l44-frontend-runtime.sh"
 
 # L39 graceful-shutdown is destructive (kills the gateway). Gate it
 # behind L39_SHUTDOWN=1 so it only runs in nightly / dispatch.

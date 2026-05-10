@@ -22,6 +22,10 @@ name: Release Readiness (L1-L34)
 #                                             L38 log-pii-leak
 #                                             L39 shutdown (gated)
 #                                             L40 idempotency
+#                                             L41 fe-be-contract
+#                                             L42 cookie-cors-csp
+#                                             L43 ci-self-audit
+#                                             L44 fe-runtime
 #
 # Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
 # canary tenants and verify residue/leak invariants without touching
