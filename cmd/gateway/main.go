@@ -627,6 +627,12 @@ func main() {
 				r.Body = io.NopCloser(bytes.NewReader(buf))
 				next.ServeHTTP(w, r)
 			case <-time.After(15 * time.Second):
+				// Setting Connection:close tells Go's HTTP server NOT
+				// to keep-alive this connection — the conn closes
+				// after this response, killing the slow client's
+				// continued body stream.
+				w.Header().Set("Connection", "close")
+				r.Close = true
 				http.Error(w, "request body read timed out", http.StatusRequestTimeout)
 			}
 		})
