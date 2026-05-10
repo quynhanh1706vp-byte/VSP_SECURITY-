@@ -627,10 +627,22 @@ func main() {
 				r.Body = io.NopCloser(bytes.NewReader(buf))
 				next.ServeHTTP(w, r)
 			case <-time.After(15 * time.Second):
-				// Setting Connection:close tells Go's HTTP server NOT
-				// to keep-alive this connection — the conn closes
-				// after this response, killing the slow client's
-				// continued body stream.
+				// Connection:close + r.Close aren't enough — Go's
+				// finishRequest() still tries to drain the slow body
+				// before the conn close lands, giving the attacker
+				// another ~ContentLength seconds. Hijack the conn and
+				// kill it ourselves so the close is immediate.
+				if hj, ok := w.(http.Hijacker); ok {
+					if conn, _, err := hj.Hijack(); err == nil {
+						_, _ = conn.Write([]byte(
+							"HTTP/1.1 408 Request Timeout\r\n" +
+								"Content-Length: 0\r\n" +
+								"Connection: close\r\n\r\n"))
+						_ = conn.Close()
+						return
+					}
+				}
+				// Hijack unavailable — best-effort close-marker.
 				w.Header().Set("Connection", "close")
 				r.Close = true
 				http.Error(w, "request body read timed out", http.StatusRequestTimeout)
