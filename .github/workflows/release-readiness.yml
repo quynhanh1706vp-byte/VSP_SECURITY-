@@ -20,6 +20,8 @@ name: Release Readiness (L1-L34)
 #   L10 openapi         L24 input-validation L36 path-encoding
 #   L11 mutation                              L37 method-tamper
 #                                             L38 log-pii-leak
+#                                             L39 shutdown (gated)
+#                                             L40 idempotency
 #
 # Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
 # canary tenants and verify residue/leak invariants without touching

@@ -167,6 +167,13 @@ run_level "L35 redirect-ssrf"   "$ROOT/scripts/test-l35-redirect-ssrf.sh"
 run_level "L36 path-encoding"   "$ROOT/scripts/test-l36-path-encoding.sh"
 run_level "L37 method-tamper"   "$ROOT/scripts/test-l37-method-tampering.sh"
 run_level "L38 log-pii-leak"    "$ROOT/scripts/test-l38-log-pii.sh"
+run_level "L40 idempotency"     "$ROOT/scripts/test-l40-idempotency.sh"
+
+# L39 graceful-shutdown is destructive (kills the gateway). Gate it
+# behind L39_SHUTDOWN=1 so it only runs in nightly / dispatch.
+if [[ "${L39_SHUTDOWN:-0}" == "1" ]]; then
+  run_level "L39 shutdown"      "$ROOT/scripts/test-l39-shutdown.sh"
+fi
 
 # L12 chaos and L14 perf are gated — they mutate the live environment
 # (stop redis, kill PG conns, sustained burst). Enable explicitly

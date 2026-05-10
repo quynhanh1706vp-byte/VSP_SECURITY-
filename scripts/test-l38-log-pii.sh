@@ -103,7 +103,9 @@ phase_open "29.3 Authorization headers redacted"
 # If the log contains an actual JWT payload it's a critical leak.
 # Filter to only HS256 JWTs (header eyJ...HMAC), to avoid catching
 # unrelated dot-separated b64 strings.
-JWT_HITS=$(grep -oE 'eyJ[A-Za-z0-9_-]{15,}\.eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{20,}' "$LOG_TMP" 2>/dev/null | head -3)
+# `|| true` on every grep pipeline because no-match returns 1 and
+# under set -euo pipefail that would abort the script silently.
+JWT_HITS=$(grep -oE 'eyJ[A-Za-z0-9_-]{15,}\.eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{20,}' "$LOG_TMP" 2>/dev/null | head -3 || true)
 if [[ -n "$JWT_HITS" ]]; then
   _fail "29.3.1 JWT-shaped token leaked into log" "first hit: $(echo "$JWT_HITS" | head -1 | cut -c1-60)..."
 else
@@ -112,8 +114,9 @@ fi
 
 # Bearer header reflection — some servers echo the header back in error
 # bodies or log lines.
-if grep -iE 'authorization:\s*bearer\s+ey' "$LOG_TMP" 2>/dev/null | head -1; then
-  _fail "29.3.2 Authorization header logged verbatim" "see hit above"
+if grep -iqE 'authorization:\s*bearer\s+ey' "$LOG_TMP" 2>/dev/null; then
+  _fail "29.3.2 Authorization header logged verbatim" \
+    "see grep -iE 'authorization:.*bearer ey' on the log"
 else
   _pass "29.3.2 Authorization header not echoed"
 fi
@@ -123,7 +126,7 @@ fi
 phase_open "29.4 Common PII patterns (credit card / SSN / phone)"
 
 # Luhn-shaped 13-19 digit sequences — credit cards.
-CC_HITS=$(grep -oE '\b[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}\b' "$LOG_TMP" 2>/dev/null | head -1)
+CC_HITS=$(grep -oE '\b[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}\b' "$LOG_TMP" 2>/dev/null | head -1 || true)
 if [[ -n "$CC_HITS" ]]; then
   _fail "29.4.1 credit-card-shaped digits in log" "$CC_HITS"
 else
@@ -131,7 +134,7 @@ else
 fi
 
 # Vietnamese phone numbers (10-11 digits starting 0).
-PHONE_HITS=$(grep -oE '\b0[1-9][0-9]{8,9}\b' "$LOG_TMP" 2>/dev/null | sort -u | head -3)
+PHONE_HITS=$(grep -oE '\b0[1-9][0-9]{8,9}\b' "$LOG_TMP" 2>/dev/null | sort -u | head -3 || true)
 if [[ -n "$PHONE_HITS" ]] && (( $(echo "$PHONE_HITS" | wc -l) > 5 )); then
   _fail "29.4.2 many phone-number-shaped digit runs" "$(echo "$PHONE_HITS" | head -3 | tr '\n' ',')..."
 else
@@ -145,8 +148,9 @@ phase_open "29.5 SQLSTATE codes don't surface in successful logs"
 # SQLSTATE in ERR/WRN log lines is fine (operator needs that). But it
 # should NEVER appear in INF lines (which are HTTP request logs and may
 # be shipped to customer-visible dashboards).
-if grep -E 'INF.*SQLSTATE [0-9]{5}' "$LOG_TMP" 2>/dev/null | head -1; then
-  _fail "29.5.1 SQLSTATE in INF log line" "see hit above"
+if grep -qE 'INF.*SQLSTATE [0-9]{5}' "$LOG_TMP" 2>/dev/null; then
+  _fail "29.5.1 SQLSTATE in INF log line" \
+    "$(grep -E 'INF.*SQLSTATE [0-9]{5}' "$LOG_TMP" | head -1)"
 else
   _pass "29.5.1 SQLSTATE absent from INF lines"
 fi

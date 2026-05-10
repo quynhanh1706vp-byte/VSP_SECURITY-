@@ -88,9 +88,11 @@ phase_open "37.3 OPTIONS method — no admin-route leakage"
 
 # OPTIONS on an admin-only endpoint with NO auth: Allow header should
 # either omit DELETE/PUT (auth-stripped) OR return 401/403.
+# `|| true` because grep -i returns 1 when there's no Allow header,
+# which under inherit_errexit-aware shells would abort the script.
 allow=$(curl -s -i --max-time 5 -X OPTIONS \
   "$BASE/api/v1/admin/users" 2>/dev/null \
-  | grep -i '^Allow:' | head -1 | tr -d '\r')
+  | grep -i '^Allow:' | head -1 | tr -d '\r' || true)
 
 # Either the gateway answered with auth (401/403) — checked separately
 # below — or the Allow header is present. Both are acceptable; we just
