@@ -30,6 +30,13 @@ vsp_*.js
 !static/vsp_upgrade_v100.js
 !static/vsp_poam.js
 !static/panels/vsp_siem_patch.js
+# Bundles referenced by static/index.html — L13 frontend test (15.5)
+# probes them and fails the ladder if any 404.
+!static/vsp_pro_realapi.js
+!static/vsp_sidebar_collapse.js
+!static/vsp_sw_inventory_panel.js
+!static/vsp_scheduler_panel.js
+!static/vsp_email_panel.js
 vsp_features_patch.js
 static/vsp_features_patch.js
 

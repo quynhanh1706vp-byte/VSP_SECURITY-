@@ -133,64 +133,6 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Apply migrations
-        run: |
-          # Migrations are written in goose format with both `+goose Up`
-          # and `+goose Down` sections in the same file. `psql -f` is
-          # NOT goose-aware — it runs the whole file, so the Down block
-          # drops every table the Up block just created. Production
-          # uses a real goose runner; CI strips the Down section with
-          # awk so psql only sees the forward migration.
-          #
-          # Several historical migrations also depend on tables that
-          # the gateway creates at runtime (store-layer auto-init), so
-          # individual failures are SOFT-failures — we log and continue.
-          # The "Start gateway" step is the hard gate: if a migration
-          # was genuinely broken, the gateway will fail to boot.
-          mkdir -p /tmp/migrations
-          fail_count=0
-          # Only NUMBERED migrations (NNN_name.sql or NNNN_name.sql).
-          # Loose helper SQLs like migrations/siem_tables.sql are
-          # superseded by the gateway's embedded goose set in
-          # internal/migrate/sql/* — applying them here creates older
-          # table shapes (e.g. iocs without tenant_id) that then trip
-          # the embedded migrations on `CREATE INDEX … ON iocs(tenant_id)`.
-          for f in $(ls migrations/[0-9]*.sql | sort); do
-            echo "▶ $f"
-            up_only="/tmp/migrations/$(basename "$f").up.sql"
-            # Keep everything from `-- +goose Up` up to (but excluding)
-            # `-- +goose Down`. If neither marker is present, take the
-            # whole file — non-goose migrations are unaffected.
-            awk '
-              /-- \+goose Down/ { stop=1 }
-              /-- \+goose Up/   { keep=1; next }
-              keep && !stop     { print }
-              !/-- \+goose/ && !keep && !stop { print }
-            ' "$f" > "$up_only"
-            if ! psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$up_only" \
-                 > "/tmp/migrations/$(basename "$f").out" 2>&1; then
-              echo "::warning::migration $(basename "$f") failed (soft) — gateway boot will retry"
-              tail -3 "/tmp/migrations/$(basename "$f").out"
-              fail_count=$((fail_count + 1))
-            fi
-          done
-          echo "migrations summary: $fail_count soft-fail(s); proceeding to gateway boot"
-
-      - name: Seed minimal fixtures
-        run: |
-          # Two tenants L4-B/L5/L7/L25/L32 expect. Some migrations (and
-          # the gateway boot) already seed a `default` tenant — use
-          # constraint-agnostic ON CONFLICT so a slug collision OR an
-          # id collision both no-op cleanly.
-          psql "$DB_DSN" -v ON_ERROR_STOP=1 <<'SQL'
-            INSERT INTO tenants (id, slug, name, plan)
-              VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE')
-              ON CONFLICT DO NOTHING;
-            INSERT INTO tenants (id, slug, name, plan)
-              VALUES ('8bb9a716-fd14-4eba-92e8-681dc5bdb718','acme-corp','ACME','FREE')
-              ON CONFLICT DO NOTHING;
-          SQL
-
       - name: Build gateway + scanner
         run: |
           go build -o bin/vsp-gateway ./cmd/gateway
@@ -198,6 +140,12 @@ jobs:
 
       - name: Start gateway
         run: |
+          # Boot order: the gateway runs its own embedded goose
+          # migrations on startup (internal/migrate/sql/*). That set
+          # creates the canonical schema (tenants, users, playbooks,
+          # iocs, …). The top-level `migrations/*.sql` set is
+          # supplemental — applied AFTER the gateway is up — and
+          # extends those base tables with newer columns/audit tables.
           # Bind on the same port the L1-L33 tests probe.
           ./bin/vsp-gateway > /tmp/gateway.log 2>&1 &
           echo $! > /tmp/gateway.pid
@@ -212,6 +160,48 @@ jobs:
           echo "::error::gateway failed to start within 30s"
           tail -80 /tmp/gateway.log
           exit 1
+
+      - name: Apply supplemental migrations (post-boot)
+        run: |
+          # Now that the gateway has created the base schema, apply the
+          # numbered top-level migrations that EXTEND it (audit columns,
+          # SOAR secret tables, P4 enhancements, etc.). Goose Down
+          # sections are stripped with awk so psql -f doesn't drop
+          # tables it just created. Failures stay SOFT — the level tests
+          # downstream will surface anything genuinely missing.
+          mkdir -p /tmp/migrations
+          fail_count=0
+          for f in $(ls migrations/[0-9]*.sql | sort); do
+            echo "▶ $f"
+            up_only="/tmp/migrations/$(basename "$f").up.sql"
+            awk '
+              /-- \+goose Down/ { stop=1 }
+              /-- \+goose Up/   { keep=1; next }
+              keep && !stop     { print }
+              !/-- \+goose/ && !keep && !stop { print }
+            ' "$f" > "$up_only"
+            if ! psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$up_only" \
+                 > "/tmp/migrations/$(basename "$f").out" 2>&1; then
+              echo "::warning::migration $(basename "$f") failed (soft)"
+              tail -3 "/tmp/migrations/$(basename "$f").out"
+              fail_count=$((fail_count + 1))
+            fi
+          done
+          echo "supplemental migrations: $fail_count soft-fail(s)"
+
+      - name: Seed minimal fixtures
+        run: |
+          # Two tenants L4-B/L5/L7/L25/L32 expect. The gateway already
+          # seeds a `default` tenant on first boot; constraint-agnostic
+          # ON CONFLICT so id OR slug collisions both no-op cleanly.
+          psql "$DB_DSN" -v ON_ERROR_STOP=1 <<'SQL'
+            INSERT INTO tenants (id, slug, name, plan)
+              VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE')
+              ON CONFLICT DO NOTHING;
+            INSERT INTO tenants (id, slug, name, plan)
+              VALUES ('8bb9a716-fd14-4eba-92e8-681dc5bdb718','acme-corp','ACME','FREE')
+              ON CONFLICT DO NOTHING;
+          SQL
 
       - name: Run release-readiness ladder
         run: |
