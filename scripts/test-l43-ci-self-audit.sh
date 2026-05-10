@@ -99,16 +99,56 @@ phase_open "43.4 No `echo \${{ secrets.* }}` patterns"
 # secrets ARE redacted in standard logs, but `echo` writes to stdout
 # which is where the redaction is applied. echo'ing into a file
 # uploaded as artifact is the actual leak path.
+#
+# SAFE patterns to allowlist (echo into stdin of credential-consuming
+# tool — argument-passing would leak via /proc, but stdin doesn't):
+#   echo "..." | docker login ... --password-stdin
+#   echo "..." | gh auth login --with-token
+#   echo "..." | helm registry login ... --password-stdin
+#   echo "..." | crane auth login ... --password-stdin
+#   echo "..." | cosign login ... --password-stdin
 SECRET_ECHO=$(grep -rEn 'echo[[:space:]]*"?\$\{\{[[:space:]]*secrets\.|cat.*<<.*secrets\.' \
   "$WF_DIR" 2>/dev/null \
   | grep -v '^\s*#' \
+  | grep -vE 'docker[[:space:]]+login.*--password-stdin|--password-stdin.*docker[[:space:]]+login|gh[[:space:]]+auth[[:space:]]+login.*--with-token|helm[[:space:]]+registry[[:space:]]+login.*--password-stdin|crane[[:space:]]+auth[[:space:]]+login.*--password-stdin|cosign[[:space:]]+login.*--password-stdin' \
   | head -3 || true)
+
+# Some workflows split the echo and the consumer across two lines via
+# trailing backslash. Re-scan with a 2-line window to catch
+#   echo "${{ secrets.X }}" | \
+#     docker login ... --password-stdin
+SECRET_ECHO_MULTILINE=""
+for f in "$WF_DIR"/*.yml; do
+  [[ -r "$f" ]] || continue
+  LEAK=$(awk '
+    /echo[[:space:]]+"?\$\{\{[[:space:]]*secrets\./ { hold=$0; held=1; next }
+    held {
+      combined=hold " " $0
+      if (combined ~ /docker[[:space:]]+login.*--password-stdin/ ||
+          combined ~ /gh[[:space:]]+auth[[:space:]]+login.*--with-token/ ||
+          combined ~ /helm[[:space:]]+registry[[:space:]]+login.*--password-stdin/ ||
+          combined ~ /crane[[:space:]]+auth[[:space:]]+login.*--password-stdin/ ||
+          combined ~ /cosign[[:space:]]+login.*--password-stdin/) {
+        held=0; next
+      }
+      print FILENAME ":" NR-1 ": " hold
+      held=0
+    }
+  ' "$f" 2>/dev/null | head -1 || true)
+  if [[ -n "$LEAK" ]]; then
+    SECRET_ECHO_MULTILINE="$LEAK"
+    break
+  fi
+done
 
 if [[ -n "$SECRET_ECHO" ]]; then
   _fail "43.4.1 secrets potentially echoed in workflow" \
     "$(echo "$SECRET_ECHO" | head -1)"
+elif [[ -n "$SECRET_ECHO_MULTILINE" ]]; then
+  _fail "43.4.1 secrets echoed (multi-line, not piped to safe consumer)" \
+    "$SECRET_ECHO_MULTILINE"
 else
-  _pass "43.4.1 no `echo \${{ secrets.* }}` patterns"
+  _pass "43.4.1 no unsafe `echo \${{ secrets.* }}` patterns (safe stdin-pipes allowlisted)"
 fi
 
 # 43.4.2 No printenv / env that would dump all env including secrets.
