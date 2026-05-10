@@ -151,6 +151,7 @@ run_level "L29 time-correctness" "$ROOT/scripts/test-l29-time-correctness.sh"
 run_level "L30 container-deploy" "$ROOT/scripts/test-l30-container-deploy.sh"
 run_level "L32 bypass"          "$ROOT/scripts/test-l32-bypass.sh"
 run_level "L33 semgrep"         "$ROOT/scripts/test-l33-semgrep.sh"
+run_level "L34 fuzz"            "$ROOT/scripts/test-l34-fuzz.sh"
 
 # L12 chaos and L14 perf are gated — they mutate the live environment
 # (stop redis, kill PG conns, sustained burst). Enable explicitly

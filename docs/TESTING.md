@@ -210,6 +210,17 @@ unit has NoNewPrivileges + ProtectSystem + PrivateTmp (a hardened
 `deploy/systemd/vsp-gateway.service` is shipped in the repo).
 `.env.example` tracked, real `.env` not.
 
+### L34 — Go native fuzzing (parsers)
+
+`scripts/test-l34-fuzz.sh` — 3 cases × ~8 s each.
+
+Go native fuzzing (`testing.F.Fuzz`) on parser hot-paths:
+`auth.parseJWT`, `auth.ClientIP`, `handler.decodeJSON`. Each runs
+a budgeted exploration, mutating seed corpus. A panic / assertion
+failure persists as a `testdata/fuzz/<Target>/<hash>` regression
+seed so subsequent runs replay it instantly. ~515 k random inputs
+explored in the default 8-s budget per target.
+
 ### L25 — Race conditions / TOCTOU
 
 `scripts/test-l25-race-toctou.sh` — 5 cases, ≈ 15 s.
