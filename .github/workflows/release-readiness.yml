@@ -91,7 +91,9 @@ jobs:
       # Synthetic JWT secret — never matches anything in production.
       # Resolves via the resolve_jwt_secret() helper in vsp-test.sh.
       JWT_SECRET: ci-test-secret-${{ github.run_id }}-not-for-production
+      # Both names: tests/scripts read DB_DSN, gateway reads DATABASE_URL.
       DB_DSN: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
+      DATABASE_URL: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
       BASE: http://127.0.0.1:8921
       PGHOST: localhost
       PGUSER: vsp
@@ -217,19 +219,19 @@ jobs:
           # equal or below passes. Update GOSEC_HIGH_BASELINE in the
           # same PR that triages a new finding.
           #
-          # Current baseline is 15 — all triaged as false-positives:
+          # Current baseline is 16 — all triaged as false-positives:
           #   G115×3   integer overflow conversions
           #             - autopr/pr_service.go:471  int  -> byte
           #             - webauthn.go:99            int64 -> uint32
           #             - quarterly_metrics.go:92   int  -> rune
           #            All values are pre-validated to fit (counter %256,
           #            usercount fits uint32, bounded month index).
-          #   G118×8   intentional context.Background in fire-and-forget
-          #            paths (pipeline/worker, soar/secrets, users,
-          #            siem_extended, runs, apikeys) — these detach
-          #            from request scope on purpose so cancellation of
-          #            the inbound HTTP request doesn't cancel the
-          #            audit/notification side-effect.
+          #   G118×9   intentional context.Background in fire-and-forget
+          #            paths (pipeline/worker×2, soar/secrets×2, users×2,
+          #            siem_extended, runs, apikeys, vsp_batch_handler)
+          #            — these detach from request scope on purpose so
+          #            cancellation of the inbound HTTP request doesn't
+          #            cancel the audit/notification side-effect.
           #   G404×1   weak RNG in retry jitter (soar/retry.go:49)
           #            — non-cryptographic backoff, math/rand is correct.
           #   G701×1   "SQL injection" in autopr/handlers — fmt.Sprintf
@@ -237,7 +239,7 @@ jobs:
           #            parameterised.
           #   G702×1   "command injection" in cosign-api — args come
           #            from server-validated inputs, cosignBin is a flag.
-          GOSEC_HIGH_BASELINE=15
+          GOSEC_HIGH_BASELINE=16
           mkdir -p /tmp/l6c
           gosec -fmt=json -severity=high -confidence=medium \
             -exclude-dir=cmd/dev-stub \

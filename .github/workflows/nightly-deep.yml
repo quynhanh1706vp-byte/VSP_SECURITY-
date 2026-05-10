@@ -59,6 +59,7 @@ jobs:
     env:
       JWT_SECRET: ci-nightly-${{ github.run_id }}
       DB_DSN: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
+      DATABASE_URL: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
       BASE: http://127.0.0.1:8921
       PGHOST: localhost
       PGUSER: vsp
