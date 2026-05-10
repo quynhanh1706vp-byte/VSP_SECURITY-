@@ -120,8 +120,7 @@ jobs:
 
       - name: Full ladder + heavy probes
         run: |
-          chmod +x scripts/test-*.sh scripts/test-all.sh \
-                   scripts/lib/*.sh 2>/dev/null || true
+          chmod +x scripts/*.sh scripts/lib/*.sh 2>/dev/null || true
           ./scripts/test-all.sh --json /tmp/nightly-report.json
 
       - name: Upload nightly scoreboard

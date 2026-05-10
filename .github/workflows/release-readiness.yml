@@ -220,8 +220,9 @@ jobs:
           # regardless of which level(s) fail.
           # Test scripts may not carry +x in the repo (Linux dev,
           # Windows clones, etc.) — make the whole tree executable.
-          chmod +x scripts/test-*.sh scripts/test-all.sh \
-                   scripts/lib/*.sh 2>/dev/null || true
+          # mint_jwt_local.sh is invoked by test-all.sh to produce
+          # TOKEN_ADMIN/TOKEN_ANALYST, so it MUST be in this set.
+          chmod +x scripts/*.sh scripts/lib/*.sh 2>/dev/null || true
           ./scripts/test-all.sh --json test-all-report.json
 
       - name: L6-C gosec dogfood (ratchet — fail on regression)
