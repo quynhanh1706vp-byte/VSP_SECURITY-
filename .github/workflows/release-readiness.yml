@@ -26,6 +26,10 @@ name: Release Readiness (L1-L34)
 #                                             L42 cookie-cors-csp
 #                                             L43 ci-self-audit
 #                                             L44 fe-runtime
+#                                             L45 api-uniformity
+#                                             L46 fe-xss
+#                                             L47 user-flow-e2e
+#                                             L48 cicd-hygiene
 #
 # Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
 # canary tenants and verify residue/leak invariants without touching

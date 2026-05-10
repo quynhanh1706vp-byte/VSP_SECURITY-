@@ -172,6 +172,10 @@ run_level "L41 fe-be-contract"  "$ROOT/scripts/test-l41-fe-be-contract.sh"
 run_level "L42 cookie-cors-csp" "$ROOT/scripts/test-l42-cookie-cors-csp.sh"
 run_level "L43 ci-self-audit"   "$ROOT/scripts/test-l43-ci-self-audit.sh"
 run_level "L44 fe-runtime"      "$ROOT/scripts/test-l44-frontend-runtime.sh"
+run_level "L45 api-uniformity"  "$ROOT/scripts/test-l45-api-uniformity.sh"
+run_level "L46 fe-xss"          "$ROOT/scripts/test-l46-fe-xss.sh"
+run_level "L47 user-flow-e2e"   "$ROOT/scripts/test-l47-user-flow-e2e.sh"
+run_level "L48 cicd-hygiene"    "$ROOT/scripts/test-l48-cicd-hygiene.sh"
 
 # L39 graceful-shutdown is destructive (kills the gateway). Gate it
 # behind L39_SHUTDOWN=1 so it only runs in nightly / dispatch.
