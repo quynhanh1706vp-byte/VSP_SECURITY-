@@ -233,4 +233,47 @@ else
   fi
 fi
 
+# ── 41.5 Query-param name drift — FE `?foo=` matches BE Get("foo") ───────
+
+phase_open "41.5 Query-param name drift"
+
+# Bug found 2026-05-10: vsp_pro_realapi.js fired
+#     /api/v1/auth/sso/login?provider=18
+# but the handler reads r.URL.Query().Get("provider_id"). The 4xx
+# was confusingly returned as "provider_id required" with no hint
+# at the FE site. This probe extracts every query-param NAME used
+# in FE for /api/v1/auth/* and verifies the handler reads that name.
+
+DRIFT=()
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  file=${line%%:*}
+  rest=${line#*:}
+  param=$(echo "$rest" | grep -oE '[?&][a-zA-Z_][a-zA-Z0-9_]+=' \
+                       | head -1 | tr -d '?&=' || true)
+  [[ -z "$param" ]] && continue
+  # Search the handler tree for r.URL.Query().Get("$param"). If found,
+  # no drift. If not, capture the param + similarly-named alternatives.
+  if grep -rqE "URL\.Query\(\)\.Get\(\"$param\"\)|FormValue\(\"$param\"\)" \
+       "$ROOT/internal/api/handler/" "$ROOT/cmd/gateway/" 2>/dev/null; then
+    continue
+  fi
+  similar=$(grep -rhoE 'URL\.Query\(\)\.Get\("[a-zA-Z_]+"\)|FormValue\("[a-zA-Z_]+"\)' \
+            "$ROOT/internal/api/handler/" "$ROOT/cmd/gateway/" 2>/dev/null \
+            | grep -oE '"[a-zA-Z_]+"' | tr -d '"' | sort -u \
+            | grep -iE "^${param}|${param}$" | head -3 \
+            | tr '\n' ',' || true)
+  DRIFT+=("$file ?$param= → handler reads ${similar:-<no match>}")
+done < <(grep -rEhn '/api/v1/auth/[a-z/]+\?[a-zA-Z_]+=' \
+            --include='*.js' --include='*.html' \
+            "$ROOT/static/" 2>/dev/null \
+            | grep -v '\.bak\.' \
+            | head -10)
+
+if (( ${#DRIFT[@]} == 0 )); then
+  _pass "41.5.1 every FE auth ?param= name resolves to a handler"
+else
+  _fail "41.5.1 query-param name drift" "${DRIFT[0]}"
+fi
+
 final_summary

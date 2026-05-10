@@ -1291,8 +1291,16 @@ function renderSSOReal(root, provResp, cfg){
 }
 PRO.ssoRefresh = function(){ refreshPanel('sso'); };
 PRO.ssoTestProvider = function(id){
+  // Backend handler at internal/api/handler/sso_oidc.go:148 reads
+  // r.URL.Query().Get("provider_id") — the param name is provider_id,
+  // NOT provider. Mismatch returned {"error":"provider_id required"}
+  // when the user clicked "Test login" from this inline panel.
+  if (!id) {
+    if (typeof window.toast === 'function') window.toast('No provider id — cannot test','error');
+    return;
+  }
   if (typeof window.toast === 'function') window.toast('Test login flow opened in new tab — check provider redirect','info');
-  try { window.open('/api/v1/auth/sso/login?provider=' + encodeURIComponent(id), '_blank'); } catch (_e) {}
+  try { window.open('/api/v1/auth/sso/login?provider_id=' + encodeURIComponent(id), '_blank'); } catch (_e) {}
 };
 PRO.ssoAddProvider = function(){
   formModal({

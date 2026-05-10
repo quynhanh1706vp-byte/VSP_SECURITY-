@@ -62,6 +62,10 @@ function injectNav(){
     { id:'supplychain',   icon:'\u26d3', label:'Supply chain',       badge:'' },
     { id:'prbot',         icon:'\u229f', label:'PR / repo bot',      badge:'' },
     { id:'secrets_vault', icon:'\u26bf', label:'Secret vault',       badge:'' },
+    // sbomdiff is registered in the PRO modules array (9 total) but
+    // was missing from the sidebar (only 8 items rendered). Adding it
+    // restores the parity advertised by the [VSP PRO] console banner.
+    { id:'sbomdiff',      icon:'\u26d3', label:'SBOM diff',          badge:'' },
     { id:'observe',       icon:'\u25c9', label:'Observability',      badge:'' },
     { id:'tenants',       icon:'\u25cd', label:'Tenants',            badge:'' },
     { id:'sso',           icon:'\u26b7', label:'SSO / SAML',         badge:'' }
