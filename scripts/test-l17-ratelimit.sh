@@ -134,6 +134,15 @@ ELAPSED=$(( $(date +%s) - START ))
 
 if (( ELAPSED < 75 )); then
   _pass "18.3.1 slow body cut off after ${ELAPSED}s"
+elif grep -qE 'HTTP/1\.[01] (400|408|413|429)' /tmp/l17_slow.out 2>/dev/null; then
+  # nc itself can outlive the gateway-side close because its stdin
+  # pipe stays readable (bash for-loop trickles bytes), so ELAPSED
+  # measures nc cleanup not the conn lifetime. Fallback: inspect the
+  # captured response — a slowloris-defending server replies
+  # 400/408/413/429 before any sane client would have finished
+  # streaming the body.
+  RESP=$(grep -oE 'HTTP/1\.[01] [0-9]+' /tmp/l17_slow.out | head -1)
+  _pass "18.3.1 slow body refused [$RESP before nc cleanup, ${ELAPSED}s wall]"
 else
   _fail "18.3.1 slow body not cut off" \
     "connection survived ${ELAPSED}s — server has no read timeout"
