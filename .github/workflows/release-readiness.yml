@@ -17,8 +17,9 @@ name: Release Readiness (L1-L34)
 #   L7  DSR-residue     L21 upload-safety    L33 semgrep
 #   L8  security-depth  L22 sqli             L34 fuzz
 #   L9  lifecycle       L23 trust-boundary   L35 redirect-ssrf
-#   L10 openapi         L24 input-validation L38 log-pii-leak
-#   L11 mutation
+#   L10 openapi         L24 input-validation L36 path-encoding
+#   L11 mutation                              L37 method-tamper
+#                                             L38 log-pii-leak
 #
 # Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
 # canary tenants and verify residue/leak invariants without touching

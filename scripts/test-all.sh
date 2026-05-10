@@ -164,6 +164,8 @@ run_level "L32 bypass"          "$ROOT/scripts/test-l32-bypass.sh"
 run_level "L33 semgrep"         "$ROOT/scripts/test-l33-semgrep.sh"
 run_level "L34 fuzz"            "$ROOT/scripts/test-l34-fuzz.sh"
 run_level "L35 redirect-ssrf"   "$ROOT/scripts/test-l35-redirect-ssrf.sh"
+run_level "L36 path-encoding"   "$ROOT/scripts/test-l36-path-encoding.sh"
+run_level "L37 method-tamper"   "$ROOT/scripts/test-l37-method-tampering.sh"
 run_level "L38 log-pii-leak"    "$ROOT/scripts/test-l38-log-pii.sh"
 
 # L12 chaos and L14 perf are gated — they mutate the live environment
