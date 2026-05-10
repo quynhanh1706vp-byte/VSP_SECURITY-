@@ -183,7 +183,11 @@ _psql_oneshot() {
   fi
   # Filter out any residual "Pager usage is off." line that some psql
   # versions print regardless of -X / pager=off.
-  printf "%s\n" "$out" | grep -v -i "pager usage" | grep -v "^$" | head -1
+  # Trailing `|| true` because grep -v returns 1 when nothing matches
+  # (e.g. empty result set), which under `set -euo pipefail` would
+  # abort the caller — that's how L4-B / L5 silently died at section
+  # 5.3 in CI when one of the SELECTs returned 0 rows.
+  printf "%s\n" "$out" | grep -v -i "pager usage" | grep -v "^$" | head -1 || true
 }
 
 # ── unit-level ─────────────────────────────────────────────────────────────

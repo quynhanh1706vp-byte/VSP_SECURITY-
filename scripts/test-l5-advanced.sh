@@ -181,7 +181,7 @@ for i in $(seq 1 30); do
     -d '{"email":"l5-burst@vsp.local","password":"wrong"}' \
     --max-time 3 "$LOGIN_URL" &
 done
-wait
+wait || true   # `set -e` would otherwise abort on any one curl's non-zero exit
 ELAPSED_MS=$(( ($(date +%s%N) - START) / 1000000 ))
 
 # After the burst, this IP should be locked. Try one more login with a
@@ -264,7 +264,7 @@ for i in $(seq 1 25); do
   curl -s -o "$OUT_DIR/B_$i.json" --max-time 8 \
     -H "Authorization: Bearer $ADMIN_B" "$BASE/api/v1/vsp/findings/summary" &
 done
-wait
+wait || true   # tolerate any single curl timing out under stampede load
 
 # Aggregate: every A response must have the same total; same for B.
 # More importantly A's totals must NOT equal B's (would indicate cache
