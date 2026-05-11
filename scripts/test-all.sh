@@ -190,6 +190,17 @@ run_level "L60 fuzz-coverage"   "$ROOT/scripts/test-l60-fuzz-coverage.sh"
 run_level "L61 dep-confusion"   "$ROOT/scripts/test-l61-dep-confusion.sh"
 run_level "L62 secrets-rotation" "$ROOT/scripts/test-l62-secrets-rotation.sh"
 run_level "L63 gh-adv-security" "$ROOT/scripts/test-l63-gh-advanced-security.sh"
+run_level "L64 hsts-preload"    "$ROOT/scripts/test-l64-hsts-preload.sh"
+run_level "L65 oidc-hardening"  "$ROOT/scripts/test-l65-oidc-hardening.sh"
+run_level "L66 pii-classification" "$ROOT/scripts/test-l66-pii-classification.sh"
+run_level "L68 slsa-l3"         "$ROOT/scripts/test-l68-slsa-l3.sh"
+run_level "L69 audit-chain"     "$ROOT/scripts/test-l69-audit-chain-nightly.sh"
+
+# L67 chaos-monkey is destructive (kill -STOP gateway, 300-req burst).
+# Gated behind L67_CHAOS=1 — runs in nightly chaos drill only.
+if [[ "${L67_CHAOS:-0}" == "1" ]]; then
+  run_level "L67 chaos-monkey"  "$ROOT/scripts/test-l67-chaos-monkey.sh"
+fi
 
 # L57 backup-restore is destructive (CREATE/DROP DATABASE). Gated.
 if [[ "${L57_BACKUP:-0}" == "1" ]]; then

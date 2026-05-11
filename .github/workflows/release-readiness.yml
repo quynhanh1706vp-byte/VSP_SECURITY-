@@ -45,6 +45,12 @@ name: Release Readiness (L1-L34)
 #                                             L61 dep-confusion
 #                                             L62 secrets-rotation
 #                                             L63 gh-adv-security
+#                                             L64 hsts-preload
+#                                             L65 oidc-hardening
+#                                             L66 pii-classification
+#                                             L67 chaos-monkey (gated)
+#                                             L68 slsa-l3
+#                                             L69 audit-chain-nightly
 #
 # Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
 # canary tenants and verify residue/leak invariants without touching
