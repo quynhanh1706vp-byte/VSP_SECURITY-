@@ -122,10 +122,14 @@ P=$(_b64 "{\"sub\":\"e2e@vsp.test\",\"role\":\"admin\",\"tenant_id\":\"default\"
 S=$(printf '%s' "$H.$P" | openssl dgst -sha256 -hmac "$SECRET" -binary | openssl base64 -e | tr -d '\n=' | tr '/+' '_-')
 SHORT_TOK="$H.$P.$S"
 
-# Verify the token works NOW.
+# Use a PROTECTED endpoint — /api/v1/status is anonymous and returns
+# 200 regardless of token. /api/v1/audit/log requires authMw, which
+# is the surface the exp check actually runs on.
+EXP_PROBE_URL="/api/v1/audit/log?limit=1"
+
 s_now=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
   -H "Authorization: Bearer $SHORT_TOK" \
-  "$BASE/api/v1/status" 2>/dev/null || echo "000")
+  "$BASE$EXP_PROBE_URL" 2>/dev/null || echo "000")
 if [[ "$s_now" =~ ^2 ]]; then
   _pass "47.3.0 short-TTL token works pre-expiry [HTTP $s_now]"
 
@@ -134,15 +138,15 @@ if [[ "$s_now" =~ ^2 ]]; then
 
   s_then=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
     -H "Authorization: Bearer $SHORT_TOK" \
-    "$BASE/api/v1/status" 2>/dev/null || echo "000")
+    "$BASE$EXP_PROBE_URL" 2>/dev/null || echo "000")
   if [[ "$s_then" == "401" || "$s_then" == "403" ]]; then
     _pass "47.3.1 short-TTL token rejected post-expiry [HTTP $s_then]"
   else
-    _fail "47.3.1 expired token still works" \
-      "HTTP $s_then — exp not enforced on /api/v1/status"
+    _fail "47.3.1 expired token still works on protected endpoint" \
+      "HTTP $s_then on $EXP_PROBE_URL — exp not enforced by auth middleware"
   fi
 else
-  _skip "47.3 short-TTL token" "didn't authenticate before expiry — env mismatch"
+  _skip "47.3 short-TTL token" "didn't authenticate before expiry [HTTP $s_now] — env mismatch"
 fi
 
 # ── 47.4 Concurrent-session safety ───────────────────────────────────────
@@ -155,11 +159,14 @@ phase_open "47.4 Logout of one token doesn't invalidate another"
 TOK_A=$($ROOT/scripts/mint_jwt_local.sh admin "$SECRET")
 TOK_B=$($ROOT/scripts/mint_jwt_local.sh admin "$SECRET")
 
-# Sanity: both work.
+# Sanity: both work. /api/v1/audit/log is protected, so the test
+# actually exercises authMw (the anonymous /api/v1/status would
+# return 200 for ANY token, defeating the purpose).
+PROBE_URL="/api/v1/audit/log?limit=1"
 sA=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-  -H "Authorization: Bearer $TOK_A" "$BASE/api/v1/status" 2>/dev/null || echo "000")
+  -H "Authorization: Bearer $TOK_A" "$BASE$PROBE_URL" 2>/dev/null || echo "000")
 sB=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-  -H "Authorization: Bearer $TOK_B" "$BASE/api/v1/status" 2>/dev/null || echo "000")
+  -H "Authorization: Bearer $TOK_B" "$BASE$PROBE_URL" 2>/dev/null || echo "000")
 
 if [[ ! "$sA" =~ ^2 || ! "$sB" =~ ^2 ]]; then
   _skip "47.4 concurrent-session" "sanity check failed — sA=$sA sB=$sB"
@@ -172,7 +179,7 @@ else
 
   # B must still work.
   sB_after=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    -H "Authorization: Bearer $TOK_B" "$BASE/api/v1/status" 2>/dev/null || echo "000")
+    -H "Authorization: Bearer $TOK_B" "$BASE$PROBE_URL" 2>/dev/null || echo "000")
 
   if [[ "$sB_after" =~ ^2 ]]; then
     _pass "47.4.1 logout of token A didn't kill token B [HTTP $sB_after]"

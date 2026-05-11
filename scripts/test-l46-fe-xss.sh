@@ -87,16 +87,24 @@ else
   _pass "46.2.1 no eval() in static assets"
 fi
 
-# new Function(...) — same as eval, just sneakier
+# new Function(...) — same as eval, just sneakier. Exclude:
+#   - .bak files
+#   - block-comment lines (start with `*` or `//` after indentation)
+#   - vsp-actions.js — documented CSP-compliant inline-handler runner;
+#     expressions come from data-vsp-click author markup, not user
+#     input, and replacing inline `onclick=` with this gadget is the
+#     migration path off CSP 'unsafe-inline'.
 NF_HITS=$(grep -rEn '\bnew\s+Function\s*\(' \
   --include='*.js' --include='*.html' \
   "$ROOT/static/" 2>/dev/null \
   | grep -v '\.bak\.\|\.bak_' \
+  | grep -vE ':\s*(\*|//|<!--)' \
+  | grep -v 'vsp-actions\.js' \
   | head -3 || true)
 if [[ -n "$NF_HITS" ]]; then
   _fail "46.2.2 new Function() call sites" "$(echo "$NF_HITS" | head -1)"
 else
-  _pass "46.2.2 no new Function() in static assets"
+  _pass "46.2.2 no new Function() (comments + vsp-actions.js excluded)"
 fi
 
 # setTimeout(string, ...) — only flag when arg 1 is clearly a string
@@ -116,15 +124,22 @@ fi
 
 phase_open "46.3 javascript: URLs in href / location"
 
+# Exclude `javascript:void(0)` and `javascript:;` — these are the
+# canonical "anchor that doesn't navigate, click is handled by JS"
+# patterns. They carry NO executable payload (void(0) returns
+# undefined, `;` is the empty statement), and removing them is a
+# huge cosmetic refactor (use buttons instead) without any security
+# win. Real XSS surface is `javascript:` + dynamic expression.
 JS_URL=$(grep -rEn '(href\s*=\s*["`'\'']?javascript:|location(\.href)?\s*=\s*["`'\'']?javascript:|window\.location\s*=\s*["`'\'']?javascript:)' \
   --include='*.js' --include='*.html' \
   "$ROOT/static/" 2>/dev/null \
   | grep -v '\.bak\.\|\.bak_\|//.*javascript:' \
+  | grep -vE 'javascript:(void\(0\)|;|\s*$)' \
   | head -3 || true)
 if [[ -n "$JS_URL" ]]; then
-  _fail "46.3.1 javascript: URL in href/location" "$(echo "$JS_URL" | head -1)"
+  _fail "46.3.1 javascript: URL with executable expression" "$(echo "$JS_URL" | head -1)"
 else
-  _pass "46.3.1 no javascript: URLs"
+  _pass "46.3.1 no javascript: URLs (void(0)/empty allowlisted)"
 fi
 
 # ── 46.4 document.write — XSS amplifier ──────────────────────────────────

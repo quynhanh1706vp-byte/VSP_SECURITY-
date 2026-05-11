@@ -123,7 +123,7 @@ func Middleware(jwtSecret string, keyStore APIKeyStore) func(http.Handler) http.
 				c, err := keyStore.ValidateAPIKey(r.Context(), k)
 				if err != nil {
 					log.Warn().Str("ip", r.RemoteAddr).Err(err).Msg("invalid api key")
-					http.Error(w, `{"error":"invalid api key"}`, http.StatusUnauthorized)
+					writeJSONError(w, http.StatusUnauthorized, "invalid api key")
 					return
 				}
 				claims, ok = c, true
@@ -162,7 +162,7 @@ func Middleware(jwtSecret string, keyStore APIKeyStore) func(http.Handler) http.
 			}
 
 			if !ok {
-				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "authentication required")
 				return
 			}
 
@@ -176,6 +176,19 @@ func Middleware(jwtSecret string, keyStore APIKeyStore) func(http.Handler) http.
 	}
 }
 
+// writeJSONError emits a JSON error response with the correct
+// application/json Content-Type. http.Error() (the convenient stdlib
+// helper) forces text/plain, which breaks API clients that route
+// responses by Content-Type — they see a JSON-shaped body but parse
+// it as text. Always use this helper inside middleware that wants to
+// short-circuit with a structured error envelope.
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(`{"error":"` + msg + `"}`))
+}
+
 // RequireRole returns middleware that enforces a minimum role level.
 // Role hierarchy: admin > analyst > dev > auditor
 func RequireRole(roles ...string) func(http.Handler) http.Handler {
@@ -187,7 +200,7 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			c, ok := FromContext(r.Context())
 			if !ok || !allowed[c.Role] {
-				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				writeJSONError(w, http.StatusForbidden, "forbidden")
 				return
 			}
 			next.ServeHTTP(w, r)
