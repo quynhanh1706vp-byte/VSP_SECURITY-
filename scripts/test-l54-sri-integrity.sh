@@ -50,9 +50,9 @@ for h in hits[:5]:
 print(f"TOTAL:{len(hits)}")
 PY
 
-TOTAL=$(grep '^TOTAL:' /tmp/l54_sri.out | cut -d: -f2)
+TOTAL=$(grep '^TOTAL:' /tmp/l54_sri.out 2>/dev/null | cut -d: -f2 || true)
 TOTAL=${TOTAL:-0}
-SAMPLE=$(grep -v '^TOTAL:' /tmp/l54_sri.out | head -1)
+SAMPLE=$(grep -v '^TOTAL:' /tmp/l54_sri.out 2>/dev/null | head -1 || true)
 
 # Threshold: many panels load chart.js / vega from CDN. The migration
 # off no-integrity is gradual. Hard floor: > 50 unguarded externs is
@@ -96,9 +96,9 @@ print(f"TOTAL:{len(hits)}")
 for h in hits[:3]: print(h)
 PY
 
-TOTAL=$(grep '^TOTAL:' /tmp/l54_css.out | cut -d: -f2)
+TOTAL=$(grep '^TOTAL:' /tmp/l54_css.out 2>/dev/null | cut -d: -f2 || true)
 TOTAL=${TOTAL:-0}
-SAMPLE=$(grep -v '^TOTAL:' /tmp/l54_css.out | head -1)
+SAMPLE=$(grep -v '^TOTAL:' /tmp/l54_css.out 2>/dev/null | head -1 || true)
 rm -f /tmp/l54_css.out
 
 if (( TOTAL == 0 )); then
@@ -141,9 +141,9 @@ print(f"TOTAL:{len(hits)}")
 for h in hits[:3]: print(h)
 PY
 
-TOTAL=$(grep '^TOTAL:' /tmp/l54_pair.out | cut -d: -f2)
+TOTAL=$(grep '^TOTAL:' /tmp/l54_pair.out 2>/dev/null | cut -d: -f2 || true)
 TOTAL=${TOTAL:-0}
-SAMPLE=$(grep -v '^TOTAL:' /tmp/l54_pair.out | head -1)
+SAMPLE=$(grep -v '^TOTAL:' /tmp/l54_pair.out 2>/dev/null | head -1 || true)
 rm -f /tmp/l54_pair.out
 
 if (( TOTAL == 0 )); then

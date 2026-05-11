@@ -591,17 +591,21 @@ func main() {
 			ww := chimw.NewWrapResponseWriter(w, req.ProtoMajor)
 			next.ServeHTTP(ww, req)
 			// L53 cardinality fix: use chi's RoutePattern when chi
-			// matched a route. For 404s / non-matched requests
-			// rctx.RoutePattern() is empty — use a sentinel rather
-			// than the raw URL.Path, otherwise every scanned-URL
-			// becomes its own time series (cardinality explosion).
+			// matched a route, sentinel for non-matched. Also
+			// collapse status code to class (2xx/3xx/4xx/5xx) —
+			// individual status codes blew the metric to 1600+
+			// series. With class-collapse we go from
+			//   routes × methods × ~20-statuses × 11-buckets
+			//   to
+			//   routes × methods × 5-classes × 11-buckets
 			rctx := chi.RouteContext(req.Context())
 			path := "<no-route>"
 			if rctx != nil && rctx.RoutePattern() != "" {
 				path = rctx.RoutePattern()
 			}
+			statusClass := fmt.Sprintf("%dxx", ww.Status()/100)
 			handler.APIRequestDuration.WithLabelValues(
-				req.Method, path, fmt.Sprintf("%d", ww.Status()),
+				req.Method, path, statusClass,
 			).Observe(time.Since(start).Seconds())
 		})
 	})
