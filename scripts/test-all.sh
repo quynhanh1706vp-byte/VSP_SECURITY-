@@ -180,6 +180,17 @@ run_level "L49 state-machine"   "$ROOT/scripts/test-l49-state-machine.sh"
 run_level "L50 tenant-deep"     "$ROOT/scripts/test-l50-multi-tenant-deep.sh"
 run_level "L51 audit-immutable" "$ROOT/scripts/test-l51-audit-immutable.sh"
 run_level "L52 upload-deep"     "$ROOT/scripts/test-l52-upload-deep.sh"
+run_level "L53 prom-cardinality" "$ROOT/scripts/test-l53-prom-cardinality.sh"
+run_level "L54 sri-integrity"   "$ROOT/scripts/test-l54-sri-integrity.sh"
+run_level "L55 deserialization" "$ROOT/scripts/test-l55-deserialization.sh"
+run_level "L56 dns-rebinding"   "$ROOT/scripts/test-l56-dns-rebinding.sh"
+run_level "L58 concurrent-mod"  "$ROOT/scripts/test-l58-concurrent-mod.sh"
+run_level "L59 timing-attack"   "$ROOT/scripts/test-l59-timing-attack.sh"
+
+# L57 backup-restore is destructive (CREATE/DROP DATABASE). Gated.
+if [[ "${L57_BACKUP:-0}" == "1" ]]; then
+  run_level "L57 backup-restore" "$ROOT/scripts/test-l57-backup-restore.sh"
+fi
 
 # L39 graceful-shutdown is destructive (kills the gateway). Gate it
 # behind L39_SHUTDOWN=1 so it only runs in nightly / dispatch.
