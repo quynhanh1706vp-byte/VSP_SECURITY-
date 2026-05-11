@@ -219,6 +219,52 @@ else
     "$UNGUARDED panel(s) without bootstrap-bypass: ${UNGUARDED_FILES[0]}"
 fi
 
+# ── 44.4.z static/index.html <nav> tag balance ───────────────────────────
+
+phase_open "44.4.z Tag balance in static/index.html"
+
+# Bug found 2026-05-11: the inner <nav class="nav"> was closed with
+# </div> instead of </nav>. Browser parser implicitly closed at
+# end-of-body, reparenting <div class="main"> INTO the sidebar and
+# breaking the entire layout. The user's screenshot showed the
+# dashboard rendered under the sidebar column at 220px width.
+#
+# Probe: count <nav and </nav> in the file (ignoring comments and
+# strings). Counts must be equal — any imbalance is a structural
+# bug that will silently break browser layout.
+
+HTML="$ROOT/static/index.html"
+if [[ ! -r "$HTML" ]]; then
+  _skip "44.4.z tag balance" "static/index.html unreadable"
+elif ! command -v python3 &>/dev/null; then
+  _skip "44.4.z tag balance" "python3 not available — needs multi-line comment stripper"
+else
+  # python3 strips multi-line HTML / JS block comments and JS line
+  # comments, then counts opens/closes. Bash regex can't do multi-line
+  # DOTALL so we delegate to python.
+  BALANCE=$(python3 - "$HTML" <<'PY'
+import re, sys
+with open(sys.argv[1]) as f: s = f.read()
+s = re.sub(r'<!--.*?-->', '', s, flags=re.DOTALL)
+s = re.sub(r'/\*.*?\*/', '', s, flags=re.DOTALL)
+s = re.sub(r'//[^\n]*', '', s)
+for tag in ('nav', 'main'):
+    o = len(re.findall(rf'<{tag}\b', s))
+    c = len(re.findall(rf'</{tag}>', s))
+    print(f'{tag}:{o}:{c}')
+PY
+)
+  while IFS=: read -r tag o c; do
+    [[ -z "$tag" ]] && continue
+    if [[ "$o" == "$c" ]]; then
+      _pass "44.4.z <$tag> tags balanced [$o open, $c close]"
+    else
+      _fail "44.4.z <$tag> tag imbalance" \
+        "$o open vs $c close — browser will auto-close, layout breaks"
+    fi
+  done <<<"$BALANCE"
+fi
+
 # ── 44.4.y Sidebar-bottom must be inside <nav class="sidebar"> ───────────
 
 phase_open "44.4.y Sidebar structural placement"
