@@ -282,9 +282,26 @@ function updateScanTools() {
 
   // Cache hit window 30s; otherwise refresh in the background and
   // render with whatever we have right now. Avoids modal-open lag.
+  //
+  // Loop guard: refresh ONLY if (a) we have no data yet AND (b) the
+  // endpoint hasn't already been marked absent. Without the second
+  // condition, the recursive .then(updateScanTools) callback fires
+  // again — endpointAbsent makes refreshScannerHealth() resolve
+  // instantly with no state change, so the next updateScanTools()
+  // sees fetchedAt=0 still and re-enters the branch forever. That
+  // is what froze the page on the old gateway binary.
   var hp = window.__SCANNER_HEALTH;
-  if (!hp.fetchedAt || Date.now() - hp.fetchedAt > 30000) {
-    refreshScannerHealth().then(function() { updateScanTools(); });
+  var needsRefresh = !hp.endpointAbsent &&
+                     (!hp.fetchedAt || Date.now() - hp.fetchedAt > 30000);
+  if (needsRefresh) {
+    refreshScannerHealth().then(function() {
+      // Re-render only if we actually got fresh data — avoids the
+      // infinite recursion that triggered the page-not-responding
+      // dialog when /scanners/health 404'd on the old gateway.
+      if (window.__SCANNER_HEALTH.fetchedAt > 0) {
+        updateScanTools();
+      }
+    });
   }
 
   // Render chips — grey-out + strikethrough tools whose binary is
