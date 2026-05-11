@@ -83,7 +83,9 @@ func ToolNamesForMode(mode Mode) []string {
 	case ModeSAST:
 		return []string{"bandit", "semgrep", "codeql", "gosec"}
 	case ModeSCA:
-		return []string{"trivy", "grype", "license", "syft", "govulncheck", "osv-scanner", "retire-js"}
+		// Must match RunnersFor(ModeSCA) exactly — 8 tools.
+		// cosign was missing here before 2026-05-11 → SCA runs showed 8/7.
+		return []string{"trivy", "grype", "license", "syft", "govulncheck", "osv-scanner", "cosign", "retire-js"}
 	case ModeSecrets:
 		return []string{"gitleaks", "secretcheck", "trufflehog"}
 	case ModeIAC:

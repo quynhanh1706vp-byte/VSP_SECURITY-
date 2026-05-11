@@ -34,17 +34,19 @@ func (h *Runs) enqueueOrLog(rid, tenantID string, mode pipeline.Mode, profile pi
 
 // EnqueueDirect is called by the scheduler engine to trigger a scan.
 func (h *Runs) EnqueueDirect(rid, tenantID string, mode pipeline.Mode, profile pipeline.Profile, src, url string) {
-	// Sync với RunnersFor() — SECRETS:3(gitleaks+secretcheck+trufflehog), SCA:3(grype+trivy+license)
-	toolsTotal := map[string]int{
-		"SAST":     4,  // bandit+semgrep+codeql+gosec
-		"SCA":      3,  // grype+trivy+license
-		"SECRETS":  3,  // gitleaks+secretcheck+trufflehog
-		"IAC":      2,  // kics+checkov
-		"DAST":     3,  // nikto+nuclei+sslscan
-		"NETWORK":  3,  // sslscan+nmap+netcap
-		"FULL":     17, // all unique tools
-		"FULL_SOC": 18, // all unique tools incl netcap
-	}[string(mode)]
+	// tools_total drives the FE progress bar AND the "X/Y" badge in the
+	// run history table. It MUST match the actual number of tools the
+	// worker will dispatch — owned by pipeline.ToolNamesForMode.
+	//
+	// Prior to 2026-05-11 a hand-maintained map here drifted:
+	//   SCA=3   (real 8 — was missing osv-scanner/cosign/retire-js/syft/govulncheck)
+	//   IAC=2   (real 3 — was missing hadolint)
+	//   FULL_SOC=18 (real 26 — was missing phase4 + network groups)
+	// The /vsp/run POST path was fixed on 2026-05-07 (runs.go:100) but
+	// this scheduler-triggered enqueue was missed, so every cron-fired
+	// FULL_SOC run showed "18/18" while the FE "New Scan" modal
+	// advertised 26 tools — a visible mismatch end-users noticed.
+	toolsTotal := len(pipeline.ToolNamesForMode(mode))
 	if toolsTotal == 0 {
 		toolsTotal = 3
 	}
