@@ -233,6 +233,27 @@ window.CATEGORY_COLORS = {
   phase4:  {bg:'rgba(34,197,94,.15)',  bd:'rgba(34,197,94,.4)',   fg:'#4ade80'},
 };
 
+// Cache the /api/v1/scanners/health snapshot for 30s so chip-render
+// stays cheap. Maps tool name → available bool. Empty map means
+// "endpoint unreachable" → fall back to all-available (legacy behaviour).
+window.__SCANNER_HEALTH = { fetchedAt: 0, byTool: {}, available: 0, expected: 26 };
+function refreshScannerHealth() {
+  return fetch('/api/v1/scanners/health', { credentials: 'same-origin' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(j) {
+      if (!j || !Array.isArray(j.tools)) return;
+      var byTool = {};
+      j.tools.forEach(function(t) { byTool[t.tool] = !!t.available; });
+      window.__SCANNER_HEALTH = {
+        fetchedAt: Date.now(),
+        byTool: byTool,
+        available: j.available || 0,
+        expected: j.expected_full_soc || 26,
+      };
+    })
+    .catch(function() { /* leave fallback */ });
+}
+
 function updateScanTools() {
   var mode = document.getElementById('scanMode').value;
   var tools = window.TOOLS_BY_MODE_SCAN[mode] || [];
@@ -241,17 +262,47 @@ function updateScanTools() {
   var noteEl = document.getElementById('scan-tools-note');
   var urlGroup = document.getElementById('scanUrlGroup');
 
-  // Render chips
+  // Cache hit window 30s; otherwise refresh in the background and
+  // render with whatever we have right now. Avoids modal-open lag.
+  var hp = window.__SCANNER_HEALTH;
+  if (!hp.fetchedAt || Date.now() - hp.fetchedAt > 30000) {
+    refreshScannerHealth().then(function() { updateScanTools(); });
+  }
+
+  // Render chips — grey-out + strikethrough tools whose binary is
+  // missing on this gateway host. The run still dispatches them, but
+  // the operator sees ahead of time which ones will record
+  // ErrToolNotFound instead of producing findings.
   if (chipsEl) {
     chipsEl.innerHTML = tools.map(function(t){
       var cat = window.TOOL_CATEGORY[t] || 'sast';
       var c = window.CATEGORY_COLORS[cat] || window.CATEGORY_COLORS.sast;
-      return '<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;'
-           + 'font-size:10px;font-family:var(--font-mono);background:'+c.bg+';border:1px solid '+c.bd+';color:'+c.fg+'">'
+      var available = hp.byTool[t];
+      // If we have no health data yet, assume available (old behaviour).
+      var ready = (available === undefined) ? true : available;
+      var style = ready
+        ? 'background:'+c.bg+';border:1px solid '+c.bd+';color:'+c.fg
+        : 'background:rgba(127,127,127,.08);border:1px dashed rgba(127,127,127,.45);color:#888;text-decoration:line-through';
+      var title = ready ? '' : ' title="binary not on $PATH on this gateway host"';
+      return '<span'+title+' style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;'
+           + 'font-size:10px;font-family:var(--font-mono);'+style+'">'
            + t + '</span>';
     }).join('');
   }
-  if (countEl) countEl.textContent = tools.length;
+  // Count display: "26" if all ready, "26 (18 ready)" if some missing.
+  if (countEl) {
+    var totalForMode = tools.length;
+    var readyForMode = tools.filter(function(t){
+      return hp.byTool[t] === undefined ? true : hp.byTool[t];
+    }).length;
+    if (Object.keys(hp.byTool).length && readyForMode < totalForMode) {
+      countEl.textContent = totalForMode + ' (' + readyForMode + ' ready)';
+      countEl.style.color = 'var(--amber)';
+    } else {
+      countEl.textContent = totalForMode;
+      countEl.style.color = 'var(--cyan)';
+    }
+  }
 
   // Note for special modes
   if (noteEl) {
@@ -659,7 +710,7 @@ window.addEventListener('DOMContentLoaded', function(){
       </div>
       <!-- Actions -->
       <button class="btn btn-ghost" onclick="loadCurrentPanel()">↻</button>
-      <button class="btn btn-primary" onclick="document.getElementById('scan-modal').classList.add('open')">+ Scan</button>
+      <button class="btn btn-primary" onclick="document.getElementById('scan-modal').classList.add('open'); if(typeof refreshScannerHealth==='function'){refreshScannerHealth().then(updateScanTools);}">+ Scan</button>
     </div>
   </header>
 
