@@ -30,6 +30,10 @@ name: Release Readiness (L1-L34)
 #                                             L46 fe-xss
 #                                             L47 user-flow-e2e
 #                                             L48 cicd-hygiene
+#                                             L49 state-machine
+#                                             L50 tenant-deep
+#                                             L51 audit-immutable
+#                                             L52 upload-deep
 #
 # Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
 # canary tenants and verify residue/leak invariants without touching

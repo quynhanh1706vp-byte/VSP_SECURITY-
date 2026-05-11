@@ -176,6 +176,10 @@ run_level "L45 api-uniformity"  "$ROOT/scripts/test-l45-api-uniformity.sh"
 run_level "L46 fe-xss"          "$ROOT/scripts/test-l46-fe-xss.sh"
 run_level "L47 user-flow-e2e"   "$ROOT/scripts/test-l47-user-flow-e2e.sh"
 run_level "L48 cicd-hygiene"    "$ROOT/scripts/test-l48-cicd-hygiene.sh"
+run_level "L49 state-machine"   "$ROOT/scripts/test-l49-state-machine.sh"
+run_level "L50 tenant-deep"     "$ROOT/scripts/test-l50-multi-tenant-deep.sh"
+run_level "L51 audit-immutable" "$ROOT/scripts/test-l51-audit-immutable.sh"
+run_level "L52 upload-deep"     "$ROOT/scripts/test-l52-upload-deep.sh"
 
 # L39 graceful-shutdown is destructive (kills the gateway). Gate it
 # behind L39_SHUTDOWN=1 so it only runs in nightly / dispatch.
