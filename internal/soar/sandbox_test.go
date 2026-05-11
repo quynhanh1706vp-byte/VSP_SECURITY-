@@ -119,7 +119,7 @@ func TestSandbox_OutputSizeCap(t *testing.T) {
 func TestSandbox_OutputMustBeJSONSerializable(t *testing.T) {
 	s := NewSandbox()
 	// Functions can't be JSON-serialized
-	_, err := s.Run(context.Background(),
+	_, _ = s.Run(context.Background(),
 		`(function(){ var o = {fn: function(){}}; return o; })()`,
 		SandboxInput{}, time.Second)
 	// Note: Goja's Export converts functions to nil, so this might pass.

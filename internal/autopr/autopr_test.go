@@ -144,7 +144,7 @@ func TestH3S_GitHubEnterprise_CreatePR_Success(t *testing.T) {
 			return
 		}
 		if r.Header.Get("Authorization") != "Bearer test-token" {
-			http.Error(w, "auth", 401)
+			http.Error(w, "auth", http.StatusUnauthorized)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

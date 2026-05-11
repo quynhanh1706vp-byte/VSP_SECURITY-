@@ -31,7 +31,7 @@ func (e *setVarExecutor) Run(ctx context.Context, n *Node, ec *ExecCtx) (json.Ra
 		return nil, "", fmt.Errorf("set_var: name required")
 	}
 
-	var value interface{} = cfg.Value
+	var value = cfg.Value
 	if cfg.ValueFrom != "" {
 		value = resolvePath(ec, cfg.ValueFrom)
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
 )
@@ -282,12 +283,13 @@ func (h *WebAuthnH) LoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Bump the sign_count to defeat replay across authenticator clones.
+	// Non-fatal: login still succeeds, error suppressed intentionally.
 	if _, err := h.DB.Pool().Exec(r.Context(),
 		`UPDATE webauthn_credentials
 		    SET sign_count = $1, last_used_at = NOW()
 		  WHERE credential_id = $2`,
 		cred.Authenticator.SignCount, cred.ID); err != nil {
-		// non-fatal: login still succeeds, log warns
+		log.Warn().Err(err).Msg("webauthn: sign_count bump failed (non-fatal)")
 	}
 	logAudit(r, h.DB, "WEBAUTHN_LOGIN", "user/"+userID)
 	jsonOK(w, map[string]any{

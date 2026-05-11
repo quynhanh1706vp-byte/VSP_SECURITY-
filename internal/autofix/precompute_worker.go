@@ -209,10 +209,11 @@ func (w *PrecomputeWorker) processRun(parentCtx context.Context, runID, tenantID
 	successCount := 0
 
 	for _, f := range findings {
-		select {
-		case <-ctx.Done():
+		// SA4011 fix: bare `break` inside select only breaks the
+		// select, not the outer for. Check ctx directly so a cancel
+		// actually stops scheduling new goroutines.
+		if ctx.Err() != nil {
 			break
-		default:
 		}
 
 		wg.Add(1)

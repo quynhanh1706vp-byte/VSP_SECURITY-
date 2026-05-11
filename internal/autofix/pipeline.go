@@ -59,7 +59,7 @@ func (p *Pipeline) Run(ctx context.Context, c *FixCandidate) (*PipelineResult, e
 	}
 	start := time.Now()
 
-	results := make([]ValidationResult, 0, len(p.Validators))
+	var results []ValidationResult
 	if p.Concurrent {
 		results = p.runConcurrent(ctx, c)
 	} else {

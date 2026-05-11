@@ -211,7 +211,7 @@ func handleAlertTest(w http.ResponseWriter, r *http.Request) {
 	switch req.Channel {
 	case "email":
 		if !emailCfg.Enabled {
-			http.Error(w, `{"error":"email not configured (set SMTP_USER + SMTP_PASSWORD)"}`, 503)
+			http.Error(w, `{"error":"email not configured (set SMTP_USER + SMTP_PASSWORD)"}`, http.StatusServiceUnavailable)
 			return
 		}
 		to := req.To
@@ -226,7 +226,7 @@ func handleAlertTest(w http.ResponseWriter, r *http.Request) {
 		sendErr = sendSMTP(to, alert.Title, alert.Message)
 	case "slack":
 		if alertConfig.SlackWebhook == "" {
-			http.Error(w, `{"error":"slack webhook not configured"}`, 503)
+			http.Error(w, `{"error":"slack webhook not configured"}`, http.StatusServiceUnavailable)
 			return
 		}
 		sendErr = sendSlackAlert(alertConfig.SlackWebhook, alert.Title, alert.Message, "#36a64f")

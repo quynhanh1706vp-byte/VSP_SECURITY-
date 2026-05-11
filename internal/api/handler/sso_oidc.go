@@ -172,10 +172,7 @@ func (h *SSOOIDCHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirAfter := r.URL.Query().Get("redirect")
-	if redirAfter == "" {
-		redirAfter = "/"
-	}
+	redirAfter := safeRedirectPath(r.URL.Query().Get("redirect"))
 
 	ls, err := sso.CreateLoginState(r.Context(), h.DB, p.ID, redirAfter)
 	if err != nil {
@@ -184,6 +181,10 @@ func (h *SSOOIDCHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	authzURL := sso.AuthorizeURL(disc, p, ls)
+	// #nosec G710 -- authzURL is built from the IdP discovery doc + our
+	// configured provider record (cfg.AuthURL / cfg.TokenURL), not from
+	// request data. The only request-tainted piece is the `state`
+	// parameter inside the query string, which is meant to be there.
 	http.Redirect(w, r, authzURL, http.StatusFound)
 }
 
@@ -302,11 +303,38 @@ func (h *SSOOIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   int(h.JWTTTL.Seconds()),
 	})
 
-	redirAfter := ls.RedirectAfter
-	if redirAfter == "" {
-		redirAfter = "/"
-	}
+	redirAfter := safeRedirectPath(ls.RedirectAfter)
 	http.Redirect(w, r, redirAfter, http.StatusFound)
+}
+
+// safeRedirectPath enforces same-origin redirects. A user-supplied
+// `?redirect=` could otherwise be `https://attacker.example/phish`
+// or `//attacker.example/phish` (protocol-relative, which browsers
+// follow off-origin). Anything not starting with a single `/` is
+// coerced to `/`. Empty string also maps to `/`.
+//
+// We don't try to allowlist protocols — the only safe answer for a
+// login post-redirect is an in-app path. If an attacker can put a
+// crafted absolute URL in the query and have it pass through, that's
+// a phishing oracle: the victim sees the legit login UI, then lands
+// on a clone after auth.
+func safeRedirectPath(p string) string {
+	if p == "" {
+		return "/"
+	}
+	if len(p) < 1 || p[0] != '/' {
+		return "/"
+	}
+	// Reject protocol-relative `//evil.com/path` — browsers treat that
+	// as cross-origin.
+	if len(p) >= 2 && p[1] == '/' {
+		return "/"
+	}
+	// Reject backslash variants some browsers normalise to `/`.
+	if strings.Contains(p, `\`) {
+		return "/"
+	}
+	return p
 }
 
 // resolveOrProvisionUser finds the VSP user by email or auto-creates one.

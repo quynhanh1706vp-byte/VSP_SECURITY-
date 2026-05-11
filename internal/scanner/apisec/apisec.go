@@ -176,7 +176,7 @@ func (s *Scanner) checkSecurityHeaders(ctx context.Context, endpoint string) *Fi
 		"Strict-Transport-Security": "",
 		"Content-Security-Policy":   "",
 	}
-	for h, _ := range required {
+	for h := range required {
 		if resp.Header.Get(h) == "" {
 			missing = append(missing, h)
 		}

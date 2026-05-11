@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
 )
 
@@ -33,9 +32,7 @@ func NewTransparency(db *store.DB) *Transparency { return &Transparency{DB: db} 
 func (h *Transparency) Report(w http.ResponseWriter, r *http.Request) {
 	// Anon-readable — same surface as /api/v1/status, but heavier.
 	// Cache 1 hour to keep this cheap when linked from /trust.
-	if _, ok := auth.FromContext(r.Context()); !ok {
-		// Allow anonymous reads — transparency is the point.
-	}
+	// Note: deliberately no auth check — transparency is the point.
 
 	period := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("period")))
 	if period != "semiannual" {

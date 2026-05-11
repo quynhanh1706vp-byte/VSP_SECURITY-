@@ -30,6 +30,14 @@ func New(ctx context.Context, dsn string) (*DB, error) {
 	cfg.ConnConfig.Tracer = otelpgx.NewTracer()
 	// RLS: set the per-request tenant GUC on connection acquire and clear
 	// it on release so subsequent acquires can't observe stale scope.
+	//
+	// SA1019: pgx deprecates BeforeAcquire in favour of PrepareConn, but
+	// they are NOT equivalent for RLS use. PrepareConn fires once per
+	// connection lifetime (at pool creation), so the GUC would be set
+	// once and then leak across tenants. BeforeAcquire fires on every
+	// acquire — exactly what RLS needs to guarantee per-request scope.
+	// Migrating to PrepareConn here would silently break tenant isolation.
+	//lint:ignore SA1019 BeforeAcquire is per-acquire semantics, PrepareConn is per-connection
 	cfg.BeforeAcquire = PoolBeforeAcquire
 	cfg.AfterRelease = PoolAfterRelease
 

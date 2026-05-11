@@ -323,13 +323,12 @@ func (r *Registry) flushOnce(ctx context.Context) {
 			lk := lkAny.(labelKey)
 			v := atomic.LoadUint64(&cAny.(*counterSeries).value)
 			labels := labelKeyToJSON(lk)
-			_, err := r.db.ExecContext(ctx, `
+			// Telemetry flush is best-effort: a DB hiccup must not stall
+			// the metric ranger or back up the in-memory counter map.
+			_, _ = r.db.ExecContext(ctx, `
 				INSERT INTO telemetry_counter (metric_name, label_pairs, value, bucket_minute)
 				VALUES ($1, $2::jsonb, $3, $4)
 			`, name, labels, float64(v), bucket)
-			if err != nil {
-				// best-effort
-			}
 			return true
 		})
 		return true

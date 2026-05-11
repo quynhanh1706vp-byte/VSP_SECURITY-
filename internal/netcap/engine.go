@@ -826,9 +826,9 @@ func (e *Engine) parseHTTPPayload(ts time.Time, srcIP, dstIP string, dstPort int
 		if strings.HasPrefix(strings.ToLower(l), "user-agent:") {
 			ua = strings.TrimSpace(l[11:])
 		}
-		if len(line) == 0 && body == "" {
-			// Headers ended
-		}
+		// Note: blank line marks headers-ended; body extracted below
+		// via bytes.Index search so we don't need to track state here.
+		_ = line
 	}
 
 	// Check for body (after blank line)
