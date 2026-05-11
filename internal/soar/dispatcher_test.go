@@ -61,3 +61,36 @@ func TestDispatcher_Register(t *testing.T) {
 		t.Errorf("got %s", string(out))
 	}
 }
+
+// panickyExec deliberately panics on Run — used to verify Dispatch
+// converts the panic into an EngineError rather than tearing down the
+// caller's goroutine (L77 — worker resilience).
+type panickyExec struct{}
+
+func (panickyExec) Run(ctx context.Context, n *Node, ec *ExecCtx) (json.RawMessage, string, error) {
+	panic("synthetic panic for L77 regression")
+}
+
+func TestDispatcher_PanicConvertedToError_L77(t *testing.T) {
+	d := NewDispatcher()
+	d.Register(StepHTTP, panickyExec{})
+	out, next, err := d.Dispatch(context.Background(),
+		&Node{ID: "n-panic", Type: StepHTTP},
+		&ExecCtx{})
+	if err == nil {
+		t.Fatal("expected EngineError from panicking executor; got nil")
+	}
+	var engErr *EngineError
+	if !errors.As(err, &engErr) {
+		t.Fatalf("expected *EngineError, got %T: %v", err, err)
+	}
+	if engErr.NodeID != "n-panic" {
+		t.Errorf("EngineError.NodeID = %q, want %q", engErr.NodeID, "n-panic")
+	}
+	if out != nil {
+		t.Errorf("out should be nil on panic, got %s", out)
+	}
+	if next != "" {
+		t.Errorf("next should be empty on panic, got %q", next)
+	}
+}

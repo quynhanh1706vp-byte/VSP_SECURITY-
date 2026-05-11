@@ -195,6 +195,10 @@ run_level "L65 oidc-hardening"  "$ROOT/scripts/test-l65-oidc-hardening.sh"
 run_level "L66 pii-classification" "$ROOT/scripts/test-l66-pii-classification.sh"
 run_level "L68 slsa-l3"         "$ROOT/scripts/test-l68-slsa-l3.sh"
 run_level "L69 audit-chain"     "$ROOT/scripts/test-l69-audit-chain-nightly.sh"
+run_level "L70 http-smuggling"  "$ROOT/scripts/test-l70-http-smuggling.sh"
+run_level "L74 log-injection"   "$ROOT/scripts/test-l74-log-injection.sh"
+run_level "L77 worker-panic"    "$ROOT/scripts/test-l77-worker-panic.sh"
+run_level "L78 migration-rollback" "$ROOT/scripts/test-l78-migration-rollback.sh"
 
 # L67 chaos-monkey is destructive (kill -STOP gateway, 300-req burst).
 # Gated behind L67_CHAOS=1 — runs in nightly chaos drill only.

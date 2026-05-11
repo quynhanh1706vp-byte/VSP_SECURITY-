@@ -43,7 +43,14 @@ func (d *Dispatcher) RegisterDefault() {
 }
 
 // Dispatch executes node via the registered executor.
-func (d *Dispatcher) Dispatch(ctx context.Context, node *Node, ec *ExecCtx) (json.RawMessage, string, error) {
+//
+// A panicking executor must NOT take down the SOAR worker goroutine —
+// the engine is shared across all tenants and a single broken playbook
+// step would otherwise stall every run. We wrap exec.Run in a recover
+// so the panic is converted to an EngineError; the engine then marks
+// the node as failed and continues with the playbook's error-handling
+// edges (or halts the run, but not the worker).
+func (d *Dispatcher) Dispatch(ctx context.Context, node *Node, ec *ExecCtx) (out json.RawMessage, next string, err error) {
 	exec, ok := d.executors[node.Type]
 	if !ok {
 		return nil, "", &EngineError{
@@ -52,6 +59,17 @@ func (d *Dispatcher) Dispatch(ctx context.Context, node *Node, ec *ExecCtx) (jso
 			Wrapped: fmt.Errorf("no executor registered for step type %q", node.Type),
 		}
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = &EngineError{
+				NodeID:  node.ID,
+				Step:    node.Type,
+				Wrapped: fmt.Errorf("executor panic: %v", r),
+			}
+			out = nil
+			next = ""
+		}
+	}()
 	return exec.Run(ctx, node, ec)
 }
 
