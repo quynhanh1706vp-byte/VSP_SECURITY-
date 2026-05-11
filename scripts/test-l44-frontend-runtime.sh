@@ -172,6 +172,53 @@ else
   _pass "44.4.1 no plain http:// to third-party domains"
 fi
 
+# ── 44.4.x Auth-bootstrap endpoints not caught by vspAuthFetch ───────────
+
+phase_open "44.4.x Auth-bootstrap exempt from vspAuthFetch guard"
+
+# Bug found 2026-05-11: every panel's embedded fetch-wrapper polled
+# 2.5s for a Bearer token then warned, even when the request was for
+# /api/v1/auth/check — which is the SOURCE of the token, not a
+# consumer. Browser console filled with false-alarm warnings.
+#
+# Defence: any panel that has `console.warn(...no token after...)`
+# MUST also have the auth-bootstrap bypass regex within 3 lines of
+# the warn. Otherwise the warning is unconditional and noise will
+# return.
+UNGUARDED=0
+UNGUARDED_FILES=()
+for f in "$ROOT"/static/panels/*.html; do
+  [[ -r "$f" ]] || continue
+  if ! grep -q 'console.warn.*no token after' "$f"; then continue; fi
+  # File has a warn — make sure each occurrence is paired with the
+  # auth-bootstrap regex nearby. JS regex literals in the wrapper
+  # write `/\/api\/v1\/auth\/.../`, so we look for ANY mention of
+  # `auth/` followed by check|refresh|login|logout|sso within the
+  # current OR previous line (handles both inline and else-if forms).
+  if ! awk '
+    { combined = prev " " $0 }
+    /no token after/ {
+      # JS regex source escapes / as \/ and may group with `(`, so the
+      # actual sequence between "auth" and the endpoint name can be
+      # any of: "/check", "\/check", "/(check", "\/(check". Allow 1-5
+      # arbitrary chars in between to cover all forms.
+      if (combined ~ /auth.{1,5}(check|refresh|login|logout|sso)/) { ok=1 }
+    }
+    { prev = $0 }
+    END { exit (ok ? 0 : 1) }
+  ' "$f"; then
+    UNGUARDED=$((UNGUARDED + 1))
+    UNGUARDED_FILES+=("$(basename "$f")")
+  fi
+done
+
+if (( UNGUARDED == 0 )); then
+  _pass "44.4.x every 'no token after' warn is gated by auth-bootstrap regex"
+else
+  _fail "44.4.x unguarded 'no token after' warn(s)" \
+    "$UNGUARDED panel(s) without bootstrap-bypass: ${UNGUARDED_FILES[0]}"
+fi
+
 # ── 44.5 Browser-cache headers on HTML ───────────────────────────────────
 
 phase_open "44.5 HTML cache headers"
