@@ -156,25 +156,23 @@ func (h *SOARv2) SecretAuditLog(w http.ResponseWriter, r *http.Request) {
 		limit = 100
 	}
 
-	args := []any{claims.TenantID}
-	where := "tenant_id=$1"
+	var nameFilter any
 	if name := q.Get("name"); name != "" {
 		if !isValidSecretName(name) {
 			jsonError(w, "invalid name filter", http.StatusBadRequest)
 			return
 		}
-		args = append(args, name)
-		where += " AND secret_name=$2"
+		nameFilter = name
 	}
-	args = append(args, limit)
-	// where is literal SQL composed from "field=$N" templates; user input via args.
-	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
-	sql := `SELECT id, secret_name, run_id, action, actor, accessed_at
-	          FROM playbook_secret_audit
-	         WHERE ` + where +
-		` ORDER BY accessed_at DESC LIMIT $` + itoa(len(args))
 
-	rows, err := h.DB.Pool().Query(r.Context(), sql, args...)
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT id, secret_name, run_id, action, actor, accessed_at
+		   FROM playbook_secret_audit
+		  WHERE tenant_id = $1
+		    AND ($2::text IS NULL OR secret_name = $2)
+		  ORDER BY accessed_at DESC
+		  LIMIT $3`,
+		claims.TenantID, nameFilter, limit)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return

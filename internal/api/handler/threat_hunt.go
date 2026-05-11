@@ -335,29 +335,27 @@ func (h *ThreatHunt) ListResults(w http.ResponseWriter, r *http.Request) {
 	if limit < 1 || limit > 500 {
 		limit = 50
 	}
-	args := []any{tenantID}
-	where := "tenant_id = $1"
+	// Optional query_id filter handled via nullable bind so the SQL
+	// stays a single literal (no `+where+` concat → no taint-tracking
+	// false positive). Empty $2 == ANY, otherwise exact-match.
+	var qidFilter any
 	if qid := q.Get("query_id"); qid != "" {
 		if !validateUUID(qid) {
 			jsonError(w, "invalid query_id", http.StatusBadRequest)
 			return
 		}
-		args = append(args, qid)
-		where += " AND query_id = $2"
+		qidFilter = qid
 	}
-	args = append(args, limit)
-	limPlaceholder := "$" + itoa(len(args))
 
-	// where/limPlaceholder are literal SQL composed from known $N placeholders;
-	// all user input flows through args via $N parameterized binds.
 	rows, err := h.DB.Pool().Query(r.Context(),
-		// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 		`SELECT id, query_id, ran_at, duration_ms, match_count,
 		        COALESCE(error,''), triggered_by
 		   FROM hunt_results
-		  WHERE `+where+`
+		  WHERE tenant_id = $1
+		    AND ($2::uuid IS NULL OR query_id = $2::uuid)
 		  ORDER BY ran_at DESC
-		  LIMIT `+limPlaceholder, args...)
+		  LIMIT $3`,
+		tenantID, qidFilter, limit)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return

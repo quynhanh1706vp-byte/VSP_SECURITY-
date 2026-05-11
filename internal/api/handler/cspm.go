@@ -196,32 +196,31 @@ func (h *CSPM) ListFindings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	args := []any{claims.TenantID}
-	where := "tenant_id = $1"
 
+	// All three optional filters validated against allowlists before
+	// binding; the actual SQL is a single literal with nullable binds
+	// so semgrep's taint analysis has nothing to chase.
+	var accountFilter, severityFilter, statusFilter any
 	if v := q.Get("account"); v != "" {
 		if !validateUUID(v) {
 			jsonError(w, "invalid account id", http.StatusBadRequest)
 			return
 		}
-		args = append(args, v)
-		where += " AND account_id = $2"
+		accountFilter = v
 	}
 	if v := strings.ToLower(q.Get("severity")); v != "" {
 		if !validSeverities[v] {
 			jsonError(w, "invalid severity", http.StatusBadRequest)
 			return
 		}
-		args = append(args, v)
-		where += " AND severity = $" + itoa(len(args))
+		severityFilter = v
 	}
 	if v := strings.ToLower(q.Get("status")); v != "" {
 		if !validFindingStatus[v] {
 			jsonError(w, "invalid status", http.StatusBadRequest)
 			return
 		}
-		args = append(args, v)
-		where += " AND status = $" + itoa(len(args))
+		statusFilter = v
 	}
 
 	limit := queryInt(r, "limit", 100)
@@ -236,18 +235,18 @@ func (h *CSPM) ListFindings(w http.ResponseWriter, r *http.Request) {
 		offset = 0
 	}
 
-	args = append(args, limit, offset)
-	// where + LIMIT/OFFSET are literal SQL with $N placeholders; user input via args.
-	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
-	sql := `SELECT id, account_id, provider, severity, resource, rule_id,
-	               COALESCE(rule_name,''), message, COALESCE(file,''),
-	               status, detected_at, resolved_at
-	          FROM cspm_findings
-	         WHERE ` + where +
-		` ORDER BY detected_at DESC
-	         LIMIT $` + itoa(len(args)-1) + ` OFFSET $` + itoa(len(args))
-
-	rows, err := h.DB.Pool().Query(r.Context(), sql, args...)
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT id, account_id, provider, severity, resource, rule_id,
+		        COALESCE(rule_name,''), message, COALESCE(file,''),
+		        status, detected_at, resolved_at
+		   FROM cspm_findings
+		  WHERE tenant_id = $1
+		    AND ($2::uuid IS NULL OR account_id = $2::uuid)
+		    AND ($3::text IS NULL OR severity   = $3)
+		    AND ($4::text IS NULL OR status     = $4)
+		  ORDER BY detected_at DESC
+		  LIMIT $5 OFFSET $6`,
+		claims.TenantID, accountFilter, severityFilter, statusFilter, limit, offset)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return

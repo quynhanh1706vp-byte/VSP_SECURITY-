@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -66,30 +65,23 @@ type ssdfRow struct {
 
 func (h *CISAAttestation) Practices(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	statusFilter := q.Get("status")
-	groupFilter := q.Get("group")
-
-	args := []any{}
-	where := "1=1"
-	if statusFilter != "" {
-		args = append(args, statusFilter)
-		where += " AND status=$1"
+	var statusFilter, groupFilter any
+	if s := q.Get("status"); s != "" {
+		statusFilter = s
 	}
-	if groupFilter != "" {
-		args = append(args, groupFilter)
-		idx := len(args)
-		where += " AND group_code=$" + strconv.Itoa(idx)
+	if g := q.Get("group"); g != "" {
+		groupFilter = g
 	}
 
-	// where is literal SQL with $N placeholders; user input via args.
 	rows, err := h.DB.Pool().Query(r.Context(),
-		// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 		`SELECT practice_id, group_code, name, COALESCE(description,''), status,
 		        COALESCE(evidence_refs,'[]'::jsonb), COALESCE(implementation_notes,''),
 		        COALESCE(responsible_role,''), COALESCE(last_assessed, NOW())
-		 FROM ssdf_practices WHERE `+where+`
+		 FROM ssdf_practices
+		 WHERE ($1::text IS NULL OR status = $1)
+		   AND ($2::text IS NULL OR group_code = $2)
 		 ORDER BY group_code, practice_id`,
-		args...)
+		statusFilter, groupFilter)
 	if err != nil {
 		log.Warn().Err(err).Msg("attestation: practices query failed")
 		jsonError(w, "query failed", http.StatusInternalServerError)
@@ -195,25 +187,20 @@ func (h *CISAAttestation) Forms(w http.ResponseWriter, r *http.Request) {
 		limit = 500
 	}
 	offset := queryInt(r, "offset", 0)
-	statusFilter := q.Get("status")
-
-	args := []any{claims.TenantID}
-	where := "tenant_id=$1"
-	if statusFilter != "" {
-		args = append(args, statusFilter)
-		where += " AND status=$2"
+	var statusFilter any
+	if s := q.Get("status"); s != "" {
+		statusFilter = s
 	}
-	args = append(args, limit, offset)
 
-	// where + LIMIT/OFFSET are literal SQL with $N placeholders; user input via args.
 	rows, err := h.DB.Pool().Query(r.Context(),
-		// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 		`SELECT form_uuid, product_name, product_version, status,
 		        COALESCE(signed_by_name,''), signature_date, created_at, updated_at
-		 FROM attestation_forms WHERE `+where+`
+		 FROM attestation_forms
+		 WHERE tenant_id = $1
+		   AND ($2::text IS NULL OR status = $2)
 		 ORDER BY updated_at DESC
-		 LIMIT $`+strconv.Itoa(len(args)-1)+` OFFSET $`+strconv.Itoa(len(args)),
-		args...)
+		 LIMIT $3 OFFSET $4`,
+		claims.TenantID, statusFilter, limit, offset)
 	if err != nil {
 		log.Warn().Err(err).Msg("attestation: forms query failed")
 		jsonError(w, "query failed", http.StatusInternalServerError)

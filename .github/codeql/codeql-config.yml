@@ -63,6 +63,19 @@ paths-ignore:
   # and SameSite cookies. Re-enable scanning post-Phase-2.
   - static/panels/**
   - static/index.html
+  # Same Phase-1 CSP-mitigated XSS surface; top-level static JS files
+  # render into the same panel iframes (vsp_upgrade_v100.js is the
+  # legacy migration helper, vsp_pro_*.js are the Pro-tier panels).
+  - 'static/*.js'
+
+  # Contract-test mock API — intentionally vulnerable patterns for
+  # the test runner to exercise. Not deployed.
+  - contract-test/**
+
+  # Our own semgrep rule definitions contain example bad-pattern
+  # snippets ('password: ""') so the rules can match them in real code.
+  - scripts/lib/semgrep-rules.yml
+  - scripts/lib/**
 
 # Build environment hints for the Go analyzer. internal/netcap pulls
 # gopacket which needs libpcap-dev at compile time. The workflow

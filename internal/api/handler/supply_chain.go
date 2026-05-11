@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -72,27 +71,26 @@ func (h *SupplyChain) Signatures(w http.ResponseWriter, r *http.Request) {
 	offset := queryInt(r, "offset", 0)
 
 	search := sanitizeString(q.Get("q"), 200)
-
-	args := []any{claims.TenantID}
-	where := "tenant_id=$1"
+	var searchPattern any
 	if search != "" {
-		args = append(args, "%"+search+"%")
-		where += " AND (artifact_name ILIKE $2 OR artifact_digest ILIKE $2 OR signed_by ILIKE $2)"
+		searchPattern = "%" + search + "%"
 	}
 
-	args = append(args, limit, offset)
-	// where + LIMIT/OFFSET placeholders are literal $N references; user input
-	// flows through args via parameterized binds, never into the SQL text.
+	// Single-literal SQL with nullable search bind — no string concat → no
+	// taint-tracking false positive.
 	rows, err := h.DB.Pool().Query(r.Context(),
-		// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 		`SELECT id::text, artifact_name, artifact_digest, signed_by, algorithm,
 		        signed_at, verified, verified_at, tlog_index,
 		        (cert_pem IS NOT NULL AND cert_pem<>'')
 		 FROM supply_chain_signatures
-		 WHERE `+where+`
+		 WHERE tenant_id = $1
+		   AND ($2::text IS NULL
+		        OR artifact_name   ILIKE $2
+		        OR artifact_digest ILIKE $2
+		        OR signed_by       ILIKE $2)
 		 ORDER BY signed_at DESC
-		 LIMIT $`+strconv.Itoa(len(args)-1)+` OFFSET $`+strconv.Itoa(len(args)),
-		args...)
+		 LIMIT $3 OFFSET $4`,
+		claims.TenantID, searchPattern, limit, offset)
 	if err != nil {
 		jsonError(w, "query failed", http.StatusInternalServerError)
 		return
@@ -418,25 +416,21 @@ func (h *SupplyChain) VEX(w http.ResponseWriter, r *http.Request) {
 	if limit > 1000 {
 		limit = 1000
 	}
-	statusFilter := r.URL.Query().Get("status")
-
-	args := []any{claims.TenantID}
-	where := "tenant_id=$1"
-	if statusFilter != "" {
-		args = append(args, statusFilter)
-		where += " AND status=$2"
+	var statusFilter any
+	if s := r.URL.Query().Get("status"); s != "" {
+		statusFilter = s
 	}
-	args = append(args, limit)
 
-	// where is literal SQL with $N placeholders; user input via args binds only.
 	rows, err := h.DB.Pool().Query(r.Context(),
-		// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 		`SELECT id::text, product_name, product_version, component_name,
 		        COALESCE(component_version,''), COALESCE(cve_id,''), status,
 		        COALESCE(justification,''), COALESCE(detail,''), author, analysis_date
-		 FROM vex_statements WHERE `+where+`
-		 ORDER BY analysis_date DESC LIMIT $`+strconv.Itoa(len(args)),
-		args...)
+		 FROM vex_statements
+		 WHERE tenant_id = $1
+		   AND ($2::text IS NULL OR status = $2)
+		 ORDER BY analysis_date DESC
+		 LIMIT $3`,
+		claims.TenantID, statusFilter, limit)
 	if err != nil {
 		jsonError(w, "query failed", http.StatusInternalServerError)
 		return
