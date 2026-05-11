@@ -212,7 +212,7 @@ func persistStore() {
 	b, _ := json.MarshalIndent(map[string]any{"jobs": jobs}, "", "  ")
 	jobsMu.RUnlock()
 	tmp := *storePath + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o640); err != nil {
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
 		log.Printf("[store] write: %v", err)
 		return
 	}
@@ -240,7 +240,7 @@ func persistRuns() {
 	b, _ := json.MarshalIndent(map[string]any{"runs": runs}, "", "  ")
 	runsMu.RUnlock()
 	tmp := *runsPath + ".tmp"
-	_ = os.WriteFile(tmp, b, 0o640)
+	_ = os.WriteFile(tmp, b, 0o600)
 	_ = os.Rename(tmp, *runsPath)
 }
 
@@ -879,7 +879,7 @@ func postJSONExpect(url string, body any, expectStatus string) (string, string, 
 }
 
 func runSBOMExport(j *Job) (string, string, string, int) {
-	_ = os.MkdirAll(sbomDir, 0o770)
+	_ = os.MkdirAll(sbomDir, 0o700)
 	ts := time.Now().UTC().Format("20060102-150405")
 	target := j.Target
 	if target == "" || target == "all" {
@@ -904,7 +904,7 @@ func runSBOMExport(j *Job) (string, string, string, int) {
 	}
 	b, _ := json.MarshalIndent(out, "", "  ")
 	path := filepath.Join(sbomDir, ts+".json")
-	if err := os.WriteFile(path, b, 0o640); err != nil {
+	if err := os.WriteFile(path, b, 0o600); err != nil {
 		return "fail", "", err.Error(), 0
 	}
 	return "pass", fmt.Sprintf("wrote %s (%d bytes)", path, len(b)), "", 200
@@ -915,8 +915,8 @@ func runSBOMExport(j *Job) (string, string, string, int) {
 func main() {
 	flag.Parse()
 
-	_ = os.MkdirAll(filepath.Dir(*storePath), 0o770)
-	_ = os.MkdirAll(filepath.Dir(*runsPath), 0o770)
+	_ = os.MkdirAll(filepath.Dir(*storePath), 0o700)
+	_ = os.MkdirAll(filepath.Dir(*runsPath), 0o700)
 	loadStore()
 	loadRuns()
 

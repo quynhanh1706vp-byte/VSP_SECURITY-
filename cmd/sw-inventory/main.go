@@ -248,14 +248,16 @@ func loadStore() {
 
 func persistStore() {
 	store.RLock()
-	b, err := json.MarshalIndent(store, "", "  ")
+	b, err := json.MarshalIndent(struct {
+		Hosts map[string]*Host `json:"hosts"`
+	}{Hosts: store.Hosts}, "", "  ")
 	store.RUnlock()
 	if err != nil {
 		log.Printf("[store] marshal: %v", err)
 		return
 	}
 	tmp := *storePath + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o640); err != nil {
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
 		log.Printf("[store] write %s: %v", tmp, err)
 		return
 	}
@@ -280,10 +282,12 @@ func loadAudit() {
 
 func persistAudit() {
 	audit.RLock()
-	b, _ := json.MarshalIndent(audit, "", "  ")
+	b, _ := json.MarshalIndent(struct {
+		Events []AuditEvent `json:"events"`
+	}{Events: audit.Events}, "", "  ")
 	audit.RUnlock()
 	tmp := *auditPath + ".tmp"
-	_ = os.WriteFile(tmp, b, 0o640)
+	_ = os.WriteFile(tmp, b, 0o600)
 	_ = os.Rename(tmp, *auditPath)
 }
 
@@ -324,8 +328,8 @@ func loadOrGenKey(path string, autogen bool) (string, error) {
 		return "", err
 	}
 	k := hex.EncodeToString(raw)
-	_ = os.MkdirAll(filepath.Dir(path), 0o750)
-	if err := os.WriteFile(path, []byte(k+"\n"), 0o640); err != nil {
+	_ = os.MkdirAll(filepath.Dir(path), 0o700)
+	if err := os.WriteFile(path, []byte(k+"\n"), 0o600); err != nil {
 		return "", err
 	}
 	log.Printf("[boot] auto-generated %s (mode 640) — share with agents", path)
@@ -651,7 +655,7 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 
-	_ = os.MkdirAll(filepath.Dir(*storePath), 0o770)
+	_ = os.MkdirAll(filepath.Dir(*storePath), 0o700)
 	loadStore()
 	loadAudit()
 	// init auditID

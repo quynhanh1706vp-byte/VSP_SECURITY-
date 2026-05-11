@@ -50,7 +50,7 @@ func (h *ComplianceEvidence) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Cap upload size before parsing so a malicious client can't OOM us.
 	r.Body = http.MaxBytesReader(w, r.Body, maxEvidenceBytes+4096)
-	if err := r.ParseMultipartForm(maxEvidenceBytes); err != nil {
+	if err := r.ParseMultipartForm(maxEvidenceBytes); err != nil { //#nosec G120 -- MaxBytesReader applied line above
 		jsonError(w, "upload too large or invalid form (max 10MB)", http.StatusBadRequest)
 		return
 	}

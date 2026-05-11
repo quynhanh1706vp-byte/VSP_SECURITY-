@@ -468,7 +468,7 @@ func (s *PRService) deriveKey() []byte {
 	if len(src) < 32 {
 		// Pad with deterministic but non-zero bytes
 		for i := len(src); i < 32; i++ {
-			key[i] = byte(0xA5 ^ i)
+			key[i] = byte(0xA5 ^ i) //#nosec G115 -- i bounded to [0,31] by loop
 		}
 	}
 	return key

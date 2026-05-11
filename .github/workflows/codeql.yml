@@ -62,6 +62,13 @@ jobs:
           # default suite — extra coverage for taint-tracking.
           queries: security-extended,security-and-quality
 
+      - name: Install system deps for Go build
+        if: matrix.language == 'go'
+        # internal/netcap (pulled by cmd/gateway + cmd/scanner) uses
+        # gopacket, which needs libpcap-dev at compile time. Without it
+        # the build fails with "fatal error: pcap.h: No such file".
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+
       - name: Build (Go)
         if: matrix.language == 'go'
         run: |

@@ -445,6 +445,9 @@ func (w *PrecomputeWorker) loadEligibleFindings(ctx context.Context, runID strin
 		args = append(args, strings.ToUpper(s))
 	}
 
+	// #nosec G201 -- sevPlaceholders is a slice of "$N" placeholders generated
+	// in the loop above; user severity values flow through $3..$N parameterized
+	// binds, never into the SQL text.
 	query := fmt.Sprintf(`
 		SELECT f.id::text, COALESCE(f.rule_id,''), f.severity,
 		       COALESCE(f.path,''), COALESCE(f.line_num, 0),
@@ -454,7 +457,7 @@ func (w *PrecomputeWorker) loadEligibleFindings(ctx context.Context, runID strin
 		  AND UPPER(f.severity) IN (%s)
 		  AND COALESCE(f.path,'') != ''
 		  AND COALESCE(f.line_num, 0) > 0
-		ORDER BY 
+		ORDER BY
 		  CASE UPPER(f.severity) WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 ELSE 3 END,
 		  f.created_at DESC
 		LIMIT $2

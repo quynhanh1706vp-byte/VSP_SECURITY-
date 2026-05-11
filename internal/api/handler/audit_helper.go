@@ -25,7 +25,7 @@ func looksLikeUUID(s string) bool {
 // or empty string if not found. Mirrors the pattern feature_config.go uses
 // for tenant resolution (slug → UUID).
 func resolveUserUUID(ctx context.Context, db *store.DB, raw string) string {
-	if raw == "" {
+	if raw == "" || db == nil {
 		return ""
 	}
 	if looksLikeUUID(raw) {
@@ -39,7 +39,7 @@ func resolveUserUUID(ctx context.Context, db *store.DB, raw string) string {
 
 // resolveTenantUUID accepts a UUID or slug, returns canonical UUID.
 func resolveTenantUUID(ctx context.Context, db *store.DB, raw string) string {
-	if raw == "" {
+	if raw == "" || db == nil {
 		return ""
 	}
 	if looksLikeUUID(raw) {

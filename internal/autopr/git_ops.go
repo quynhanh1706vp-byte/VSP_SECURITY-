@@ -144,10 +144,10 @@ func (w *GitWorkspace) ApplyFix(filePath string, content string) error {
 		return fmt.Errorf("path escapes workspace: %s", filePath)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(full), 0o700); err != nil {
 		return err
 	}
-	return os.WriteFile(full, []byte(content), 0o644)
+	return os.WriteFile(full, []byte(content), 0o600)
 }
 
 // Commit — git add + commit with structured message
@@ -277,10 +277,10 @@ func (w *GitWorkspace) CopyFromReader(filePath string, src io.Reader) error {
 		return fmt.Errorf("unsafe path")
 	}
 	full := filepath.Join(w.Dir, filePath)
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(full), 0o700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(full, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(full, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}

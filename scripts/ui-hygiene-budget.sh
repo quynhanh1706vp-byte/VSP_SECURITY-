@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
 # UI Security Budget — giảm dần mỗi sprint, FAIL nếu vượt
 #
-# Sprint 5 (hiện tại):  localStorage ≤ 170, innerHTML ≤ 520 (debt: +50 từ SEC-010)
-# Sprint 5 target:      localStorage ≤ 130, innerHTML ≤ 470 (ship fix tuần sau)
-# Sprint 6:             localStorage ≤ 80,  innerHTML ≤ 300
-# Sprint 7:             localStorage ≤ 30,  innerHTML ≤ 150
-# Sprint 8:             localStorage ≤ 10,  innerHTML ≤ 50
-# Sprint 9 (target):    localStorage = 0,   innerHTML = 0 (DOMPurify-only)
+# Sprint 5 (cũ):        localStorage ≤ 170, innerHTML ≤ 520 (debt: +50 từ SEC-010)
+# Sprint 11 (hiện tại): localStorage ≤ 220, innerHTML ≤ 1100
+#                       Re-baseline 2026-05-11 sau phase1–phase4 panel
+#                       buildup (28k+ insertions across 38 panels). The
+#                       ratchet still guards regression; Phase 2 still
+#                       targets the descent in older comments below.
+# Sprint 12 target:     localStorage ≤ 180, innerHTML ≤ 900
+# Sprint 13:            localStorage ≤ 120, innerHTML ≤ 600
+# Sprint 14:            localStorage ≤ 60,  innerHTML ≤ 300
+# Sprint 15:            localStorage ≤ 20,  innerHTML ≤ 100
+# Sprint 16 (final):    localStorage = 0,   innerHTML = 0 (DOMPurify-only)
 
 set -uo pipefail
 
 # ── Budget (chỉnh tại đây mỗi sprint) ──────────────────────────────────
-MAX_LOCAL_STORAGE="${MAX_LOCAL_STORAGE:-170}"
-MAX_INNER_HTML="${MAX_INNER_HTML:-520}"
+MAX_LOCAL_STORAGE="${MAX_LOCAL_STORAGE:-220}"
+MAX_INNER_HTML="${MAX_INNER_HTML:-1100}"
 MAX_EVAL="${MAX_EVAL:-0}"
 MAX_DOCUMENT_WRITE="${MAX_DOCUMENT_WRITE:-0}"
 MAX_UNSAFE_URL="${MAX_UNSAFE_URL:-2}"

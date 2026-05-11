@@ -514,6 +514,7 @@ func (db *DB) ListSecrets(ctx context.Context, tenantID string) ([]SOARSecretMet
 		FROM playbook_secrets
 		WHERE tenant_id = $1
 		ORDER BY name
+		LIMIT 1000
 	`, tenantID)
 	if err != nil {
 		return nil, err

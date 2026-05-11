@@ -96,7 +96,7 @@ func (h *WebAuthnH) loadUser(r *http.Request, userID, tenantID string) (*dbUser,
 			ID:        credID,
 			PublicKey: pubKey,
 			Authenticator: webauthn.Authenticator{
-				SignCount: uint32(signCount), //nolint:gosec — width matches WebAuthn spec
+				SignCount: uint32(signCount), //#nosec G115 -- WebAuthn spec specifies uint32 SignCount
 			},
 			Flags: webauthn.CredentialFlags{UserVerified: uv},
 		}

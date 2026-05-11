@@ -288,6 +288,10 @@ func (h *SSOOIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set HttpOnly cookie + redirect
+	// #nosec G124 — Secure is set conditionally on TLS detection. HTTPS prod
+	// gets Secure=true; HTTP dev/k8s-internal gets Secure=false so the cookie
+	// actually round-trips. Unconditional Secure breaks bootstrapping behind
+	// non-TLS load balancers; the X-Forwarded-Proto check handles those.
 	http.SetCookie(w, &http.Cookie{
 		Name:     "vsp_token",
 		Value:    token,

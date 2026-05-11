@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
 )
@@ -80,6 +81,8 @@ func (h *CISAAttestation) Practices(w http.ResponseWriter, r *http.Request) {
 		where += " AND group_code=$" + strconv.Itoa(idx)
 	}
 
+	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
+	// where is literal SQL with $N placeholders; user input via args.
 	rows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT practice_id, group_code, name, COALESCE(description,''), status,
 		        COALESCE(evidence_refs,'[]'::jsonb), COALESCE(implementation_notes,''),
@@ -88,7 +91,8 @@ func (h *CISAAttestation) Practices(w http.ResponseWriter, r *http.Request) {
 		 ORDER BY group_code, practice_id`,
 		args...)
 	if err != nil {
-		jsonError(w, "query failed: "+err.Error(), http.StatusInternalServerError)
+		log.Warn().Err(err).Msg("attestation: practices query failed")
+		jsonError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -159,7 +163,8 @@ func (h *CISAAttestation) UpdatePractice(w http.ResponseWriter, r *http.Request)
 		 WHERE practice_id=$4`,
 		req.Status, req.ImplementationNotes, req.EvidenceRefs, id)
 	if err != nil {
-		jsonError(w, "update failed: "+err.Error(), http.StatusInternalServerError)
+		log.Warn().Err(err).Msg("attestation: practice update failed")
+		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -200,6 +205,8 @@ func (h *CISAAttestation) Forms(w http.ResponseWriter, r *http.Request) {
 	}
 	args = append(args, limit, offset)
 
+	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
+	// where + LIMIT/OFFSET are literal SQL with $N placeholders; user input via args.
 	rows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT form_uuid, product_name, product_version, status,
 		        COALESCE(signed_by_name,''), signature_date, created_at, updated_at
@@ -208,7 +215,8 @@ func (h *CISAAttestation) Forms(w http.ResponseWriter, r *http.Request) {
 		 LIMIT $`+strconv.Itoa(len(args)-1)+` OFFSET $`+strconv.Itoa(len(args)),
 		args...)
 	if err != nil {
-		jsonError(w, "query failed: "+err.Error(), http.StatusInternalServerError)
+		log.Warn().Err(err).Msg("attestation: forms query failed")
+		jsonError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -395,7 +403,8 @@ func (h *CISAAttestation) SignForm(w http.ResponseWriter, r *http.Request) {
 		 WHERE form_uuid=$5 AND tenant_id=$6 AND status='draft'`,
 		req.Name, req.Title, req.Email, req.SignatureMethod, uuidStr, claims.TenantID)
 	if err != nil {
-		jsonError(w, "update failed: "+err.Error(), http.StatusInternalServerError)
+		log.Warn().Err(err).Msg("attestation: form sign failed")
+		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {

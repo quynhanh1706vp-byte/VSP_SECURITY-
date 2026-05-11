@@ -81,6 +81,9 @@ func (h *SupplyChain) Signatures(w http.ResponseWriter, r *http.Request) {
 	}
 
 	args = append(args, limit, offset)
+	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
+	// where + LIMIT/OFFSET placeholders are literal $N references; user input
+	// flows through args via parameterized binds, never into the SQL text.
 	rows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT id::text, artifact_name, artifact_digest, signed_by, algorithm,
 		        signed_at, verified, verified_at, tlog_index,
@@ -425,6 +428,8 @@ func (h *SupplyChain) VEX(w http.ResponseWriter, r *http.Request) {
 	}
 	args = append(args, limit)
 
+	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
+	// where is literal SQL with $N placeholders; user input via args binds only.
 	rows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT id::text, product_name, product_version, component_name,
 		        COALESCE(component_version,''), COALESCE(cve_id,''), status,

@@ -46,7 +46,7 @@ func computeDelay(p *RetryPolicy, attempt int) time.Duration {
 	}
 	// Apply jitter (additive, ±jitter_ratio * ms)
 	if p.JitterRatio > 0 {
-		j := (rand.Float64()*2 - 1) * p.JitterRatio * ms //nolint:gosec // jitter, not crypto
+		j := (rand.Float64()*2 - 1) * p.JitterRatio * ms //#nosec G404 -- jitter only, not cryptographic
 		ms += j
 		if ms < 0 {
 			ms = 0

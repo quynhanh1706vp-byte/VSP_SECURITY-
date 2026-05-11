@@ -326,7 +326,14 @@ func main() {
 
 	log.Printf("VSP Trivy API listening on %s", listenAddr)
 	log.Printf("Try: curl -X POST http://127.0.0.1%s/api/v1/container/seed", listenAddr)
-	if err := http.ListenAndServe(listenAddr, mux); err != nil {
+	srv := &http.Server{
+		Addr:              listenAddr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }

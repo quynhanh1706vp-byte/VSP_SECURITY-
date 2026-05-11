@@ -107,6 +107,9 @@ func HandlerListPR(db *sql.DB) http.HandlerFunc {
 		}
 		args = append(args, limit)
 
+		// #nosec G201,G701 -- WHERE clauses come from literal strings ("pr_status = $N"),
+		// the only %s expansion is a join of those literals. User input flows through
+		// $N parameterized binds only.
 		q := fmt.Sprintf(`
 			SELECT id, cache_key, finding_id, COALESCE(rule_id,''), COALESCE(severity,''),
 			       COALESCE(file_path,''), COALESCE(branch_name,''),
@@ -119,7 +122,7 @@ func HandlerListPR(db *sql.DB) http.HandlerFunc {
 			ORDER BY created_at DESC
 			LIMIT $%d`, strings.Join(where, " AND "), len(args))
 
-		rows, err := db.QueryContext(ctx, q, args...)
+		rows, err := db.QueryContext(ctx, q, args...) //#nosec G701 -- see fmt.Sprintf comment above
 		if err != nil {
 			http.Error(w, "query failed", http.StatusInternalServerError)
 			return

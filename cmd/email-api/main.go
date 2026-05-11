@@ -181,7 +181,7 @@ func persistConfig() {
 	tmplMu.RUnlock()
 	b, _ := json.MarshalIndent(out, "", "  ")
 	tmp := *configPath + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o640); err != nil {
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
 		log.Printf("[config] write: %v", err)
 		return
 	}
@@ -211,7 +211,7 @@ func persistHistory() {
 	histMu.RUnlock()
 	b, _ := json.MarshalIndent(out, "", "  ")
 	tmp := *historyPath + ".tmp"
-	_ = os.WriteFile(tmp, b, 0o640)
+	_ = os.WriteFile(tmp, b, 0o600)
 	_ = os.Rename(tmp, *historyPath)
 }
 
@@ -360,7 +360,7 @@ func sendEmail(to []string, subject, body string, isHTML bool) error {
 	if c.From == "" {
 		c.From = "vsp@vsp.local"
 	}
-	addr := fmt.Sprintf("%s:%d", c.Host, c.Port)
+	addr := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
 
 	// Build MIME message
 	var msg strings.Builder
@@ -495,7 +495,7 @@ func handleConfigHealth(w http.ResponseWriter, r *http.Request) {
 	cfgMu.RLock()
 	c := cfg
 	cfgMu.RUnlock()
-	addr := fmt.Sprintf("%s:%d", c.Host, c.Port)
+	addr := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
 		writeJSON(w, 200, map[string]any{
@@ -726,7 +726,7 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
-	_ = os.MkdirAll(filepath.Dir(*configPath), 0o770)
+	_ = os.MkdirAll(filepath.Dir(*configPath), 0o700)
 	loadConfig()
 	loadHistory()
 

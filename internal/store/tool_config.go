@@ -27,7 +27,8 @@ type ToolConfig struct {
 func (db *DB) GetDisabledTools(ctx context.Context, tenantID string) ([]string, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT tool_name FROM tenant_tool_config
-		 WHERE tenant_id = $1 AND enabled = false`,
+		 WHERE tenant_id = $1 AND enabled = false
+		 LIMIT 500`,
 		tenantID)
 	if err != nil {
 		return nil, err
@@ -52,7 +53,8 @@ func (db *DB) ListToolConfig(ctx context.Context, tenantID string) ([]ToolConfig
 	rows, err := db.pool.Query(ctx,
 		`SELECT tenant_id, tool_name, enabled, custom_args, updated_at, updated_by
 		 FROM tenant_tool_config WHERE tenant_id = $1
-		 ORDER BY tool_name ASC`,
+		 ORDER BY tool_name ASC
+		 LIMIT 500`,
 		tenantID)
 	if err != nil {
 		return nil, err

@@ -189,7 +189,7 @@ func persistStore() {
 	b, _ := json.MarshalIndent(out, "", "  ")
 	mu.RUnlock()
 	tmp := *storePath + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o640); err != nil {
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
 		log.Printf("[store] write: %v", err)
 		return
 	}
@@ -673,7 +673,7 @@ func main() {
 	// Re-init semaphore with configured max parallel
 	scanSem = make(chan struct{}, *maxParallel)
 
-	_ = os.MkdirAll(filepath.Dir(*storePath), 0o770)
+	_ = os.MkdirAll(filepath.Dir(*storePath), 0o700)
 	loadStore()
 
 	t := detectNuclei()

@@ -125,7 +125,7 @@ func parseField(field string, lo, hi int, names map[string]int) (uint64, error) 
 			return 0, fmt.Errorf("out of range %d-%d (allowed %d-%d)", start, end, lo, hi)
 		}
 		for v := start; v <= end; v += step {
-			mask |= 1 << uint(v)
+			mask |= 1 << uint(v) //#nosec G115 -- v bounded to [lo,hi] above (max 59)
 		}
 	}
 	if mask == 0 {
@@ -146,17 +146,17 @@ func lookupOrInt(s string, names map[string]int) (int, error) {
 
 // Match returns true if t matches the expression.
 func (c *CronExpr) Match(t time.Time) bool {
-	if c.Minute&(1<<uint(t.Minute())) == 0 {
+	if c.Minute&(1<<uint(t.Minute())) == 0 { //#nosec G115 -- Minute() bounded to [0,59]
 		return false
 	}
-	if c.Hour&(1<<uint(t.Hour())) == 0 {
+	if c.Hour&(1<<uint(t.Hour())) == 0 { //#nosec G115 -- Hour() bounded to [0,23]
 		return false
 	}
-	if c.Month&(1<<uint(t.Month())) == 0 {
+	if c.Month&(1<<uint(t.Month())) == 0 { //#nosec G115 -- Month() bounded to [1,12]
 		return false
 	}
-	domOK := c.DOM&(1<<uint(t.Day())) != 0
-	dowOK := c.DOW&(1<<uint(t.Weekday())) != 0
+	domOK := c.DOM&(1<<uint(t.Day())) != 0      //#nosec G115 -- Day() bounded to [1,31]
+	dowOK := c.DOW&(1<<uint(t.Weekday())) != 0 //#nosec G115 -- Weekday() bounded to [0,6]
 	// Standard cron: if both DOM and DOW are restricted (not '*'),
 	// the job matches if EITHER one matches (OR). If one is '*', AND.
 	if c.domStar && c.dowStar {

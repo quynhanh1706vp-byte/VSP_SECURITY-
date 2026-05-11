@@ -266,6 +266,9 @@ func runCosign(ctx context.Context, args ...string) (string, string, error) {
 	cctx, cancel := context.WithTimeout(ctx, *scanTO)
 	defer cancel()
 
+	// #nosec G702 -- exec.CommandContext passes args via argv (no shell), so
+	// special characters in user-provided image names are literal arguments
+	// to cosign, not shell metacharacters.
 	cmd := exec.CommandContext(cctx, *cosignBin, args...)
 	cmd.Env = append(os.Environ(),
 		"COSIGN_PASSWORD="+password,
@@ -656,7 +659,7 @@ func main() {
 
 	mustExist(keyPath, "run `cosign generate-key-pair` and copy cosign.key here")
 	mustExist(pubPath, "run `cosign generate-key-pair` and copy cosign.pub here")
-	if err := os.MkdirAll(*storeDir, 0o750); err != nil {
+	if err := os.MkdirAll(*storeDir, 0o700); err != nil {
 		log.Fatalf("[boot] mkdir store: %v", err)
 	}
 	mustLoadPassword()

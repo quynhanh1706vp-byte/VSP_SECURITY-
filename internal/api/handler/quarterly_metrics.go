@@ -89,7 +89,7 @@ func lastNQuarters(now time.Time, n int) []qBounds {
 		end := start.AddDate(0, 3, 0)
 		out = append(out, qBounds{
 			label: time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC).Format("2006") +
-				"-Q" + string(rune('0'+q)),
+				"-Q" + string(rune('0'+q)), //#nosec G115 -- q bounded to [1,4]
 			start: start,
 			end:   end,
 		})

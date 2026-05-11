@@ -2307,7 +2307,10 @@ func main() {
 				period = "30d"
 			}
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"period":"` + period + `","tenant":"default","entries":[],"total":0}`))
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"period": period, "tenant": "default",
+				"entries": []any{}, "total": 0,
+			})
 		})
 		// #12 Audit metrics
 		r.Get("/api/v1/autofix/metrics", func(w http.ResponseWriter, req *http.Request) {
@@ -2316,7 +2319,21 @@ func main() {
 				period = "30d"
 			}
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"period_days":30,"period":"` + period + `","tenant_id":"default","totals":{"findings_open":0,"findings_applied":0,"findings_verified":0,"findings_failed":0,"findings_accepted":0,"findings_false_pos":0},"rates":{"verification_rate":0,"first_attempt_success":0,"auto_remediation_rate":0},"mttr":{"critical_hours":0,"high_hours":0,"medium_hours":0,"low_hours":0,"overall_hours":0},"top_rules_remediated":[]}`))
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"period_days": 30, "period": period, "tenant_id": "default",
+				"totals": map[string]int{
+					"findings_open": 0, "findings_applied": 0, "findings_verified": 0,
+					"findings_failed": 0, "findings_accepted": 0, "findings_false_pos": 0,
+				},
+				"rates": map[string]int{
+					"verification_rate": 0, "first_attempt_success": 0, "auto_remediation_rate": 0,
+				},
+				"mttr": map[string]int{
+					"critical_hours": 0, "high_hours": 0, "medium_hours": 0,
+					"low_hours": 0, "overall_hours": 0,
+				},
+				"top_rules_remediated": []any{},
+			})
 		})
 		// ─── End H3.M ────────────────────────────────────────────────────
 		// ─── [H3.O] Pre-compute status endpoints ─────────────────────

@@ -348,6 +348,9 @@ func (h *ThreatHunt) ListResults(w http.ResponseWriter, r *http.Request) {
 	args = append(args, limit)
 	limPlaceholder := "$" + itoa(len(args))
 
+	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
+	// where/limPlaceholder are literal SQL composed from known $N placeholders;
+	// all user input flows through args via $N parameterized binds.
 	rows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT id, query_id, ran_at, duration_ms, match_count,
 		        COALESCE(error,''), triggered_by

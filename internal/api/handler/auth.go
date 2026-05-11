@@ -318,6 +318,9 @@ func (a *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func (a *Auth) writeAudit(r *http.Request, tenantID string, userID *string, action, resource string) {
+	if a.DB == nil {
+		return
+	}
 	// L9 2026-05-09: callers historically passed claims.TenantID
 	// directly which is often the slug "default" not a UUID. The
 	// audit_log.tenant_id column is uuid; the slug-typed bind silently

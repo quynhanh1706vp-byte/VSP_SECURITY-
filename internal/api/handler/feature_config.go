@@ -125,8 +125,7 @@ func (h *FeatureConfig) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// No row yet — return empty object, not 404. The panel form will
 		// just show defaults.
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"feature_id":"` + id + `","config":{}}`))
+		jsonOK(w, map[string]any{"feature_id": id, "config": map[string]any{}})
 		return
 	}
 	out := struct {

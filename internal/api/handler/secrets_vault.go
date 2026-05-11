@@ -167,6 +167,8 @@ func (h *SOARv2) SecretAuditLog(w http.ResponseWriter, r *http.Request) {
 		where += " AND secret_name=$2"
 	}
 	args = append(args, limit)
+	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
+	// where is literal SQL composed from "field=$N" templates; user input via args.
 	sql := `SELECT id, secret_name, run_id, action, actor, accessed_at
 	          FROM playbook_secret_audit
 	         WHERE ` + where +
