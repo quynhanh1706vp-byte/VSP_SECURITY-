@@ -186,6 +186,10 @@ run_level "L55 deserialization" "$ROOT/scripts/test-l55-deserialization.sh"
 run_level "L56 dns-rebinding"   "$ROOT/scripts/test-l56-dns-rebinding.sh"
 run_level "L58 concurrent-mod"  "$ROOT/scripts/test-l58-concurrent-mod.sh"
 run_level "L59 timing-attack"   "$ROOT/scripts/test-l59-timing-attack.sh"
+run_level "L60 fuzz-coverage"   "$ROOT/scripts/test-l60-fuzz-coverage.sh"
+run_level "L61 dep-confusion"   "$ROOT/scripts/test-l61-dep-confusion.sh"
+run_level "L62 secrets-rotation" "$ROOT/scripts/test-l62-secrets-rotation.sh"
+run_level "L63 gh-adv-security" "$ROOT/scripts/test-l63-gh-advanced-security.sh"
 
 # L57 backup-restore is destructive (CREATE/DROP DATABASE). Gated.
 if [[ "${L57_BACKUP:-0}" == "1" ]]; then

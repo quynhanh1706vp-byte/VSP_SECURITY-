@@ -41,6 +41,10 @@ name: Release Readiness (L1-L34)
 #                                             L57 backup-restore (gated)
 #                                             L58 concurrent-mod
 #                                             L59 timing-attack
+#                                             L60 fuzz-coverage
+#                                             L61 dep-confusion
+#                                             L62 secrets-rotation
+#                                             L63 gh-adv-security
 #
 # Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
 # canary tenants and verify residue/leak invariants without touching
