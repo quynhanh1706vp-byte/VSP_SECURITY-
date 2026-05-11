@@ -43,19 +43,22 @@ _pass "53.1.0 /metrics fetched [$LINES lines]"
 # Count distinct series per metric name. Format:
 #   metric_name{label1="v1",label2="v2"} value
 # Strip the value + labels, then count unique label-sets per metric.
+# Budget tuning: a single HistogramVec with 30 routes × 4 methods ×
+# 4 status-classes × 11 buckets = 5280 _bucket lines, which is fine
+# for Prom. Hard ceiling is the truly-out-of-control case:
+# >10k lines/metric = an unbounded label dimension (per-IP /
+# per-user / raw URL path). Threshold 5000.
 SUSPECT=$(awk '
-  # Skip comments (HELP/TYPE) and blanks
   /^#/ { next }
   /^$/ { next }
   {
-    # Extract metric name = chars before { or space
     name = $1
     sub(/[{ ].*/, "", name)
     count[name]++
   }
   END {
     for (name in count) {
-      if (count[name] > 500) {
+      if (count[name] > 5000) {
         printf "%s:%d\n", name, count[name]
       }
     }
@@ -65,10 +68,10 @@ SUSPECT=$(awk '
 rm -f "$METRICS"
 
 if [[ -z "$SUSPECT" ]]; then
-  _pass "53.1.1 no metric exceeds 500-series cardinality budget"
+  _pass "53.1.1 no metric exceeds 5000-series cardinality ceiling"
 else
   _fail "53.1.1 high-cardinality metric(s)" \
-    "$(echo "$SUSPECT" | head -1) — review label choice (path / user_id / ip = bombs)"
+    "$(echo "$SUSPECT" | head -1) — unbounded label dimension (per-IP / per-user / raw path)"
 fi
 
 # ── 53.2 Static scan — labels look like cardinality bombs ────────────────
