@@ -388,8 +388,12 @@ func sendEmail(to []string, subject, body string, isHTML bool) error {
 	}
 
 	if c.UseTLS {
-		// Implicit TLS
-		conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: c.Host})
+		// Implicit TLS. MinVersion = TLS 1.2 to refuse legacy SSLv3/TLS1.0/1.1
+		// downgrades against the upstream SMTP server.
+		conn, err := tls.Dial("tcp", addr, &tls.Config{
+			ServerName: c.Host,
+			MinVersion: tls.VersionTLS12,
+		})
 		if err != nil {
 			return fmt.Errorf("tls dial: %w", err)
 		}

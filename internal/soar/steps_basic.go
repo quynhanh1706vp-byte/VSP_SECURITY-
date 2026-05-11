@@ -261,6 +261,9 @@ func parseConfig[T any](n *Node) (T, error) {
 	if len(n.Config) == 0 {
 		return cfg, nil
 	}
+	// nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+	// n.Config is playbook author content stored in playbooks.config_json,
+	// not a request body. Tenant-scoped DB read; not untrusted input.
 	if err := json.Unmarshal(n.Config, &cfg); err != nil {
 		return cfg, fmt.Errorf("%s config: %w", n.Type, err)
 	}
@@ -297,6 +300,8 @@ func resolvePath(ec *ExecCtx, path string) interface{} {
 			return nil
 		}
 		var v interface{}
+		// nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+		// raw comes from a previous step's output in the same run.
 		_ = json.Unmarshal(raw, &v)
 		root = v
 		parts = parts[2:]

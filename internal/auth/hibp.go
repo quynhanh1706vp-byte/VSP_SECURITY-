@@ -48,6 +48,7 @@ func CheckPasswordBreached(ctx context.Context, password string) error {
 	if password == "" {
 		return nil
 	}
+	// nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
 	sum := sha1.Sum([]byte(password)) //#nosec G401 — k-anonymity prefix; HIBP API requirement
 	hashHex := strings.ToUpper(hex.EncodeToString(sum[:]))
 	prefix := hashHex[:5]

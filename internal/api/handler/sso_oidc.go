@@ -185,6 +185,7 @@ func (h *SSOOIDCHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// configured provider record (cfg.AuthURL / cfg.TokenURL), not from
 	// request data. The only request-tainted piece is the `state`
 	// parameter inside the query string, which is meant to be there.
+	// nosemgrep: go.lang.security.injection.open-redirect.open-redirect
 	http.Redirect(w, r, authzURL, http.StatusFound)
 }
 
@@ -308,6 +309,7 @@ func (h *SSOOIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	// start with single "/", reject "//" / backslash. gosec's taint
 	// analysis can't see the sanitizer, but the value here is guaranteed
 	// to be a same-origin path or "/".
+	// nosemgrep: go.lang.security.injection.open-redirect.open-redirect
 	http.Redirect(w, r, redirAfter, http.StatusFound)
 }
 

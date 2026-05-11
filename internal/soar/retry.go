@@ -46,6 +46,7 @@ func computeDelay(p *RetryPolicy, attempt int) time.Duration {
 	}
 	// Apply jitter (additive, ±jitter_ratio * ms)
 	if p.JitterRatio > 0 {
+		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 		j := (rand.Float64()*2 - 1) * p.JitterRatio * ms //#nosec G404 -- jitter only, not cryptographic
 		ms += j
 		if ms < 0 {

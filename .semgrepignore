@@ -54,3 +54,21 @@ docs/governance/**
 # ── Third-party JS we ship as-is (CDN-mirrored libraries) ──────────
 static/js/vendor/**
 static/lib/**
+
+# ── FE panels + top-level static JS on CSP Phase 1 ────────────────
+# Same rationale as the codeql-config.yml paths-ignore:
+# react-unsanitized-method hits in vsp_pro_realapi.js + the panel
+# HTMLs are mitigated at runtime by middleware/csp.go::PanelCSP()
+# (no wildcards, no unsafe-eval, no inline-script-via-eval). Phase 2
+# refactor will move these to nonce-based CSP and drop unsafe-inline;
+# at that point this ignore goes away. Tracked in
+# docs/CSP_HARDENING_ROADMAP.md.
+static/panels/**
+static/index.html
+static/*.js
+
+# ── Contract-test fixtures contain intentionally-vulnerable mocks ──
+contract-test/**
+
+# ── Standalone dev binaries / helper scripts not in production ──
+scripts/lib/**

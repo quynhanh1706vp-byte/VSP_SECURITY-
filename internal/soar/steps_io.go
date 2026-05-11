@@ -114,7 +114,11 @@ func (e *httpExecutor) Run(ctx context.Context, n *Node, ec *ExecCtx) (json.RawM
 		return nil, "", fmt.Errorf("http: status %d", resp.StatusCode)
 	}
 
-	// Try to parse JSON response
+	// Try to parse JSON response.
+	// nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+	// resp.Body is from an HTTP endpoint the playbook author configured,
+	// gated by SSRF allowlist + sandbox timeout. The interface{} target
+	// is intentional — we surface arbitrary JSON to the next step.
 	var bodyJSON interface{}
 	if err := json.Unmarshal(resp.Body, &bodyJSON); err != nil {
 		bodyJSON = string(resp.Body)

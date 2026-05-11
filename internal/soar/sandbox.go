@@ -140,6 +140,9 @@ func (s *Sandbox) Run(parentCtx context.Context, script string, input SandboxInp
 	stepsView := make(map[string]interface{}, len(input.StepOutputs))
 	for k, v := range input.StepOutputs {
 		var any interface{}
+		// nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+		// StepOutputs are produced by prior SOAR steps in the same run
+		// — trusted internal data, never request body.
 		_ = json.Unmarshal(v, &any)
 		stepsView[k] = any
 	}
