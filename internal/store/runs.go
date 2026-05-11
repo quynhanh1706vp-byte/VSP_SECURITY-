@@ -104,13 +104,20 @@ func (db *DB) UpdateRunStatus(ctx context.Context, tenantID, rid, status string,
 	return err
 }
 
-func (db *DB) UpdateRunResult(ctx context.Context, tenantID, rid, gate, posture string, total int, summary json.RawMessage) error {
+// UpdateRunResult finalises a run row. toolsDone is the actual number
+// of tool runners the worker dispatched (success + fail combined) —
+// it must NOT be clamped to tools_total. Pre-2026-05-11 this query
+// did `tools_done = tools_total`, which papered over the FULL_SOC
+// drift bug: stale tools_total=18 caused the UI to show "18/18"
+// regardless of how many tools actually ran. Pass the real count
+// from the worker so the operator sees ground truth.
+func (db *DB) UpdateRunResult(ctx context.Context, tenantID, rid, gate, posture string, total, toolsDone int, summary json.RawMessage) error {
 	_, err := db.pool.Exec(ctx,
 		`UPDATE runs
 		 SET status='DONE', gate=$3, posture=$4, total_findings=$5,
-		     summary=$6, tools_done=tools_total, finished_at=NOW()
+		     summary=$6, tools_done=$7, finished_at=NOW()
 		 WHERE rid=$1 AND tenant_id=$2`,
-		rid, tenantID, gate, posture, total, summary)
+		rid, tenantID, gate, posture, total, summary, toolsDone)
 	return err
 }
 

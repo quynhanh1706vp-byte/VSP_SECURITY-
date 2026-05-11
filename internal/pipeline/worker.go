@@ -228,9 +228,13 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	// is always ≤ the emit count. The L6-A db-integrity watchdog
 	// caught the drift at every dashboard refresh: total_findings
 	// reported by the scoreboard differed from what /findings returned.
+	// toolsDone = number of tool runners the worker dispatched in
+	// this run. Every runner contributes either a finding set or an
+	// entry in ToolErrors, so len(profileRunners) is the canonical
+	// "completed" count regardless of per-tool success/fail.
 	h.DB.UpdateRunResult(dbCtx, payload.TenantID, payload.RID,
 		string(eval.Decision), eval.Posture,
-		len(saved), summaryJSON)
+		len(saved), len(profileRunners), summaryJSON)
 	// Store gate reason for audit trail
 	h.DB.UpdateRunGateReason(dbCtx, payload.TenantID, payload.RID, eval.Reason)
 
