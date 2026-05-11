@@ -46,6 +46,21 @@ func TestErrTamper_Sentinel(t *testing.T) {
 	}
 }
 
+// TestNewFromPassphrase_EmptyRejected_L60 pins the empty-passphrase
+// guard. An empty input would derive to SHA256("") which is a known
+// constant — every empty-passphrase ciphertext would be decryptable
+// by attackers. L11 mutation C2_empty_passphrase_accepted removes
+// this guard, so this test MUST fail when that mutation is active.
+func TestNewFromPassphrase_EmptyRejected_L60(t *testing.T) {
+	_, err := NewFromPassphrase("")
+	if err == nil {
+		t.Fatal("NewFromPassphrase(\"\") must return error — empty passphrase derives to constant key SHA256(\"\")")
+	}
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("expected ErrInvalidKey on empty passphrase, got: %v", err)
+	}
+}
+
 // TestDecrypt_ShortCiphertext_L60 exercises the ciphertext-length guard.
 // A mutation removing this check would surface here.
 func TestDecrypt_ShortCiphertext_L60(t *testing.T) {
