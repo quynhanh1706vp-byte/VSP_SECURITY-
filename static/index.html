@@ -236,10 +236,27 @@ window.CATEGORY_COLORS = {
 // Cache the /api/v1/scanners/health snapshot for 30s so chip-render
 // stays cheap. Maps tool name → available bool. Empty map means
 // "endpoint unreachable" → fall back to all-available (legacy behaviour).
-window.__SCANNER_HEALTH = { fetchedAt: 0, byTool: {}, available: 0, expected: 26 };
+//
+// Defensive: if the gateway hasn't been redeployed and the endpoint
+// returns 404, we cache that "absent" state for the whole session so
+// we don't spam DevTools with red 404 lines on every chip refresh.
+// Same idea for any 5xx — we'll quietly degrade and let the operator
+// reload after they confirm the new gateway is up.
+window.__SCANNER_HEALTH = {
+  fetchedAt: 0, byTool: {}, available: 0, expected: 26,
+  endpointAbsent: false,
+};
 function refreshScannerHealth() {
+  if (window.__SCANNER_HEALTH.endpointAbsent) return Promise.resolve();
   return fetch('/api/v1/scanners/health', { credentials: 'same-origin' })
-    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(r) {
+      if (r.status === 404) {
+        // Old gateway binary — endpoint not deployed. Stop trying.
+        window.__SCANNER_HEALTH.endpointAbsent = true;
+        return null;
+      }
+      return r.ok ? r.json() : null;
+    })
     .then(function(j) {
       if (!j || !Array.isArray(j.tools)) return;
       var byTool = {};
@@ -249,6 +266,7 @@ function refreshScannerHealth() {
         byTool: byTool,
         available: j.available || 0,
         expected: j.expected_full_soc || 26,
+        endpointAbsent: false,
       };
     })
     .catch(function() { /* leave fallback */ });
