@@ -114,7 +114,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		if a.IPLock != nil {
 			if locked, _ := a.IPLock.RecordFail(clientIP); locked {
 				LoginAttempts.WithLabelValues("ip_locked").Inc()
-			go a.writeAudit(r.Clone(context.Background()), tenantID, nil, "LOGIN_IP_LOCKED", "/auth/login")
+				go a.writeAudit(r.Clone(context.Background()), tenantID, nil, "LOGIN_IP_LOCKED", "/auth/login")
 			}
 		}
 		// Sprint 12.7: backoff also on missing-user path. Pre-12.7 the
@@ -136,7 +136,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	if user.LockedUntil != nil && time.Now().Before(*user.LockedUntil) {
 		log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: account locked")
 		LoginAttempts.WithLabelValues("locked").Inc()
-	go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_LOCKED", "/auth/login")
+		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_LOCKED", "/auth/login")
 		jsonError(w, "account temporarily locked — too many failed attempts", http.StatusTooManyRequests)
 		return
 	}

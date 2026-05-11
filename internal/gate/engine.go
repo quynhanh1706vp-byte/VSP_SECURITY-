@@ -134,7 +134,9 @@ func Evaluate(rule PolicyRule, s scanner.Summary) EvalResult {
 // than one with 50.
 //
 // Penalty per bucket: weight × sqrt(count). Examples for HIGH (w=8):
-//   count=1 → 8pts   count=4 → 16pts   count=25 → 40pts   count=100 → 80pts
+//
+//	count=1 → 8pts   count=4 → 16pts   count=25 → 40pts   count=100 → 80pts
+//
 // Score floor is still 0 (clamp); the bucket itself is uncapped.
 func Score(s scanner.Summary) int {
 	// Use weighted counts when available (DAST×1.5, SCA×1.2, IAC×0.8, SAST×1.0)
@@ -210,12 +212,12 @@ func sqrtPenalty(count, weight int) int {
 // pre-Sprint-7 bug that motivated this consolidation).
 //
 // Computation is two-step:
-//   1. Hard-fail conditions force "F" regardless of score:
-//        • any critical finding present
-//        • live secrets present (HasSecrets)
-//   2. Otherwise, derive from numeric Score(s):
-//        ≥ 90 → A+,  ≥ 80 → A,  ≥ 70 → B,
-//        ≥ 60 → C,   ≥ 40 → D,  else F
+//  1. Hard-fail conditions force "F" regardless of score:
+//     • any critical finding present
+//     • live secrets present (HasSecrets)
+//  2. Otherwise, derive from numeric Score(s):
+//     ≥ 90 → A+,  ≥ 80 → A,  ≥ 70 → B,
+//     ≥ 60 → C,   ≥ 40 → D,  else F
 //
 // The score-based bands match what the JS dashboard previously computed
 // independently — this keeps existing UI snapshots stable while moving

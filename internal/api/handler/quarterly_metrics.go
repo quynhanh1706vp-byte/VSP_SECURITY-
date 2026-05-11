@@ -5,11 +5,11 @@
 // endpoint produces a per-quarter rollup of the headline KPIs so an
 // auditor can see the trend at a glance:
 //
-//   • DORA metrics (deploy freq, lead time, MTTR, change failure rate)
-//   • Posture score median across runs
-//   • Audit-chain integrity events
-//   • Disclosure SLA compliance (how often we hit ack/triage SLAs)
-//   • Incident count + MTTR
+//   - DORA metrics (deploy freq, lead time, MTTR, change failure rate)
+//   - Posture score median across runs
+//   - Audit-chain integrity events
+//   - Disclosure SLA compliance (how often we hit ack/triage SLAs)
+//   - Incident count + MTTR
 //
 // The endpoint computes the 4 most recent quarters on demand. We
 // deliberately do not cache: the data set is small (4 rows), the
@@ -34,18 +34,18 @@ type Improvement struct {
 func NewImprovement(db *store.DB) *Improvement { return &Improvement{DB: db} }
 
 type quarterRow struct {
-	Quarter           string  `json:"quarter"`            // "2026-Q2"
-	Start             string  `json:"start"`
-	End               string  `json:"end"`
-	DeployFreq        float64 `json:"deploy_freq_per_day"`
-	LeadTimeHrs       float64 `json:"lead_time_hours"`
-	MTTRHrs           float64 `json:"mttr_hours"`
-	ChangeFailRatePct float64 `json:"change_fail_rate_pct"`
-	IncidentCount     int     `json:"incident_count"`
-	MedianPostureScore int    `json:"median_posture_score"`
-	AuditChainBreaks  int     `json:"audit_chain_breaks"`
-	DisclosureSLAHits int     `json:"disclosure_sla_hits"`
-	DisclosureCount   int     `json:"disclosure_count"`
+	Quarter            string  `json:"quarter"` // "2026-Q2"
+	Start              string  `json:"start"`
+	End                string  `json:"end"`
+	DeployFreq         float64 `json:"deploy_freq_per_day"`
+	LeadTimeHrs        float64 `json:"lead_time_hours"`
+	MTTRHrs            float64 `json:"mttr_hours"`
+	ChangeFailRatePct  float64 `json:"change_fail_rate_pct"`
+	IncidentCount      int     `json:"incident_count"`
+	MedianPostureScore int     `json:"median_posture_score"`
+	AuditChainBreaks   int     `json:"audit_chain_breaks"`
+	DisclosureSLAHits  int     `json:"disclosure_sla_hits"`
+	DisclosureCount    int     `json:"disclosure_count"`
 }
 
 func (h *Improvement) Quarters(w http.ResponseWriter, r *http.Request) {

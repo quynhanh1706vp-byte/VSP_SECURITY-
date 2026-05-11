@@ -3005,9 +3005,9 @@ func main() {
 		r.Mount(prefix, http.StripPrefix(prefix, proxy))
 		log.Info().Str("prefix", prefix).Str("target", target).Msg("microservice proxy mounted")
 	}
-	mountMicroProxy("/api/sc",    "http://127.0.0.1:8091") // cosign-api
+	mountMicroProxy("/api/sc", "http://127.0.0.1:8091")    // cosign-api
 	mountMicroProxy("/api/sched", "http://127.0.0.1:8092") // scheduler-api
-	mountMicroProxy("/api/dast",  "http://127.0.0.1:8093") // dast-api
+	mountMicroProxy("/api/dast", "http://127.0.0.1:8093")  // dast-api
 	mountMicroProxy("/api/swinv", "http://127.0.0.1:8094") // sw-inventory
 	mountMicroProxy("/api/email", "http://127.0.0.1:8095") // email-api
 

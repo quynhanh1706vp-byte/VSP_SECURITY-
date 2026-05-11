@@ -62,9 +62,9 @@ var validFeatures = map[string]bool{
 	"settings_health":    true,
 	"settings_retention": true,
 	// Inline REPORTS panels (from Pass 1B inline-decorator):
-	"analytics":  true,
-	"executive":  true,
-	"export":     true,
+	"analytics": true,
+	"executive": true,
+	"export":    true,
 	// Iframe REPORTS panels (from Pass 1A companion):
 	"users":        true,
 	"cicd":         true,
@@ -89,12 +89,12 @@ var validFeatures = map[string]bool{
 // insufficient (the pre-Sprint-12.4 bug was a UI claiming "admin
 // required" while the server happily accepted analyst tokens).
 var adminOnlyFeatures = map[string]bool{
-	"system_toggles":      true,
-	"cato":                true,
-	"grafana":             true,
-	"settings_security":   true,
-	"settings_apikeys":    true,
-	"settings_retention":  true,
+	"system_toggles":     true,
+	"cato":               true,
+	"grafana":            true,
+	"settings_security":  true,
+	"settings_apikeys":   true,
+	"settings_retention": true,
 }
 
 // Get — GET /api/v1/features/{id}/config

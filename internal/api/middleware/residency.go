@@ -8,13 +8,13 @@
 // outside the legal envelope.
 //
 // Wiring:
-//   1. Operator sets VSP_REGION at deployment (e.g. "vn-1" for
-//      Vietnam-mainland deployment, "eu-1" for Frankfurt, "us-1" for
-//      Virginia). Default empty = no enforcement (development).
-//   2. Tenants register their primary_region + optional egress list
-//      via /api/v1/residency/config (admin only).
-//   3. Every authenticated request hits this middleware. Mismatch →
-//      451 Unavailable For Legal Reasons + residency_violations row.
+//  1. Operator sets VSP_REGION at deployment (e.g. "vn-1" for
+//     Vietnam-mainland deployment, "eu-1" for Frankfurt, "us-1" for
+//     Virginia). Default empty = no enforcement (development).
+//  2. Tenants register their primary_region + optional egress list
+//     via /api/v1/residency/config (admin only).
+//  3. Every authenticated request hits this middleware. Mismatch →
+//     451 Unavailable For Legal Reasons + residency_violations row.
 package middleware
 
 import (
@@ -39,9 +39,9 @@ type residencyCache struct {
 }
 
 type residencyEntry struct {
-	primary   string
-	allowed   map[string]struct{}
-	cachedAt  time.Time
+	primary  string
+	allowed  map[string]struct{}
+	cachedAt time.Time
 }
 
 const residencyTTL = 5 * time.Minute
@@ -91,11 +91,11 @@ func Residency(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				w.Header().Set("X-VSP-Residency", "violated")
 				w.WriteHeader(http.StatusUnavailableForLegalReasons)
 				_ = json.NewEncoder(w).Encode(map[string]any{
-					"error":            "data residency policy violation",
-					"tenant_region":    entry.primary,
-					"gateway_region":   gatewayRegion,
-					"allowed_regions":  entry.allowedList(),
-					"hint":             "route to the tenant's primary region",
+					"error":           "data residency policy violation",
+					"tenant_region":   entry.primary,
+					"gateway_region":  gatewayRegion,
+					"allowed_regions": entry.allowedList(),
+					"hint":            "route to the tenant's primary region",
 				})
 				return
 			}

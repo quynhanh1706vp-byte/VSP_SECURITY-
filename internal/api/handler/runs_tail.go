@@ -6,10 +6,10 @@
 // long-lived HTTP connection. The server emits SSE events as the run
 // progresses:
 //
-//   event: status   data: {"status":"RUNNING","tools_done":3,"tools_total":8}
-//   event: finding  data: {"tool":"gosec","severity":"HIGH","rule_id":"G401",...}
-//   event: log      data: {"ts":"00:01:14","tool":"trivy","level":"INFO",...}
-//   event: done     data: {"status":"COMPLETED","total_findings":104}
+//	event: status   data: {"status":"RUNNING","tools_done":3,"tools_total":8}
+//	event: finding  data: {"tool":"gosec","severity":"HIGH","rule_id":"G401",...}
+//	event: log      data: {"ts":"00:01:14","tool":"trivy","level":"INFO",...}
+//	event: done     data: {"status":"COMPLETED","total_findings":104}
 //
 // Implementation note: we don't have a real-time pubsub wired for finding
 // inserts, so the tailer polls the DB every pollInterval and emits the

@@ -8,8 +8,9 @@
 // the file under /app/sbom/) and serves it anonymously.
 //
 // Endpoints:
-//   GET /sbom.cyclonedx.json   — anonymous, cache 1h
-//   GET /sbom.spdx.json        — anonymous, cache 1h
+//
+//	GET /sbom.cyclonedx.json   — anonymous, cache 1h
+//	GET /sbom.spdx.json        — anonymous, cache 1h
 //
 // Why the path is unversioned: convention. Tools auto-discover
 // `/sbom.cyclonedx.json` per the OpenSSF Scorecard "SBOM published"

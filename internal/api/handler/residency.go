@@ -21,9 +21,9 @@ type Residency struct {
 func NewResidency(db *store.DB) *Residency { return &Residency{DB: db} }
 
 type residencyConfig struct {
-	PrimaryRegion       string   `json:"primary_region"`
-	AllowEgressRegions  []string `json:"allow_egress_regions"`
-	Basis               string   `json:"basis,omitempty"`
+	PrimaryRegion      string   `json:"primary_region"`
+	AllowEgressRegions []string `json:"allow_egress_regions"`
+	Basis              string   `json:"basis,omitempty"`
 }
 
 // validRegions is a soft whitelist — operator can append by editing
@@ -31,8 +31,8 @@ type residencyConfig struct {
 // region doesn't need a migration; the whitelist guards against typos.
 var validRegions = map[string]bool{
 	"vn-1": true, "vn-2": true, // Vietnam mainland (Hanoi, HCMC)
-	"sg-1":         true,        // Singapore (closest APAC neighbour)
-	"jp-1":         true,        // Tokyo
+	"sg-1":         true, // Singapore (closest APAC neighbour)
+	"jp-1":         true, // Tokyo
 	"eu-frankfurt": true,
 	"eu-paris":     true,
 	"us-east-1":    true,

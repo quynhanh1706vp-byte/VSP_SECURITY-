@@ -28,16 +28,11 @@ jobs:
         with:
           # Repo composition: ~210 Go files, ~12 JS files, ~9 Python.
           # CodeQL 'javascript' language covers both JS and TS.
-          # Previous config scanned 'csharp,javascript' — carried over from a
-          # .NET repo template (DeMasterProCloud.sln references). There is
-          # no C# in this repository.
           languages: go, javascript
-          # CodeQL 2.15+ rejects the '+suite,+suite' comma syntax with:
-          #   A fatal error occurred: +security-and-quality is not a .ql
-          #   file, .qls file, a directory, or a query pack specification.
-          # Use a single suite name. 'security-and-quality' is a superset
-          # of 'security-extended'.
-          queries: security-and-quality
+          # Path filters + query suite live in
+          # .github/codeql/codeql-config.yml so the Default Setup
+          # and the workflow stay in sync.
+          config-file: ./.github/codeql/codeql-config.yml
 
       # Autobuild handles Go module resolution and compilation for CodeQL
       # tracing. No .NET project exists, so the dotnet build scaffolding
@@ -55,9 +50,12 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: semgrep/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d # v0.58.0
         with:
+          # p/csharp removed — no C# in this repo (carry-over from
+          # template). Kept SAST-relevant + supply-chain rule packs.
+          # Per-file suppressions live in .semgrepignore at repo root;
+          # inline `// nosemgrep:` comments mark the deliberate-OK sites.
           config: >
             p/owasp-top-ten
-            p/csharp
             p/secrets
             p/docker
             p/kubernetes

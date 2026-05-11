@@ -7,8 +7,9 @@
 // amber/red checklist.
 //
 // Endpoints:
-//   GET /api/v1/cato        — posture summary (status of each criterion)
-//   POST /api/v1/cato/toggle — admin only, enables/disables the cATO claim
+//
+//	GET /api/v1/cato        — posture summary (status of each criterion)
+//	POST /api/v1/cato/toggle — admin only, enables/disables the cATO claim
 //
 // The toggle stores its state in feature_config(tenant_id, 'cato'). When
 // enabled, dashboard surfaces will warn about criteria that drift out of
@@ -109,9 +110,9 @@ func (h *CATO) Toggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := map[string]any{
-		"enabled":      body.Enabled,
-		"toggled_at":   time.Now().UTC().Format(time.RFC3339),
-		"toggled_by":   claims.UserID,
+		"enabled":    body.Enabled,
+		"toggled_at": time.Now().UTC().Format(time.RFC3339),
+		"toggled_by": claims.UserID,
 	}
 	raw, _ := json.Marshal(cfg)
 	_, err := h.DB.Pool().Exec(r.Context(),

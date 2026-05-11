@@ -1,12 +1,13 @@
 // Package handler — WebAuthn registration + authentication endpoints.
 //
 // Endpoints:
-//   POST /api/v1/auth/webauthn/register/begin   — start registration; returns options
-//   POST /api/v1/auth/webauthn/register/finish  — finish registration; persists credential
-//   POST /api/v1/auth/webauthn/login/begin      — start authentication; returns assertion options
-//   POST /api/v1/auth/webauthn/login/finish     — finish authentication; issues JWT
-//   GET  /api/v1/auth/webauthn/credentials      — list user's credentials
-//   POST /api/v1/auth/webauthn/credentials/{id}/revoke — revoke one credential
+//
+//	POST /api/v1/auth/webauthn/register/begin   — start registration; returns options
+//	POST /api/v1/auth/webauthn/register/finish  — finish registration; persists credential
+//	POST /api/v1/auth/webauthn/login/begin      — start authentication; returns assertion options
+//	POST /api/v1/auth/webauthn/login/finish     — finish authentication; issues JWT
+//	GET  /api/v1/auth/webauthn/credentials      — list user's credentials
+//	POST /api/v1/auth/webauthn/credentials/{id}/revoke — revoke one credential
 //
 // All four flow endpoints require a valid bearer token EXCEPT login/* which
 // are anonymous (you're not logged in yet — that's the point). For login,

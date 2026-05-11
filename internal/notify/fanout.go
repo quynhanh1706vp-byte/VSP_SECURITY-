@@ -86,8 +86,9 @@ func (f *Fanout) Run(ctx context.Context) {
 }
 
 // drainOnce pulls a small batch of due rows and dispatches them. Includes:
-//   • New rows (status_code=0, attempts=0)
-//   • Transient failures within max_attempts whose next_retry_at has elapsed
+//   - New rows (status_code=0, attempts=0)
+//   - Transient failures within max_attempts whose next_retry_at has elapsed
+//
 // Permanent 4xx failures and DLQ rows (status_code=-1) are skipped.
 //
 // SELECT ... FOR UPDATE SKIP LOCKED lets multiple gateway replicas share the

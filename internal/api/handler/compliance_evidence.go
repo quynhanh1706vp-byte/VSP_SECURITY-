@@ -1,10 +1,11 @@
 // Package handler — compliance evidence file storage.
 //
 // Endpoints:
-//   POST   /api/v1/compliance/evidence       multipart upload (file + control_id + notes)
-//   GET    /api/v1/compliance/evidence       list (filter ?control_id=)
-//   GET    /api/v1/compliance/evidence/{id}  download (sets Content-Disposition)
-//   DELETE /api/v1/compliance/evidence/{id}  remove (admin only)
+//
+//	POST   /api/v1/compliance/evidence       multipart upload (file + control_id + notes)
+//	GET    /api/v1/compliance/evidence       list (filter ?control_id=)
+//	GET    /api/v1/compliance/evidence/{id}  download (sets Content-Disposition)
+//	DELETE /api/v1/compliance/evidence/{id}  remove (admin only)
 //
 // Storage: bytea blob in Postgres (see migration 030). Max 10 MB per file
 // enforced at handler. SHA-256 is computed server-side and exposed so clients

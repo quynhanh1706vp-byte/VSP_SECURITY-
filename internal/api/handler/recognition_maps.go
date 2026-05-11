@@ -18,8 +18,9 @@
 // than claim coverage.
 //
 // Endpoints:
-//   GET /api/v1/recognition/soc2-readiness
-//   GET /api/v1/recognition/iso27001-mapping
+//
+//	GET /api/v1/recognition/soc2-readiness
+//	GET /api/v1/recognition/iso27001-mapping
 package handler
 
 import (
@@ -39,10 +40,10 @@ func NewRecognition(db *store.DB) *Recognition { return &Recognition{DB: db} }
 // ── SOC 2 ──────────────────────────────────────────────────────────────────
 
 type soc2Criterion struct {
-	ID       string   `json:"id"`        // e.g. "CC6.1"
-	Category string   `json:"category"`  // CC | A | C | PI | P
+	ID       string   `json:"id"`       // e.g. "CC6.1"
+	Category string   `json:"category"` // CC | A | C | PI | P
 	Name     string   `json:"name"`
-	Status   string   `json:"status"`    // implemented | partial | shared
+	Status   string   `json:"status"` // implemented | partial | shared
 	Evidence []string `json:"evidence"`
 }
 
@@ -119,16 +120,16 @@ func (h *Recognition) SOC2Readiness(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonOK(w, map[string]any{
-		"framework":          "SOC 2 Type I — AICPA Trust Services Criteria 2017 (rev. 2022)",
-		"audit_type":         "Type I (design / readiness)",
-		"attested_by":        "VSP-self",
-		"attested_at":        time.Now().UTC().Format(time.RFC3339),
-		"caveat":             "Self-attestation. Type I attestation requires AICPA-licensed CPA firm. Type II additionally requires 3-6 months of operating effectiveness evidence.",
-		"criteria":           criteria,
+		"framework":   "SOC 2 Type I — AICPA Trust Services Criteria 2017 (rev. 2022)",
+		"audit_type":  "Type I (design / readiness)",
+		"attested_by": "VSP-self",
+		"attested_at": time.Now().UTC().Format(time.RFC3339),
+		"caveat":      "Self-attestation. Type I attestation requires AICPA-licensed CPA firm. Type II additionally requires 3-6 months of operating effectiveness evidence.",
+		"criteria":    criteria,
 		"summary": map[string]any{
-			"total":          len(criteria),
-			"implemented":    implCount,
-			"readiness_pct":  (implCount * 100) / len(criteria),
+			"total":         len(criteria),
+			"implemented":   implCount,
+			"readiness_pct": (implCount * 100) / len(criteria),
 		},
 	})
 }
@@ -136,10 +137,10 @@ func (h *Recognition) SOC2Readiness(w http.ResponseWriter, r *http.Request) {
 // ── ISO 27001:2022 ─────────────────────────────────────────────────────────
 
 type isoControl struct {
-	ID       string   `json:"id"`       // e.g. "A.5.1"
-	Theme    string   `json:"theme"`    // Organisational | People | Physical | Technological
+	ID       string   `json:"id"`    // e.g. "A.5.1"
+	Theme    string   `json:"theme"` // Organisational | People | Physical | Technological
 	Name     string   `json:"name"`
-	Status   string   `json:"status"`   // implemented | partial | shared
+	Status   string   `json:"status"` // implemented | partial | shared
 	Evidence []string `json:"evidence"`
 }
 
@@ -232,13 +233,13 @@ func (h *Recognition) ISO27001Mapping(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonOK(w, map[string]any{
-		"framework":     "ISO/IEC 27001:2022 Annex A",
-		"controls_total": 93,
+		"framework":       "ISO/IEC 27001:2022 Annex A",
+		"controls_total":  93,
 		"controls_mapped": len(controls),
-		"attested_by":    "VSP-self",
-		"attested_at":    time.Now().UTC().Format(time.RFC3339),
-		"caveat":         "Self-attestation across the 30 highest-impact Annex A controls. ISO 27001 certification requires accredited certification body + 3-stage audit cycle (initial / surveillance / recertification). Use this mapping as Stage 1 readiness input.",
-		"controls":       controls,
+		"attested_by":     "VSP-self",
+		"attested_at":     time.Now().UTC().Format(time.RFC3339),
+		"caveat":          "Self-attestation across the 30 highest-impact Annex A controls. ISO 27001 certification requires accredited certification body + 3-stage audit cycle (initial / surveillance / recertification). Use this mapping as Stage 1 readiness input.",
+		"controls":        controls,
 		"summary": map[string]any{
 			"implemented_of_mapped": implCount,
 			"mapped_pct":            (len(controls) * 100) / 93,

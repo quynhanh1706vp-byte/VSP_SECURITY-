@@ -48,13 +48,13 @@ func (h *Transparency) Report(w http.ResponseWriter, r *http.Request) {
 
 	// ── Disclosure stats ───────────────────────────────────────────
 	type discBucket struct {
-		Total       int     `json:"total"`
-		Acked       int     `json:"acknowledged"`
-		Triaged     int     `json:"triaged"`
-		Resolved    int     `json:"resolved"`
-		AckHitSLA   int     `json:"ack_hit_sla"`
-		TriageHitSLA int    `json:"triage_hit_sla"`
-		AckHitPct   float64 `json:"ack_hit_pct"`
+		Total        int     `json:"total"`
+		Acked        int     `json:"acknowledged"`
+		Triaged      int     `json:"triaged"`
+		Resolved     int     `json:"resolved"`
+		AckHitSLA    int     `json:"ack_hit_sla"`
+		TriageHitSLA int     `json:"triage_hit_sla"`
+		AckHitPct    float64 `json:"ack_hit_pct"`
 		TriageHitPct float64 `json:"triage_hit_pct"`
 	}
 	var d discBucket
@@ -77,9 +77,9 @@ func (h *Transparency) Report(w http.ResponseWriter, r *http.Request) {
 
 	// ── Incidents ──────────────────────────────────────────────────
 	type incBucket struct {
-		Total       int     `json:"total"`
-		Resolved    int     `json:"resolved"`
-		Substantial int     `json:"substantial"`
+		Total         int     `json:"total"`
+		Resolved      int     `json:"resolved"`
+		Substantial   int     `json:"substantial"`
 		MedianMTTRHrs float64 `json:"median_mttr_hours"`
 	}
 	var inc incBucket
@@ -140,9 +140,9 @@ func (h *Transparency) Report(w http.ResponseWriter, r *http.Request) {
 		"findings_surfaced_total": totalFindings,
 		"government_requests":     govReports,
 		"public_attestations": map[string]any{
-			"slsa_provenance_signed":     "every completed run (DSSE)",
-			"rekor_publishable":          "yes — POST /api/v1/runs/{rid}/provenance/publish-rekor",
-			"openssf_scorecard_running":  ".github/workflows/scorecard.yml",
+			"slsa_provenance_signed":    "every completed run (DSSE)",
+			"rekor_publishable":         "yes — POST /api/v1/runs/{rid}/provenance/publish-rekor",
+			"openssf_scorecard_running": ".github/workflows/scorecard.yml",
 		},
 		"note": "Anon-safe aggregates. No per-tenant data, no reporter " +
 			"identities. Reproduce by running this endpoint with the " +

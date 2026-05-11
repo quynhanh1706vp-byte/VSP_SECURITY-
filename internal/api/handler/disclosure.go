@@ -1,16 +1,18 @@
 // Package handler — vulnerability disclosure intake (RFC 9116 + VDP).
 //
 // Three endpoints:
-//   POST /api/v1/security/disclose       — anonymous researcher intake
-//   GET  /api/v1/security/disclosures    — admin: list reports + SLA state
-//   POST /api/v1/security/disclosures/{id}/transition — admin: triage workflow
+//
+//	POST /api/v1/security/disclose       — anonymous researcher intake
+//	GET  /api/v1/security/disclosures    — admin: list reports + SLA state
+//	POST /api/v1/security/disclosures/{id}/transition — admin: triage workflow
 //
 // SLA contract is anchored to the published Vulnerability Disclosure
 // Policy (docs/security/VULNERABILITY_DISCLOSURE_POLICY.md):
-//   ack within 1 business day, triage within 5 business days, fix
-//   timelines vary by severity. Computing "business day" properly
-//   needs a holiday calendar; for v1 we approximate as 24h × N which
-//   is intentionally stricter than the published commitment.
+//
+//	ack within 1 business day, triage within 5 business days, fix
+//	timelines vary by severity. Computing "business day" properly
+//	needs a holiday calendar; for v1 we approximate as 24h × N which
+//	is intentionally stricter than the published commitment.
 package handler
 
 import (
@@ -132,11 +134,11 @@ func (h *Disclosure) Submit(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	logAudit(r, h.DB, "DISCLOSURE_SUBMITTED", "vdr/submit")
 	jsonOK(w, map[string]any{
-		"status":          "received",
-		"ack_due_at":      now.Add(ackSLA).Format(time.RFC3339),
-		"triage_due_at":   now.Add(triageSLA).Format(time.RFC3339),
-		"contact":         "security@vsp.vn",
-		"policy":          "/security/policy",
+		"status":        "received",
+		"ack_due_at":    now.Add(ackSLA).Format(time.RFC3339),
+		"triage_due_at": now.Add(triageSLA).Format(time.RFC3339),
+		"contact":       "security@vsp.vn",
+		"policy":        "/security/policy",
 	})
 }
 
@@ -160,24 +162,24 @@ func (h *Disclosure) List(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	type item struct {
-		ID            string     `json:"id"`
-		PublicRef     string     `json:"public_ref,omitempty"`
-		Reporter      string     `json:"reporter_email"`
-		Title         string     `json:"title"`
-		Affected      string     `json:"affected,omitempty"`
-		Status        string     `json:"status"`
-		Severity      string     `json:"severity,omitempty"`
-		CVSS          *float64   `json:"cvss_v3,omitempty"`
-		SubmittedAt   time.Time  `json:"submitted_at"`
-		AckDueAt      time.Time  `json:"ack_due_at"`
-		TriageDueAt   time.Time  `json:"triage_due_at"`
-		FixDueAt      *time.Time `json:"fix_due_at,omitempty"`
+		ID             string     `json:"id"`
+		PublicRef      string     `json:"public_ref,omitempty"`
+		Reporter       string     `json:"reporter_email"`
+		Title          string     `json:"title"`
+		Affected       string     `json:"affected,omitempty"`
+		Status         string     `json:"status"`
+		Severity       string     `json:"severity,omitempty"`
+		CVSS           *float64   `json:"cvss_v3,omitempty"`
+		SubmittedAt    time.Time  `json:"submitted_at"`
+		AckDueAt       time.Time  `json:"ack_due_at"`
+		TriageDueAt    time.Time  `json:"triage_due_at"`
+		FixDueAt       *time.Time `json:"fix_due_at,omitempty"`
 		AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
-		TriagedAt     *time.Time `json:"triaged_at,omitempty"`
-		ResolvedAt    *time.Time `json:"resolved_at,omitempty"`
-		AckOverdue    bool       `json:"ack_overdue"`
-		TriageOverdue bool       `json:"triage_overdue"`
-		FixOverdue    bool       `json:"fix_overdue"`
+		TriagedAt      *time.Time `json:"triaged_at,omitempty"`
+		ResolvedAt     *time.Time `json:"resolved_at,omitempty"`
+		AckOverdue     bool       `json:"ack_overdue"`
+		TriageOverdue  bool       `json:"triage_overdue"`
+		FixOverdue     bool       `json:"fix_overdue"`
 	}
 	out := []item{}
 	now := time.Now()

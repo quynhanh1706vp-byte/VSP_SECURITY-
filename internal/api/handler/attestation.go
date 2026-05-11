@@ -81,9 +81,9 @@ func (h *CISAAttestation) Practices(w http.ResponseWriter, r *http.Request) {
 		where += " AND group_code=$" + strconv.Itoa(idx)
 	}
 
-	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 	// where is literal SQL with $N placeholders; user input via args.
 	rows, err := h.DB.Pool().Query(r.Context(),
+		// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 		`SELECT practice_id, group_code, name, COALESCE(description,''), status,
 		        COALESCE(evidence_refs,'[]'::jsonb), COALESCE(implementation_notes,''),
 		        COALESCE(responsible_role,''), COALESCE(last_assessed, NOW())
@@ -205,9 +205,9 @@ func (h *CISAAttestation) Forms(w http.ResponseWriter, r *http.Request) {
 	}
 	args = append(args, limit, offset)
 
-	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 	// where + LIMIT/OFFSET are literal SQL with $N placeholders; user input via args.
 	rows, err := h.DB.Pool().Query(r.Context(),
+		// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 		`SELECT form_uuid, product_name, product_version, status,
 		        COALESCE(signed_by_name,''), signature_date, created_at, updated_at
 		 FROM attestation_forms WHERE `+where+`

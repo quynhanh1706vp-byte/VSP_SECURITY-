@@ -58,9 +58,11 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          # security-extended adds a few more queries beyond the
-          # default suite — extra coverage for taint-tracking.
-          queries: security-extended,security-and-quality
+          # security-extended only. security-and-quality adds ~100
+          # style rules that produced ~150 non-actionable alerts on
+          # the first run after enabling extended. Path filters and
+          # rule selection live in .github/codeql/codeql-config.yml.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Install system deps for Go build
         if: matrix.language == 'go'

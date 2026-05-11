@@ -1,8 +1,8 @@
 // Package handler — tabletop exercise registry.
 //
-//   GET    /api/v1/tabletop/exercises    — list, filter by scenario_kind
-//   POST   /api/v1/tabletop/exercises    — record a completed exercise
-//   GET    /api/v1/tabletop/cadence      — last-run-per-scenario summary
+//	GET    /api/v1/tabletop/exercises    — list, filter by scenario_kind
+//	POST   /api/v1/tabletop/exercises    — record a completed exercise
+//	GET    /api/v1/tabletop/cadence      — last-run-per-scenario summary
 //
 // The cadence endpoint is what an auditor actually wants — "when did
 // you last practise ransomware? data breach? insider threat?" — so the
@@ -45,16 +45,16 @@ func (h *Tabletop) Record(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		ScenarioKind string                   `json:"scenario_kind"`
-		Title        string                   `json:"title"`
-		ScenarioText string                   `json:"scenario_text"`
-		ConductedAt  time.Time                `json:"conducted_at"`
-		DurationMin  int                      `json:"duration_min"`
-		Participants string                   `json:"participants"`
-		Facilitator  string                   `json:"facilitator"`
-		Observations string                   `json:"observations"`
-		ActionItems  []map[string]any         `json:"action_items"`
-		Rating       string                   `json:"rating"`
+		ScenarioKind string           `json:"scenario_kind"`
+		Title        string           `json:"title"`
+		ScenarioText string           `json:"scenario_text"`
+		ConductedAt  time.Time        `json:"conducted_at"`
+		DurationMin  int              `json:"duration_min"`
+		Participants string           `json:"participants"`
+		Facilitator  string           `json:"facilitator"`
+		Observations string           `json:"observations"`
+		ActionItems  []map[string]any `json:"action_items"`
+		Rating       string           `json:"rating"`
 	}
 	if !decodeJSON(w, r, &body) {
 		return

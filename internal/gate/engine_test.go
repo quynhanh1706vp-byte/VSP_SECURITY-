@@ -83,9 +83,9 @@ func TestEvaluate_ScoreThreshold(t *testing.T) {
 // Sprint 7.2 unified the previously-divergent count-based Go grader
 // and the score-based JS dashboard grader. The new contract is:
 //
-//   1. Critical > 0  → F (hard fail, regardless of score)
-//   2. HasSecrets    → F (hard fail, regardless of score)
-//   3. Otherwise, A+/A/B/C/D bands derived from gate.Score(s).
+//  1. Critical > 0  → F (hard fail, regardless of score)
+//  2. HasSecrets    → F (hard fail, regardless of score)
+//  3. Otherwise, A+/A/B/C/D bands derived from gate.Score(s).
 //
 // This test is also the canonical example for any new UI that wants
 // to render a grade — call gate.Posture() and never compute locally.
@@ -127,13 +127,13 @@ func TestPosture(t *testing.T) {
 // silent dashboard regression.
 func TestScore(t *testing.T) {
 	assert.Equal(t, 100, gate.Score(scanner.Summary{}))
-	assert.Equal(t, 92, gate.Score(scanner.Summary{High: 1}))   // 100 - 8*sqrt(1)
+	assert.Equal(t, 92, gate.Score(scanner.Summary{High: 1}))     // 100 - 8*sqrt(1)
 	assert.Equal(t, 85, gate.Score(scanner.Summary{Critical: 1})) // 100 - 15*sqrt(1)
 	// Critical: 10 — under the OLD capped math this was 70 ("2 capped × 15");
 	// the new math discriminates (10 critical IS worse than 2 critical):
 	// 15*sqrt(10) ≈ 47, score ≈ 53.
 	assert.Equal(t, 53, gate.Score(scanner.Summary{Critical: 10}))
-	assert.Equal(t, 75, gate.Score(scanner.Summary{HasSecrets: true})) // 100 - 25
+	assert.Equal(t, 75, gate.Score(scanner.Summary{HasSecrets: true}))              // 100 - 25
 	assert.Equal(t, 60, gate.Score(scanner.Summary{HasSecrets: true, Critical: 1})) // 100-25-15
 	// Large-volume case: 100 high reaches the floor cleanly.
 	assert.Equal(t, 20, gate.Score(scanner.Summary{High: 100})) // 100 - 8*sqrt(100) = 100-80

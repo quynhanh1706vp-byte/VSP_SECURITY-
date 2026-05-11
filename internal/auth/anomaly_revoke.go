@@ -4,17 +4,17 @@
 // triggers RevokeAllForUser when behavioural anomalies indicate a likely
 // account compromise:
 //
-//   1. Impossible travel — same user successful logins from two distinct
-//      /16 networks within 30 min. Can't be the same person physically.
-//   2. Rapid IP rotation on success — same user logged in from N (>4)
-//      distinct IPs in 10 min. A real user doesn't roam that fast.
-//   3. Login spike during off-hours — > 5 logins in 5 min outside the
-//      user's historical 9-21 window (best-effort heuristic, opt-in via
-//      VSP_AUTH_OFFHOURS_REVOKE=1).
+//  1. Impossible travel — same user successful logins from two distinct
+//     /16 networks within 30 min. Can't be the same person physically.
+//  2. Rapid IP rotation on success — same user logged in from N (>4)
+//     distinct IPs in 10 min. A real user doesn't roam that fast.
+//  3. Login spike during off-hours — > 5 logins in 5 min outside the
+//     user's historical 9-21 window (best-effort heuristic, opt-in via
+//     VSP_AUTH_OFFHOURS_REVOKE=1).
 //
 // Each anomaly writes:
-//   • A SECURITY_EVENT row to audit_log (visible in the audit panel)
-//   • A blacklist entry via RevokeAllForUser, so all the user's existing
+//   - A SECURITY_EVENT row to audit_log (visible in the audit panel)
+//   - A blacklist entry via RevokeAllForUser, so all the user's existing
 //     tokens are rejected on the next authenticated request
 //
 // Out of scope for this v1: emailing the user, requiring step-up auth,

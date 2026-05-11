@@ -5,16 +5,16 @@
 // Builds a ZIP of every artefact a 3PAO / SOC 2 auditor / FedRAMP
 // assessor wants for an authorisation review:
 //
-//   • manifest.json       — bundle metadata + checksums
-//   • audit_log.jsonl     — full hash-chained audit log for the tenant
-//   • evidence/*.{pdf,…}  — every compliance_evidence file
-//   • slsa/*.json         — every signed SLSA provenance statement
-//   • disclosures.json    — security disclosure history (timestamps + SLA only)
-//   • tabletops.json      — incident response exercise log
-//   • cato.json           — current cATO posture snapshot
-//   • dora.json           — DORA metrics for the last 90 days
-//   • improvement.json    — last 4 quarterly metric rollups
-//   • README.txt          — guide for the assessor
+//   - manifest.json       — bundle metadata + checksums
+//   - audit_log.jsonl     — full hash-chained audit log for the tenant
+//   - evidence/*.{pdf,…}  — every compliance_evidence file
+//   - slsa/*.json         — every signed SLSA provenance statement
+//   - disclosures.json    — security disclosure history (timestamps + SLA only)
+//   - tabletops.json      — incident response exercise log
+//   - cato.json           — current cATO posture snapshot
+//   - dora.json           — DORA metrics for the last 90 days
+//   - improvement.json    — last 4 quarterly metric rollups
+//   - README.txt          — guide for the assessor
 //
 // Pre-Sprint-8.6, an auditor would have to call ~10 endpoints and
 // download evidence files individually. This bundle is the single
@@ -245,16 +245,16 @@ func dumpDisclosureSummary(ctx context.Context, pool *pgxpool.Pool) ([]byte, err
 	}
 	defer rows.Close()
 	type item struct {
-		PublicRef       string     `json:"public_ref"`
-		Title           string     `json:"title"`
-		Severity        string     `json:"severity"`
-		Status          string     `json:"status"`
-		SubmittedAt     time.Time  `json:"submitted_at"`
-		AckDueAt        time.Time  `json:"ack_due_at"`
-		AcknowledgedAt  *time.Time `json:"acknowledged_at"`
-		TriagedAt       *time.Time `json:"triaged_at"`
-		ResolvedAt      *time.Time `json:"resolved_at"`
-		AckHitSLA       bool       `json:"ack_hit_sla"`
+		PublicRef      string     `json:"public_ref"`
+		Title          string     `json:"title"`
+		Severity       string     `json:"severity"`
+		Status         string     `json:"status"`
+		SubmittedAt    time.Time  `json:"submitted_at"`
+		AckDueAt       time.Time  `json:"ack_due_at"`
+		AcknowledgedAt *time.Time `json:"acknowledged_at"`
+		TriagedAt      *time.Time `json:"triaged_at"`
+		ResolvedAt     *time.Time `json:"resolved_at"`
+		AckHitSLA      bool       `json:"ack_hit_sla"`
 	}
 	var out []item
 	for rows.Next() {

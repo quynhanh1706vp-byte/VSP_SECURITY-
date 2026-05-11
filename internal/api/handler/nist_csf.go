@@ -30,12 +30,12 @@ type NISTCSF struct {
 func NewNISTCSF(db *store.DB) *NISTCSF { return &NISTCSF{DB: db} }
 
 type csfCategory struct {
-	ID          string   `json:"id"`        // e.g. "GV.OC"
-	Name        string   `json:"name"`
-	Function    string   `json:"function"`  // GV | ID | PR | DE | RS | RC
-	Tier        int      `json:"tier"`      // 1..4
-	TierLabel   string   `json:"tier_label"`
-	Evidence    []string `json:"evidence"`
+	ID        string   `json:"id"` // e.g. "GV.OC"
+	Name      string   `json:"name"`
+	Function  string   `json:"function"` // GV | ID | PR | DE | RS | RC
+	Tier      int      `json:"tier"`     // 1..4
+	TierLabel string   `json:"tier_label"`
+	Evidence  []string `json:"evidence"`
 }
 
 func tierLabel(t int) string {
@@ -66,11 +66,11 @@ func (h *NISTCSF) Profile(w http.ResponseWriter, r *http.Request) {
 	avgTier := float64(tierSum) / float64(len(cats))
 
 	jsonOK(w, map[string]any{
-		"framework":      "NIST CSF 2.0 (February 2024)",
-		"profile_type":   "Organisational Profile (Current State)",
-		"attested_by":    "VSP-self",
-		"attested_at":    time.Now().UTC().Format(time.RFC3339),
-		"caveat":         "Self-attestation. Third-party validation by 3PAO planned Q3 2026.",
+		"framework":    "NIST CSF 2.0 (February 2024)",
+		"profile_type": "Organisational Profile (Current State)",
+		"attested_by":  "VSP-self",
+		"attested_at":  time.Now().UTC().Format(time.RFC3339),
+		"caveat":       "Self-attestation. Third-party validation by 3PAO planned Q3 2026.",
 		"functions": []map[string]any{
 			{"id": "GV", "name": "Govern", "categories_total": 5},
 			{"id": "ID", "name": "Identify", "categories_total": 3},
@@ -79,13 +79,13 @@ func (h *NISTCSF) Profile(w http.ResponseWriter, r *http.Request) {
 			{"id": "RS", "name": "Respond", "categories_total": 4},
 			{"id": "RC", "name": "Recover", "categories_total": 2},
 		},
-		"categories":     cats,
-		"average_tier":   avgTier,
+		"categories":   cats,
+		"average_tier": avgTier,
 		"tier_breakdown": map[string]int{
-			"1_partial":      countByTier(cats, 1),
-			"2_risk_inf":     countByTier(cats, 2),
-			"3_repeatable":   countByTier(cats, 3),
-			"4_adaptive":     countByTier(cats, 4),
+			"1_partial":    countByTier(cats, 1),
+			"2_risk_inf":   countByTier(cats, 2),
+			"3_repeatable": countByTier(cats, 3),
+			"4_adaptive":   countByTier(cats, 4),
 		},
 	})
 }

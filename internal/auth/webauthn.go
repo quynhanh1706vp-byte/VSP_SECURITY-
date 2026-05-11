@@ -1,19 +1,19 @@
 // Package auth — WebAuthn / FIDO2 / Passkey support.
 //
 // VSP supports two authenticator types via the same flow:
-//   • Platform authenticators (Touch ID, Face ID, Windows Hello, Android
+//   - Platform authenticators (Touch ID, Face ID, Windows Hello, Android
 //     biometric) — convenient daily login.
-//   • Cross-platform authenticators (YubiKey, Titan, etc.) — high-
+//   - Cross-platform authenticators (YubiKey, Titan, etc.) — high-
 //     assurance use cases where DSOMM L4 / FedRAMP High demand a
 //     hardware root of trust.
 //
 // We use github.com/go-webauthn/webauthn for the heavy crypto (CBOR
 // decoding, COSE key parsing, attestation-statement verification). This
 // package wraps the library with VSP-specific concerns:
-//   • Per-tenant configurable RP ID + origin
-//   • DB-backed session store (5 min TTL; replaces the library's
+//   - Per-tenant configurable RP ID + origin
+//   - DB-backed session store (5 min TTL; replaces the library's
 //     in-memory store so cluster deployments work)
-//   • Credential enumeration / revocation hooks
+//   - Credential enumeration / revocation hooks
 //
 // The credential store is multi-credential per user — a user can register
 // a phone passkey AND a hardware key for backup. Login picks any

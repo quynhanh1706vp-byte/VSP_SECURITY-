@@ -9,9 +9,9 @@ import "testing"
 // that drift at CI time.
 func TestValidFeatures_RecentMigrationsCovered(t *testing.T) {
 	mustHave := []string{
-		"cato",            // migration 031 — Sprint 3
-		"grafana",         // migration 033 — Sprint 4
-		"system_toggles",  // migration 045 — Sprint 12
+		"cato",           // migration 031 — Sprint 3
+		"grafana",        // migration 033 — Sprint 4
+		"system_toggles", // migration 045 — Sprint 12
 	}
 	for _, id := range mustHave {
 		if !validFeatures[id] {

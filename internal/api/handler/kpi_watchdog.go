@@ -76,9 +76,9 @@ func checkKPIInvariants(ctx context.Context, db *store.DB) {
 	c := gate.Score(scanner.Summary{High: 500})
 	if !(a > b && b > c) {
 		failures = append(failures, map[string]any{
-			"check":   "score_monotonic",
-			"reason":  "score must decrease as finding count grows",
-			"high_5":  a, "high_50": b, "high_500": c,
+			"check":  "score_monotonic",
+			"reason": "score must decrease as finding count grows",
+			"high_5": a, "high_50": b, "high_500": c,
 		})
 	}
 

@@ -21,14 +21,14 @@ func NewProPanels(db *store.DB) *ProPanels { return &ProPanels{DB: db} }
 // ── Tenants → quota panel ─────────────────────────────────────────────────────
 
 type tenantQuotaPanel struct {
-	TenantID    string  `json:"tenant_id"`
-	Plan        string  `json:"plan"`
-	Scans       int64   `json:"scans"`
-	OpenFinds   int64   `json:"open_findings"`
-	Secrets     int64   `json:"secrets"`
-	CSPMAccts   int64   `json:"cspm_accounts"`
-	Repos       int64   `json:"repos"`
-	GeneratedAt string  `json:"generated_at"`
+	TenantID    string `json:"tenant_id"`
+	Plan        string `json:"plan"`
+	Scans       int64  `json:"scans"`
+	OpenFinds   int64  `json:"open_findings"`
+	Secrets     int64  `json:"secrets"`
+	CSPMAccts   int64  `json:"cspm_accounts"`
+	Repos       int64  `json:"repos"`
+	GeneratedAt string `json:"generated_at"`
 }
 
 // TenantQuota — GET /api/v1/tenants/quota
@@ -142,19 +142,19 @@ func (p *ProPanels) ObservabilityConfigPut(w http.ResponseWriter, r *http.Reques
 // ── Notifications ────────────────────────────────────────────────────────────
 
 type notificationCfg struct {
-	SlackWebhook            string    `json:"slack_webhook"`
-	TeamsWebhook            string    `json:"teams_webhook"`
-	GenericWebhook          string    `json:"generic_webhook"`
-	EmailRecipients         []string  `json:"email_recipients"`
-	PagerdutyKey            string    `json:"pagerduty_key"`
-	AlertOnCriticalFinding  bool      `json:"alert_on_critical_finding"`
-	AlertOnSecretRotated    bool      `json:"alert_on_secret_rotated"`
-	AlertOnPRBlocked        bool      `json:"alert_on_pr_blocked"`
-	AlertOnImageAdmission   bool      `json:"alert_on_image_admission"`
-	AlertOnSupplyChainFail  bool      `json:"alert_on_supply_chain_fail"`
-	AlertOnSSOLoginFailure  bool      `json:"alert_on_sso_login_failure"`
-	RateLimitPerHour        int       `json:"rate_limit_per_hour"`
-	UpdatedAt               time.Time `json:"updated_at"`
+	SlackWebhook           string    `json:"slack_webhook"`
+	TeamsWebhook           string    `json:"teams_webhook"`
+	GenericWebhook         string    `json:"generic_webhook"`
+	EmailRecipients        []string  `json:"email_recipients"`
+	PagerdutyKey           string    `json:"pagerduty_key"`
+	AlertOnCriticalFinding bool      `json:"alert_on_critical_finding"`
+	AlertOnSecretRotated   bool      `json:"alert_on_secret_rotated"`
+	AlertOnPRBlocked       bool      `json:"alert_on_pr_blocked"`
+	AlertOnImageAdmission  bool      `json:"alert_on_image_admission"`
+	AlertOnSupplyChainFail bool      `json:"alert_on_supply_chain_fail"`
+	AlertOnSSOLoginFailure bool      `json:"alert_on_sso_login_failure"`
+	RateLimitPerHour       int       `json:"rate_limit_per_hour"`
+	UpdatedAt              time.Time `json:"updated_at"`
 }
 
 func (p *ProPanels) NotificationConfigGet(w http.ResponseWriter, r *http.Request) {
@@ -192,18 +192,18 @@ func (p *ProPanels) NotificationConfigPut(w http.ResponseWriter, r *http.Request
 		return
 	}
 	var req struct {
-		SlackWebhook            string   `json:"slack_webhook"`
-		TeamsWebhook            string   `json:"teams_webhook"`
-		GenericWebhook          string   `json:"generic_webhook"`
-		EmailRecipients         []string `json:"email_recipients"`
-		PagerdutyKey            string   `json:"pagerduty_key"`
-		AlertOnCriticalFinding  bool     `json:"alert_on_critical_finding"`
-		AlertOnSecretRotated    bool     `json:"alert_on_secret_rotated"`
-		AlertOnPRBlocked        bool     `json:"alert_on_pr_blocked"`
-		AlertOnImageAdmission   bool     `json:"alert_on_image_admission"`
-		AlertOnSupplyChainFail  bool     `json:"alert_on_supply_chain_fail"`
-		AlertOnSSOLoginFailure  bool     `json:"alert_on_sso_login_failure"`
-		RateLimitPerHour        int      `json:"rate_limit_per_hour"`
+		SlackWebhook           string   `json:"slack_webhook"`
+		TeamsWebhook           string   `json:"teams_webhook"`
+		GenericWebhook         string   `json:"generic_webhook"`
+		EmailRecipients        []string `json:"email_recipients"`
+		PagerdutyKey           string   `json:"pagerduty_key"`
+		AlertOnCriticalFinding bool     `json:"alert_on_critical_finding"`
+		AlertOnSecretRotated   bool     `json:"alert_on_secret_rotated"`
+		AlertOnPRBlocked       bool     `json:"alert_on_pr_blocked"`
+		AlertOnImageAdmission  bool     `json:"alert_on_image_admission"`
+		AlertOnSupplyChainFail bool     `json:"alert_on_supply_chain_fail"`
+		AlertOnSSOLoginFailure bool     `json:"alert_on_sso_login_failure"`
+		RateLimitPerHour       int      `json:"rate_limit_per_hour"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -710,11 +710,11 @@ func (p *ProPanels) SupplyChainConfigPut(w http.ResponseWriter, r *http.Request)
 // ── SBOM diff panel config ───────────────────────────────────────────────────
 
 type sbomCfg struct {
-	DiffAlertSeverity   string    `json:"diff_alert_severity"`
-	AlertOnNewCritical  bool      `json:"alert_on_new_critical"`
-	SBOMFormat          string    `json:"sbom_format"`
-	AutoGenerate        bool      `json:"auto_generate"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	DiffAlertSeverity  string    `json:"diff_alert_severity"`
+	AlertOnNewCritical bool      `json:"alert_on_new_critical"`
+	SBOMFormat         string    `json:"sbom_format"`
+	AutoGenerate       bool      `json:"auto_generate"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // SBOMConfigGet — GET /api/v1/sbom/config
@@ -790,12 +790,12 @@ func (p *ProPanels) SBOMConfigPut(w http.ResponseWriter, r *http.Request) {
 // ── SSO panel config ─────────────────────────────────────────────────────────
 
 type ssoCfg struct {
-	DefaultRole      string    `json:"default_role"`
-	SCIMEnabled      bool      `json:"scim_enabled"`
-	JITProvisioning  bool      `json:"jit_provisioning"`
-	RequireMFA       bool      `json:"require_mfa"`
-	SessionMaxHours  int       `json:"session_max_hours"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	DefaultRole     string    `json:"default_role"`
+	SCIMEnabled     bool      `json:"scim_enabled"`
+	JITProvisioning bool      `json:"jit_provisioning"`
+	RequireMFA      bool      `json:"require_mfa"`
+	SessionMaxHours int       `json:"session_max_hours"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // SSOConfigGet — GET /api/v1/sso/config

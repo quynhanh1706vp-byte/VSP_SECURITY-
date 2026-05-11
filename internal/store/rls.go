@@ -6,15 +6,15 @@
 //
 // Two ways to scope a query:
 //
-//   1. WithTenant — recommended for any new code that touches multiple
-//      tenant-scoped tables in one logical operation. Wraps the work in
-//      a transaction with `SET LOCAL vsp.tenant_id`.
+//  1. WithTenant — recommended for any new code that touches multiple
+//     tenant-scoped tables in one logical operation. Wraps the work in
+//     a transaction with `SET LOCAL vsp.tenant_id`.
 //
-//   2. PoolBeforeAcquire — drop-in for handlers that already use
-//      db.Pool().Query(ctx, ...) without retrofitting. Configured at
-//      pool init: every connection acquired with a tenant in ctx gets
-//      `set_config('vsp.tenant_id', ...)` run before the caller sees
-//      the connection. See StoreOpenWithRLS for setup.
+//  2. PoolBeforeAcquire — drop-in for handlers that already use
+//     db.Pool().Query(ctx, ...) without retrofitting. Configured at
+//     pool init: every connection acquired with a tenant in ctx gets
+//     `set_config('vsp.tenant_id', ...)` run before the caller sees
+//     the connection. See StoreOpenWithRLS for setup.
 package store
 
 import (

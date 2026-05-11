@@ -6,14 +6,14 @@
 // the in-memory cache, enabling zero-downtime rotation.
 //
 // Rotation pattern:
-//   1. Operator writes new secrets to Vault (e.g. via `vault kv patch`)
-//   2. Within rotateInterval (default 15 min) the watcher picks up new
-//      values and swaps them into the cache.
-//   3. JWT signing accepts BOTH the new secret (for new tokens) and
-//      the previous secret (for in-flight ones) for the rotation
-//      window — see internal/auth/rotation.go which already reads
-//      JWT_SECRET_OLD; the watcher mirrors the previous value into
-//      that env-equivalent slot when it changes.
+//  1. Operator writes new secrets to Vault (e.g. via `vault kv patch`)
+//  2. Within rotateInterval (default 15 min) the watcher picks up new
+//     values and swaps them into the cache.
+//  3. JWT signing accepts BOTH the new secret (for new tokens) and
+//     the previous secret (for in-flight ones) for the rotation
+//     window — see internal/auth/rotation.go which already reads
+//     JWT_SECRET_OLD; the watcher mirrors the previous value into
+//     that env-equivalent slot when it changes.
 //
 // We deliberately keep this dead simple: poll, swap, log. No leader
 // election, no distributed coordination. Each gateway replica polls

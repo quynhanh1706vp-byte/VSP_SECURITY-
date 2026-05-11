@@ -5,9 +5,10 @@
 // surface inside VSP, then the static panel iframes them in.
 //
 // Endpoints:
-//   GET  /api/v1/grafana/config    — read tenant config (any role)
-//   POST /api/v1/grafana/config    — write tenant config (admin only)
-//   GET  /api/v1/grafana/embed-url — sign the embed URL with kiosk params
+//
+//	GET  /api/v1/grafana/config    — read tenant config (any role)
+//	POST /api/v1/grafana/config    — write tenant config (admin only)
+//	GET  /api/v1/grafana/embed-url — sign the embed URL with kiosk params
 //
 // Note: VSP never proxies Grafana traffic. The operator must configure
 // their Grafana to allow iframe embedding from the VSP origin (set

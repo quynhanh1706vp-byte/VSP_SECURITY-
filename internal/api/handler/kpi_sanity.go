@@ -7,12 +7,12 @@
 // in staging / prod and treat any `passed=false` row as a release
 // blocker. The pre-Sprint-7 motivating examples:
 //
-//   • The dashboard letter grade matches what gate.Posture() returns
+//   - The dashboard letter grade matches what gate.Posture() returns
 //     for the same scan summary (no JS-derived divergence).
-//   • Score floor is consistent with bucket weights (no run with
+//   - Score floor is consistent with bucket weights (no run with
 //     impossible-by-construction score values like 30 with 2032
 //     findings of which only 5 are high — the old hard-cap math).
-//   • Supply-chain status taxonomy never contains a stray "tampered"
+//   - Supply-chain status taxonomy never contains a stray "tampered"
 //     for a record whose reason field clearly indicates a non-tamper
 //     failure mode (cosign unavailable, registry unreachable, etc.).
 //
@@ -36,11 +36,11 @@ type KPISanity struct {
 func NewKPISanity(db *store.DB) *KPISanity { return &KPISanity{DB: db} }
 
 type sanityAssertion struct {
-	ID      string `json:"id"`
-	Label   string `json:"label"`
-	Passed  bool   `json:"passed"`
-	Detail  string `json:"detail,omitempty"`
-	BlocksRelease bool `json:"blocks_release"` // CI hard-fails on these
+	ID            string `json:"id"`
+	Label         string `json:"label"`
+	Passed        bool   `json:"passed"`
+	Detail        string `json:"detail,omitempty"`
+	BlocksRelease bool   `json:"blocks_release"` // CI hard-fails on these
 }
 
 func (h *KPISanity) Get(w http.ResponseWriter, r *http.Request) {
@@ -99,10 +99,10 @@ func (h *KPISanity) checkGradeUnification() sanityAssertion {
 	// not A. Pre-12.6 the assertion expected "A" which made KPI
 	// sanity always 409 in healthy clusters.
 	probes := []scanner.Summary{
-		{},                         // score 100 → A+
-		{High: 1},                  // 100 - 8 = 92 → A+
-		{Critical: 1},              // hard-fail dominates score → F
-		{HasSecrets: true},         // hard-fail dominates score → F
+		{},                 // score 100 → A+
+		{High: 1},          // 100 - 8 = 92 → A+
+		{Critical: 1},      // hard-fail dominates score → F
+		{HasSecrets: true}, // hard-fail dominates score → F
 	}
 	expected := []string{"A+", "A+", "F", "F"}
 	for i, s := range probes {

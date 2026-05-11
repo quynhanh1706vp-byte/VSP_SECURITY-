@@ -237,8 +237,8 @@ func (h *CSPM) ListFindings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	args = append(args, limit, offset)
-	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 	// where + LIMIT/OFFSET are literal SQL with $N placeholders; user input via args.
+	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 	sql := `SELECT id, account_id, provider, severity, resource, rule_id,
 	               COALESCE(rule_name,''), message, COALESCE(file,''),
 	               status, detected_at, resolved_at

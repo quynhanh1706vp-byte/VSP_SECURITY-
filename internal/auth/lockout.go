@@ -2,23 +2,23 @@
 //
 // Three layers, designed to fail-closed independently:
 //
-//   1. Per-account lockout (existing in users.failed_logins)
-//      Hard limit: 5 fails → 15-min lock. Already enforced by the auth
-//      handler.
+//  1. Per-account lockout (existing in users.failed_logins)
+//     Hard limit: 5 fails → 15-min lock. Already enforced by the auth
+//     handler.
 //
-//   2. Per-IP sliding window (this file)
-//      Defends against credential-stuffing: attacker iterates usernames,
-//      each pass uses one user's quota only once. Tracks fails per IP
-//      across a 10-min sliding window; >= 20 fails locks the IP for 15
-//      min regardless of which username it tried. In-memory; Redis-back
-//      for multi-replica is a future step (see PoolBeforeAcquire pattern
-//      in store/rls.go for the migration path).
+//  2. Per-IP sliding window (this file)
+//     Defends against credential-stuffing: attacker iterates usernames,
+//     each pass uses one user's quota only once. Tracks fails per IP
+//     across a 10-min sliding window; >= 20 fails locks the IP for 15
+//     min regardless of which username it tried. In-memory; Redis-back
+//     for multi-replica is a future step (see PoolBeforeAcquire pattern
+//     in store/rls.go for the migration path).
 //
-//   3. Constant-time response (this file)
-//      DummyHash + matching bcrypt cost lets the handler ALWAYS run a
-//      compare even when the user doesn't exist. Eliminates the timing
-//      side-channel that previously let an attacker enumerate valid
-//      emails (~50ms vs <1ms gap on production hardware).
+//  3. Constant-time response (this file)
+//     DummyHash + matching bcrypt cost lets the handler ALWAYS run a
+//     compare even when the user doesn't exist. Eliminates the timing
+//     side-channel that previously let an attacker enumerate valid
+//     emails (~50ms vs <1ms gap on production hardware).
 package auth
 
 import (

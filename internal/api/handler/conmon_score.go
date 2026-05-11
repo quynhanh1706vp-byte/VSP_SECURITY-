@@ -12,9 +12,9 @@
 // Posture Score" (gate.Score) are SEPARATE — they measure different
 // things:
 //
-//   • Posture Score (gate.Score) — point-in-time scan finding posture.
+//   - Posture Score (gate.Score) — point-in-time scan finding posture.
 //     Answers "how vulnerable is the codebase right now?".
-//   • ConMon Score (this file)  — operational maturity over time.
+//   - ConMon Score (this file)  — operational maturity over time.
 //     Answers "are we doing continuous monitoring properly?".
 //
 // Reconciliation: the response includes an `explanation` field the UI
@@ -41,8 +41,8 @@ func NewConMonScore(db *store.DB) *ConMonScore { return &ConMonScore{DB: db} }
 type conmonCriterion struct {
 	ID     string `json:"id"`
 	Label  string `json:"label"`
-	Points int    `json:"points"`     // points awarded (0..weight)
-	Weight int    `json:"weight"`     // max possible
+	Points int    `json:"points"` // points awarded (0..weight)
+	Weight int    `json:"weight"` // max possible
 	Detail string `json:"detail"`
 }
 

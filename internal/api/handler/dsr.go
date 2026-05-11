@@ -2,22 +2,23 @@
 //
 // GDPR Art. 15/17 + Vietnam PDPA Decree 13/2023 Arts. 9-12 require any
 // SaaS storing personal data to provide:
-//   1. Export ("Subject Access") — return all data we hold for the tenant
-//   2. Erasure ("Right to be Forgotten") — irreversibly delete on request
+//  1. Export ("Subject Access") — return all data we hold for the tenant
+//  2. Erasure ("Right to be Forgotten") — irreversibly delete on request
 //
 // Endpoints:
-//   POST   /api/v1/data/export                 → kick off async export
-//   GET    /api/v1/data/exports/{id}           → status + download URL
-//   POST   /api/v1/data/erasure                → schedule erasure (admin)
-//   POST   /api/v1/data/erasure/{id}/confirm   → confirm with token
-//   POST   /api/v1/data/erasure/{id}/cancel    → cancel within grace
-//   GET    /api/v1/data/requests               → list tenant requests
+//
+//	POST   /api/v1/data/export                 → kick off async export
+//	GET    /api/v1/data/exports/{id}           → status + download URL
+//	POST   /api/v1/data/erasure                → schedule erasure (admin)
+//	POST   /api/v1/data/erasure/{id}/confirm   → confirm with token
+//	POST   /api/v1/data/erasure/{id}/cancel    → cancel within grace
+//	GET    /api/v1/data/requests               → list tenant requests
 //
 // Workers (background):
-//   • dsrExportWorker drains 'pending' export requests, builds JSON
+//   - dsrExportWorker drains 'pending' export requests, builds JSON
 //     archive in compliance_evidence (re-using existing bytea blob),
 //     marks 'ready'.
-//   • dsrErasureWorker fires at scheduled_at for confirmed requests,
+//   - dsrErasureWorker fires at scheduled_at for confirmed requests,
 //     cascades DELETE across tenant rows, writes irrevocable audit
 //     entries.
 package handler
@@ -189,13 +190,13 @@ func (h *DSR) RequestErasure(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	jsonOK(w, map[string]any{
-		"id":             id,
-		"kind":           "erasure",
-		"status":         "pending",
-		"scheduled_at":   scheduledAt.UTC().Format(time.RFC3339),
-		"confirm_token":  token, // ONE-TIME — never returned again
-		"grace_days":     int(erasureGracePeriod / (24 * time.Hour)),
-		"warning":        "Erasure is irreversible. Cancel before scheduled_at to abort.",
+		"id":            id,
+		"kind":          "erasure",
+		"status":        "pending",
+		"scheduled_at":  scheduledAt.UTC().Format(time.RFC3339),
+		"confirm_token": token, // ONE-TIME — never returned again
+		"grace_days":    int(erasureGracePeriod / (24 * time.Hour)),
+		"warning":       "Erasure is irreversible. Cancel before scheduled_at to abort.",
 	})
 }
 
@@ -363,9 +364,9 @@ func RunErasureWorker(ctx context.Context, db *store.DB, tickInterval time.Durat
 // list — L7 8.1 will fail loudly if a table appears in one but not the
 // other.
 var eraseTableExclude = map[string]bool{
-	"data_subject_requests":           true,
-	"tenant_residency":                true,
-	"scan_schedules_backup_20260428":  true,
+	"data_subject_requests":          true,
+	"tenant_residency":               true,
+	"scan_schedules_backup_20260428": true,
 }
 
 // processOneDueErasure picks at most one due request per tick and runs

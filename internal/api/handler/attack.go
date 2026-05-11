@@ -27,11 +27,11 @@ type Attack struct {
 func NewAttack(db *store.DB) *Attack { return &Attack{DB: db} }
 
 type techCell struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Count   int    `json:"count"`
-	MaxSev  string `json:"max_severity"`
-	Sev     map[string]int `json:"by_severity"`
+	ID     string         `json:"id"`
+	Name   string         `json:"name"`
+	Count  int            `json:"count"`
+	MaxSev string         `json:"max_severity"`
+	Sev    map[string]int `json:"by_severity"`
 }
 
 type tacticOut struct {
@@ -122,12 +122,12 @@ func (h *Attack) Heatmap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]any{
-		"window_days":      days,
-		"total_findings":   total,
-		"mapped_findings":  total - unmapped,
-		"unmapped":         unmapped,
-		"tactics":          out,
-		"tactics_covered":  countCovered(out),
+		"window_days":        days,
+		"total_findings":     total,
+		"mapped_findings":    total - unmapped,
+		"unmapped":           unmapped,
+		"tactics":            out,
+		"tactics_covered":    countCovered(out),
 		"techniques_covered": len(agg),
 	})
 }

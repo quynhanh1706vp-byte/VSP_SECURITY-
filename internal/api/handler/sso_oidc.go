@@ -304,6 +304,10 @@ func (h *SSOOIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	})
 
 	redirAfter := safeRedirectPath(ls.RedirectAfter)
+	// #nosec G710 -- redirAfter is sanitized by safeRedirectPath: must
+	// start with single "/", reject "//" / backslash. gosec's taint
+	// analysis can't see the sanitizer, but the value here is guaranteed
+	// to be a same-origin path or "/".
 	http.Redirect(w, r, redirAfter, http.StatusFound)
 }
 

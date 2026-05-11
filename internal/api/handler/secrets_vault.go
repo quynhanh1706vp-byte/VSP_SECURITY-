@@ -167,8 +167,8 @@ func (h *SOARv2) SecretAuditLog(w http.ResponseWriter, r *http.Request) {
 		where += " AND secret_name=$2"
 	}
 	args = append(args, limit)
-	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 	// where is literal SQL composed from "field=$N" templates; user input via args.
+	// nosemgrep: go.lang.security.injection.tainted-sql-string.tainted-sql-string
 	sql := `SELECT id, secret_name, run_id, action, actor, accessed_at
 	          FROM playbook_secret_audit
 	         WHERE ` + where +
@@ -287,11 +287,11 @@ func (h *SOARv2) UpdateVaultConfig(w http.ResponseWriter, r *http.Request) {
 // ── Summary (counts + rotation stats for dashboard tile) ─────────────────────
 
 type vaultSummary struct {
-	Total          int        `json:"total"`
-	StaleCount     int        `json:"stale_count"`     // not used in last 30d
-	OverdueCount   int        `json:"overdue_count"`   // older than rotation_days
-	LastCreatedAt  *time.Time `json:"last_created_at,omitempty"`
-	RotationDays   int        `json:"rotation_days"`   // current policy
+	Total         int        `json:"total"`
+	StaleCount    int        `json:"stale_count"`   // not used in last 30d
+	OverdueCount  int        `json:"overdue_count"` // older than rotation_days
+	LastCreatedAt *time.Time `json:"last_created_at,omitempty"`
+	RotationDays  int        `json:"rotation_days"` // current policy
 }
 
 // VaultSummary — GET /api/v1/soar/secrets/summary

@@ -155,7 +155,7 @@ func (c *CronExpr) Match(t time.Time) bool {
 	if c.Month&(1<<uint(t.Month())) == 0 { //#nosec G115 -- Month() bounded to [1,12]
 		return false
 	}
-	domOK := c.DOM&(1<<uint(t.Day())) != 0      //#nosec G115 -- Day() bounded to [1,31]
+	domOK := c.DOM&(1<<uint(t.Day())) != 0     //#nosec G115 -- Day() bounded to [1,31]
 	dowOK := c.DOW&(1<<uint(t.Weekday())) != 0 //#nosec G115 -- Weekday() bounded to [0,6]
 	// Standard cron: if both DOM and DOW are restricted (not '*'),
 	// the job matches if EITHER one matches (OR). If one is '*', AND.

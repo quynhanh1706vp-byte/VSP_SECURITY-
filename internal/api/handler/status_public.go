@@ -6,21 +6,21 @@
 // Returns a small uptime + SLO snapshot + open-incident count. The
 // shape matches what most status-page importers expect:
 //
-//   {
-//     "status": "operational" | "degraded" | "partial_outage" | "major_outage",
-//     "components": [
-//       {"name":"gateway",   "status":"operational"},
-//       {"name":"scanner",   "status":"operational"},
-//       {"name":"audit_log", "status":"operational"}
-//     ],
-//     "slo": {
-//       "availability_30d_pct": 99.94,
-//       "p95_latency_ms": 312,
-//       "target_p95_ms": 500
-//     },
-//     "open_incidents": 0,
-//     "as_of": "2026-05-08T12:34:56Z"
-//   }
+//	{
+//	  "status": "operational" | "degraded" | "partial_outage" | "major_outage",
+//	  "components": [
+//	    {"name":"gateway",   "status":"operational"},
+//	    {"name":"scanner",   "status":"operational"},
+//	    {"name":"audit_log", "status":"operational"}
+//	  ],
+//	  "slo": {
+//	    "availability_30d_pct": 99.94,
+//	    "p95_latency_ms": 312,
+//	    "target_p95_ms": 500
+//	  },
+//	  "open_incidents": 0,
+//	  "as_of": "2026-05-08T12:34:56Z"
+//	}
 //
 // The endpoint deliberately avoids any tenant-scoped data — anyone on
 // the public internet can read it. Per-tenant SLO breakdowns live on

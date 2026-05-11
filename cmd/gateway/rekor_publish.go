@@ -42,9 +42,9 @@ const rekorBase = "https://rekor.sigstore.dev/api/v1"
 // We encode the DSSE envelope's payload + signature; Rekor verifies
 // the signature against the publicKey we attach.
 type rekorIntotoEntry struct {
-	APIVersion string             `json:"apiVersion"`
-	Kind       string             `json:"kind"`
-	Spec       rekorIntotoSpec    `json:"spec"`
+	APIVersion string          `json:"apiVersion"`
+	Kind       string          `json:"kind"`
+	Spec       rekorIntotoSpec `json:"spec"`
 }
 
 type rekorIntotoSpec struct {

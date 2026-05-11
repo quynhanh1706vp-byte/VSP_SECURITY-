@@ -1,11 +1,11 @@
 // Package i18n provides per-request localisation for VSP.
 //
 // Locale selection precedence (highest first):
-//   1. ?lang= query parameter (vi, en) — useful for testing & shareable URLs
-//   2. X-VSP-Locale request header — what authenticated SPA clients send
-//   3. user_settings.locale row in DB (set via /api/v1/locale endpoint)
-//   4. Accept-Language header — RFC 4647 quality-weighted negotiation
-//   5. defaultLocale (currently "vi") — VSP's primary market is Vietnam
+//  1. ?lang= query parameter (vi, en) — useful for testing & shareable URLs
+//  2. X-VSP-Locale request header — what authenticated SPA clients send
+//  3. user_settings.locale row in DB (set via /api/v1/locale endpoint)
+//  4. Accept-Language header — RFC 4647 quality-weighted negotiation
+//  5. defaultLocale (currently "vi") — VSP's primary market is Vietnam
 //
 // We deliberately choose Vietnamese as default rather than English: the
 // platform is Vietnamese-first per project naming, and English-only ops
@@ -40,52 +40,52 @@ var Supported = []string{"vi", "en"}
 var catalogue = map[string]map[string]string{
 	"vi": {
 		// Auth
-		"auth.invalid_credentials":   "Email hoặc mật khẩu không đúng.",
-		"auth.unauthorized":           "Bạn cần đăng nhập để truy cập tài nguyên này.",
-		"auth.forbidden":              "Bạn không có quyền truy cập tài nguyên này.",
-		"auth.password_too_short":     "Mật khẩu phải có ít nhất 12 ký tự.",
-		"auth.password_breached":      "Mật khẩu này đã xuất hiện trong các vụ rò rỉ — vui lòng chọn mật khẩu khác.",
-		"auth.password_reused":        "Mật khẩu này đã được sử dụng gần đây — vui lòng chọn mật khẩu khác.",
-		"auth.mfa_required":           "Cần mã xác thực hai yếu tố (MFA).",
-		"auth.mfa_invalid":            "Mã MFA không hợp lệ.",
-		"auth.account_locked":         "Tài khoản bị khoá tạm thời do quá nhiều lần đăng nhập sai.",
+		"auth.invalid_credentials": "Email hoặc mật khẩu không đúng.",
+		"auth.unauthorized":        "Bạn cần đăng nhập để truy cập tài nguyên này.",
+		"auth.forbidden":           "Bạn không có quyền truy cập tài nguyên này.",
+		"auth.password_too_short":  "Mật khẩu phải có ít nhất 12 ký tự.",
+		"auth.password_breached":   "Mật khẩu này đã xuất hiện trong các vụ rò rỉ — vui lòng chọn mật khẩu khác.",
+		"auth.password_reused":     "Mật khẩu này đã được sử dụng gần đây — vui lòng chọn mật khẩu khác.",
+		"auth.mfa_required":        "Cần mã xác thực hai yếu tố (MFA).",
+		"auth.mfa_invalid":         "Mã MFA không hợp lệ.",
+		"auth.account_locked":      "Tài khoản bị khoá tạm thời do quá nhiều lần đăng nhập sai.",
 		// Tenant / data
-		"tenant.not_found":            "Không tìm thấy tổ chức.",
-		"resource.not_found":          "Không tìm thấy tài nguyên.",
-		"validation.required":         "Trường này là bắt buộc.",
-		"validation.too_long":         "Giá trị quá dài.",
+		"tenant.not_found":    "Không tìm thấy tổ chức.",
+		"resource.not_found":  "Không tìm thấy tài nguyên.",
+		"validation.required": "Trường này là bắt buộc.",
+		"validation.too_long": "Giá trị quá dài.",
 		// PRO gating
-		"pro.required":                "Tính năng này yêu cầu gói PRO.",
+		"pro.required": "Tính năng này yêu cầu gói PRO.",
 		// Compliance
 		"compliance.evidence_uploaded": "Đã tải lên bằng chứng tuân thủ.",
 		"compliance.erasure_scheduled": "Yêu cầu xoá dữ liệu đã được ghi nhận. Dữ liệu sẽ bị xoá sau 30 ngày.",
 		"compliance.export_ready":      "Bản xuất dữ liệu của bạn đã sẵn sàng.",
 		// Generic
-		"error.internal":              "Lỗi hệ thống. Vui lòng thử lại sau.",
-		"error.rate_limited":          "Quá nhiều yêu cầu. Vui lòng đợi và thử lại.",
-		"ok":                          "Thành công.",
+		"error.internal":     "Lỗi hệ thống. Vui lòng thử lại sau.",
+		"error.rate_limited": "Quá nhiều yêu cầu. Vui lòng đợi và thử lại.",
+		"ok":                 "Thành công.",
 	},
 	"en": {
-		"auth.invalid_credentials":   "Invalid email or password.",
-		"auth.unauthorized":           "You must be authenticated to access this resource.",
-		"auth.forbidden":              "You do not have permission to access this resource.",
-		"auth.password_too_short":     "Password must be at least 12 characters.",
-		"auth.password_breached":      "This password appears in known breaches — please choose a different one.",
-		"auth.password_reused":        "This password was recently used — please choose a different one.",
-		"auth.mfa_required":           "Multi-factor authentication code is required.",
-		"auth.mfa_invalid":            "Invalid MFA code.",
-		"auth.account_locked":         "Account is temporarily locked due to too many failed login attempts.",
-		"tenant.not_found":            "Tenant not found.",
-		"resource.not_found":          "Resource not found.",
-		"validation.required":         "This field is required.",
-		"validation.too_long":         "Value is too long.",
-		"pro.required":                "This feature requires the PRO plan.",
+		"auth.invalid_credentials":     "Invalid email or password.",
+		"auth.unauthorized":            "You must be authenticated to access this resource.",
+		"auth.forbidden":               "You do not have permission to access this resource.",
+		"auth.password_too_short":      "Password must be at least 12 characters.",
+		"auth.password_breached":       "This password appears in known breaches — please choose a different one.",
+		"auth.password_reused":         "This password was recently used — please choose a different one.",
+		"auth.mfa_required":            "Multi-factor authentication code is required.",
+		"auth.mfa_invalid":             "Invalid MFA code.",
+		"auth.account_locked":          "Account is temporarily locked due to too many failed login attempts.",
+		"tenant.not_found":             "Tenant not found.",
+		"resource.not_found":           "Resource not found.",
+		"validation.required":          "This field is required.",
+		"validation.too_long":          "Value is too long.",
+		"pro.required":                 "This feature requires the PRO plan.",
 		"compliance.evidence_uploaded": "Compliance evidence uploaded.",
 		"compliance.erasure_scheduled": "Erasure request recorded. Data will be deleted after 30 days.",
 		"compliance.export_ready":      "Your data export is ready.",
-		"error.internal":              "Internal error. Please try again later.",
-		"error.rate_limited":          "Too many requests. Please wait and retry.",
-		"ok":                          "OK.",
+		"error.internal":               "Internal error. Please try again later.",
+		"error.rate_limited":           "Too many requests. Please wait and retry.",
+		"ok":                           "OK.",
 	},
 }
 

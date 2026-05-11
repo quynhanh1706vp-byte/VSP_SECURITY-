@@ -7,9 +7,10 @@
 //   - Change Failure Rate       (% of deploys that failed/rolled back)
 //
 // Data sources:
-//   runs            — successful scan runs ≈ "deploys" (gate verdict gate=PASS)
-//   autofix_pr      — merged PRs give finding → fix latency
-//   ir_incidents    — incident lifecycle for MTTR
+//
+//	runs            — successful scan runs ≈ "deploys" (gate verdict gate=PASS)
+//	autofix_pr      — merged PRs give finding → fix latency
+//	ir_incidents    — incident lifecycle for MTTR
 //
 // Endpoint: GET /api/v1/dora?days=30  (default 30, max 365)
 package handler
@@ -30,12 +31,12 @@ type DORA struct {
 func NewDORA(db *store.DB) *DORA { return &DORA{DB: db} }
 
 type doraMetric struct {
-	Value    float64 `json:"value"`
-	Unit     string  `json:"unit"`
-	Tier     string  `json:"tier"` // elite|high|medium|low — DORA classification
-	Samples  int     `json:"samples"`
-	Trend    float64 `json:"trend_pct"` // % change vs previous window
-	Insight  string  `json:"insight,omitempty"`
+	Value   float64 `json:"value"`
+	Unit    string  `json:"unit"`
+	Tier    string  `json:"tier"` // elite|high|medium|low — DORA classification
+	Samples int     `json:"samples"`
+	Trend   float64 `json:"trend_pct"` // % change vs previous window
+	Insight string  `json:"insight,omitempty"`
 }
 
 func (h *DORA) Get(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +73,8 @@ func (h *DORA) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // deployFrequency: passed scan runs per day. Tier thresholds per DORA 2023:
-//   elite ≥ 1/day · high 1/day–1/week · medium 1/week–1/month · low < 1/month
+//
+//	elite ≥ 1/day · high 1/day–1/week · medium 1/week–1/month · low < 1/month
 func (h *DORA) deployFrequency(r *http.Request, tenant string, cur, prev time.Time, days int) doraMetric {
 	var cnt, prevCnt int
 	_ = h.DB.Pool().QueryRow(r.Context(),
