@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"sync"
 	"time"
@@ -119,7 +121,13 @@ func (h *SSO) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role := h.Handler.DetermineRole(info.Email)
-	log.Info().Str("email", info.Email).Str("role", role).
+	// L66.4.1: don't ship raw email to logs (PII / GDPR). Hash + take
+	// the first 8 hex chars — enough to correlate sessions across log
+	// lines without exposing the address. The full email is still in
+	// audit_log (which has access controls + retention rules).
+	emailHash := sha256.Sum256([]byte(info.Email))
+	log.Info().Str("email_hash", hex.EncodeToString(emailHash[:4])).
+		Str("role", role).
 		Str("provider", h.Handler.Config.ProviderName).Msg("sso: login")
 
 	// Issue JWT via existing Auth handler

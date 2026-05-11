@@ -67,7 +67,11 @@ fi
 
 phase_open "69.3 audit_log.seq monotonic per tenant"
 
-# Find any tenant where seq has a gap or duplicate.
+# seq must be STRICTLY INCREASING per tenant. Gaps are OK — Postgres
+# BIGSERIAL consumes sequence values inside transactions that roll
+# back (audit emission fails) so delta > 1 is expected. Only delta
+# <= 0 (duplicate or backward) is a real integrity violation, since
+# it would mean two rows claim the same chain position.
 ANOMALY=$(_psql_oneshot "
   WITH seqs AS (
     SELECT tenant_id, seq,
@@ -76,13 +80,13 @@ ANOMALY=$(_psql_oneshot "
   )
   SELECT tenant_id || '@' || seq || ' (delta=' || delta || ')'
   FROM seqs
-  WHERE delta IS NOT NULL AND (delta <= 0 OR delta > 1)
+  WHERE delta IS NOT NULL AND delta <= 0
   LIMIT 1;")
 
 if [[ -z "$ANOMALY" ]]; then
-  _pass "69.3.1 audit_log.seq strictly monotonic (+1) per tenant"
+  _pass "69.3.1 audit_log.seq strictly increasing per tenant (gaps OK from rolled-back tx)"
 else
-  _fail "69.3.1 audit_log.seq has gap or duplicate" \
+  _fail "69.3.1 audit_log.seq duplicate or backward" \
     "$ANOMALY — chain integrity compromised"
 fi
 
