@@ -113,11 +113,16 @@ phase_open "59.3 Source-level: bcrypt.CompareHashAndPassword vs == on hash"
 
 # Plain `==` or `bytes.Equal` on a password hash is constant-time-ish
 # in Go, but bcrypt.CompareHashAndPassword is the canonical correct
-# call. Look for raw equality checks on a "password" or "hash" field.
-LEAKS=$(grep -rEn '(passwordHash|pw_hash|password)\s*==\s*' \
+# call. Look for raw equality checks where BOTH sides are a hash-like
+# variable. Exclude:
+#   - `password == ""` (empty-string check, not hash comparison)
+#   - `password == nil`
+#   - comparison with string literal (not a hash)
+LEAKS=$(grep -rEn '(passwordHash|pw_hash|hashed_password|HashedPassword)\s*==\s*[a-zA-Z_]' \
   --include='*.go' \
   "$ROOT/internal/" "$ROOT/cmd/" 2>/dev/null \
   | grep -v '_test\.go\|\.bak\|// safe-cmp' \
+  | grep -vE '==\s*(""|nil|0)' \
   | head -3 || true)
 
 if [[ -z "$LEAKS" ]]; then

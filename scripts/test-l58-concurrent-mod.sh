@@ -31,9 +31,15 @@ TENANT_A_UUID="1bdf7f20-dbb3-4116-815f-26b4dc747e76"
 
 phase_open "58.1 Concurrent PATCH — final state is well-defined"
 
+RUN_ID_L58=$(_psql_oneshot "
+  INSERT INTO runs (tenant_id, rid, mode, profile, status)
+  VALUES ('$TENANT_A_UUID', 'l58-run-$(date +%s%N | head -c 12)',
+          'FAST', 'FAST', 'success')
+  RETURNING id;")
 FID=$(_psql_oneshot "
-  INSERT INTO findings (tenant_id, tool, severity, message, rule_id)
-  VALUES ('$TENANT_A_UUID', 'l58-probe', 'LOW', 'L58 concurrent probe', 'L58-RULE')
+  INSERT INTO findings (run_id, tenant_id, tool, severity, message, rule_id)
+  VALUES ('$RUN_ID_L58', '$TENANT_A_UUID', 'l58-probe', 'LOW',
+          'L58 concurrent probe', 'L58-RULE')
   RETURNING id;")
 
 if [[ -z "$FID" || ! "$FID" =~ ^[0-9a-f-]{36}$ ]]; then
@@ -108,8 +114,8 @@ elif [[ "${AUDIT_COUNT:-0}" == "0" ]]; then
     "0 audit rows — handler may not emit audit on PATCH (informational)"
 fi
 
-# Cleanup
-_psql_oneshot "DELETE FROM findings WHERE id='$FID';" >/dev/null 2>&1 || true
+# Cleanup — CASCADE deletes finding when run goes.
+_psql_oneshot "DELETE FROM runs WHERE id='$RUN_ID_L58';" >/dev/null 2>&1 || true
 rm -rf "$TMP"
 
 # ── 58.4 Optimistic-concurrency header support (best practice) ───────────

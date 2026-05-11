@@ -24,7 +24,8 @@ phase_open "54.1 External <script src> has integrity attribute"
 
 # Find <script src="https://...">. python parser handles multi-line
 # attributes and self-closing tags better than grep.
-python3 - "$ROOT/static" <<'PY' > /tmp/l54_sri.out
+# `|| true` so a python3 hiccup doesn't kill the script under set -e
+python3 - "$ROOT/static" <<'PY' > /tmp/l54_sri.out 2>&1 || true
 import os, re, sys
 root = sys.argv[1]
 hits = []
@@ -72,7 +73,7 @@ rm -f /tmp/l54_sri.out
 
 phase_open "54.2 External stylesheets — integrity hash"
 
-python3 - "$ROOT/static" <<'PY' > /tmp/l54_css.out
+python3 - "$ROOT/static" <<'PY' > /tmp/l54_css.out 2>&1 || true
 import os, re, sys
 root = sys.argv[1]
 hits = []
@@ -117,7 +118,7 @@ phase_open "54.3 integrity + crossorigin pairing"
 # When integrity is set, crossorigin MUST also be set (anonymous or
 # use-credentials), otherwise the browser silently skips the SRI check
 # for cross-origin resources due to opacity rules.
-python3 - "$ROOT/static" <<'PY' > /tmp/l54_pair.out
+python3 - "$ROOT/static" <<'PY' > /tmp/l54_pair.out 2>&1 || true
 import os, re, sys
 root = sys.argv[1]
 hits = []

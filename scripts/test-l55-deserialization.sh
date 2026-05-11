@@ -60,12 +60,15 @@ YAML_HITS=$(grep -rEn 'yaml\.Unmarshal\s*\([^,]+,\s*&?(\w+)\s*\)' \
 
 # Heuristic: a yaml.Unmarshal call with a generic interface{} target.
 # We accept calls with a typed struct.
+# All COUNT extractions wrap with || echo 0 to ensure a clean integer.
 UNSAFE=$(echo "$YAML_HITS" | grep -v '// safe-yaml' | head -3)
-COUNT=$(echo "$UNSAFE" | grep -c . 2>/dev/null || echo 0)
+COUNT=$(printf '%s' "$YAML_HITS" | grep -c '.' 2>/dev/null || echo 0)
+# Sanitise — sometimes grep -c outputs "0\n0" if the var is multiline.
+COUNT=$(echo "$COUNT" | head -1 | tr -dc '0-9')
 COUNT=${COUNT:-0}
-if (( COUNT == 0 )); then
+if [[ "$COUNT" -eq 0 ]] 2>/dev/null; then
   _pass "55.2.1 no yaml.Unmarshal calls (or all marked safe)"
-elif (( COUNT <= 10 )); then
+elif [[ "$COUNT" -le 10 ]] 2>/dev/null; then
   _skip "55.2.1 yaml.Unmarshal usage" \
     "$COUNT call sites — review whether targets are typed structs"
 else

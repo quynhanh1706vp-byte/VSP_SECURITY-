@@ -53,12 +53,15 @@ else
 
   # Each validator file should mention `LookupHost`, `LookupIP`, or
   # `DialContext` — proves it resolves AND pins (not just regex-checks
-  # the hostname).
+  # the hostname). `|| true` because no-match grep -l exits 1 and
+  # would otherwise abort under set -e + pipefail.
   PINS=$(echo "$VALIDATORS" | while read -r f; do
-    grep -lE 'LookupHost|LookupIP|DialContext|net\.IPNet|169\.254' "$f" 2>/dev/null
-  done | sort -u | wc -l | tr -d ' ')
+    grep -lE 'LookupHost|LookupIP|DialContext|net\.IPNet|169\.254' "$f" 2>/dev/null || true
+  done | sort -u | grep -c . 2>/dev/null || echo 0)
+  PINS=$(echo "$PINS" | head -1 | tr -dc '0-9')
+  PINS=${PINS:-0}
 
-  if (( PINS >= 1 )); then
+  if [[ "$PINS" -ge 1 ]] 2>/dev/null; then
     _pass "56.1.1 at least one validator resolves+checks IP [$PINS file(s)]"
   else
     _fail "56.1.1 no validator does IP-resolution + check" \

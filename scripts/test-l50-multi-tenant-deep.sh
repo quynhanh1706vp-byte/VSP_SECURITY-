@@ -76,9 +76,16 @@ phase_open "50.2 Mass-assignment — tenant_id can't be overwritten"
 # Seed a finding in tenant A, then PATCH it from tenant A with a body
 # trying to set tenant_id to tenant B. The PATCH must either reject
 # the field, ignore it, or fail. NEVER: silently move the row.
+# findings.run_id is NOT NULL — create parent run.
+RUN_A_ID=$(_psql_oneshot "
+  INSERT INTO runs (tenant_id, rid, mode, profile, status)
+  VALUES ('$TENANT_A_UUID', 'l50-runA-$(date +%s%N | head -c 12)',
+          'FAST', 'FAST', 'success')
+  RETURNING id;")
 FID=$(_psql_oneshot "
-  INSERT INTO findings (tenant_id, tool, severity, message, rule_id)
-  VALUES ('$TENANT_A_UUID', 'l50-probe', 'LOW', 'L50 mass-assign probe', 'L50-RULE')
+  INSERT INTO findings (run_id, tenant_id, tool, severity, message, rule_id)
+  VALUES ('$RUN_A_ID', '$TENANT_A_UUID', 'l50-probe', 'LOW',
+          'L50 mass-assign probe', 'L50-RULE')
   RETURNING id;")
 
 if [[ -z "$FID" || ! "$FID" =~ ^[0-9a-f-]{36}$ ]]; then
@@ -101,7 +108,7 @@ else
     _skip "50.2.1 mass-assign" "tenant_id changed unexpectedly to '$actual_tenant'"
   fi
 
-  _psql_oneshot "DELETE FROM findings WHERE id='$FID';" >/dev/null 2>&1 || true
+  _psql_oneshot "DELETE FROM runs WHERE id='$RUN_A_ID';" >/dev/null 2>&1 || true
 fi
 
 # ── 50.3 Cross-tenant DELETE returns 404 not 403 ─────────────────────────
@@ -112,9 +119,15 @@ phase_open "50.3 Cross-tenant DELETE indistinguishable from 'not exists'"
 # Expected: 404 (resource doesn't exist FROM A's perspective).
 # 403 leaks "resource exists but you can't touch it" — a less-bad
 # but still detectable info-disclosure.
+RUN_B_ID=$(_psql_oneshot "
+  INSERT INTO runs (tenant_id, rid, mode, profile, status)
+  VALUES ('$TENANT_B_UUID', 'l50-runB-$(date +%s%N | head -c 12)',
+          'FAST', 'FAST', 'success')
+  RETURNING id;")
 FID_B=$(_psql_oneshot "
-  INSERT INTO findings (tenant_id, tool, severity, message, rule_id)
-  VALUES ('$TENANT_B_UUID', 'l50-cross-probe', 'LOW', 'tenant B owned', 'L50-CROSS')
+  INSERT INTO findings (run_id, tenant_id, tool, severity, message, rule_id)
+  VALUES ('$RUN_B_ID', '$TENANT_B_UUID', 'l50-cross-probe', 'LOW',
+          'tenant B owned', 'L50-CROSS')
   RETURNING id;")
 
 if [[ -z "$FID_B" ]]; then
@@ -142,7 +155,7 @@ else
     _skip "50.3.1 cross-tenant DELETE" "HTTP $status_http"
   fi
 
-  _psql_oneshot "DELETE FROM findings WHERE id='$FID_B';" >/dev/null 2>&1 || true
+  _psql_oneshot "DELETE FROM runs WHERE id='$RUN_B_ID';" >/dev/null 2>&1 || true
 fi
 
 # ── 50.4 limit= clamping — can't request 1M rows ─────────────────────────

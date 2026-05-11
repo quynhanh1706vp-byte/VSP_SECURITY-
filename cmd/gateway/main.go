@@ -590,8 +590,13 @@ func main() {
 			start := time.Now()
 			ww := chimw.NewWrapResponseWriter(w, req.ProtoMajor)
 			next.ServeHTTP(ww, req)
+			// L53 cardinality fix: use chi's RoutePattern when chi
+			// matched a route. For 404s / non-matched requests
+			// rctx.RoutePattern() is empty — use a sentinel rather
+			// than the raw URL.Path, otherwise every scanned-URL
+			// becomes its own time series (cardinality explosion).
 			rctx := chi.RouteContext(req.Context())
-			path := req.URL.Path
+			path := "<no-route>"
 			if rctx != nil && rctx.RoutePattern() != "" {
 				path = rctx.RoutePattern()
 			}
