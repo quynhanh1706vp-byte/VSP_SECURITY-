@@ -32,15 +32,27 @@ TENANT_A_UUID="1bdf7f20-dbb3-4116-815f-26b4dc747e76"
 
 phase_open "51.1 Seed probe audit event"
 
-# Trigger an audit by hitting a state-changing endpoint that emits one
-# (e.g. /audit/verify, /api-keys, /users). /audit/verify is cheap and
-# emits an AUDIT_VERIFY event.
-curl -s -o /dev/null --max-time 5 -X POST \
-  -H "Authorization: Bearer $ADMIN" \
-  "$BASE/api/v1/audit/verify" > /dev/null 2>&1 || true
-sleep 1
+# Trigger an audit by hitting state-changing endpoints. Try several
+# until one writes a row for tenant A — different builds wire audit
+# emission differently and not every endpoint guarantees an emit.
+for trigger in \
+    "POST /api/v1/audit/verify" \
+    "GET  /api/v1/admin/users" \
+    "GET  /api/v1/admin/api-keys" \
+    "POST /api/v1/scheduler/jobs"; do
+  method=${trigger%% *}
+  path=${trigger##* }
+  curl -s -o /dev/null --max-time 5 -X "$method" \
+    -H "Authorization: Bearer $ADMIN" \
+    "$BASE$path" > /dev/null 2>&1 || true
+done
+# Give async audit writers time to flush (the logAudit helper detaches
+# the request via `go func()` with context.Background()).
+sleep 2
 
-# Grab the latest audit_log row for tenant A.
+# If still nothing for tenant A, seed one directly via SQL so the
+# rest of the immutability probes (UPDATE/DELETE/TRUNCATE) still
+# exercise the constraint layer.
 LATEST=$(_psql_oneshot "
   SELECT id || ',' || seq || ',' || hash::text
   FROM audit_log
@@ -49,8 +61,22 @@ LATEST=$(_psql_oneshot "
   LIMIT 1;")
 
 if [[ -z "$LATEST" ]]; then
-  _skip "51.1.0 seed audit event" "no audit_log rows for tenant A — env mismatch"
-  final_summary; exit 0
+  # Fallback: insert directly. This still verifies UPDATE/DELETE refusal
+  # at the DB layer — that's the invariant L51 actually cares about.
+  PROBE_UID=$(_psql_oneshot "
+    INSERT INTO audit_log (tenant_id, action, resource, ip, hash, prev_hash, seq)
+    VALUES ('$TENANT_A_UUID', 'L51_SEED', 'l51-immutable-probe', '127.0.0.1',
+            decode('$(echo -n l51 | sha256sum | cut -c1-64)','hex'),
+            decode('$(echo -n prev | sha256sum | cut -c1-64)','hex'),
+            COALESCE((SELECT MAX(seq)+1 FROM audit_log WHERE tenant_id='$TENANT_A_UUID'), 1))
+    RETURNING id;" 2>/dev/null || true)
+  if [[ -n "$PROBE_UID" && "$PROBE_UID" =~ ^[0-9a-f-]{36}$ ]]; then
+    LATEST="$PROBE_UID,direct-seed,direct"
+    _skip "51.1.0 audit event seed" "no audit emitted by HTTP triggers — direct INSERT for probe"
+  else
+    _skip "51.1.0 seed audit event" "no audit_log rows AND direct insert failed — env mismatch"
+    final_summary; exit 0
+  fi
 fi
 
 PROBE_ID=$(echo "$LATEST" | cut -d, -f1)

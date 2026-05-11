@@ -546,6 +546,22 @@ func main() {
 
 	// ── Router ────────────────────────────────────────────────────
 	r := chi.NewRouter()
+	// Custom 404 / 405 — chi's default emits `text/plain` "404 page not
+	// found", which breaks JSON-routing clients (they expected the
+	// {"error":"..."} envelope every other 4xx uses). L45.1.1 caught
+	// this on /api/v1/scheduler/jobs.
+	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"route not found"}`))
+	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(`{"error":"method not allowed"}`))
+	})
 	// Strip trailing slash before route matching (so /api/x/ → /api/x)
 	r.Use(chimw.StripSlashes)
 	r.Use(chimw.RequestID)
