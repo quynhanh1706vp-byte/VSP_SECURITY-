@@ -490,11 +490,14 @@ window.addEventListener('DOMContentLoaded', function(){
         CSPM
       </button>
     </div>
-    </div>
+    </nav>
 
-  <!-- Bottom — MUST be inside <nav class="sidebar"> so the CSS grid
-       layout doesn't allocate it a separate cell between sidebar and
-       main, pushing the dashboard content under the sidebar column. -->
+  <!-- Bottom — direct child of <nav class="sidebar"> (the OUTER one).
+       The inner <nav class="nav"> just above contains the scrollable
+       nav-section list and is closed by the </nav> 3 lines up.
+       Before fix: that close was </div>, leaving the inner nav open,
+       so the browser auto-closed everything at end-of-body and the
+       sidebar visually swallowed <div class="main"> below it. -->
   <div class="sidebar-bottom">
     <div class="gate-status" id="gate-widget">
       <span class="gate-icon" id="d-gate-icon">—</span>
