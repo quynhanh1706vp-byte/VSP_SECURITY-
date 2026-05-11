@@ -111,10 +111,18 @@ done < <(grep -rhE '^\s+"[a-z0-9.-]+\.[a-z]{2,}/[^"]+"' \
     | grep -v '_test\.go' \
     | head -200)
 
-UNIQUE_COUNT=$(printf '%s\n' "${SUSPECT[@]}" | sort -u | grep -c . 2>/dev/null || echo 0)
+# Use array length directly instead of piping through grep -c .
+# Previous version's pipeline (`printf ... | sort -u | grep -c .` with
+# || echo 0 fallback) emitted "0\n0" when SUSPECT was empty, which
+# `(( N == 0 ))` parsed as a syntax error and fell through to _fail.
+UNIQUE_COUNT=${#SUSPECT[@]}
+if [[ "$UNIQUE_COUNT" -gt 0 ]]; then
+  # Deduplicate via printf | sort -u (only when array is non-empty).
+  UNIQUE_COUNT=$(printf '%s\n' "${SUSPECT[@]}" | sort -u | wc -l | tr -dc '0-9')
+fi
 UNIQUE_COUNT=${UNIQUE_COUNT:-0}
 
-if (( UNIQUE_COUNT == 0 )); then
+if [[ "$UNIQUE_COUNT" -eq 0 ]]; then
   _pass "61.4.1 no rogue '$ORG_PREFIX/*' imports outside module $MODULE_PATH"
 else
   _fail "61.4.1 import path mismatch in module namespace" \

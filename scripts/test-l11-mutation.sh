@@ -32,7 +32,8 @@ require_command go sed diff
 TARGET="$ROOT/internal/gate/engine.go"
 TARGET_AUDIT="$ROOT/internal/audit/chain.go"
 TARGET_AUTH="$ROOT/internal/auth/lockout.go"
-for f in "$TARGET" "$TARGET_AUDIT" "$TARGET_AUTH"; do
+TARGET_CRYPTO="$ROOT/internal/crypto/aesgcm.go"
+for f in "$TARGET" "$TARGET_AUDIT" "$TARGET_AUTH" "$TARGET_CRYPTO"; do
   if [[ ! -f "$f" ]]; then
     printf "%s✗%s target %s missing\n" "$C_RED" "$C_RESET" "$f" >&2
     exit 2
@@ -43,14 +44,17 @@ done
 ORIG=$(mktemp)
 ORIG_AUDIT=$(mktemp)
 ORIG_AUTH=$(mktemp)
-cp "$TARGET"       "$ORIG"
-cp "$TARGET_AUDIT" "$ORIG_AUDIT"
-cp "$TARGET_AUTH"  "$ORIG_AUTH"
+ORIG_CRYPTO=$(mktemp)
+cp "$TARGET"        "$ORIG"
+cp "$TARGET_AUDIT"  "$ORIG_AUDIT"
+cp "$TARGET_AUTH"   "$ORIG_AUTH"
+cp "$TARGET_CRYPTO" "$ORIG_CRYPTO"
 restore() {
-  cp "$ORIG"       "$TARGET"
-  cp "$ORIG_AUDIT" "$TARGET_AUDIT"
-  cp "$ORIG_AUTH"  "$TARGET_AUTH"
-  rm -f "$ORIG" "$ORIG_AUDIT" "$ORIG_AUTH"
+  cp "$ORIG"        "$TARGET"
+  cp "$ORIG_AUDIT"  "$TARGET_AUDIT"
+  cp "$ORIG_AUTH"   "$TARGET_AUTH"
+  cp "$ORIG_CRYPTO" "$TARGET_CRYPTO"
+  rm -f "$ORIG" "$ORIG_AUDIT" "$ORIG_AUTH" "$ORIG_CRYPTO"
 }
 trap restore EXIT
 
@@ -109,6 +113,7 @@ _run_mutation() {
 mutate()       { _run_mutation "$1" "$2" "$3" "$TARGET"       "./internal/gate"  "$ORIG";       }
 mutate_audit() { _run_mutation "$1" "$2" "$3" "$TARGET_AUDIT" "./internal/audit" "$ORIG_AUDIT"; }
 mutate_auth()  { _run_mutation "$1" "$2" "$3" "$TARGET_AUTH"  "./internal/auth"  "$ORIG_AUTH";  }
+mutate_crypto(){ _run_mutation "$1" "$2" "$3" "$TARGET_CRYPTO" "./internal/crypto" "$ORIG_CRYPTO"; }
 
 # ── 13.2 mutations ─────────────────────────────────────────────────────────
 
@@ -196,6 +201,22 @@ mutate_auth "AU2_lockout_shortened" \
 mutate_auth "AU3_backoff_neutered" \
   "BackoffSleep early return — no delay applied" \
   's/^func BackoffSleep(failedCount int) {/func BackoffSleep(failedCount int) { return; if false {/'
+
+# ── 13.2.crypto_* — internal/crypto/aesgcm.go mutations ─────────────────────
+# Drop sentinel comparisons so caller's switch on err type stops working.
+# Tests in errors_test.go (TestDecrypt_WrongKey_L60 / _TamperedCiphertext_L60)
+# assert errors.Is(err, ErrTamper) — these mutations should kill cleanly.
+
+# C1: Replace ErrTamper with a different error — `errors.Is` callers
+# now fall through to default branch.
+mutate_crypto "C1_errtamper_renamed" \
+  "ErrTamper sentinel replaced with generic error — errors.Is fails" \
+  's/ErrTamper = errors\.New("crypto: ciphertext tampered or wrong key")/ErrTamper = errors.New("crypto: other")/'
+
+# C2: Skip empty-passphrase guard — empty key becomes SHA256("").
+mutate_crypto "C2_empty_passphrase_accepted" \
+  "NewFromPassphrase no longer rejects empty input" \
+  's/if passphrase == "" {/if false {/'
 
 # ── 13.3 summary ───────────────────────────────────────────────────────────
 

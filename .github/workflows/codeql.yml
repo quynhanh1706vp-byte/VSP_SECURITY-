@@ -1,0 +1,81 @@
+name: CodeQL
+
+# Semantic SAST via GitHub's CodeQL engine. Catches a different
+# bug class than L33 semgrep (rule-pattern matching): CodeQL traces
+# data-flow across function boundaries, so e.g. taint from
+# r.URL.Query() → SQL query is detected even if the variable is
+# renamed and passed through 3 helpers.
+#
+# Runs on:
+#   - every PR that touches Go or JS
+#   - push to main (post-merge backstop)
+#   - weekly cron (catches drift in branches that haven't seen PRs)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.go'
+      - '**/*.js'
+      - '**/*.html'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    branches: [main]
+  schedule:
+    # Sunday 02:30 UTC — well outside business hours
+    - cron: '30 2 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['go', 'javascript']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go (for go analysis)
+        if: matrix.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # security-extended adds a few more queries beyond the
+          # default suite — extra coverage for taint-tracking.
+          queries: security-extended,security-and-quality
+
+      - name: Build (Go)
+        if: matrix.language == 'go'
+        run: |
+          # Pin a build that exercises the auth + audit paths so
+          # CodeQL has full call-graph data for the security-critical
+          # surfaces.
+          go build ./cmd/gateway ./cmd/scanner
+
+      - name: Autobuild (JavaScript)
+        if: matrix.language == 'javascript'
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: true
