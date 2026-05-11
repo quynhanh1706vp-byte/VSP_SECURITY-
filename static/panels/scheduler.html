@@ -56,7 +56,7 @@
     if (tk) {
       opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
     } else {
-      console.warn("[VSP guard] no token after 2.5s:", url);
+      if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) console.warn("[VSP guard] no token after 2.5s:", url);
     }
     return _origFetch(url, opts);
   };

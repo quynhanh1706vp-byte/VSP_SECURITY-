@@ -56,8 +56,11 @@
     var tk = await getToken();
     if (tk) {
       opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + tk });
-    } else {
-      // Quiet final warning
+    } else if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) {
+      // Quiet final warning — but only for endpoints that REQUIRE a
+      // Bearer token. The /auth/* bootstrap endpoints rely on the
+      // session cookie (sent via credentials:'include') so they're
+      // not really missing a token, they don't need one.
       console.warn('[VSP guard v2] no token after 10s — request may fail:', url);
     }
     return _origFetch(url, opts);
@@ -123,15 +126,37 @@
     if (tk) {
       opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
     } else {
-      console.warn("[VSP guard] no token after 2.5s:", url);
+      if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) console.warn("[VSP guard] no token after 2.5s:", url);
     }
     return _origFetch(url, opts);
   };
   
   var _origFetch = window.fetch;
+  // Endpoints that BOOTSTRAP the auth state — they're the source of
+  // the token, not consumers. Wrapping them in vspAuthFetch causes a
+  // 2.5s wait + console warn + fallback fetch *without* Bearer, even
+  // though these endpoints rely on the session cookie (sent by the
+  // browser automatically via credentials:'include' below).
+  var AUTH_BOOTSTRAP_PATHS = ["/api/v1/auth/check", "/api/v1/auth/refresh",
+                              "/api/v1/auth/login", "/api/v1/auth/logout",
+                              "/api/v1/auth/sso/"];
+  function isAuthBootstrap(u) {
+    if (typeof u !== "string") return false;
+    for (var i = 0; i < AUTH_BOOTSTRAP_PATHS.length; i++) {
+      if (u.indexOf(AUTH_BOOTSTRAP_PATHS[i]) >= 0) return true;
+    }
+    return false;
+  }
   window.fetch = function(url, opts){
     if (typeof url === "string" && url.indexOf("/api/") >= 0) {
       if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      // Skip the guard for auth-bootstrap endpoints — they're the
+      // source of the token, not a consumer. Pass through directly so
+      // the session cookie (credentials:'include' at call site) does
+      // the auth, and no noisy "no token after 2.5s" warns fire.
+      if (isAuthBootstrap(url)) {
         return _origFetch(url, opts);
       }
       return window.vspAuthFetch(url, opts);
