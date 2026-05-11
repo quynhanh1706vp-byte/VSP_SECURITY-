@@ -1486,7 +1486,7 @@ renderSampleData();
         window.parent.showPanel(panelArg, navBtn);
         if (hint) {
           setTimeout(function () {
-            try { window.parent.postMessage({ type: 'vsp-cross-nav', panel: panelFile, hint: hint }, '*'); } catch (e) {}
+            try { window.parent.postMessage({ type: 'vsp-cross-nav', panel: panelFile, hint: hint }, window.location.origin); } catch (e) {}
           }, 300);
         }
         return true;

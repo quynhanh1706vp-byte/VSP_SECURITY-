@@ -9334,6 +9334,7 @@ function startMFATimer() {
   window.__VSP_NAV_BRIDGE__ = true;
   console.log('[VSP-NAV-BRIDGE] Loaded — listening for cross-nav messages');
   window.addEventListener('message', function(e) {
+    if (window.VSPOrigin && !window.VSPOrigin.check(e)) return;
     if (!e.data || e.data.type !== 'vsp-cross-nav') return;
     var panel = e.data.panel;
     var hint  = e.data.hint || {};

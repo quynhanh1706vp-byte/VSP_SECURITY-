@@ -1146,7 +1146,7 @@ loadAll();
       try {
         if (window.parent && window.parent.location) {
           // Fire navigation event
-          window.parent.postMessage({ type: 'vsp-navigate', target: 'compliance', practice: pid }, '*');
+          window.parent.postMessage({ type: 'vsp-navigate', target: 'compliance', practice: pid }, window.location.origin);
           // Fallback: try sidebar click
           const compNav = window.parent.document.querySelector('[data-panel="compliance"], a[href*="compliance"], [data-tab="compliance"]');
           if (compNav) compNav.click();
