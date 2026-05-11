@@ -935,6 +935,20 @@ func main() {
 	publicStatusH := handler.NewStatusPublic(db)
 	r.Get("/api/v1/status", publicStatusH.Get)
 
+	// Scanner availability — anon-readable so the FE "New Scan" modal
+	// can grey out tools whose binary isn't on $PATH. Drives the "26/26
+	// ready" badge in the dashboard header.
+	r.Get("/api/v1/scanners/health", func(w http.ResponseWriter, req *http.Request) {
+		available, results := pipeline.HealthSnapshot()
+		w.Header().Set("Cache-Control", "public, max-age=15")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"available":         available,
+			"expected_full_soc": 26,
+			"tools":             results,
+		})
+	})
+
 	// VSP own-SBOM (Sprint 10.5) — anonymous, cached 1h.
 	// Path convention matches OpenSSF Scorecard auto-discovery.
 	selfSBOMH := handler.NewSelfSBOM()
@@ -1050,6 +1064,11 @@ func main() {
 	// ── Deep Packet Analysis (NetCap) ──────────────────────────────────────────
 	netCapEngine := netcap.NewEngine()
 	pipeline.SetNetcapEngine(netCapEngine) // register with scan pipeline (NETWORK/FULL_SOC modes)
+
+	// Probe scanner binaries once at boot so the operator sees the
+	// "X / 26 dispatchable" line in startup logs. This catches an
+	// under-provisioned image before users see partial FULL_SOC runs.
+	pipeline.ProbeScannerBinaries()
 	netCapH := handler.NewNetCapHandler(netCapEngine)
 	// Auto-start on best available interface — disabled by default.
 	// NetCap auto-start requires CAP_NET_RAW capability which most deploys don't grant.

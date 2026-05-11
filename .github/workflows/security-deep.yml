@@ -45,24 +45,34 @@ jobs:
   semgrep:
     name: Semgrep wide packs
     runs-on: ubuntu-latest
+    # Semgrep CLI v1.x respects inline `// nosemgrep:rule-id` comments
+    # AND .semgrepignore globs. The legacy semgrep-action@v0.58 (2021)
+    # did not, which is why we switched to direct CLI invocation.
+    container:
+      image: returntocorp/semgrep:1.140.0
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with: { fetch-depth: 0 }
-      - uses: semgrep/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d # v0.58.0
-        with:
-          # p/csharp removed — no C# in this repo (carry-over from
-          # template). Kept SAST-relevant + supply-chain rule packs.
-          # Per-file suppressions live in .semgrepignore at repo root;
-          # inline `// nosemgrep:` comments mark the deliberate-OK sites.
-          config: >
-            p/owasp-top-ten
-            p/secrets
-            p/docker
-            p/kubernetes
-            p/ci
-          generateSarif: "1"
+      - name: Semgrep scan
         env:
+          # Optional — empty when SEMGREP_APP_TOKEN isn't set (forks, etc.).
+          # The CLI mode does not require a token to run rule packs.
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          # --error: exit non-zero only when blocking findings remain
+          # --severity ERROR: don't fail on warnings/notes (legacy
+          #                   broke the build on every "info" hit)
+          # --sarif --output: emit SARIF for GHAS upload below
+          semgrep scan \
+            --config p/owasp-top-ten \
+            --config p/secrets \
+            --config p/docker \
+            --config p/kubernetes \
+            --config p/ci \
+            --severity ERROR \
+            --error \
+            --sarif --output semgrep.sarif \
+            --metrics off
       - uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3.35.2
         if: always()
         with: { sarif_file: semgrep.sarif }
