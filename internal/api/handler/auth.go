@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -14,6 +16,15 @@ import (
 	"github.com/vsp/platform/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// emailHash returns the first 8 hex chars of SHA256(email) for use as
+// a log correlation field. Enough to follow a session across log lines
+// without shipping raw PII (L66.4.1 / GDPR). Full email lives in
+// audit_log which has retention + access controls.
+func emailHash(email string) string {
+	h := sha256.Sum256([]byte(email))
+	return hex.EncodeToString(h[:4])
+}
 
 // Auth bundles dependencies for auth handlers.
 type Auth struct {
@@ -89,7 +100,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	// Lookup user
 	user, err := a.DB.GetUserByEmail(r.Context(), tenantID, req.Email)
 	if err != nil {
-		log.Error().Err(err).Str("email", req.Email).Msg("login: db error")
+		log.Error().Err(err).Str("email_hash", emailHash(req.Email)).Msg("login: db error")
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -123,7 +134,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Check account lockout
 	if user.LockedUntil != nil && time.Now().Before(*user.LockedUntil) {
-		log.Warn().Str("email", req.Email).Msg("login: account locked")
+		log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: account locked")
 		LoginAttempts.WithLabelValues("locked").Inc()
 	go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_LOCKED", "/auth/login")
 		jsonError(w, "account temporarily locked — too many failed attempts", http.StatusTooManyRequests)
@@ -163,12 +174,12 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	if user.Role == "admin" && (!user.MFAEnabled || !user.MFAVerified) {
 		env := viper.GetString("server.env")
 		if env == "production" || env == "staging" {
-			log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured")
+			log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: admin MFA not configured")
 			jsonError(w, "admin accounts require MFA — please set up TOTP before logging in",
 				http.StatusForbidden)
 			return
 		}
-		log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured (dev — allowed)")
+		log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: admin MFA not configured (dev — allowed)")
 	}
 
 	// Verify MFA if enabled
@@ -184,7 +195,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !auth.VerifyTOTP(user.MFASecret, req.MFACode) {
-			log.Warn().Str("email", req.Email).Msg("login: invalid MFA code")
+			log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: invalid MFA code")
 			LoginAttempts.WithLabelValues("mfa_failed").Inc()
 			go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_MFA_FAILED", "/auth/login")
 			jsonError(w, "invalid MFA code", http.StatusUnauthorized)
