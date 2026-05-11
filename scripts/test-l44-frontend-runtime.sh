@@ -219,6 +219,40 @@ else
     "$UNGUARDED panel(s) without bootstrap-bypass: ${UNGUARDED_FILES[0]}"
 fi
 
+# ── 44.4.y Sidebar-bottom must be inside <nav class="sidebar"> ───────────
+
+phase_open "44.4.y Sidebar structural placement"
+
+# Bug found 2026-05-11: <div class="sidebar-bottom"> was a sibling of
+# <nav class="sidebar"> instead of a child. The .app CSS grid
+# allocates one cell per direct child, so sidebar-bottom consumed
+# the cell that should have held <div class="main">, pushing the
+# Dashboard panel content underneath the sidebar column. UI broken.
+#
+# Probe: find the position of <nav class="sidebar"> and </nav> in
+# static/index.html, then confirm <div class="sidebar-bottom"> is
+# between those two markers (i.e. INSIDE the nav).
+HTML="$ROOT/static/index.html"
+if [[ ! -r "$HTML" ]]; then
+  _skip "44.4.y sidebar structure" "static/index.html unreadable"
+else
+  NAV_OPEN=$(grep -n '<nav class="sidebar">' "$HTML" | head -1 | cut -d: -f1)
+  NAV_CLOSE=$(awk -v start="$NAV_OPEN" '
+    NR > start && /^<\/nav>/ { print NR; exit }
+  ' "$HTML")
+  SB_LINE=$(grep -n '<div class="sidebar-bottom">' "$HTML" | head -1 | cut -d: -f1)
+
+  if [[ -z "$NAV_OPEN" || -z "$NAV_CLOSE" || -z "$SB_LINE" ]]; then
+    _skip "44.4.y sidebar structural placement" \
+      "couldn't locate landmarks (nav_open=$NAV_OPEN nav_close=$NAV_CLOSE sb=$SB_LINE)"
+  elif (( SB_LINE > NAV_OPEN && SB_LINE < NAV_CLOSE )); then
+    _pass "44.4.y .sidebar-bottom is inside <nav class=\"sidebar\"> [lines $NAV_OPEN < $SB_LINE < $NAV_CLOSE]"
+  else
+    _fail "44.4.y .sidebar-bottom is a sibling of nav, not a child" \
+      "sb_line=$SB_LINE outside [nav_open=$NAV_OPEN..nav_close=$NAV_CLOSE] — CSS grid will mis-allocate main column"
+  fi
+fi
+
 # ── 44.5 Browser-cache headers on HTML ───────────────────────────────────
 
 phase_open "44.5 HTML cache headers"

@@ -491,9 +491,10 @@ window.addEventListener('DOMContentLoaded', function(){
       </button>
     </div>
     </div>
-</nav>
 
-  <!-- Bottom -->
+  <!-- Bottom — MUST be inside <nav class="sidebar"> so the CSS grid
+       layout doesn't allocate it a separate cell between sidebar and
+       main, pushing the dashboard content under the sidebar column. -->
   <div class="sidebar-bottom">
     <div class="gate-status" id="gate-widget">
       <span class="gate-icon" id="d-gate-icon">—</span>
@@ -513,6 +514,7 @@ window.addEventListener('DOMContentLoaded', function(){
       <span class="qs-key" style="margin-left:auto">⌘K</span>
     </div>
   </div>
+</nav>
 
 <!-- ══════════════════════════════════════════════
      MAIN
