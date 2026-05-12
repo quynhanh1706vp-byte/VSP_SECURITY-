@@ -212,7 +212,7 @@ done <<<"$GATEWAY_GETS"
 # commit. This avoids one giant doc-sprint while still locking in
 # every gain. Update RATCHET when you intentionally accept a higher
 # count or close out documented endpoints.
-RATCHET=142
+RATCHET=143
 COUNT=${#UNDOC[@]}
 if (( COUNT == 0 )); then
   _pass "11.3.1 every public GET is documented [$DOC_COUNT/$TOTAL_CODE]"

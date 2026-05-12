@@ -50,11 +50,11 @@ var scannerBinaries = map[string]string{
 // ScannerHealth is the per-tool health payload returned by the
 // /api/v1/scanners/health endpoint.
 type ScannerHealth struct {
-	Tool        string `json:"tool"`
-	Binary      string `json:"binary,omitempty"`
-	Available   bool   `json:"available"`
-	BuiltIn     bool   `json:"built_in,omitempty"`
-	NetcapEngine bool  `json:"netcap_engine,omitempty"`
+	Tool         string `json:"tool"`
+	Binary       string `json:"binary,omitempty"`
+	Available    bool   `json:"available"`
+	BuiltIn      bool   `json:"built_in,omitempty"`
+	NetcapEngine bool   `json:"netcap_engine,omitempty"`
 }
 
 // HealthSnapshot returns the current scanner availability map. Cheap
