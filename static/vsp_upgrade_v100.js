@@ -33,9 +33,15 @@ async function safeApi(method, url, fallback = {}) {
     if (!window.TOKEN && !localStorage.getItem('vsp_token')) {
       return fallback;
     }
+    // Per-endpoint timeout: some KPI aggregations (remediation/stats,
+    // findings/summary) scan 50k+ rows on the first poll after a cache
+    // miss. 8s tripped them on the user's tenant; bump to 20s for the
+    // known-slow paths. Everything else stays on the 8s budget.
+    const slowPaths = ['/remediation/stats', '/findings/summary', '/vsp/runs/index'];
+    const timeoutMs = slowPaths.some(p => url.includes(p)) ? 20000 : 8000;
     const result = await Promise.race([
       window.api(method, url),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))
     ]);
     return result || fallback;
   } catch (e) {

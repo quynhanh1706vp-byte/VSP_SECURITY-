@@ -3,6 +3,8 @@ package handler
 import (
 	"github.com/rs/zerolog/log"
 	"net/http"
+	"sync"
+	"time"
 
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -12,6 +14,23 @@ import (
 )
 
 type Remediation struct{ DB *store.DB }
+
+// remStatsCache memoises /remediation/stats per tenant for 30s.
+// Why: the dashboard ticker polls this endpoint every 30s per logged-in
+// browser tab. A tenant with 55k+ remediations was tripping the FE's
+// 8s safeApi timeout under load — the GROUP BY query is fast (idx_rem_
+// tenant covers it) but contended with concurrent scan-writes. Memoising
+// in BE means each poll cycle issues one DB query at most, regardless of
+// how many UI tabs are open, and the second-through-Nth tab gets a
+// sub-millisecond response.
+var remStatsCache sync.Map // tenantID -> *remStatsEntry
+
+type remStatsEntry struct {
+	at   time.Time
+	data map[string]int
+}
+
+const remStatsTTL = 30 * time.Second
 
 // GET /api/v1/remediation — list all with optional ?status=open
 func (h *Remediation) List(w http.ResponseWriter, r *http.Request) {
@@ -40,11 +59,20 @@ func (h *Remediation) List(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/remediation/stats
 func (h *Remediation) Stats(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
+	// Cache hit?
+	if v, ok := remStatsCache.Load(claims.TenantID); ok {
+		ent := v.(*remStatsEntry)
+		if time.Since(ent.at) < remStatsTTL {
+			jsonOK(w, ent.data)
+			return
+		}
+	}
 	stats, err := h.DB.RemediationStats(r.Context(), claims.TenantID)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	remStatsCache.Store(claims.TenantID, &remStatsEntry{at: time.Now(), data: stats})
 	jsonOK(w, stats)
 }
 
