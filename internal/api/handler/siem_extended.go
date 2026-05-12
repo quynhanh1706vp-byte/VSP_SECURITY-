@@ -582,7 +582,14 @@ func (h *ThreatIntel) MITRE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ThreatIntel) SyncFeeds(w http.ResponseWriter, r *http.Request) {
-	go h.DB.SeedIOCsFromFindings(r.Context())
+	// IOC seed can take 10s+ on a large findings table — way past the
+	// HTTP response cycle. Pre-fix it raced r.Context() and never
+	// completed under any non-trivial dataset.
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		h.DB.SeedIOCsFromFindings(ctx)
+	}()
 	jsonOK(w, map[string]any{"status": "sync_started", "started_at": time.Now()})
 }
 

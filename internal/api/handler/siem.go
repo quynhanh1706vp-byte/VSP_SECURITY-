@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -121,6 +122,12 @@ func (h *SIEM) Test(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 		Src:       "test",
 	}
-	go siem.Deliver(r.Context(), h.DB, testEvent)
+	// SIEM webhook delivery must survive the response — r.Context()
+	// race would silently drop the outbound HTTP POST in production.
+	go func(ev siem.Event) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		siem.Deliver(ctx, h.DB, ev)
+	}(testEvent)
 	jsonOK(w, map[string]string{"status": "test event fired", "webhook": target.Label})
 }

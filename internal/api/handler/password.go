@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/vsp/platform/internal/auth"
 	"golang.org/x/crypto/bcrypt"
@@ -40,7 +42,16 @@ func (a *Auth) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PwHash), []byte(req.CurrentPassword)); err != nil {
-		go a.DB.RecordFailedLogin(r.Context(), user.ID) //nolint:errcheck
+		// Failed login counter increment MUST survive the response.
+		// Pre-fix, the r.Context() goroutine raced response cancel and
+		// often dropped the increment under load → brute force not
+		// rate-limited by failed_logins ratchet.
+		uid := user.ID
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, _ = a.DB.RecordFailedLogin(ctx, uid)
+		}()
 		jsonError(w, "current password is incorrect", http.StatusUnauthorized)
 		return
 	}
@@ -82,7 +93,19 @@ func (a *Auth) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "failed to update password", http.StatusInternalServerError)
 		return
 	}
-	go a.DB.RevokeAllRefreshTokens(r.Context(), claims.UserID) //nolint:errcheck
-	go a.writeAudit(r.Clone(r.Context()), claims.TenantID, &claims.UserID, "PASSWORD_CHANGED", "/auth/password/change")
+	// SECURITY: refresh-token revoke MUST run to completion. The
+	// pre-fix goroutine used r.Context() which the HTTP layer cancels
+	// the instant the response is flushed; pgx then sees "context
+	// canceled" before the DELETE executes. Result: a user changing
+	// their password under load could leave old refresh tokens valid
+	// — defeating the password-change-invalidates-sessions guarantee.
+	uid := claims.UserID
+	tid := claims.TenantID
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = a.DB.RevokeAllRefreshTokens(ctx, uid)
+	}()
+	go a.writeAudit(r.Clone(context.Background()), tid, &uid, "PASSWORD_CHANGED", "/auth/password/change")
 	jsonOK(w, map[string]string{"message": "password changed successfully"})
 }

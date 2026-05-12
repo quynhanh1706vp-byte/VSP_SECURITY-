@@ -158,7 +158,12 @@ func submitToRekor(ctx context.Context, body []byte) (*rekorEntryResponse, error
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	// Bounded HTTP client — Rekor is a public sigstore.dev endpoint
+	// and historically has had slow responses + DoS pages. Without
+	// this timeout, "Publish provenance" UI clicks would hang the
+	// request goroutine indefinitely on a bad day.
+	rekorClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := rekorClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

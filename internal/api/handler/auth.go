@@ -203,8 +203,16 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Reset failed logins on success
-	go a.DB.ResetFailedLogins(r.Context(), user.ID)
+	// Reset failed logins on success. MUST use background ctx — same
+	// race-with-response-cancel pattern as last_login. Without this,
+	// successful logins under load may not clear the counter and a
+	// legitimate user gradually approaches the lockout threshold.
+	userIDForReset := user.ID
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = a.DB.ResetFailedLogins(ctx, userIDForReset)
+	}()
 
 	// Issue JWT
 	ttl := a.JWTTTL

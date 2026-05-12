@@ -119,13 +119,20 @@ func (h *APIKeys) Delete(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
+	// Pre-fix: GetLastAuditHash used the new ctx but InsertAudit fell
+	// back to r.Context() — half-fix that lost the audit row whenever
+	// the response flushed before pgx finished the INSERT. Use the
+	// bounded bg ctx for both DB calls.
+	tenantID := claims.TenantID
+	userID := claims.UserID
+	remoteIP := r.RemoteAddr
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) //nolint:gosec // G118: intentional
 		defer cancel()
-		prevHash, _ := h.DB.GetLastAuditHash(ctx, claims.TenantID)
-		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
+		prevHash, _ := h.DB.GetLastAuditHash(ctx, tenantID)
+		e := audit.Entry{TenantID: tenantID, UserID: userID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: remoteIP, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
-		h.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
+		_, _, _ = h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: tenantID, UserID: &userID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: remoteIP, PrevHash: prevHash})
 	}()
 	w.WriteHeader(http.StatusNoContent)
 }

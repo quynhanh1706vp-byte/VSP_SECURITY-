@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -65,7 +66,13 @@ func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 		Src:       "sandbox",
 	}
-	go siem.Deliver(r.Context(), h.DB, event)
+	// Background ctx — webhook POST may take a few seconds; r.Context()
+	// would race the response flush and silently drop deliveries.
+	go func(ev siem.Event) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		siem.Deliver(ctx, h.DB, ev)
+	}(event)
 
 	h.mu.Lock()
 	h.events = append(h.events, sandboxEvent{
