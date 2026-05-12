@@ -987,6 +987,19 @@ window.vspGetPosture = async function() {
 // LAST_OVERRIDE — inject sau tất cả, dùng DOMContentLoaded để chắc chắn chạy sau
 window.addEventListener('load', function() {
   function _masterShow(name, btn) {
+    // Dismiss PRO overlay before navigating — see _FINAL below for the
+    // full rationale. Both showPanel variants need this guard because
+    // either may win the binding race depending on script order.
+    try {
+      if (window.PRO && typeof window.PRO.closePanel === 'function') window.PRO.closePanel();
+      if (window.VSP_PRO && typeof window.VSP_PRO.closePanel === 'function') window.VSP_PRO.closePanel();
+      var po_ = document.getElementById('pro-overlay'); if (po_) po_.classList.remove('open');
+      // vspm-overlay is a *class*, not an id — openModal in
+      // vsp_pro_realapi.js appends one node per open() call, so a
+      // querySelectorAll().forEach(remove) is needed to clear them all.
+      document.querySelectorAll('.vspm-overlay').forEach(function(o){ o.remove(); });
+      document.body.style.overflow = '';
+    } catch(e) {}
     document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
     document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
     var panel = document.getElementById('panel-' + name);
@@ -1015,6 +1028,24 @@ window.addEventListener('load', function() {
 // LOCK_SHOW_PANEL — dùng defineProperty để không ai override được nữa
 window.addEventListener('load', function() {
   function _FINAL(name, btn) {
+    // Dismiss any open PRO/SIEM modal overlay before activating a new
+    // panel. Pre-fix the user would click Container Security (which
+    // opens #pro-overlay via PRO.openPanel) and then click SBOM in
+    // the sidebar — showPanel correctly activated #panel-sbom
+    // underneath, but the #pro-overlay div with display:flex stayed
+    // on top, so the user saw "Cloud security posture management"
+    // instead of SBOM. Same for .vspm-overlay nodes spawned by
+    // vsp_pro_realapi.openModal. Closing here makes nav-clicks
+    // unambiguous.
+    try {
+      if (window.PRO && typeof window.PRO.closePanel === 'function') window.PRO.closePanel();
+      if (window.VSP_PRO && typeof window.VSP_PRO.closePanel === 'function') window.VSP_PRO.closePanel();
+      var po = document.getElementById('pro-overlay'); if (po) po.classList.remove('open');
+      // openModal in vsp_pro_realapi.js appends one .vspm-overlay node
+      // per open() call — clear them all on nav transition.
+      document.querySelectorAll('.vspm-overlay').forEach(function(o){ o.remove(); });
+      document.body.style.overflow = '';
+    } catch(e) {}
     document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
     document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
     var panel = document.getElementById('panel-' + name);
