@@ -1192,50 +1192,44 @@ PRO.prbotRegisterRepo = function(){
 };
 
 /* ════════════════════════════════════════════════════════════════════════
-   MODULE: SBOM diff  — full override (was pure mock)
-   ════════════════════════════════════════════════════════════════════════ */
+   MODULE: SBOM diff  — redirect to the real #panel-sbom Diff tab
+   ════════════════════════════════════════════════════════════════════════
+   The PRO overlay only ever showed the 4 config-cards (FORMAT / DIFF
+   ALERT / NEW CRIT / AUTO-GENERATE) with no actual diff data. The real
+   per-run NEW/FIXED/PERSISTED counters + findings table live in the
+   regular SBOM panel (#panel-sbom) under its Diff tab (rendered by the
+   _sbomUnified module). Pre-fix the user clicked "SBOM diff" in the
+   PRO sidebar, saw the near-empty config view, and thought the panel
+   was broken. We now route the click straight to the real panel +
+   activate the Diff tab. Kept renderSbomReal below so a future
+   roadmap can re-enable a config-only overlay if needed. */
 var origSbomDiff = PRO.modules.sbomdiff && PRO.modules.sbomdiff.render;
 if (PRO.modules.sbomdiff){
-  PRO.modules.sbomdiff.render = function(root){
-    loading(root, 'LOADING SBOM CONFIG …');
-    proFetch('/api/v1/sbom/config').then(function(cfg){
-      renderSbomReal(root, cfg);
-    }).catch(function(err){
-      if (err && err.is402){
-        root.innerHTML = upgradeOverlayHTML('SBOM diff', err.required, err.current);
-        return;
+  PRO.modules.sbomdiff.render = function(){
+    try {
+      if (typeof window.PRO !== 'undefined' && typeof PRO.closePanel === 'function') {
+        PRO.closePanel();
       }
-      console.warn('[VSP-PRO-REALAPI] sbomdiff fallback:', err.message || err);
-      if (origSbomDiff) origSbomDiff.call(PRO.modules.sbomdiff, root);
-      root.insertAdjacentHTML('afterbegin', errorBanner('SBOM API offline — showing mock data: ' + (err.message || err)));
-    });
+      var win = window.parent && window.parent !== window ? window.parent : window;
+      if (typeof win.showPanel === 'function') win.showPanel('sbom');
+      setTimeout(function(){
+        var u = win._sbomUnified;
+        if (u && typeof u.setView === 'function') u.setView('diff');
+      }, 200);
+    } catch(e) {
+      // Fallback: render the config-only view we used to ship so the
+      // overlay isn't completely empty if showPanel isn't reachable.
+      if (origSbomDiff) origSbomDiff.apply(this, arguments);
+    }
   };
 }
 
-function renderSbomReal(root, cfg){
-  cfg = cfg || {};
-  var html = '';
-  html += '<div class="vspm-toolbar">' +
-            '<button class="pro-btn ghost" onclick="VSP_PRO.sbomRefresh()">↻ Refresh</button>' +
-            '<div class="spacer"></div>' + configureBtn('sbomdiff') +
-          '</div>';
-  html += '<div class="pro-grid c4" style="margin-bottom:18px">' +
-    kpiCard('Format',         (cfg.sbom_format||'cyclonedx').toUpperCase(), 'output spec', '#22d3ee') +
-    kpiCard('Diff alert',     (cfg.diff_alert_severity||'high').toUpperCase(), 'min severity',
-            cfg.diff_alert_severity === 'critical' ? '#ef4444' :
-            cfg.diff_alert_severity === 'high' ? '#fbbf24' : '#22d3ee') +
-    kpiCard('New CRIT alert', cfg.alert_on_new_critical ? 'on' : 'off', 'paging',
-            cfg.alert_on_new_critical ? '#22c55e' : '#94a3b8') +
-    kpiCard('Auto-generate',  cfg.auto_generate ? 'on' : 'off', 'on every scan',
-            cfg.auto_generate ? '#22c55e' : '#94a3b8') +
-    '</div>';
-  html += '<div style="color:#94a3b8;font-size:11px;margin-top:8px">' +
-          'Per-run SBOMs: <code>GET /api/v1/sbom/{rid}</code> · Diff: <code>GET /api/v1/sbom/{rid}/diff</code></div>';
-  html += '<div style="color:#94a3b8;font-size:11px">Last config update: ' +
-          (cfg.updated_at ? esc(new Date(cfg.updated_at).toLocaleString()) : '—') + '</div>';
-  root.innerHTML = html;
-}
-PRO.sbomRefresh = function(){ refreshPanel('sbomdiff'); };
+// renderSbomReal + PRO.sbomRefresh removed in the SBOM-redirect change.
+// They rendered only the 4 config-cards (Format / Diff alert / New CRIT /
+// Auto-generate) — no actual diff data, which is what made the overlay
+// look near-empty. Real data is in #panel-sbom > Diff tab now.
+// origSbomDiff is still captured above as a fallback if showPanel
+// becomes unreachable, so the symbol is preserved.
 
 /* ════════════════════════════════════════════════════════════════════════
    MODULE: SSO / SAML  — full override (was pure mock)
