@@ -834,7 +834,7 @@ window.vspGetPosture = async function() {
     if (document.getElementById('dod-widget-row')) return;
     injectDoDRow();
     loadDoDWidgets();
-    console.log('[VSP] DoD widgets auto-injected');
+    if (window.VSP_DEBUG) console.log('[VSP] DoD widgets injected');
   }
   // Thử nhiều lần: 1s, 2s, 3s, 5s sau khi load
   [1000, 2000, 3000, 5000].forEach(function(ms) {
@@ -1040,10 +1040,10 @@ window.addEventListener('load', function() {
       writable: false,
       configurable: false
     });
-    console.log('[VSP] LOCK_SHOW_PANEL — locked!');
+    if (window.VSP_DEBUG) console.log('[VSP] showPanel locked (defineProperty)');
   } catch(e) {
     window.showPanel = _FINAL;
-    console.log('[VSP] LOCK_SHOW_PANEL — assigned (no lock)');
+    if (window.VSP_DEBUG) console.log('[VSP] showPanel assigned (defineProperty failed)');
   }
 });
 

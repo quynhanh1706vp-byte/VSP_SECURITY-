@@ -126,7 +126,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   </div>
   <div class="card">
     <div class="card-head"><div><div class="card-title">Assets</div><div class="card-sub" id="asset-count-sub">12 assets</div></div>
-      <select id="env-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderAssets()">
+      <select aria-label="Environment filter" id="env-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderAssets()">
         <option value="">All envs</option><option value="prod">Production</option><option value="staging">Staging</option><option value="dev">Dev</option>
       </select>
     </div>
@@ -142,10 +142,10 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   <div class="card-head">
     <div><div class="card-title" id="findings-title">All findings</div><div class="card-sub" id="findings-sub">—</div></div>
     <div style="display:flex;gap:6px">
-      <select id="sev-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderFindings()">
+      <select aria-label="Severity filter" id="sev-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderFindings()">
         <option value="">All severity</option><option value="CRITICAL">Critical</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option>
       </select>
-      <select id="status-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderFindings()">
+      <select aria-label="Status filter" id="status-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderFindings()">
         <option value="">All status</option><option value="open">Open</option><option value="resolved">Resolved</option>
       </select>
       <button class="btn btn-sm" onclick="_activeAsset=null;renderFindings()">Clear filter</button>

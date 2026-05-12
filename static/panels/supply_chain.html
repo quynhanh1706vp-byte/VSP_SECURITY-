@@ -1412,22 +1412,26 @@ loadSignatures();
   };
 
   // ─── Init ─────────────────────────────────────────────────────────────────
+  // Three boot paths (readyState branch + DOMContentLoaded + 1.5s catch-up)
+  // would otherwise call init twice, double-binding the input/change
+  // listeners attached inside polishProvTab/polishVexTab/etc. The guard
+  // makes init idempotent so the duplicate boot paths are safe.
+  let _scInitDone = false;
   function init() {
+    if (_scInitDone) return;
+    _scInitDone = true;
     polishSignTab();
     polishSignaturesTab();
     polishProvTab();
     polishVexTab();
     polishKeyTab();
     injectSettingsButton();
-    // Re-trigger renders nếu data đã load trước
     if (sigCache.length === 0 && window.loadSignatures) window.loadSignatures();
-    console.log('[VSP-SC-POLISH] Loaded successfully');
+    if (window.VSP_DEBUG) console.log('[VSP-SC-POLISH] ready');
   }
   if (document.readyState !== 'loading') setTimeout(init, 200);
   else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 200));
-
-  // Re-init khi tab switch (trường hợp wrappers chưa attach)
-  setTimeout(init, 1500);
+  setTimeout(init, 1500); // catch-up path; no-op once _scInitDone is set
 })();
 
 </script>

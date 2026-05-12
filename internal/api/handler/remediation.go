@@ -26,7 +26,15 @@ func (h *Remediation) List(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Remediation{}
 	}
-	jsonOK(w, map[string]any{"remediations": list, "total": len(list)})
+	totalCount, _ := h.DB.CountRemediations(r.Context(), claims.TenantID, status)
+	if totalCount == 0 {
+		totalCount = len(list)
+	}
+	jsonOK(w, map[string]any{
+		"remediations": list,
+		"total":        totalCount,
+		"page_size":    len(list),
+	})
 }
 
 // GET /api/v1/remediation/stats

@@ -322,7 +322,7 @@ loadAll();
   'use strict';
   if (window.__VSP_OSCAL_POLISH__) return;
   window.__VSP_OSCAL_POLISH__ = true;
-  console.log('[VSP-OSCAL-POLISH] Loaded successfully');
+  if (window.VSP_DEBUG) console.log('[VSP-OSCAL-POLISH] ready');
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

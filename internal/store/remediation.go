@@ -96,6 +96,25 @@ func (db *DB) UpsertRemediation(ctx context.Context, r Remediation) (*Remediatio
 	return &out, nil
 }
 
+// CountRemediations — true row count for the tenant, optionally filtered
+// by status (mirrors ListRemediations filter semantics). The list query
+// caps at LIMIT 200; without this helper the handler reports
+// "total: len(list)" which jams at 200 even when the tenant has the
+// 55,712 remediations we actually see on the dashboard.
+func (db *DB) CountRemediations(ctx context.Context, tenantID, status string) (int, error) {
+	var statusFilter any
+	if status != "" {
+		statusFilter = status
+	}
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM remediations
+		WHERE tenant_id = $1
+		  AND ($2::text IS NULL OR status = $2)
+	`, tenantID, statusFilter).Scan(&n)
+	return n, err
+}
+
 func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]Remediation, error) {
 	where := "r.tenant_id=$1"
 	args := []any{tenantID}

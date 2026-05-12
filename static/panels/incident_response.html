@@ -771,7 +771,7 @@ loadKPIs();loadIncidents();
   'use strict';
   if (window.__VSP_IR_POLISH__) return;
   window.__VSP_IR_POLISH__ = true;
-  console.log('[VSP-IR-POLISH] Loaded successfully');
+  if (window.VSP_DEBUG) console.log('[VSP-IR-POLISH] ready');
 
   function $(s, ctx) { return (ctx || document).querySelector(s); }
   function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }

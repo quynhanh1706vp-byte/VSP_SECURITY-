@@ -63,7 +63,7 @@ window.__esc = __esc;
       <div class="g2 mb14">
         <div class="form-group mb8">
           <label class="form-label">Status</label>
-          <select id="rem-status" class="form-ctrl">
+          <select aria-label="Remediation status filter" id="rem-status" class="form-ctrl">
             <option value="open">Open</option>
             <option value="in_progress">In progress</option>
             <option value="resolved">Resolved</option>
@@ -74,7 +74,7 @@ window.__esc = __esc;
         </div>
         <div class="form-group mb8">
           <label class="form-label">Priority</label>
-          <select id="rem-priority" class="form-ctrl">
+          <select aria-label="Remediation priority" id="rem-priority" class="form-ctrl">
             <option value="P1">P1 — Critical</option>
             <option value="P2">P2 — High</option>
             <option value="P3">P3 — Medium</option>
@@ -92,7 +92,7 @@ window.__esc = __esc;
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <textarea id="rem-notes" class="form-ctrl" rows="3" style="resize:vertical"></textarea>
+        <textarea aria-label="Remediation notes" id="rem-notes" class="form-ctrl" rows="3" style="resize:vertical"></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -132,7 +132,7 @@ window.__esc = __esc;
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="form-group mb0">
           <label class="form-label">Mode</label>
-          <select id="scanMode" class="form-ctrl" onchange="updateScanTools()">
+          <select aria-label="Scan mode" id="scanMode" class="form-ctrl" onchange="updateScanTools()">
             <option value="SAST">SAST — Source code</option>
             <option value="SCA">SCA — Dependencies</option>
             <option value="SECRETS">SECRETS — Credentials</option>
@@ -145,7 +145,7 @@ window.__esc = __esc;
         </div>
         <div class="form-group mb0">
           <label class="form-label">Profile</label>
-          <select id="scanProfile" class="form-ctrl">
+          <select aria-label="Scan profile" id="scanProfile" class="form-ctrl">
             <option value="FAST">FAST — quick scan</option>
             <option value="STANDARD" selected>STANDARD — balanced</option>
             <option value="THOROUGH">THOROUGH — deep</option>
@@ -405,18 +405,18 @@ window.addEventListener('DOMContentLoaded', function(){
 
       <div class="login-field">
         <label class="login-label" for="login-email">Email / User ID</label>
-        <input class="login-input" id="login-email" type="email"
+        <input aria-label="Email address" class="login-input" id="login-email" type="email"
                placeholder="user@agency.gov" autocomplete="username">
       </div>
       <div class="login-field">
         <label class="login-label" for="login-pass">Password</label>
-        <input class="login-input" id="login-pass" type="password"
+        <input aria-label="Password" class="login-input" id="login-pass" type="password"
                placeholder="••••••••" autocomplete="current-password">
       </div>
 
       <!-- Consent -->
       <div class="login-consent">
-        <input type="checkbox" id="login-consent-cb">
+        <input aria-label="I consent to access controls" type="checkbox" id="login-consent-cb">
         <label for="login-consent-cb">
           I have read, understand, and consent to the <strong>U.S. Government Warning &amp; Consent Notice</strong> above. I am an authorized user of this system.
         </label>
@@ -946,7 +946,7 @@ window.addEventListener('DOMContentLoaded', function(){
       <div class="card mb14">
         <div class="card-body" style="padding:10px 14px">
           <div class="flex gap8" style="align-items:center">
-            <select id="log-run-select" class="filter-select" style="flex:1;max-width:480px" onchange="loadRunLog(this.value)">
+            <select aria-label="Select run for scan log" id="log-run-select" class="filter-select" style="flex:1;max-width:480px" onchange="loadRunLog(this.value)">
               <option value="">— select run —</option>
               <option value="RID_SCHED_20260329_194714_0">RID_SCHED_20260329_194714_0 · IAC · DONE</option>
               <option value="RID_VSPGO_RUN_20260329_171611_59df331a">RID_VSPGO_RUN_20260329_171611 · FULL · DONE</option>
@@ -981,7 +981,7 @@ window.addEventListener('DOMContentLoaded', function(){
         <input class="filter-input" id="log-search" placeholder="Search logs…" style="max-width:200px" oninput="filterLogs()">
         <span id="log-count" class="mono-sm" style="margin-left:auto">17 lines</span>
         <label class="flex gap8 f10 c-t3" style="align-items:center;cursor:pointer">
-          <input type="checkbox" id="log-autoscroll" checked style="accent-color:var(--amber)"> Auto-scroll
+          <input aria-label="Auto-scroll scan log" type="checkbox" id="log-autoscroll" checked style="accent-color:var(--amber)"> Auto-scroll
         </label>
       </div>
 
@@ -1118,14 +1118,14 @@ window.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="filter-bar">
-        <select class="filter-select" id="filter-severity">
+        <select aria-label="Severity filter" class="filter-select" id="filter-severity">
           <option value="">All Severities</option>
           <option value="CRITICAL">🔴 CRITICAL</option>
           <option value="HIGH">🟠 HIGH</option>
           <option value="MEDIUM">🟡 MEDIUM</option>
           <option value="LOW">🟢 LOW</option>
         </select>
-        <select class="filter-select" id="filter-tool">
+        <select aria-label="Tool filter" class="filter-select" id="filter-tool">
           <option value="">All Tools</option>
           <option>kics</option><option>trivy</option><option>gitleaks</option>
           <option>checkov</option><option>bandit</option><option>semgrep</option>
@@ -1140,7 +1140,7 @@ window.addEventListener('DOMContentLoaded', function(){
 
       <div class="bulk-bar" id="bulk-action-bar">
         <div class="bulk-check">
-          <input type="checkbox" id="bulk-select-all" onchange="toggleAllFindings(this.checked)">
+          <input aria-label="Select all findings" type="checkbox" id="bulk-select-all" onchange="toggleAllFindings(this.checked)">
           <label for="bulk-select-all">Select all</label>
         </div>
         <span class="bulk-count" id="bulk-count">0 selected</span>
@@ -1177,7 +1177,7 @@ window.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="filter-bar">
-        <select class="filter-select" id="rem-filter-status">
+        <select aria-label="Remediation status filter" class="filter-select" id="rem-filter-status">
           <option value="">All statuses</option>
           <option value="open">Open</option>
           <option value="in_progress">In progress</option>
@@ -1489,7 +1489,7 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="card-head">
           <div><div class="card-title">Available SBOMs</div><div class="card-sub">CycloneDX 1.5 · per scan run</div></div>
           <div style="display:flex;gap:8px;align-items:center">
-            <select class="filter-select" id="sbom-gate-filter" onchange="sbomRender()" style="font-size:10px;padding:3px 8px">
+            <select aria-label="SBOM gate filter" class="filter-select" id="sbom-gate-filter" onchange="sbomRender()" style="font-size:10px;padding:3px 8px">
               <option value="">All Gates</option>
               <option value="PASS">PASS</option>
               <option value="FAIL">FAIL</option>
@@ -1582,7 +1582,7 @@ window.addEventListener('DOMContentLoaded', function(){
           <div class="mono-sm" style="margin-top:3px">Trends · comparisons · insights</div>
         </div>
         <div class="flex gap8">
-          <select class="filter-select" id="analytics-days" onchange="loadAnalytics()" style="font-size:10px">
+          <select aria-label="Analytics time range" class="filter-select" id="analytics-days" onchange="loadAnalytics()" style="font-size:10px">
             <option value="7">Last 7 days</option>
             <option value="14" selected>Last 14 days</option>
             <option value="30">Last 30 days</option>
@@ -1711,7 +1711,7 @@ window.addEventListener('DOMContentLoaded', function(){
           <button class="btn btn-ghost" onclick="loadExportRuns()">↻ Refresh</button>
         </div>
         <div class="card-body">
-          <select class="filter-select" id="export-run-select" style="width:100%;max-width:600px;margin-bottom:14px" onchange="updateExportRID()">
+          <select aria-label="Select run for export" class="filter-select" id="export-run-select" style="width:100%;max-width:600px;margin-bottom:14px" onchange="updateExportRID()">
             <option value="">— select run —</option>
           </select>
           <div class="flex gap8 mb12">
@@ -2526,7 +2526,10 @@ async function runEval() {
   };
 
   setMsg('var(--cyan)', '⏳ Evaluating… [v3]');
-  console.log('[runEval v3] start; window.TOKEN length=', (window.TOKEN || '').length);
+  // Token presence logged via a non-misleading tag — pre-fix the literal
+  // "window.TOKEN= 357 chars" in the console looked like the JWT itself
+  // was being printed. Same value (presence) without the bad optics.
+  if (window.VSP_DEBUG) console.log('[runEval v3] start; auth=', window.TOKEN ? 'ok' : 'missing');
 
   const tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
   if (!tk || tk.length < 20) {
@@ -3967,7 +3970,7 @@ async function loadRunsDropdown() {
   const sel = document.getElementById('log-run-select');
   if (!sel) return;
   sel.innerHTML = '<option value="">⏳ loading runs…</option>';
-  console.log('[scanlog] loadRunsDropdown start; window.TOKEN=', (window.TOKEN||'').length, 'chars');
+  if (window.VSP_DEBUG) console.log('[scanlog] loadRunsDropdown start; auth=', window.TOKEN ? 'ok' : 'missing');
 
   const tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
   if (!tk || tk.length < 20) {
@@ -5595,7 +5598,7 @@ window.runEval = async function() {
   var el = document.getElementById('eval-result');
   if (!el) return;
   el.innerHTML = '<span style="color:var(--cyan)">⏳ Evaluating… [v4]</span>';
-  console.log('[runEval v4] start; token len=', (window.TOKEN || '').length);
+  if (window.VSP_DEBUG) console.log('[runEval v4] start; auth=', window.TOKEN ? 'ok' : 'missing');
   var tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
   if (!tk || tk.length < 20) {
     el.innerHTML = '<span style="color:var(--amber);font-weight:700">⚠ NOT AUTHENTICATED — please login first</span>';

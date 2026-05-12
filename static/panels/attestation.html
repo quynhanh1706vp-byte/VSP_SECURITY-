@@ -335,7 +335,7 @@ loadForms();
   'use strict';
   if (window.__VSP_ATT_POLISH__) return;
   window.__VSP_ATT_POLISH__ = true;
-  console.log('[VSP-ATT-POLISH] Loaded successfully');
+  if (window.VSP_DEBUG) console.log('[VSP-ATT-POLISH] ready');
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   function $(id) { return document.getElementById(id); }
