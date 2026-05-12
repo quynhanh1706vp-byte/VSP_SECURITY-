@@ -93,6 +93,14 @@ type IOC struct {
 
 // ── Correlation rules ─────────────────────────────────────────
 
+// CountCorrelationRules — true total for paginated /correlation/rules.
+func (db *DB) CountCorrelationRules(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM correlation_rules WHERE tenant_id = $1`, tenantID).Scan(&n)
+	return n, err
+}
+
 func (db *DB) ListCorrelationRules(ctx context.Context, tenantID string) ([]CorrelationRule, error) {
 	rows, err := db.pool.Query(ctx, `
 		SELECT id, name, sources, window_min, severity,
@@ -144,6 +152,28 @@ func (db *DB) DeleteCorrelationRule(ctx context.Context, tenantID, id string) er
 }
 
 // ── Incidents ─────────────────────────────────────────────────
+
+// CountIncidents — true row count matching the same filter set as
+// ListIncidents. Used by /api/v1/correlation/incidents handler so the
+// dashboard "Open Incidents" KPI is accurate even when limit < total.
+func (db *DB) CountIncidents(ctx context.Context, tenantID, status, sev string) (int, error) {
+	// nullable-bind pattern keeps the SQL a single literal; no taint.
+	var statusFilter, sevFilter any
+	if status != "" {
+		statusFilter = status
+	}
+	if sev != "" {
+		sevFilter = sev
+	}
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM incidents
+		WHERE tenant_id = $1
+		  AND ($2::text IS NULL OR status   = $2)
+		  AND ($3::text IS NULL OR severity = $3)
+	`, tenantID, statusFilter, sevFilter).Scan(&n)
+	return n, err
+}
 
 func (db *DB) ListIncidents(ctx context.Context, tenantID, status, sev string, limit int) ([]Incident, error) {
 	q := `SELECT i.id, i.title, i.severity, i.status,
@@ -218,6 +248,22 @@ func (db *DB) GetIncident(ctx context.Context, tenantID, id string) (*Incident, 
 }
 
 // ── Playbooks ─────────────────────────────────────────────────
+
+// CountPlaybooks — true total for paginated /soar/playbooks.
+func (db *DB) CountPlaybooks(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM playbooks WHERE tenant_id = $1`, tenantID).Scan(&n)
+	return n, err
+}
+
+// CountPlaybookRuns — true total for paginated /soar/runs.
+func (db *DB) CountPlaybookRuns(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM playbook_runs WHERE tenant_id = $1`, tenantID).Scan(&n)
+	return n, err
+}
 
 func (db *DB) ListPlaybooks(ctx context.Context, tenantID string) ([]Playbook, error) {
 	rows, err := db.pool.Query(ctx, `
@@ -340,6 +386,14 @@ func (db *DB) FindEnabledPlaybooks(ctx context.Context, tenantID, trigger, sev s
 
 // ── Log sources ───────────────────────────────────────────────
 
+// CountLogSources — true total for paginated /log/sources.
+func (db *DB) CountLogSources(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM log_sources WHERE tenant_id = $1`, tenantID).Scan(&n)
+	return n, err
+}
+
 func (db *DB) ListLogSources(ctx context.Context, tenantID string) ([]LogSource, error) {
 	rows, err := db.pool.Query(ctx, `
 		SELECT id, name, host, protocol, port, format,
@@ -402,6 +456,22 @@ func (db *DB) LogSourceStats(ctx context.Context, tenantID string) (total, onlin
 
 // ── IOCs ──────────────────────────────────────────────────────
 
+// CountIOCs — true total of non-expired IOCs (optionally filtered by type).
+// Matches ListIOCs filter semantics so dashboard "Active IOCs" KPI is accurate.
+func (db *DB) CountIOCs(ctx context.Context, iocType string) (int, error) {
+	var typeFilter any
+	if iocType != "" {
+		typeFilter = iocType
+	}
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM iocs
+		WHERE (expires_at > NOW() OR expires_at IS NULL)
+		  AND ($1::text IS NULL OR type = $1)
+	`, typeFilter).Scan(&n)
+	return n, err
+}
+
 func (db *DB) ListIOCs(ctx context.Context, iocType string, limit int) ([]IOC, error) {
 	q := `SELECT id, type, value, severity, feed, description, matched, created_at
 	      FROM iocs WHERE (expires_at > NOW() OR expires_at IS NULL)`
@@ -427,6 +497,19 @@ func (db *DB) ListIOCs(ctx context.Context, iocType string, limit int) ([]IOC, e
 		out = append(out, ioc)
 	}
 	return out, nil
+}
+
+// CountMatchedIOCs — true count of currently-matched IOCs (Matches endpoint).
+// Mirrors the in-memory filter `ioc.Matched == true` against the live IOC set
+// (expires_at gate matches ListIOCs).
+func (db *DB) CountMatchedIOCs(ctx context.Context) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM iocs
+		WHERE matched = true
+		  AND (expires_at > NOW() OR expires_at IS NULL)
+	`).Scan(&n)
+	return n, err
 }
 
 func (db *DB) IOCFeedCounts(ctx context.Context, feed string) int {

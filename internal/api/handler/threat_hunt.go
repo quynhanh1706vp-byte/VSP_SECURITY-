@@ -102,7 +102,8 @@ func (h *ThreatHunt) ListQueries(w http.ResponseWriter, r *http.Request) {
 		q.MITRETechniques = splitCSV(techs)
 		out = append(out, q)
 	}
-	jsonOK(w, map[string]any{"queries": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	// SQL has no LIMIT — out is the complete hunt_queries set for the tenant.
+	jsonOK(w, map[string]any{"queries": out, "total": len(out)}) // safe-len: unlimited query
 }
 
 // POST /api/v1/threat-hunt/queries
@@ -270,7 +271,7 @@ func (h *ThreatHunt) RunQuery(w http.ResponseWriter, r *http.Request) {
 		_, _ = h.DB.Pool().Exec(r.Context(),
 			`INSERT INTO hunt_results(query_id, tenant_id, error, triggered_by)
 			 VALUES($1, $2, $3, 'manual')`, id, tenantID, err.Error())
-		jsonError(w, "hunt failed: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "hunt failed", err)
 		return
 	}
 	defer rows.Close()
@@ -383,5 +384,14 @@ func (h *ThreatHunt) ListResults(w http.ResponseWriter, r *http.Request) {
 	if out == nil {
 		out = []entry{}
 	}
-	jsonOK(w, map[string]any{"results": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	var totalCount int
+	_ = h.DB.Pool().QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM hunt_results
+		   WHERE tenant_id = $1
+		     AND ($2::uuid IS NULL OR query_id = $2::uuid)`,
+		tenantID, qidFilter).Scan(&totalCount)
+	if totalCount == 0 {
+		totalCount = len(out)
+	}
+	jsonOK(w, map[string]any{"results": out, "total": totalCount, "page_size": len(out)})
 }

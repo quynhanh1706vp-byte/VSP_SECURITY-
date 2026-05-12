@@ -35,7 +35,7 @@ func (h *OSCALModels) AssessmentPlan(w http.ResponseWriter, r *http.Request) {
 		`SELECT tool, COUNT(*) AS cnt FROM findings WHERE tenant_id = $1
 		 GROUP BY tool ORDER BY cnt DESC LIMIT 20`, tenant)
 	if err != nil {
-		jsonError(w, "query findings: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "query findings", err)
 		return
 	}
 	defer rows.Close()
@@ -155,7 +155,7 @@ func (h *OSCALModels) AssessmentResults(w http.ResponseWriter, r *http.Request) 
 		`SELECT severity, COUNT(*) FROM findings WHERE tenant_id=$1
 		 GROUP BY severity ORDER BY 2 DESC`, tenant)
 	if err != nil {
-		jsonError(w, "severity query: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "severity query", err)
 		return
 	}
 	defer rows.Close()
@@ -176,7 +176,7 @@ func (h *OSCALModels) AssessmentResults(w http.ResponseWriter, r *http.Request) 
 		 ORDER BY cvss DESC NULLS LAST, severity DESC
 		 LIMIT 100`, tenant)
 	if err != nil {
-		jsonError(w, "top findings query: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "top findings query", err)
 		return
 	}
 	defer topRows.Close()
@@ -281,7 +281,7 @@ func (h *OSCALModels) POAM(w http.ResponseWriter, r *http.Request) {
 		 WHERE tenant_id = $1 OR tenant_id = 'default' OR tenant_id IS NULL
 		 ORDER BY created_at DESC LIMIT 200`, tenant)
 	if err != nil {
-		jsonError(w, "poam query: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "poam query", err)
 		return
 	}
 	defer rows.Close()

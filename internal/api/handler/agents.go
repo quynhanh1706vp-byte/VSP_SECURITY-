@@ -61,7 +61,7 @@ func (h *Agents) Enroll(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.DB.EnrollAgent(r.Context(), claims.TenantID, req.Hostname, req.OSFamily, req.OSVersion, req.Arch, req.Version)
 	if err != nil {
-		jsonError(w, "enroll: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "enroll", err)
 		return
 	}
 	// L8 fix: agent enrollment is identity creation — must be audited.
@@ -96,7 +96,18 @@ func (h *Agents) List(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	jsonOK(w, map[string]interface{}{"agents": agents, "count": len(agents)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	// True total count, not page size — matches the FE "X agents" KPI
+	// to reality even when limit < total. Falls back to page size on
+	// query error so we never hide rows the user just received.
+	totalCount, _ := h.DB.CountAgents(r.Context(), claims.TenantID)
+	if totalCount == 0 {
+		totalCount = len(agents)
+	}
+	jsonOK(w, map[string]interface{}{
+		"agents":    agents,
+		"count":     totalCount,
+		"page_size": len(agents),
+	})
 }
 
 // Get — GET /api/v1/agents/{id}
@@ -210,7 +221,7 @@ func (h *Agents) Heartbeat(w http.ResponseWriter, r *http.Request) {
 
 	ip := extractClientIP(r)
 	if err := h.DB.TouchAgent(r.Context(), a.ID, ip, req.Version); err != nil {
-		jsonError(w, "touch: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "touch", err)
 		return
 	}
 	jsonOK(w, map[string]interface{}{"ok": true, "agent_id": a.ID, "next_heartbeat_seconds": 60})
@@ -244,7 +255,7 @@ func (h *Agents) Inventory(w http.ResponseWriter, r *http.Request) {
 	ua := r.Header.Get("User-Agent")
 	count, err := h.DB.IngestInventory(r.Context(), a.TenantID, a.ID, ip, ua, req.Packages)
 	if err != nil {
-		jsonError(w, "ingest: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "ingest", err)
 		return
 	}
 

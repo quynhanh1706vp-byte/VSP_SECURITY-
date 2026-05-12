@@ -133,7 +133,7 @@ func (h *SSO) Callback(w http.ResponseWriter, r *http.Request) {
 	// Issue JWT via existing Auth handler
 	token, err := h.AuthH.IssueToken(r.Context(), info.Email, info.Name, role)
 	if err != nil {
-		jsonError(w, "token issue failed: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "token issue failed", err)
 		return
 	}
 

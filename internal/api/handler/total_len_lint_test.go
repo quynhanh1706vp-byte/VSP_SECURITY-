@@ -37,7 +37,12 @@ import (
 func TestNoFalseTotalCount(t *testing.T) {
 	totalLenRe := regexp.MustCompile(`"(total|count)":\s*len\(`)
 	limitRe := regexp.MustCompile(`queryInt\(r,\s*"limit"|r\.URL\.Query\(\)\.Get\("limit"\)|Limit\s+int\s+\x60json:"limit"\x60`)
-	allowRe := regexp.MustCompile(`page-size-not-total`)
+	// `page-size-not-total:` and `safe-len:` are both explicit opt-outs.
+	// `page-size-not-total` was the original ratchet token; `safe-len:` was
+	// adopted in the 2026-05-12 audit to distinguish "deliberately
+	// non-paginated" sites (in-memory list, hardcoded set, unlimited query)
+	// from the still-pending wire-CountX TODOs.
+	allowRe := regexp.MustCompile(`page-size-not-total|safe-len:`)
 
 	files, err := filepath.Glob("*.go")
 	if err != nil {

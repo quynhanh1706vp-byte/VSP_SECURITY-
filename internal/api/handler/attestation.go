@@ -106,9 +106,10 @@ func (h *CISAAttestation) Practices(w http.ResponseWriter, r *http.Request) {
 		counts[p.Status]++
 	}
 
+	// SQL has no LIMIT — out is the complete ssdf_practices set.
 	jsonOK(w, map[string]any{
 		"practices": out,
-		"total":     len(out), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+		"total":     len(out), // safe-len: unlimited query
 		"counts":    counts,
 	})
 }
@@ -336,7 +337,7 @@ func (h *CISAAttestation) GenerateDraft(w http.ResponseWriter, r *http.Request) 
 		claims.TenantID, formUUID, req.ProducerName, req.ProductName,
 		req.ProductVersion, snapshotJSON).Scan(&newID)
 	if err != nil {
-		jsonError(w, "insert failed: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "insert failed", err)
 		return
 	}
 

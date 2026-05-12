@@ -55,7 +55,7 @@ func (h *UEBA) Analyze(w http.ResponseWriter, r *http.Request) {
 	engine := siem.NewUEBAEngine(h.DB, claims.TenantID)
 	anomalies, err := engine.Analyze(r.Context())
 	if err != nil {
-		jsonError(w, "analysis failed: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "analysis failed", err)
 		return
 	}
 	// Persist significant anomalies as incidents

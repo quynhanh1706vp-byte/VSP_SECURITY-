@@ -80,12 +80,19 @@ func TestNoErrLeakInClientResponse(t *testing.T) {
 		}
 	}
 
-	// Ratchet: the 2026-05-12 audit measured 110 leak sites in handlers.
-	// We bumped 8 to jsonInternalError, leaving 102. CI passes only if
-	// the count is ≤ that ratchet — every PR is expected to either hold
-	// the line or chip it down. New leaks bump the count and trip the
-	// gate. Existing site refactors lower the ratchet in the same PR.
-	const ratchet = 110
+	// Ratchet history:
+	//   2026-05-12 morning: 110 sites at first audit
+	//   2026-05-12 noon  :  20 sites after batch jsonInternalError convert
+	//   2026-05-12 PM    :  12 sites after annotating intentional 4xx
+	//                       validation feedback (safe-err-leak)
+	//
+	// Remaining 12 are all client-facing 4xx validation messages where
+	// err.Error() text IS the user feedback (e.g. URL parse failures
+	// in /vsp/run trigger). Each PR is expected to hold the line; new
+	// leak sites bump the count and trip the gate. The reduction
+	// trajectory was -98 in one day so the floor here is intentionally
+	// tight.
+	const ratchet = 12
 	if len(bad) > ratchet {
 		t.Errorf("err.Error() leak count %d > ratchet %d", len(bad), ratchet)
 		t.Errorf("New code must use jsonInternalError(w, r, msg, err)")

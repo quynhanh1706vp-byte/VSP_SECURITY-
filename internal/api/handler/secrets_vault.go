@@ -45,7 +45,7 @@ func (h *SOARv2) GetSecretMeta(w http.ResponseWriter, r *http.Request) {
 	}
 	secrets, err := h.Vault.List(r.Context(), claims.TenantID)
 	if err != nil {
-		jsonError(w, "list: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "list", err)
 		return
 	}
 	for _, s := range secrets {
@@ -98,7 +98,7 @@ func (h *SOARv2) RotateSecret(w http.ResponseWriter, r *http.Request) {
 	// Verify the secret already exists (rotate ≠ create).
 	secrets, err := h.Vault.List(r.Context(), claims.TenantID)
 	if err != nil {
-		jsonError(w, "list: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "list", err)
 		return
 	}
 	found := false
@@ -119,7 +119,7 @@ func (h *SOARv2) RotateSecret(w http.ResponseWriter, r *http.Request) {
 		desc = prevDesc
 	}
 	if err := h.Vault.Put(r.Context(), claims.TenantID, name, req.Value, desc, claims.UserID); err != nil {
-		jsonError(w, "rotate: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "rotate", err)
 		return
 	}
 	// Best-effort 'rotate' audit row (vault.Put already wrote a 'create' row;
@@ -187,7 +187,19 @@ func (h *SOARv2) SecretAuditLog(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, a)
 	}
-	jsonOK(w, map[string]any{"entries": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+
+	// True audit row count for the filter — same nullable-bind shape
+	// as the SELECT above so an empty filter counts everything.
+	var totalCount int
+	_ = h.DB.Pool().QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM playbook_secret_audit
+		  WHERE tenant_id = $1
+		    AND ($2::text IS NULL OR secret_name = $2)`,
+		claims.TenantID, nameFilter).Scan(&totalCount)
+	if totalCount == 0 {
+		totalCount = len(out)
+	}
+	jsonOK(w, map[string]any{"entries": out, "total": totalCount, "page_size": len(out)})
 }
 
 // ── Per-tenant vault config (PRO "view details" panel) ──────────────────────
@@ -305,7 +317,7 @@ func (h *SOARv2) VaultSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	secrets, err := h.Vault.List(r.Context(), claims.TenantID)
 	if err != nil {
-		jsonError(w, "list: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "list", err)
 		return
 	}
 

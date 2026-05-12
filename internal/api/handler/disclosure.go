@@ -273,7 +273,7 @@ func (h *Disclosure) Transition(w http.ResponseWriter, r *http.Request) {
 	tag, err := h.DB.Pool().Exec(r.Context(),
 		`UPDATE security_disclosures SET `+setClause+` WHERE id = $2`, args...)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	if tag.RowsAffected() == 0 {

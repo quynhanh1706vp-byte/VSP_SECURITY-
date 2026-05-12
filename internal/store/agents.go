@@ -162,6 +162,15 @@ func (db *DB) GetAgentByID(ctx context.Context, tenantID, agentID string) (*Agen
 	return a, nil
 }
 
+// CountAgents — true row count for the tenant. Used by /api/v1/agents
+// handler so the "X agents" KPI shows real count, not page size.
+func (db *DB) CountAgents(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM agents WHERE tenant_id = $1`, tenantID).Scan(&n)
+	return n, err
+}
+
 // ListAgents — paginated tenant-scoped list. Newest first.
 func (db *DB) ListAgents(ctx context.Context, tenantID string, limit int) ([]Agent, error) {
 	if limit <= 0 || limit > 500 {

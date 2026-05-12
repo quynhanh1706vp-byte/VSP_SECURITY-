@@ -118,7 +118,7 @@ func (h *Grafana) SetConfig(w http.ResponseWriter, r *http.Request) {
 		 ON CONFLICT (tenant_id, feature_id) DO UPDATE
 		 SET config = EXCLUDED.config, updated_at = NOW()`,
 		tenantID, raw); err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	logAudit(r, h.DB, "GRAFANA_CONFIG_SET", "grafana/"+tenantID)

@@ -129,16 +129,16 @@ func (h *WebAuthnH) RegisterBegin(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := h.loadUser(r, userID, tenantID)
 	if err != nil {
-		jsonError(w, "load user: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "load user", err)
 		return
 	}
 	options, sessionData, err := h.W.BeginRegistration(u)
 	if err != nil {
-		jsonError(w, "begin registration: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "begin registration", err)
 		return
 	}
 	if err := h.persistSession(r, userID, tenantID, "registration", sessionData); err != nil {
-		jsonError(w, "persist session: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "persist session", err)
 		return
 	}
 	jsonOK(w, options)
@@ -194,7 +194,7 @@ func (h *WebAuthnH) RegisterFinish(w http.ResponseWriter, r *http.Request) {
 		userID, tenantID, cred.ID, cred.PublicKey, cred.Authenticator.SignCount,
 		aaguid, transports, meta.Nickname, meta.Attachment, cred.Flags.UserVerified,
 	); err != nil {
-		jsonError(w, "persist credential: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "persist credential", err)
 		return
 	}
 	logAudit(r, h.DB, "WEBAUTHN_REGISTERED", "webauthn/"+meta.Nickname)
@@ -229,11 +229,11 @@ func (h *WebAuthnH) LoginBegin(w http.ResponseWriter, r *http.Request) {
 	}
 	options, sessionData, err := h.W.BeginLogin(u)
 	if err != nil {
-		jsonError(w, "begin login: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "begin login", err)
 		return
 	}
 	if err := h.persistSession(r, userID, tenantID, "authentication", sessionData); err != nil {
-		jsonError(w, "persist session: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "persist session", err)
 		return
 	}
 	jsonOK(w, options)

@@ -20,7 +20,7 @@ func (h *Remediation) List(w http.ResponseWriter, r *http.Request) {
 	list, err := h.DB.ListRemediations(r.Context(), claims.TenantID, status)
 	if err != nil {
 		log.Error().Err(err).Str("tenant", claims.TenantID).Msg("ListRemediations failed")
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	if list == nil {
@@ -230,7 +230,7 @@ func (h *Remediation) Transition(w http.ResponseWriter, r *http.Request) {
 		}
 		updated, err = h.DB.UpsertRemediation(r.Context(), newRem)
 		if err != nil {
-			jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+			jsonInternalError(w, r, "db error", err)
 			return
 		}
 	}
@@ -362,7 +362,7 @@ func (h *Remediation) History(w http.ResponseWriter, r *http.Request) {
 
 	history, err := h.DB.ListRemediationHistory(r.Context(), rem.ID, 200)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 
@@ -381,7 +381,7 @@ func (h *Remediation) KPIs(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := h.DB.RemediationStats(r.Context(), claims.TenantID)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 

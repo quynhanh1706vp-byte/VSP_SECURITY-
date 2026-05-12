@@ -165,7 +165,7 @@ func (h *Audit) Repair(w http.ResponseWriter, r *http.Request) {
 	adapter := &auditStoreAdapter{db: h.DB}
 	result, err := audit.RepairChain(r.Context(), adapter, tenantID, !req.Confirm)
 	if err != nil {
-		jsonError(w, "repair failed: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "repair failed", err)
 		return
 	}
 	// If we actually wrote changes, log a meta-audit entry recording the act.

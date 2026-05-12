@@ -3349,8 +3349,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         var _p = JSON.parse(atob(window.TOKEN.split('.')[1]));
         if (_p.exp && _p.exp * 1000 > Date.now()) {
-          updateTicker();
-          setInterval(updateTicker, 30000);
+          startTicker();
         } else {
           localStorage.removeItem('vsp_token');
           window.TOKEN = '';
@@ -3610,8 +3609,7 @@ async function govLoginSubmit() {
     setTimeout(loadCurrentPanel, 300);
     // Trigger KPI update ngay sau login
     setTimeout(function() {
-      if (typeof updateTicker === 'function') updateTicker();
-      setInterval(updateTicker, 30000);
+      if (typeof startTicker === 'function') startTicker();
     }, 500);
 
     showToast('Authenticated — welcome, ' + (data.email||'user'), 'success');
@@ -3847,6 +3845,24 @@ window.downloadExecutivePDF = async function() {
   }
 };
 
+// ── startTicker — idempotent registrar so the 30s KPI poll only runs once.
+// Pre-fix: four separate setInterval(updateTicker, 30000) sites layered
+// across boot paths (DOMContentLoaded, readyState fallback, login success,
+// post-token check) → after a normal session boot users had 2-4 intervals
+// firing every 30s, hitting /api/v1/vsp/run/latest 2-4x and accumulating
+// closure-captured DOM refs across tabs.
+window.startTicker = function() {
+  if (window._updateTickerIv) return; // already running
+  if (typeof window.updateTicker === 'function') window.updateTicker();
+  window._updateTickerIv = setInterval(window.updateTicker, 30000);
+};
+window.stopTicker = function() {
+  if (window._updateTickerIv) {
+    clearInterval(window._updateTickerIv);
+    window._updateTickerIv = null;
+  }
+};
+
 // ── updateTicker — full KPI update ───────────────────────────────────────
 window.updateTicker = async function() {
   if (!window.TOKEN || window.TOKEN === '') return;
@@ -3919,13 +3935,12 @@ window.showPanel = function(name, btn) {
 document.addEventListener('DOMContentLoaded', async function() {
   if (!await ensureToken()) return;
   initSSE();
-  if (window.TOKEN) updateTicker();
-  setInterval(updateTicker, 30000);
+  if (window.TOKEN) startTicker();
 });
 
 // Fallback nếu DOMContentLoaded đã fired
 if (document.readyState !== 'loading') {
-  ensureToken().then(ok => { if(!ok) return; initSSE(); updateTicker(); setInterval(updateTicker,30000); });
+  ensureToken().then(ok => { if(!ok) return; initSSE(); startTicker(); });
 }
 </script>
 

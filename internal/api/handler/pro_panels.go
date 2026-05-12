@@ -347,7 +347,14 @@ func (p *ProPanels) NotificationLog(w http.ResponseWriter, r *http.Request) {
 	if out == nil {
 		out = []entry{}
 	}
-	jsonOK(w, map[string]any{"entries": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	var totalCount int
+	_ = p.DB.Pool().QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM notification_log WHERE tenant_id = $1`,
+		claims.TenantID).Scan(&totalCount)
+	if totalCount == 0 {
+		totalCount = len(out)
+	}
+	jsonOK(w, map[string]any{"entries": out, "total": totalCount, "page_size": len(out)})
 }
 
 // NotificationDLQ — GET /api/v1/notifications/dlq
@@ -401,7 +408,15 @@ func (p *ProPanels) NotificationDLQ(w http.ResponseWriter, r *http.Request) {
 	if out == nil {
 		out = []dlqEntry{}
 	}
-	jsonOK(w, map[string]any{"entries": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	var totalCount int
+	_ = p.DB.Pool().QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM notification_log
+		 WHERE tenant_id = $1 AND status_code = -1`,
+		tenantID).Scan(&totalCount)
+	if totalCount == 0 {
+		totalCount = len(out)
+	}
+	jsonOK(w, map[string]any{"entries": out, "total": totalCount, "page_size": len(out)})
 }
 
 // NotificationDLQRetry — POST /api/v1/notifications/dlq/retry

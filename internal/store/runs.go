@@ -105,6 +105,28 @@ func (db *DB) CountRuns(ctx context.Context, tenantID string) (int, error) {
 	return n, err
 }
 
+// CountSBOMRuns — true count of DONE runs (SBOM index handler page-cap=50).
+func (db *DB) CountSBOMRuns(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM runs WHERE tenant_id = $1 AND status = 'DONE'`,
+		tenantID).Scan(&n)
+	return n, err
+}
+
+// CountDastTargets — distinct target_urls observed for the tenant.
+// Powers the DAST settings panel total (SettingsDastTargets cap=50).
+func (db *DB) CountDastTargets(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT target_url) FROM runs
+		WHERE tenant_id = $1
+		  AND target_url IS NOT NULL
+		  AND target_url != ''
+	`, tenantID).Scan(&n)
+	return n, err
+}
+
 func (db *DB) UpdateRunStatus(ctx context.Context, tenantID, rid, status string, toolsDone int) error {
 	_, err := db.pool.Exec(ctx,
 		`UPDATE runs SET status=$3, tools_done=$4,

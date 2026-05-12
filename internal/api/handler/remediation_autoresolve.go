@@ -27,7 +27,7 @@ func (h *Remediation) AutoResolve(w http.ResponseWriter, r *http.Request) {
 	res, err := h.DB.AutoResolveOrphans(r.Context(), claims.TenantID)
 	if err != nil {
 		log.Error().Err(err).Str("tenant", claims.TenantID).Msg("AutoResolveOrphans failed")
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 

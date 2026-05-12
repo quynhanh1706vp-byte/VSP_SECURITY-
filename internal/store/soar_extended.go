@@ -239,6 +239,15 @@ func (db *DB) UpdatePlaybookGraph(ctx context.Context, tenantID, id string, grap
 	return newVersion, nil
 }
 
+// CountPlaybookVersions — true total of version history for a playbook.
+func (db *DB) CountPlaybookVersions(ctx context.Context, playbookID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM playbook_versions WHERE playbook_id = $1`,
+		playbookID).Scan(&n)
+	return n, err
+}
+
 // ListPlaybookVersions — newest first.
 func (db *DB) ListPlaybookVersions(ctx context.Context, playbookID string, limit int) ([]PlaybookVersion, error) {
 	if limit <= 0 || limit > 100 {
@@ -722,6 +731,17 @@ func (db *DB) RecordApprovalDecision(ctx context.Context, approvalID, by, decisi
 	}
 
 	return tx.Commit(ctx)
+}
+
+// CountPendingApprovals — true total of pending approval rows for the tenant.
+func (db *DB) CountPendingApprovals(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM playbook_approvals a
+		JOIN playbook_runs r ON r.id = a.run_id
+		WHERE r.tenant_id = $1 AND a.status = 'pending'
+	`, tenantID).Scan(&n)
+	return n, err
 }
 
 // ListPendingApprovals — for tenant dashboard.

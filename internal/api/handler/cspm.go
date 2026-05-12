@@ -67,7 +67,8 @@ func (h *CSPM) ListAccounts(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, a)
 	}
-	jsonOK(w, map[string]any{"accounts": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	// SQL has no LIMIT — out is the complete cspm_accounts set for the tenant.
+	jsonOK(w, map[string]any{"accounts": out, "total": len(out)}) // safe-len: unlimited query
 }
 
 // POST /api/v1/cspm/accounts — register a new cloud account.
@@ -262,7 +263,25 @@ func (h *CSPM) ListFindings(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, f)
 	}
-	jsonOK(w, map[string]any{"findings": out, "total": len(out), "limit": limit, "offset": offset}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	var totalCount int
+	_ = h.DB.Pool().QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM cspm_findings
+		   WHERE tenant_id = $1
+		     AND ($2::uuid IS NULL OR account_id = $2::uuid)
+		     AND ($3::text IS NULL OR severity   = $3)
+		     AND ($4::text IS NULL OR status     = $4)`,
+		claims.TenantID, accountFilter, severityFilter, statusFilter,
+	).Scan(&totalCount)
+	if totalCount == 0 {
+		totalCount = len(out)
+	}
+	jsonOK(w, map[string]any{
+		"findings":  out,
+		"total":     totalCount,
+		"page_size": len(out),
+		"limit":     limit,
+		"offset":    offset,
+	})
 }
 
 // GET /api/v1/cspm/findings/{id}

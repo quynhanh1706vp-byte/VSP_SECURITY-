@@ -1117,6 +1117,17 @@ func (e *Engine) GetStats() Stats {
 	return e.stats
 }
 
+// Counts returns the ring-buffer cardinality for each subsystem. Used by
+// the /netcap/* handlers so the FE shows the true buffer depth, not the
+// page-cap. The buffer caps are typically 10k flows, 1k anomalies, etc.
+func (e *Engine) Counts() (flows, anoms, http, dns, sql, tls, grpc, eth int) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return len(e.flows), len(e.anomalies), len(e.httpReqs),
+		len(e.dnsQ), len(e.sqlEvts), len(e.tlsSess),
+		len(e.grpcEvts), len(e.ethFrames)
+}
+
 func (e *Engine) GetFlows(limit int, protoFilter, flagFilter string) []*Flow {
 	e.mu.RLock()
 	defer e.mu.RUnlock()

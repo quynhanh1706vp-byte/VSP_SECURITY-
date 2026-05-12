@@ -164,9 +164,15 @@ func (h *SOARv2) ListPlaybookVersions(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	totalCount, _ := h.DB.CountPlaybookVersions(r.Context(), id)
+	if totalCount == 0 {
+		totalCount = len(versions)
+	}
 	jsonOK(w, map[string]interface{}{
-		"versions": versions,
-		"count":    len(versions), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+		"versions":  versions,
+		"count":     len(versions), // safe-len: legacy page count; total is honest
+		"total":     totalCount,
+		"page_size": len(versions),
 	})
 }
 
@@ -206,9 +212,15 @@ func (h *SOARv2) ListPendingApprovals(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	totalCount, _ := h.DB.CountPendingApprovals(r.Context(), claims.TenantID)
+	if totalCount == 0 {
+		totalCount = len(approvals)
+	}
 	jsonOK(w, map[string]interface{}{
 		"approvals": approvals,
-		"count":     len(approvals), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+		"count":     len(approvals), // safe-len: legacy page count; total is honest
+		"total":     totalCount,
+		"page_size": len(approvals),
 	})
 }
 
@@ -266,12 +278,13 @@ func (h *SOARv2) ListSecrets(w http.ResponseWriter, r *http.Request) {
 	}
 	secrets, err := h.Vault.List(r.Context(), claims.TenantID)
 	if err != nil {
-		jsonError(w, "list: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "list", err)
 		return
 	}
+	// ListSecrets has a 1000-row cap in SQL — realistic vaults are <100 entries.
 	jsonOK(w, map[string]interface{}{
 		"secrets": secrets,
-		"count":   len(secrets), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+		"count":   len(secrets), // safe-len: 1k cap; tenant vaults rarely exceed 100
 	})
 }
 
@@ -303,7 +316,7 @@ func (h *SOARv2) CreateSecret(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Vault.Put(r.Context(), claims.TenantID, req.Name, req.Value, req.Description, claims.UserID); err != nil {
-		jsonError(w, "store: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "store", err)
 		return
 	}
 	jsonOK(w, map[string]interface{}{

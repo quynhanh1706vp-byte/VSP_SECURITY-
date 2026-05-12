@@ -84,7 +84,7 @@ func (h *DSR) RequestExport(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO data_subject_requests (tenant_id, requested_by, kind, status)
 		 VALUES ($1, $2, 'export', 'pending') RETURNING id`,
 		tenantID, userPtr).Scan(&id); err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	logAudit(r, h.DB, "DSR_EXPORT_REQUESTED", "data_subject_requests/"+id)
@@ -182,7 +182,7 @@ func (h *DSR) RequestErasure(w http.ResponseWriter, r *http.Request) {
 		 RETURNING id`,
 		tenantID, userPtr, scheduledAt, body.Notes, hashHex,
 	).Scan(&id); err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	logAudit(r, h.DB, "DSR_ERASURE_SCHEDULED",
@@ -236,7 +236,7 @@ func (h *DSR) ConfirmErasure(w http.ResponseWriter, r *http.Request) {
 		    AND status = 'pending' AND confirm_hash = $3`,
 		id, tenantID, hashHex)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	if tag.RowsAffected() == 0 {

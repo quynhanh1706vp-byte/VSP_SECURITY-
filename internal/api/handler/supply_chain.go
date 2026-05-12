@@ -262,7 +262,7 @@ func (h *SupplyChain) Sign(w http.ResponseWriter, r *http.Request) {
 		[]byte(sigB64), sigB64, pubKey, bundleJSON, claims.Email,
 		"ECDSA_P256_SHA256").Scan(&newID)
 	if err != nil {
-		jsonError(w, "insert failed: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "insert failed", err)
 		return
 	}
 
@@ -318,7 +318,19 @@ func (h *SupplyChain) Provenance(w http.ResponseWriter, r *http.Request) {
 			out = append(out, p)
 		}
 	}
-	jsonOK(w, map[string]any{"provenance": out, "total": len(out), "count": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	var totalCount int
+	_ = h.DB.Pool().QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM slsa_provenance WHERE tenant_id = $1`,
+		claims.TenantID).Scan(&totalCount)
+	if totalCount == 0 {
+		totalCount = len(out)
+	}
+	jsonOK(w, map[string]any{
+		"provenance": out,
+		"total":      totalCount,
+		"count":      len(out), // safe-len: legacy page count; total is honest
+		"page_size":  len(out),
+	})
 }
 
 // ─── POST /api/v1/supply-chain/provenance ──────────────────────────────────
@@ -384,7 +396,7 @@ func (h *SupplyChain) GenerateProvenance(w http.ResponseWriter, r *http.Request)
 		"https://slsa-framework.github.io/slsa-github-generator", req.SourceURI,
 		req.SourceCommit, invJSON, matJSON, metaJSON, stmtJSON).Scan(&newID)
 	if err != nil {
-		jsonError(w, "insert failed: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "insert failed", err)
 		return
 	}
 
@@ -446,7 +458,21 @@ func (h *SupplyChain) VEX(w http.ResponseWriter, r *http.Request) {
 			out = append(out, v)
 		}
 	}
-	jsonOK(w, map[string]any{"vex": out, "total": len(out), "count": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
+	var totalCount int
+	_ = h.DB.Pool().QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM vex_statements
+		 WHERE tenant_id = $1
+		   AND ($2::text IS NULL OR status = $2)`,
+		claims.TenantID, statusFilter).Scan(&totalCount)
+	if totalCount == 0 {
+		totalCount = len(out)
+	}
+	jsonOK(w, map[string]any{
+		"vex":       out,
+		"total":     totalCount,
+		"count":     len(out), // safe-len: legacy page count; total is honest
+		"page_size": len(out),
+	})
 }
 
 // ─── GET /api/v1/supply-chain/key ──────────────────────────────────────────
