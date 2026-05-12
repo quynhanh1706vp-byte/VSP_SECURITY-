@@ -840,7 +840,17 @@ function renderTenantsReal(root, listResp, quota){
       } else {
         planCell = '<span class="pro-pill ' + (t.plan === 'pro' || t.plan === 'enterprise' ? 'ok' : 'muted') + '">' + esc(t.plan || 'starter') + '</span>';
       }
-      html += '<tr><td class="pro-mono">' + esc(t.slug || t.id) + '</td>' +
+      // Store underlying data as data-* attrs so the row-click handler
+      // (vsp_pro_realapi.js:2104) reads actual DB values instead of
+      // .textContent. Admin's <select> cell would otherwise concat all
+      // four option labels into "STARTERPROENTERPRISEFREE", and an empty
+      // created_at would surface as a literal "" in the modal.
+      html += '<tr ' +
+              'data-tenant-slug="' + esc(t.slug || t.id) + '" ' +
+              'data-tenant-name="' + esc(t.name || '') + '" ' +
+              'data-tenant-plan="' + esc(t.plan || 'starter') + '" ' +
+              'data-tenant-created="' + esc(t.created_at || '') + '">' +
+              '<td class="pro-mono">' + esc(t.slug || t.id) + '</td>' +
               '<td>' + esc(t.name || '') + '</td>' +
               '<td>' + planCell + '</td>' +
               '<td class="pro-mono" style="font-size:10px">' + esc(t.created_at ? new Date(t.created_at).toLocaleDateString() : '') + '</td></tr>';
@@ -2101,14 +2111,30 @@ if (origTenantsRenderForRow){
           if (tr.querySelector('td[data-vspm-act]')) return;
           var cells = tr.querySelectorAll('td');
           if (cells.length < 4) return;
-          var slug = (cells[0].textContent || '').trim();
-          var name = (cells[1].textContent || '').trim();
-          var plan = (cells[2].textContent || '').trim();
-          var when = (cells[3].textContent || '').trim();
+          // Prefer data-* attributes set by the new tenants renderer
+          // (renderTenantsReal above). Falls back to cell text for the
+          // legacy mock-data path. This avoids the
+          // "STARTERPROENTERPRISEFREE" bug where cells[2] of an admin
+          // user contains a <select> whose .textContent is the
+          // concatenation of every option label.
+          var slug = tr.getAttribute('data-tenant-slug') ||
+                     (cells[0].textContent || '').trim();
+          var name = tr.getAttribute('data-tenant-name') ||
+                     (cells[1].textContent || '').trim();
+          var plan = tr.getAttribute('data-tenant-plan') ||
+                     (cells[2].textContent || '').trim();
+          var when = tr.getAttribute('data-tenant-created') ||
+                     (cells[3].textContent || '').trim();
+          // Friendly date label for the modal; raw ISO stays usable too.
+          var whenLabel = when ?
+                          (new Date(when).toString() !== 'Invalid Date'
+                             ? new Date(when).toLocaleString()
+                             : when)
+                          : '—';
           var td = document.createElement('td');
           td.setAttribute('data-vspm-act', '1');
           td.innerHTML = '<button class="pro-btn ghost" onclick="VSP_PRO.tenantsShowDetail(\'' +
-                         esc(slug) + '\',\'' + esc(name) + '\',\'' + esc(plan) + '\',\'' + esc(when) + '\')">Details</button>';
+                         esc(slug) + '\',\'' + esc(name) + '\',\'' + esc(plan) + '\',\'' + esc(whenLabel) + '\')">Details</button>';
           tr.appendChild(td);
         });
       }, 50);
