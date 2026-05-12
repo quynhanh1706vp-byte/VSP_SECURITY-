@@ -156,7 +156,7 @@ async function loadDORA() {
     ].join('');
     document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
   } catch (e) {
-    grid.innerHTML = `<div class="card" style="grid-column:1/-1"><div class="label">Error</div><div class="value">—</div><div class="insight">${e.message}</div></div>`;
+    grid.innerHTML = `<div class="card" style="grid-column:1/-1"><div class="label">Error</div><div class="value">—</div><div class="insight">${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div></div>`;
   }
 }
 loadDORA();

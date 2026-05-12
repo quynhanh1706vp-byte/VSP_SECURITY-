@@ -135,7 +135,7 @@ async function loadConfig() {
     populateSelect();
     renderSelected();
   } catch (e) {
-    document.getElementById('content').innerHTML = `<div class="empty-card"><h3>Error</h3><div>${e.message}</div></div>`;
+    document.getElementById('content').innerHTML = `<div class="empty-card"><h3>Error</h3><div>${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div></div>`;
   }
 }
 
@@ -171,7 +171,7 @@ async function renderSelected() {
     const j = await r.json();
     c.innerHTML = `<iframe class="dash" src="${escapeAttr(j.embed_url)}" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`;
   } catch (e) {
-    c.innerHTML = `<div class="empty-card"><h3>Embed failed</h3><div>${e.message}</div></div>`;
+    c.innerHTML = `<div class="empty-card"><h3>Embed failed</h3><div>${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div></div>`;
   }
 }
 

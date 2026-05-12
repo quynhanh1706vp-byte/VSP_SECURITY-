@@ -287,7 +287,7 @@ async function loadSchedules() {
  </tr>
  `).join('');
  } catch (e) {
- if(typeof VSPUXState !== 'undefined'){VSPUXState.error('#schedules-body', 'Error: '+e.message, loadSchedules);}else{tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;}
+ if(typeof VSPUXState !== 'undefined'){VSPUXState.error('#schedules-body', 'Error: '+e.message, loadSchedules);}else{tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</td></tr>`;}
  }
 }
 
@@ -375,7 +375,7 @@ async function loadDeviations() {
  </tr>
  `).join('');
  } catch (e) {
- if(typeof VSPUXState !== 'undefined'){VSPUXState.error('#deviations-body', 'Error: '+e.message, loadDeviations);}else{tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;}
+ if(typeof VSPUXState !== 'undefined'){VSPUXState.error('#deviations-body', 'Error: '+e.message, loadDeviations);}else{tbody.innerHTML = `<tr><td colspan="7" class="empty">Error: ${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</td></tr>`;}
  }
 }
 

@@ -150,7 +150,7 @@ async function loadHeatmap() {
       <div class="stat"><div class="v" style="color:var(--accent)">${d.techniques_covered}</div><div class="l">Techniques seen</div></div>`;
     grid.innerHTML = (d.tactics || []).map(renderTactic).join('');
   } catch (e) {
-    grid.innerHTML = `<div class="skeleton">Error: ${e.message}</div>`;
+    grid.innerHTML = `<div class="skeleton">Error: ${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div>`;
   }
 }
 

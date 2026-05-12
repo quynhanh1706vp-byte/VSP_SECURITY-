@@ -157,7 +157,7 @@ async function loadCATO() {
       </div>`).join('');
   } catch (e) {
     document.getElementById('overall').textContent = 'Error';
-    document.getElementById('criteria').innerHTML = `<div class="criterion"><div class="icon fail">✕</div><div><div class="label">Failed to load</div><div class="detail">${e.message}</div></div><div></div></div>`;
+    document.getElementById('criteria').innerHTML = `<div class="criterion"><div class="icon fail">✕</div><div><div class="label">Failed to load</div><div class="detail">${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div></div><div></div></div>`;
   }
 }
 
