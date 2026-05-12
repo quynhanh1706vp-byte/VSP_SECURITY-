@@ -65,7 +65,7 @@ func (h *Attack) Heatmap(w http.ResponseWriter, r *http.Request) {
 		  WHERE tenant_id = $1 AND created_at >= $2`,
 		tenantID, cutoff)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	defer rows.Close()

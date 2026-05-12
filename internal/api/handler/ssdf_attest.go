@@ -223,7 +223,7 @@ func (h *SSDFAttest) Sign(w http.ResponseWriter, r *http.Request) {
 		body.SignerName, body.SignerTitle, body.SignerEmail, body.Method,
 		id, tenantID)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	if tag.RowsAffected() == 0 {

@@ -125,7 +125,7 @@ func (h *Residency) Set(w http.ResponseWriter, r *http.Request) {
 		     updated_at           = NOW()`,
 		tenantID, cfg.PrimaryRegion, cleanEgress, cfg.Basis, userPtr,
 	); err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	logAudit(r, h.DB, "RESIDENCY_CONFIGURED",

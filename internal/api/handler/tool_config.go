@@ -79,7 +79,7 @@ func (h *ToolConfig) Get(w http.ResponseWriter, r *http.Request) {
 	// Load explicit overrides (rows that exist in tenant_tool_config)
 	rows, err := h.DB.ListToolConfig(r.Context(), claims.TenantID)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	overrides := make(map[string]store.ToolConfig, len(rows))
@@ -173,7 +173,7 @@ func (h *ToolConfig) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := resolveUserUUID(r.Context(), h.DB, claims.UserID)
 	if err := h.DB.BulkSetToolEnabled(r.Context(), tenantID, userID, clean); err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 
@@ -211,7 +211,7 @@ func (h *ToolConfig) Reset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.DB.ResetToolConfig(r.Context(), tenantID); err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	logAudit(r, h.DB, "TOOL_CONFIG_RESET", "tool_config:all")

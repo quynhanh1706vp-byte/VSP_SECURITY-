@@ -93,7 +93,7 @@ func (h *Tabletop) Record(w http.ResponseWriter, r *http.Request) {
 		body.Observations, itemsJSON, body.Rating,
 	).Scan(&id)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	logAudit(r, h.DB, "TABLETOP_RECORDED",

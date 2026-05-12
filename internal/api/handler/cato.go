@@ -122,7 +122,7 @@ func (h *CATO) Toggle(w http.ResponseWriter, r *http.Request) {
 		 SET config = EXCLUDED.config, updated_at = NOW()`,
 		tenantID, raw)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	action := "CATO_ENABLED"

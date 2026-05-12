@@ -452,7 +452,7 @@ func (p *ProPanels) NotificationDLQRetry(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	logAudit(r, p.DB, "NOTIFICATION_DLQ_RETRY",

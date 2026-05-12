@@ -122,7 +122,7 @@ func (h *ComplianceEvidence) Upload(w http.ResponseWriter, r *http.Request) {
 		uploadedByPtr, notes, blob,
 	).Scan(&id)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 
@@ -174,7 +174,7 @@ func (h *ComplianceEvidence) List(w http.ResponseWriter, r *http.Request) {
 			tenantID)
 	}
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "db error", err)
 		return
 	}
 	defer rows.Close()
