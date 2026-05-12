@@ -385,16 +385,32 @@ function renderTools(tools) {
 }
 
 // ── SLA panel ──────────────────────────────────────────────
+// BE /api/v1/vsp/sla_tracker returns
+//   { sla: [{severity, sla_days, open_count, breach_count, avg_age_days, status}] }
+// FE pre-fix read r.label / r.pct which don't exist on the BE shape, so
+// every row rendered "undefined / undefined%". Now derives both:
+//   label = severity (CRITICAL/HIGH/...)
+//   pct   = % of open findings that are *within* SLA window
+//         = (open - breach) / open * 100        (open > 0)
+//         = 100                                  (open == 0 → vacuously compliant)
 function renderSLA(slaRows) {
   document.getElementById('sla-body').innerHTML = slaRows.map(function(r) {
-    var ok = r.pct >= 90;
-    var color = r.pct >= 90 ? 'var(--green)' : r.pct >= 70 ? 'var(--amber)' : 'var(--red)';
+    var label = r.label || r.severity || '—';
+    var pct;
+    if (typeof r.pct === 'number') {
+      pct = r.pct;
+    } else if (r.open_count > 0) {
+      pct = Math.round((r.open_count - (r.breach_count || 0)) / r.open_count * 100);
+    } else {
+      pct = 100;
+    }
+    var color = pct >= 90 ? 'var(--green)' : pct >= 70 ? 'var(--amber)' : 'var(--red)';
     return '<div class="sla-row">'
-      + '<span style="font-size:11px;width:110px;flex-shrink:0">' + r.label + '</span>'
+      + '<span style="font-size:11px;width:110px;flex-shrink:0">' + label + '</span>'
       + '<div class="progress-bar">'
-      + '<div class="progress-fill" style="width:' + r.pct + '%;background:' + color + '"></div>'
+      + '<div class="progress-fill" style="width:' + pct + '%;background:' + color + '"></div>'
       + '</div>'
-      + '<span style="font-size:11px;font-family:var(--font-mono);color:' + color + ';width:36px;text-align:right">' + r.pct + '%</span>'
+      + '<span style="font-size:11px;font-family:var(--font-mono);color:' + color + ';width:36px;text-align:right">' + pct + '%</span>'
       + '</div>';
   }).join('');
 }
