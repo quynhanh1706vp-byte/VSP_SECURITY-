@@ -9534,26 +9534,11 @@ function startMFATimer() {
 </script>
 <!-- VSP-NAV-BRIDGE-END -->
 
-<div class="phase4-banner" id="phase4-banner" onclick="document.getElementById('phase4-banner').classList.remove('show')">
-  ✨ Phase 4 Quick Wins deployed: +CSPM +Fuzzing +Race Detector +API Security
-</div>
+<!-- Phase 4 "Quick Wins deployed" banner removed: it was a one-time
+     internal rollout notice that shipped to prod and stuck at the
+     bottom of the dashboard for every user. Sticky dev artifacts
+     don't belong in the operator UI. -->
 
-<script>
-// Show Phase 4 banner once per 24h
-(function(){
-  var seen = sessionStorage.getItem('vsp_phase4_seen');
-  if (!seen) {
-    setTimeout(function() {
-      var b = document.getElementById('phase4-banner');
-      if (b) b.classList.add('show');
-      sessionStorage.setItem('vsp_phase4_seen', '1');
-      setTimeout(function() {
-        if (b) b.classList.remove('show');
-      }, 8000); // Auto-hide after 8s
-    }, 1500);
-  }
-})();
-</script>
 
 <script src="/vsp_pro_100.js"></script>
 <script src="/vsp_pro_cwpp_realapi.js"></script>
