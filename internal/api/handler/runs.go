@@ -278,7 +278,16 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:     run.CreatedAt,
 		})
 	}
-	jsonOK(w, map[string]any{"runs": rows, "total": len(rows)})
+	// True total — not len(rows). Pre-fix, every caller that read
+	// `total` got the page size back (50 from Dashboard fetch,
+	// 200 from Runs page fetch), so the "Total Runs" KPI flipped
+	// between 50 and 200 depending on which tab loaded the data
+	// last. Cheap COUNT(*) backed by tenant_id index.
+	totalCount, _ := h.DB.CountRuns(r.Context(), tenantUUID)
+	if totalCount == 0 {
+		totalCount = len(rows) // fallback if COUNT errored
+	}
+	jsonOK(w, map[string]any{"runs": rows, "total": totalCount, "page_size": len(rows)})
 }
 
 // POST /api/v1/vsp/run/{rid}/cancel

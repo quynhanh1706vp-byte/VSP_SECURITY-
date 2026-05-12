@@ -2910,7 +2910,11 @@ async function loadExecutive() {
 
     // Score ring
     var score = (run.summary&&run.summary.SCORE)||0;
-    var totalRuns=(runsIdx&&runsIdx.runs)?runsIdx.runs.length:0;
+    // Prefer the true count returned by BE (`total`) over page size
+    // (`runs.length`). Pre-fix, "Total Runs" flipped between 50 and
+    // 200 depending on which tab's fetch landed last because every
+    // call site picked a different ?limit= and showed page size.
+    var totalRuns = (runsIdx && (runsIdx.total || (runsIdx.runs ? runsIdx.runs.length : 0))) || 0;
     var elR=document.getElementById('d-runs-count'); if(elR&&totalRuns) elR.textContent=totalRuns;
     var elR2=document.getElementById('exec-total-runs'); if(elR2&&totalRuns) elR2.textContent=totalRuns;
     var scoreColor = score>=70?'#22c55e':score>=40?'#f59e0b':'#ef4444';
@@ -4511,6 +4515,10 @@ window.loadRuns = async function() {
   try {
     const d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers:{'Authorization':'Bearer '+window.TOKEN}}).then(r=>r.json());
     const runs = d.runs || [];
+    // Prefer true total from BE (post-2026-05-12 COUNT(*) backed); fall
+    // back to page size for old gateway. Pre-fix this KPI was always
+    // "200" because the fetch limit capped the array length.
+    const realTotal = (typeof d.total === 'number') ? d.total : runs.length;
 
     // ── KPI calc
     const done   = runs.filter(r=>r.status==='DONE');
@@ -4534,7 +4542,7 @@ window.loadRuns = async function() {
       kpiRow.innerHTML = `
         <div class="spark-card">
           <div class="spark-label">Total Runs</div>
-          <div class="spark-value c-cyan">${runs.length}</div>
+          <div class="spark-value c-cyan">${realTotal}</div>
           <div class="spark-canvas-wrap"><canvas id="sp-runs-total" height="40"></canvas></div>
         </div>
         <div class="spark-card">

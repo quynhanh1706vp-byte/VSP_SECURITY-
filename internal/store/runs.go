@@ -94,6 +94,17 @@ func (db *DB) ListRuns(ctx context.Context, tenantID string, limit, offset int) 
 	return runs, nil
 }
 
+// CountRuns returns the true row count for the tenant — used by the
+// /vsp/runs/index handler so the FE "Total Runs" KPI shows the real
+// number instead of `len(page)` which jumped between 50/200 depending
+// on which fetch site asked. Cheap: backed by idx_runs_tenant.
+func (db *DB) CountRuns(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM runs WHERE tenant_id = $1`, tenantID).Scan(&n)
+	return n, err
+}
+
 func (db *DB) UpdateRunStatus(ctx context.Context, tenantID, rid, status string, toolsDone int) error {
 	_, err := db.pool.Exec(ctx,
 		`UPDATE runs SET status=$3, tools_done=$4,
