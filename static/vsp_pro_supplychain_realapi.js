@@ -37,7 +37,7 @@
   }
   function toast(msg, kind) {
     if (typeof window.showToast === 'function') return window.showToast(msg, kind || 'info');
-    console.log('[supplychain]', kind || 'info', msg);
+    (window.VSP_DEBUG && console.log('[supplychain]', kind || 'info', msg));
   }
   async function api(path, opts) {
     const ctrl = new AbortController();
@@ -118,7 +118,7 @@
         </div>
 
         <div style="padding:14px;display:grid;grid-template-columns:1fr auto auto auto;gap:8px">
-          <input id="sc-image" class="form-ctrl"
+          <input aria-label="image:tag — e.g. ghcr.io/org/api:1.2.3" id="sc-image" class="form-ctrl"
                  placeholder="image:tag — e.g. ghcr.io/org/api:1.2.3"
                  value="${esc(lastImg)}"
                  style="font-family:var(--font-mono);font-size:12px">
@@ -170,14 +170,14 @@
         </div>
         <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
-            <label class="form-label">SBOM A (previous)</label>
+            <label class="form-label" for="sc-sbom-a">SBOM A (previous)</label>
             <textarea id="sc-sbom-a" class="form-ctrl" rows="8"
                       style="font-family:var(--font-mono);font-size:10px;
                              white-space:pre;overflow:auto"
                       placeholder='{"bomFormat":"CycloneDX","components":[…]}'></textarea>
           </div>
           <div>
-            <label class="form-label">SBOM B (current)</label>
+            <label class="form-label" for="sc-sbom-b">SBOM B (current)</label>
             <textarea id="sc-sbom-b" class="form-ctrl" rows="8"
                       style="font-family:var(--font-mono);font-size:10px;
                              white-space:pre;overflow:auto"
@@ -466,5 +466,5 @@
     apiBase: API_BASE,
   };
 
-  console.log('[vsp-supplychain] real-API patch loaded — backend:', API_BASE);
+  (window.VSP_DEBUG && console.log('[vsp-supplychain] real-API patch loaded — backend:', API_BASE));
 })();

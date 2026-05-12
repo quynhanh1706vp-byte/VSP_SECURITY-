@@ -143,11 +143,11 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
         </div>
         <div class="form-group">
           <div class="form-label">Webhook URL</div>
-          <input class="form-ctrl" type="password" id="slack-url" value="https://hooks.slack.com/services/T0xxx" placeholder="https://hooks.slack.com/services/...">
+          <input aria-label="https://hooks.slack.com/services/..." class="form-ctrl" type="password" id="slack-url" value="https://hooks.slack.com/services/T0xxx" placeholder="https://hooks.slack.com/services/...">
         </div>
         <div class="form-group">
           <div class="form-label">Channel</div>
-          <input class="form-ctrl" id="slack-channel" value="#security-alerts" placeholder="#channel">
+          <input aria-label="#channel" class="form-ctrl" id="slack-channel" value="#security-alerts" placeholder="#channel">
         </div>
         <div class="int-actions">
           <button class="btn btn-sm btn-primary" onclick="saveSlack()">Save</button>
@@ -163,19 +163,19 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
         </div>
         <div class="form-group">
           <div class="form-label">SMTP Host</div>
-          <input class="form-ctrl" id="smtp-host" value="smtp.gmail.com" placeholder="smtp.gmail.com">
+          <input aria-label="smtp.gmail.com" class="form-ctrl" id="smtp-host" value="smtp.gmail.com" placeholder="smtp.gmail.com">
         </div>
         <div class="form-group">
           <div class="form-label">Port · User · Password</div>
           <div style="display:grid;grid-template-columns:60px 1fr 1fr;gap:4px">
-            <input class="form-ctrl" id="smtp-port" value="587" placeholder="587">
-            <input class="form-ctrl" id="smtp-user" value="soc@agency.gov" placeholder="user@domain">
-            <input class="form-ctrl" type="password" id="smtp-pass" placeholder="app password">
+            <input aria-label="587" class="form-ctrl" id="smtp-port" value="587" placeholder="587">
+            <input aria-label="user@domain" class="form-ctrl" id="smtp-user" value="soc@agency.gov" placeholder="user@domain">
+            <input aria-label="app password" class="form-ctrl" type="password" id="smtp-pass" placeholder="app password">
           </div>
         </div>
         <div class="form-group">
           <div class="form-label">Alert recipients</div>
-          <input class="form-ctrl" id="smtp-to" value="soc@agency.gov, ciso@agency.gov" placeholder="email1, email2">
+          <input aria-label="email1, email2" class="form-ctrl" id="smtp-to" value="soc@agency.gov, ciso@agency.gov" placeholder="email1, email2">
         </div>
         <div class="int-actions">
           <button class="btn btn-sm btn-primary" onclick="saveSMTP()">Save</button>
@@ -191,11 +191,11 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
         </div>
         <div class="form-group">
           <div class="form-label">Webhook URL</div>
-          <input class="form-ctrl" id="teams-url" placeholder="https://xxx.webhook.office.com/...">
+          <input aria-label="https://xxx.webhook.office.com/..." class="form-ctrl" id="teams-url" placeholder="https://xxx.webhook.office.com/...">
         </div>
         <div class="form-group">
           <div class="form-label">Min severity</div>
-          <select class="form-ctrl" id="teams-sev">
+          <select aria-label="Teams Sev" class="form-ctrl" id="teams-sev">
             <option value="CRITICAL">Critical only</option>
             <option value="HIGH" selected>High and above</option>
             <option value="MEDIUM">Medium and above</option>
@@ -217,11 +217,11 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
         </div>
         <div class="form-group">
           <div class="form-label">Integration key (Events API v2)</div>
-          <input class="form-ctrl" id="pd-key" placeholder="a1b2c3d4...">
+          <input aria-label="a1b2c3d4..." class="form-ctrl" id="pd-key" placeholder="a1b2c3d4...">
         </div>
         <div class="form-group">
           <div class="form-label">Escalation policy</div>
-          <input class="form-ctrl" id="pd-policy" placeholder="P0xxxxx">
+          <input aria-label="P0xxxxx" class="form-ctrl" id="pd-policy" placeholder="P0xxxxx">
         </div>
         <div class="int-actions">
           <button class="btn btn-sm btn-primary" onclick="savePD()">Save</button>
@@ -237,11 +237,11 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
         </div>
         <div class="form-group">
           <div class="form-label">URL</div>
-          <input class="form-ctrl" id="wh-url" placeholder="https://your-endpoint.com/vsp-hook">
+          <input aria-label="https://your-endpoint.com/vsp-hook" class="form-ctrl" id="wh-url" placeholder="https://your-endpoint.com/vsp-hook">
         </div>
         <div class="form-group">
           <div class="form-label">Secret (HMAC-SHA256)</div>
-          <input class="form-ctrl" type="password" id="wh-secret" placeholder="webhook secret">
+          <input aria-label="webhook secret" class="form-ctrl" type="password" id="wh-secret" placeholder="webhook secret">
         </div>
         <div class="int-actions">
           <button class="btn btn-sm btn-primary" onclick="saveWebhook()">Save</button>
@@ -267,26 +267,26 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
     <div class="int-body">
       <div class="form-group">
         <div class="form-label">Jira URL</div>
-        <input class="form-ctrl" id="jira-url" placeholder="https://yourorg.atlassian.net">
+        <input aria-label="https://yourorg.atlassian.net" class="form-ctrl" id="jira-url" placeholder="https://yourorg.atlassian.net">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="form-group">
           <div class="form-label">Email</div>
-          <input class="form-ctrl" id="jira-email" placeholder="user@org.com">
+          <input aria-label="user@org.com" class="form-ctrl" id="jira-email" placeholder="user@org.com">
         </div>
         <div class="form-group">
           <div class="form-label">API Token</div>
-          <input class="form-ctrl" type="password" id="jira-token" placeholder="ATATT3xF...">
+          <input aria-label="ATATT3xF..." class="form-ctrl" type="password" id="jira-token" placeholder="ATATT3xF...">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="form-group">
           <div class="form-label">Project key</div>
-          <input class="form-ctrl" id="jira-project" value="VSP" placeholder="e.g. SEC">
+          <input aria-label="e.g. SEC" class="form-ctrl" id="jira-project" value="VSP" placeholder="e.g. SEC">
         </div>
         <div class="form-group">
           <div class="form-label">Issue type</div>
-          <select class="form-ctrl" id="jira-type">
+          <select aria-label="Jira Type" class="form-ctrl" id="jira-type">
             <option>Bug</option><option>Task</option><option>Story</option><option>Security Issue</option>
           </select>
         </div>
@@ -312,21 +312,21 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
     <div class="int-body">
       <div class="form-group">
         <div class="form-label">Instance URL</div>
-        <input class="form-ctrl" id="sn-url" placeholder="https://yourorg.service-now.com">
+        <input aria-label="https://yourorg.service-now.com" class="form-ctrl" id="sn-url" placeholder="https://yourorg.service-now.com">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="form-group">
           <div class="form-label">Username</div>
-          <input class="form-ctrl" id="sn-user" placeholder="vsp_integration">
+          <input aria-label="vsp_integration" class="form-ctrl" id="sn-user" placeholder="vsp_integration">
         </div>
         <div class="form-group">
           <div class="form-label">Password / OAuth</div>
-          <input class="form-ctrl" type="password" id="sn-pass" placeholder="password or bearer token">
+          <input aria-label="password or bearer token" class="form-ctrl" type="password" id="sn-pass" placeholder="password or bearer token">
         </div>
       </div>
       <div class="form-group">
         <div class="form-label">Table (default: incident)</div>
-        <input class="form-ctrl" id="sn-table" value="incident" placeholder="incident">
+        <input aria-label="incident" class="form-ctrl" id="sn-table" value="incident" placeholder="incident">
       </div>
       <div class="int-actions">
         <button class="btn btn-sm btn-primary" onclick="saveSN()">Save & connect</button>
@@ -351,29 +351,29 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
     <div class="int-body">
       <div class="form-group">
         <div class="form-label">Personal Access Token (repo, PR comment scope)</div>
-        <input class="form-ctrl" type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+        <input aria-label="ghp_xxxxxxxxxxxxxxxxxxxx" class="form-ctrl" type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="form-group">
           <div class="form-label">Org / Owner</div>
-          <input class="form-ctrl" id="gh-org" placeholder="your-org">
+          <input aria-label="your-org" class="form-ctrl" id="gh-org" placeholder="your-org">
         </div>
         <div class="form-group">
           <div class="form-label">Default repo</div>
-          <input class="form-ctrl" id="gh-repo" placeholder="your-repo">
+          <input aria-label="your-repo" class="form-ctrl" id="gh-repo" placeholder="your-repo">
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
         <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-          <label class="sw-wrap"><input type="checkbox" id="gh-pr-comment" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Gh Pr Comment" type="checkbox" id="gh-pr-comment" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
           <span style="color:var(--t2)">Post PR comment on gate FAIL</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-          <label class="sw-wrap"><input type="checkbox" id="gh-status-check" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Gh Status Check" type="checkbox" id="gh-status-check" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
           <span style="color:var(--t2)">Set commit status check (vsp/gate)</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-          <label class="sw-wrap"><input type="checkbox" id="gh-sarif"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Gh Sarif" type="checkbox" id="gh-sarif"><div class="sw-track"></div><div class="sw-thumb"></div></label>
           <span style="color:var(--t2)">Upload SARIF to GitHub Security tab</span>
         </div>
       </div>
@@ -398,15 +398,15 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
     <div class="int-body">
       <div class="form-group">
         <div class="form-label">GitLab URL (default: gitlab.com)</div>
-        <input class="form-ctrl" id="gl-url" value="https://gitlab.com" placeholder="https://gitlab.com">
+        <input aria-label="https://gitlab.com" class="form-ctrl" id="gl-url" value="https://gitlab.com" placeholder="https://gitlab.com">
       </div>
       <div class="form-group">
         <div class="form-label">Personal / Project Access Token</div>
-        <input class="form-ctrl" type="password" id="gl-token" placeholder="Enter GitLab Personal Access Token">
+        <input aria-label="Enter GitLab Personal Access Token" class="form-ctrl" type="password" id="gl-token" placeholder="Enter GitLab Personal Access Token">
       </div>
       <div class="form-group">
         <div class="form-label">Project ID</div>
-        <input class="form-ctrl" id="gl-project" placeholder="12345678">
+        <input aria-label="12345678" class="form-ctrl" id="gl-project" placeholder="12345678">
       </div>
       <div class="int-actions">
         <button class="btn btn-sm btn-primary" onclick="saveGitLab()">Save & connect</button>
@@ -432,7 +432,7 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
         </div>
         <div class="form-group">
           <div class="form-label">API Key (v3)</div>
-          <input class="form-ctrl" type="password" id="vt-key" placeholder="64-char API key">
+          <input aria-label="64-char API key" class="form-ctrl" type="password" id="vt-key" placeholder="64-char API key">
         </div>
         <div style="font-size:10px;color:var(--t3);margin-bottom:8px">Used for binary/hash check in SW Inventory panel. Free tier: 500 lookups/day.</div>
         <div class="int-actions">
@@ -449,7 +449,7 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
         </div>
         <div class="form-group">
           <div class="form-label">API Key (optional — higher rate limit)</div>
-          <input class="form-ctrl" type="password" id="nvd-key" placeholder="Optional — increases to 50 req/30s">
+          <input aria-label="Optional — increases to 50 req/30s" class="form-ctrl" type="password" id="nvd-key" placeholder="Optional — increases to 50 req/30s">
         </div>
         <div class="status-row"><span class="status-label">Last sync</span><span class="status-val c-green">5 min ago</span></div>
         <div class="status-row"><span class="status-label">CVEs indexed</span><span class="status-val">28,413</span></div>
@@ -467,11 +467,11 @@ body{background:transparent;font-family:var(--font-ui);color:var(--t1);font-size
         </div>
         <div class="form-group">
           <div class="form-label">MISP URL (optional)</div>
-          <input class="form-ctrl" id="misp-url" placeholder="https://misp.yourdomain.com">
+          <input aria-label="https://misp.yourdomain.com" class="form-ctrl" id="misp-url" placeholder="https://misp.yourdomain.com">
         </div>
         <div class="form-group">
           <div class="form-label">MISP API Key</div>
-          <input class="form-ctrl" type="password" id="misp-key" placeholder="MISP auth key">
+          <input aria-label="MISP auth key" class="form-ctrl" type="password" id="misp-key" placeholder="MISP auth key">
         </div>
         <div class="int-actions">
           <button class="btn btn-sm btn-primary" onclick="saveMISP()">Save</button>
@@ -620,7 +620,7 @@ window.addEventListener('message', e => {
     /integrations\.html/.test(path)  ? 'integrations' :
     /sso_admin\.html/.test(path)     ? 'sso_admin' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V4] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V4] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -966,7 +966,10 @@ window.addEventListener('message', e => {
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'users')             initUsers();
     else if (PANEL === 'settings')     initSettings();
     else if (PANEL === 'integrations') initIntegrations();

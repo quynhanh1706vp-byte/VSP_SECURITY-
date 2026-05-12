@@ -366,7 +366,7 @@ render();
     /scheduler/.test(path)     ? 'scheduler' :
     /network_flow/.test(path)  ? 'network_flow' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
 
   // ─── Toast (shared) ──────────────────────────────────────────────────────
   let tcontainer = null;
@@ -885,7 +885,10 @@ render();
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'ai_advisor')         initAIAdvisor();
     else if (PANEL === 'ai_analyst')    initAIAnalyst();
     else if (PANEL === 'cicd')          initCICD();

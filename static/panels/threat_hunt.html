@@ -119,13 +119,13 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 <!-- Search bar -->
 <div class="search-bar">
   <span class="search-icon">&#128269;</span>
-  <input class="search-input" id="hunt-q" type="text" placeholder="Search messages... (e.g. Failed password, sudo, segfault)" onkeydown="if(event.key==='Enter')runHunt()">
+  <input aria-label="Search messages... (e.g. Failed password, sudo, segfault)" class="search-input" id="hunt-q" type="text" placeholder="Search messages... (e.g. Failed password, sudo, segfault)" onkeydown="if(event.key==='Enter')runHunt()">
   <button class="btn btn-primary btn-sm" onclick="runHunt()">&#9654; Hunt</button>
 </div>
 
 <!-- Filters -->
 <div class="filters">
-  <select class="filter-select" id="hunt-sev">
+  <select aria-label="Hunt Sev" class="filter-select" id="hunt-sev">
     <option value="">All severities</option>
     <option value="CRITICAL">CRITICAL</option>
     <option value="HIGH">HIGH</option>
@@ -133,16 +133,16 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     <option value="LOW">LOW</option>
     <option value="INFO">INFO</option>
   </select>
-  <select class="filter-select" id="hunt-hours">
+  <select aria-label="Hunt Hours" class="filter-select" id="hunt-hours">
     <option value="1">Last 1h</option>
     <option value="6">Last 6h</option>
     <option value="24" selected>Last 24h</option>
     <option value="72">Last 3d</option>
     <option value="168">Last 7d</option>
   </select>
-  <input class="filter-select" id="hunt-process" type="text" placeholder="process (e.g. sshd)" style="width:120px">
-  <input class="filter-select" id="hunt-ip" type="text" placeholder="source IP" style="width:120px">
-  <select class="filter-select" id="hunt-limit">
+  <input aria-label="process (e.g. sshd)" class="filter-select" id="hunt-process" type="text" placeholder="process (e.g. sshd)" style="width:120px">
+  <input aria-label="source IP" class="filter-select" id="hunt-ip" type="text" placeholder="source IP" style="width:120px">
+  <select aria-label="Hunt Limit" class="filter-select" id="hunt-limit">
     <option value="50">50 rows</option>
     <option value="100" selected>100 rows</option>
     <option value="200">200 rows</option>
@@ -655,7 +655,7 @@ if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, 
     /correlation/.test(path)  ? 'correlation' :
     /log_pipeline/.test(path) ? 'log_pipeline' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1180,7 +1180,7 @@ if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, 
 
   if (window.__VSP_TH_SMART_V4__) return;
   window.__VSP_TH_SMART_V4__ = true;
-  console.log('[VSP-TH-SMART-V4] Loaded');
+  (window.VSP_DEBUG && console.log('[VSP-TH-SMART-V4] Loaded'));
 
   function $(s) { return document.querySelector(s); }
   function $$(s) { return Array.from(document.querySelectorAll(s)); }
@@ -1249,7 +1249,7 @@ if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, 
 
   function showBanner(info) {
     if (!info) {
-      console.log('[VSP-TH-SMART-V4] Probe failed — no banner');
+      (window.VSP_DEBUG && console.log('[VSP-TH-SMART-V4] Probe failed — no banner'));
       return;
     }
     if ($('#vsp-th-fresh-banner')) return;

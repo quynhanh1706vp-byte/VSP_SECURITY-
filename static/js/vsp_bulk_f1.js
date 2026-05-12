@@ -352,7 +352,7 @@
     };
     // Run once for current state
     setTimeout(injectCheckboxes, 80);
-    console.log('[VSP-BULK-F1] filterCVEs hooked');
+    (window.VSP_DEBUG && console.log('[VSP-BULK-F1] filterCVEs hooked'));
   }
 
   // ── Inject checkbox column into rendered rows + header ──────────────
@@ -435,7 +435,7 @@
     injectCSS();
     injectDOM();
     hookFilterCVEs();
-    console.log('[VSP-BULK-F1] Active');
+    (window.VSP_DEBUG && console.log('[VSP-BULK-F1] Active'));
   }
 
   if (document.readyState !== 'loading') {

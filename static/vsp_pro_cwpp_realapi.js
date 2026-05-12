@@ -203,5 +203,5 @@ PRO.cwppShowCVEs = function(imageID){
     });
 };
 
-console.log('[VSP-PRO-CWPP] Patched — module cwpp now uses real Trivy API');
+(window.VSP_DEBUG && console.log('[VSP-PRO-CWPP] Patched — module cwpp now uses real Trivy API'));
 })();

@@ -34,7 +34,7 @@ function el(tag, attrs, kids){
 }
 function toast(msg, type){
   if (typeof window.showToast === 'function') return window.showToast(msg, type||'info');
-  console.log('[' + (type||'info') + ']', msg);
+  (window.VSP_DEBUG && console.log('[' + (type||'info') + ']', msg));
 }
 
 /* ── nav injection ───────────────────────────────────────────────────── */
@@ -858,7 +858,7 @@ function init(){
   buildHost();
   console.log('%c VSP PRO v' + PRO.version + ' loaded \u2713 ',
     'background:#22d3ee;color:#0d1424;padding:2px 6px;border-radius:3px');
-  console.log('Modules registered:', Object.keys(PRO.modules));
+  (window.VSP_DEBUG && console.log('Modules registered:', Object.keys(PRO.modules)));
 }
 
 if (document.readyState === 'loading'){

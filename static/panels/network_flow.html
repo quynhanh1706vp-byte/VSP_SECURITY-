@@ -138,7 +138,7 @@ canvas{display:block}
   <div class="card-head">
     <div><div class="card-title">Top connections</div><div class="card-sub">by bytes transferred</div></div>
     <div style="display:flex;gap:6px">
-      <select id="conn-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderConns()">
+      <select aria-label="Conn Filter" id="conn-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderConns()">
         <option value="">All</option><option value="suspicious">Suspicious</option><option value="ok">Clean</option>
       </select>
     </div>
@@ -534,7 +534,7 @@ renderProtos();renderAlerts();renderConns();
     /scheduler/.test(path)     ? 'scheduler' :
     /network_flow/.test(path)  ? 'network_flow' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
 
   // ─── Toast (shared) ──────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1053,7 +1053,10 @@ renderProtos();renderAlerts();renderConns();
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'ai_advisor')         initAIAdvisor();
     else if (PANEL === 'ai_analyst')    initAIAnalyst();
     else if (PANEL === 'cicd')          initCICD();

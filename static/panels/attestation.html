@@ -142,11 +142,11 @@ function escapeHtml(s) {
   <div class="card-body">
     <div class="form-grid">
       <div class="form-row">
-        <label>Executive Name *</label>
+        <label for="sig-name">Executive Name *</label>
         <input id="sig-name" placeholder="John Smith">
       </div>
       <div class="form-row">
-        <label>Title *</label>
+        <label for="sig-title">Title *</label>
         <select id="sig-title">
           <option>Chief Executive Officer</option>
           <option>Chief Technology Officer</option>
@@ -156,11 +156,11 @@ function escapeHtml(s) {
         </select>
       </div>
       <div class="form-row">
-        <label>Email *</label>
+        <label for="sig-email">Email *</label>
         <input id="sig-email" placeholder="ceo@vsp.local">
       </div>
       <div class="form-row">
-        <label>Signature Method</label>
+        <label for="sig-method">Signature Method</label>
         <select id="sig-method">
           <option value="electronic">Electronic (DocuSign, etc.)</option>
           <option value="digital">Digital (PKI signature)</option>
@@ -452,7 +452,7 @@ loadForms();
     bar.className = 'vsp-att-pills';
     bar.style.cssText = 'display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap;font-size:11px';
     bar.innerHTML = ''
-      + '<input id="att-fq" placeholder="Search practice ID or name…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<input aria-label="Search practice ID or name…" id="att-fq" placeholder="Search practice ID or name…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
       + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
       +   '<button class="att-pill att-pill-active" data-s="" onclick="window._vspATT.pill(\'\',this)">All</button>'
       +   '<button class="att-pill" data-s="yes" onclick="window._vspATT.pill(\'yes\',this)" style="color:#10b981">✓ Can attest</button>'
@@ -540,7 +540,7 @@ loadForms();
           ? '<div style="font-size:11px;color:var(--t2,#a1a1aa);margin-bottom:14px;padding:10px 14px;background:var(--bg1,#111);border-radius:6px;line-height:1.5">' + esc(detail.description) + '</div>'
           : '')
       + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">IMPLEMENTATION NOTES</div>'
-      + '<textarea id="prac-notes" style="width:100%;padding:8px 10px;font-size:11px;min-height:80px;resize:vertical;font-family:inherit;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px;margin-bottom:14px" placeholder="Implementation details, evidence, exceptions…">' + esc(notes) + '</textarea>'
+      + '<textarea aria-label="Implementation details, evidence, exceptions…" id="prac-notes" style="width:100%;padding:8px 10px;font-size:11px;min-height:80px;resize:vertical;font-family:inherit;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px;margin-bottom:14px" placeholder="Implementation details, evidence, exceptions…">' + esc(notes) + '</textarea>'
       + (evidenceRefs.length
           ? '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">EVIDENCE REFERENCES</div>'
             + '<div style="background:var(--bg1,#111);padding:8px 12px;border-radius:6px;font-size:11px;margin-bottom:14px">'
@@ -548,7 +548,7 @@ loadForms();
             + '</div>'
           : '')
       + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">STATUS OVERRIDE</div>'
-      + '<select id="prac-status" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<select aria-label="Prac Status" id="prac-status" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
       +   ['implemented','partial','not_implemented','not_applicable'].map(s => `<option value="${s}" ${status === s ? 'selected' : ''}>${s}</option>`).join('')
       + '</select>';
 

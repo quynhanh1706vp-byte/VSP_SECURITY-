@@ -158,11 +158,11 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 <div id="pane-stream" style="display:none">
   <div class="stream-controls">
     <span style="font-size:11px;color:var(--t3);font-family:var(--font-mono);flex-shrink:0">filter:</span>
-    <input class="stream-input" id="stream-filter" placeholder="severity:ERROR source:auth keyword…" oninput="applyFilter()">
-    <select id="stream-sev" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
+    <input aria-label="severity:ERROR source:auth keyword…" class="stream-input" id="stream-filter" placeholder="severity:ERROR source:auth keyword…" oninput="applyFilter()">
+    <select aria-label="Stream Sev" id="stream-sev" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
       <option value="">All levels</option><option value="ERROR">ERROR</option><option value="WARN">WARN</option><option value="INFO">INFO</option><option value="CRIT">CRIT</option>
     </select>
-    <select id="stream-src" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
+    <select aria-label="Stream Src" id="stream-src" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
       <option value="">All sources</option>
       <option value="auth">auth</option><option value="scan">scan</option><option value="nginx">nginx</option><option value="k8s">k8s</option><option value="aws">aws</option>
     </select>
@@ -220,8 +220,8 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px" id="source-type-grid"></div>
       <div id="add-source-form" style="display:none">
-        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Source name</label><input id="ns-name" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;outline:none" placeholder="e.g. Production syslog"></div>
-        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Address</label><input id="ns-addr" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;font-family:var(--font-mono);outline:none" placeholder="10.0.1.10:514"></div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Source name</label><input aria-label="e.g. Production syslog" id="ns-name" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;outline:none" placeholder="e.g. Production syslog"></div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Address</label><input aria-label="10.0.1.10:514" id="ns-addr" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;font-family:var(--font-mono);outline:none" placeholder="10.0.1.10:514"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -517,7 +517,7 @@ renderSources();
     /correlation/.test(path)  ? 'correlation' :
     /log_pipeline/.test(path) ? 'log_pipeline' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1005,7 +1005,10 @@ renderSources();
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'threat_intel')      initThreatIntel();
     else if (PANEL === 'threat_hunt')  initThreatHunt();
     else if (PANEL === 'ueba')         initUEBA();

@@ -213,7 +213,7 @@ window._siemAutoTrigger = async function(msg) {
   );
 })();
 
-console.log('VSP SIEM patch loaded ✓ — correlation | soar | logsources | threatintel | ueba | assets');
+(window.VSP_DEBUG && console.log('VSP SIEM patch loaded ✓ — correlation | soar | logsources | threatintel | ueba | assets'));
 
 
 // Download SIEM PDF report

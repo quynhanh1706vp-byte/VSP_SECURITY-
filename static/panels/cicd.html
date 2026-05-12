@@ -662,11 +662,11 @@ td{padding:7px 10px;vertical-align:middle}
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Post PR comment</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires GitHub OAuth token</div></div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-pr-comment" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Pr Comment" type="checkbox" id="pol-pr-comment" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Auto-create Jira ticket</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires Jira API key in Integrations</div></div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-jira" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Jira" type="checkbox" id="pol-jira" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
       </div>
     </div>
@@ -735,14 +735,14 @@ td{padding:7px 10px;vertical-align:middle}
       <button class="btn btn-sm af-sev-pill" data-sev="MEDIUM" onclick="afFilterSeverity(this,'MEDIUM')" style="color:#f59e0b">Medium</button>
       <button class="btn btn-sm af-sev-pill" data-sev="LOW" onclick="afFilterSeverity(this,'LOW')" style="color:#22c55e">Low</button>
       <span style="width:1px;height:18px;background:var(--border);margin:0 4px"></span>
-      <select id="af-tool-filter" class="form-ctrl" style="font-size:10px;padding:4px 8px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px" onchange="renderAutofixTable()">
+      <select aria-label="Af Tool Filter" id="af-tool-filter" class="form-ctrl" style="font-size:10px;padding:4px 8px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px" onchange="renderAutofixTable()">
         <option value="">All tools</option>
       </select>
       <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2);cursor:pointer;margin-left:6px">
-        <input type="checkbox" id="af-fixable-only" onchange="renderAutofixTable()">
+        <input aria-label="Af Fixable Only" type="checkbox" id="af-fixable-only" onchange="renderAutofixTable()">
         Auto-fixable only
       </label>
-      <input id="af-search" type="search" placeholder="🔍 Search rule / message / file…" oninput="renderAutofixTable()"
+      <input aria-label="🔍 Search rule / message / file…" id="af-search" type="search" placeholder="🔍 Search rule / message / file…" oninput="renderAutofixTable()"
         style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px;margin-left:6px" />
     </div>
     <style>
@@ -762,13 +762,13 @@ td{padding:7px 10px;vertical-align:middle}
 <!-- ══ TAB 6 — HISTORY ══ -->
 <div class="tab-panel" id="tab-history">
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-    <select id="hist-filter-trigger" class="form-ctrl" style="width:140px;font-size:11px" onchange="renderHistory()">
+    <select aria-label="Hist Filter Trigger" id="hist-filter-trigger" class="form-ctrl" style="width:140px;font-size:11px" onchange="renderHistory()">
       <option value="">All triggers</option>
       <option value="cicd">CI/CD</option>
       <option value="manual">Manual</option>
       <option value="schedule">Schedule</option>
     </select>
-    <select id="hist-filter-gate" class="form-ctrl" style="width:120px;font-size:11px" onchange="renderHistory()">
+    <select aria-label="Hist Filter Gate" id="hist-filter-gate" class="form-ctrl" style="width:120px;font-size:11px" onchange="renderHistory()">
       <option value="">All gates</option>
       <option value="PASS">PASS</option>
       <option value="FAIL">FAIL</option>
@@ -1677,7 +1677,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     /scheduler/.test(path)     ? 'scheduler' :
     /network_flow/.test(path)  ? 'network_flow' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
 
   // ─── Toast (shared) ──────────────────────────────────────────────────────
   let tcontainer = null;
@@ -2196,7 +2196,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'ai_advisor')         initAIAdvisor();
     else if (PANEL === 'ai_analyst')    initAIAnalyst();
     else if (PANEL === 'cicd')          initCICD();
@@ -2331,7 +2334,7 @@ document.addEventListener('keydown', function(e){
     closeSetupWizard();
   }
 });
-console.log('[CICD-H2] Setup wizard + 4 new templates loaded');
+(window.VSP_DEBUG && console.log('[CICD-H2] Setup wizard + 4 new templates loaded'));
 </script>
 
 
@@ -2344,9 +2347,9 @@ console.log('[CICD-H2] Setup wizard + 4 new templates loaded');
     </div>
     <div style="padding:16px" id="mcs-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div><label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px">Schedule name *</label>
+        <div><label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-name">Schedule name *</label>
           <input id="cs-name" placeholder="Daily SAST scan" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px"></div>
-        <div><label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px">Mode *</label>
+        <div><label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-mode">Mode *</label>
           <select id="cs-mode" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px">
             <option value="FULL">FULL — all 26 tools</option>
             <option value="FULL_SOC">FULL_SOC — SOC-tuned</option>
@@ -2359,11 +2362,11 @@ console.log('[CICD-H2] Setup wizard + 4 new templates loaded');
           </select></div>
       </div>
       <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px">Source path *</label>
+        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-src">Source path *</label>
         <input id="cs-src" placeholder="/home/user/repo  or  https://example.com" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;font-family:var(--font-mono)">
       </div>
       <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px">Cron expression *</label>
+        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-cron">Cron expression *</label>
         <input id="cs-cron" placeholder="0 2 * * *" value="0 2 * * *" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;font-family:var(--font-mono)">
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
           <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 2 * * *'" style="font-size:9px;padding:3px 8px">Daily 02:00</button>
@@ -2446,7 +2449,7 @@ document.addEventListener('keydown', function(e){
   if(e.key === 'Escape' && m && m.style.display === 'flex') closeCreateSchedule();
 });
 
-console.log('[CICD-H2.F] Template selector + create schedule modal loaded');
+(window.VSP_DEBUG && console.log('[CICD-H2.F] Template selector + create schedule modal loaded'));
 </script>
 
 
@@ -2596,7 +2599,7 @@ document.addEventListener('keydown', function(e){
   var m = document.getElementById('modal-fix-preview');
   if(e.key === 'Escape' && m && m.style.display === 'flex') closeFixPreview();
 });
-console.log('[CICD-H2.L] Run history click + fix preview modal loaded');
+(window.VSP_DEBUG && console.log('[CICD-H2.L] Run history click + fix preview modal loaded'));
 </script>
 
 
@@ -2620,7 +2623,7 @@ document.addEventListener('keydown', function(e){
   var m = document.getElementById('modal-auto-remediation');
   if(e.key === 'Escape' && m && m.style.display === 'flex') closeAutoRemediationModal();
 });
-console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills + CSV + auto-remediation modal');
+(window.VSP_DEBUG && console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills + CSV + auto-remediation modal'));
 </script>
 
 
@@ -2797,7 +2800,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
     return '<button class="btn btn-sm" onclick="previewFix(\'' + id + '\')">Preview fix</button>';
   };
 
-  console.log('[H3.L] Autofix verify loop loaded');
+  (window.VSP_DEBUG && console.log('[H3.L] Autofix verify loop loaded'));
 })();
 </script>
 
@@ -2874,7 +2877,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
     };
   }
 
-  console.log('[H3.L] Autofix KPI bar loaded');
+  (window.VSP_DEBUG && console.log('[H3.L] Autofix KPI bar loaded'));
 })();
 </script>
 
@@ -2918,7 +2921,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
       + cell('Fix failed',  'h3l-kpi-failed',   '#ef4444', 'rescan still finds');
     card.parentNode.insertBefore(bar, card);
     if (typeof refreshAutofixKPIs === 'function') refreshAutofixKPIs();
-    console.log('[H3.L] KPI bar injected via retry-observer');
+    (window.VSP_DEBUG && console.log('[H3.L] KPI bar injected via retry-observer'));
     return true;
   }
 
@@ -3258,7 +3261,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
     card.parentNode.insertBefore(boardMount, card);
     h3mLoadLeaderboard('30d', document.getElementById('h3m-board-body'));
 
-    console.log('[H3.M] Quick wins mounted: metrics + leaderboard');
+    (window.VSP_DEBUG && console.log('[H3.M] Quick wins mounted: metrics + leaderboard'));
     return true;
   }
 
@@ -3272,7 +3275,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
     if (!document.getElementById('h3m-metrics-mount')) tryInjectMetrics();
   }).observe(document.body, {childList: true, subtree: true});
 
-  console.log('[H3.M] Autofix Quick Wins loaded — keyboard shortcuts active (press ?)');
+  (window.VSP_DEBUG && console.log('[H3.M] Autofix Quick Wins loaded — keyboard shortcuts active (press ?)'));
 })();
 </script>
 
@@ -3309,7 +3312,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
       }, 100);
       return r;
     };
-    console.log('[H3.M] previewFix hooked — diff will render in modal');
+    (window.VSP_DEBUG && console.log('[H3.M] previewFix hooked — diff will render in modal'));
   }
   tryHook();
 })();
@@ -3385,7 +3388,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
         targetEl.innerHTML = '<div style="color:#ef4444;padding:10px">Could not load diff: ' + e.message + '</div>';
       }
     };
-    console.log('[H3.N] Diff renderer extended — AI badge + rationale + confidence enabled');
+    (window.VSP_DEBUG && console.log('[H3.N] Diff renderer extended — AI badge + rationale + confidence enabled'));
   }
 
   function h3nRenderDiff(d) {
@@ -3492,7 +3495,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
   }
 
   tryHook();
-  console.log('[H3.N] AI-Powered Autofix loaded — modal will show AI badge when source=llm');
+  (window.VSP_DEBUG && console.log('[H3.N] AI-Powered Autofix loaded — modal will show AI badge when source=llm'));
 })();
 </script>
 
@@ -3555,7 +3558,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
       }
     };
     window.previewFix._h3nFix4Wrapped = true;
-    console.log('[H3.N.fix4] previewFix re-wrapped — modal will always use latest renderer');
+    (window.VSP_DEBUG && console.log('[H3.N.fix4] previewFix re-wrapped — modal will always use latest renderer'));
   }
 
   // Also handle showFixPreviewByIdx (other entry point)
@@ -3586,7 +3589,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
       return result;
     };
     window.showFixPreviewByIdx._h3nFix4Wrapped = true;
-    console.log('[H3.N.fix4] showFixPreviewByIdx re-wrapped');
+    (window.VSP_DEBUG && console.log('[H3.N.fix4] showFixPreviewByIdx re-wrapped'));
   }
 
   // Mutation observer fallback: when modal becomes visible, force re-render
@@ -3609,7 +3612,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
       }
     });
     obs.observe(modal, { attributes: true, attributeFilter: ['style'] });
-    console.log('[H3.N.fix4] modal observer installed');
+    (window.VSP_DEBUG && console.log('[H3.N.fix4] modal observer installed'));
   }
 
   wrapPreviewFix();
@@ -3697,7 +3700,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
       return result;
     };
     window.showFixPreview._h3nFix5 = true;
-    console.log('[H3.N.fix5] showFixPreview hooked — modal will show AI diff after open');
+    (window.VSP_DEBUG && console.log('[H3.N.fix5] showFixPreview hooked — modal will show AI diff after open'));
   }
 
   tryWrap();
@@ -3769,7 +3772,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
       return result;
     };
     window.showFixPreviewByIdx._h3nFix6 = true;
-    console.log('[H3.N.fix6] showFixPreviewByIdx hooked — button click will render AI diff');
+    (window.VSP_DEBUG && console.log('[H3.N.fix6] showFixPreviewByIdx hooked — button click will render AI diff'));
   }
 
   tryWrap();
@@ -3915,7 +3918,7 @@ console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills 
     injectWidget();
     tick();
     pollInterval = setInterval(tick, 5000); // start fast (5s) — slows to 30s when idle
-    console.log('[H3.O] Pre-compute status widget loaded');
+    (window.VSP_DEBUG && console.log('[H3.O] Pre-compute status widget loaded'));
   }
 })();
 </script>

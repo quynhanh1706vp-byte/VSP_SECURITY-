@@ -25,7 +25,7 @@
   }
   function toast(m, k) {
     if (typeof window.showToast === 'function') return window.showToast(m, k || 'info');
-    console.log('[dast]', k || 'info', m);
+    (window.VSP_DEBUG && console.log('[dast]', k || 'info', m));
   }
   async function api(path, opts) {
     const ctrl = new AbortController();
@@ -205,7 +205,7 @@
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label">Target URL</label>
+            <label class="form-label" for="dast-sm-target">Target URL</label>
             <input id="dast-sm-target" class="form-ctrl"
                    placeholder="https://example.com"
                    style="font-family:var(--font-mono);font-size:12px">
@@ -217,19 +217,19 @@
             <label class="form-label">Profile</label>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
               <label style="display:block;padding:12px;background:var(--bg3);border-radius:4px;border:2px solid var(--cyan);cursor:pointer" id="dast-sm-p-quick">
-                <input type="radio" name="dast-profile" value="quick" checked style="display:none">
+                <input aria-label="Dast Profile" type="radio" name="dast-profile" value="quick" checked style="display:none">
                 <div style="font-size:11px;font-weight:700;color:var(--cyan)">⚡ Quick</div>
                 <div style="font-size:10px;color:var(--t3);margin-top:4px">~30s</div>
                 <div style="font-size:10px;color:var(--t2);margin-top:4px">CVE templates only<br>severity: critical, high</div>
               </label>
               <label style="display:block;padding:12px;background:var(--bg3);border-radius:4px;border:2px solid var(--border);cursor:pointer" id="dast-sm-p-std">
-                <input type="radio" name="dast-profile" value="standard" style="display:none">
+                <input aria-label="Dast Profile" type="radio" name="dast-profile" value="standard" style="display:none">
                 <div style="font-size:11px;font-weight:700;color:var(--purple)">◐ Standard</div>
                 <div style="font-size:10px;color:var(--t3);margin-top:4px">~3min</div>
                 <div style="font-size:10px;color:var(--t2);margin-top:4px">All templates<br>severity: critical, high, medium</div>
               </label>
               <label style="display:block;padding:12px;background:var(--bg3);border-radius:4px;border:2px solid var(--border);cursor:pointer" id="dast-sm-p-deep">
-                <input type="radio" name="dast-profile" value="deep" style="display:none">
+                <input aria-label="Dast Profile" type="radio" name="dast-profile" value="deep" style="display:none">
                 <div style="font-size:11px;font-weight:700;color:var(--red)">◉ Deep</div>
                 <div style="font-size:10px;color:var(--t3);margin-top:4px">~10min+</div>
                 <div style="font-size:10px;color:var(--t2);margin-top:4px">Everything<br>all severities</div>
@@ -567,5 +567,5 @@
   else boot();
 
   window.VSPDast = { refresh: refreshAll, api, apiBase: API_BASE };
-  console.log('[vsp-dast] panel wired — backend:', API_BASE);
+  (window.VSP_DEBUG && console.log('[vsp-dast] panel wired — backend:', API_BASE));
 })();

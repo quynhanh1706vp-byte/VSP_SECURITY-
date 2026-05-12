@@ -43,7 +43,7 @@
 
       // Quiet wait — only warn once after 3s
       if (firstWarn && (Date.now() - (deadline - maxWaitMs)) > 3000) {
-        console.info('[VSP guard] waiting for parent token…');
+        (window.VSP_DEBUG && console.info('[VSP guard] waiting for parent token…'));
         firstWarn = false;
       }
       await new Promise(r => setTimeout(r, 250));
@@ -76,7 +76,7 @@
     return _origFetch(url, opts);
   };
 
-  console.log('[VSP-SWINV-GUARD v2] Active — 10s timeout, multi-source token lookup');
+  (window.VSP_DEBUG && console.log('[VSP-SWINV-GUARD v2] Active — 10s timeout, multi-source token lookup'));
 })();
 
 </script>
@@ -360,8 +360,8 @@ td{padding:7px 10px;vertical-align:middle}
 ═══════════════════════════════════ -->
 <div class="tab-panel active" id="tab-inventory">
   <div class="toolbar">
-    <input id="inv-search" placeholder="Search package, version, host…" oninput="renderInventory()">
-    <select id="inv-filter-status" onchange="renderInventory()">
+    <input aria-label="Search package, version, host…" id="inv-search" placeholder="Search package, version, host…" oninput="renderInventory()">
+    <select aria-label="Inv Filter Status" id="inv-filter-status" onchange="renderInventory()">
       <option value="">All status</option>
       <option value="approved">Approved</option>
       <option value="unauthorized">Unauthorized</option>
@@ -369,7 +369,7 @@ td{padding:7px 10px;vertical-align:middle}
       <option value="eol">EOL</option>
       <option value="warning">Warning</option>
     </select>
-    <select id="inv-filter-os" onchange="renderInventory()">
+    <select aria-label="Inv Filter Os" id="inv-filter-os" onchange="renderInventory()">
       <option value="">All OS</option>
       <option value="linux">Linux</option>
       <option value="windows">Windows</option>
@@ -443,11 +443,11 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-head"><div class="card-title">Manual Hash Check</div><div class="card-sub">SHA-256 vs known-cracked DB</div></div>
       <div class="card-body">
         <div class="form-group">
-          <label class="form-label">File Hash (SHA-256 / MD5)</label>
+          <label class="form-label" for="hash-input">File Hash (SHA-256 / MD5)</label>
           <input class="form-ctrl" id="hash-input" placeholder="e.g. 5f4dcc3b5aa765d61d8327deb882cf99" style="font-family:var(--font-mono);font-size:11px">
         </div>
         <div class="form-group">
-          <label class="form-label">Software Name (optional)</label>
+          <label class="form-label" for="hash-name-input">Software Name (optional)</label>
           <input class="form-ctrl" id="hash-name-input" placeholder="e.g. Adobe Photoshop 2024">
         </div>
         <button class="btn btn-primary" style="width:100%" onclick="checkHash()">Check Hash →</button>
@@ -558,35 +558,35 @@ td{padding:7px 10px;vertical-align:middle}
             <div style="font-size:12px;font-weight:500">Block unauthorized installs</div>
             <div style="font-size:10px;color:var(--t3)">Alert SOC when unlisted SW detected</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-block" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Block" type="checkbox" id="pol-block" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
           <div>
             <div style="font-size:12px;font-weight:500">Crack / Pirate scan on agent report</div>
             <div style="font-size:10px;color:var(--t3)">Run hash check when agent reports packages</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-crack" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Crack" type="checkbox" id="pol-crack" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
           <div>
             <div style="font-size:12px;font-weight:500">EOL software alert</div>
             <div style="font-size:10px;color:var(--t3)">Warn when package past end-of-life date</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-eol" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Eol" type="checkbox" id="pol-eol" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
           <div>
             <div style="font-size:12px;font-weight:500">GPL copyleft enforcement</div>
             <div style="font-size:10px;color:var(--t3)">Block GPL/AGPL in proprietary products</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-gpl" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Gpl" type="checkbox" id="pol-gpl" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
           <div>
             <div style="font-size:12px;font-weight:500">VirusTotal enrichment</div>
             <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires VT API key in config</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-vt" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Vt" type="checkbox" id="pol-vt" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
       </div>
     </div>
@@ -632,20 +632,20 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="g2">
         <div class="form-group">
           <label class="form-label">Package Name <span style="color:var(--red)">*</span></label>
-          <input class="form-ctrl" id="add-pkg-name" placeholder="e.g. nginx, chrome, vlc">
+          <input aria-label="e.g. nginx, chrome, vlc" class="form-ctrl" id="add-pkg-name" placeholder="e.g. nginx, chrome, vlc">
         </div>
         <div class="form-group">
           <label class="form-label">Version (optional)</label>
-          <input class="form-ctrl" id="add-pkg-ver" placeholder="e.g. 1.x, >=2.0, any">
+          <input aria-label="e.g. 1.x, >=2.0, any" class="form-ctrl" id="add-pkg-ver" placeholder="e.g. 1.x, >=2.0, any">
         </div>
       </div>
       <div class="g2">
         <div class="form-group">
-          <label class="form-label">Vendor</label>
+          <label class="form-label" for="add-pkg-vendor">Vendor</label>
           <input class="form-ctrl" id="add-pkg-vendor" placeholder="e.g. Google, Apache">
         </div>
         <div class="form-group">
-          <label class="form-label">Category</label>
+          <label class="form-label" for="add-pkg-cat">Category</label>
           <select class="form-ctrl" id="add-pkg-cat">
             <option value="browser">Browser</option>
             <option value="devtools">Dev Tools</option>
@@ -658,11 +658,11 @@ td{padding:7px 10px;vertical-align:middle}
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Reason / Notes</label>
+        <label class="form-label" for="add-pkg-reason">Reason / Notes</label>
         <input class="form-ctrl" id="add-pkg-reason" placeholder="e.g. Approved by ISSO, required for dev workflow">
       </div>
       <div class="form-group" id="add-hash-group">
-        <label class="form-label">Known-good SHA-256 hash (optional)</label>
+        <label class="form-label" for="add-pkg-hash">Known-good SHA-256 hash (optional)</label>
         <input class="form-ctrl" id="add-pkg-hash" placeholder="SHA-256 of installer / binary" style="font-family:var(--font-mono);font-size:10px">
       </div>
     </div>
@@ -888,7 +888,7 @@ async function loadInventory() {
     window._invData = _invData;
     window._invPage = _invPage;
     window.INV_PAGE_SIZE = INV_PAGE_SIZE;
-    console.log('[SW] Loaded', _invData.length, 'items from API');
+    (window.VSP_DEBUG && console.log('[SW] Loaded', _invData.length, 'items from API'));
     _swinvKPIClear();
     updateKPIs();
     renderInventory();

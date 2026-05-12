@@ -161,20 +161,20 @@ tr:hover td{background:var(--bg3)}
     <div class="card-body">
       <div class="form-grid">
         <div class="form-row">
-          <label>Artifact name *</label>
+          <label for="sign-name">Artifact name *</label>
           <input id="sign-name" placeholder="vsp-gateway:v1.0" value="vsp-gateway:v1.0">
         </div>
         <div class="form-row">
-          <label>Artifact digest (sha256) *</label>
+          <label for="sign-digest">Artifact digest (sha256) *</label>
           <input id="sign-digest" placeholder="sha256:abc..." value="sha256:06f22db4a8c5e9c7f2b1a3d4e5f6c7b8a9e0f1d2c3b4a5968775849302817263">
         </div>
       </div>
       <div class="form-row" style="margin-bottom:10px">
-        <label>Payload (JSON)</label>
+        <label for="sign-payload">Payload (JSON)</label>
         <textarea id="sign-payload">{"build_id":"vsp-build-001","builder":"local","commit":"06f22db"}</textarea>
       </div>
       <div class="form-row" style="margin-bottom:10px">
-        <label>Signed by</label>
+        <label for="sign-by">Signed by</label>
         <input id="sign-by" value="admin@vsp.local">
       </div>
       <button class="btn btn-primary" onclick="signArtifact()">🔏 Sign</button>
@@ -198,7 +198,7 @@ tr:hover td{background:var(--bg3)}
     </div>
     <div class="card-body">
       <div class="form-row" style="margin-bottom:10px">
-        <label>Bundle JSON (paste from sign output)</label>
+        <label for="verify-bundle">Bundle JSON (paste from sign output)</label>
         <textarea id="verify-bundle" style="min-height:120px" placeholder='{"base64Signature":"...","payload":"...","publicKey":"..."}'></textarea>
       </div>
       <button class="btn btn-primary" onclick="verifyBundle()">✔ Verify</button>
@@ -235,27 +235,27 @@ tr:hover td{background:var(--bg3)}
     <div class="card-body">
       <div class="form-grid">
         <div class="form-row">
-          <label>Artifact name</label>
+          <label for="prov-name">Artifact name</label>
           <input id="prov-name" value="vsp-gateway:v1.0">
         </div>
         <div class="form-row">
-          <label>Artifact digest</label>
+          <label for="prov-digest">Artifact digest</label>
           <input id="prov-digest" value="sha256:06f22db...">
         </div>
         <div class="form-row">
-          <label>Source URI</label>
+          <label for="prov-source">Source URI</label>
           <input id="prov-source" value="git+https://github.com/vsp/platform">
         </div>
         <div class="form-row">
-          <label>Source commit</label>
+          <label for="prov-commit">Source commit</label>
           <input id="prov-commit" value="06f22db">
         </div>
         <div class="form-row">
-          <label>Builder ID</label>
+          <label for="prov-builder">Builder ID</label>
           <input id="prov-builder" value="vsp-gateway-builder/v1.0">
         </div>
         <div class="form-row">
-          <label>SLSA Level</label>
+          <label for="prov-level">SLSA Level</label>
           <select id="prov-level">
             <option value="1">Level 1 — documented</option>
             <option value="2" selected>Level 2 — signed provenance</option>
@@ -294,27 +294,27 @@ tr:hover td{background:var(--bg3)}
     <div class="card-body">
       <div class="form-grid">
         <div class="form-row">
-          <label>Product name</label>
+          <label for="vex-prod">Product name</label>
           <input id="vex-prod" value="vsp-gateway">
         </div>
         <div class="form-row">
-          <label>Product version</label>
+          <label for="vex-prodver">Product version</label>
           <input id="vex-prodver" value="1.0">
         </div>
         <div class="form-row">
-          <label>Component name *</label>
+          <label for="vex-comp">Component name *</label>
           <input id="vex-comp" placeholder="libexpat">
         </div>
         <div class="form-row">
-          <label>Component version</label>
+          <label for="vex-compver">Component version</label>
           <input id="vex-compver" placeholder="2.6.2">
         </div>
         <div class="form-row">
-          <label>CVE ID</label>
+          <label for="vex-cve">CVE ID</label>
           <input id="vex-cve" placeholder="CVE-2024-28757">
         </div>
         <div class="form-row">
-          <label>Status *</label>
+          <label for="vex-status">Status *</label>
           <select id="vex-status">
             <option value="not_affected">not_affected</option>
             <option value="affected">affected</option>
@@ -325,7 +325,7 @@ tr:hover td{background:var(--bg3)}
           </select>
         </div>
         <div class="form-row">
-          <label>Justification</label>
+          <label for="vex-just">Justification</label>
           <select id="vex-just">
             <option value="">—</option>
             <option value="code_not_present">code_not_present</option>
@@ -340,12 +340,12 @@ tr:hover td{background:var(--bg3)}
           </select>
         </div>
         <div class="form-row">
-          <label>Author</label>
+          <label for="vex-author">Author</label>
           <input id="vex-author" value="security@vsp.local">
         </div>
       </div>
       <div class="form-row" style="margin-bottom:10px">
-        <label>Detail / explanation</label>
+        <label for="vex-detail">Detail / explanation</label>
         <textarea id="vex-detail" placeholder="Description of why this vulnerability does not affect the product..."></textarea>
       </div>
       <button class="btn btn-primary" onclick="createVEX()">📝 Create VEX</button>
@@ -976,12 +976,12 @@ loadSignatures();
     bar.className = 'vsp-sc-filter';
     bar.style.cssText = 'display:flex;gap:8px;align-items:center;padding:8px 0;margin-bottom:10px;flex-wrap:wrap;font-size:11px';
     bar.innerHTML = ''
-      + '<input id="sig-fq" placeholder="Search artifact / digest / signer…" style="font-size:11px;padding:5px 10px;flex:1;min-width:240px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
-      + '<select id="sig-falgo" style="font-size:11px;padding:5px 10px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<input aria-label="Search artifact / digest / signer…" id="sig-fq" placeholder="Search artifact / digest / signer…" style="font-size:11px;padding:5px 10px;flex:1;min-width:240px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<select aria-label="Sig Falgo" id="sig-falgo" style="font-size:11px;padding:5px 10px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
       +   '<option value="">All algorithms</option>'
       +   '<option>ECDSA_P256_SHA256</option><option>ECDSA_P384_SHA384</option><option>RSA_PSS_SHA256</option><option>ED25519</option>'
       + '</select>'
-      + '<select id="sig-fstatus" style="font-size:11px;padding:5px 10px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<select aria-label="Sig Fstatus" id="sig-fstatus" style="font-size:11px;padding:5px 10px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
       +   '<option value="">All status</option>'
       +   '<option value="verified">✓ Verified</option><option value="unverified">⏳ Unverified</option>'
       + '</select>'
@@ -1217,7 +1217,7 @@ loadSignatures();
     bar.className = 'vsp-vex-filter';
     bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:8px 0;margin-bottom:10px;flex-wrap:wrap';
     bar.innerHTML = ''
-      + '<input id="vex-fq" placeholder="Search CVE / component / author…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<input aria-label="Search CVE / component / author…" id="vex-fq" placeholder="Search CVE / component / author…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
       + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
       +   '<button class="vex-pill vex-pill-active" data-vs="" onclick="window._vspSC.vexPill(\'\',this)">All</button>'
       +   '<button class="vex-pill" data-vs="affected" onclick="window._vspSC.vexPill(\'affected\',this)" style="color:#ef4444">Affected</button>'
@@ -1381,15 +1381,15 @@ loadSignatures();
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:14px">Settings persist locally in your browser.</div>'
       + '<div style="display:grid;gap:12px">'
       +   '<div><div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Default signature algorithm</div>'
-      +     '<select id="cfg-algo" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1);border:1px solid var(--bd);color:var(--t1);border-radius:4px">'
+      +     '<select aria-label="Cfg Algo" id="cfg-algo" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1);border:1px solid var(--bd);color:var(--t1);border-radius:4px">'
       +       ['ECDSA_P256_SHA256', 'ECDSA_P384_SHA384', 'RSA_PSS_SHA256', 'ED25519'].map(a => `<option value="${a}" ${cfg.algo === a ? 'selected' : ''}>${a}</option>`).join('')
       +     '</select></div>'
       +   '<div><div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Default SLSA level</div>'
-      +     '<select id="cfg-slsa" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1);border:1px solid var(--bd);color:var(--t1);border-radius:4px">'
+      +     '<select aria-label="Cfg Slsa" id="cfg-slsa" style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg1);border:1px solid var(--bd);color:var(--t1);border-radius:4px">'
       +       [1,2,3,4].map(l => `<option value="${l}" ${cfg.slsa == l ? 'selected' : ''}>Level ${l}</option>`).join('')
       +     '</select></div>'
-      +   '<div><label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input type="checkbox" id="cfg-autoverify" ' + (cfg.autoverify ? 'checked' : '') + '> Auto-verify signatures on load</label></div>'
-      +   '<div><label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input type="checkbox" id="cfg-toasts" ' + (cfg.toasts !== false ? 'checked' : '') + '> Show toast notifications</label></div>'
+      +   '<div><label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input aria-label="Cfg Autoverify" type="checkbox" id="cfg-autoverify" ' + (cfg.autoverify ? 'checked' : '') + '> Auto-verify signatures on load</label></div>'
+      +   '<div><label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input aria-label="Cfg Toasts" type="checkbox" id="cfg-toasts" ' + (cfg.toasts !== false ? 'checked' : '') + '> Show toast notifications</label></div>'
       + '</div>';
     const footer = ''
       + '<button class="btn btn-sm" onclick="window._vspSC.close()" style="margin-right:auto">Cancel</button>'

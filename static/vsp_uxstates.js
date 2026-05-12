@@ -130,6 +130,6 @@
 
   global.VSPUXState = { skeleton: skeleton, empty: empty, error: error, clear: clear, VERSION: "1.0" };
   if (typeof console !== "undefined" && console.log) {
-    console.log("[VSPUXState] v1.0 loaded — VSPUXState.{skeleton,empty,error,clear}");
+    (window.VSP_DEBUG && console.log("[VSPUXState] v1.0 loaded — VSPUXState.{skeleton,empty,error,clear}"));
   }
 })(typeof window !== "undefined" ? window : this);

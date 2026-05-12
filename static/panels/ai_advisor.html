@@ -147,8 +147,8 @@
  <div class="vsp-panel-card">
  <h3>New Advisory Request</h3>
 
- <label>Compliance Framework</label>
- <select aria-label="Compliance framework" id="framework">
+ <label for="framework">Compliance Framework</label>
+ <select id="framework">
  <option value="fedramp_moderate">FedRAMP Moderate (NIST 800-53)</option>
  <option value="cmmc_l2">CMMC Level 2</option>
  <option value="iso_27001">ISO/IEC 27001:2022</option>
@@ -156,13 +156,13 @@
  <option value="eo_14028">EO 14028 / SBOM Mandate</option>
  </select>
 
- <label>Control / Practice ID</label>
+ <label for="control_id">Control / Practice ID</label>
  <input id="control_id" placeholder="e.g. AC-2, SI-2, RA-5, A.5.15">
 
- <label>Failing Finding (description)</label>
+ <label for="finding_summary">Failing Finding (description)</label>
  <textarea id="finding_summary" placeholder="e.g. Three privileged service accounts have not rotated credentials in 180 days, exceeding the 60-day FedRAMP threshold."></textarea>
 
- <label>Evidence (one per line, optional)</label>
+ <label for="evidence">Evidence (one per line, optional)</label>
  <textarea id="evidence" placeholder="e.g.&#10;account: svc-prod-deploy, last rotation: 2025-09-01&#10;policy doc: docs/security/credential-rotation.md"></textarea>
 
  <button class="btn" id="advise-btn" onclick="getAdvice()">Get Remediation</button>
@@ -429,7 +429,7 @@ setInterval(loadStats, 30000);
  /scheduler/.test(path) ? 'scheduler' :
  /network_flow/.test(path) ? 'network_flow' : 'unknown';
 
- console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL);
+ (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
 
  // ─── Toast (shared) ──────────────────────────────────────────────────────
  let tcontainer = null;
@@ -948,7 +948,10 @@ setInterval(loadStats, 30000);
  }
 
  // ─── Init dispatch ───────────────────────────────────────────────────────
+ let _initDone = false;
  function init() {
+   if (_initDone) return;
+   _initDone = true;
  if (PANEL === 'ai_advisor') initAIAdvisor();
  else if (PANEL === 'ai_analyst') initAIAnalyst();
  else if (PANEL === 'cicd') initCICD();

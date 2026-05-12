@@ -127,7 +127,7 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
 <div class="hdr">
   <div><h2>🛡 Vulnerability Management</h2><p>Trend · CVE tracking · tool breakdown · SLA</p></div>
   <div style="display:flex;gap:8px;align-items:center">
-    <select id="days-sel" onchange="loadAll()" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-size:11px;padding:4px 8px;cursor:pointer">
+    <select aria-label="Days Sel" id="days-sel" onchange="loadAll()" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-size:11px;padding:4px 8px;cursor:pointer">
       <option value="7">Last 7d</option>
       <option value="30" selected>Last 30d</option>
       <option value="90">Last 90d</option>
@@ -162,8 +162,8 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
     <div class="card-head">
       <div><div class="card-title">Top CVEs</div><div class="card-sub" id="cve-sub">—</div></div>
       <div style="display:flex;gap:6px;align-items:center">
-        <input class="search-bar" id="cve-search" placeholder="🔍 Filter CVEs…" oninput="filterCVEs()">
-        <select id="sev-filter" class="btn btn-sm" style="cursor:pointer" onchange="filterCVEs()">
+        <input aria-label="🔍 Filter CVEs…" class="search-bar" id="cve-search" placeholder="🔍 Filter CVEs…" oninput="filterCVEs()">
+        <select aria-label="Sev Filter" id="sev-filter" class="btn btn-sm" style="cursor:pointer" onchange="filterCVEs()">
           <option value="">All severity</option>
           <option value="CRITICAL">Critical</option>
           <option value="HIGH">High</option>
@@ -753,7 +753,7 @@ renderSampleData();
       }, 50);
       return ret;
     };
-    console.log("[VSP-E5] EPSS/KEV columns enhancement active");
+    (window.VSP_DEBUG && console.log("[VSP-E5] EPSS/KEV columns enhancement active"));
   }
 
   // Also hook openCVEDetail to show EPSS/KEV in modal
@@ -868,7 +868,7 @@ renderSampleData();
     /conmon/.test(path)    ? 'conmon' :
     /soar/.test(path)      ? 'soar' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1405,7 +1405,7 @@ renderSampleData();
     /incident_response/.test(path) ? 'incident_response' :
     /p4_compliance/.test(path)     ? 'p4_compliance' : 'unknown';
 
-  console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────
   let tcontainer = null;

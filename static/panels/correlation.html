@@ -205,7 +205,7 @@ select.form-ctrl option{background:var(--bg2)}
     <div class="card-head">
       <div><div class="card-title">Correlation rules</div><div class="card-sub" id="rules-sub">7 rules</div></div>
       <div style="display:flex;gap:6px">
-        <select id="rule-filter" class="form-ctrl" style="width:100px;padding:3px 6px;font-size:11px" onchange="renderRules()">
+        <select aria-label="Rule Filter" id="rule-filter" class="form-ctrl" style="width:100px;padding:3px 6px;font-size:11px" onchange="renderRules()">
           <option value="">All</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option>
         </select>
         <button class="btn btn-sm" onclick="loadFromAPI()">&#8635;</button>
@@ -219,10 +219,10 @@ select.form-ctrl option{background:var(--bg2)}
     <div class="card-head">
       <div><div class="card-title">Active incidents</div><div class="card-sub" id="inc-sub">4 incidents</div></div>
       <div style="display:flex;gap:6px">
-        <select id="inc-filter" class="form-ctrl" style="width:110px;padding:3px 6px;font-size:11px" onchange="renderIncidents()">
+        <select aria-label="Inc Filter" id="inc-filter" class="form-ctrl" style="width:110px;padding:3px 6px;font-size:11px" onchange="renderIncidents()">
           <option value="">All severity</option><option value="CRITICAL">Critical</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option>
         </select>
-        <select id="inc-status-filter" class="form-ctrl" style="width:90px;padding:3px 6px;font-size:11px" onchange="renderIncidents()">
+        <select aria-label="Inc Status Filter" id="inc-status-filter" class="form-ctrl" style="width:90px;padding:3px 6px;font-size:11px" onchange="renderIncidents()">
           <option value="">All status</option><option value="open">Open</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option>
         </select>
       </div>
@@ -306,16 +306,16 @@ select.form-ctrl option{background:var(--bg2)}
       <button class="modal-close" onclick="closeModal('rule-modal')">&#10005;</button>
     </div>
     <div class="modal-body">
-      <div class="form-group"><label class="form-label">Rule name</label><input class="form-ctrl" id="nr-name" placeholder="e.g. FAIL + secrets in 5 min"></div>
-      <div class="form-group"><label class="form-label">Sources (comma-separated)</label><input class="form-ctrl" id="nr-sources" placeholder="scan, auth, git, infra"></div>
+      <div class="form-group"><label class="form-label">Rule name</label><input aria-label="e.g. FAIL + secrets in 5 min" class="form-ctrl" id="nr-name" placeholder="e.g. FAIL + secrets in 5 min"></div>
+      <div class="form-group"><label class="form-label">Sources (comma-separated)</label><input aria-label="scan, auth, git, infra" class="form-ctrl" id="nr-sources" placeholder="scan, auth, git, infra"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="form-group"><label class="form-label">Time window (min)</label><input class="form-ctrl" id="nr-window" type="number" value="5" min="1" max="1440"></div>
-        <div class="form-group"><label class="form-label">Severity output</label>
+        <div class="form-group"><label class="form-label">Time window (min)</label><input aria-label="Nr Window" class="form-ctrl" id="nr-window" type="number" value="5" min="1" max="1440"></div>
+        <div class="form-group"><label class="form-label" for="nr-sev">Severity output</label>
           <select class="form-ctrl" id="nr-sev"><option value="CRITICAL">Critical</option><option value="HIGH" selected>High</option><option value="MEDIUM">Medium</option></select>
         </div>
       </div>
-      <div class="form-group"><label class="form-label">Condition expression</label><input class="form-ctrl" id="nr-cond" placeholder="gate=FAIL AND tool=gitleaks"></div>
-      <div class="form-group"><label class="form-label">Description</label><input class="form-ctrl" id="nr-desc" placeholder="What does this rule detect?"></div>
+      <div class="form-group"><label class="form-label">Condition expression</label><input aria-label="gate=FAIL AND tool=gitleaks" class="form-ctrl" id="nr-cond" placeholder="gate=FAIL AND tool=gitleaks"></div>
+      <div class="form-group"><label class="form-label">Description</label><input aria-label="What does this rule detect?" class="form-ctrl" id="nr-desc" placeholder="What does this rule detect?"></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('rule-modal')">Cancel</button>
@@ -835,7 +835,7 @@ if(typeof VSPUXState!=='undefined'){
     /correlation/.test(path)  ? 'correlation' :
     /log_pipeline/.test(path) ? 'log_pipeline' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1323,7 +1323,10 @@ if(typeof VSPUXState!=='undefined'){
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'threat_intel')      initThreatIntel();
     else if (PANEL === 'threat_hunt')  initThreatHunt();
     else if (PANEL === 'ueba')         initUEBA();

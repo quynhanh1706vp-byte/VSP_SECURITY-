@@ -338,12 +338,12 @@
       </div>
       <div id="ctrl-table-wrap">
         <div id="ctrl-toolbar">
-          <input id="ctrl-search" placeholder="Search ID, control, family…" oninput="window._ctrlSearch(this.value)">
+          <input aria-label="Search ID, control, family…" id="ctrl-search" placeholder="Search ID, control, family…" oninput="window._ctrlSearch(this.value)">
           <button class="ctrl-filter-btn f-all active" onclick="window._ctrlSetFilter('all',this)">All</button>
           <button class="ctrl-filter-btn f-pass"       onclick="window._ctrlSetFilter('pass',this)">PASS</button>
           <button class="ctrl-filter-btn f-warn"       onclick="window._ctrlSetFilter('warn',this)">WARN</button>
           <button class="ctrl-filter-btn f-fail"       onclick="window._ctrlSetFilter('fail',this)">FAIL</button>
-          <select id="ctrl-family-select" onchange="window._ctrlSetFamily(this.value)">
+          <select aria-label="Ctrl Family Select" id="ctrl-family-select" onchange="window._ctrlSetFamily(this.value)">
             <option value="all">All Families</option>
           </select>
         </div>
@@ -742,6 +742,6 @@
     {id:'SR-11',family:'Supply Chain',   control:'Component Authenticity',           tools:['trivy'],            status:'warn', score:68, evidence:'trivy: SBOM attestation missing', framework:'CMMC', autofix:false},
   ];
 
-  console.log('[VSP ComplianceTable Patch v1.0] Loaded ✓');
+  (window.VSP_DEBUG && console.log('[VSP ComplianceTable Patch v1.0] Loaded ✓'));
 
 })();

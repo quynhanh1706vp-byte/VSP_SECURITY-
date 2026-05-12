@@ -828,7 +828,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
         <div class="section-hd">
           <div class="section-title">SOFTWARE BILL OF MATERIALS — SBOM VIEW</div>
           <div style="display:flex;gap:8px;align-items:center">
-            <input id="sbom-search-input" class="sbom-search" placeholder="Search component..." oninput="window._sbomData&&renderSBOMTable(window._sbomData,this.value,window._sbomFilter||'all')">
+            <input aria-label="Search component..." id="sbom-search-input" class="sbom-search" placeholder="Search component..." oninput="window._sbomData&&renderSBOMTable(window._sbomData,this.value,window._sbomFilter||'all')">
             <div class="filter-pills">
               <button class="filter-pill active" onclick="setSBOMFilter('all',this)">All</button>
               <button class="filter-pill" onclick="setSBOMFilter('vuln',this)">⚠ Vulnerable</button>
@@ -1106,36 +1106,36 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
   <div class="modal">
     <div class="modal-title">Add Micro-Segmentation Rule</div>
     <div class="form-row">
-      <label class="form-label">Rule Name</label>
+      <label class="form-label" for="seg-name">Rule Name</label>
       <input class="form-input" id="seg-name" placeholder="e.g. vsp-scanner → redis">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-row">
-        <label class="form-label">Source Service</label>
+        <label class="form-label" for="seg-src">Source Service</label>
         <input class="form-input" id="seg-src" placeholder="vsp-api">
       </div>
       <div class="form-row">
-        <label class="form-label">Destination Service</label>
+        <label class="form-label" for="seg-dst">Destination Service</label>
         <input class="form-input" id="seg-dst" placeholder="postgres">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div class="form-row">
-        <label class="form-label">Port</label>
+        <label class="form-label" for="seg-port">Port</label>
         <input class="form-input" id="seg-port" type="number" placeholder="5432">
       </div>
       <div class="form-row">
-        <label class="form-label">Protocol</label>
+        <label class="form-label" for="seg-proto">Protocol</label>
         <select class="form-input" id="seg-proto"><option>TCP</option><option>UDP</option><option>gRPC</option></select>
       </div>
       <div class="form-row">
-        <label class="form-label">Action</label>
+        <label class="form-label" for="seg-action">Action</label>
         <select class="form-input" id="seg-action"><option>allow</option><option>deny</option><option>inspect</option></select>
       </div>
     </div>
     <div class="form-row">
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
-        <input type="checkbox" id="seg-mtls" checked> Require mTLS
+        <input aria-label="Seg Mtls" type="checkbox" id="seg-mtls" checked> Require mTLS
       </label>
     </div>
     <div class="modal-footer">
@@ -2945,7 +2945,7 @@ const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Appli
     <div id="ai-quick-btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;flex-shrink:0"></div>
     <div id="ai-chat-messages" style="flex:1;overflow-y:auto;padding:4px 0;min-height:0"></div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-shrink:0">
-      <input id="ai-chat-input" type="text" placeholder="Ask about remediation, controls, evidence..." onkeydown="aiKeydown(event)" style="flex:1;font-size:12px"/>
+      <input aria-label="Ask about remediation, controls, evidence..." id="ai-chat-input" type="text" placeholder="Ask about remediation, controls, evidence..." onkeydown="aiKeydown(event)" style="flex:1;font-size:12px"/>
       <button class="btn btn-primary btn-sm" onclick="sendAIMessage(null,false)">Send</button>
     </div>
   </div>
@@ -3199,7 +3199,7 @@ function switchTenant(id) {
     }
   }
 
-  console.log('[P4] loadSBOMView + loadVNStandards overridden');
+  (window.VSP_DEBUG && console.log('[P4] loadSBOMView + loadVNStandards overridden'));
   if(window.VSP_DEBUG)console.log('[P4] api() override active — mock for vn-standards + sbom/view-db');
 })();
 </script>
@@ -3254,7 +3254,7 @@ function switchTenant(id) {
     /incident_response/.test(path) ? 'incident_response' :
     /p4_compliance/.test(path)     ? 'p4_compliance' : 'unknown';
 
-  console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -3694,7 +3694,10 @@ function switchTenant(id) {
   }
 
   // ─── Init ────────────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'vuln_mgmt')              initVulnMgmt();
     else if (PANEL === 'incident_response') initIncidentResponse();
     else if (PANEL === 'p4_compliance')     initP4Compliance();

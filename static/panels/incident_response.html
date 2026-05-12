@@ -159,23 +159,23 @@ tr.clickable{cursor:pointer}
     <div class="card-body">
       <div class="banner banner-blue">ℹ️ <b>CIRCIA auto-flagging</b>: chọn bất kỳ impact → flag substantial → 72h deadline.</div>
       <div class="form-grid">
-        <div class="form-row"><label>Title *</label><input id="nc-title" placeholder="Brief description"></div>
-        <div class="form-row"><label>Severity</label><select id="nc-severity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option><option value="critical">critical</option></select></div>
-        <div class="form-row"><label>Category</label><select id="nc-category"><option value="">—</option><option value="CAT-1">CAT-1: Unauthorized</option><option value="CAT-2">CAT-2: DoS</option><option value="CAT-3">CAT-3: Malicious Code</option><option value="CAT-4">CAT-4: Improper</option><option value="CAT-5">CAT-5: Scans</option><option value="CAT-6">CAT-6: Investigation</option></select></div>
-        <div class="form-row"><label>Reporter</label><input id="nc-reporter" value="soc@vsp.local"></div>
+        <div class="form-row"><label>Title *</label><input aria-label="Brief description" id="nc-title" placeholder="Brief description"></div>
+        <div class="form-row"><label>Severity</label><select aria-label="Nc Severity" id="nc-severity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option><option value="critical">critical</option></select></div>
+        <div class="form-row"><label>Category</label><select aria-label="Nc Category" id="nc-category"><option value="">—</option><option value="CAT-1">CAT-1: Unauthorized</option><option value="CAT-2">CAT-2: DoS</option><option value="CAT-3">CAT-3: Malicious Code</option><option value="CAT-4">CAT-4: Improper</option><option value="CAT-5">CAT-5: Scans</option><option value="CAT-6">CAT-6: Investigation</option></select></div>
+        <div class="form-row"><label>Reporter</label><input aria-label="Nc Reporter" id="nc-reporter" value="soc@vsp.local"></div>
       </div>
-      <div class="form-row"><label>Description</label><textarea id="nc-desc"></textarea></div>
+      <div class="form-row"><label>Description</label><textarea aria-label="Nc Desc" id="nc-desc"></textarea></div>
       <div class="form-row"><label>Impact (CIRCIA criteria)</label>
         <div class="chk-row">
-          <label><input type="checkbox" id="nc-imp-c"> Confidentiality</label>
-          <label><input type="checkbox" id="nc-imp-i"> Integrity</label>
-          <label><input type="checkbox" id="nc-imp-a"> Availability</label>
-          <label><input type="checkbox" id="nc-imp-s"> Safety</label>
-          <label><input type="checkbox" id="nc-imp-b"> Business Ops</label>
-          <label><input type="checkbox" id="nc-imp-sc"> Supply Chain</label>
+          <label><input aria-label="Nc Imp C" type="checkbox" id="nc-imp-c"> Confidentiality</label>
+          <label><input aria-label="Nc Imp I" type="checkbox" id="nc-imp-i"> Integrity</label>
+          <label><input aria-label="Nc Imp A" type="checkbox" id="nc-imp-a"> Availability</label>
+          <label><input aria-label="Nc Imp S" type="checkbox" id="nc-imp-s"> Safety</label>
+          <label><input aria-label="Nc Imp B" type="checkbox" id="nc-imp-b"> Business Ops</label>
+          <label><input aria-label="Nc Imp Sc" type="checkbox" id="nc-imp-sc"> Supply Chain</label>
         </div>
       </div>
-      <div class="form-row"><label>Special</label><div><label><input type="checkbox" id="nc-ransom"> 💰 Ransomware</label></div></div>
+      <div class="form-row"><label>Special</label><div><label><input aria-label="Nc Ransom" type="checkbox" id="nc-ransom"> 💰 Ransomware</label></div></div>
       <button class="btn btn-primary" onclick="createIncident()">🚨 Create</button>
       <div id="nc-result" style="margin-top:10px"></div>
     </div>
@@ -424,8 +424,8 @@ function showRansomForm(id){
   document.getElementById('mr-body').innerHTML=`
     <div class="banner banner-yellow">⚠️ Recording ransom payment triggers <b>CIRCIA 24-hour reporting deadline</b>.</div>
     <div class="form-row"><label>Incident</label><input value="${id}" readonly></div>
-    <div class="form-row"><label>Amount (USD) *</label><input id="rp-amount" type="number" placeholder="50000" step="0.01"></div>
-    <div class="form-row"><label>Payment Method</label>
+    <div class="form-row"><label>Amount (USD) *</label><input aria-label="50000" id="rp-amount" type="number" placeholder="50000" step="0.01"></div>
+    <div class="form-row"><label for="rp-method">Payment Method</label>
       <select id="rp-method">
         <option value="bitcoin">Bitcoin (BTC)</option>
         <option value="monero">Monero (XMR)</option>
@@ -433,7 +433,7 @@ function showRansomForm(id){
         <option value="wire">Wire Transfer</option>
         <option value="other">Other</option>
       </select></div>
-    <div class="form-row"><label>Wallet / Account</label><input id="rp-wallet" placeholder="bc1q..."></div>
+    <div class="form-row"><label>Wallet / Account</label><input aria-label="bc1q..." id="rp-wallet" placeholder="bc1q..."></div>
     <div class="action-row">
       <button class="btn btn-danger" onclick="submitRansom('${id}')">💰 Record Payment</button>
       <button class="btn" onclick="closeModal('ransom')">Cancel</button>
@@ -454,9 +454,9 @@ async function submitRansom(id){
 function showLessonsForm(id){
   document.getElementById('modal-lessons').classList.add('show');
   document.getElementById('ml-body').innerHTML=`
-    <div class="form-row"><label>Root Cause Analysis</label><textarea id="ll-rc" placeholder="Primary cause of the incident..."></textarea></div>
-    <div class="form-row"><label>Lessons Learned</label><textarea id="ll-lessons" placeholder="What worked, what didn't..."></textarea></div>
-    <div class="form-row"><label>Corrective Actions (1 per line)</label><textarea id="ll-actions" placeholder="Patch system X\nImplement control Y\nUpdate runbook Z"></textarea></div>
+    <div class="form-row"><label>Root Cause Analysis</label><textarea aria-label="Primary cause of the incident..." id="ll-rc" placeholder="Primary cause of the incident..."></textarea></div>
+    <div class="form-row"><label>Lessons Learned</label><textarea aria-label="What worked, what didn" id="ll-lessons" placeholder="What worked, what didn't..."></textarea></div>
+    <div class="form-row"><label>Corrective Actions (1 per line)</label><textarea aria-label="Patch system X\nImplement control Y\nUpdate runbook Z" id="ll-actions" placeholder="Patch system X\nImplement control Y\nUpdate runbook Z"></textarea></div>
     <div class="action-row">
       <button class="btn btn-primary" onclick="submitLessons('${id}')">💾 Save</button>
       <button class="btn" onclick="closeModal('lessons')">Cancel</button>
@@ -577,9 +577,9 @@ async function showCIRCIADetail(uuid){
     const submitHtml=d.status==='draft'?`
       <div class="section-title">Submit to CISA</div>
       <div class="form-grid">
-        <div class="form-row"><label>Your name</label><input id="sub-name" placeholder="Jane Doe"></div>
-        <div class="form-row"><label>Your title</label><input id="sub-title" placeholder="CISO"></div>
-        <div class="form-row"><label>Email</label><input id="sub-email" placeholder="ciso@org"></div>
+        <div class="form-row"><label>Your name</label><input aria-label="Jane Doe" id="sub-name" placeholder="Jane Doe"></div>
+        <div class="form-row"><label>Your title</label><input aria-label="CISO" id="sub-title" placeholder="CISO"></div>
+        <div class="form-row"><label>Email</label><input aria-label="ciso@org" id="sub-email" placeholder="ciso@org"></div>
       </div>
       <button class="btn btn-danger" onclick="submitCIRCIA('${uuid}')">⏱️ Submit to CISA</button>`:'';
     body.innerHTML=`
@@ -667,8 +667,8 @@ function showCustody(i){
 function showAddEvidence(){
   document.getElementById('modal-evidence').classList.add('show');
   document.getElementById('me-body').innerHTML=`
-    <div class="form-row"><label>Incident ID *</label><input id="ae-inc" placeholder="INC-2026-0001"></div>
-    <div class="form-row"><label>Evidence Type</label>
+    <div class="form-row"><label>Incident ID *</label><input aria-label="INC-2026-0001" id="ae-inc" placeholder="INC-2026-0001"></div>
+    <div class="form-row"><label for="ae-type">Evidence Type</label>
       <select id="ae-type">
         <option value="memory_dump">Memory Dump</option>
         <option value="disk_image">Disk Image</option>
@@ -680,17 +680,17 @@ function showAddEvidence(){
         <option value="screenshot">Screenshot</option>
         <option value="other">Other</option>
       </select></div>
-    <div class="form-row"><label>Description *</label><textarea id="ae-desc"></textarea></div>
+    <div class="form-row"><label>Description *</label><textarea aria-label="Ae Desc" id="ae-desc"></textarea></div>
     <div class="form-grid">
-      <div class="form-row"><label>File path</label><input id="ae-path" placeholder="/evidence/..."></div>
-      <div class="form-row"><label>Size (bytes)</label><input id="ae-size" type="number" placeholder="1073741824"></div>
+      <div class="form-row"><label>File path</label><input aria-label="/evidence/..." id="ae-path" placeholder="/evidence/..."></div>
+      <div class="form-row"><label>Size (bytes)</label><input aria-label="1073741824" id="ae-size" type="number" placeholder="1073741824"></div>
     </div>
-    <div class="form-row"><label>SHA-256 Hash</label><input id="ae-hash" placeholder="a3f7b2c1..." style="font-family:monospace"></div>
+    <div class="form-row"><label>SHA-256 Hash</label><input aria-label="a3f7b2c1..." id="ae-hash" placeholder="a3f7b2c1..." style="font-family:monospace"></div>
     <div class="form-grid">
-      <div class="form-row"><label>Collected by</label><input id="ae-by" value="forensics@vsp.local"></div>
-      <div class="form-row"><label>Method</label><input id="ae-method" placeholder="dd + dcfldd"></div>
+      <div class="form-row"><label>Collected by</label><input aria-label="Ae By" id="ae-by" value="forensics@vsp.local"></div>
+      <div class="form-row"><label>Method</label><input aria-label="dd + dcfldd" id="ae-method" placeholder="dd + dcfldd"></div>
     </div>
-    <div class="form-row"><label>Source system</label><input id="ae-src" placeholder="db01.prod.vsp.local"></div>
+    <div class="form-row"><label>Source system</label><input aria-label="db01.prod.vsp.local" id="ae-src" placeholder="db01.prod.vsp.local"></div>
     <div class="action-row">
       <button class="btn btn-primary" onclick="submitEvidence()">🔬 Add Evidence</button>
       <button class="btn" onclick="closeModal('evidence')">Cancel</button>
@@ -947,7 +947,7 @@ loadKPIs();loadIncidents();
     bar.className = 'vsp-ir-filter';
     bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
     bar.innerHTML = ''
-      + '<input id="ir-fq" placeholder="Search title / ID / category…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<input aria-label="Search title / ID / category…" id="ir-fq" placeholder="Search title / ID / category…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
       + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
       +   '<button class="ir-pill ir-pill-active" data-s="" onclick="window._vspIR.sevPill(\'\',this)">All severity</button>'
       +   '<button class="ir-pill" data-s="critical" onclick="window._vspIR.sevPill(\'critical\',this)" style="color:#dc2626">Critical</button>'
@@ -1435,7 +1435,7 @@ loadKPIs();loadIncidents();
     /incident_response/.test(path) ? 'incident_response' :
     /p4_compliance/.test(path)     ? 'p4_compliance' : 'unknown';
 
-  console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1954,8 +1954,8 @@ window.showEditFieldModal = function(incidentId, field, currentVal){
     '<div class="form-row"><label>Field</label><input value="'+field+'" readonly></div>' +
     '<div class="form-row"><label>New Value</label>' +
     (isLong
-      ? '<textarea id="mef-val" rows="5" style="width:100%">'+(currentVal||'').replace(/</g,'&lt;')+'</textarea>'
-      : '<input id="mef-val" value="'+(currentVal||'').replace(/"/g,'&quot;')+'">') +
+      ? '<textarea aria-label="Mef Val" id="mef-val" rows="5" style="width:100%">'+(currentVal||'').replace(/</g,'&lt;')+'</textarea>'
+      : '<input aria-label="Mef Val" id="mef-val" value="'+(currentVal||'').replace(/"/g,'&quot;')+'">') +
     '</div>' +
     '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
     '<button class="btn" onclick="closeModal(\'editfield\')">Cancel</button>' +
@@ -2085,8 +2085,8 @@ window.showCustodyModal = function(ev){
     '<hr style="border-color:var(--border);margin:14px 0">' +
     '<div class="section-title" style="font-size:13px;margin-bottom:8px">Add new custody entry</div>' +
     '<div class="form-grid">' +
-    '<div class="form-row"><label>Actor *</label><input id="cust-actor" placeholder="forensics@vsp.local"></div>' +
-    '<div class="form-row"><label>Action *</label><select id="cust-action">' +
+    '<div class="form-row"><label>Actor *</label><input aria-label="forensics@vsp.local" id="cust-actor" placeholder="forensics@vsp.local"></div>' +
+    '<div class="form-row"><label>Action *</label><select aria-label="Cust Action" id="cust-action">' +
     '<option value="seized">seized</option>' +
     '<option value="transferred">transferred</option>' +
     '<option value="analyzed">analyzed</option>' +
@@ -2097,8 +2097,8 @@ window.showCustodyModal = function(ev){
     '<option value="destroyed">destroyed</option>' +
     '</select></div></div>' +
     '<div class="form-grid">' +
-    '<div class="form-row"><label>Location</label><input id="cust-location" placeholder="evidence-locker-01"></div>' +
-    '<div class="form-row"><label>Notes</label><input id="cust-notes" placeholder="optional"></div></div>' +
+    '<div class="form-row"><label>Location</label><input aria-label="evidence-locker-01" id="cust-location" placeholder="evidence-locker-01"></div>' +
+    '<div class="form-row"><label>Notes</label><input aria-label="optional" id="cust-notes" placeholder="optional"></div></div>' +
     '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
     '<button class="btn" onclick="closeModal(\'custody\')">Close</button>' +
     '<button class="btn btn-primary" onclick="submitCustodyEntry(\'' + ev.evidence_id + '\')">Add Entry</button>' +

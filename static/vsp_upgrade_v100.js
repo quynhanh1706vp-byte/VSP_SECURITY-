@@ -292,21 +292,21 @@ function upgradeFindings() {
   bar.id = 'findings-filter-bar';
   bar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center';
   bar.innerHTML = `
-    <select id="vsp-filter-severity" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
+    <select aria-label="Vsp Filter Severity" id="vsp-filter-severity" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
       <option value="">All Severities</option>
       <option value="CRITICAL">🔴 CRITICAL</option>
       <option value="HIGH">🟠 HIGH</option>
       <option value="MEDIUM">🟡 MEDIUM</option>
       <option value="LOW">🟢 LOW</option>
     </select>
-    <select id="vsp-filter-tool" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
+    <select aria-label="Vsp Filter Tool" id="vsp-filter-tool" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
       <option value="">All Tools</option>
       <option value="kics">kics</option><option value="trivy">trivy</option>
       <option value="gitleaks">gitleaks</option><option value="checkov">checkov</option>
       <option value="bandit">bandit</option><option value="semgrep">semgrep</option>
       <option value="grype">grype</option><option value="codeql">codeql</option>
     </select>
-    <input id="vsp-filter-search" placeholder="Search findings..." style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 10px;border-radius:4px;font-size:11px;flex:1;min-width:150px">
+    <input aria-label="Search findings..." id="vsp-filter-search" placeholder="Search findings..." style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 10px;border-radius:4px;font-size:11px;flex:1;min-width:150px">
     <button class="btn-sm btn-primary" onclick="applyFindingsFilter()">Filter</button>
     <button class="btn-sm" onclick="clearFindingsFilter()">Clear</button>`;
   panel.insertBefore(bar, panel.firstChild);
@@ -1006,7 +1006,7 @@ window.addEventListener('load', function() {
     if(panel){var iframe=panel.querySelector('iframe[data-src]');if(iframe&&!iframe.src)iframe.src=iframe.getAttribute('data-src');}
     var loaders={runs:function(){if(typeof window.loadRuns==='function')window.loadRuns();},audit:function(){if(typeof loadAuditReal==='function')loadAuditReal();},dashboard:function(){if(typeof initDashboardCharts==='function')initDashboardCharts();},findings:function(){if(typeof loadFindingsPanel==='function')loadFindingsPanel();},sla:function(){if(typeof loadSLA==='function')loadSLA();},sbom:function(){if(typeof loadSBOM==='function')loadSBOM();},compliance:function(){if(typeof loadFedRAMP==='function')loadFedRAMP();},governance:function(){if(typeof window.loadRiskRegister==='function')window.loadRiskRegister();},executive:function(){if(typeof loadExecutive==='function')loadExecutive();}};
     if(loaders[name]) setTimeout(loaders[name], 120);
-    console.log('[VSP MASTER] showPanel:', name);
+    (window.VSP_DEBUG && console.log('[VSP MASTER] showPanel:', name));
   }
   window.showPanel = _masterShow;
   if(window.VSP_DEBUG)console.log('[VSP] LAST_OVERRIDE installed');
@@ -1343,7 +1343,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
         +mkFW('SOC 2 Type II', getScore('SOC'), 'Trust service criteria', 'CC1-CC9')
         +mkFW('CIS Controls v8', getScore('CIS')||55, 'Implementation groups', 'IG1,IG2')
         +mkFW('Zero Trust Maturity', getScore('Zero')||78, 'CISA ZT pillars', '7 pillars assessed');
-      console.log('[VSP] SOC Scorecard updated from API');
+      (window.VSP_DEBUG && console.log('[VSP] SOC Scorecard updated from API'));
     } catch(e) { console.error('SOC Scorecard:', e); }
   };
 })();
@@ -1369,10 +1369,10 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
         +'<div class="card-body" style="padding:12px 14px">'
         +'<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin-bottom:12px">'
         +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Base run</label>'
-        +'<select id="sbom-diff-base" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
+        +'<select aria-label="Sbom Diff Base" id="sbom-diff-base" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
         +'<div style="font-size:18px;color:var(--t3);text-align:center">→</div>'
         +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Compare run</label>'
-        +'<select id="sbom-diff-head" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
+        +'<select aria-label="Sbom Diff Head" id="sbom-diff-head" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
         +'</div>'
         +'<div id="sbom-diff-result"></div>'
         +'</div>';
@@ -1566,7 +1566,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
           +'</div>';
       };
       body.innerHTML = frameworks.map(mkFW).join('');
-      console.log('[VSP] SOC Scorecard v3.4 updated:', frameworks.length, 'frameworks');
+      (window.VSP_DEBUG && console.log('[VSP] SOC Scorecard v3.4 updated:', frameworks.length, 'frameworks'));
     } catch(e) { console.error('SOC scorecard v3.4:', e); }
   };
   // Trigger ngay nếu SOC panel đang active
@@ -2119,7 +2119,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       var iframe = panel.querySelector('iframe[data-src]');
       if (iframe && !iframe.src.includes('.html')) {
         iframe.src = iframe.getAttribute('data-src');
-        console.log('[VSP] iframe loaded:', name);
+        (window.VSP_DEBUG && console.log('[VSP] iframe loaded:', name));
       }
     });
   }, 300);
@@ -2139,7 +2139,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       var iframe = panel.querySelector('iframe[data-src]');
       if (iframe && !iframe.src.includes('.html')) {
         iframe.src = iframe.getAttribute('data-src');
-        console.log('[VSP] iframe loaded:', name);
+        (window.VSP_DEBUG && console.log('[VSP] iframe loaded:', name));
       }
     });
   }, 300);
@@ -2228,12 +2228,12 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       +   '</div>'
       // ---- Filter bar (chung cho mọi view) ----
       +   '<div style="display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;background:var(--surface)">'
-      +     '<select id="sbom-u-fsev"  class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()">'
+      +     '<select aria-label="Sbom U Fsev" id="sbom-u-fsev"  class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()">'
       +       '<option value="">All severity</option><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>'
       +     '</select>'
-      +     '<select id="sbom-u-ftool" class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()"><option value="">All tools</option></select>'
-      +     '<input  id="sbom-u-fq"    class="filter-select" style="font-size:10px;padding:3px 8px;min-width:200px;flex:1" placeholder="Component / CVE / path / message…" oninput="window._sbomUnified.debouncedFilter()">'
-      +     '<select id="sbom-u-fgate" class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()" data-only="inventory"><option value="">All gates</option><option>PASS</option><option>FAIL</option><option>WARN</option></select>'
+      +     '<select aria-label="Sbom U Ftool" id="sbom-u-ftool" class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()"><option value="">All tools</option></select>'
+      +     '<input aria-label="Component / CVE / path / message…"  id="sbom-u-fq"    class="filter-select" style="font-size:10px;padding:3px 8px;min-width:200px;flex:1" placeholder="Component / CVE / path / message…" oninput="window._sbomUnified.debouncedFilter()">'
+      +     '<select aria-label="Sbom U Fgate" id="sbom-u-fgate" class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()" data-only="inventory"><option value="">All gates</option><option>PASS</option><option>FAIL</option><option>WARN</option></select>'
       +     '<span id="sbom-u-meta" class="mono-sm c-t3" style="margin-left:auto;font-size:10px"></span>'
       +   '</div>'
       // ---- KPI row ----
@@ -2297,10 +2297,10 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     } else if (S.view === 'diff') {
       sel.innerHTML =
           '<span class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em">NEW:</span>'
-        + '<select id="sbom-u-newsel" class="filter-select" style="font-size:10px;padding:3px 8px;min-width:240px;flex:1" onchange="window._sbomUnified.onSelChange(\'new\')">'+opts(S.newRunUUID)+'</select>'
+        + '<select aria-label="Sbom U Newsel" id="sbom-u-newsel" class="filter-select" style="font-size:10px;padding:3px 8px;min-width:240px;flex:1" onchange="window._sbomUnified.onSelChange(\'new\')">'+opts(S.newRunUUID)+'</select>'
         + '<span class="mono-sm c-t3" style="font-size:10px">vs</span>'
         + '<span class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em">BASELINE:</span>'
-        + '<select id="sbom-u-basesel" class="filter-select" style="font-size:10px;padding:3px 8px;min-width:240px;flex:1" onchange="window._sbomUnified.onSelChange(\'base\')">'+opts(S.baseRunUUID)+'</select>'
+        + '<select aria-label="Sbom U Basesel" id="sbom-u-basesel" class="filter-select" style="font-size:10px;padding:3px 8px;min-width:240px;flex:1" onchange="window._sbomUnified.onSelChange(\'base\')">'+opts(S.baseRunUUID)+'</select>'
         + '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.swap()" title="Swap NEW & BASELINE">⇄</button>';
     } else {
       sel.innerHTML =
@@ -2528,7 +2528,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
 
     var head =
       '<div class="sbom-u-row sbom-u-row-head">'
-      + '<span><input type="checkbox" id="sbom-u-selall" onchange="window._sbomUnified.selectAll(this.checked)" style="cursor:pointer"></span>'
+      + '<span><input aria-label="Sbom U Selall" type="checkbox" id="sbom-u-selall" onchange="window._sbomUnified.selectAll(this.checked)" style="cursor:pointer"></span>'
       + '<span>STATUS</span><span>SEV</span><span>TOOL</span><span>COMPONENT / RULE</span><span>PATH</span><span>SLA</span><span>ACTIONS</span>'
       + '</div>';
     var body = page.map(function(f){
@@ -2745,15 +2745,15 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
         '<div style="margin-bottom:14px;font-size:12px;color:var(--text-2)">Create a Jira ticket for this finding.</div>'
       + '<div style="display:grid;gap:10px">'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Project key</div>'
-      +     '<input id="jira-project" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" placeholder="e.g. SEC" value="SEC"></div>'
+      +     '<input aria-label="e.g. SEC" id="jira-project" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" placeholder="e.g. SEC" value="SEC"></div>'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Priority</div>'
-      +     '<select id="jira-priority" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
+      +     '<select aria-label="Jira Priority" id="jira-priority" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
       +       '<option>Highest</option><option selected>High</option><option>Medium</option><option>Low</option>'
       +     '</select></div>'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Assignee (optional)</div>'
-      +     '<input id="jira-assignee" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" placeholder="e.g. john.doe"></div>'
+      +     '<input aria-label="e.g. john.doe" id="jira-assignee" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" placeholder="e.g. john.doe"></div>'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Note</div>'
-      +     '<textarea id="jira-note" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:60px;resize:vertical;font-family:inherit" placeholder="Additional context for triage…"></textarea></div>'
+      +     '<textarea aria-label="Additional context for triage…" id="jira-note" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:60px;resize:vertical;font-family:inherit" placeholder="Additional context for triage…"></textarea></div>'
       + '</div>';
     var footer = ''
       + '<button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="window._sbomUnified.closeModal()">Cancel</button>'
@@ -2788,14 +2788,14 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
         '<div style="margin-bottom:14px;font-size:12px;color:var(--text-2)">Record VEX (Vulnerability Exploitability eXchange) status for this finding.</div>'
       + '<div style="display:grid;gap:10px">'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Status *</div>'
-      +     '<select id="vex-status" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" onchange="window._sbomUnified._toggleVexJust(this.value)">'
+      +     '<select aria-label="Vex Status" id="vex-status" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" onchange="window._sbomUnified._toggleVexJust(this.value)">'
       +       '<option value="not_affected">not_affected — vulnerability does not impact this product</option>'
       +       '<option value="under_investigation" selected>under_investigation — being analyzed</option>'
       +       '<option value="affected">affected — vulnerability confirmed</option>'
       +       '<option value="fixed">fixed — remediation applied</option>'
       +     '</select></div>'
       +   '<div id="vex-justif-wrap" style="display:none"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Justification (for not_affected)</div>'
-      +     '<select id="vex-justification" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
+      +     '<select aria-label="Vex Justification" id="vex-justification" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
       +       '<option value="">— select —</option>'
       +       '<option value="component_not_present">component_not_present</option>'
       +       '<option value="vulnerable_code_not_present">vulnerable_code_not_present</option>'
@@ -2804,7 +2804,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       +       '<option value="inline_mitigations_already_exist">inline_mitigations_already_exist</option>'
       +     '</select></div>'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Detail / impact statement</div>'
-      +     '<textarea id="vex-detail" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:70px;resize:vertical;font-family:inherit" placeholder="Explain the rationale, e.g. \'Affected function not called in our codebase\'"></textarea></div>'
+      +     '<textarea aria-label="Explain the rationale, e.g. \" id="vex-detail" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:70px;resize:vertical;font-family:inherit" placeholder="Explain the rationale, e.g. \'Affected function not called in our codebase\'"></textarea></div>'
       + '</div>';
     var footer = ''
       + '<button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="window._sbomUnified.closeModal()">Cancel</button>'
@@ -2843,9 +2843,9 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       +   '<b style="color:var(--amber)">⚠ Use sparingly.</b> Accepted findings still appear in reports for audit purposes, but won\'t generate alerts or block deployments.'
       + '</div>'
       + '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Reason for acceptance *</div>'
-      +   '<textarea id="acc-reason" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:70px;resize:vertical;font-family:inherit" placeholder="e.g. \'Risk accepted — internal-only service, no PII\'"></textarea></div>'
+      +   '<textarea aria-label="e.g. \" id="acc-reason" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:70px;resize:vertical;font-family:inherit" placeholder="e.g. \'Risk accepted — internal-only service, no PII\'"></textarea></div>'
       + '<div style="margin-top:10px"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Expires</div>'
-      +   '<select id="acc-expires" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
+      +   '<select aria-label="Acc Expires" id="acc-expires" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
       +     '<option value="30">30 days (recommended)</option>'
       +     '<option value="90" selected>90 days</option>'
       +     '<option value="180">180 days</option>'
@@ -3078,7 +3078,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       +   (S.view==='diff' ? ' · NEW='+(S.newRunUUID||'').slice(-8)+' / BASE='+(S.baseRunUUID||'').slice(-8) : '')
       + '</div>'
       + '<div style="display:flex;gap:8px">'
-      +   '<input id="view-name" class="filter-select" style="flex:1;padding:6px 10px;font-size:11px" placeholder="Enter view name (e.g. \'Critical CVEs in production\')">'
+      +   '<input aria-label="Enter view name (e.g. \" id="view-name" class="filter-select" style="flex:1;padding:6px 10px;font-size:11px" placeholder="Enter view name (e.g. \'Critical CVEs in production\')">'
       +   '<button class="btn btn-primary" style="font-size:11px" onclick="window._sbomUnified._saveView()">💾 Save</button>'
       + '</div>';
 
@@ -3258,13 +3258,13 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       // Baseline section
       + '<div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600">DIFF BASELINE</div>'
       + '<div style="margin-bottom:18px">'
-      +   '<select id="cfg-auto-baseline" class="filter-select" style="width:100%;padding:8px 10px;font-size:11px" onchange="window._sbomUnified._onBaselineChange(this.value)">'
+      +   '<select aria-label="Cfg Auto Baseline" id="cfg-auto-baseline" class="filter-select" style="width:100%;padding:8px 10px;font-size:11px" onchange="window._sbomUnified._onBaselineChange(this.value)">'
       +     '<option value="previous_done"'+(c.auto_baseline==='previous_done'?' selected':'')+'>Auto: previous DONE run</option>'
       +     '<option value="specific"'+(c.auto_baseline==='specific'?' selected':'')+'>Pin to specific run</option>'
       +     '<option value="disabled"'+(c.auto_baseline==='disabled'?' selected':'')+'>Disabled (manual select)</option>'
       +   '</select>'
       +   '<div id="cfg-baseline-rid-wrap" style="margin-top:8px;'+(c.auto_baseline==='specific'?'':'display:none')+'">'
-      +     '<select id="cfg-baseline-rid" class="filter-select" style="width:100%;padding:8px 10px;font-size:11px">'
+      +     '<select aria-label="Cfg Baseline Rid" id="cfg-baseline-rid" class="filter-select" style="width:100%;padding:8px 10px;font-size:11px">'
       +       S.runs.map(function(r){
                 return '<option value="'+esc(r.rid)+'"'+(r.rid===c.baseline_rid?' selected':'')+'>'+esc(r.rid)+' · '+esc(r.mode||'?')+' · '+(r.total_findings||0)+' findings</option>';
               }).join('')
@@ -3275,17 +3275,17 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       + '<div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600">DISPLAY</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px">'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">Page size</div>'
-      +     '<select id="cfg-page-size" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
+      +     '<select aria-label="Cfg Page Size" id="cfg-page-size" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
       +       [10,15,25,50,100].map(function(n){ return '<option value="'+n+'"'+(n==c.page_size?' selected':'')+'>'+n+' rows</option>'; }).join('')
       +     '</select></div>'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">Default view</div>'
-      +     '<select id="cfg-default-view" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
+      +     '<select aria-label="Cfg Default View" id="cfg-default-view" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
       +       '<option value="inventory"'+(c.default_view==='inventory'?' selected':'')+'>📦 Inventory</option>'
       +       '<option value="diff"'+(c.default_view==='diff'?' selected':'')+'>🔄 Diff</option>'
       +       '<option value="trend"'+(c.default_view==='trend'?' selected':'')+'>📊 Trend</option>'
       +     '</select></div>'
       +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">Trend range</div>'
-      +     '<select id="cfg-trend-range" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
+      +     '<select aria-label="Cfg Trend Range" id="cfg-trend-range" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
       +       [7,14,30,60,90].map(function(n){ return '<option value="'+n+'"'+(n==c.trend_range?' selected':'')+'>Last '+n+' runs</option>'; }).join('')
       +     '</select></div>'
       + '</div>'
@@ -3306,7 +3306,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     return '<div>'
       + '<div style="font-size:10px;color:'+color+';font-weight:600;margin-bottom:4px;letter-spacing:.05em">'+label+'</div>'
       + '<div style="display:flex;align-items:center;gap:4px">'
-      +   '<input id="cfg-'+id+'" type="number" min="1" max="365" value="'+val+'" class="filter-select" style="width:100%;padding:6px 8px;font-size:12px;font-family:var(--font-mono)">'
+      +   '<input aria-label="Cfg" id="cfg-'+id+'" type="number" min="1" max="365" value="'+val+'" class="filter-select" style="width:100%;padding:6px 8px;font-size:12px;font-family:var(--font-mono)">'
       +   '<span style="font-size:10px;color:var(--text-3)">'+suffix+'</span>'
       + '</div></div>';
   }
@@ -3462,7 +3462,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       } catch(e){}
       return ORIG(input, init);
     };
-    console.log('[VSP-AUTH] fetch auto-token wrapper armed');
+    (window.VSP_DEBUG && console.log('[VSP-AUTH] fetch auto-token wrapper armed'));
   })();
 
 

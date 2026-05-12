@@ -75,7 +75,7 @@
   <div class="subtitle">Embed external Grafana boards inside VSP. Operator-controlled per tenant.</div>
 
   <div class="toolbar">
-    <label style="font-size:11px;color:var(--t3)">DASHBOARD</label>
+    <label style="font-size:11px;color:var(--t3)" for="dash-sel">DASHBOARD</label>
     <select id="dash-sel" onchange="renderSelected()"></select>
     <button onclick="loadConfig()">Refresh</button>
     <button onclick="openCfg()" style="margin-left:auto">⚙ Configure</button>
@@ -87,11 +87,11 @@
 <div id="cfg-drawer">
   <h3>Configure Grafana embed</h3>
   <div class="field">
-    <label>Base URL</label>
+    <label for="cfg-base">Base URL</label>
     <input id="cfg-base" placeholder="https://grafana.your-domain.tld/" />
   </div>
   <div class="field">
-    <label>Default theme</label>
+    <label for="cfg-theme">Default theme</label>
     <select id="cfg-theme">
       <option value="">(grafana default)</option>
       <option value="dark">dark</option>
@@ -191,9 +191,9 @@ function renderDashRows() {
   const wrap = document.getElementById('cfg-dashboards');
   wrap.innerHTML = (currentCfg.dashboards || []).map((d, i) => `
     <div class="dash-row">
-      <input data-i="${i}" data-k="uid" value="${escapeAttr(d.uid||'')}" placeholder="uid" />
-      <input data-i="${i}" data-k="title" value="${escapeAttr(d.title||'')}" placeholder="title" />
-      <input data-i="${i}" data-k="from" value="${escapeAttr(d.from||'')}" placeholder="from" />
+      <input aria-label="uid" data-i="${i}" data-k="uid" value="${escapeAttr(d.uid||'')}" placeholder="uid" />
+      <input aria-label="title" data-i="${i}" data-k="title" value="${escapeAttr(d.title||'')}" placeholder="title" />
+      <input aria-label="from" data-i="${i}" data-k="from" value="${escapeAttr(d.from||'')}" placeholder="from" />
       <button class="rm" onclick="removeDashRow(${i})">×</button>
     </div>`).join('');
 }

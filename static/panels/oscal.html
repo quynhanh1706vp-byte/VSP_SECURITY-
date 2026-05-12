@@ -431,7 +431,7 @@ loadAll();
     bar.className = 'vsp-oscal-pills';
     bar.style.cssText = 'display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap;font-size:11px';
     bar.innerHTML = ''
-      + '<input id="oscal-fq" placeholder="Search practice ID or name…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<input aria-label="Search practice ID or name…" id="oscal-fq" placeholder="Search practice ID or name…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
       + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
       +   '<button class="oscal-pill oscal-pill-active" data-s="" onclick="window._vspOSCAL.pill(\'\',this)">All</button>'
       +   '<button class="oscal-pill" data-s="implemented" onclick="window._vspOSCAL.pill(\'implemented\',this)" style="color:#10b981">✓ Implemented</button>'
@@ -736,7 +736,7 @@ loadAll();
   'use strict';
   if (window.__VSP_OSCAL_PACK_A__) return;
   window.__VSP_OSCAL_PACK_A__ = true;
-  console.log('[VSP-OSCAL-PACK-A] Loaded');
+  (window.VSP_DEBUG && console.log('[VSP-OSCAL-PACK-A] Loaded'));
 
   function $(s, ctx) { return (ctx || document).querySelector(s); }
   function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
@@ -1008,7 +1008,7 @@ loadAll();
   'use strict';
   if (window.__VSP_OSCAL_PACK_B__) return;
   window.__VSP_OSCAL_PACK_B__ = true;
-  console.log('[VSP-OSCAL-PACK-B] Loaded');
+  (window.VSP_DEBUG && console.log('[VSP-OSCAL-PACK-B] Loaded'));
 
   function $(s, ctx) { return (ctx || document).querySelector(s); }
   function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
@@ -1023,7 +1023,7 @@ loadAll();
   }
   function toast(msg, type) {
     if (window._vspOSCAL && window._vspOSCAL.toast) return window._vspOSCAL.toast(msg, type);
-    console.log('[toast ' + (type || 'info') + ']', msg);
+    (window.VSP_DEBUG && console.log('[toast ' + (type || 'info') + ']', msg));
   }
 
   // ─── 1. Wrap downloadAllModels to include manifest.json ──────────────────
@@ -1283,7 +1283,7 @@ loadAll();
   'use strict';
   if (window.__VSP_OSCAL_PACK_C__) return;
   window.__VSP_OSCAL_PACK_C__ = true;
-  console.log('[VSP-OSCAL-PACK-C] Loaded');
+  (window.VSP_DEBUG && console.log('[VSP-OSCAL-PACK-C] Loaded'));
 
   function $(s, ctx) { return (ctx || document).querySelector(s); }
   function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
@@ -1291,7 +1291,7 @@ loadAll();
   function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
   function toast(msg, type) {
     if (window._vspOSCAL && window._vspOSCAL.toast) return window._vspOSCAL.toast(msg, type);
-    console.log('[toast]', msg);
+    (window.VSP_DEBUG && console.log('[toast]', msg));
   }
 
   // ─── Build FedRAMP package via BE endpoint ──────────────────────────────

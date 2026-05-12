@@ -64,7 +64,7 @@ var PRO = window.VSP_PRO;
     } catch (_e) {}
     return ORIG(input, init);
   };
-  console.log('[VSP-PRO-REALAPI v2] CSRF auto-wrapper armed (X-CSRF-Token from vsp_csrf cookie)');
+  (window.VSP_DEBUG && console.log('[VSP-PRO-REALAPI v2] CSRF auto-wrapper armed (X-CSRF-Token from vsp_csrf cookie)'));
 })();
 
 /* ── inject modal CSS once ──────────────────────────────────────────────── */
@@ -2199,7 +2199,7 @@ function wireTableExtras(root){
       var bar = document.createElement('div');
       bar.className = 'vspm-search';
       bar.innerHTML =
-        '<input type="search" placeholder="Filter rows…" />' +
+        '<input aria-label="Filter rows…" type="search" placeholder="Filter rows…" />' +
         '<span class="count"></span>' +
         '<button class="pro-btn ghost" style="font-size:10px">⤓ Export CSV</button>';
       table.parentNode.insertBefore(bar, table);
@@ -2781,5 +2781,5 @@ if (document.readyState === 'loading'){
 setTimeout(decorateAllInlinePanels, 800);
 setTimeout(decorateAllInlinePanels, 2000);
 
-console.log('[VSP-PRO-REALAPI v3.8] + inline-panel Configure decorators (analytics/executive/export)');
+(window.VSP_DEBUG && console.log('[VSP-PRO-REALAPI v3.8] + inline-panel Configure decorators (analytics/executive/export)'));
 })();

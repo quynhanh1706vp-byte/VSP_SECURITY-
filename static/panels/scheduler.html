@@ -149,8 +149,8 @@ select.form-ctrl option{background:var(--bg2)}
   <div class="card-head">
     <div><div class="card-title">Schedules</div><div class="card-sub" id="sched-sub">—</div></div>
     <div style="display:flex;gap:6px;align-items:center">
-      <input class="search-bar" id="sched-search" placeholder="🔍 Search…" oninput="renderSchedules()">
-      <select id="mode-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderSchedules()">
+      <input aria-label="🔍 Search…" class="search-bar" id="sched-search" placeholder="🔍 Search…" oninput="renderSchedules()">
+      <select aria-label="Mode Filter" id="mode-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderSchedules()">
         <option value="">All modes</option>
         <option value="SAST">SAST</option>
         <option value="IAC">IAC</option>
@@ -160,7 +160,7 @@ select.form-ctrl option{background:var(--bg2)}
         <option value="FULL">Full</option>
         <option value="FULL_SOC">FULL_SOC</option>
       </select>
-      <select id="status-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderSchedules()">
+      <select aria-label="Status Filter" id="status-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderSchedules()">
         <option value="">All status</option>
         <option value="enabled">Enabled</option>
         <option value="disabled">Disabled</option>
@@ -188,12 +188,12 @@ select.form-ctrl option{background:var(--bg2)}
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Schedule name <span class="req">*</span></label>
-        <input class="form-ctrl" id="s-name" placeholder="e.g. Daily production scan" maxlength="80">
+        <input aria-label="e.g. Daily production scan" class="form-ctrl" id="s-name" placeholder="e.g. Daily production scan" maxlength="80">
         <div style="font-size:10px;color:var(--red);margin-top:3px;display:none" id="s-name-err">Name is required</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="form-group">
-          <label class="form-label">Scan mode</label>
+          <label class="form-label" for="s-mode">Scan mode</label>
           <select class="form-ctrl" id="s-mode">
             <option value="SAST">SAST — Static analysis</option>
             <option value="IAC">IAC — Infrastructure</option>
@@ -205,7 +205,7 @@ select.form-ctrl option{background:var(--bg2)}
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Profile</label>
+          <label class="form-label" for="s-profile">Profile</label>
           <select class="form-ctrl" id="s-profile">
             <option value="FAST">FAST — Quick scan</option>
             <option value="EXT">EXT — Extended</option>
@@ -220,20 +220,20 @@ select.form-ctrl option{background:var(--bg2)}
       <div class="form-group">
         <label class="form-label">Cron expression <span class="req">*</span></label>
         <div class="cron-presets" id="cron-presets"></div>
-        <input class="form-ctrl" id="s-cron" placeholder="0 2 * * *" style="font-family:var(--font-mono)" oninput="onCronInput()">
+        <input aria-label="0 2 * * *" class="form-ctrl" id="s-cron" placeholder="0 2 * * *" style="font-family:var(--font-mono)" oninput="onCronInput()">
         <div style="font-size:10px;color:var(--t3);margin-top:4px" id="cron-explain">Enter a cron expression or select a preset above</div>
       </div>
       <div class="form-group">
         <label class="form-label">Target <span style="color:var(--t4);font-size:9px;text-transform:none">(path or URL)</span></label>
-        <input class="form-ctrl" id="s-src" placeholder="/home/test/Data/GOLANG_VSP or https://github.com/org/repo">
+        <input aria-label="/home/test/Data/GOLANG_VSP or https://github.com/org/repo" class="form-ctrl" id="s-src" placeholder="/home/test/Data/GOLANG_VSP or https://github.com/org/repo">
       </div>
       <div class="form-group">
         <label class="form-label">Tags <span style="color:var(--t4);font-size:9px;text-transform:none">(comma-separated)</span></label>
-        <input class="form-ctrl" id="s-tags" placeholder="production, nightly, critical">
+        <input aria-label="production, nightly, critical" class="form-ctrl" id="s-tags" placeholder="production, nightly, critical">
       </div>
       <div class="form-group">
         <label class="form-label" style="cursor:pointer;display:flex;align-items:center;gap:6px">
-          <input type="checkbox" id="s-enabled" checked style="accent-color:var(--green)">
+          <input aria-label="S Enabled" type="checkbox" id="s-enabled" checked style="accent-color:var(--green)">
           Enable schedule immediately
         </label>
       </div>
@@ -799,7 +799,7 @@ renderRecentRuns();
     /scheduler/.test(path)     ? 'scheduler' :
     /network_flow/.test(path)  ? 'network_flow' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
 
   // ─── Toast (shared) ──────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1318,7 +1318,10 @@ renderRecentRuns();
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'ai_advisor')         initAIAdvisor();
     else if (PANEL === 'ai_analyst')    initAIAnalyst();
     else if (PANEL === 'cicd')          initCICD();

@@ -145,27 +145,27 @@ td{padding:7px 10px;vertical-align:middle}
         <div class="card-body">
           <div class="form-group">
             <div class="form-label">System name</div>
-            <input class="form-ctrl" id="sys-name" value="VSP Security Platform">
+            <input aria-label="Sys Name" class="form-ctrl" id="sys-name" value="VSP Security Platform">
           </div>
           <div class="form-group">
             <div class="form-label">Organization</div>
-            <input class="form-ctrl" id="sys-org" value="Agency Security Operations">
+            <input aria-label="Sys Org" class="form-ctrl" id="sys-org" value="Agency Security Operations">
           </div>
           <div class="form-group">
             <div class="form-label">System ID / ATO identifier</div>
-            <input class="form-ctrl mono" id="sys-id" value="VSP-DOD-2025-001">
+            <input aria-label="Sys Id" class="form-ctrl mono" id="sys-id" value="VSP-DOD-2025-001">
           </div>
           <div class="form-group">
             <div class="form-label">Authorizing Official</div>
-            <input class="form-ctrl" id="sys-ao" value="CISO / Designated Authorizing Authority (DAA)">
+            <input aria-label="Sys Ao" class="form-ctrl" id="sys-ao" value="CISO / Designated Authorizing Authority (DAA)">
           </div>
           <div class="form-group">
             <div class="form-label">3PAO Assessor</div>
-            <input class="form-ctrl" id="sys-3pao" value="Coalfire Systems Inc.">
+            <input aria-label="Sys 3pao" class="form-ctrl" id="sys-3pao" value="Coalfire Systems Inc.">
           </div>
           <div class="form-group">
             <div class="form-label">Platform URL</div>
-            <input class="form-ctrl mono" id="sys-url" value="http://127.0.0.1:8921">
+            <input aria-label="Sys Url" class="form-ctrl mono" id="sys-url" value="http://127.0.0.1:8921">
           </div>
           <button class="btn btn-primary btn-sm" onclick="saveGeneral()">Save</button>
         </div>
@@ -215,11 +215,11 @@ td{padding:7px 10px;vertical-align:middle}
       <div style="display:flex;gap:8px;align-items:flex-end">
         <div style="flex:1">
           <div class="form-label">Add target URL</div>
-          <input class="form-ctrl mono" id="dast-new-url" placeholder="https://staging.yourapp.com">
+          <input aria-label="https://staging.yourapp.com" class="form-ctrl mono" id="dast-new-url" placeholder="https://staging.yourapp.com">
         </div>
         <div style="width:120px">
           <div class="form-label">Environment</div>
-          <select class="form-ctrl" id="dast-new-env">
+          <select aria-label="Dast New Env" class="form-ctrl" id="dast-new-env">
             <option>staging</option><option>dev</option><option>qa</option>
           </select>
         </div>
@@ -234,23 +234,23 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-body">
         <div class="form-group">
           <div class="form-label">Default scan mode</div>
-          <select class="form-ctrl" id="def-mode">
+          <select aria-label="Def Mode" class="form-ctrl" id="def-mode">
             <option>FULL</option><option>SAST</option><option>SCA</option><option>IAC</option>
           </select>
         </div>
         <div class="form-group">
           <div class="form-label">Default profile</div>
-          <select class="form-ctrl" id="def-profile">
+          <select aria-label="Def Profile" class="form-ctrl" id="def-profile">
             <option>STANDARD</option><option>FAST</option><option>DEEP</option>
           </select>
         </div>
         <div class="form-group">
           <div class="form-label">Gate threshold (score)</div>
-          <input class="form-ctrl mono" id="gate-threshold" value="70" type="number" min="0" max="100">
+          <input aria-label="Gate Threshold" class="form-ctrl mono" id="gate-threshold" value="70" type="number" min="0" max="100">
         </div>
         <div class="form-group">
           <div class="form-label">Max concurrent scans</div>
-          <input class="form-ctrl mono" id="max-scans" value="3" type="number" min="1" max="10">
+          <input aria-label="Max Scans" class="form-ctrl mono" id="max-scans" value="3" type="number" min="1" max="10">
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveScanDefaults()">Save</button>
       </div>
@@ -298,7 +298,7 @@ td{padding:7px 10px;vertical-align:middle}
           </div>
           <div class="form-group" style="margin-bottom:0">
             <div class="form-label">Escalate to</div>
-            <input class="form-ctrl" value="ciso@agency.gov" placeholder="email">
+            <input aria-label="email" class="form-ctrl" value="ciso@agency.gov" placeholder="email">
           </div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--orange)">
@@ -309,7 +309,7 @@ td{padding:7px 10px;vertical-align:middle}
           </div>
           <div class="form-group" style="margin-bottom:0">
             <div class="form-label">Escalate to</div>
-            <input class="form-ctrl" value="soc@agency.gov" placeholder="email">
+            <input aria-label="email" class="form-ctrl" value="soc@agency.gov" placeholder="email">
           </div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--amber)">
@@ -320,7 +320,7 @@ td{padding:7px 10px;vertical-align:middle}
           </div>
           <div class="form-group" style="margin-bottom:0">
             <div class="form-label">Escalate to</div>
-            <input class="form-ctrl" value="sec-eng@agency.gov" placeholder="email">
+            <input aria-label="email" class="form-ctrl" value="sec-eng@agency.gov" placeholder="email">
           </div>
         </div>
       </div>
@@ -350,13 +350,13 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="g2">
         <div class="form-group">
           <div class="form-label">Access token expiry</div>
-          <select class="form-ctrl" id="jwt-access">
+          <select aria-label="Jwt Access" class="form-ctrl" id="jwt-access">
             <option>1h</option><option selected>8h</option><option>24h</option><option>7d</option>
           </select>
         </div>
         <div class="form-group">
           <div class="form-label">Refresh token expiry</div>
-          <select class="form-ctrl" id="jwt-refresh">
+          <select aria-label="Jwt Refresh" class="form-ctrl" id="jwt-refresh">
             <option>7d</option><option selected>30d</option><option>90d</option>
           </select>
         </div>
@@ -390,7 +390,7 @@ td{padding:7px 10px;vertical-align:middle}
         </div>
         <div class="form-group">
           <div class="form-label">Allowed IP ranges (CIDR, one per line)</div>
-          <textarea class="form-ctrl mono" rows="3" placeholder="0.0.0.0/0&#10;192.168.1.0/24">0.0.0.0/0</textarea>
+          <textarea aria-label="0.0.0.0/0&#10;192.168.1.0/24" class="form-ctrl mono" rows="3" placeholder="0.0.0.0/0&#10;192.168.1.0/24">0.0.0.0/0</textarea>
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveAuth()">Save</button>
       </div>
@@ -404,7 +404,7 @@ td{padding:7px 10px;vertical-align:middle}
         </div>
         <div class="toggle-row">
           <div><div class="toggle-label">Exempt SW agent endpoint from CSRF</div><div class="toggle-sub">/api/v1/software-inventory/report · agent-only endpoint</div></div>
-          <label class="sw-wrap"><input type="checkbox" id="csrf-exempt" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Csrf Exempt" type="checkbox" id="csrf-exempt" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div class="toggle-row">
           <div><div class="toggle-label">CSRF protection (all other endpoints)</div><div class="toggle-sub">Required for browser-based requests</div></div>
@@ -749,7 +749,7 @@ function addAlertRule(){
   var body = `
     <div class="form-group">
       <div class="form-label">Trigger event</div>
-      <select class="form-ctrl" id="ar-trigger">
+      <select aria-label="Ar Trigger" class="form-ctrl" id="ar-trigger">
         <option value="gate_fail">gate_fail — Gate check failed</option>
         <option value="critical_finding">critical_finding — Critical severity detected</option>
         <option value="sla_breach">sla_breach — SLA window exceeded</option>
@@ -760,7 +760,7 @@ function addAlertRule(){
     </div>
     <div class="form-group">
       <div class="form-label">Severity filter</div>
-      <select class="form-ctrl" id="ar-sev">
+      <select aria-label="Ar Sev" class="form-ctrl" id="ar-sev">
         <option value="any">any (no filter)</option>
         <option value="CRITICAL">CRITICAL only</option>
         <option value="HIGH">HIGH and above</option>
@@ -770,10 +770,10 @@ function addAlertRule(){
     <div class="form-group">
       <div class="form-label">Notification channels</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;padding:6px 2px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ch-slack" checked> <span>Slack</span></label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ch-email" checked> <span>Email</span></label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ch-pagerduty"> <span>PagerDuty</span></label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ch-webhook"> <span>Webhook</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input aria-label="Ch Slack" type="checkbox" id="ch-slack" checked> <span>Slack</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input aria-label="Ch Email" type="checkbox" id="ch-email" checked> <span>Email</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input aria-label="Ch Pagerduty" type="checkbox" id="ch-pagerduty"> <span>PagerDuty</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input aria-label="Ch Webhook" type="checkbox" id="ch-webhook"> <span>Webhook</span></label>
       </div>
     </div>
   `;
@@ -830,12 +830,12 @@ function createAPIKey(){
   var body = `
     <div class="form-group">
       <div class="form-label">Key label *</div>
-      <input class="form-ctrl" id="ak-label" placeholder="e.g. CI/CD pipeline" maxlength="100" autofocus>
+      <input aria-label="e.g. CI/CD pipeline" class="form-ctrl" id="ak-label" placeholder="e.g. CI/CD pipeline" maxlength="100" autofocus>
       <div style="font-size:10px;color:var(--t3);margin-top:4px">Max 100 characters. Used to identify the key.</div>
     </div>
     <div class="form-group">
       <div class="form-label">Role</div>
-      <select class="form-ctrl" id="ak-role">
+      <select aria-label="Ak Role" class="form-ctrl" id="ak-role">
         <option value="analyst" selected>analyst — Read findings, trigger scans</option>
         <option value="dev">dev — Trigger scans on own projects</option>
         <option value="auditor">auditor — Read-only access for compliance</option>
@@ -844,7 +844,7 @@ function createAPIKey(){
     </div>
     <div class="form-group">
       <div class="form-label">Expires after</div>
-      <select class="form-ctrl" id="ak-expiry">
+      <select aria-label="Ak Expiry" class="form-ctrl" id="ak-expiry">
         <option value="30">30 days</option>
         <option value="60">60 days</option>
         <option value="90" selected>90 days (recommended)</option>
@@ -919,7 +919,7 @@ function showAPIKeySecret(data, label){
     <div class="form-group">
       <div class="form-label">Full key (copy now)</div>
       <div style="display:flex;gap:6px">
-        <input class="form-ctrl mono" id="ak-secret" value="${fullKey}" readonly style="font-family:var(--font-mono);font-size:11px;flex:1">
+        <input aria-label="Ak Secret" class="form-ctrl mono" id="ak-secret" value="${fullKey}" readonly style="font-family:var(--font-mono);font-size:11px;flex:1">
         <button class="btn btn-primary btn-sm" onclick="copyAPIKey()">📋 Copy</button>
       </div>
     </div>
@@ -1288,7 +1288,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     /integrations\.html/.test(path)  ? 'integrations' :
     /sso_admin\.html/.test(path)     ? 'sso_admin' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V4] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V4] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1634,7 +1634,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'users')             initUsers();
     else if (PANEL === 'settings')     initSettings();
     else if (PANEL === 'integrations') initIntegrations();

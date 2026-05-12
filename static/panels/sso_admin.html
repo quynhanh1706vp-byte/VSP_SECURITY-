@@ -132,34 +132,34 @@
 
  <input type="hidden" id="p-id">
 
- <label>Display Name</label>
+ <label for="p-name">Display Name</label>
  <input id="p-name" placeholder="Production Okta">
 
- <label>OIDC Issuer URL</label>
+ <label for="p-issuer">OIDC Issuer URL</label>
  <input id="p-issuer" placeholder="https://your-org.okta.com/oauth2/default">
  <div class="help">Without trailing slash. Discovery happens at issuer + /.well-known/openid-configuration</div>
 
  <div class="row2">
  <div>
- <label>Client ID</label>
+ <label for="p-client-id">Client ID</label>
  <input id="p-client-id" placeholder="0oab1c2d3...">
  </div>
  <div>
- <label>Client Secret</label>
+ <label for="p-client-secret">Client Secret</label>
  <input id="p-client-secret" type="password" placeholder="leave blank to keep">
  </div>
  </div>
 
- <label>Redirect URI (must match IdP config)</label>
+ <label for="p-redirect">Redirect URI (must match IdP config)</label>
  <input id="p-redirect" placeholder="https://vsp.your-domain.com/api/v1/auth/sso/callback">
 
  <div class="row2">
  <div>
- <label>Scopes</label>
+ <label for="p-scopes">Scopes</label>
  <input id="p-scopes" value="openid email profile">
  </div>
  <div>
- <label>Default Role for New Users</label>
+ <label for="p-role">Default Role for New Users</label>
  <select id="p-role">
  <option value="analyst">analyst</option>
  <option value="auditor">auditor</option>
@@ -169,11 +169,11 @@
  </div>
  </div>
 
- <label>Allowed Email Domains (comma separated, optional)</label>
+ <label for="p-domains">Allowed Email Domains (comma separated, optional)</label>
  <input id="p-domains" placeholder="company.com, subsidiary.com">
 
  <label>
- <input type="checkbox" id="p-enabled" checked style="width:auto;margin-right:8px">
+ <input aria-label="P Enabled" type="checkbox" id="p-enabled" checked style="width:auto;margin-right:8px">
  Enabled
  </label>
 
@@ -405,7 +405,7 @@ loadProviders();
  /integrations\.html/.test(path) ? 'integrations' :
  /sso_admin\.html/.test(path) ? 'sso_admin' : 'unknown';
 
- console.log('[VSP-UNI-POLISH-V4] Loaded for panel:', PANEL);
+ (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V4] Loaded for panel:', PANEL));
 
  // ─── Toast ────────────────────────────────────────────────────────────────
  let tcontainer = null;
@@ -751,7 +751,10 @@ loadProviders();
  }
 
  // ─── Init dispatch ───────────────────────────────────────────────────────
+ let _initDone = false;
  function init() {
+   if (_initDone) return;
+   _initDone = true;
  if (PANEL === 'users') initUsers();
  else if (PANEL === 'settings') initSettings();
  else if (PANEL === 'integrations') initIntegrations();

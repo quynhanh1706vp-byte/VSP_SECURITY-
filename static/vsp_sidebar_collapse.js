@@ -102,5 +102,5 @@ if (document.readyState === 'loading'){
 setTimeout(init, 600);
 setTimeout(init, 2000);
 
-console.log('[VSP-SIDEBAR-COLLAPSE] active — click section labels to toggle');
+(window.VSP_DEBUG && console.log('[VSP-SIDEBAR-COLLAPSE] active — click section labels to toggle'));
 })();

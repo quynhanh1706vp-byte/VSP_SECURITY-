@@ -39,7 +39,7 @@
   }
   function toast(msg, kind) {
     if (typeof window.showToast === 'function') return window.showToast(msg, kind || 'info');
-    console.log('[sw-inv]', kind || 'info', msg);
+    (window.VSP_DEBUG && console.log('[sw-inv]', kind || 'info', msg));
   }
   async function api(path, opts) {
     const ctrl = new AbortController();
@@ -169,9 +169,9 @@
         </div>
 
         <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 200px 140px;gap:8px">
-          <input id="swi-search" class="form-ctrl" placeholder="Search hostname…"
+          <input aria-label="Search hostname…" id="swi-search" class="form-ctrl" placeholder="Search hostname…"
                  style="font-size:12px">
-          <select id="swi-os" class="form-ctrl" style="font-size:12px">
+          <select aria-label="Swi Os" id="swi-os" class="form-ctrl" style="font-size:12px">
             <option value="">All OS</option>
             <option value="ubuntu">Ubuntu</option>
             <option value="debian">Debian</option>
@@ -180,7 +180,7 @@
             <option value="rhel">RHEL</option>
             <option value="amazon">Amazon Linux</option>
           </select>
-          <select id="swi-min-risk" class="form-ctrl" style="font-size:12px">
+          <select aria-label="Swi Min Risk" id="swi-min-risk" class="form-ctrl" style="font-size:12px">
             <option value="0">All risk</option>
             <option value="1">Risk ≥ 1</option>
             <option value="5">Risk ≥ 5 (medium+)</option>
@@ -569,5 +569,5 @@
   else boot();
 
   window.VSPSWInventory = { refresh: refreshAll, api, apiBase: API_BASE };
-  console.log('[vsp-sw-inventory] panel wired — backend:', API_BASE);
+  (window.VSP_DEBUG && console.log('[vsp-sw-inventory] panel wired — backend:', API_BASE));
 })();

@@ -118,13 +118,13 @@ tr:hover td{background:var(--surface)}
 <div class="run-select">
   <div class="select-box">
     <div class="select-lbl">New run (target)</div>
-    <select class="form-ctrl" id="rid1"><option value="">— select run —</option></select>
+    <select aria-label="Rid1" class="form-ctrl" id="rid1"><option value="">— select run —</option></select>
     <div class="run-meta" id="meta1"></div>
   </div>
   <div class="vs-badge">VS</div>
   <div class="select-box">
     <div class="select-lbl">Baseline run</div>
-    <select class="form-ctrl" id="rid2"><option value="">— select run —</option></select>
+    <select aria-label="Rid2" class="form-ctrl" id="rid2"><option value="">— select run —</option></select>
     <div class="run-meta" id="meta2"></div>
   </div>
 </div>
@@ -358,7 +358,7 @@ if(window.parent!==window){
     /scheduler/.test(path)     ? 'scheduler' :
     /network_flow/.test(path)  ? 'network_flow' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
 
   // ─── Toast (shared) ──────────────────────────────────────────────────────
   let tcontainer = null;
@@ -877,7 +877,10 @@ if(window.parent!==window){
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'ai_advisor')         initAIAdvisor();
     else if (PANEL === 'ai_analyst')    initAIAnalyst();
     else if (PANEL === 'cicd')          initCICD();

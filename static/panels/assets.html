@@ -103,7 +103,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 <div class="hdr">
   <div><h2>Asset inventory</h2><p>CMDB · risk scoring · vulnerability heatmap · findings per asset</p></div>
   <div style="display:flex;gap:8px;align-items:center">
-    <input id="search-box" placeholder="Search assets…" class="btn" style="width:150px;text-align:left" oninput="renderAssets()">
+    <input aria-label="Search assets…" id="search-box" placeholder="Search assets…" class="btn" style="width:150px;text-align:left" oninput="renderAssets()">
     <button class="btn btn-sm" onclick="loadAssets()">&#8635;</button>
   </div>
 </div>
@@ -505,7 +505,7 @@ updateKPIs();renderHeatmap();renderAssets();
     /conmon/.test(path)    ? 'conmon' :
     /soar/.test(path)      ? 'soar' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;

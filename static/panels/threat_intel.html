@@ -112,13 +112,13 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     <div class="card-head">
       <div><div class="card-title">IOC matches</div><div class="card-sub">findings matched against TI</div></div>
       <div style="display:flex;gap:6px">
-        <select id="ioc-type-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderIOCs()">
+        <select aria-label="Ioc Type Filter" id="ioc-type-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderIOCs()">
           <option value="">All types</option><option value="IP">IP</option><option value="DOMAIN">Domain</option><option value="CVE">CVE</option><option value="HASH">Hash</option><option value="URL">URL</option>
         </select>
       </div>
     </div>
     <div style="padding:8px 10px">
-      <input class="search-bar" id="ioc-search" placeholder="Search IOCs…" oninput="renderIOCs()">
+      <input aria-label="Search IOCs…" class="search-bar" id="ioc-search" placeholder="Search IOCs…" oninput="renderIOCs()">
       <div style="max-height:280px;overflow-y:auto" id="ioc-list"></div>
     </div>
   </div>
@@ -464,7 +464,7 @@ if(typeof VSPUXState!=='undefined'){
     /correlation/.test(path)  ? 'correlation' :
     /log_pipeline/.test(path) ? 'log_pipeline' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -952,7 +952,10 @@ if(typeof VSPUXState!=='undefined'){
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'threat_intel')      initThreatIntel();
     else if (PANEL === 'threat_hunt')  initThreatHunt();
     else if (PANEL === 'ueba')         initUEBA();

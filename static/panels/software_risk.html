@@ -178,11 +178,11 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height
 
 <div id="tab-list" style="display:none">
   <div class="filters">
-    <input class="filter-input" id="search-host" placeholder="Search hostname..." oninput="renderAssetTable()">
-    <select class="filter-select" id="filter-os" onchange="renderAssetTable()">
+    <input aria-label="Search hostname..." class="filter-input" id="search-host" placeholder="Search hostname..." oninput="renderAssetTable()">
+    <select aria-label="Filter Os" class="filter-select" id="filter-os" onchange="renderAssetTable()">
       <option value="">All OS</option><option value="windows">Windows</option><option value="linux">Linux</option>
     </select>
-    <select class="filter-select" id="filter-risk" onchange="renderAssetTable()">
+    <select aria-label="Filter Risk" class="filter-select" id="filter-risk" onchange="renderAssetTable()">
       <option value="">All risk</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="clean">Clean</option>
     </select>
     <span id="asset-count" style="font-size:10px;color:var(--t3);margin-left:auto"></span>
@@ -199,7 +199,7 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height
 
 <div id="tab-findings" style="display:none">
   <div class="filters">
-    <input class="filter-input" id="search-finding" placeholder="Search findings..." oninput="renderFindings()">
+    <input aria-label="Search findings..." class="filter-input" id="search-finding" placeholder="Search findings..." oninput="renderFindings()">
     <span id="findings-count" style="font-size:10px;color:var(--t3);margin-left:auto"></span>
   </div>
   <div id="findings-list"></div>
@@ -207,8 +207,8 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height
 
 <div id="tab-eol" style="display:none">
   <div class="filters">
-    <input class="filter-input" id="search-eol" placeholder="Search product..." oninput="renderEOL()">
-    <select class="filter-select" id="filter-eol-status" onchange="renderEOL()">
+    <input aria-label="Search product..." class="filter-input" id="search-eol" placeholder="Search product..." oninput="renderEOL()">
+    <select aria-label="Filter Eol Status" class="filter-select" id="filter-eol-status" onchange="renderEOL()">
       <option value="">All</option><option value="eol">EOL</option><option value="lts">LTS</option>
     </select>
   </div>
@@ -258,7 +258,7 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);line-height
       <div style="margin-bottom:14px">
         <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Agent token</label>
         <div style="display:flex;gap:8px">
-          <input class="filter-input" id="agent-token-display" style="flex:1;width:auto;font-family:var(--font-mono);font-size:10px" readonly value="Generating...">
+          <input aria-label="Agent Token Display" class="filter-input" id="agent-token-display" style="flex:1;width:auto;font-family:var(--font-mono);font-size:10px" readonly value="Generating...">
           <button class="btn btn-sm" onclick="copyToken()">Copy</button>
         </div>
       </div>
@@ -591,7 +591,7 @@ renderEOL();
     /scheduler/.test(path)     ? 'scheduler' :
     /network_flow/.test(path)  ? 'network_flow' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
 
   // ─── Toast (shared) ──────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1110,7 +1110,10 @@ renderEOL();
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'ai_advisor')         initAIAdvisor();
     else if (PANEL === 'ai_analyst')    initAIAnalyst();
     else if (PANEL === 'cicd')          initCICD();

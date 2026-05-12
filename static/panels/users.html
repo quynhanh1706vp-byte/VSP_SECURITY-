@@ -61,8 +61,8 @@ select.form-ctrl option{background:var(--bg2)}
     <div class="card-head">
       <div><div class="card-title">Users</div><div class="card-sub" id="users-sub">—</div></div>
       <div style="display:flex;gap:6px">
-        <input id="user-search" placeholder="Search users..." class="btn" style="width:160px;text-align:left;font-size:11px" oninput="renderUsers()">
-        <select id="role-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderUsers()">
+        <input aria-label="Search users..." id="user-search" placeholder="Search users..." class="btn" style="width:160px;text-align:left;font-size:11px" oninput="renderUsers()">
+        <select aria-label="Role Filter" id="role-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderUsers()">
           <option value="">All roles</option>
           <option value="admin">Admin</option>
           <option value="analyst">Analyst</option>
@@ -88,7 +88,7 @@ select.form-ctrl option{background:var(--bg2)}
   <div class="card">
     <div class="card-head">
       <div><div class="card-title">Audit log</div><div class="card-sub">user actions &middot; last 100 events</div></div>
-      <select id="audit-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderAudit()">
+      <select aria-label="Audit Filter" id="audit-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderAudit()">
         <option value="">All actions</option>
         <option value="login">Login</option>
         <option value="scan">Scan</option>
@@ -115,16 +115,16 @@ select.form-ctrl option{background:var(--bg2)}
     <div class="modal-head"><div class="modal-title" id="umod-title">New user</div><button class="modal-close" onclick="closeModal('user-modal')">&#10005;</button></div>
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group"><label class="form-label">Full name</label><input class="form-ctrl" id="u-name" placeholder="Jane Smith"></div>
-        <div class="form-group"><label class="form-label">Email</label><input class="form-ctrl" id="u-email" placeholder="jane@company.com" type="email"></div>
+        <div class="form-group"><label class="form-label">Full name</label><input aria-label="Jane Smith" class="form-ctrl" id="u-name" placeholder="Jane Smith"></div>
+        <div class="form-group"><label class="form-label">Email</label><input aria-label="jane@company.com" class="form-ctrl" id="u-email" placeholder="jane@company.com" type="email"></div>
       </div>
-      <div class="form-group"><label class="form-label">Password</label><input class="form-ctrl" id="u-pass" placeholder="Min 12 chars" type="password"></div>
+      <div class="form-group"><label class="form-label">Password</label><input aria-label="Min 12 chars" class="form-ctrl" id="u-pass" placeholder="Min 12 chars" type="password"></div>
       <div class="form-group">
         <label class="form-label">Role</label>
         <div class="role-grid" id="role-picker"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Clearance level</label>
+        <label class="form-label" for="u-clearance">Clearance level</label>
         <select class="form-ctrl" id="u-clearance">
           <option value="UNCLASS">UNCLASSIFIED</option>
           <option value="CUI">CUI</option>
@@ -143,15 +143,15 @@ select.form-ctrl option{background:var(--bg2)}
   <div class="modal">
     <div class="modal-head"><div class="modal-title" id="kmod-title">New API key</div><button class="modal-close" onclick="closeModal('key-modal')">&#10005;</button></div>
     <div class="modal-body" id="kmod-body">
-      <div class="form-group"><label class="form-label">Key name</label><input class="form-ctrl" id="k-name" placeholder="e.g. CI/CD pipeline"></div>
+      <div class="form-group"><label class="form-label">Key name</label><input aria-label="e.g. CI/CD pipeline" class="form-ctrl" id="k-name" placeholder="e.g. CI/CD pipeline"></div>
       <div class="form-group"><label class="form-label">Permissions</label>
         <div class="perm-list">
-          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" id="p-scan" checked> Scans</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:10px"><input type="checkbox" id="p-read"> Read-only</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:10px"><input type="checkbox" id="p-report"> Reports</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input aria-label="P Scan" type="checkbox" id="p-scan" checked> Scans</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:10px"><input aria-label="P Read" type="checkbox" id="p-read"> Read-only</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:10px"><input aria-label="P Report" type="checkbox" id="p-report"> Reports</label>
         </div>
       </div>
-      <div class="form-group"><label class="form-label">Expires</label>
+      <div class="form-group"><label class="form-label" for="k-expires">Expires</label>
         <select class="form-ctrl" id="k-expires">
           <option value="30">30 days</option>
           <option value="90" selected>90 days</option>
@@ -491,7 +491,7 @@ if(typeof VSPUXState!=='undefined'){VSPUXState.skeleton('#users-tbody',{rows:6})
     /integrations\.html/.test(path)  ? 'integrations' :
     /sso_admin\.html/.test(path)     ? 'sso_admin' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V4] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V4] Loaded for panel:', PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -837,7 +837,10 @@ if(typeof VSPUXState!=='undefined'){VSPUXState.skeleton('#users-tbody',{rows:6})
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'users')             initUsers();
     else if (PANEL === 'settings')     initSettings();
     else if (PANEL === 'integrations') initIntegrations();

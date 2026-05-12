@@ -444,7 +444,7 @@ html,body{height:100%;background:var(--bg0);color:var(--t1);font-family:var(--fo
     </div>
     <div class="chat-foot">
       <div class="input-row">
-        <textarea class="chat-input" id="chat-input" placeholder="Hỏi về incidents, CVEs, findings, threats... (Enter để gửi)" rows="2" onkeydown="handleKey(event)"></textarea>
+        <textarea aria-label="Hỏi về incidents, CVEs, findings, threats... (Enter để gửi)" class="chat-input" id="chat-input" placeholder="Hỏi về incidents, CVEs, findings, threats... (Enter để gửi)" rows="2" onkeydown="handleKey(event)"></textarea>
         <button class="send-btn" onclick="sendMessage()">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2L7 9M14 2L9 14 7 9 2 7l12-5z"/></svg>
         </button>
@@ -572,7 +572,7 @@ html,body{height:100%;background:var(--bg0);color:var(--t1);font-family:var(--fo
   <div class="tab-panel" id="panel-hunt">
     <div class="hunt-wrap">
       <div class="hunt-search">
-        <input class="hunt-input" placeholder="Search IOCs, hashes, IPs, domains..." id="hunt-search-input">
+        <input aria-label="Search IOCs, hashes, IPs, domains..." class="hunt-input" placeholder="Search IOCs, hashes, IPs, domains..." id="hunt-search-input">
         <button class="btn btn-ghost" onclick="runHunt()">Hunt →</button>
         <button class="btn btn-ai" onclick="aiHunt()">◈ AI Hunt</button>
       </div>
@@ -1170,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     /scheduler/.test(path)     ? 'scheduler' :
     /network_flow/.test(path)  ? 'network_flow' : 'unknown';
 
-  console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL);
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
 
   // ─── Toast (shared) ──────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1689,7 +1689,10 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
 
   // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
   function init() {
+    if (_initDone) return;
+    _initDone = true;
     if (PANEL === 'ai_advisor')         initAIAdvisor();
     else if (PANEL === 'ai_analyst')    initAIAnalyst();
     else if (PANEL === 'cicd')          initCICD();

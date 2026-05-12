@@ -28,7 +28,7 @@
   }
   function toast(m, k) {
     if (typeof window.showToast === 'function') return window.showToast(m, k || 'info');
-    console.log('[email]', k || 'info', m);
+    (window.VSP_DEBUG && console.log('[email]', k || 'info', m));
   }
   async function api(path, opts) {
     const ctrl = new AbortController();
@@ -84,25 +84,25 @@
           <div>
             <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">SMTP server</div>
             <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 10px;align-items:center;font-size:12px">
-              <label style="color:var(--t3)">Host</label>
+              <label style="color:var(--t3)" for="em-f-host">Host</label>
               <input id="em-f-host" class="form-ctrl" placeholder="127.0.0.1" style="font-family:var(--font-mono);font-size:11px">
 
-              <label style="color:var(--t3)">Port</label>
+              <label style="color:var(--t3)" for="em-f-port">Port</label>
               <input id="em-f-port" type="number" class="form-ctrl" placeholder="1025" style="font-family:var(--font-mono);font-size:11px">
 
-              <label style="color:var(--t3)">Username</label>
+              <label style="color:var(--t3)" for="em-f-user">Username</label>
               <input id="em-f-user" class="form-ctrl" placeholder="(blank for anon)" style="font-family:var(--font-mono);font-size:11px">
 
-              <label style="color:var(--t3)">Password</label>
+              <label style="color:var(--t3)" for="em-f-pass">Password</label>
               <input id="em-f-pass" type="password" class="form-ctrl" placeholder="********" style="font-family:var(--font-mono);font-size:11px">
 
-              <label style="color:var(--t3)">From</label>
+              <label style="color:var(--t3)" for="em-f-from">From</label>
               <input id="em-f-from" class="form-ctrl" placeholder="vsp@vsp.local" style="font-family:var(--font-mono);font-size:11px">
 
-              <label style="color:var(--t3)">From name</label>
+              <label style="color:var(--t3)" for="em-f-fromname">From name</label>
               <input id="em-f-fromname" class="form-ctrl" placeholder="VSP DevSecOps">
 
-              <label style="color:var(--t3)">Encryption</label>
+              <label style="color:var(--t3)" for="em-f-enc">Encryption</label>
               <select id="em-f-enc" class="form-ctrl" style="font-size:11px">
                 <option value="none">None (plain SMTP)</option>
                 <option value="starttls">STARTTLS (port 587)</option>
@@ -120,7 +120,7 @@
           <div>
             <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Send test email</div>
             <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 10px;align-items:center;font-size:12px">
-              <label style="color:var(--t3)">To</label>
+              <label style="color:var(--t3)" for="em-test-to">To</label>
               <input id="em-test-to" class="form-ctrl" placeholder="you@example.com" style="font-family:var(--font-mono);font-size:11px">
             </div>
             <div style="margin-top:14px;display:flex;gap:6px">
@@ -344,21 +344,21 @@
         </div>
         <div class="modal-body" style="overflow:auto;flex:1">
           <div class="form-group">
-            <label class="form-label">Name (snake_case, used in /send body)</label>
+            <label class="form-label" for="em-tm-name">Name (snake_case, used in /send body)</label>
             <input id="em-tm-name" class="form-ctrl" style="font-family:var(--font-mono);font-size:12px">
           </div>
           <div class="form-group">
-            <label class="form-label">Subject</label>
+            <label class="form-label" for="em-tm-subject">Subject</label>
             <input id="em-tm-subject" class="form-ctrl" style="font-family:var(--font-mono);font-size:12px">
           </div>
           <div class="form-group">
-            <label class="form-label">Body</label>
+            <label class="form-label" for="em-tm-body">Body</label>
             <textarea id="em-tm-body" class="form-ctrl" rows="12"
                       style="font-family:var(--font-mono);font-size:11px;white-space:pre"></textarea>
           </div>
           <div class="form-group" style="display:flex;align-items:center;gap:8px">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
-              <input type="checkbox" id="em-tm-html"> HTML body (use Content-Type text/html)
+              <input aria-label="Em Tm Html" type="checkbox" id="em-tm-html"> HTML body (use Content-Type text/html)
             </label>
           </div>
           <div style="padding:10px;background:var(--bg3);border-radius:4px;font-size:11px;color:var(--t2)">
@@ -443,5 +443,5 @@
   else boot();
 
   window.VSPEmail = { refresh: refreshAll, api, apiBase: API_BASE };
-  console.log('[vsp-email] panel wired — backend:', API_BASE);
+  (window.VSP_DEBUG && console.log('[vsp-email] panel wired — backend:', API_BASE));
 })();

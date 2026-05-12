@@ -38,7 +38,7 @@
   }
   function toast(m, k) {
     if (typeof window.showToast === 'function') return window.showToast(m, k || 'info');
-    console.log('[scheduler]', k || 'info', m);
+    (window.VSP_DEBUG && console.log('[scheduler]', k || 'info', m));
   }
   async function api(path, opts) {
     const ctrl = new AbortController();
@@ -176,8 +176,8 @@
           </div>
         </div>
         <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 200px 160px;gap:8px">
-          <input id="sch-search" class="form-ctrl" placeholder="Search job name…" style="font-size:12px">
-          <select id="sch-type" class="form-ctrl" style="font-size:12px">
+          <input aria-label="Search job name…" id="sch-search" class="form-ctrl" placeholder="Search job name…" style="font-size:12px">
+          <select aria-label="Sch Type" id="sch-type" class="form-ctrl" style="font-size:12px">
             <option value="">All types</option>
             <option value="scan_image">Scan image</option>
             <option value="sign_image">Sign image</option>
@@ -187,7 +187,7 @@
             <option value="sbom_export">SBOM export</option>
             <option value="webhook">Webhook</option>
           </select>
-          <select id="sch-state" class="form-ctrl" style="font-size:12px">
+          <select aria-label="Sch State" id="sch-state" class="form-ctrl" style="font-size:12px">
             <option value="">All states</option>
             <option value="enabled">Enabled only</option>
             <option value="disabled">Disabled only</option>
@@ -309,11 +309,11 @@
         </div>
         <div class="modal-body" style="overflow:auto;flex:1">
           <div class="form-group">
-            <label class="form-label">Name</label>
+            <label class="form-label" for="sch-f-name">Name</label>
             <input class="form-ctrl" id="sch-f-name" placeholder="e.g. Nightly Trivy scan">
           </div>
           <div class="form-group">
-            <label class="form-label">Job type</label>
+            <label class="form-label" for="sch-f-type">Job type</label>
             <select class="form-ctrl" id="sch-f-type">
               <option value="scan_image">🔍 Scan image (Trivy)</option>
               <option value="sign_image">✍ Sign image (Cosign)</option>
@@ -325,7 +325,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Target</label>
+            <label class="form-label" for="sch-f-target">Target</label>
             <input class="form-ctrl" id="sch-f-target"
                    placeholder="image:tag, URL, or 'all' depending on type"
                    style="font-family:var(--font-mono);font-size:11px">
@@ -343,13 +343,13 @@
             <div id="sch-picker" style="background:var(--bg3);padding:12px;border-radius:4px;margin-bottom:8px">
               <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;font-size:12px">
                 <input type="radio" name="sch-mode" id="sch-m-min" value="minutes">
-                <label for="sch-m-min">Every <input id="sch-m-min-n" type="number" min="1" max="59" value="15" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"> minutes</label>
+                <label for="sch-m-min">Every <input aria-label="Sch M Min N" id="sch-m-min-n" type="number" min="1" max="59" value="15" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"> minutes</label>
 
                 <input type="radio" name="sch-mode" id="sch-m-hour" value="hours">
-                <label for="sch-m-hour">Every <input id="sch-m-hour-n" type="number" min="1" max="23" value="2" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"> hours</label>
+                <label for="sch-m-hour">Every <input aria-label="Sch M Hour N" id="sch-m-hour-n" type="number" min="1" max="23" value="2" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"> hours</label>
 
                 <input type="radio" name="sch-mode" id="sch-m-daily" value="daily" checked>
-                <label for="sch-m-daily">Daily at <input id="sch-m-daily-t" type="time" value="02:00" style="background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"></label>
+                <label for="sch-m-daily">Daily at <input aria-label="Sch M Daily T" id="sch-m-daily-t" type="time" value="02:00" style="background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"></label>
 
                 <input type="radio" name="sch-mode" id="sch-m-weekly" value="weekly">
                 <label for="sch-m-weekly">Weekly on
@@ -360,16 +360,16 @@
                       </label>
                     `).join('')}
                   </span>
-                  at <input id="sch-m-weekly-t" type="time" value="02:00" style="background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px">
+                  at <input aria-label="Sch M Weekly T" id="sch-m-weekly-t" type="time" value="02:00" style="background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px">
                 </label>
 
                 <input type="radio" name="sch-mode" id="sch-m-monthly" value="monthly">
-                <label for="sch-m-monthly">Monthly on day <input id="sch-m-monthly-d" type="number" min="1" max="31" value="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"> at <input id="sch-m-monthly-t" type="time" value="02:00" style="background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"></label>
+                <label for="sch-m-monthly">Monthly on day <input aria-label="Sch M Monthly D" id="sch-m-monthly-d" type="number" min="1" max="31" value="1" style="width:50px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"> at <input aria-label="Sch M Monthly T" id="sch-m-monthly-t" type="time" value="02:00" style="background:var(--bg2);border:1px solid var(--border);color:var(--t1);padding:2px 4px;border-radius:3px"></label>
               </div>
             </div>
 
             <div id="sch-raw" style="display:none;background:var(--bg3);padding:12px;border-radius:4px;margin-bottom:8px">
-              <input class="form-ctrl" id="sch-f-cron"
+              <input aria-label="0 2 * * *  (minute hour dom month dow)" class="form-ctrl" id="sch-f-cron"
                      placeholder="0 2 * * *  (minute hour dom month dow)"
                      style="font-family:var(--font-mono);font-size:13px">
               <div style="font-size:10px;color:var(--t3);margin-top:6px">
@@ -387,13 +387,13 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Notes (optional)</label>
+            <label class="form-label" for="sch-f-notes">Notes (optional)</label>
             <input class="form-ctrl" id="sch-f-notes" placeholder="Free-form note">
           </div>
 
           <div class="form-group" style="display:flex;align-items:center;gap:8px">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-              <input type="checkbox" id="sch-f-enabled" checked>
+              <input aria-label="Sch F Enabled" type="checkbox" id="sch-f-enabled" checked>
               <span>Enabled (start scheduling immediately)</span>
             </label>
           </div>
@@ -919,5 +919,5 @@
     runNow, toggle, showRun: showRunDetail,
     refresh: refreshAll, api, apiBase: API_BASE,
   };
-  console.log('[vsp-scheduler] panel wired — backend:', API_BASE);
+  (window.VSP_DEBUG && console.log('[vsp-scheduler] panel wired — backend:', API_BASE));
 })();

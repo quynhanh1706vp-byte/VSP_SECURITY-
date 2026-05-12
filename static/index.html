@@ -38,7 +38,7 @@ window.__esc = __esc;
 <!-- QUICK SEARCH OVERLAY -->
 <div id="qs-overlay" onclick="if(event.target===this)closeQS()">
   <div id="qs-box">
-    <input id="qs-input" placeholder="Search panels, findings, runs… (↑↓ Enter Esc)" autocomplete="off">
+    <input aria-label="Search panels, findings, runs… (↑↓ Enter Esc)" id="qs-input" placeholder="Search panels, findings, runs… (↑↓ Enter Esc)" autocomplete="off">
     <div id="qs-results"></div>
     <div id="qs-hint-bar">
       <span class="qs-hint-key"><kbd>↑↓</kbd> navigate</span>
@@ -62,8 +62,8 @@ window.__esc = __esc;
     <div class="modal-body">
       <div class="g2 mb14">
         <div class="form-group mb8">
-          <label class="form-label">Status</label>
-          <select aria-label="Remediation status filter" id="rem-status" class="form-ctrl">
+          <label class="form-label" for="rem-status">Status</label>
+          <select id="rem-status" class="form-ctrl">
             <option value="open">Open</option>
             <option value="in_progress">In progress</option>
             <option value="resolved">Resolved</option>
@@ -73,8 +73,8 @@ window.__esc = __esc;
           </select>
         </div>
         <div class="form-group mb8">
-          <label class="form-label">Priority</label>
-          <select aria-label="Remediation priority" id="rem-priority" class="form-ctrl">
+          <label class="form-label" for="rem-priority">Priority</label>
+          <select id="rem-priority" class="form-ctrl">
             <option value="P1">P1 — Critical</option>
             <option value="P2">P2 — High</option>
             <option value="P3">P3 — Medium</option>
@@ -83,16 +83,16 @@ window.__esc = __esc;
         </div>
       </div>
       <div class="form-group mb8">
-        <label class="form-label">Assignee</label>
+        <label class="form-label" for="rem-assignee">Assignee</label>
         <input id="rem-assignee" class="form-ctrl" placeholder="email or name">
       </div>
       <div class="form-group mb8">
-        <label class="form-label">Ticket URL</label>
+        <label class="form-label" for="rem-ticket">Ticket URL</label>
         <input id="rem-ticket" class="form-ctrl" placeholder="https://jira.example.com/VSP-001">
       </div>
       <div class="form-group">
-        <label class="form-label">Notes</label>
-        <textarea aria-label="Remediation notes" id="rem-notes" class="form-ctrl" rows="3" style="resize:vertical"></textarea>
+        <label class="form-label" for="rem-notes">Notes</label>
+        <textarea id="rem-notes" class="form-ctrl" rows="3" style="resize:vertical"></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -131,8 +131,8 @@ window.__esc = __esc;
       <!-- Mode + Profile -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="form-group mb0">
-          <label class="form-label">Mode</label>
-          <select aria-label="Scan mode" id="scanMode" class="form-ctrl" onchange="updateScanTools()">
+          <label class="form-label" for="scanMode">Mode</label>
+          <select id="scanMode" class="form-ctrl" onchange="updateScanTools()">
             <option value="SAST">SAST — Source code</option>
             <option value="SCA">SCA — Dependencies</option>
             <option value="SECRETS">SECRETS — Credentials</option>
@@ -144,8 +144,8 @@ window.__esc = __esc;
           </select>
         </div>
         <div class="form-group mb0">
-          <label class="form-label">Profile</label>
-          <select aria-label="Scan profile" id="scanProfile" class="form-ctrl">
+          <label class="form-label" for="scanProfile">Profile</label>
+          <select id="scanProfile" class="form-ctrl">
             <option value="FAST">FAST — quick scan</option>
             <option value="STANDARD" selected>STANDARD — balanced</option>
             <option value="THOROUGH">THOROUGH — deep</option>
@@ -157,14 +157,14 @@ window.__esc = __esc;
       <!-- Source path -->
       <div class="form-group" id="scanSrcGroup" style="margin-bottom:10px">
         <label class="form-label">Source path <span id="scanSrcReq" style="color:var(--red)">*</span></label>
-        <input id="scanSrc" class="form-ctrl" placeholder="/home/test/Data/GOLANG_VSP" value="/home/test/Data/GOLANG_VSP">
+        <input aria-label="/home/test/Data/GOLANG_VSP" id="scanSrc" class="form-ctrl" placeholder="/home/test/Data/GOLANG_VSP" value="/home/test/Data/GOLANG_VSP">
         <div style="font-size:9px;color:var(--t3);margin-top:3px">Local path · Git URL · empty = dùng đường dẫn mặc định</div>
       </div>
 
       <!-- Target URL (DAST/NETWORK only) -->
       <div class="form-group" id="scanUrlGroup" style="margin-bottom:10px;display:none">
         <label class="form-label">Target URL <span style="color:var(--red)">*</span></label>
-        <input id="scanUrl" class="form-ctrl" placeholder="https://example.com">
+        <input aria-label="https://example.com" id="scanUrl" class="form-ctrl" placeholder="https://example.com">
         <div style="font-size:9px;color:var(--t3);margin-top:3px">Required for DAST/NETWORK · Web app or service endpoint</div>
       </div>
 
@@ -731,15 +731,15 @@ window.addEventListener('DOMContentLoaded', function(){
             <button class="chpw-close" onclick="document.getElementById('chpw-modal').classList.remove('open')">✕</button>
           </div>
           <div class="chpw-field">
-            <label class="chpw-label">Current password</label>
+            <label class="chpw-label" for="chpw-current">Current password</label>
             <input class="chpw-input" type="password" id="chpw-current" placeholder="••••••••">
           </div>
           <div class="chpw-field">
-            <label class="chpw-label">New password</label>
+            <label class="chpw-label" for="chpw-new">New password</label>
             <input class="chpw-input" type="password" id="chpw-new" placeholder="min 8 characters">
           </div>
           <div class="chpw-field">
-            <label class="chpw-label">Confirm new password</label>
+            <label class="chpw-label" for="chpw-confirm">Confirm new password</label>
             <input class="chpw-input" type="password" id="chpw-confirm" placeholder="••••••••">
           </div>
           <div class="chpw-error" id="chpw-error"></div>
@@ -978,7 +978,7 @@ window.addEventListener('DOMContentLoaded', function(){
           <button class="log-filter-btn" onclick="setLogFilter('ERROR',this)">ERROR</button>
           <button class="log-filter-btn" onclick="setLogFilter('DONE',this)">DONE</button>
         </div>
-        <input class="filter-input" id="log-search" placeholder="Search logs…" style="max-width:200px" oninput="filterLogs()">
+        <input aria-label="Search logs…" class="filter-input" id="log-search" placeholder="Search logs…" style="max-width:200px" oninput="filterLogs()">
         <span id="log-count" class="mono-sm" style="margin-left:auto">17 lines</span>
         <label class="flex gap8 f10 c-t3" style="align-items:center;cursor:pointer">
           <input aria-label="Auto-scroll scan log" type="checkbox" id="log-autoscroll" checked style="accent-color:var(--amber)"> Auto-scroll
@@ -1132,7 +1132,7 @@ window.addEventListener('DOMContentLoaded', function(){
           <option>codeql</option><option>grype</option><option>nuclei</option>
           <option>nikto</option><option>trufflehog</option>
         </select>
-        <input class="filter-input" id="filter-search" placeholder="Search findings…">
+        <input aria-label="Search findings…" class="filter-input" id="filter-search" placeholder="Search findings…">
         <button class="btn btn-primary" onclick="loadFindings(0)">Filter</button>
         <button class="btn btn-ghost" onclick="exportFindingsCSV()">↓ CSV</button>
         <span class="mono-sm c-t3" id="findings-total-lbl">— findings</span>
@@ -2548,9 +2548,9 @@ async function runEval() {
       credentials: 'same-origin',
       body: JSON.stringify({ repo: 'current' })
     });
-    console.log('[runEval v3] HTTP', resp.status);
+    (window.VSP_DEBUG && console.log('[runEval v3] HTTP', resp.status));
     const r = await resp.json().catch(() => ({}));
-    console.log('[runEval v3] body:', r);
+    (window.VSP_DEBUG && console.log('[runEval v3] body:', r));
 
     if (!resp.ok) {
       setMsg('var(--red)', '✗ HTTP ' + resp.status + ' — ' + (r.error || resp.statusText));
@@ -2748,8 +2748,8 @@ function _setupCompFilters() {
   fb.id = 'comp-filter-bar';
   fb.className = 'filter-bar';
   fb.style.cssText = 'padding:10px 14px;border-bottom:1px solid var(--border)';
-  fb.innerHTML = '<input class="filter-input" id="comp-search" placeholder="Search ID, family, control…" style="flex:1;max-width:300px" oninput="_renderCompTable(this.value, document.getElementById(\'comp-status-filter\').value)">'
-    +'<select class="filter-select" id="comp-status-filter" onchange="_renderCompTable(document.getElementById(\'comp-search\').value, this.value)">'
+  fb.innerHTML = '<input aria-label="Search ID, family, control…" class="filter-input" id="comp-search" placeholder="Search ID, family, control…" style="flex:1;max-width:300px" oninput="_renderCompTable(this.value, document.getElementById(\'comp-status-filter\').value)">'
+    +'<select aria-label="Comp Status Filter" class="filter-select" id="comp-status-filter" onchange="_renderCompTable(document.getElementById(\'comp-search\').value, this.value)">'
     +'<option value="">All statuses</option>'
     +'<option value="assessed">Assessed</option>'
     +'<option value="not_assessed">Not assessed</option>'
@@ -3987,7 +3987,7 @@ async function loadRunsDropdown() {
     }
     const d = await r.json();
     const runs = d.runs || [];
-    console.log('[scanlog] received', runs.length, 'runs');
+    (window.VSP_DEBUG && console.log('[scanlog] received', runs.length, 'runs'));
     if (runs.length === 0) {
       sel.innerHTML = '<option value="">— no runs yet —</option>';
       _scanLogClearStaticData('No scan runs yet. Click + Scan to trigger one.');
@@ -5611,9 +5611,9 @@ window.runEval = async function() {
       credentials: 'same-origin',
       body: JSON.stringify({repo:'current'})
     });
-    console.log('[runEval v4] HTTP', r.status);
+    (window.VSP_DEBUG && console.log('[runEval v4] HTTP', r.status));
     var d = await r.json().catch(function(){ return {}; });
-    console.log('[runEval v4] body:', d);
+    (window.VSP_DEBUG && console.log('[runEval v4] body:', d));
     if (!r.ok) {
       el.innerHTML = '<span style="color:var(--red);font-weight:700">✗ HTTP '+r.status+'</span> · '+(d.error || r.statusText || '');
       return;
@@ -5695,23 +5695,23 @@ var modalHTML = '<div class="modal-overlay" id="nr-modal">'
   + '</div>'
   + '<div class="modal-body">'
   + '<div class="form-group mb8"><label class="form-label">Rule name *</label>'
-  + '<input id="nr-name" class="form-ctrl" placeholder="e.g. Block High Findings"></div>'
+  + '<input aria-label="e.g. Block High Findings" id="nr-name" class="form-ctrl" placeholder="e.g. Block High Findings"></div>'
   + '<div class="form-group mb8"><label class="form-label">Description</label>'
-  + '<input id="nr-desc" class="form-ctrl" placeholder="What does this rule do?"></div>'
+  + '<input aria-label="What does this rule do?" id="nr-desc" class="form-ctrl" placeholder="What does this rule do?"></div>'
   + '<div class="g2 mb8">'
   + '<div class="form-group mb8"><label class="form-label">Block Critical</label>'
-  + '<select id="nr-critical" class="form-ctrl"><option value="true">Yes</option><option value="false">No</option></select></div>'
+  + '<select aria-label="Nr Critical" id="nr-critical" class="form-ctrl"><option value="true">Yes</option><option value="false">No</option></select></div>'
   + '<div class="form-group mb8"><label class="form-label">Block Secrets</label>'
-  + '<select id="nr-secrets" class="form-ctrl"><option value="true">Yes</option><option value="false">No</option></select></div>'
+  + '<select aria-label="Nr Secrets" id="nr-secrets" class="form-ctrl"><option value="true">Yes</option><option value="false">No</option></select></div>'
   + '</div>'
   + '<div class="g2 mb8">'
   + '<div class="form-group mb8"><label class="form-label">Max HIGH (-1=unlimited)</label>'
-  + '<input id="nr-maxhigh" class="form-ctrl" type="number" value="-1"></div>'
+  + '<input aria-label="Nr Maxhigh" id="nr-maxhigh" class="form-ctrl" type="number" value="-1"></div>'
   + '<div class="form-group mb8"><label class="form-label">Min score (0=no limit)</label>'
-  + '<input id="nr-minscore" class="form-ctrl" type="number" value="0"></div>'
+  + '<input aria-label="Nr Minscore" id="nr-minscore" class="form-ctrl" type="number" value="0"></div>'
   + '</div>'
   + '<div class="form-group mb8"><label class="form-label">Repo pattern</label>'
-  + '<input id="nr-repo" class="form-ctrl" value="*"></div>'
+  + '<input aria-label="Nr Repo" id="nr-repo" class="form-ctrl" value="*"></div>'
   + '<div id="nr-msg" style="font-size:11px;font-family:var(--font-mono);margin-top:8px"></div>'
   + '</div>'
   + '<div class="modal-footer">'
@@ -7266,7 +7266,7 @@ function _openRemEditModal(r) {
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
     +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Status</label>'
-    +'<select id="rem-em-status" class="filter-select" style="width:100%">'
+    +'<select aria-label="Rem Em Status" id="rem-em-status" class="filter-select" style="width:100%">'
     +'<option value="open"'+(r.status==="open"?" selected":"")+'>Open</option>'
     +'<option value="in_progress"'+(r.status==="in_progress"?" selected":"")+'>In Progress</option>'
     +'<option value="resolved"'+(r.status==="resolved"?" selected":"")+'>Resolved</option>'
@@ -7275,19 +7275,19 @@ function _openRemEditModal(r) {
     +'<option value="suppressed"'+(r.status==="suppressed"?" selected":"")+'>Suppressed</option>'
     +'</select></div>'
     +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Priority</label>'
-    +'<select id="rem-em-priority" class="filter-select" style="width:100%">'
+    +'<select aria-label="Rem Em Priority" id="rem-em-priority" class="filter-select" style="width:100%">'
     +'<option value="P1"'+(r.priority==="P1"?" selected":"")+'>P1 - Critical</option>'
     +'<option value="P2"'+(r.priority==="P2"?" selected":"")+'>P2 - High</option>'
     +'<option value="P3"'+(r.priority==="P3"?" selected":"")+'>P3 - Medium</option>'
     +'<option value="P4"'+(r.priority==="P4"?" selected":"")+'>P4 - Low</option>'
     +'</select></div>'
     +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Assignee</label>'
-    +'<input id="rem-em-assignee" class="filter-input" style="width:100%" value="'+(r.assignee||'')+'" placeholder="email or name"></div>'
+    +'<input aria-label="email or name" id="rem-em-assignee" class="filter-input" style="width:100%" value="'+(r.assignee||'')+'" placeholder="email or name"></div>'
     +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Ticket URL</label>'
-    +'<input id="rem-em-ticket" class="filter-input" style="width:100%" value="'+(r.ticket_url||'')+'" placeholder="https://jira/..."></div>'
+    +'<input aria-label="https://jira/..." id="rem-em-ticket" class="filter-input" style="width:100%" value="'+(r.ticket_url||'')+'" placeholder="https://jira/..."></div>'
     +'</div>'
     +'<div style="margin-bottom:14px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Notes</label>'
-    +'<textarea id="rem-em-notes" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--t1);font-size:12px;resize:vertical;min-height:70px">'+(r.notes||'')+'</textarea></div>'
+    +'<textarea aria-label="Rem Em Notes" id="rem-em-notes" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--t1);font-size:12px;resize:vertical;min-height:70px">'+(r.notes||'')+'</textarea></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end">'
     +'<button class="btn btn-ghost" onclick="document.getElementById(\'rem-edit-modal\').classList.remove(\'open\')">Cancel</button>'
     +'<button class="btn btn-primary" onclick="_saveRemediation(\''+( r.finding_id||r.id||'')+'\')">Save →</button>'
@@ -7514,12 +7514,12 @@ function _openInviteModal() {
       +'<button class="modal-close" onclick="document.getElementById(\'invite-modal\').classList.remove(\'open\')">✕</button></div>'
       +'<div class="modal-body" style="padding:16px">'
       +'<div style="margin-bottom:12px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Email <span style=\"color:var(--red)\">*</span></label>'
-      +'<input id="invite-email" class="filter-input" style="width:100%" placeholder="user@example.com" type="email"></div>'
+      +'<input aria-label="user@example.com" id="invite-email" class="filter-input" style="width:100%" placeholder="user@example.com" type="email"></div>'
       +'<div style="margin-bottom:12px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Password <span style=\"color:var(--red)\">*</span></label>'
-      +'<input id="invite-password" type="password" class="filter-input" style="width:100%" placeholder="min 8 characters">'
+      +'<input aria-label="min 8 characters" id="invite-password" type="password" class="filter-input" style="width:100%" placeholder="min 8 characters">'
       +'<div style=\"font-size:9px;color:var(--t3);margin-top:3px\">Required · min 8 characters</div></div>'
       +'<div style="margin-bottom:16px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Role</label>'
-      +'<select id="invite-role" class="filter-select" style="width:100%">'
+      +'<select aria-label="Invite Role" id="invite-role" class="filter-select" style="width:100%">'
       +'<option value="analyst">Analyst</option>'
       +'<option value="admin">Admin</option>'
       +'</select></div>'
@@ -8483,15 +8483,15 @@ function _openNewRuleModal() {
       <div class="modal-body">
         <div class="form-group mb8">
           <label class="form-label">Rule name <span style="color:var(--red)">*</span></label>
-          <input id="nr-name-gov" class="form-ctrl" placeholder="e.g. Block Critical Findings">
+          <input aria-label="e.g. Block Critical Findings" id="nr-name-gov" class="form-ctrl" placeholder="e.g. Block Critical Findings">
         </div>
         <div class="form-group mb8">
-          <label class="form-label">Description</label>
+          <label class="form-label" for="nr-desc-gov">Description</label>
           <input id="nr-desc-gov" class="form-ctrl" placeholder="What does this rule do?">
         </div>
         <div class="g2 mb8">
           <div class="form-group">
-            <label class="form-label">Severity threshold</label>
+            <label class="form-label" for="nr-sev-gov">Severity threshold</label>
             <select id="nr-sev-gov" class="form-ctrl">
               <option value="CRITICAL">CRITICAL</option>
               <option value="HIGH" selected>HIGH</option>
@@ -8500,12 +8500,12 @@ function _openNewRuleModal() {
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Max findings</label>
+            <label class="form-label" for="nr-max-gov">Max findings</label>
             <input id="nr-max-gov" class="form-ctrl" type="number" value="0" min="0">
           </div>
         </div>
         <div class="form-group mb8">
-          <label class="form-label">Action</label>
+          <label class="form-label" for="nr-action-gov">Action</label>
           <select id="nr-action-gov" class="form-ctrl">
             <option value="block">Block (FAIL gate)</option>
             <option value="warn">Warn only</option>
@@ -9263,7 +9263,7 @@ var _siemKPIpoll = setInterval(function() {
     if (window._vspPollTimer) clearInterval(window._vspPollTimer);
     const interval = window._vspFastMode ? FAST_INTERVAL : POLL_INTERVAL;
     window._vspPollTimer = setInterval(refreshDashboard, interval);
-    console.log(`[VSP] Poll interval: ${interval/1000}s`);
+    (window.VSP_DEBUG && console.log(`[VSP] Poll interval: ${interval/1000}s`));
   }
 
   // SSE scan_complete → fast mode 30s, sau đó về normal
@@ -9273,7 +9273,7 @@ var _siemKPIpoll = setInterval(function() {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'scan_complete') {
-          console.log('[VSP] SSE scan_complete → triggering refresh');
+          (window.VSP_DEBUG && console.log('[VSP] SSE scan_complete → triggering refresh'));
           window._vspFastMode = true;
           refreshDashboard();
           // Về normal sau 30s
@@ -9315,7 +9315,7 @@ var _siemKPIpoll = setInterval(function() {
   // Expose để debug
   window._vsp = { refreshDashboard, startSmartPoll };
 
-  console.log('[VSP] Smart polling loaded — interval: 30s, SSE-driven refresh: enabled');
+  (window.VSP_DEBUG && console.log('[VSP] Smart polling loaded — interval: 30s, SSE-driven refresh: enabled'));
 })();
 
 // ── MFA Login Flow ────────────────────────────────────────────────────────
@@ -9445,12 +9445,12 @@ function startMFATimer() {
     <h3>Two-factor authentication</h3>
     <p>Nhập mã 6 chữ số từ authenticator app của bạn</p>
     <div class="mfa-digits">
-      <input class="mfa-digit" type="number" id="md0" maxlength="1" oninput="mfaDigit(0)" onkeydown="mfaKey(0,event)" onpaste="mfaPaste(event)">
-      <input class="mfa-digit" type="number" id="md1" maxlength="1" oninput="mfaDigit(1)" onkeydown="mfaKey(1,event)">
-      <input class="mfa-digit" type="number" id="md2" maxlength="1" oninput="mfaDigit(2)" onkeydown="mfaKey(2,event)">
-      <input class="mfa-digit" type="number" id="md3" maxlength="1" oninput="mfaDigit(3)" onkeydown="mfaKey(3,event)">
-      <input class="mfa-digit" type="number" id="md4" maxlength="1" oninput="mfaDigit(4)" onkeydown="mfaKey(4,event)">
-      <input class="mfa-digit" type="number" id="md5" maxlength="1" oninput="mfaDigit(5)" onkeydown="mfaKey(5,event)">
+      <input aria-label="Md0" class="mfa-digit" type="number" id="md0" maxlength="1" oninput="mfaDigit(0)" onkeydown="mfaKey(0,event)" onpaste="mfaPaste(event)">
+      <input aria-label="Md1" class="mfa-digit" type="number" id="md1" maxlength="1" oninput="mfaDigit(1)" onkeydown="mfaKey(1,event)">
+      <input aria-label="Md2" class="mfa-digit" type="number" id="md2" maxlength="1" oninput="mfaDigit(2)" onkeydown="mfaKey(2,event)">
+      <input aria-label="Md3" class="mfa-digit" type="number" id="md3" maxlength="1" oninput="mfaDigit(3)" onkeydown="mfaKey(3,event)">
+      <input aria-label="Md4" class="mfa-digit" type="number" id="md4" maxlength="1" oninput="mfaDigit(4)" onkeydown="mfaKey(4,event)">
+      <input aria-label="Md5" class="mfa-digit" type="number" id="md5" maxlength="1" oninput="mfaDigit(5)" onkeydown="mfaKey(5,event)">
     </div>
     <div class="mfa-err" id="mfa-err"></div>
     <div class="mfa-timer">
@@ -9479,13 +9479,13 @@ function startMFATimer() {
 (function(){
   if (window.__VSP_NAV_BRIDGE__) return;
   window.__VSP_NAV_BRIDGE__ = true;
-  console.log('[VSP-NAV-BRIDGE] Loaded — listening for cross-nav messages');
+  (window.VSP_DEBUG && console.log('[VSP-NAV-BRIDGE] Loaded — listening for cross-nav messages'));
   window.addEventListener('message', function(e) {
     if (window.VSPOrigin && !window.VSPOrigin.check(e)) return;
     if (!e.data || e.data.type !== 'vsp-cross-nav') return;
     var panel = e.data.panel;
     var hint  = e.data.hint || {};
-    console.log('[VSP-NAV-BRIDGE] Received cross-nav:', panel, hint);
+    (window.VSP_DEBUG && console.log('[VSP-NAV-BRIDGE] Received cross-nav:', panel, hint));
 
     var nameMap = {
       'vuln_mgmt': 'vulnmgmt',
@@ -9509,7 +9509,7 @@ function startMFATimer() {
       }
       try {
         showPanel(target, navBtn);
-        console.log('[VSP-NAV-BRIDGE] showPanel("' + target + '") called');
+        (window.VSP_DEBUG && console.log('[VSP-NAV-BRIDGE] showPanel("' + target + '") called'));
       } catch(err) {
         console.warn('[VSP-NAV-BRIDGE] showPanel error:', err);
       }

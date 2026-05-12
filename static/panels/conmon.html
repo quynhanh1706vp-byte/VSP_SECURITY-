@@ -155,9 +155,9 @@
 <div class="modal-backdrop" id="modal-create">
  <div class="modal">
  <h3>New ConMon Schedule</h3>
- <label>Name</label>
+ <label for="ns-name">Name</label>
  <input id="ns-name" placeholder="Quarterly FedRAMP Re-scan">
- <label>Cadence</label>
+ <label for="ns-cadence">Cadence</label>
  <select id="ns-cadence">
  <option value="30d">30-day (FedRAMP Moderate)</option>
  <option value="60d">60-day (FedRAMP Moderate)</option>
@@ -165,7 +165,7 @@
  <option value="weekly">Weekly</option>
  <option value="daily">Daily</option>
  </select>
- <label>Scan Mode</label>
+ <label for="ns-mode">Scan Mode</label>
  <select id="ns-mode">
  <option value="FULL">FULL (all scanners)</option>
  <option value="FULL_SOC">FULL + SOC correlation</option>
@@ -173,7 +173,7 @@
  <option value="SCA">SCA only</option>
  <option value="IAC">IaC only</option>
  </select>
- <label>Target Path</label>
+ <label for="ns-target">Target Path</label>
  <input id="ns-target" placeholder="/path/to/repo or registry://image">
  <div class="actions">
  <button class="btn btn-ghost" onclick="closeCreateModal()">Cancel</button>
@@ -510,7 +510,7 @@ setInterval(loadAll, 60000);
  /conmon/.test(path) ? 'conmon' :
  /soar/.test(path) ? 'soar' : 'unknown';
 
- console.log('[VSP-UNI-POLISH] Loaded for panel:', PANEL);
+ (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH] Loaded for panel:', PANEL));
 
  // ─── Toast ────────────────────────────────────────────────────────────────
  let tcontainer = null;
