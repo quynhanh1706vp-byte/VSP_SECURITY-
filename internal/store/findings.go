@@ -24,6 +24,15 @@ type Finding struct {
 	Raw       json.RawMessage `json:"raw,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
 	Status    string          `json:"status"`
+	// FirstSeen / LastSeen come from a per-fingerprint aggregate
+	// (MIN/MAX(created_at) WHERE fingerprint=f.fingerprint AND
+	// tenant_id=f.tenant_id). They tell the operator whether this
+	// finding has been seen across multiple runs, even if those runs
+	// were weeks apart. Both are nullable in JSON because pre-2026-05-12
+	// callers that didn't request the join would receive null — the FE
+	// detail modal falls back to created_at in that case.
+	FirstSeen *time.Time `json:"first_seen,omitempty"`
+	LastSeen  *time.Time `json:"last_seen,omitempty"`
 }
 
 type FindingFilter struct {
@@ -82,10 +91,19 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 	db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM findings f LEFT JOIN remediations r ON r.finding_id=f.id AND r.tenant_id=f.tenant_id WHERE "+whereSQL, args...).Scan(&total) //nolint:errcheck
 
 	args = append(args, f.Limit, f.Offset)
+	// first_seen / last_seen come from a per-fingerprint aggregate
+	// scoped to the tenant. The (tenant_id, fingerprint) index added by
+	// migration 020 makes each correlated subquery a constant-time
+	// index lookup, so worst-case 2 × LIMIT extra index hits — cheap
+	// even at LIMIT=2000.
 	rows, err := db.pool.Query(ctx,
 		fmt.Sprintf(`SELECT f.id, f.run_id, f.tenant_id, f.tool, f.severity, f.rule_id,
 		             f.message, f.path, f.line_num, f.cwe, f.cvss, f.fix_signal, f.created_at,
-		             COALESCE(r.status::text, 'open') as remediation_status
+		             COALESCE(r.status::text, 'open') as remediation_status,
+		             (SELECT MIN(ff.created_at) FROM findings ff
+		              WHERE ff.tenant_id = f.tenant_id AND ff.fingerprint = f.fingerprint) AS first_seen,
+		             (SELECT MAX(ff.created_at) FROM findings ff
+		              WHERE ff.tenant_id = f.tenant_id AND ff.fingerprint = f.fingerprint) AS last_seen
 		             FROM findings f
 		             LEFT JOIN remediations r ON r.finding_id=f.id AND r.tenant_id=f.tenant_id
 		             WHERE %s
@@ -110,11 +128,15 @@ func (db *DB) ListFindings(ctx context.Context, tenantID string, f FindingFilter
 		var cvss *float64
 		var lineNum *int
 		var remStatus *string
+		var firstSeen, lastSeen *time.Time
 		if err := rows.Scan(&fn.ID, &fn.RunID, &fn.TenantID, &fn.Tool,
 			&fn.Severity, &ruleID, &message, &fpath,
-			&lineNum, &cwe, &cvss, &fixSignal, &fn.CreatedAt, &remStatus); err != nil {
+			&lineNum, &cwe, &cvss, &fixSignal, &fn.CreatedAt, &remStatus,
+			&firstSeen, &lastSeen); err != nil {
 			return nil, 0, err
 		}
+		fn.FirstSeen = firstSeen
+		fn.LastSeen = lastSeen
 		if ruleID != nil {
 			fn.RuleID = *ruleID
 		}

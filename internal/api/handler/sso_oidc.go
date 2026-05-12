@@ -65,6 +65,15 @@ func (h *SSOOIDCHandler) Providers(w http.ResponseWriter, r *http.Request) {
 		if p.Type == "" {
 			p.Type = "oidc"
 		}
+		// Reject template placeholders so we don't get the
+		// "discovery failed: YOUR-TENANT-ID 400" runtime error
+		// surfaced in the user's screenshot. The sso_admin.html
+		// dropdown pre-fills these strings as a hint; the user must
+		// replace them with the real org tenant id before saving.
+		if msg := validateProviderTemplate(p); msg != "" {
+			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": msg})
+			return
+		}
 		id, err := sso.CreateProvider(r.Context(), h.DB, p)
 		if err != nil {
 			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -107,6 +116,10 @@ func (h *SSOOIDCHandler) ProviderByID(w http.ResponseWriter, r *http.Request) {
 		}
 		p.ID = id
 		p.TenantID = tenantID
+		if msg := validateProviderTemplate(p); msg != "" {
+			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": msg})
+			return
+		}
 		if err := sso.UpdateProvider(r.Context(), h.DB, p); err != nil {
 			if err == sql.ErrNoRows {
 				writeJSON2(w, http.StatusNotFound, map[string]string{"error": "not found"})
@@ -386,4 +399,45 @@ func writeJSON2(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// validateProviderTemplate rejects placeholder strings shipped by the
+// SSO Admin "+ Add provider" preset dropdown (static/panels/sso_admin.html
+// lines 201-209). Without this guard, a user accepts the Azure / Okta /
+// Keycloak / Auth0 template, hits Save, and the row lands in DB with
+// the literal "YOUR-TENANT-ID" / "YOUR-ORG.okta.com" / "YOUR-REALM"
+// inside the issuer_url. Any subsequent /auth/sso/login?provider_id=N
+// then fails the OIDC discovery fetch with 400 — exactly the error the
+// user surfaced ("discovery failed: ... YOUR-TENANT-ID/v2.0/.well-known/
+// openid-configuration returned 400").
+//
+// Returns "" when the provider is OK to persist; otherwise a
+// user-facing message describing which field still has a placeholder.
+func validateProviderTemplate(p sso.Provider) string {
+	if p.Name == "" {
+		return "name is required"
+	}
+	if p.IssuerURL == "" {
+		return "issuer_url is required"
+	}
+	if p.ClientID == "" {
+		return "client_id is required"
+	}
+	tmplPatterns := []string{
+		"YOUR-TENANT-ID", "YOUR_TENANT_ID",
+		"YOUR-ORG", "YOUR_ORG",
+		"YOUR-REALM", "YOUR_REALM",
+		"YOUR-TENANT.auth0",
+		"example.com/oauth2/default",
+	}
+	for _, t := range tmplPatterns {
+		if strings.Contains(p.IssuerURL, t) {
+			return "issuer_url still contains placeholder " + t +
+				" — fill in your real tenant/org id before saving"
+		}
+		if strings.Contains(p.ClientID, t) {
+			return "client_id still contains placeholder " + t
+		}
+	}
+	return ""
 }
