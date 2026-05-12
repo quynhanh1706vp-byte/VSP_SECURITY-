@@ -24,7 +24,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -1142,14 +1141,18 @@ func main() {
 	// via runsH.EnqueueDirect — same code path used by manual /scan calls
 	// and the existing schedEngine. Tenant + target are taken from the
 	// schedule row; mode is mapped through pipeline.Mode/Profile types.
-	conmonRunTrigger := func(ctx context.Context, tenantID, mode, target string) (int64, error) {
-		rid := uuid.NewString()
+	conmonRunTrigger := func(ctx context.Context, tenantID, mode, target string) (string, int64, error) {
+		// Use the RID_SCHED_* prefix so the scheduler can later
+		// correlate this run with other cron-fired runs in the
+		// history table — same convention as scheduler.go line 67.
+		rid := fmt.Sprintf("RID_SCHED_%s_conmon", time.Now().Format("20060102_150405"))
 		runsH.EnqueueDirect(rid, tenantID, pipeline.Mode(mode), pipeline.Profile("default"), target, "")
-		// EnqueueDirect is fire-and-forget; we return 0 because the run ID
-		// is the rid string, but Schedule.LastRunID is *int64 (legacy schema).
-		// The drift detector reads runs by tenant+timestamp, not by this id.
-		_ = rid
-		return 0, nil
+		// The legacy int64 ID is always 0 (runs.id is UUID). The RID
+		// string is what the worker's post-scan hook will use to find
+		// this conmon_schedule and fill its last_verdict — see
+		// scheduler.go:163 (writes last_run_rid) +
+		// pipeline/worker.go (UPDATE conmon_schedules WHERE last_run_rid).
+		return rid, 0, nil
 	}
 	conmonSched := conmon.NewScheduler(p4DB, conmonRunTrigger)
 	go conmonSched.Start(ctx)

@@ -44,8 +44,14 @@ type Scheduler struct {
 }
 
 // RunTriggerFunc is the contract the gateway provides to actually
-// kick off a pipeline run. Returns the run ID.
-type RunTriggerFunc func(ctx context.Context, tenantID string, mode, targetPath string) (int64, error)
+// kick off a pipeline run.
+//
+// Returns the legacy int64 run ID for backwards compat (always 0 in
+// practice since the gateway's pipeline uses UUIDs) AND the new RID
+// string, which is what the conmon scheduler actually persists into
+// conmon_schedules.last_run_rid. The worker's post-scan hook then
+// matches on the RID to fill conmon_schedules.last_verdict.
+type RunTriggerFunc func(ctx context.Context, tenantID string, mode, targetPath string) (rid string, legacyID int64, err error)
 
 // NewScheduler constructs a Scheduler with sensible defaults.
 func NewScheduler(db *sql.DB, trigger RunTriggerFunc) *Scheduler {
@@ -138,7 +144,7 @@ func (s *Scheduler) triggerOne(ctx context.Context, sch Schedule) {
 		return
 	}
 
-	runID, err := s.RunTrigger(ctx, sch.TenantID, sch.Mode, sch.TargetPath)
+	rid, runID, err := s.RunTrigger(ctx, sch.TenantID, sch.Mode, sch.TargetPath)
 	if err != nil {
 		// Mark next_run_at to now+5min so we retry without locking us
 		// into infinite-failure loops.
@@ -150,16 +156,19 @@ func (s *Scheduler) triggerOne(ctx context.Context, sch Schedule) {
 		return
 	}
 
-	// Compute next run time based on cadence. We update last_run_id;
-	// last_verdict will be filled by the drift detector after the
-	// pipeline finishes.
+	// Compute next run time based on cadence. We update both:
+	//   - last_run_id (BIGINT, legacy) for callers reading the old column
+	//   - last_run_rid (TEXT, migration 021) which the worker post-scan
+	//     hook matches against to fill last_verdict when the run finishes
+	// Without the RID column the verdict update would have nothing to
+	// match against (runs.id is UUID, can't fit in BIGINT).
 	next := nextRun(time.Now(), sch.Cadence)
 	_, _ = s.DB.ExecContext(ctx, `
 		UPDATE conmon_schedules
-		SET last_run_id = $1, last_run_at = now(), next_run_at = $2,
-		    updated_at = now()
-		WHERE id = $3
-	`, runID, next, sch.ID)
+		SET last_run_id = $1, last_run_rid = $2, last_run_at = now(),
+		    next_run_at = $3, last_verdict = NULL, updated_at = now()
+		WHERE id = $4
+	`, runID, rid, next, sch.ID)
 }
 
 // nextRun computes the next scheduled time given a cadence string.

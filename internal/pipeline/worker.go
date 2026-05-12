@@ -238,6 +238,25 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	// Store gate reason for audit trail
 	h.DB.UpdateRunGateReason(dbCtx, payload.TenantID, payload.RID, eval.Reason)
 
+	// Post-scan: fill conmon_schedules.last_verdict for any ConMon
+	// schedule that fired this run. Pre-2026-05-12 conmon_schedules
+	// stored last_run_id BIGINT (always 0 — runs use UUIDs), so this
+	// hook had nothing to match against; migration 021 added
+	// last_run_rid TEXT and the conmon scheduler now writes the RID
+	// when firing. Match here and set the verdict from the gate
+	// decision — that's the user-visible "LAST VERDICT" column.
+	// Best-effort: a missing column on older deploys silently no-ops.
+	go func(tenantID, rid, verdict string) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, _ = h.DB.Pool().Exec(bgCtx, `
+			UPDATE conmon_schedules
+			   SET last_verdict = $1, updated_at = now()
+			 WHERE tenant_id    = $2
+			   AND last_run_rid = $3
+		`, verdict, tenantID, rid)
+	}(payload.TenantID, payload.RID, string(eval.Decision))
+
 	// Post-scan hook: auto-resolve orphan remediations whose finding fingerprint
 	// is no longer present in this newer same-mode run. Non-fatal — log and continue.
 	// Only triggers on PASS/WARN paths (FAILED runs return early above).
