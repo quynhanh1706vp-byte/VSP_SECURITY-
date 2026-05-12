@@ -3141,13 +3141,14 @@ function updateTicker() {
         // Exec panel
         var en=document.getElementById('exec-score-num'); if(en){en.textContent=score;en.className='score-num '+sc;}
         var eg=document.getElementById('exec-grade-static'); if(eg){eg.textContent=posture;eg.className='exec-grade '+sc;}
-        // KPI cards
+        // KPI cards — DASHBOARD KPIs are *all-time aggregate* (owned by
+        // loadDashKPIs which hits /vsp/findings/summary?scope=all).
+        // Pre-fix this ticker ALSO wrote the same cards from the LATEST
+        // RUN summary every 30s, so users saw the cards flap between
+        // 102,400 (all-time) and 2,059 (latest run). The ticker still
+        // owns "Latest run findings" in the Executive panel below
+        // (exec-* IDs are explicitly scoped to the latest run).
         var summ=d.summary||{};
-        var kpis={'d-critical':summ.CRITICAL||summ.critical||0,'d-high':summ.HIGH||summ.high||0,'d-medium':summ.MEDIUM||summ.medium||0,'d-total':summ.total||d.total_findings||0};
-        Object.entries(kpis).forEach(function(kv){
-          var el=document.getElementById(kv[0]); if(el) el.textContent=kv[1];
-        });
-        // Executive stats
         var exc={'exec-crit':summ.CRITICAL||0,'exec-high':summ.HIGH||0,'exec-med':summ.MEDIUM||0,'exec-total':d.total_findings||0};
         Object.entries(exc).forEach(function(kv){
           var el=document.getElementById(kv[0]); if(el) el.textContent=kv[1];
@@ -3902,9 +3903,11 @@ window.updateTicker = async function() {
       // Score ring
       var ringColor=gate==='PASS'?'#22c55e':gate==='WARN'?'#f59e0b':'#ef4444';
       if(typeof drawScoreRing==='function') drawScoreRing('score-ring', score, ringColor);
-      // Severity KPIs
-      var kpis={'d-critical':summ.CRITICAL||summ.critical||0,'d-high':summ.HIGH||summ.high||0,'d-medium':summ.MEDIUM||summ.medium||0,'d-low':summ.LOW||summ.low||0,'d-total':summ.total||d.total_findings||0};
-      Object.entries(kpis).forEach(function(kv){var e=document.getElementById(kv[0]);if(e)e.textContent=kv[1];});
+      // Severity KPIs intentionally NOT written here — loadDashKPIs
+      // owns d-critical / d-high / d-medium / d-low / d-total and pulls
+      // the all-time aggregate. Pre-fix this 30s ticker overwrote them
+      // with the latest-run summary, causing the cards to flap between
+      // ~102k (all-time) and ~2k (latest) every poll cycle.
     }
   } catch(e) {}
   try {
@@ -3923,6 +3926,16 @@ window.updateTicker = async function() {
       const d = await r3.json();
       var open = d.open || 0;
       var el = document.getElementById('d-rem'); if(el) el.textContent = open.toLocaleString();
+    }
+  } catch(e) {}
+  // 4. Refresh the all-time severity KPI cards. loadDashKPIs is the
+  //    single source of truth for d-critical/high/medium/low/total —
+  //    we delegate to it instead of duplicating the fetch here, which
+  //    would re-introduce the latest-run-vs-all-time flapping the user
+  //    saw between dashboard reloads.
+  try {
+    if (typeof window.loadDashKPIs === 'function') {
+      await window.loadDashKPIs();
     }
   } catch(e) {}
 };
