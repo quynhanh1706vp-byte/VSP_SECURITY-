@@ -1881,6 +1881,35 @@ let TOKEN = (function(){
   } catch(e) { localStorage.removeItem('vsp_token'); return ''; }
   return t;
 })();
+
+// Parent-side responder for the iframe panel token handshake.
+//
+// Background: each panel iframe (incident_response, oscal, attestation,
+// supply_chain, p4_compliance, …) loads vsp_iframe_bootstrap.js which
+// fires {type:'vsp:request_token'} at this parent window when it can't
+// find a token in its own URL / localStorage / parent.TOKEN access.
+// Pre-2026-05-12 the parent had NO listener for that message, so the
+// iframe sat on its in-memory Promise forever, every API call was
+// unauthenticated, and the console filled with 401s on /api/p4/...
+// endpoints (incidents, attestation, oscal, supply-chain, vex, ssdf,
+// etc).
+//
+// VSP-SEC-001 requires every postMessage listener to gate on
+// VSPOrigin.check; we use it here too. Reply targets the requesting
+// iframe's source window with our own origin (same-origin by CSP
+// frame-ancestors 'self'). If we don't have a token yet, we still
+// reply — with empty token — so the iframe stops waiting and can
+// show a "session expired" hint instead of hanging.
+window.addEventListener('message', function (e) {
+  if (window.VSPOrigin && !window.VSPOrigin.check(e)) return;
+  if (!e.data || e.data.type !== 'vsp:request_token') return;
+  try {
+    e.source.postMessage(
+      { type: 'vsp:token', token: window.TOKEN || '' },
+      window.location.origin
+    );
+  } catch (err) { /* iframe closed/cross-origin — drop */ }
+});
 let _currentPanel = 'dashboard';
 let _allLogs = [];
 let _logFilter = 'ALL';
