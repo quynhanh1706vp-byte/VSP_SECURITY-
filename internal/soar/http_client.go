@@ -148,24 +148,44 @@ func (c *SafeHTTPClient) Do(req *HTTPReq) (*HTTPResp, error) {
 }
 
 // checkSSRF rejects hostnames pointing to private/loopback/link-local addresses.
+//
+// Fail-closed posture: pre-fix this returned nil on DNS resolution
+// failure, which an attacker-controlled hostname can trigger (NXDOMAIN
+// at check time, A-record at send time — classic rebinding). Now any
+// resolution failure is treated as a denial. The literal-IP path is
+// also explicit so 127.0.0.1 / [::1] / 169.254.169.254 are caught
+// without needing the DNS round-trip.
 func checkSSRF(hostname string) error {
 	if hostname == "" {
 		return fmt.Errorf("%w: empty host", ErrSSRFBlocked)
 	}
 
-	// Reject obvious internal names
 	lh := strings.ToLower(hostname)
-	if lh == "localhost" || lh == "metadata.google.internal" ||
-		strings.HasSuffix(lh, ".internal") || strings.HasSuffix(lh, ".local") {
+	if lh == "localhost" || lh == "ip6-localhost" || lh == "ip6-loopback" ||
+		lh == "metadata.google.internal" || strings.HasPrefix(lh, "metadata.") ||
+		strings.HasSuffix(lh, ".internal") || strings.HasSuffix(lh, ".local") ||
+		strings.HasSuffix(lh, ".localhost") {
 		return fmt.Errorf("%w: %s", ErrSSRFBlocked, hostname)
 	}
 
-	// Resolve and check all IPs (multi-A record can dodge single-IP check)
+	// Literal IP — check directly, no DNS round-trip.
+	if ip := net.ParseIP(hostname); ip != nil {
+		if isPrivateIP(ip) {
+			return fmt.Errorf("%w: %s", ErrSSRFBlocked, hostname)
+		}
+		return nil
+	}
+
+	// Hostname — resolve and check every A/AAAA answer.
 	ips, err := net.LookupIP(hostname)
 	if err != nil {
-		// DNS failure — let request proceed (will fail later); some hosts
-		// resolve only via private DNS in tests
-		return nil
+		// Fail CLOSED: an attacker-controlled hostname that returns
+		// NXDOMAIN at validation and resolves at send time would
+		// otherwise slip past.
+		return fmt.Errorf("%w: %s DNS lookup failed: %v", ErrSSRFBlocked, hostname, err)
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("%w: %s has no DNS answers", ErrSSRFBlocked, hostname)
 	}
 	for _, ip := range ips {
 		if isPrivateIP(ip) {

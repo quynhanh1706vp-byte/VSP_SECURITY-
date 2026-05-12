@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
 	"strings"
@@ -104,7 +105,13 @@ func CSRFProtect(next http.Handler) http.Handler {
 			return
 		}
 		header := r.Header.Get(csrfHeader)
-		if header == "" || header != cookie.Value {
+		// Constant-time compare to deny byte-by-byte timing brute-force.
+		// Length-equal precheck is required because ConstantTimeCompare
+		// returns 0 (no match) immediately on length mismatch, which is
+		// itself non-secret information here; we only need the equality
+		// proof to leak no per-byte timing.
+		if header == "" || len(header) != len(cookie.Value) ||
+			subtle.ConstantTimeCompare([]byte(header), []byte(cookie.Value)) != 1 {
 			http.Error(w, "CSRF token mismatch", http.StatusForbidden)
 			return
 		}
