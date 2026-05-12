@@ -224,8 +224,18 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update last_login (best-effort)
-	go a.DB.UpdateLastLogin(r.Context(), user.ID) //nolint:errcheck
+	// Update last_login (best-effort). MUST use a fresh background
+	// context — r.Context() is cancelled the instant the response is
+	// flushed, so the goroutine racing the response writer would see
+	// "context canceled" before pgx executes the UPDATE. That bug
+	// made every users.last_login stay NULL → the Users panel showed
+	// "—" for every row regardless of actual login activity.
+	userID := user.ID
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = a.DB.UpdateLastLogin(ctx, userID)
+	}()
 
 	// Write audit log (best-effort)
 	LoginAttempts.WithLabelValues("success").Inc()

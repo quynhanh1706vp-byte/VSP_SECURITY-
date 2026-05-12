@@ -892,6 +892,26 @@ async function loadKPIs(){
 // ── SCHEDULER ──
 // (cleanup) MOCK_SCHEDULES removed — using real API
 
+// Format scheduler timestamps coming back from /api/v1/schedules.
+// BE returns ISO-8601 strings on the `next_run_at` / `last_run_at`
+// fields; legacy mock data shipped the same payload as `next_run` /
+// `last_run`. Accept either, render a human-friendly relative date,
+// fall back to the raw value if Date parsing fails, em-dash if absent.
+function fmtSchedTime(v){
+  if (!v) return '—';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return v;
+  var now = new Date();
+  var sec = (d.getTime() - now.getTime()) / 1000;
+  var abs = Math.abs(sec);
+  var dir = sec >= 0 ? 'in ' : '';
+  var suf = sec < 0 ? ' ago' : '';
+  if (abs < 60)   return dir + Math.round(abs) + 's' + suf;
+  if (abs < 3600) return dir + Math.round(abs/60) + 'm' + suf;
+  if (abs < 86400)return dir + Math.round(abs/3600) + 'h' + suf;
+  return d.toLocaleString();
+}
+
 async function loadSchedules(){
   var hasUX = typeof VSPUXState !== 'undefined';
   var hasData = false;
@@ -943,7 +963,7 @@ async function loadSchedules(){
         <div class="sched-name">${s.name}</div>
         <div class="sched-meta">${s.mode} · ${s.cron} · ${s.src}</div>
       </div>
-      <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:8px">${s.next_run||'—'}</span>
+      <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:8px">${fmtSchedTime(s.next_run||s.next_run_at)}</span>
       <span class="badge badge-${s.last_gate==='PASS'?'ok':s.last_gate==='FAIL'?'danger':'warn'}">${s.last_gate||'—'}</span>
       <button class="btn btn-sm" style="margin-left:8px" onclick="runScheduleNow('${s.id}','${s.name}')">▶ Now</button>
     </div>`).join('');
@@ -955,8 +975,8 @@ async function loadSchedules(){
     document.getElementById('upcoming-tbody').innerHTML = upcoming.map(s => `<tr>
       <td style="font-weight:500">${s.name}</td>
       <td><span class="badge badge-info">${s.mode}</span></td>
-      <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${s.next_run||'—'}</td>
-      <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron||'—'}</td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${fmtSchedTime(s.next_run||s.next_run_at)}</td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron||s.cron_expr||'—'}</td>
       <td><span class="badge badge-ok">Enabled</span></td>
     </tr>`).join('');
   }
