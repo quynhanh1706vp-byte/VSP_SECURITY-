@@ -1222,6 +1222,12 @@ func main() {
 		r.Get("/api/v1/vsp/run/{rid}/tail", runsH.Tail) // SSE live-tail
 		r.Get("/api/v1/vsp/runs", runsH.List)
 		r.Get("/api/v1/vsp/runs/index", runsH.Index)
+		// Alias for the detail endpoint — FE callers (cicd.html:2699
+		// remediation status poll) historically used the plural form
+		// /api/v1/vsp/runs/{rid} where the canonical route is the
+		// singular /api/v1/vsp/run/{rid}. Same handler, both spellings
+		// work. Cheaper than chasing every FE call site.
+		r.Get("/api/v1/vsp/runs/{rid}", runsH.Get)
 		r.With(ca.Middleware("runs-index", 10*time.Second)).Get("/api/v1/vsp/runs/index", runsH.Index)
 		// ── Batch scan ──────────────────────────────────────────────
 		batchH := newBatchHandler(db, runsH)
