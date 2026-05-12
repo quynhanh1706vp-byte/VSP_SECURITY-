@@ -841,57 +841,45 @@ func main() {
 	// (e.g. href="/vsp_enterprise_ui.css"). Without these routes they 404.
 	// Using ServeFile directly so Go's http package sets the correct
 	// Content-Type header (text/css, application/javascript) via extension.
-	r.Get("/vsp_enterprise_ui.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_enterprise_ui.css")
-	})
-	r.Get("/vsp_enterprise_navy_theme.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_enterprise_navy_theme.css")
-	})
-	r.Get("/vsp_upgrade_v100.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_upgrade_v100.js")
-	})
+	//
+	// Cache strategy: serveAssetWithRevalidate sets no-cache so the
+	// browser always sends If-Modified-Since and gets 304 when unchanged
+	// (ServeFile already sets Last-Modified from mtime). Pre-fix the
+	// user installed a fresh binary, restarted, hard-refreshed — and
+	// Chrome STILL served the old JS from its cache because the
+	// response had no Cache-Control at all, so the heuristic kicked in.
+	// "no-cache" doesn't mean "don't cache" — it means "revalidate
+	// every fetch", which is what we want for live-shipped assets.
+	serveAssetWithRevalidate := func(path string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+			http.ServeFile(w, r, path)
+		}
+	}
 
-	r.Get("/vsp_pro_100.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_pro_100.js")
-	})
-	r.Get("/vsp_pro_cwpp_realapi.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_pro_cwpp_realapi.js")
-	})
-	r.Get("/vsp_pro_supplychain_realapi.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_pro_supplychain_realapi.js")
-	})
+	r.Get("/vsp_enterprise_ui.css", serveAssetWithRevalidate("./static/vsp_enterprise_ui.css"))
+	r.Get("/vsp_enterprise_navy_theme.css", serveAssetWithRevalidate("./static/vsp_enterprise_navy_theme.css"))
+	r.Get("/vsp_upgrade_v100.js", serveAssetWithRevalidate("./static/vsp_upgrade_v100.js"))
+
+	r.Get("/vsp_pro_100.js", serveAssetWithRevalidate("./static/vsp_pro_100.js"))
+	r.Get("/vsp_pro_cwpp_realapi.js", serveAssetWithRevalidate("./static/vsp_pro_cwpp_realapi.js"))
+	r.Get("/vsp_pro_supplychain_realapi.js", serveAssetWithRevalidate("./static/vsp_pro_supplychain_realapi.js"))
 	// realapi companion for cspm / secrets_vault / tenants / observe panels.
 	// Adds 402-aware fetch + "Upgrade to PRO" overlay + Configure sub-panel.
-	r.Get("/vsp_pro_realapi.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_pro_realapi.js")
-	})
+	r.Get("/vsp_pro_realapi.js", serveAssetWithRevalidate("./static/vsp_pro_realapi.js"))
 	// Sidebar collapsible sections — chevron toggle per nav-section.
-	r.Get("/vsp_sidebar_collapse.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_sidebar_collapse.js")
-	})
+	r.Get("/vsp_sidebar_collapse.js", serveAssetWithRevalidate("./static/vsp_sidebar_collapse.js"))
 	// SIEM panel companion — runs inside each /panels/<id>.html iframe and
 	// reaches back into the parent VSP_PRO via same-origin window.parent
 	// to render Configure / Notifications buttons. Schemas live in the JS.
-	r.Get("/vsp_siem_companion.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_siem_companion.js")
-	})
-	r.Get("/vsp_sw_inventory_panel.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_sw_inventory_panel.js")
-	})
-	r.Get("/vsp_scheduler_panel.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_scheduler_panel.js")
-	})
-	r.Get("/vsp_email_panel.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_email_panel.js")
-	})
-	r.Get("/vsp_dast_panel.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_dast_panel.js")
-	})
+	r.Get("/vsp_siem_companion.js", serveAssetWithRevalidate("./static/vsp_siem_companion.js"))
+	r.Get("/vsp_sw_inventory_panel.js", serveAssetWithRevalidate("./static/vsp_sw_inventory_panel.js"))
+	r.Get("/vsp_scheduler_panel.js", serveAssetWithRevalidate("./static/vsp_scheduler_panel.js"))
+	r.Get("/vsp_email_panel.js", serveAssetWithRevalidate("./static/vsp_email_panel.js"))
+	r.Get("/vsp_dast_panel.js", serveAssetWithRevalidate("./static/vsp_dast_panel.js"))
 
 	// FEAT-04: vsp_uxstates.js — shared skeleton/empty/error UI module
-	r.Get("/vsp_uxstates.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_uxstates.js")
-	})
+	r.Get("/vsp_uxstates.js", serveAssetWithRevalidate("./static/vsp_uxstates.js"))
 
 	// Serve JS assets from ./static/js/ (dom-safe.js, vsp_iframe_bootstrap.js, etc.)
 	// These scripts are referenced by index.html and panel HTML files.
@@ -905,8 +893,15 @@ func main() {
 		http.FileServer(http.Dir("./static/patches/"))).ServeHTTP)
 
 	// Serve general static assets from ./static/ (inject_ux_v1.1.js, inject_ux_v1.1.css, etc.)
-	r.Get("/static/*", http.StripPrefix("/static/",
-		http.FileServer(http.Dir("./static/"))).ServeHTTP)
+	// no-cache: forces revalidation after binary swap so JS/CSS updates
+	// take effect on next page load. Pre-fix Chrome served stale assets
+	// from heuristic cache because the FileServer didn't set
+	// Cache-Control at all.
+	r.Get("/static/*", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+		http.StripPrefix("/static/",
+			http.FileServer(http.Dir("./static/"))).ServeHTTP(w, r)
+	})
 
 	// RFC 9116 — security.txt at /.well-known/security.txt + the
 	// disclosure policy doc. Anonymous, no rate-limit.
