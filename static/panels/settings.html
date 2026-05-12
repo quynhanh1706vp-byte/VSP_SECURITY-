@@ -177,27 +177,27 @@ td{padding:7px 10px;vertical-align:middle}
         <div class="card-body">
           <div class="toggle-row">
             <div><div class="toggle-label">Auto-sync findings → POA&amp;M</div><div class="toggle-sub">Create POA&M items from every CRITICAL/HIGH finding</div></div>
-            <label class="sw-wrap"><input aria-label="Toggle poam" type="checkbox" checked onchange="saveFeat('poam',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+            <label class="sw-wrap"><input name="toggle-poam" aria-label="Toggle poam" type="checkbox" checked onchange="saveFeat('poam',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
           </div>
           <div class="toggle-row">
             <div><div class="toggle-label">SBOM diff on every run</div><div class="toggle-sub">Compare component list with previous run</div></div>
-            <label class="sw-wrap"><input aria-label="Toggle sbom diff" type="checkbox" checked onchange="saveFeat('sbom_diff',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+            <label class="sw-wrap"><input name="toggle-sbom-diff" aria-label="Toggle sbom diff" type="checkbox" checked onchange="saveFeat('sbom_diff',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
           </div>
           <div class="toggle-row">
             <div><div class="toggle-label">AI analyst auto-triage</div><div class="toggle-sub">AI analysis on new critical findings</div></div>
-            <label class="sw-wrap"><input aria-label="Toggle ai triage" type="checkbox" checked onchange="saveFeat('ai_triage',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+            <label class="sw-wrap"><input name="toggle-ai-triage" aria-label="Toggle ai triage" type="checkbox" checked onchange="saveFeat('ai_triage',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
           </div>
           <div class="toggle-row">
             <div><div class="toggle-label">SW crack detection</div><div class="toggle-sub">Hash check on agent-reported packages</div></div>
-            <label class="sw-wrap"><input aria-label="Toggle crack detect" type="checkbox" checked onchange="saveFeat('crack_detect',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+            <label class="sw-wrap"><input name="toggle-crack-detect" aria-label="Toggle crack detect" type="checkbox" checked onchange="saveFeat('crack_detect',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
           </div>
           <div class="toggle-row">
             <div><div class="toggle-label">PostgreSQL persistence</div><div class="toggle-sub">Save P4 state to database on every change</div></div>
-            <label class="sw-wrap"><input aria-label="Toggle pg" type="checkbox" checked onchange="saveFeat('pg',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+            <label class="sw-wrap"><input name="toggle-pg" aria-label="Toggle pg" type="checkbox" checked onchange="saveFeat('pg',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
           </div>
           <div class="toggle-row">
             <div><div class="toggle-label">VN threat feeds</div><div class="toggle-sub">VNCERT / BKAV / ViettelCS IOC feeds</div></div>
-            <label class="sw-wrap"><input aria-label="Toggle vn feeds" type="checkbox" checked onchange="saveFeat('vn_feeds',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+            <label class="sw-wrap"><input name="toggle-vn-feeds" aria-label="Toggle vn feeds" type="checkbox" checked onchange="saveFeat('vn_feeds',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
           </div>
         </div>
       </div>
@@ -294,33 +294,33 @@ td{padding:7px 10px;vertical-align:middle}
           <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:6px">Critical SLA</div>
           <div class="form-group" style="margin-bottom:6px">
             <div class="form-label">SLA days</div>
-            <input aria-label="Numeric setting (default 3)" class="form-ctrl mono" value="3" type="number">
+            <input name="numeric-setting-default-3" aria-label="Numeric setting (default 3)" class="form-ctrl mono" value="3" type="number">
           </div>
           <div class="form-group" style="margin-bottom:0">
             <div class="form-label">Escalate to</div>
-            <input aria-label="email" class="form-ctrl" value="ciso@agency.gov" placeholder="email">
+            <input name="email" aria-label="email" class="form-ctrl" value="ciso@agency.gov" placeholder="email">
           </div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--orange)">
           <div style="font-size:11px;font-weight:600;color:var(--orange);margin-bottom:6px">High SLA</div>
           <div class="form-group" style="margin-bottom:6px">
             <div class="form-label">SLA days</div>
-            <input aria-label="Numeric setting (default 14)" class="form-ctrl mono" value="14" type="number">
+            <input name="numeric-setting-default-14" aria-label="Numeric setting (default 14)" class="form-ctrl mono" value="14" type="number">
           </div>
           <div class="form-group" style="margin-bottom:0">
             <div class="form-label">Escalate to</div>
-            <input aria-label="email" class="form-ctrl" value="soc@agency.gov" placeholder="email">
+            <input name="email-2" aria-label="email" class="form-ctrl" value="soc@agency.gov" placeholder="email">
           </div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--amber)">
           <div style="font-size:11px;font-weight:600;color:var(--amber);margin-bottom:6px">Medium SLA</div>
           <div class="form-group" style="margin-bottom:6px">
             <div class="form-label">SLA days</div>
-            <input aria-label="Numeric setting (default 30)" class="form-ctrl mono" value="30" type="number">
+            <input name="numeric-setting-default-30" aria-label="Numeric setting (default 30)" class="form-ctrl mono" value="30" type="number">
           </div>
           <div class="form-group" style="margin-bottom:0">
             <div class="form-label">Escalate to</div>
-            <input aria-label="email" class="form-ctrl" value="sec-eng@agency.gov" placeholder="email">
+            <input name="email-3" aria-label="email" class="form-ctrl" value="sec-eng@agency.gov" placeholder="email">
           </div>
         </div>
       </div>
@@ -374,23 +374,23 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-body">
         <div class="toggle-row">
           <div><div class="toggle-label">Enforce MFA</div><div class="toggle-sub">All users must have MFA enabled</div></div>
-          <label class="sw-wrap"><input aria-label="Toggle option" type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="toggle-option" aria-label="Toggle option" type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div class="toggle-row">
           <div><div class="toggle-label">SSO / SAML</div><div class="toggle-sub">Enterprise SSO integration</div></div>
-          <label class="sw-wrap"><input aria-label="Toggle option" type="checkbox"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="toggle-option-2" aria-label="Toggle option" type="checkbox"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div class="toggle-row">
           <div><div class="toggle-label">Rate limit login</div><div class="toggle-sub">Lock after 5 failed attempts</div></div>
-          <label class="sw-wrap"><input aria-label="Toggle option" type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="toggle-option-3" aria-label="Toggle option" type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div class="form-group" style="margin-top:8px">
           <div class="form-label">Session timeout (minutes)</div>
-          <input aria-label="Numeric setting (default 480)" class="form-ctrl mono" value="480" type="number">
+          <input name="numeric-setting-default-480" aria-label="Numeric setting (default 480)" class="form-ctrl mono" value="480" type="number">
         </div>
         <div class="form-group">
           <div class="form-label">Allowed IP ranges (CIDR, one per line)</div>
-          <textarea aria-label="0.0.0.0/0&#10;192.168.1.0/24" class="form-ctrl mono" rows="3" placeholder="0.0.0.0/0&#10;192.168.1.0/24">0.0.0.0/0</textarea>
+          <textarea name="0-0-0-0-0-10-192-168-1-0-24" aria-label="0.0.0.0/0&#10;192.168.1.0/24" class="form-ctrl mono" rows="3" placeholder="0.0.0.0/0&#10;192.168.1.0/24">0.0.0.0/0</textarea>
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveAuth()">Save</button>
       </div>
@@ -408,11 +408,11 @@ td{padding:7px 10px;vertical-align:middle}
         </div>
         <div class="toggle-row">
           <div><div class="toggle-label">CSRF protection (all other endpoints)</div><div class="toggle-sub">Required for browser-based requests</div></div>
-          <label class="sw-wrap"><input aria-label="Toggle option" type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="toggle-option-4" aria-label="Toggle option" type="checkbox" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div class="form-group" style="margin-top:8px">
           <div class="form-label">Agent token header</div>
-          <input aria-label="Read-only value" class="form-ctrl mono" value="X-VSP-Agent-Token" readonly>
+          <input name="read-only-value" aria-label="Read-only value" class="form-ctrl mono" value="X-VSP-Agent-Token" readonly>
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveCSRF()">Apply fix</button>
       </div>
@@ -425,15 +425,15 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="g3">
         <div class="form-group">
           <div class="form-label">Audit log retention (days)</div>
-          <input aria-label="Numeric setting (default 90)" class="form-ctrl mono" value="90" type="number">
+          <input name="numeric-setting-default-90" aria-label="Numeric setting (default 90)" class="form-ctrl mono" value="90" type="number">
         </div>
         <div class="form-group">
           <div class="form-label">Scan data retention (days)</div>
-          <input aria-label="Numeric setting (default 365)" class="form-ctrl mono" value="365" type="number">
+          <input name="numeric-setting-default-365" aria-label="Numeric setting (default 365)" class="form-ctrl mono" value="365" type="number">
         </div>
         <div class="form-group">
           <div class="form-label">Finding retention (days)</div>
-          <input aria-label="Numeric setting (default 730)" class="form-ctrl mono" value="730" type="number">
+          <input name="numeric-setting-default-730" aria-label="Numeric setting (default 730)" class="form-ctrl mono" value="730" type="number">
         </div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="saveRetention()">Save retention policy</button>
@@ -735,7 +735,7 @@ function renderAlertRules(){
     <td><span class="badge badge-neutral" style="font-size:9px">${r.sev}</span></td>
     <td style="font-size:10px;color:var(--t2)">${r.channels.join(', ')}</td>
     <td>
-      <label class="sw-wrap"><input aria-label="Toggle option" type="checkbox" ${r.enabled?'checked':''} onchange="_alertRules[${i}].enabled=this.checked;saveAlertRules()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+      <label class="sw-wrap"><input name="toggle-option-5" aria-label="Toggle option" type="checkbox" ${r.enabled?'checked':''} onchange="_alertRules[${i}].enabled=this.checked;saveAlertRules()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
     </td>
     <td><button class="btn btn-sm btn-danger" onclick="deleteAlertRule(${i})">✕</button></td>
   </tr>`).join('');
@@ -1141,7 +1141,7 @@ function renderToolConfig(){
            +     '<div class="toggle-label" style="font-family:var(--font-mono);font-size:11px">'+t.name+override+'</div>'
            +   '</div>'
            +   '<label class="sw-wrap">'
-           +     '<input aria-label="Tool" type="checkbox" data-tool="'+t.name+'" '+(t.enabled?'checked':'')+' onchange="onToolToggle(this)">'
+           +     '<input name="tool" aria-label="Tool" type="checkbox" data-tool="'+t.name+'" '+(t.enabled?'checked':'')+' onchange="onToolToggle(this)">'
            +     '<div class="sw-track"></div><div class="sw-thumb"></div>'
            +   '</label>'
            + '</div>';
@@ -1381,7 +1381,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
     bar.innerHTML = ''
       + (filters.search !== false
-          ? '<input aria-label="Search filter" class="vsp-uni4-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+          ? '<input name="search-filter" aria-label="Search filter" class="vsp-uni4-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
       + (filters.pills ? renderPillGroup(filters.pills) : '')
       + (filters.csv !== false
           ? '<button class="btn btn-sm vsp-uni4-csv" style="font-size:10px">↓ CSV</button>' : '')

@@ -276,7 +276,7 @@ textarea.form-ctrl{font-family:var(--font-mono);font-size:10px;resize:vertical}
       +   (prompt ? '<div style="font-size:12px;opacity:.85;margin-bottom:10px;padding:8px;background:rgba(0,0,0,.15);border-radius:4px">'+escapeHtml(prompt)+'</div>' : '')
       +   '<div style="margin-bottom:8px">'
       +     '<label class="form-label" style="font-size:10px;opacity:.7;margin-bottom:4px;display:block">Comment (optional)</label>'
-      +     '<textarea aria-label="Reason for decision…" class="form-ctrl approval-comment" rows="2" placeholder="Reason for decision…" style="font-size:12px"></textarea>'
+      +     '<textarea name="reason-for-decision" aria-label="Reason for decision…" class="form-ctrl approval-comment" rows="2" placeholder="Reason for decision…" style="font-size:12px"></textarea>'
       +   '</div>'
       +   '<div style="display:flex;gap:8px;justify-content:flex-end">'
       +     '<button class="btn btn-sm" onclick="decideApproval(\''+id+'\', \'reject\', this)" style="background:rgba(239,68,68,.10);color:#ef4444;border-color:rgba(239,68,68,.3)">Reject</button>'
@@ -1376,7 +1376,7 @@ loadRunHistory();
     bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
     bar.innerHTML = ''
       + (filters.search !== false
-          ? '<input aria-label="Search filter" class="vsp-uni-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+          ? '<input name="search-filter" aria-label="Search filter" class="vsp-uni-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
       + (filters.pills ? renderPillGroup('vsp-uni-pill', filters.pills) : '')
       + (filters.csv !== false
           ? '<button class="btn btn-sm vsp-uni-csv" style="font-size:10px">↓ CSV</button>' : '')

@@ -191,9 +191,9 @@ function renderDashRows() {
   const wrap = document.getElementById('cfg-dashboards');
   wrap.innerHTML = (currentCfg.dashboards || []).map((d, i) => `
     <div class="dash-row">
-      <input aria-label="uid" data-i="${i}" data-k="uid" value="${escapeAttr(d.uid||'')}" placeholder="uid" />
-      <input aria-label="title" data-i="${i}" data-k="title" value="${escapeAttr(d.title||'')}" placeholder="title" />
-      <input aria-label="from" data-i="${i}" data-k="from" value="${escapeAttr(d.from||'')}" placeholder="from" />
+      <input name="uid" aria-label="uid" data-i="${i}" data-k="uid" value="${escapeAttr(d.uid||'')}" placeholder="uid" />
+      <input name="title" aria-label="title" data-i="${i}" data-k="title" value="${escapeAttr(d.title||'')}" placeholder="title" />
+      <input name="from" aria-label="from" data-i="${i}" data-k="from" value="${escapeAttr(d.from||'')}" placeholder="from" />
       <button class="rm" onclick="removeDashRow(${i})">×</button>
     </div>`).join('');
 }

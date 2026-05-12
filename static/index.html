@@ -3736,7 +3736,7 @@ async function applyFindingsFilter() {
     const SEV_C = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--amber)',LOW:'var(--green)'};
     tbody.innerHTML = findings.map((f,i) => `
       <tr>
-        <td><input aria-label="Select finding for bulk action" type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td>
+        <td><input name="select-finding-for-bulk-action" aria-label="Select finding for bulk action" type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()"></td>
         <td><span class="sev sev-${(f.severity||'').toLowerCase()}">${f.severity||'—'}</span></td>
         <td class="c-t3 f11">${f.tool||'—'}</td>
         <td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px">${f.rule_id||'—'}</td>
@@ -4872,7 +4872,7 @@ function renderFindingsTable(findings, total) {
     var sev = (f.severity||'').toLowerCase();
     var sevClass = 'sev-'+sev;
     return '<tr style="cursor:pointer" onclick="showFindingDetail('+i+')" title="Click for detail">'
-      +'<td><input aria-label="Select finding for bulk action" type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
+      +'<td><input name="select-finding-for-bulk-action-2" aria-label="Select finding for bulk action" type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
       +'<td><span class="sev '+sevClass+'">'+f.severity+'</span></td>'
       +'<td class="c-t3 f11">'+f.tool+'</td>'
       +'<td class="mono c-blue overflow-ellipsis" style="max-width:110px;font-size:9px" title="'+(f.rule_id||'')+'">'+((f.rule_id||'').slice(0,18)||'—')+'</td>'
@@ -5409,7 +5409,7 @@ window.renderFindingsTable = function(findings, total) {
     var lineStr = f.line ? ':'+f.line : '';
 
     return '<tr style="cursor:pointer" onclick="showFindingDetail('+i+')" title="Click for detail">'
-      +'<td><input aria-label="Select finding for bulk action" type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
+      +'<td><input name="select-finding-for-bulk-action-3" aria-label="Select finding for bulk action" type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
       +'<td><span class="sev sev-'+sev+'">'+f.severity+'</span></td>'
       +'<td class="c-t3 f11">'+f.tool+'</td>'
       +'<td class="mono c-blue" style="font-size:9px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(f.rule_id||'')+'">'
@@ -7013,7 +7013,7 @@ function _renderFindings(findings) {
       +' onmouseenter="this.style.background=\'var(--surface2)\'"'
       +' onmouseleave="this.style.background=\'\'"'
       +' onclick="showFindingDetail('+(_findingsOffset+i)+')">'
-      +'<td><input aria-label="Select finding for bulk action" type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
+      +'<td><input name="select-finding-for-bulk-action-4" aria-label="Select finding for bulk action" type="checkbox" class="finding-cb" style="accent-color:var(--amber)" onchange="updateBulkCount()" onclick="event.stopPropagation()"></td>'
       +'<td><span class="sev '+sc+'">'+f.severity+'</span></td>'
       +'<td class="c-t3 f11">'+f.tool+'</td>'
       +'<td class="mono c-blue overflow-ellipsis" style="max-width:120px;font-size:10px" title="'+f.rule_id+'">'+f.rule_id+'</td>'

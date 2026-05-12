@@ -650,15 +650,15 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Fail on CRITICAL</div><div style="font-size:10px;color:var(--t3)">Block PR if any critical finding</div></div>
-          <label class="sw-wrap"><input aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="policy-gate-toggle" aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Fail on secrets</div><div style="font-size:10px;color:var(--t3)">Block if gitleaks / trufflehog detects</div></div>
-          <label class="sw-wrap"><input aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="policy-gate-toggle-2" aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Min score 70</div><div style="font-size:10px;color:var(--t3)">Block if score &lt; 70/100</div></div>
-          <label class="sw-wrap"><input aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="policy-gate-toggle-3" aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Post PR comment</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires GitHub OAuth token</div></div>
@@ -958,7 +958,7 @@ async function loadSchedules(){
 
   document.getElementById('schedules-list').innerHTML = list.map(s => `
     <div class="sched-row">
-      <label class="sw-wrap"><input aria-label="Toggle schedule" type="checkbox" ${s.enabled?'checked':''} onchange="toggleSchedule('${s.id}',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+      <label class="sw-wrap"><input name="toggle-schedule" aria-label="Toggle schedule" type="checkbox" ${s.enabled?'checked':''} onchange="toggleSchedule('${s.id}',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
       <div style="flex:1">
         <div class="sched-name">${s.name}</div>
         <div class="sched-meta">${s.mode} · ${s.cron} · ${s.src}</div>
@@ -1388,7 +1388,7 @@ function renderAutofixPager(totalPages){
     pager.innerHTML =
       '<span class="af-pager-info"></span>' +
       '<label style="display:flex;align-items:center;gap:6px">Per page ' +
-        '<select aria-label="Page size" class="af-pager-size" style="font-size:11px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px">' +
+        '<select name="page-size" aria-label="Page size" class="af-pager-size" style="font-size:11px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px">' +
           '<option value="25">25</option><option value="50">50</option>' +
           '<option value="100">100</option><option value="0">All</option>' +
         '</select></label>' +
@@ -1771,7 +1771,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
     bar.innerHTML = ''
       + (filters.search !== false
-          ? '<input aria-label="Search filter" class="vsp-uni3-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+          ? '<input name="search-filter" aria-label="Search filter" class="vsp-uni3-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
       + (filters.pills ? renderPillGroup(filters.pills) : '')
       + (filters.csv !== false
           ? '<button class="btn btn-sm vsp-uni3-csv" style="font-size:10px">↓ CSV</button>' : '')

@@ -399,7 +399,7 @@
 
       var td = document.createElement('td');
       td.className = 'vsp-cb-cell';
-      td.innerHTML = '<input type="checkbox" class="vsp-cb" aria-label="Select ' + esc(cveText) + '">';
+      td.innerHTML = '<input name="select" type="checkbox" class="vsp-cb" aria-label="Select ' + esc(cveText) + '">';
       // Stop click bubble so existing row click (openCVEDetail) doesn't fire
       td.addEventListener('click', function (e) { e.stopPropagation(); });
       var cb = td.querySelector('input');
