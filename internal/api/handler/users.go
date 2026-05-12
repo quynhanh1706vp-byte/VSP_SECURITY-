@@ -48,7 +48,11 @@ func (u *Users) List(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/admin/users
 func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req struct {
 		Email    string `json:"email"`
@@ -104,7 +108,11 @@ func (u *Users) Create(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/v1/admin/users/{id}
 func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	if err := u.DB.DeleteUser(r.Context(), claims.TenantID, id); err != nil {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
