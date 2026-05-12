@@ -1296,8 +1296,13 @@ window.addEventListener('DOMContentLoaded', function(){
           <table>
             <thead><tr><th>Seq</th><th>Action</th><th>Resource</th><th>IP</th><th>Time</th><th>Hash</th></tr></thead>
             <tbody id="audit-table" data-vsp-paginate="20">
-              <tr><td class="mono-sm">1</td><td><span class="pill pill-run" style="font-size:8px">LOGIN</span></td><td class="mono-sm overflow-ellipsis" style="max-width:180px">admin@vsp.local</td><td class="mono-sm">127.0.0.1</td><td class="mono-sm">29/3 09:15</td><td class="mono-sm" style="color:var(--t4)">a3f7c9d1…</td></tr>
-              <tr><td class="mono-sm">2</td><td><span class="pill pill-done" style="font-size:8px;background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.25)">SCAN</span></td><td class="mono-sm overflow-ellipsis" style="max-width:180px">RID_SCHED_194714_0</td><td class="mono-sm">127.0.0.1</td><td class="mono-sm">29/3 19:47</td><td class="mono-sm" style="color:var(--t4)">b8e2a4f0…</td></tr>
+              <!-- Initial row stays empty; loadAuditReal() fetches the
+                   real audit_log entries on panel-show. Pre-fix two
+                   hardcoded demo rows ("29/3 09:15 LOGIN admin@vsp.local")
+                   shipped to prod and looked like real audit history
+                   until the fetch returned, confusing operators about
+                   what's authentic. -->
+              <tr class="audit-empty-row"><td colspan="6" class="mono-sm c-t3" style="text-align:center;padding:24px">Loading audit log…</td></tr>
             </tbody>
           </table>
         </div>
