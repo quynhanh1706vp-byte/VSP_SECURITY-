@@ -254,6 +254,20 @@ function drawGauge(score){
   ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,.6)';ctx.fill();
 }
 function renderScoreBars(){
+  // Empty/invalid data guards. Pre-fix any of these conditions would
+  // render "↓ NaNpts vs baseline" because cur was undefined or BL_SCORE
+  // was null:
+  //   - SCORE_HIST=[] (BE returned no history)
+  //   - BL_SCORE=null (no 30-day baseline yet — fresh tenant)
+  if(!Array.isArray(SCORE_HIST) || SCORE_HIST.length===0 || BL_SCORE==null){
+    document.getElementById('score-bars').innerHTML =
+      '<div style="text-align:center;padding:20px;color:var(--t3);font-size:11px">Not enough run history for score trend yet — needs at least one completed scan in the last 14 days</div>';
+    document.getElementById('gauge-val').textContent = BL_SCORE==null ? '—' : Math.round(BL_SCORE);
+    document.getElementById('gauge-trend').textContent = 'no history yet';
+    document.getElementById('gauge-trend').style.color = 'var(--t3)';
+    if(BL_SCORE!=null) drawGauge(BL_SCORE);
+    return;
+  }
   var max=Math.max.apply(null,SCORE_HIST)||1;
   var baseH=Math.round(BL_SCORE/max*84);
   document.getElementById('score-bars').innerHTML=SCORE_HIST.map(function(v,i){
@@ -262,11 +276,11 @@ function renderScoreBars(){
     return '<div class="chart-bar-wrap" title="Score: '+v+'"><div class="chart-bar" style="height:'+h+'px;background:'+color+'"></div><div class="chart-bar-lbl">'+(lbl||'')+'</div></div>';
   }).join('');
   document.getElementById('baseline-line').style.bottom=(baseH+30)+'px';
-  var cur=SCORE_HIST[SCORE_HIST.length-1];
+  var cur=Math.round(SCORE_HIST[SCORE_HIST.length-1]);
   document.getElementById('gauge-val').textContent=cur;
   drawGauge(cur);
-  var diff=cur-BL_SCORE,trend=document.getElementById('gauge-trend');
-  trend.textContent=(diff>=0?'↑ +':' ↓ ')+Math.abs(diff)+'pts vs baseline';
+  var diff=Math.round(cur-BL_SCORE),trend=document.getElementById('gauge-trend');
+  trend.textContent=(diff>=0?'↑ +':'↓ ')+Math.abs(diff)+'pts vs baseline';
   trend.style.color=diff>=0?'var(--green)':'var(--red)';
 }
 function renderChecks(){
