@@ -187,7 +187,7 @@ func (h *SOARv2) SecretAuditLog(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, a)
 	}
-	jsonOK(w, map[string]any{"entries": out, "total": len(out)})
+	jsonOK(w, map[string]any{"entries": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // ── Per-tenant vault config (PRO "view details" panel) ──────────────────────

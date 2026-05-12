@@ -108,7 +108,7 @@ func (h *CISAAttestation) Practices(w http.ResponseWriter, r *http.Request) {
 
 	jsonOK(w, map[string]any{
 		"practices": out,
-		"total":     len(out),
+		"total":     len(out), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 		"counts":    counts,
 	})
 }

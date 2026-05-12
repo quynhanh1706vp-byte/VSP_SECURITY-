@@ -102,7 +102,7 @@ func (h *ThreatHunt) ListQueries(w http.ResponseWriter, r *http.Request) {
 		q.MITRETechniques = splitCSV(techs)
 		out = append(out, q)
 	}
-	jsonOK(w, map[string]any{"queries": out, "total": len(out)})
+	jsonOK(w, map[string]any{"queries": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // POST /api/v1/threat-hunt/queries
@@ -383,5 +383,5 @@ func (h *ThreatHunt) ListResults(w http.ResponseWriter, r *http.Request) {
 	if out == nil {
 		out = []entry{}
 	}
-	jsonOK(w, map[string]any{"results": out, "total": len(out)})
+	jsonOK(w, map[string]any{"results": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }

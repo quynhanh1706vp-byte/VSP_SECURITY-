@@ -166,7 +166,7 @@ func (h *SOARv2) ListPlaybookVersions(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]interface{}{
 		"versions": versions,
-		"count":    len(versions),
+		"count":    len(versions), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -208,7 +208,7 @@ func (h *SOARv2) ListPendingApprovals(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]interface{}{
 		"approvals": approvals,
-		"count":     len(approvals),
+		"count":     len(approvals), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -271,7 +271,7 @@ func (h *SOARv2) ListSecrets(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]interface{}{
 		"secrets": secrets,
-		"count":   len(secrets),
+		"count":   len(secrets), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 

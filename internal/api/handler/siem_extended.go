@@ -37,7 +37,7 @@ func (h *Correlation) ListRules(w http.ResponseWriter, r *http.Request) {
 	if rules == nil {
 		rules = []store.CorrelationRule{}
 	}
-	jsonOK(w, map[string]any{"rules": rules, "total": len(rules)})
+	jsonOK(w, map[string]any{"rules": rules, "total": len(rules)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +129,7 @@ func (h *Correlation) ListIncidents(w http.ResponseWriter, r *http.Request) {
 	if incidents == nil {
 		incidents = []store.Incident{}
 	}
-	jsonOK(w, map[string]any{"incidents": incidents, "total": len(incidents)})
+	jsonOK(w, map[string]any{"incidents": incidents, "total": len(incidents)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
@@ -220,7 +220,7 @@ func (h *SOAR) ListPlaybooks(w http.ResponseWriter, r *http.Request) {
 	if pbs == nil {
 		pbs = []store.Playbook{}
 	}
-	jsonOK(w, map[string]any{"playbooks": pbs, "total": len(pbs)})
+	jsonOK(w, map[string]any{"playbooks": pbs, "total": len(pbs)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
@@ -403,7 +403,7 @@ func (h *SOAR) ListRuns(w http.ResponseWriter, r *http.Request) {
 	if runs == nil {
 		runs = []store.PlaybookRun{}
 	}
-	jsonOK(w, map[string]any{"runs": runs, "total": len(runs)})
+	jsonOK(w, map[string]any{"runs": runs, "total": len(runs)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // ── Log sources ───────────────────────────────────────────────
@@ -420,7 +420,7 @@ func (h *LogSources) List(w http.ResponseWriter, r *http.Request) {
 	if sources == nil {
 		sources = []store.LogSource{}
 	}
-	jsonOK(w, map[string]any{"sources": sources, "total": len(sources)})
+	jsonOK(w, map[string]any{"sources": sources, "total": len(sources)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 func (h *LogSources) Create(w http.ResponseWriter, r *http.Request) {
@@ -509,7 +509,7 @@ func (h *ThreatIntel) ListIOCs(w http.ResponseWriter, r *http.Request) {
 	if iocs == nil {
 		iocs = []store.IOC{}
 	}
-	jsonOK(w, map[string]any{"iocs": iocs, "total": len(iocs)})
+	jsonOK(w, map[string]any{"iocs": iocs, "total": len(iocs)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 func (h *ThreatIntel) ListFeeds(w http.ResponseWriter, r *http.Request) {
@@ -529,7 +529,7 @@ func (h *ThreatIntel) ListFeeds(w http.ResponseWriter, r *http.Request) {
 		}
 		feeds[i] = Feed{Name: name, Status: status, IOCs: cnt, Last: "5m"}
 	}
-	jsonOK(w, map[string]any{"feeds": feeds, "total": len(feeds)})
+	jsonOK(w, map[string]any{"feeds": feeds, "total": len(feeds)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 func (h *ThreatIntel) Matches(w http.ResponseWriter, r *http.Request) {
@@ -548,7 +548,7 @@ func (h *ThreatIntel) Matches(w http.ResponseWriter, r *http.Request) {
 			matched = append(matched, ioc)
 		}
 	}
-	jsonOK(w, map[string]any{"matches": matched, "total": len(matched)})
+	jsonOK(w, map[string]any{"matches": matched, "total": len(matched)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 func (h *ThreatIntel) MITRE(w http.ResponseWriter, r *http.Request) {
@@ -636,7 +636,7 @@ func (h *ThreatIntel) EnrichBatch(w http.ResponseWriter, r *http.Request) {
 		req.CVEs = req.CVEs[:50]
 	}
 	results := _tiClient.EnrichBatch(r.Context(), req.CVEs)
-	jsonOK(w, map[string]any{"enrichments": results, "total": len(results)})
+	jsonOK(w, map[string]any{"enrichments": results, "total": len(results)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // GET /api/v1/vsp/findings/dedup — deduplicated findings với fingerprint
@@ -694,7 +694,7 @@ func (h *ThreatIntel) ExploitChains(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]any{
 		"chains": chains,
-		"total":  len(chains),
+		"total":  len(chains), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -822,7 +822,7 @@ func (h *ThreatIntel) CheckSecretBatch(w http.ResponseWriter, r *http.Request) {
 	if results == nil {
 		results = []result{}
 	}
-	jsonOK(w, map[string]any{"results": results, "total": len(results)})
+	jsonOK(w, map[string]any{"results": results, "total": len(results)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // GET /api/v1/compliance/license — scan license compliance
@@ -1026,7 +1026,7 @@ func (h *ThreatIntel) IntegrationsList(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{
 		"integrations": items,
 		"providers":    providers,
-		"total":        len(items),
+		"total":        len(items), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -1130,7 +1130,7 @@ func (h *ThreatIntel) SettingsScanConfig(w http.ResponseWriter, r *http.Request)
 		items = []policyRule{}
 	}
 
-	jsonOK(w, map[string]any{"rules": items, "total": len(items)})
+	jsonOK(w, map[string]any{"rules": items, "total": len(items)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // SettingsDastTargets serves GET /api/v1/settings/dast-targets
@@ -1174,7 +1174,7 @@ func (h *ThreatIntel) SettingsDastTargets(w http.ResponseWriter, r *http.Request
 		targets = []dastTarget{}
 	}
 
-	jsonOK(w, map[string]any{"targets": targets, "total": len(targets)})
+	jsonOK(w, map[string]any{"targets": targets, "total": len(targets)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // SBOMIndex serves GET /api/v1/sbom — list runs với SBOM URLs.
@@ -1223,7 +1223,7 @@ func (h *ThreatIntel) SBOMIndex(w http.ResponseWriter, r *http.Request) {
 
 	jsonOK(w, map[string]any{
 		"runs":   runs,
-		"total":  len(runs),
+		"total":  len(runs), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 		"format": "CycloneDX 1.5 (JSON)",
 	})
 }

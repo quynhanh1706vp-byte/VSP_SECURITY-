@@ -104,7 +104,7 @@ func (h *NetCapHandler) Flows(w http.ResponseWriter, r *http.Request) {
 	flows := h.Engine.GetFlows(limit, proto, flags)
 	jsonOK(w, map[string]interface{}{
 		"flows": flows,
-		"count": len(flows),
+		"count": len(flows), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -119,7 +119,7 @@ func (h *NetCapHandler) Anomalies(w http.ResponseWriter, r *http.Request) {
 	anoms := h.Engine.GetAnomalies(limit)
 	jsonOK(w, map[string]interface{}{
 		"anomalies": anoms,
-		"count":     len(anoms),
+		"count":     len(anoms), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -153,7 +153,7 @@ func (h *NetCapHandler) L7HTTP(w http.ResponseWriter, r *http.Request) {
 	reqs := h.Engine.GetHTTPRequests(limit)
 	jsonOK(w, map[string]interface{}{
 		"requests": reqs,
-		"count":    len(reqs),
+		"count":    len(reqs), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -167,7 +167,7 @@ func (h *NetCapHandler) L7DNS(w http.ResponseWriter, r *http.Request) {
 	queries := h.Engine.GetDNSQueries(limit)
 	jsonOK(w, map[string]interface{}{
 		"queries": queries,
-		"count":   len(queries),
+		"count":   len(queries), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -181,7 +181,7 @@ func (h *NetCapHandler) L7SQL(w http.ResponseWriter, r *http.Request) {
 	evts := h.Engine.GetSQLEvents(limit)
 	jsonOK(w, map[string]interface{}{
 		"events": evts,
-		"count":  len(evts),
+		"count":  len(evts), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -195,7 +195,7 @@ func (h *NetCapHandler) L7TLS(w http.ResponseWriter, r *http.Request) {
 	sessions := h.Engine.GetTLSSessions(limit)
 	jsonOK(w, map[string]interface{}{
 		"sessions": sessions,
-		"count":    len(sessions),
+		"count":    len(sessions), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 
@@ -209,7 +209,7 @@ func (h *NetCapHandler) L7GRPC(w http.ResponseWriter, r *http.Request) {
 	evts := h.Engine.GetGRPCEvents(limit)
 	jsonOK(w, map[string]interface{}{
 		"events": evts,
-		"count":  len(evts),
+		"count":  len(evts), // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 	})
 }
 

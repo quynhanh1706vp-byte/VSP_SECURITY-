@@ -347,7 +347,7 @@ func (p *ProPanels) NotificationLog(w http.ResponseWriter, r *http.Request) {
 	if out == nil {
 		out = []entry{}
 	}
-	jsonOK(w, map[string]any{"entries": out, "total": len(out)})
+	jsonOK(w, map[string]any{"entries": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // NotificationDLQ — GET /api/v1/notifications/dlq
@@ -401,7 +401,7 @@ func (p *ProPanels) NotificationDLQ(w http.ResponseWriter, r *http.Request) {
 	if out == nil {
 		out = []dlqEntry{}
 	}
-	jsonOK(w, map[string]any{"entries": out, "total": len(out)})
+	jsonOK(w, map[string]any{"entries": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // NotificationDLQRetry — POST /api/v1/notifications/dlq/retry

@@ -318,7 +318,7 @@ func (h *SupplyChain) Provenance(w http.ResponseWriter, r *http.Request) {
 			out = append(out, p)
 		}
 	}
-	jsonOK(w, map[string]any{"provenance": out, "total": len(out), "count": len(out)})
+	jsonOK(w, map[string]any{"provenance": out, "total": len(out), "count": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // ─── POST /api/v1/supply-chain/provenance ──────────────────────────────────
@@ -446,7 +446,7 @@ func (h *SupplyChain) VEX(w http.ResponseWriter, r *http.Request) {
 			out = append(out, v)
 		}
 	}
-	jsonOK(w, map[string]any{"vex": out, "total": len(out), "count": len(out)})
+	jsonOK(w, map[string]any{"vex": out, "total": len(out), "count": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // ─── GET /api/v1/supply-chain/key ──────────────────────────────────────────

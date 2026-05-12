@@ -96,7 +96,7 @@ func (h *Agents) List(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	jsonOK(w, map[string]interface{}{"agents": agents, "count": len(agents)})
+	jsonOK(w, map[string]interface{}{"agents": agents, "count": len(agents)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // Get — GET /api/v1/agents/{id}

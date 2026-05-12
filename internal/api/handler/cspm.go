@@ -67,7 +67,7 @@ func (h *CSPM) ListAccounts(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, a)
 	}
-	jsonOK(w, map[string]any{"accounts": out, "total": len(out)})
+	jsonOK(w, map[string]any{"accounts": out, "total": len(out)}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // POST /api/v1/cspm/accounts — register a new cloud account.
@@ -262,7 +262,7 @@ func (h *CSPM) ListFindings(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, f)
 	}
-	jsonOK(w, map[string]any{"findings": out, "total": len(out), "limit": limit, "offset": offset})
+	jsonOK(w, map[string]any{"findings": out, "total": len(out), "limit": limit, "offset": offset}) // page-size-not-total: TODO 2026-05-12 audit — wire CountX helper
 }
 
 // GET /api/v1/cspm/findings/{id}
