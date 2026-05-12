@@ -179,7 +179,11 @@ func (h *SOARv2) ListPlaybookVersions(w http.ResponseWriter, r *http.Request) {
 // RollbackVersion sets playbook.graph to a prior version.
 // POST /api/v1/soar/playbooks/{id}/version/{n}/rollback
 func (h *SOARv2) RollbackVersion(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	verStr := chi.URLParam(r, "n")
 	if !validateUUID(id) {
@@ -228,7 +232,11 @@ func (h *SOARv2) ListPendingApprovals(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/soar/approvals/{id}/decide
 // Body: {"decision": "approved|rejected", "note": "..."}
 func (h *SOARv2) DecideApproval(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	if !validateUUID(id) {
 		jsonError(w, "invalid approval id", http.StatusBadRequest)
@@ -292,7 +300,11 @@ func (h *SOARv2) ListSecrets(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/soar/secrets
 // Body: {"name": "...", "value": "...", "description": "..."}
 func (h *SOARv2) CreateSecret(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	if h.Vault == nil {
 		jsonError(w, "vault not initialized", http.StatusServiceUnavailable)
 		return
@@ -328,7 +340,11 @@ func (h *SOARv2) CreateSecret(w http.ResponseWriter, r *http.Request) {
 // DeleteSecret removes a secret.
 // DELETE /api/v1/soar/secrets/{name}
 func (h *SOARv2) DeleteSecret(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	if h.Vault == nil {
 		jsonError(w, "vault not initialized", http.StatusServiceUnavailable)
 		return

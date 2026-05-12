@@ -31,7 +31,11 @@ func (h *APIKeys) List(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/admin/api-keys
 func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req struct {
 		Label      string `json:"label"`

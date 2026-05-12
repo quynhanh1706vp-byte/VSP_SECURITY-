@@ -90,7 +90,11 @@ func (h *UEBA) Analyze(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/ueba/baseline
 func (h *UEBA) Baseline(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	type Stats struct {
 		AvgScore       float64 `json:"avg_score"`
 		StdScore       float64 `json:"std_score"`

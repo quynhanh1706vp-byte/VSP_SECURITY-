@@ -216,7 +216,11 @@ type signRequest struct {
 }
 
 func (h *SupplyChain) Sign(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req signRequest
 	if !decodeJSON(w, r, &req) {
 		return

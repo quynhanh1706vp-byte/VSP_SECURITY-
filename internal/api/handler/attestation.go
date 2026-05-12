@@ -377,7 +377,11 @@ type signFormReq struct {
 }
 
 func (h *CISAAttestation) SignForm(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/cisa-attestation/forms/")
 	path = strings.TrimSuffix(path, "/sign")
 	uuidStr := strings.TrimSuffix(path, "/")

@@ -97,7 +97,11 @@ func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Correlation) ToggleRule(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	enabled, err := h.DB.ToggleCorrelationRule(r.Context(), claims.TenantID, id)
 	if err != nil {
@@ -109,7 +113,11 @@ func (h *Correlation) ToggleRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Correlation) DeleteRule(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	h.DB.DeleteCorrelationRule(r.Context(), claims.TenantID, chi.URLParam(r, "id")) //nolint:errcheck
 	logAudit(r, h.DB, "CORRELATION_RULE_DELETED", "correlation_rules/delete")
 	w.WriteHeader(http.StatusNoContent)
@@ -188,7 +196,11 @@ func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Correlation) ResolveIncident(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	var req struct {
 		Status string `json:"status"`
@@ -241,7 +253,11 @@ func (h *SOAR) ListPlaybooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req struct {
 		Name        string          `json:"name"`
 		Description string          `json:"description"`
@@ -283,7 +299,11 @@ func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SOAR) TogglePlaybook(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	enabled, err := h.DB.TogglePlaybook(r.Context(), claims.TenantID, id)
 	if err != nil {
@@ -376,7 +396,11 @@ func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SOAR) Trigger(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req struct {
 		Trigger  string `json:"trigger"`
 		Severity string `json:"severity"`
@@ -449,7 +473,11 @@ func (h *LogSources) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LogSources) Create(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req store.LogSource
 	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -480,14 +508,22 @@ func (h *LogSources) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LogSources) Delete(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	h.DB.DeleteLogSource(r.Context(), claims.TenantID, chi.URLParam(r, "id")) //nolint:errcheck
 	logAudit(r, h.DB, "LOG_SOURCE_DELETED", "log_sources/delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *LogSources) Test(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	if err := h.DB.TestLogSource(r.Context(), claims.TenantID, chi.URLParam(r, "id")); err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return

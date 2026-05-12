@@ -44,7 +44,11 @@ func (h *Sandbox) List(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/vsp/sandbox/test-fire
 func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req struct {
 		EventType string `json:"event_type"`
 		Gate      string `json:"gate"`

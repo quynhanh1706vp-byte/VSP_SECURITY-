@@ -116,7 +116,11 @@ func (h *Remediation) Upsert(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/remediation/{rem_id}/comments
 func (h *Remediation) AddComment(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	remID := chi.URLParam(r, "rem_id")
 	var req struct {
 		Body string `json:"body"`

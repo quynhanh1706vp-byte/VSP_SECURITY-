@@ -129,7 +129,11 @@ func (h *Gate) ListRules(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/policy/rules
 func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req store.PolicyRule
 	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
