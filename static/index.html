@@ -280,29 +280,17 @@ function updateScanTools() {
   var noteEl = document.getElementById('scan-tools-note');
   var urlGroup = document.getElementById('scanUrlGroup');
 
-  // Cache hit window 30s; otherwise refresh in the background and
-  // render with whatever we have right now. Avoids modal-open lag.
-  //
-  // Loop guard: refresh ONLY if (a) we have no data yet AND (b) the
-  // endpoint hasn't already been marked absent. Without the second
-  // condition, the recursive .then(updateScanTools) callback fires
-  // again — endpointAbsent makes refreshScannerHealth() resolve
-  // instantly with no state change, so the next updateScanTools()
-  // sees fetchedAt=0 still and re-enters the branch forever. That
-  // is what froze the page on the old gateway binary.
+  // NOTE: updateScanTools() never auto-fires refreshScannerHealth().
+  // That recursive .then(updateScanTools) pattern caused an infinite
+  // microtask loop on the old gateway binary that didn't ship
+  // /api/v1/scanners/health yet, freezing the dashboard with
+  // "Trang không phản hồi". Health is refreshed explicitly:
+  //   - On "+ Scan" button click (see header button onclick).
+  //   - When the modal is already open, by user reopening it.
+  // We render with whatever is in window.__SCANNER_HEALTH right now;
+  // if it's empty (page just loaded, never refreshed), the fallback
+  // path treats all tools as available, matching legacy behaviour.
   var hp = window.__SCANNER_HEALTH;
-  var needsRefresh = !hp.endpointAbsent &&
-                     (!hp.fetchedAt || Date.now() - hp.fetchedAt > 30000);
-  if (needsRefresh) {
-    refreshScannerHealth().then(function() {
-      // Re-render only if we actually got fresh data — avoids the
-      // infinite recursion that triggered the page-not-responding
-      // dialog when /scanners/health 404'd on the old gateway.
-      if (window.__SCANNER_HEALTH.fetchedAt > 0) {
-        updateScanTools();
-      }
-    });
-  }
 
   // Render chips — grey-out + strikethrough tools whose binary is
   // missing on this gateway host. The run still dispatches them, but
@@ -354,6 +342,24 @@ function updateScanTools() {
   }
   var srcReq = document.getElementById('scanSrcReq');
   if (srcReq) srcReq.style.display = needsURL ? 'none' : '';
+}
+
+// Open the scan modal AND kick off a single, non-blocking health
+// fetch. The refresh result is consumed on the NEXT call to
+// updateScanTools (e.g. user changes mode dropdown). We deliberately
+// don't .then(updateScanTools) here to avoid the recursion that
+// previously hung the page when the endpoint 404'd.
+function openScanModal() {
+  document.getElementById('scan-modal').classList.add('open');
+  if (typeof refreshScannerHealth === 'function') {
+    refreshScannerHealth().then(function() {
+      // Re-render once IF we got data — single shot, never recurses.
+      if (window.__SCANNER_HEALTH && window.__SCANNER_HEALTH.fetchedAt > 0) {
+        updateScanTools();
+      }
+    });
+  }
+  updateScanTools();  // immediate render with whatever data we have
 }
 
 // Init chips on page load
@@ -745,7 +751,7 @@ window.addEventListener('DOMContentLoaded', function(){
       </div>
       <!-- Actions -->
       <button class="btn btn-ghost" onclick="loadCurrentPanel()">↻</button>
-      <button class="btn btn-primary" onclick="document.getElementById('scan-modal').classList.add('open'); if(typeof refreshScannerHealth==='function'){refreshScannerHealth().then(updateScanTools);}">+ Scan</button>
+      <button class="btn btn-primary" onclick="openScanModal()">+ Scan</button>
     </div>
   </header>
 
