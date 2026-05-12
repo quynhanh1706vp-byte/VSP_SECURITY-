@@ -1140,15 +1140,34 @@ func (h *ThreatIntel) IntegrationsTestProvider(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// SSRF guard: tenant-supplied webhook URL must pass the same
+	// allowlist used by the delivery path (private/loopback/RFC1918,
+	// metadata aliases, NXDOMAIN-fail-closed). Pre-fix this handler
+	// did a HEAD straight to whatever the tenant configured — letting
+	// "Test integration" pivot to 169.254.169.254 cloud-metadata.
+	if err := siem.ValidateWebhookURL(url); err != nil {
+		jsonOK(w, map[string]any{
+			"ok":       false,
+			"provider": provider,
+			"error":    "URL blocked by SSRF policy",
+		})
+		return
+	}
+
 	// HEAD ping (5s timeout)
 	req, _ := http.NewRequestWithContext(r.Context(), http.MethodHead, url, nil)
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, pingErr := client.Do(req)
 	if pingErr != nil {
+		// Don't echo the network error string — it leaks the resolved
+		// URL and DNS infrastructure (the previous "endpoint
+		// unreachable: dial tcp ..." reply happily told the caller
+		// which internal IP an attacker-controlled hostname pointed at).
+		log.Warn().Err(pingErr).Str("provider", provider).Msg("integration test: ping failed")
 		jsonOK(w, map[string]any{
 			"ok":       false,
 			"provider": provider,
-			"error":    "endpoint unreachable: " + pingErr.Error(),
+			"error":    "endpoint unreachable",
 		})
 		return
 	}
