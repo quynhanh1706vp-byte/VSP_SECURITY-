@@ -3367,7 +3367,17 @@ func (s *apiKeyStore) ValidateAPIKey(ctx context.Context, rawKey string) (auth.C
 		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(rawKey)); err != nil {
 			continue
 		}
-		go s.db.TouchAPIKey(ctx, id) //nolint:errcheck
+		// Touch in a fresh ctx — the request ctx gets cancelled the
+		// moment the response flushes, and pgx then drops the UPDATE
+		// with "context canceled", so the api_keys.last_used_at column
+		// stays NULL forever. Same fix as the password / siem.Deliver /
+		// audit-log goroutines.
+		keyID := id
+		go func() {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = s.db.TouchAPIKey(bgCtx, keyID)
+		}()
 		return auth.Claims{TenantID: tenantID, Role: role, UserID: id}, nil
 	}
 	return auth.Claims{}, fmt.Errorf("invalid api key")

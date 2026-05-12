@@ -122,6 +122,22 @@ type practiceUpdate struct {
 }
 
 func (h *CISAAttestation) UpdatePractice(w http.ResponseWriter, r *http.Request) {
+	// SSDF practices live in a *global* (non-tenant-scoped) table —
+	// UPDATE ssdf_practices WHERE practice_id=$1 mutates state shared
+	// across every tenant. Until the schema gets a tenant_id column,
+	// gate the write to admin only so a regular tenant user can't flip
+	// PO.1.1 → "implemented" globally to game another tenant's
+	// compliance dashboard.
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.Role != "admin" {
+		jsonError(w, "admin role required for SSDF practice writes", http.StatusForbidden)
+		return
+	}
+
 	id := strings.TrimPrefix(r.URL.Path, "/api/v1/cisa-attestation/practices/")
 	id = strings.TrimSuffix(id, "/")
 	if id == "" || strings.Contains(id, "/") {
