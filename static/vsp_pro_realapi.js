@@ -297,7 +297,7 @@ function formModal(opts){
           var v = typeof o === 'string' ? o : o.value;
           var lbl = typeof o === 'string' ? o : (o.label || o.value);
           var checked = current.indexOf(v) >= 0 ? ' checked' : '';
-          return '<label><input type="checkbox" value="' + esc(v) + '"' + checked + ' /><span>' + esc(lbl) + '</span></label>';
+          return '<label><input aria-label="Toggle option" type="checkbox" value="' + esc(v) + '"' + checked + ' /><span>' + esc(lbl) + '</span></label>';
         }).join('') +
         '</div>';
     } else if (f.type === 'readonly'){
@@ -834,7 +834,7 @@ function renderTenantsReal(root, listResp, quota){
         var opts = ['starter','pro','enterprise','free'].map(function(p){
           return '<option value="'+p+'"'+(p === (t.plan || 'starter') ? ' selected' : '')+'>'+p+'</option>';
         }).join('');
-        planCell = '<select class="pro-plan-select" data-tid="'+esc(t.id)+'" data-prev="'+esc(t.plan||'starter')+'" '
+        planCell = '<select aria-label="Tid" class="pro-plan-select" data-tid="'+esc(t.id)+'" data-prev="'+esc(t.plan||'starter')+'" '
           + 'style="background:var(--bg2);border:1px solid var(--bd);color:var(--t1);padding:2px 6px;font-size:11px;border-radius:3px">'
           + opts + '</select>';
       } else {
@@ -842,7 +842,7 @@ function renderTenantsReal(root, listResp, quota){
       }
       // Store underlying data as data-* attrs so the row-click handler
       // (vsp_pro_realapi.js:2104) reads actual DB values instead of
-      // .textContent. Admin's <select> cell would otherwise concat all
+      // .textContent. Admin's <select aria-label="Select option"> cell would otherwise concat all
       // four option labels into "STARTERPROENTERPRISEFREE", and an empty
       // created_at would surface as a literal "" in the modal.
       html += '<tr ' +
@@ -2115,7 +2115,7 @@ if (origTenantsRenderForRow){
           // (renderTenantsReal above). Falls back to cell text for the
           // legacy mock-data path. This avoids the
           // "STARTERPROENTERPRISEFREE" bug where cells[2] of an admin
-          // user contains a <select> whose .textContent is the
+          // user contains a <select aria-label="Select option"> whose .textContent is the
           // concatenation of every option label.
           var slug = tr.getAttribute('data-tenant-slug') ||
                      (cells[0].textContent || '').trim();
@@ -2286,7 +2286,7 @@ function attachPagination(table){
   pager.className = 'vspm-pager';
   pager.innerHTML =
     '<span class="info"></span>' +
-    '<label>Per page <select>' +
+    '<label>Per page <select aria-label="Select option">' +
       '<option value="25">25</option>' +
       '<option value="50">50</option>' +
       '<option value="100">100</option>' +
@@ -2375,7 +2375,7 @@ function attachBulkActions(table, panelID){
     var th = document.createElement('th');
     th.setAttribute('data-vspm-bulk-th', '1');
     th.style.width = '24px';
-    th.innerHTML = '<input type="checkbox" class="vspm-bulk-checkbox" data-vspm-bulk-all />';
+    th.innerHTML = '<input aria-label="Toggle option" type="checkbox" class="vspm-bulk-checkbox" data-vspm-bulk-all />';
     head.insertBefore(th, head.firstChild);
   }
   table.querySelectorAll('tbody tr').forEach(function(tr){
@@ -2386,7 +2386,7 @@ function attachBulkActions(table, panelID){
     // CSPM (UUID in column 1) and Secrets (name in column 1).
     var firstCell = tr.querySelector('td');
     var rowKey = firstCell ? (firstCell.textContent || '').trim() : '';
-    td.innerHTML = '<input type="checkbox" class="vspm-bulk-checkbox" data-vspm-row-key="' + esc(rowKey) + '" />';
+    td.innerHTML = '<input aria-label="Vspm row key" type="checkbox" class="vspm-bulk-checkbox" data-vspm-row-key="' + esc(rowKey) + '" />';
     tr.insertBefore(td, tr.firstChild);
   });
 

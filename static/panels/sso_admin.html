@@ -498,7 +498,7 @@ loadProviders();
  bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
  bar.innerHTML = ''
  + (filters.search !== false
- ? '<input class="vsp-uni4-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+ ? '<input aria-label="Search filter" class="vsp-uni4-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
  + (filters.pills ? renderPillGroup(filters.pills) : '')
  + (filters.csv !== false
  ? '<button class="btn btn-sm vsp-uni4-csv" style="font-size:10px">↓ CSV</button>' : '')

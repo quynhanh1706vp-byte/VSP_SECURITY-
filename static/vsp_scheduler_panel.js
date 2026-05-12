@@ -356,7 +356,7 @@
                   <span id="sch-m-weekly-d" style="display:inline-flex;gap:3px;margin:0 4px">
                     ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=>`
                       <label style="font-size:10px;cursor:pointer;padding:2px 6px;border:1px solid var(--border);border-radius:3px;background:var(--bg2)">
-                        <input type="checkbox" data-dow="${i}" ${i===1?'checked':''} style="display:none">${d}
+                        <input aria-label="Dow" type="checkbox" data-dow="${i}" ${i===1?'checked':''} style="display:none">${d}
                       </label>
                     `).join('')}
                   </span>

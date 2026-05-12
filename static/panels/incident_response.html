@@ -423,7 +423,7 @@ function showRansomForm(id){
   document.getElementById('modal-ransom').classList.add('show');
   document.getElementById('mr-body').innerHTML=`
     <div class="banner banner-yellow">⚠️ Recording ransom payment triggers <b>CIRCIA 24-hour reporting deadline</b>.</div>
-    <div class="form-row"><label>Incident</label><input value="${id}" readonly></div>
+    <div class="form-row"><label>Incident</label><input aria-label="Read-only value" value="${id}" readonly></div>
     <div class="form-row"><label>Amount (USD) *</label><input aria-label="50000" id="rp-amount" type="number" placeholder="50000" step="0.01"></div>
     <div class="form-row"><label for="rp-method">Payment Method</label>
       <select id="rp-method">
@@ -1951,7 +1951,7 @@ window.showEditFieldModal = function(incidentId, field, currentVal){
   document.getElementById('mef-title').textContent = 'Edit ' + field;
   var isLong = (field === 'description' || field === 'notes' || (currentVal||'').length > 80);
   document.getElementById('mef-body').innerHTML =
-    '<div class="form-row"><label>Field</label><input value="'+field+'" readonly></div>' +
+    '<div class="form-row"><label>Field</label><input aria-label="Read-only value" value="'+field+'" readonly></div>' +
     '<div class="form-row"><label>New Value</label>' +
     (isLong
       ? '<textarea aria-label="Mef Val" id="mef-val" rows="5" style="width:100%">'+(currentVal||'').replace(/</g,'&lt;')+'</textarea>'
@@ -1981,12 +1981,12 @@ window.showTransitionModal = function(incidentId, currentPhase){
   var opts = nextPhases.map(function(p, i){
     var sel = i === 0 ? 'checked' : '';
     return '<label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer">'+
-      '<input type="radio" name="mt-phase" value="'+p+'" '+sel+'>'+
+      '<input aria-label="Select option" type="radio" name="mt-phase" value="'+p+'" '+sel+'>'+
       '<span><b>'+p.replace(/_/g,' ')+'</b></span></label>';
   }).join('');
   document.getElementById('mt-body').innerHTML =
-    '<div class="form-row"><label>Incident</label><input value="'+incidentId+'" readonly></div>' +
-    '<div class="form-row"><label>Current Phase</label><input value="'+currentPhase.replace(/_/g,' ')+'" readonly></div>' +
+    '<div class="form-row"><label>Incident</label><input aria-label="Read-only value" value="'+incidentId+'" readonly></div>' +
+    '<div class="form-row"><label>Current Phase</label><input aria-label="Read-only value" value="'+currentPhase.replace(/_/g,' ')+'" readonly></div>' +
     '<div class="form-row"><label>Next Phase</label>'+opts+'</div>' +
     '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
     '<button class="btn" onclick="closeModal(\'transition\')">Cancel</button>' +
@@ -2009,13 +2009,13 @@ window.submitTransition = async function(incidentId){
 window.showCIRCIAGenModal = function(incidentId){
   document.getElementById('mcg-body').innerHTML =
     '<div class="banner banner-blue">CIRCIA reports must be filed within prescribed timelines: <b>72h</b> for substantial incidents, <b>24h</b> for ransomware payments.</div>' +
-    '<div class="form-row"><label>Incident</label><input value="'+incidentId+'" readonly></div>' +
-    '<div class="form-row"><label>Report Type *</label><select id="mcg-type">' +
+    '<div class="form-row"><label>Incident</label><input aria-label="Read-only value" value="'+incidentId+'" readonly></div>' +
+    '<div class="form-row"><label>Report Type *</label><select aria-label="Select option" id="mcg-type">' +
     '<option value="substantial_incident">Substantial Incident (72h)</option>' +
     '<option value="ransomware_payment">Ransomware Payment (24h)</option>' +
     '<option value="joint">Joint Report (combined)</option>' +
     '</select></div>' +
-    '<div class="form-row"><label>Critical Infrastructure Sector *</label><select id="mcg-sector">' +
+    '<div class="form-row"><label>Critical Infrastructure Sector *</label><select aria-label="Select option" id="mcg-sector">' +
     '<option value="information_technology">Information Technology</option>' +
     '<option value="financial_services">Financial Services</option>' +
     '<option value="healthcare_public_health">Healthcare &amp; Public Health</option>' +

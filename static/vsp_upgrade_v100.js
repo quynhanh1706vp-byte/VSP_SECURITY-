@@ -2305,7 +2305,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     } else {
       sel.innerHTML =
           '<span class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em">RANGE:</span>'
-        + '<select class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.setTrendRange(this.value)">'
+        + '<select aria-label="Filter" class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.setTrendRange(this.value)">'
         + '<option value="7">Last 7 runs</option><option value="30" selected>Last 30 runs</option><option value="60">Last 60 runs</option>'
         + '</select>';
     }
@@ -2540,7 +2540,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       var pathClass = st==='FIXED' ? 'mono-sm c-t3" style="font-size:10px;text-decoration:line-through;opacity:.6' : 'mono-sm c-t3" style="font-size:10px';
       var sla = slaBadge(f);
       return '<div class="sbom-u-row" style="cursor:pointer" onclick="if(event.target.tagName!==\'INPUT\'&&event.target.tagName!==\'BUTTON\')window._sbomUnified.openFindingDetail(\''+esc(fp)+'\')">'
-        + '<span><input type="checkbox" '+checked+' data-fp="'+esc(fp)+'" onchange="window._sbomUnified.toggleSel(this.dataset.fp,this.checked)" style="cursor:pointer"></span>'
+        + '<span><input aria-label="Fp" type="checkbox" '+checked+' data-fp="'+esc(fp)+'" onchange="window._sbomUnified.toggleSel(this.dataset.fp,this.checked)" style="cursor:pointer"></span>'
         + '<span class="'+stClass+'" style="font-weight:600">'+statusIcon(st)+' '+st+'</span>'
         + sevPill
         + '<span class="mono-sm c-t3">'+esc(f.tool||'—')+'</span>'
