@@ -62,10 +62,13 @@ function injectNav(){
     { id:'supplychain',   icon:'\u26d3', label:'Supply chain',       badge:'' },
     { id:'prbot',         icon:'\u229f', label:'PR / repo bot',      badge:'' },
     { id:'secrets_vault', icon:'\u26bf', label:'Secret vault',       badge:'' },
-    // sbomdiff is registered in the PRO modules array (9 total) but
-    // was missing from the sidebar (only 8 items rendered). Adding it
-    // restores the parity advertised by the [VSP PRO] console banner.
-    { id:'sbomdiff',      icon:'\u26d3', label:'SBOM diff',          badge:'' },
+    // 'sbomdiff' sidebar item removed: it was a duplicate of the
+    // Compliance > SBOM panel's Diff tab. After the redirect fix
+    // (ce84c6f) clicking it just jumped to that tab anyway, which
+    // confused users who saw two identical-looking entries with
+    // different labels. The PRO.modules.sbomdiff registration is
+    // kept so any deep-link / external trigger of openPanel still
+    // works \u2014 only the sidebar button is gone.
     { id:'observe',       icon:'\u25c9', label:'Observability',      badge:'' },
     { id:'tenants',       icon:'\u25cd', label:'Tenants',            badge:'' },
     { id:'sso',           icon:'\u26b7', label:'SSO / SAML',         badge:'' }
