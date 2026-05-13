@@ -1872,6 +1872,8 @@ func main() {
 		r.Post("/api/v1/integrations/{provider}", tiH.IntegrationsSaveProvider)
 		r.Post("/api/v1/integrations/{provider}/test-pr-comment", tiH.IntegrationsTestProvider)
 		r.Post("/api/v1/integrations/{provider}/test-ticket", tiH.IntegrationsTestProvider)
+		r.Post("/api/v1/integrations/jira/create", handleJiraCreate)
+		r.Get("/api/v1/sbom/signatures", handleSBOMSignatures)
 		r.Get("/api/v1/settings/scan-config", tiH.SettingsScanConfig)
 		r.Get("/api/v1/settings/dast-targets", tiH.SettingsDastTargets)
 

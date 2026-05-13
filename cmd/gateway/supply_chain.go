@@ -28,6 +28,10 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/ticket"
+	"github.com/spf13/viper"
 )
 
 // ════════════════════════════════════════════════════════════════
@@ -801,4 +805,122 @@ func generateUUID() string {
 		hex.EncodeToString(b[6:8]),
 		hex.EncodeToString(b[8:10]),
 		hex.EncodeToString(b[10:16]))
+}
+
+
+// handleJiraCreate — POST /api/v1/integrations/jira/create
+// Creates a Jira ticket from a finding ID.
+func handleJiraCreate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		writeJSONErr(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	_ = claims
+
+	var req struct {
+		FindingID string `json:"finding_id"`
+		Project   string `json:"project"`
+		Priority  string `json:"priority"`
+		Assignee  string `json:"assignee"`
+		Note      string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONErr(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if req.FindingID == "" {
+		writeJSONErr(w, http.StatusBadRequest, "finding_id required")
+		return
+	}
+	if req.Project == "" {
+		req.Project = viper.GetString("integrations.jira_project")
+	}
+	if req.Project == "" {
+		req.Project = "SEC"
+	}
+	if req.Priority == "" {
+		req.Priority = "High"
+	}
+
+	jiraURL   := viper.GetString("integrations.jira_url")
+	jiraEmail := viper.GetString("integrations.jira_email")
+	jiraToken := viper.GetString("integrations.jira_token")
+
+	if jiraURL == "" || jiraEmail == "" || jiraToken == "" {
+		writeJSONErr(w, http.StatusBadRequest, "Jira not configured — set integrations.jira_url, jira_email, jira_token")
+		return
+	}
+
+	t := ticket.New(ticket.Config{
+		JiraBaseURL:  jiraURL,
+		JiraEmail:    jiraEmail,
+		JiraAPIToken: jiraToken,
+	})
+
+	summary := "[VSP] Security finding: " + req.FindingID
+	desc := "Finding ID: " + req.FindingID
+	if req.Note != "" {
+		desc += "\n\nNote: " + req.Note
+	}
+
+	key, url, err := t.Create(r.Context(), "jira", req.Project, summary, desc, map[string]interface{}{
+		"priority": req.Priority,
+		"labels":   []string{"vsp", "security"},
+	})
+	if err != nil {
+		writeJSONErr(w, http.StatusBadGateway, "jira error: "+err.Error())
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"ok":          true,
+		"key":         key,
+		"url":         url,
+		"finding_id":  req.FindingID,
+	})
+}
+
+// handleSBOMSignatures — GET /api/v1/sbom/signatures
+// Alias for /api/v1/supply-chain/signatures with frontend-compatible field names.
+func handleSBOMSignatures(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if p4SQLDB == nil {
+		json.NewEncoder(w).Encode(map[string]any{"signatures": []any{}})
+		return
+	}
+	rows, err := p4SQLDB.Query(`
+		SELECT id, artifact_name, signed_by, algorithm,
+		       signed_at, verified
+		FROM supply_chain_signatures
+		ORDER BY signed_at DESC LIMIT 100`)
+	if err != nil {
+		writeJSONErr(w, http.StatusInternalServerError, "db error")
+		return
+	}
+	defer rows.Close()
+
+	var sigs []map[string]any
+	for rows.Next() {
+		var id, name, signer, algo string
+		var signedAt time.Time
+		var verified bool
+		if err := rows.Scan(&id, &name, &signer, &algo, &signedAt, &verified); err == nil {
+			status := "unverified"
+			if verified { status = "verified" }
+			sigs = append(sigs, map[string]any{
+				"id":           id,
+				"artifact_name": name,
+				"signer":       signer,
+				"algo":         algo,
+				"verified_at":  signedAt,
+				"status":       status,
+			})
+		}
+	}
+	if sigs == nil {
+		sigs = []map[string]any{}
+	}
+	json.NewEncoder(w).Encode(map[string]any{"signatures": sigs})
 }
