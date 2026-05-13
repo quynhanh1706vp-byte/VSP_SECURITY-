@@ -723,7 +723,7 @@ function showToast(msg, type='info') {
 // ═══════════════════════════════════
 //  MOCK DATA (real API falls back to this)
 // ═══════════════════════════════════
-const MOCK_INVENTORY = [
+const DEF_INVENTORY = [
   {id:1,name:'nginx',version:'1.18.0',vendor:'nginx.org',host:'web-prod-01',os:'linux',status:'approved',cves:2,license:'BSD-2-Clause',eol_date:null},
   {id:2,name:'openssl',version:'1.1.1f',vendor:'OpenSSL',host:'web-prod-01',os:'linux',status:'eol',cves:14,license:'OpenSSL',eol_date:'2023-09-11'},
   {id:3,name:'vlc',version:'3.0.18',vendor:'VideoLAN',host:'ws-dev-03',os:'windows',status:'unauthorized',cves:0,license:'GPL-2.0',eol_date:null},
@@ -741,7 +741,7 @@ const MOCK_INVENTORY = [
   {id:15,name:'putty',version:'0.78',vendor:'Simon Tatham',host:'ws-it-01',os:'windows',status:'approved',cves:2,license:'MIT',eol_date:null},
 ];
 
-const MOCK_WHITELIST = [
+const DEF_WHITELIST = [
   {name:'nginx',version:'>=1.18',vendor:'nginx.org',cat:'utility',reason:'Approved web server'},
   {name:'python',version:'>=3.8',vendor:'PSF',cat:'devtools',reason:'Dev standard'},
   {name:'chrome',version:'any',vendor:'Google',cat:'browser',reason:'Corporate browser'},
@@ -750,7 +750,7 @@ const MOCK_WHITELIST = [
   {name:'libreoffice',version:'any',vendor:'TDF',cat:'productivity',reason:'Office suite'},
   {name:'putty',version:'any',vendor:'Simon Tatham',cat:'utility',reason:'SSH client'},
 ];
-const MOCK_BLACKLIST = [
+const DEF_BLACKLIST = [
   {name:'teamviewer',version:'any',vendor:'TeamViewer',cat:'utility',reason:'Remote access risk — use Citrix'},
   {name:'*_crack',version:'any',vendor:'Unknown',cat:'other',reason:'Pirated software'},
   {name:'*_keygen',version:'any',vendor:'Unknown',cat:'other',reason:'License bypass tool'},
@@ -759,13 +759,13 @@ const MOCK_BLACKLIST = [
 ];
 const MOCK_WARNING = ['log4j','oracle_jdk','flash','silverlight','java_8','python2'];
 
-const MOCK_CRACKS = [
+const DEF_CRACKS = [
   {name:'adobe_photoshop_crack',version:'2024',host:'ws-hr-07',method:'Hash match (NSRL)',risk:'CRITICAL',hash:'a3f2...9d1e'},
   {name:'7zip_keygen',version:'23.01',host:'ws-fin-04',method:'Keygen signature',risk:'HIGH',hash:'b1e4...3c7a'},
   {name:'autocad_patch',version:'2023',host:'ws-eng-02',method:'Patcher signature · high PE entropy',risk:'HIGH',hash:'9d2a...f4b6'},
 ];
 
-const MOCK_LICENSE = [
+const DEF_LICENSE = [
   {comp:'log4j',ver:'2.14.1',license:'Apache-2.0',type:'Permissive',risk:'OK',sbom:true},
   {comp:'vlc',ver:'3.0.18',license:'GPL-2.0',type:'Copyleft',risk:'WARN',sbom:false},
   {comp:'curl',ver:'7.81.0',license:'MIT',type:'Permissive',risk:'OK',sbom:true},
@@ -775,11 +775,15 @@ const MOCK_LICENSE = [
   {comp:'ffmpeg',ver:'6.0',license:'LGPL-2.1',type:'Weak Copyleft',risk:'INFO',sbom:true},
 ];
 
-const MOCK_SCAN_HISTORY = [
+const DEF_SCAN_HISTORY = [
   {rid:'SW-014',host:'All agents',total:47,unauth:2,crack:3,eol:2,date:'2026-04-15 08:12',status:'DONE'},
   {rid:'SW-013',host:'All agents',total:44,unauth:2,crack:2,eol:3,date:'2026-04-14 08:10',status:'DONE'},
   {rid:'SW-012',host:'ws-hr-07',total:18,unauth:1,crack:1,eol:1,date:'2026-04-13 14:22',status:'DONE'},
 ];
+
+// State arrays — populated by fetch
+var INVENTORY=[], WHITELIST=[], BLACKLIST=[], CRACKS=[], LICENSE_DATA=[], SCAN_HISTORY=[];
+
 
 // ═══════════════════════════════════
 //  TAB SWITCHING
@@ -847,7 +851,7 @@ async function loadInventory() {
         return;
       }
       // Graceful degradation if VSPUXState missing
-      _invData = MOCK_INVENTORY;
+      _invData = INVENTORY;
       _swinvKPIClear();
       updateKPIs();
       renderInventory();
@@ -862,7 +866,7 @@ async function loadInventory() {
         VSPUXState.empty('#inv-tbody', 'No inventory found — run a scan to discover assets', loadInventory);
         return;
       }
-      _invData = MOCK_INVENTORY;
+      _invData = INVENTORY;
       _swinvKPIClear();
       updateKPIs();
       renderInventory();
@@ -900,7 +904,7 @@ async function loadInventory() {
       return;
     }
     // Graceful degradation
-    _invData = MOCK_INVENTORY;
+    _invData = INVENTORY;
     _swinvKPIClear();
     updateKPIs();
     renderInventory();
@@ -918,10 +922,10 @@ function updateKPIs() {
   document.getElementById('cs-suspicious').textContent = _invData.filter(x=>x.status==='cracked'||x.status==='warning').length;
   document.getElementById('cs-confirmed').textContent = _invData.filter(x=>x.status==='cracked').length;
   // license stats
-  document.getElementById('lic-ok').textContent = MOCK_LICENSE.filter(x=>x.risk==='OK').length;
-  document.getElementById('lic-gpl').textContent = MOCK_LICENSE.filter(x=>x.license&&x.license.includes('GPL')&&x.type==='Copyleft').length;
-  document.getElementById('lic-none').textContent = MOCK_LICENSE.filter(x=>x.license==='None'||x.type==='Unknown').length;
-  document.getElementById('lic-prop').textContent = MOCK_LICENSE.filter(x=>x.type==='Commercial').length;
+  document.getElementById('lic-ok').textContent = LICENSE_DATA.filter(x=>x.risk==='OK').length;
+  document.getElementById('lic-gpl').textContent = LICENSE_DATA.filter(x=>x.license&&x.license.includes('GPL')&&x.type==='Copyleft').length;
+  document.getElementById('lic-none').textContent = LICENSE_DATA.filter(x=>x.license==='None'||x.type==='Unknown').length;
+  document.getElementById('lic-prop').textContent = LICENSE_DATA.filter(x=>x.type==='Commercial').length;
 }
 
 function filterByStatus(status) {
@@ -988,7 +992,7 @@ function invPage(d) { _invPage += d; renderInventory(); }
 //  WHITELIST / BLACKLIST
 // ═══════════════════════════════════
 function renderWhitelist() {
-  document.getElementById('whitelist-list').innerHTML = MOCK_WHITELIST.map(x=>`
+  document.getElementById('whitelist-list').innerHTML = WHITELIST.map(x=>`
     <div class="policy-item approved">
       <div>
         <div class="policy-name">${x.name} <span style="font-size:10px;color:var(--t3);font-weight:400">${x.version}</span></div>
@@ -1000,7 +1004,7 @@ function renderWhitelist() {
       </div>
     </div>`).join('');
 
-  document.getElementById('blacklist-list').innerHTML = MOCK_BLACKLIST.map(x=>`
+  document.getElementById('blacklist-list').innerHTML = BLACKLIST.map(x=>`
     <div class="policy-item blocked">
       <div>
         <div class="policy-name">${x.name} <span style="font-size:10px;color:var(--t3);font-weight:400">${x.version}</span></div>
@@ -1026,9 +1030,9 @@ function loadCrackFindings() {
     MEDIUM:'<span class="sev sev-med">MEDIUM</span>',
   }[r]||r);
 
-  document.getElementById('crack-tbody').innerHTML = MOCK_CRACKS.length === 0
+  document.getElementById('crack-tbody').innerHTML = CRACKS.length === 0
     ? '<tr><td colspan="7" class="empty">No crack/pirate detections found</td></tr>'
-    : MOCK_CRACKS.map(x=>`<tr class="row-danger">
+    : CRACKS.map(x=>`<tr class="row-danger">
         <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--orange)">${x.name}</td>
         <td><span class="badge badge-neutral">${x.version}</span></td>
         <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${x.host}</td>
@@ -1082,7 +1086,7 @@ function loadLicenseData() {
     INFO:'<span class="badge badge-info">INFO</span>',
   }[r]||r);
 
-  document.getElementById('license-tbody').innerHTML = MOCK_LICENSE.map(x=>`<tr>
+  document.getElementById('license-tbody').innerHTML = LICENSE_DATA.map(x=>`<tr>
     <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--t1)">${x.comp}</td>
     <td><span class="badge badge-neutral">${x.ver}</span></td>
     <td style="font-family:var(--font-mono);font-size:11px;color:${x.license==='None'?'var(--red)':x.license&&x.license.includes('GPL')?'var(--amber)':'var(--t2)'}">${x.license}</td>
@@ -1109,7 +1113,7 @@ function loadLicenseData() {
 //  SCAN HISTORY
 // ═══════════════════════════════════
 function loadScanHistory() {
-  document.getElementById('scan-history-tbody').innerHTML = MOCK_SCAN_HISTORY.map(x=>`<tr>
+  document.getElementById('scan-history-tbody').innerHTML = SCAN_HISTORY.map(x=>`<tr>
     <td style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">${x.rid}</td>
     <td style="font-size:11px;color:var(--t2)">${x.host}</td>
     <td style="font-family:var(--font-mono);font-weight:600">${x.total}</td>
@@ -1142,8 +1146,8 @@ function saveToList() {
   const cat = document.getElementById('add-pkg-cat').value;
   const reason = document.getElementById('add-pkg-reason').value.trim()||'No reason provided';
 
-  if(_addModalTarget==='whitelist') MOCK_WHITELIST.push({name,version:ver,vendor,cat,reason});
-  else if(_addModalTarget==='blacklist') MOCK_BLACKLIST.push({name,version:ver,vendor,cat,reason});
+  if(_addModalTarget==='whitelist') WHITELIST.push({name,version:ver,vendor,cat,reason});
+  else if(_addModalTarget==='blacklist') BLACKLIST.push({name,version:ver,vendor,cat,reason});
   else MOCK_WARNING.push(name);
 
   renderWhitelist();
@@ -1158,15 +1162,15 @@ function saveToList() {
 function removeFromList(list, name) {
   if(!confirm(`Remove "${name}" from ${list}?`)) return;
   showToast(`${name} removed from ${list}`,'success');
-  if(list==='whitelist') { const i=MOCK_WHITELIST.findIndex(x=>x.name===name); if(i>=0) MOCK_WHITELIST.splice(i,1); }
-  else if(list==='blacklist') { const i=MOCK_BLACKLIST.findIndex(x=>x.name===name); if(i>=0) MOCK_BLACKLIST.splice(i,1); }
+  if(list==='whitelist') { const i=WHITELIST.findIndex(x=>x.name===name); if(i>=0) WHITELIST.splice(i,1); }
+  else if(list==='blacklist') { const i=BLACKLIST.findIndex(x=>x.name===name); if(i>=0) BLACKLIST.splice(i,1); }
   else { const i=MOCK_WARNING.indexOf(name); if(i>=0) MOCK_WARNING.splice(i,1); }
   renderWhitelist();
 }
 
 function blockSW(name) {
   if(!confirm(`Block "${name}" and add to blacklist?`)) return;
-  MOCK_BLACKLIST.push({name,version:'any',vendor:'Unknown',cat:'other',reason:'Auto-blocked: crack/pirate detection'});
+  BLACKLIST.push({name,version:'any',vendor:'Unknown',cat:'other',reason:'Auto-blocked: crack/pirate detection'});
   showToast(`${name} blocked and added to blacklist`,'error');
 }
 
@@ -1199,7 +1203,7 @@ function blockFromDetail() {
 function approveFromDetail() {
   if(!_detailSW) return;
   const x = _detailSW;
-  MOCK_WHITELIST.push({name:x.name,version:x.version||'any',vendor:x.vendor||'Unknown',cat:'other',reason:'Manually approved'});
+  WHITELIST.push({name:x.name,version:x.version||'any',vendor:x.vendor||'Unknown',cat:'other',reason:'Manually approved'});
   x.status = 'approved';
   renderInventory(); renderWhitelist(); updateKPIs();
   document.getElementById('detail-modal').classList.remove('open');
@@ -1239,5 +1243,40 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 <script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 <!-- VSP-SIEM-COMPANION -->
 <script src="/vsp_siem_companion.js"></script>
+
+<script>
+// FEAT-29: Bootstrap fetch from /api/swinv
+TOKEN='';
+async function _loadAllSwInv(){
+  if(!TOKEN) return;
+  var h={Authorization:'Bearer '+TOKEN};
+  try{
+    var [inv,wl,bl,cr,li,sh]=await Promise.all([
+      fetch(API+'/api/swinv/inventory',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/whitelist',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/blacklist',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/cracks',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/licenses',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/scan-history',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+    ]);
+    if(inv&&inv.items) INVENTORY=inv.items;
+    if(wl&&wl.items) WHITELIST=wl.items;
+    if(bl&&bl.items) BLACKLIST=bl.items;
+    if(cr&&cr.items) CRACKS=cr.items;
+    if(li&&li.items) LICENSE_DATA=li.items;
+    if(sh&&sh.items) SCAN_HISTORY=sh.items;
+    if(typeof loadInventory==='function') loadInventory();
+    if(typeof renderWhitelist==='function') renderWhitelist();
+    if(typeof renderBlacklist==='function') renderBlacklist();
+    if(typeof renderCracks==='function') renderCracks();
+    if(typeof renderLicense==='function') renderLicense();
+  }catch(e){console.warn('[swinv] load failed',e);}
+}
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;_loadAllSwInv();}}
+});
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
+</script>
 </body>
 </html>

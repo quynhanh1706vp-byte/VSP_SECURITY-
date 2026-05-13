@@ -239,16 +239,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 </div>
 <script>
 var TOKEN='',API='',_paused=false,_tab='sources';
-var SOURCES=[
-  {id:'s1',name:'Linux syslog (prod)',proto:'syslog-udp',format:'syslog-rfc3164',addr:'10.0.1.10:514',eps:905,lastEvent:'1s',parseRate:99.8,status:'ok',events:4200000},
-  {id:'s2',name:'Nginx access log',proto:'syslog-tcp',format:'json-raw',addr:'10.0.1.11:514',eps:1240,lastEvent:'0s',parseRate:100,status:'ok',events:1200000},
-  {id:'s3',name:'AWS CloudTrail',proto:'s3',format:'aws-cloudtrail',addr:'s3://logs',eps:77,lastEvent:'4s',parseRate:98.1,status:'ok',events:320000},
-  {id:'s4',name:'Windows Event Log',proto:'agent',format:'windows-evtx',addr:'10.0.1.45:8514',eps:0,lastEvent:'14m',parseRate:0,status:'err',events:0},
-  {id:'s5',name:'Firewall (Palo Alto)',proto:'syslog-tls',format:'cef-v25',addr:'10.0.2.1:6514',eps:380,lastEvent:'1s',parseRate:99.5,status:'ok',events:890000},
-  {id:'s6',name:'VSP scan engine',proto:'http-json',format:'json-raw',addr:'127.0.0.1:8922',eps:28,lastEvent:'2s',parseRate:100,status:'ok',events:42000},
-  {id:'s7',name:'GitHub audit log',proto:'http-json',format:'json-raw',addr:'api.github.com:443',eps:12,lastEvent:'8s',parseRate:97.2,status:'ok',events:28000},
-  {id:'s8',name:'Kubernetes events',proto:'agent',format:'json-raw',addr:'10.0.3.1:8514',eps:718,lastEvent:'1s',parseRate:98.8,status:'warn',events:1400000},
-];
+var SOURCES=[];// populated by loadSources()
 var STREAM_BUFFER=[],STREAM_ALL=[],_streamErrors=0,_streamTotal=0;
 var TP_DATA=[];for(var i=0;i<60;i++)TP_DATA.push(Math.round(2800+Math.random()*1200));
 var NORM_RULES=[

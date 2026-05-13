@@ -615,15 +615,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
   </button>
   <div id="tenant-switcher-dropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:220px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
     <div style="font-size:10px;color:var(--t3);padding:4px 8px;margin-bottom:4px">SWITCH TENANT</div>
-    <div onclick="switchTenant('VSP-DOD-2025-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
-      <span>VSP — Default</span><span style="color:var(--green);font-size:10px">P4 100%</span>
-    </div>
-    <div onclick="switchTenant('TENANT-ACME-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
-      <span>ACME Defense</span><span style="color:var(--amber);font-size:10px">P4 38%</span>
-    </div>
-    <div onclick="switchTenant('TENANT-NGIT-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
-      <span>Northrop IT</span><span style="color:var(--green);font-size:10px">P4 87%</span>
-    </div>
+    <div id="tenant-list"><div style="padding:8px 10px;color:var(--t3);font-size:11px">Loading…</div></div>
     <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px">
       <div onclick="window.location.href='/onboarding'" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--cyan)" onmouseover="this.style.background='rgba(6,182,212,.08)'" onmouseout="this.style.background='transparent'">
         + Add new tenant
@@ -2954,7 +2946,6 @@ const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Appli
 document.addEventListener('DOMContentLoaded',function(){
   const qb=document.getElementById('ai-quick-btns');
   if(!qb)return;
-  const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Application pillar to 100?','Generate evidence for SC-7(5) micro-seg','CMMC L2 vs FedRAMP Moderate differences'];
 AI_QUICK.forEach(function(p){
     const b=document.createElement('button');
     b.className='btn btn-ghost btn-sm';
@@ -2988,12 +2979,10 @@ async function downloadOSCAL() {
 
 
 // ── Multi-tenant switcher ─────────────────────────────────
-const TENANTS = [
-  {id:'VSP-DOD-2025-001', name:'VSP — Default', status:'authorized', p4:100},
-  {id:'TENANT-ACME-001', name:'ACME Defense Systems', status:'ato_in_progress', p4:38},
-  {id:'TENANT-NGIT-001', name:'Northrop IT', status:'authorized', p4:87},
-];
+let TENANTS = [{id:'default', name:'Default tenant', status:'authorized', p4:100}];
 let currentTenant = TENANTS[0];
+function renderTenantList(){var el=document.getElementById('tenant-list');if(!el)return;if(!TENANTS.length){el.innerHTML='<div style="padding:8px 10px;color:var(--t3);font-size:11px">No tenants</div>';return;}el.innerHTML=TENANTS.map(function(t){var p4=t.p4||0;var col=p4>=85?'var(--green)':p4>=60?'var(--amber)':'var(--red)';return '<div onclick="switchTenant(\''+t.id+'\')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" onmouseout="this.style.background=\'transparent\'"><span>'+(t.name||t.id)+'</span><span style="color:'+col+';font-size:10px">P4 '+p4+'%</span></div>';}).join('');var lbl=document.getElementById('tenant-label');if(lbl&&currentTenant)lbl.textContent=currentTenant.name||currentTenant.id;}
+(async function(){try{var r=await fetch(API+'/api/v1/admin/tenants');if(r.ok){var d=await r.json();if(d.tenants&&d.tenants.length){TENANTS=d.tenants;currentTenant=TENANTS[0];}}}catch(e){}renderTenantList();})();
 
 function openTenantSwitcher() {
   const el = document.getElementById('tenant-switcher-dropdown');

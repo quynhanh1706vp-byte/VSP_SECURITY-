@@ -1174,17 +1174,36 @@ PRO.prbotRegisterRepo = function(){
     fields: [
       { id: 'provider', label: 'Provider', type: 'select', value: 'github', required: true,
         options: [{value:'github',label:'GitHub'},{value:'gitlab',label:'GitLab'},{value:'bitbucket',label:'Bitbucket'}] },
-      { id: 'full_name', label: 'Full name', type: 'text', required: true,
-        placeholder: 'org/repo (e.g. acme/payments-api)' },
+      { id: 'full_name', label: 'Full name (org/repo)', type: 'text', required: true,
+        placeholder: 'acme/payments-api' },
+      { id: 'token_user', label: 'Token username', type: 'text', required: true,
+        placeholder: 'git username or x-token-auth' },
+      { id: 'token', label: 'Access token', type: 'password', required: true,
+        hint: 'PAT with repo read+write access.' },
       { id: 'default_branch', label: 'Default branch', type: 'text', value: 'main', required: true },
       { id: 'webhook_secret', label: 'Webhook secret', type: 'password',
-        hint: 'HMAC secret used to validate inbound webhooks. Leave blank to skip webhook setup.' }
+        hint: 'HMAC secret used to validate inbound webhooks. Leave blank to skip.' }
     ],
     commit: function(v){
+      var parts = (v.full_name||'').trim().split('/');
+      var owner = parts[0]||'';
+      var repo  = parts.slice(1).join('/')||'';
+      if (!owner || !repo) return Promise.reject(new Error('Full name phai la org/repo'));
+      var baseURL = v.provider === 'gitlab' ? 'https://gitlab.com'
+                  : v.provider === 'bitbucket' ? 'https://bitbucket.org'
+                  : 'https://github.com';
       return proFetch('/api/v1/autofix/repo/register', { method: 'POST',
         body: JSON.stringify({
-          provider: v.provider, full_name: v.full_name.trim(),
-          default_branch: v.default_branch.trim(), webhook_secret: v.webhook_secret || ''
+          platform:        v.provider,
+          base_url:        baseURL,
+          repo_owner:      owner,
+          repo_name:       repo,
+          token_user:      v.token_user.trim(),
+          token:           v.token,
+          default_branch:  v.default_branch.trim(),
+          webhook_secret:  v.webhook_secret || '',
+          nickname:        owner + '/' + repo,
+          auto_pr_enabled: true
         }) });
     }
   }).then(function(v){ if (v) refreshPanel('prbot'); })

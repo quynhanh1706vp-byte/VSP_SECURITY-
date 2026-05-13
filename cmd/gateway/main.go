@@ -1305,6 +1305,8 @@ func main() {
 		r.With(requirePro).Put("/api/v1/supply-chain/config", proPanels.SupplyChainConfigPut)
 		r.With(requirePro).Get("/api/v1/sbom/config", proPanels.SBOMConfigGet)
 		r.With(requirePro).Put("/api/v1/sbom/config", proPanels.SBOMConfigPut)
+		r.With(requirePro).Get("/api/v1/settings/sbom", proPanels.SBOMConfigGet)
+		r.With(requirePro).Put("/api/v1/settings/sbom", proPanels.SBOMConfigPut)
 		r.With(requirePro).Get("/api/v1/sso/config", proPanels.SSOConfigGet)
 		r.With(requirePro).Put("/api/v1/sso/config", proPanels.SSOConfigPut)
 		// Cross-panel notifications: Slack/Teams/webhook/email/PagerDuty.
@@ -1867,6 +1869,7 @@ func main() {
 
 		// UI Real Data — query actual DB tables
 		r.Get("/api/v1/integrations", tiH.IntegrationsList)
+		r.Post("/api/v1/integrations/{provider}", tiH.IntegrationsSaveProvider)
 		r.Post("/api/v1/integrations/{provider}/test-pr-comment", tiH.IntegrationsTestProvider)
 		r.Post("/api/v1/integrations/{provider}/test-ticket", tiH.IntegrationsTestProvider)
 		r.Get("/api/v1/settings/scan-config", tiH.SettingsScanConfig)

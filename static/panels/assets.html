@@ -199,7 +199,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 <script>
 var TOKEN='',API='',_assetFilter='',_activeAsset=null;
 var ASSETS=[];
-var ALL_FINDINGS=[];
+var ALL_FINDINGS=[];// lazy-loaded via openAssetModal()
 /* FEAT-34: assets L2 UX states (mirror p4_compliance pattern, override-aware) */
 function _assetSkel(target, opts) {
   if (typeof VSPUXState !== 'undefined') VSPUXState.skeleton(target, opts || { rows: 4, kind: 'row' });

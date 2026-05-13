@@ -1348,3 +1348,49 @@ func (h *ThreatIntel) OSCALIndex(w http.ResponseWriter, r *http.Request) {
 		"format":  "JSON",
 	})
 }
+
+// IntegrationsSaveProvider serves POST /api/v1/integrations/{provider}
+// Upserts webhook config into siem_webhooks table.
+func (h *ThreatIntel) IntegrationsSaveProvider(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	provider := chi.URLParam(r, "provider")
+	if provider == "" {
+		jsonError(w, "provider required", http.StatusBadRequest)
+		return
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	// Extract URL — field name differs per provider
+	urlVal := ""
+	for _, k := range []string{"url", "webhook_url", "token", "key"} {
+		if v, ok := body[k]; ok {
+			if s, ok := v.(string); ok && s != "" {
+				urlVal = s
+				break
+			}
+		}
+	}
+	label := provider
+	if n, ok := body["name"].(string); ok && n != "" {
+		label = n
+	}
+
+	_, err := h.DB.Pool().Exec(r.Context(), `
+		INSERT INTO siem_webhooks (tenant_id, label, type, url, min_sev, active)
+		VALUES ($1, $2, $3, $4, 'LOW', true)`,
+		claims.TenantID, label, provider, urlVal)
+	if err != nil {
+		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{"ok": true, "provider": provider})
+}

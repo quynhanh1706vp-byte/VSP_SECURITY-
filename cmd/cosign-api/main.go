@@ -66,7 +66,8 @@ var (
 	password  string                   // loaded from cosign.pass at boot
 	keyPath   string
 	pubPath   string
-	storePath string
+	storePath         string
+	signingConfigPath string
 )
 
 // ─── types ────────────────────────────────────────────────────────────────
@@ -308,7 +309,7 @@ func handleSign(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	args := []string{"sign", "--key", keyPath, "--tlog-upload=false"}
+	args := []string{"sign", "--key", keyPath, "--signing-config", signingConfigPath}
 	if req.Recursive {
 		args = append(args, "--recursive")
 	}
@@ -395,9 +396,9 @@ func handleAttest(w http.ResponseWriter, r *http.Request) {
 		Predicate: predicate,
 		CreatedAt: time.Now().UTC(),
 	}
-	args := []string{"attest", "--key", keyPath,
+	args := []string{"attest", "--key", keyPath, "--signing-config", signingConfigPath,
 		"--predicate", predFile, "--type", predicate,
-		"--tlog-upload=false", "--yes", req.Image}
+		"--yes", req.Image}
 
 	stdout, stderr, err := runCosign(r.Context(), args...)
 	sig.Output = clip(stdout+"\n"+stderr, 4096)
@@ -656,6 +657,7 @@ func main() {
 	keyPath = filepath.Join(*keyDir, "cosign.key")
 	pubPath = filepath.Join(*keyDir, "cosign.pub")
 	storePath = filepath.Join(*storeDir, "sigs.json")
+	signingConfigPath = filepath.Join(*keyDir, "signing-config.json")
 
 	mustExist(keyPath, "run `cosign generate-key-pair` and copy cosign.key here")
 	mustExist(pubPath, "run `cosign generate-key-pair` and copy cosign.pub here")

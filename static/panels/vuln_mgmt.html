@@ -1416,12 +1416,12 @@ renderSampleData();
   };
 
   const path = location.pathname;
-  const PANEL =
+  const CL_PANEL =
     /vuln_mgmt/.test(path)         ? 'vuln_mgmt' :
     /incident_response/.test(path) ? 'incident_response' :
     /p4_compliance/.test(path)     ? 'p4_compliance' : 'unknown';
 
-  (window.VSP_DEBUG && console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL));
+  (window.VSP_DEBUG && console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', CL_PANEL));
 
   // ─── Toast ────────────────────────────────────────────────────────────
   let tcontainer = null;
@@ -1512,7 +1512,7 @@ renderSampleData();
   }
 
   // ═════════════════════════════════════════════════════════════════════
-  // PANEL: vuln_mgmt — CVE enrichment cross-link (UNCHANGED from v2)
+  // CL_PANEL: vuln_mgmt — CVE enrichment cross-link (UNCHANGED from v2)
   // ═════════════════════════════════════════════════════════════════════
   function initVulnMgmt() {
     setTimeout(async function () {
@@ -1643,7 +1643,7 @@ renderSampleData();
   };
 
   // ═════════════════════════════════════════════════════════════════════
-  // PANEL: incident_response — SOAR playbook trigger (FIXED v3)
+  // CL_PANEL: incident_response — SOAR playbook trigger (FIXED v3)
   // ═════════════════════════════════════════════════════════════════════
   function initIncidentResponse() {
     setTimeout(function () {
@@ -1839,7 +1839,7 @@ renderSampleData();
   };
 
   // ═════════════════════════════════════════════════════════════════════
-  // PANEL: p4_compliance — Reverse link to OSCAL (UNCHANGED)
+  // CL_PANEL: p4_compliance — Reverse link to OSCAL (UNCHANGED)
   // ═════════════════════════════════════════════════════════════════════
   function initP4Compliance() {
     setTimeout(function () {
@@ -1862,9 +1862,9 @@ renderSampleData();
 
   // ─── Init ────────────────────────────────────────────────────────────
   function init() {
-    if (PANEL === 'vuln_mgmt')              initVulnMgmt();
-    else if (PANEL === 'incident_response') initIncidentResponse();
-    else if (PANEL === 'p4_compliance')     initP4Compliance();
+    if (CL_PANEL === 'vuln_mgmt')              initVulnMgmt();
+    else if (CL_PANEL === 'incident_response') initIncidentResponse();
+    else if (CL_PANEL === 'p4_compliance')     initP4Compliance();
   }
 
   if (document.readyState !== 'loading') setTimeout(init, 800);
