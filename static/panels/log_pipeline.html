@@ -120,11 +120,18 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   <div class="kpi"><div class="kpi-lbl">Sources</div><div class="kpi-val" id="k-sources">8</div><div class="kpi-sub" id="k-sources-sub">7 ok · 1 err</div></div>
   <div class="kpi"><div class="kpi-lbl">Queue depth</div><div class="kpi-val" style="color:var(--amber)" id="k-queue">146</div><div class="kpi-sub">events pending</div></div>
 </div>
-<!-- Pipeline architecture -->
+<!-- Pipeline architecture (read-only diagram).
+     Pre-fix users hovered the boxes expecting drill-down per stage
+     but each box was just decorative HTML with no handler. The 8
+     stages map 1:1 to the tabs below: live throughput / parse rate
+     / normalizer breakdown live in "Throughput" + "Normalizer".
+     Stage-level metrics will land when the BE exposes per-stage
+     counters (not on the roadmap yet). For now the title hints at
+     where to find detail so users stop clicking dead boxes. -->
 <div class="card">
-  <div class="card-head"><div class="card-title">Pipeline architecture</div><div class="card-sub">data flow: source → VSP findings</div></div>
+  <div class="card-head"><div class="card-title">Pipeline architecture <span style="font-size:10px;color:var(--t3);font-weight:normal;margin-left:6px">diagram only — see tabs below for live metrics</span></div><div class="card-sub">data flow: source → VSP findings</div></div>
   <div class="card-body">
-    <div style="display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:4px">
+    <div style="display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:4px" role="img" aria-label="Log ingestion pipeline stages: Receive, Buffer, Parse, Normalize, Enrich, Filter, Route, Store">
       <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⇌</div><div style="font-size:10px;font-weight:600">Receive</div><div style="font-size:9px;color:var(--t3)">UDP/TCP/TLS</div></div>
       <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
       <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⊞</div><div style="font-size:10px;font-weight:600">Buffer</div><div style="font-size:9px;color:var(--t3)">in-memory queue</div></div>
