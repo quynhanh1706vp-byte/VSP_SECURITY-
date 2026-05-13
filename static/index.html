@@ -918,10 +918,11 @@ window.addEventListener('DOMContentLoaded', function(){
           <table>
             <thead><tr><th>Run ID</th><th>Mode</th><th>Status</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Created</th></tr></thead>
             <tbody id="d-runs-table">
-              <tr><td class="mono overflow-ellipsis" style="max-width:240px">RID_SCHED_20260329_194714_0</td><td><span class="pill pill-run">IAC</span></td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">104</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 19:47</td></tr>
-              <tr><td class="mono overflow-ellipsis" style="max-width:240px">RID_VSPGO_RUN_20260329_171611</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-orange fw7">49</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 17:16</td></tr>
-              <tr><td class="mono overflow-ellipsis" style="max-width:240px">RID_VSPGO_RUN_20260329_165946</td><td><span class="pill pill-run">IAC</span></td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-warn">WARN</span></td><td class="c-amber fw7">43</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 16:59</td></tr>
-              <tr><td class="mono overflow-ellipsis" style="max-width:240px">RID_VSPGO_RUN_20260329_164947</td><td><span class="pill pill-run">IAC</span></td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-pass">PASS</span></td><td class="c-green fw7">8</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 16:49</td></tr>
+              <!-- Replaced by loadDashRuns() on panel-show. Pre-fix four
+                   hardcoded "RID_VSPGO_RUN_20260329_xxx · 29/3 19:47"
+                   demo rows shipped to prod and looked like real history
+                   until the fetch returned. -->
+              <tr class="placeholder-row"><td colspan="7" class="mono-sm c-t3" style="text-align:center;padding:24px">Loading recent runs…</td></tr>
             </tbody>
           </table>
         </div>
@@ -948,11 +949,10 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="card-body" style="padding:10px 14px">
           <div class="flex gap8" style="align-items:center">
             <select aria-label="Select run for scan log" id="log-run-select" class="filter-select" style="flex:1;max-width:480px" onchange="loadRunLog(this.value)">
+              <!-- Replaced by loadRunsDropdown() on panel-show; pre-fix
+                   four hardcoded "RID_VSPGO_RUN_20260329_xxx" options
+                   shipped to prod. -->
               <option value="">— select run —</option>
-              <option value="RID_SCHED_20260329_194714_0">RID_SCHED_20260329_194714_0 · IAC · DONE</option>
-              <option value="RID_VSPGO_RUN_20260329_171611_59df331a">RID_VSPGO_RUN_20260329_171611 · FULL · DONE</option>
-              <option value="RID_VSPGO_RUN_20260329_165946_252112b8">RID_VSPGO_RUN_20260329_165946 · IAC · DONE</option>
-              <option value="RID_VSPGO_RUN_20260329_164947_95de1cb5">RID_VSPGO_RUN_20260329_164947 · IAC · DONE</option>
             </select>
             <span id="log-run-info" class="mono-sm"></span>
           </div>
@@ -987,20 +987,12 @@ window.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="log-stream" id="log-stream">
-        <div class="log-line"><span class="log-ts">00:00:00</span><span class="log-tool" style="color:var(--t2)">scanner</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Run started: RID_SCHED_20260329_194714_0</span></div>
-        <div class="log-line"><span class="log-ts">00:00:01</span><span class="log-tool" style="color:var(--t2)">scanner</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Mode: IAC · Profile: FAST</span></div>
-        <div class="log-line"><span class="log-ts">00:00:02</span><span class="log-tool" style="color:#818cf8">kics</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Starting scan…</span></div>
-        <div class="log-line"><span class="log-ts">00:00:03</span><span class="log-tool" style="color:#818cf8">kics</span><span class="log-level log-ERROR">ERROR</span><span class="log-msg">Found 13 CRITICAL findings</span></div>
-        <div class="log-line"><span class="log-ts">00:00:04</span><span class="log-tool" style="color:#818cf8">kics</span><span class="log-level log-WARN">WARN</span><span class="log-msg">Found 462 HIGH findings</span></div>
-        <div class="log-line"><span class="log-ts">00:00:05</span><span class="log-tool" style="color:#818cf8">kics</span><span class="log-level log-DONE">DONE</span><span class="log-msg">Completed · 475 findings</span></div>
-        <div class="log-line"><span class="log-ts">00:00:06</span><span class="log-tool" style="color:#fbbf24">trivy</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Starting scan…</span></div>
-        <div class="log-line"><span class="log-ts">00:00:07</span><span class="log-tool" style="color:#fbbf24">trivy</span><span class="log-level log-ERROR">ERROR</span><span class="log-msg">Found 3 CRITICAL findings (CVE-2024-45337, CVE-2025-22869, CVE-2025-30204)</span></div>
-        <div class="log-line"><span class="log-ts">00:00:08</span><span class="log-tool" style="color:#fbbf24">trivy</span><span class="log-level log-DONE">DONE</span><span class="log-msg">Completed · 9 findings</span></div>
-        <div class="log-line"><span class="log-ts">00:00:10</span><span class="log-tool" style="color:#f87171">gitleaks</span><span class="log-level log-ERROR">ERROR</span><span class="log-msg">Found 3 CRITICAL findings (generic-api-key)</span></div>
-        <div class="log-line"><span class="log-ts">00:00:13</span><span class="log-tool" style="color:#f87171">gitleaks</span><span class="log-level log-DONE">DONE</span><span class="log-msg">Completed · 3 findings</span></div>
-        <div class="log-line"><span class="log-ts">00:00:14</span><span class="log-tool" style="color:#a78bfa">checkov</span><span class="log-level log-INFO">INFO</span><span class="log-msg">Starting scan…</span></div>
-        <div class="log-line"><span class="log-ts">00:00:16</span><span class="log-tool" style="color:#a78bfa">checkov</span><span class="log-level log-WARN">WARN</span><span class="log-msg">Found 13 HIGH findings (CKV_AWS_20, CKV_AWS_21, CKV_AWS_18…)</span></div>
-        <div class="log-line"><span class="log-ts">00:00:17</span><span class="log-tool" style="color:#a78bfa">checkov</span><span class="log-level log-DONE">DONE</span><span class="log-msg">Completed · 13 findings</span></div>
+        <!-- Replaced by loadRunLog() when user picks a run from the
+             dropdown. Pre-fix 14 hardcoded log lines (kics 475 findings
+             from RID_SCHED_20260329_194714_0, trivy CVE-2024-45337
+             etc.) shipped to prod and made every scanlog session start
+             with stale March-29 demo content. -->
+        <div class="log-line c-t3" style="text-align:center;padding:24px">Select a run above to view its scan log</div>
         <div class="log-line"><span class="log-ts">00:00:18</span><span class="log-tool" style="color:#38bdf8">gate</span><span class="log-level log-ERROR">ERROR</span><span class="log-msg">Gate decision: FAIL · Total: 104 findings · Score: 22</span></div>
       </div>
     </div>
@@ -1063,12 +1055,10 @@ window.addEventListener('DOMContentLoaded', function(){
           <table>
             <thead><tr><th>Run ID</th><th>Mode</th><th>Profile</th><th>Status</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Score</th><th>Created</th></tr></thead>
             <tbody id="runs-table">
-              <tr><td class="mono" style="font-size:10px">RID_SCHED_20260329_194714_0</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">104</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 19:47</td></tr>
-              <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_171611</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-orange fw7">49</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 17:16</td></tr>
-              <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_165946</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-warn">WARN</span></td><td class="c-amber fw7">43</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 16:59</td></tr>
-              <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_164947</td><td><span class="pill pill-run">IAC</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-pass">PASS</span></td><td class="c-green fw7">8</td><td class="mono-sm">2/2</td><td class="mono-sm">29/3 16:49</td></tr>
-              <tr><td class="mono" style="font-size:10px">RID_VSPGO_RUN_20260329_163409</td><td><span class="pill" style="background:var(--purple2);color:var(--purple);border:1px solid rgba(139,92,246,.25)">FULL</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-done">DONE</span></td><td><span class="pill pill-fail">FAIL</span></td><td class="c-red fw7">14</td><td class="mono-sm">9/9</td><td class="mono-sm">29/3 16:34</td></tr>
-              <tr><td class="mono" style="font-size:10px">RID_SCHED_20260329_134703_1</td><td><span class="pill" style="background:var(--blue2);color:var(--blue);border:1px solid rgba(59,130,246,.25)">SAST</span></td><td class="mono-sm">FAST</td><td><span class="pill pill-run">RUNNING</span></td><td>—</td><td>0</td><td class="mono-sm">0/3</td><td class="mono-sm">29/3 13:47</td></tr>
+              <!-- Replaced by loadRuns() on panel-show. Pre-fix six
+                   hardcoded demo rows ("29/3 19:47 RID_VSPGO_RUN_...")
+                   shipped to prod. -->
+              <tr class="placeholder-row"><td colspan="9" class="mono-sm c-t3" style="text-align:center;padding:24px">Loading run history…</td></tr>
             </tbody>
           </table>
         </div>
