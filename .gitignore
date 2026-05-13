@@ -264,3 +264,11 @@ secrets/
 secrets.yaml
 secrets.yml
 *.key
+cosign-api
+vsp-dev-stub
+vsp-gateway-new
+re
+static/panels/csv
+scripts/mint_jwt.sh
+scripts/start-devstub.sh
+scripts/stop-devstub.sh
