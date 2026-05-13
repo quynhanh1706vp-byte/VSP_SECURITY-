@@ -169,21 +169,14 @@ select.form-ctrl option{background:var(--bg2)}
 var TOKEN='',API='';
 var USERS=[];
 var ROLES=[];
-var AUDIT=[
-  {action:'login',user:'admin@vsp.local',detail:'Login from 127.0.0.1',ts:'just now',level:'info'},
-  {action:'scan',user:'admin@vsp.local',detail:'Triggered SAST scan on /home/test/Data/GOLANG_VSP',ts:'29m ago',level:'info'},
-  {action:'admin',user:'admin@vsp.local',detail:'Created user analyst@vsp.local with role analyst',ts:'2h ago',level:'warn'},
-  {action:'scan',user:'analyst@vsp.local',detail:'Viewed findings — 104 results',ts:'2h ago',level:'info'},
-  {action:'api',user:'cicd@vsp.local',detail:'API scan triggered via token vsp_xxxxxxxx',ts:'5m ago',level:'info'},
-  {action:'admin',user:'admin@vsp.local',detail:'Policy updated — gate threshold changed to 30',ts:'1d ago',level:'warn'},
-  {action:'login',user:'sec-eng@vsp.local',detail:'Login from 192.168.1.50',ts:'1d ago',level:'info'},
-  {action:'scan',user:'cicd@vsp.local',detail:'Scheduled scan complete — gate FAIL 104 findings',ts:'1d ago',level:'info'},
-];
-var API_KEYS=[
-  {id:'k1',name:'CI/CD pipeline',prefix:'vsp_ci_',perms:'scans,read',created:'30d ago',expires:'60d',status:'active'},
-  {id:'k2',name:'SIEM integration',prefix:'vsp_si_',perms:'read,reports',created:'90d ago',expires:'never',status:'active'},
-  {id:'k3',name:'Old deployment key',prefix:'vsp_od_',perms:'scans',created:'180d ago',expires:'expired',status:'expired'},
-];
+// AUDIT + API_KEYS were seeded with hardcoded demo entries (8 fake
+// audit lines about "analyst@vsp.local", a "cicd@vsp.local" API key,
+// "Old deployment key" expired 180 days ago, etc.). No fetch ever
+// replaced them — they just decorated the panel forever and made
+// every tenant look like ACME Corp had been using the system for
+// 180 days. Start empty; loadAPIKeys() wires the real list.
+var AUDIT=[];
+var API_KEYS=[];
 var _selectedRole='analyst',_editId=null;
 
 function roleColor(r){return {admin:'var(--red)',analyst:'var(--amber)',viewer:'var(--blue)',api:'var(--purple)'}[r]||'var(--t3)';}
@@ -274,7 +267,7 @@ function switchTab(idx){
   }
   if(idx===1){if(!ROLES.length)loadRoles();else renderRoles();}
   if(idx===2)renderAudit();
-  if(idx===3)renderKeys();
+  if(idx===3){renderKeys();loadAPIKeys();}
 }
 
 function openNewUser(){
@@ -411,6 +404,28 @@ async function loadUsers(){
   }
 }
 
+async function loadAPIKeys(){
+  if(!TOKEN) return;
+  try{
+    var r = await fetch(API+'/api/v1/admin/api-keys',{headers:{Authorization:'Bearer '+TOKEN}});
+    if(!r.ok) return;
+    var d = await r.json();
+    var keys = d.api_keys || d.keys || d.items || [];
+    API_KEYS = keys.map(function(k){
+      return {
+        id: k.id,
+        name: k.label || k.name || '—',
+        prefix: (k.prefix || '').slice(0, 12),
+        perms: k.role || k.perms || '—',
+        created: k.created_at ? new Date(k.created_at).toLocaleDateString() : '—',
+        expires: k.expires_at ? new Date(k.expires_at).toLocaleDateString() : 'never',
+        status: k.revoked ? 'revoked' : (k.expires_at && new Date(k.expires_at) < new Date() ? 'expired' : 'active')
+      };
+    });
+    updateKPIs(); renderKeys();
+  }catch(e){}
+}
+
 async function loadRoles(){
   // FEAT-05: Roles are typically static config. Try API first, fall back to defaults.
   var DEFAULT_ROLES=[
@@ -434,7 +449,7 @@ function _onTokenReady(){}
 window.addEventListener('message',function(e){
   if (window.VSPOrigin && !window.VSPOrigin.check(e)) return;
   if(!e.data)return;
-  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;loadUsers();}}
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;loadUsers();loadAPIKeys();}}
   if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
 });
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);

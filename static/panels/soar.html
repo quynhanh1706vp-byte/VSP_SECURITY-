@@ -815,7 +815,13 @@ var DEF_PB=[
   {id:'pb-004',name:'Secret detection lockdown',enabled:true,trigger:'secret_detected',sev:'CRITICAL',desc:'Block CI + P0 ticket + page',steps:TPLS.block,runs:2,success:2,last:'3h ago'},
   {id:'pb-005',name:'Score drop alert',enabled:false,trigger:'gate_fail',sev:'any',desc:'Alert when score drops >20',steps:TPLS.notify,runs:0,success:0,last:'never'},
 ];
-PLAYBOOKS=DEF_PB;
+// Pre-fix: panel seeded PLAYBOOKS with DEF_PB (5 fake "Gate FAIL
+// auto-response" / "SLA breach escalation" etc.) so the SOAR tab
+// always opened looking like the tenant had 5 well-tuned playbooks
+// with realistic run counts. API fetch (line ~1176/~1186) replaces
+// them after a few hundred ms — until then, fake data flashed.
+// DEF_PB retained above as schema documentation, not auto-assigned.
+PLAYBOOKS=[];
 
 var DEF_RUNS=[
   {id:'RUN-0048',pb:'Gate FAIL auto-response',pbId:'pb-001',status:'success',ts:'19:47:32',dur:'12s',trigger:'gate_fail',
@@ -868,7 +874,11 @@ var DEF_RUNS=[
      {ts:'16:34:22',lv:'WARN',msg:'Playbook failed at step 3/5 · 2 steps skipped'},
    ]},
 ];
-RUN_HISTORY=DEF_RUNS;
+// Pre-fix: DEF_RUNS (3-5 hardcoded sample playbook runs with
+// "RUN-0048 19:47:32 · Gate FAIL auto-response · 12s") seeded
+// RUN_HISTORY so every fresh load showed the same demo execution
+// history. API fetch replaces it; start empty to avoid the flash.
+RUN_HISTORY=[];
 
 // ── Render sidebar list ────────────────────────────────────
 function renderList(){

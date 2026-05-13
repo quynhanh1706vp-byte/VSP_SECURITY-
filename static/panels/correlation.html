@@ -409,8 +409,15 @@ var DEF_INCIDENTS=[
      {icon:'✉',label:'Escalate to team lead',color:'var(--amber2)',tc:'var(--amber)'},
    ]},
 ];
-RULES     = DEF_RULES;
-INCIDENTS = DEF_INCIDENTS;
+// Pre-fix: panel seeded RULES + INCIDENTS with DEF_RULES (3 fake
+// "Gate FAIL + secrets in window" rules) and DEF_INCIDENTS so the
+// API fetch (line ~706 / ~746) only replaced them after 100-500ms.
+// During that flash window every tenant saw the same fake correlation
+// state. Start empty; API populates real data.
+// DEF_RULES + DEF_INCIDENTS retained above as a documented schema
+// reference for the BE shape — not assigned at boot.
+RULES     = [];
+INCIDENTS = [];
 
 // ── Helpers ────────────────────────────────────────────────
 function sevBadge(s,small){

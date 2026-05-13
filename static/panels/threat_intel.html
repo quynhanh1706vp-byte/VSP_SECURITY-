@@ -199,16 +199,23 @@ var TOKEN='',API='';
 var IOCS=[];
 var FEEDS=[];
 var CVES=[];
+// MITRE tactics are config (id + name + techniques mapping) — those
+// stay fixed. But the `count` field was hardcoded to fake numbers
+// (Initial Access: 3, Execution: 1, C&C: 2, etc.) so EVERY tenant's
+// MITRE heatmap looked identical regardless of their actual findings.
+// No fetch ever overwrote MITRE. Start with count:0 across the board;
+// loadMITRECoverage() (added below) hits /api/v1/ti/mitre and
+// populates real per-tenant counts.
 var MITRE=[
-  {tactic:'Initial Access',id:'TA0001',count:3,techniques:['T1190','T1078']},
-  {tactic:'Execution',id:'TA0002',count:1,techniques:['T1059.001']},
+  {tactic:'Initial Access',id:'TA0001',count:0,techniques:['T1190','T1078']},
+  {tactic:'Execution',id:'TA0002',count:0,techniques:['T1059.001']},
   {tactic:'Persistence',id:'TA0003',count:0,techniques:[]},
   {tactic:'Priv. Escalation',id:'TA0004',count:0,techniques:[]},
-  {tactic:'Defense Evasion',id:'TA0005',count:1,techniques:['T1090']},
+  {tactic:'Defense Evasion',id:'TA0005',count:0,techniques:['T1090']},
   {tactic:'Collection',id:'TA0009',count:0,techniques:[]},
-  {tactic:'C&C',id:'TA0011',count:2,techniques:['T1071','T1584']},
+  {tactic:'C&C',id:'TA0011',count:0,techniques:['T1071','T1584']},
   {tactic:'Lateral Mov.',id:'TA0008',count:0,techniques:[]},
-  {tactic:'Discovery',id:'TA0007',count:1,techniques:['T1046']},
+  {tactic:'Discovery',id:'TA0007',count:0,techniques:['T1046']},
   {tactic:'Exfiltration',id:'TA0010',count:0,techniques:[]},
 ];
 function sevClass(s){return {CRITICAL:'crit',HIGH:'high',MEDIUM:'med',LOW:'low'}[(s||'').toUpperCase()]||'';}
@@ -366,7 +373,16 @@ async function loadFromAPI(){
       fetch(API+'/api/v1/ti/feeds',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
       fetch(API+'/api/v1/ti/matches',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
       fetch(API+'/api/v1/vulns/top-cves',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+      // BE returns {tactics:[{id:'TA0001', name:'Initial access', count:N}, ...]}
+      // The local MITRE array already has tactic name + technique
+      // list; we only need to merge the count by id.
+      fetch(API+'/api/v1/ti/mitre',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
     ]);
+    if(res[4]&&Array.isArray(res[4].tactics)){
+      var byId={}; res[4].tactics.forEach(function(t){ byId[t.id]=t.count||0; });
+      MITRE.forEach(function(m){ if(byId[m.id]!=null) m.count=byId[m.id]; });
+      renderMITRE();
+    }
     // IOCs
     if(res[0]&&res[0].iocs&&res[0].iocs.length){
       IOCS=res[0].iocs.map(function(i){return Object.assign({id:i.id||Math.random().toString(36).slice(2),matched:false,findings:[],mitre:[]},i);});
