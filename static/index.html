@@ -876,25 +876,15 @@ window.addEventListener('DOMContentLoaded', function(){
             <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="showPanel('findings',null)">View all →</button>
           </div>
           <div id="top-findings-list">
-            <div class="tl-item">
-              <div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div>
+            <!-- Replaced by loadTopFindings() on panel-show. Pre-fix
+                 three hardcoded fake findings (S3 Bucket ACL,
+                 CVE-2024-45337, generic-api-key in .env) shipped to
+                 prod and NO renderer ever overwrote them — they
+                 displayed forever regardless of the tenant's actual
+                 findings. -->
+            <div class="tl-item placeholder-row">
               <div class="tl-content">
-                <div class="tl-title" style="font-size:11px">38c5ee0d — S3 Bucket ACL Allows Read/Write</div>
-                <div class="tl-meta">kics · ../../../../tmp/iac_test/main.tf:3</div>
-              </div>
-            </div>
-            <div class="tl-item">
-              <div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div>
-              <div class="tl-content">
-                <div class="tl-title" style="font-size:11px">CVE-2024-45337 — PublicKeyCallback bypass</div>
-                <div class="tl-meta">trivy · go.mod · golang.org/x/crypto</div>
-              </div>
-            </div>
-            <div class="tl-item">
-              <div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div>
-              <div class="tl-content">
-                <div class="tl-title" style="font-size:11px">generic-api-key — API key exposed in .env</div>
-                <div class="tl-meta">gitleaks · /home/test/Data/GOLANG_VSP/.env:10 · CWE-798</div>
+                <div class="tl-meta" style="text-align:center;padding:12px;color:var(--t3)">Loading critical findings…</div>
               </div>
             </div>
           </div>
@@ -960,13 +950,18 @@ window.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div class="log-tool-grid mb12">
-        <div class="log-tool-cell done" id="ltc-kics"><div class="log-tool-name">kics</div><div class="log-tool-status c-green f10 fmono">475 findings</div></div>
+        <!-- Pre-fix: kics had hardcoded "475 findings", trivy "9
+             findings", gitleaks "3 findings", checkov "13 findings"
+             showing on every fresh load even before the user picked a
+             run. Replaced with "—" placeholder; setLogTool() (4109)
+             populates real per-tool counts when a run is selected. -->
+        <div class="log-tool-cell" id="ltc-kics"><div class="log-tool-name">kics</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
         <div class="log-tool-cell" id="ltc-bandit"><div class="log-tool-name">bandit</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
         <div class="log-tool-cell" id="ltc-semgrep"><div class="log-tool-name">semgrep</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
         <div class="log-tool-cell" id="ltc-grype"><div class="log-tool-name">grype</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
-        <div class="log-tool-cell done" id="ltc-trivy"><div class="log-tool-name">trivy</div><div class="log-tool-status c-green f10 fmono">9 findings</div></div>
-        <div class="log-tool-cell done" id="ltc-gitleaks"><div class="log-tool-name">gitleaks</div><div class="log-tool-status c-green f10 fmono">3 findings</div></div>
-        <div class="log-tool-cell done" id="ltc-checkov"><div class="log-tool-name">checkov</div><div class="log-tool-status c-green f10 fmono">13 findings</div></div>
+        <div class="log-tool-cell" id="ltc-trivy"><div class="log-tool-name">trivy</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-gitleaks"><div class="log-tool-name">gitleaks</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
+        <div class="log-tool-cell" id="ltc-checkov"><div class="log-tool-name">checkov</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
         <div class="log-tool-cell" id="ltc-trufflehog"><div class="log-tool-name">trufflehog</div><div class="log-tool-status c-t3 f10 fmono">—</div></div>
       </div>
 
@@ -980,7 +975,7 @@ window.addEventListener('DOMContentLoaded', function(){
           <button class="log-filter-btn" onclick="setLogFilter('DONE',this)">DONE</button>
         </div>
         <input aria-label="Search logs…" class="filter-input" id="log-search" placeholder="Search logs…" style="max-width:200px" oninput="filterLogs()">
-        <span id="log-count" class="mono-sm" style="margin-left:auto">17 lines</span>
+        <span id="log-count" class="mono-sm" style="margin-left:auto">— lines</span>
         <label class="flex gap8 f10 c-t3" style="align-items:center;cursor:pointer">
           <input aria-label="Auto-scroll scan log" type="checkbox" id="log-autoscroll" checked style="accent-color:var(--amber)"> Auto-scroll
         </label>
@@ -1264,12 +1259,11 @@ window.addEventListener('DOMContentLoaded', function(){
       <div class="card mb14">
         <div class="card-head"><div class="card-title">Recent activity</div></div>
         <div class="timeline">
-          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · IAC · FAIL</div><div class="tl-meta">RID_SCHED_20260329_194714_0 · 104 findings · 19:47:14 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · FULL · FAIL</div><div class="tl-meta">RID_VSPGO_RUN_20260329_171611 · 49 findings · 17:16:11 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--amber3);border:1px solid rgba(245,158,11,.25);color:var(--amber)">⚠</div><div class="tl-content"><div class="tl-title">SCAN · IAC · WARN</div><div class="tl-meta">RID_VSPGO_RUN_20260329_165946 · 43 findings · 16:59:46 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--green2);border:1px solid rgba(34,197,94,.25);color:var(--green)">✓</div><div class="tl-content"><div class="tl-title">SCAN · IAC · PASS</div><div class="tl-meta">RID_VSPGO_RUN_20260329_164947 · 8 findings · 16:49:47 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">✗</div><div class="tl-content"><div class="tl-title">SCAN · FULL · FAIL</div><div class="tl-meta">RID_VSPGO_RUN_20260329_163409 · 14 findings · 16:34:09 29/3/2026</div></div></div>
-          <div class="tl-item"><div class="tl-dot" style="background:var(--cyan2);border:1px solid rgba(6,182,212,.25);color:var(--cyan)">→</div><div class="tl-content"><div class="tl-title">LOGIN · admin@vsp.local</div><div class="tl-meta">192.168.1.1 · 29/3/2026 09:15:00</div></div></div>
+          <!-- Replaced by loadAuditReal() on panel-show via
+               #panel-audit .timeline selector (index.html line 5780).
+               Pre-fix six fake scan events from 29/3/2026 shipped to
+               prod and showed before the real audit fetch returned. -->
+          <div class="tl-item placeholder-row"><div class="tl-content"><div class="tl-meta" style="text-align:center;padding:12px;color:var(--t3)">Loading recent activity…</div></div></div>
         </div>
       </div>
 
@@ -1952,7 +1946,7 @@ const PANEL_META = {
   dashboard:   {title:'Dashboard',     sub:'VSP / Operations / Dashboard'},
   scanlog:     {title:'Scan log',      sub:'VSP / Operations / Scan log viewer'},
   runs:        {title:'Run history',   sub:'VSP / Operations / Runs'},
-  findings:    {title:'Findings',      sub:'VSP / Operations / Findings · 1306 total'},
+  findings:    {title:'Findings',      sub:'VSP / Operations / Findings'},
   remediation: {title:'Remediation',   sub:'VSP / Operations / Remediation'},
   policy:      {title:'Policy',        sub:'VSP / Security / Policy rules'},
   audit:       {title:'Audit log',     sub:'VSP / Security / Audit · hash-chain verified'},
@@ -2993,7 +2987,7 @@ const QS_PANELS = [
   {name:'Dashboard',icon:'◈',p:'dashboard',desc:'KPIs, charts, recent runs'},
   {name:'Scan log',icon:'▦',p:'scanlog',desc:'Real-time tool output'},
   {name:'Runs',icon:'▷',p:'runs',desc:'Run history & trigger'},
-  {name:'Findings',icon:'◎',p:'findings',desc:'1306 total findings'},
+  {name:'Findings',icon:'◎',p:'findings',desc:'Findings panel'},
   {name:'Remediation',icon:'◐',p:'remediation',desc:'Open remediations'},
   {name:'Policy',icon:'◫',p:'policy',desc:'Gate rules & evaluation'},
   {name:'Audit',icon:'◷',p:'audit',desc:'Hash-chain audit log'},
@@ -3372,8 +3366,47 @@ async function loadDashKPIs() {
     // Each kpi-sub gets a delta badge ↑/↓/= so user sees direction at a glance.
     _renderWoWTrends(runsResp.runs || []);
   } catch(e) { console.warn('loadDashKPIs failed', e); }
+  // Also refresh the "Top critical findings" sidebar list. Pre-fix
+  // the 3 critical findings shown on the dashboard were hardcoded in
+  // index.html (no JS renderer at all) so they showed identical
+  // S3-bucket / CVE-2024-45337 / generic-api-key entries forever
+  // regardless of the tenant's real CRITICAL findings. Now we fetch
+  // and render the 3 most recent critical findings on the actual
+  // tenant data.
+  try { await loadTopCritical(); } catch(e) {}
 }
 window.loadDashKPIs = loadDashKPIs;
+
+async function loadTopCritical() {
+  var host = document.getElementById('top-findings-list');
+  if (!host || !window.TOKEN) return;
+  var h = { 'Authorization': 'Bearer ' + window.TOKEN };
+  var resp = await fetch('/api/v1/vsp/findings?severity=CRITICAL&limit=3', { headers: h });
+  if (!resp.ok) {
+    host.innerHTML = '<div class="tl-item"><div class="tl-content"><div class="tl-meta" style="text-align:center;padding:12px;color:var(--red)">Failed to load — HTTP ' + resp.status + '</div></div></div>';
+    return;
+  }
+  var d = await resp.json();
+  var items = d.findings || [];
+  if (items.length === 0) {
+    host.innerHTML = '<div class="tl-item"><div class="tl-content"><div class="tl-meta" style="text-align:center;padding:12px;color:var(--t3)">No CRITICAL findings — good job</div></div></div>';
+    return;
+  }
+  // Inline HTML escape so attacker-controlled finding text can't inject markup.
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+  host.innerHTML = items.slice(0, 3).map(function(f) {
+    var title = esc((f.rule_id || f.id || '').slice(0, 12)) + ' — ' + esc(f.message || f.title || 'Critical finding');
+    var meta = esc(f.tool || '') + (f.path ? ' · ' + esc(f.path) : '') + (f.line ? ':' + esc(f.line) : '');
+    return '<div class="tl-item">' +
+      '<div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div>' +
+      '<div class="tl-content">' +
+        '<div class="tl-title" style="font-size:11px">' + title + '</div>' +
+        '<div class="tl-meta">' + meta + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+window.loadTopCritical = loadTopCritical;
 
 function _renderWoWTrends(runs) {
   const now = Date.now();
