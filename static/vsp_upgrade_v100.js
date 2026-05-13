@@ -1420,20 +1420,45 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
     }, 500);
   };
 
-  window._loadSBOMDiffRuns = async function() {
+  // Loads the run list into the SBOM diff Base/Compare dropdowns.
+  // Pre-fix this function had an empty `catch(e){}` — when the user
+  // opened the SBOM diff panel during the service restart window
+  // (e.g. right after `systemctl restart vsp-gateway`), the fetch
+  // failed with ERR_CONNECTION_REFUSED, the catch swallowed the
+  // error, and the dropdowns stayed on "Loading..." forever. The
+  // browser cache made a manual page refresh useless because the
+  // panel-show flow only called this function once at bootstrap.
+  // Now: exponential retry (1s → 2s → 4s) + visible error state
+  // with a manual Reload button so the user can recover without F5.
+  window._loadSBOMDiffRuns = async function(attempt) {
+    attempt = attempt || 0;
     await ensureToken();
     var h = {'Authorization':'Bearer '+window.TOKEN};
+    var base = document.getElementById('sbom-diff-base');
+    var head = document.getElementById('sbom-diff-head');
     try {
-      var d = await fetch('/api/v1/vsp/runs/index?limit=50', {headers:h}).then(r=>r.json());
+      var d = await fetch('/api/v1/vsp/runs/index?limit=50', {headers:h}).then(function(r){
+        if (!r.ok) throw new Error('HTTP '+r.status);
+        return r.json();
+      });
       var runs = (d.runs||[]).filter(function(r){ return r.status==='DONE'; });
       var opts = runs.map(function(r){
         return '<option value="'+r.rid+'">'+r.rid.slice(-20)+' · '+r.mode+' · '+(r.total||0)+'f</option>';
       }).join('');
-      var base = document.getElementById('sbom-diff-base');
-      var head = document.getElementById('sbom-diff-head');
       if (base) { base.innerHTML = '<option value="">— base run —</option>'+opts; if(runs.length>1) base.value=runs[1].rid; }
       if (head) { head.innerHTML = '<option value="">— compare run —</option>'+opts; if(runs.length>0) head.value=runs[0].rid; }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('[SBOM-DIFF] runs fetch failed (attempt '+(attempt+1)+'):', e.message || e);
+      if (attempt < 2) {
+        var backoff = (attempt + 1) * 1000;
+        setTimeout(function(){ window._loadSBOMDiffRuns(attempt + 1); }, backoff);
+        return;
+      }
+      // Final failure → show actionable error, not silent loading.
+      var errOpts = '<option value="">⚠ Failed to load runs — click here to retry</option>';
+      if (base) { base.innerHTML = errOpts; base.onchange = function(){ window._loadSBOMDiffRuns(0); }; }
+      if (head) { head.innerHTML = errOpts; head.onchange = function(){ window._loadSBOMDiffRuns(0); }; }
+    }
   };
 
   window._runSBOMDiff = async function() {
