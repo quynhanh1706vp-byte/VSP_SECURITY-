@@ -6570,7 +6570,15 @@ async function loadGovernanceV2() {
           // Top findings table
           +'<div style="border-top:1px solid var(--border);padding:0">'
           +'<table><thead><tr><th>Severity</th><th>Rule</th><th>Control</th><th>Framework</th><th>Status</th></tr></thead><tbody>'
-          +traces.slice(0,10).map(function(t){
+          // Dedup by rule_id + control
+          var seen = {};
+          var dedupTraces = traces.filter(function(t){
+            var k = t.rule_id+'|'+t.control+'|'+t.severity;
+            if (seen[k]) return false;
+            seen[k] = true;
+            return true;
+          });
+          +dedupTraces.slice(0,10).map(function(t){
             var sc={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low',INFO:'sev-info'}[t.severity]||'sev-info';
             var st=t.status==='open'?'pill-fail':t.status==='monitor'?'pill-warn':'pill-pass';
             return '<tr>'
@@ -9352,7 +9360,7 @@ var _siemKPIpoll = setInterval(function() {
   setInterval(loadSIEMKPIs, 60000);
 }, 1000);
 </script>
-<script src="/vsp_upgrade_v100.js?v=1778737521"></script>
+<script src="/vsp_upgrade_v100.js?v=1778737745"></script>
 <!-- removed: vsp_gate_widget.js (file does not exist) -->
 <script>
 // ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
