@@ -1845,7 +1845,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       +'<input type="checkbox" id="er-blocksec-gov"'+(rule.block_secrets?' checked':'')+'>Block Secrets</label>'
       +'</div>'
       +'</div><div class="modal-footer">'
-      +'<button class="btn btn-ghost" onclick="document.getElementById('edit-rule-modal-gov').remove()">Cancel</button>'
+      +'<button class="btn btn-ghost" onclick="document.getElementById(\"edit-rule-modal-gov\").remove()">Cancel</button>'
       +'<button class="btn btn-primary" onclick="_submitEditRule(''+rule.id+'')">Save changes</button>'
       +'</div></div>';
     document.body.appendChild(overlay);
