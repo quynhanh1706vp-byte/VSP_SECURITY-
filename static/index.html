@@ -8538,10 +8538,13 @@ async function _submitNewRule() {
       headers: {'Authorization':'Bearer '+window.TOKEN, 'Content-Type':'application/json'},
       body: JSON.stringify({
         name: name,
-        description: desc,
-        conditions: { min_severity: sev, max_findings: maxF },
-        action: action,
-        enabled: true
+        repo_pattern: '*',
+        fail_on: action === 'block' ? 'FAIL' : 'WARN',
+        max_high: sev === 'HIGH' || sev === 'CRITICAL' ? maxF || -1 : -1,
+        min_score: sev === 'CRITICAL' ? 9 : sev === 'HIGH' ? 7 : sev === 'MEDIUM' ? 4 : 0,
+        block_critical: sev === 'CRITICAL',
+        block_secrets: true,
+        active: true
       })
     });
     if (!r.ok) {

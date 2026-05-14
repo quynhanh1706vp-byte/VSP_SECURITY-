@@ -2982,6 +2982,8 @@ func main() {
 		r.Get("/api/v1/export/sarif/{rid}", exportH.SARIF)
 		r.With(requirePro).Get("/api/v1/export/csv/{rid}", exportH.CSV)
 		r.Get("/api/v1/export/json/{rid}", exportH.JSON)
+		r.Get("/api/v1/findings/{rid}/sarif", exportH.SARIF)
+		r.Get("/api/v1/sbom/{rid}/vex", p4AuthMiddleware(handleListVEX))
 
 		// Software Inventory routes (read-only — under CSRF group)
 		swH := &handler.SoftwareInventoryHandler{DB: db}
