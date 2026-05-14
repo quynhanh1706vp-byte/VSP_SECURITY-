@@ -1330,17 +1330,13 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="card">
           <div class="card-head"><div class="card-title">Framework scorecard</div></div>
           <div class="card-body">
-            <div class="comp-row"><div class="comp-header"><span class="comp-name">NIST SP 800-53</span><span class="comp-pct c-red">40</span></div><div class="progress-bar"><div class="progress-fill" style="width:40%;background:var(--red)"></div></div></div>
-            <div class="comp-row"><div class="comp-header"><span class="comp-name">ISO 27001</span><span class="comp-pct c-red">40</span></div><div class="progress-bar"><div class="progress-fill" style="width:40%;background:var(--red)"></div></div></div>
-            <div class="comp-row" style="margin-bottom:0"><div class="comp-header"><span class="comp-name">SOC 2 Type II</span><span class="comp-pct c-red">40</span></div><div class="progress-bar"><div class="progress-fill" style="width:40%;background:var(--red)"></div></div></div>
+            <div class="comp-row"><div class="comp-header"><span class="comp-name c-t3">Loading…</span></div></div>
           </div>
         </div>
         <div class="card">
           <div class="card-head"><div class="card-title">Incident timeline</div></div>
-          <div class="timeline">
-            <div class="tl-item"><div class="tl-dot" style="background:var(--red2);border:1px solid rgba(239,68,68,.25);color:var(--red)">!</div><div class="tl-content"><div class="tl-title" style="font-size:11px">Generic API key exposed in .env</div><div class="tl-meta">gitleaks · CRITICAL · CWE-798 · open</div></div></div>
-            <div class="tl-item"><div class="tl-dot" style="background:var(--amber3);border:1px solid rgba(245,158,11,.25);color:var(--amber)">!</div><div class="tl-content"><div class="tl-title" style="font-size:11px">S3 Bucket ACL allows public access</div><div class="tl-meta">kics · HIGH · main.tf · investigating</div></div></div>
-            <div class="tl-item"><div class="tl-dot" style="background:var(--green2);border:1px solid rgba(34,197,94,.25);color:var(--green)">✓</div><div class="tl-content"><div class="tl-title" style="font-size:11px">DAST scan — no web vulnerabilities</div><div class="tl-meta">27/3 12:22 · PASS · resolved</div></div></div>
+          <div class="timeline" id="soc-incident-timeline">
+            <div class="tl-item"><div class="tl-dot" style="background:var(--b2);color:var(--t3)">·</div><div class="tl-content"><div class="tl-title" style="font-size:11px;color:var(--t3)">Loading incidents…</div></div></div>
           </div>
         </div>
       </div>
