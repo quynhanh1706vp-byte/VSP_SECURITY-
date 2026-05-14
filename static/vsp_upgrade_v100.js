@@ -1772,7 +1772,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
         var created = r.created_at ? new Date(r.created_at).toLocaleDateString('vi-VN') : '';
         return '<div class="rule-card" style="border-left:2px solid var(--cyan)">'
           +'<div class="rule-header">'
-          +'<div class="rule-name">'+r.name+'</div>'
+          +'<div class="rule-name" style="cursor:pointer" onclick="_viewPolicyRule(\''+r.id+'\')" title="Click to view details">'+r.name+'</div>'
           +'<span class="rule-tag" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2)">API</span>'
           +'<button class="toggle-btn'+(r.active?' on':'')+'" data-id="'+r.id+'" onclick="_togglePolicyRule(this)"></button>'
           +'</div>'
@@ -1804,6 +1804,51 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       });
       showToast('Rule '+(active?'disabled':'enabled'),'info');
     } catch(e) { showToast('Update failed','error'); }
+  };
+
+
+  window._viewPolicyRule = async function(id) {
+    await ensureToken();
+    var resp = await fetch('/api/v1/policy/rules', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var data = await resp.json().catch(function(){return{rules:[]};});
+    var r = (data.rules||[]).find(function(x){return x.id===id;});
+    if (!r) { showToast('Rule not found','error'); return; }
+    var existing = document.getElementById('view-rule-modal-gov');
+    if (existing) existing.remove();
+    var tags = [];
+    if (r.block_critical) tags.push('<span class="pill" style="background:var(--red2);color:var(--red);font-size:9px">BLOCK CRITICAL</span>');
+    if (r.block_secrets)  tags.push('<span class="pill" style="background:var(--amber3);color:var(--amber);font-size:9px">BLOCK SECRETS</span>');
+    if (r.max_high >= 0)  tags.push('<span class="pill" style="background:var(--b2);color:var(--t2);font-size:9px">MAX HIGH: '+r.max_high+'</span>');
+    if (r.min_score > 0)  tags.push('<span class="pill" style="background:var(--b2);color:var(--t2);font-size:9px">MIN SCORE: '+r.min_score+'</span>');
+    var created = r.created_at ? new Date(r.created_at).toLocaleString('vi-VN') : '—';
+    var overlay = document.createElement('div');
+    overlay.id = 'view-rule-modal-gov';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = '<div class="modal" style="max-width:500px">'
+      +'<div class="modal-header">'
+      +'<div class="modal-title">'+r.name+'</div>'
+      +'<button class="modal-close" onclick="document.getElementById(\'view-rule-modal-gov\').remove()">✕</button>'
+      +'</div>'
+      +'<div class="modal-body">'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'
+      +'<div><div class="form-label" style="margin-bottom:4px">Rule ID</div><div class="mono-sm c-t3">'+r.id+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Status</div>'
+      +'<span class="pill" style="background:'+(r.active?'var(--green2)':'var(--b2)')+';color:'+(r.active?'var(--green)':'var(--t3)')+';font-size:9px">'+(r.active?'ACTIVE':'INACTIVE')+'</span></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Fail on</div><div class="mono-sm fw7">'+r.fail_on+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Repo pattern</div><div class="mono-sm">'+r.repo_pattern+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Min score</div><div class="mono-sm">'+r.min_score+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Max HIGH</div><div class="mono-sm">'+(r.max_high<0?'unlimited':r.max_high)+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Created</div><div class="mono-sm c-t3">'+created+'</div></div>'
+      +'</div>'
+      +'<div class="form-label" style="margin-bottom:6px">Conditions</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">'+(tags.join('')||'<span class="mono-sm c-t3">None</span>')+'</div>'
+      +'</div>'
+      +'<div class="modal-footer">'
+      +'<button class="btn btn-ghost" onclick="document.getElementById(\'view-rule-modal-gov\').remove()">Close</button>'
+      +'<button class="btn btn-primary" onclick="document.getElementById(\'view-rule-modal-gov\').remove();_editPolicyRule(\''+r.id+'\',null)">Edit rule</button>'
+      +'</div></div>';
+    document.body.appendChild(overlay);
+    setTimeout(function(){ overlay.classList.add('open'); }, 10);
   };
 
   window._editPolicyRule = async function(id, btn) {
