@@ -222,7 +222,9 @@ func (db *DB) ListAuditPagedFiltered(ctx context.Context, tenantID, actionFilter
 		i++
 	}
 	var total int64
-	_ = db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM audit_log"+base, args...).Scan(&total)
+	countArgs := make([]any, len(args))
+	copy(countArgs, args)
+	_ = db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM audit_log"+base, countArgs...).Scan(&total)
 	args = append(args, limit, offset)
 	rows, err := db.pool.Query(ctx,
 		"SELECT seq, action, COALESCE(resource,''), COALESCE(ip,''), created_at"+
