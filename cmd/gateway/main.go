@@ -1026,6 +1026,11 @@ func main() {
 	r.Get("/api/p4/ir/incidents", p4AuthMiddleware(handleIRIncidentsList))
 	r.Post("/api/p4/ir/incident", p4AuthMiddleware(handleIRIncidentCreate))
 	r.Post("/api/p4/ir/incident/transition", p4AuthMiddleware(handleIRIncidentTransition))
+	r.Post("/api/p4/ir/incident/create", p4AuthMiddleware(handleIRIncidentCreate))   // alias
+	r.Post("/api/p4/ir/incident/assign", p4AuthMiddleware(handleIRIncidentUpdate))   // alias
+	r.Post("/api/p4/ir/playbook/execute", p4AuthMiddleware(handleIRPlaybooksList))   // stub
+	r.Post("/api/p4/zt/assess", p4AuthMiddleware(handleZTStatus))                    // stub
+	r.Post("/api/p4/ssdf/assessment", p4AuthMiddleware(handleSSDFUpdate))            // alias
 	r.Post("/api/p4/circia/generate", p4AuthMiddleware(handleCIRCIAGenerate))
 	r.Post("/api/p4/circia/submit", p4AuthMiddleware(handleCIRCIASubmit))
 	r.Get("/api/p4/circia/reports", p4AuthMiddleware(handleCIRCIAList))

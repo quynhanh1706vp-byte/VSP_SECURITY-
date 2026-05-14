@@ -628,6 +628,17 @@ func handleCreateVEX(w http.ResponseWriter, r *http.Request) {
 	if req.Author == "" {
 		req.Author = "vsp-analyst"
 	}
+	// Validate justification against DB constraint
+	validJust := map[string]bool{
+		"code_not_present": true, "code_not_reachable": true, "requires_configuration": true,
+		"requires_dependency": true, "requires_environment": true, "protected_by_compiler": true,
+		"protected_at_runtime": true, "protected_at_perimeter": true, "protected_by_mitigating_control": true, "": true,
+	}
+	if req.Justification != "" {
+		if !validJust[req.Justification] {
+			req.Justification = ""
+		}
+	}
 
 	// Build CycloneDX VEX statement
 	vex := CycloneDXVEX{
