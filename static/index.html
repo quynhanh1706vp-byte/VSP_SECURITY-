@@ -1397,14 +1397,14 @@ window.addEventListener('DOMContentLoaded', function(){
       <div class="g3 mb14">
         <div class="card" style="text-align:center">
           <div class="card-body">
-            <div class="gauge-wrap"><canvas id="gauge-fedramp" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-cyan" id="gv-fedramp">62%</div><div class="gauge-unit">coverage</div></div></div>
+            <div class="gauge-wrap"><canvas id="gauge-fedramp" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-cyan" id="gv-fedramp">—</div><div class="gauge-unit">coverage</div></div></div>
             <div class="f12 fw7 c-t2 mb8">FedRAMP Moderate</div>
             <div class="mono-sm">45 / 73 controls</div>
           </div>
         </div>
         <div class="card" style="text-align:center">
           <div class="card-body">
-            <div class="gauge-wrap"><canvas id="gauge-cmmc" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-amber" id="gv-cmmc">54%</div><div class="gauge-unit">coverage</div></div></div>
+            <div class="gauge-wrap"><canvas id="gauge-cmmc" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-amber" id="gv-cmmc">—</div><div class="gauge-unit">coverage</div></div></div>
             <div class="f12 fw7 c-t2 mb8">CMMC Level 2</div>
             <div class="mono-sm">59 / 110 practices</div>
           </div>
@@ -1661,8 +1661,8 @@ window.addEventListener('DOMContentLoaded', function(){
         <div class="card">
           <div class="card-head"><div class="card-title">Compliance posture</div></div>
           <div class="card-body">
-            <div class="comp-row" style="cursor:pointer" onclick="showPanel('compliance',null);setTimeout(loadFedRAMP,400)" title="View FedRAMP detail"><div class="comp-header"><span class="comp-name" style="color:var(--cyan)">FedRAMP Moderate →</span><span class="comp-pct c-cyan">62%</span></div><div class="progress-bar"><div class="progress-fill" style="width:62%;background:var(--cyan)"></div></div></div>
-            <div class="comp-row" style="margin-bottom:0;cursor:pointer" onclick="showPanel('compliance',null);setTimeout(loadCMMC,400)" title="View CMMC detail"><div class="comp-header"><span class="comp-name" style="color:var(--amber)">CMMC Level 2 →</span><span class="comp-pct c-amber">54%</span></div><div class="progress-bar"><div class="progress-fill" style="width:54%;background:var(--amber)"></div></div></div>
+            <div class="comp-row" style="cursor:pointer" onclick="showPanel('compliance',null);setTimeout(loadFedRAMP,400)" title="View FedRAMP detail"><div class="comp-header"><span class="comp-name" style="color:var(--cyan)">FedRAMP Moderate →</span><span class="comp-pct c-cyan" id="fedramp-pct-link">—</span></div><div class="progress-bar"><div class="progress-fill" id="fedramp-bar-link" style="width:0%;background:var(--cyan)"></div></div></div>
+            <div class="comp-row" style="margin-bottom:0;cursor:pointer" onclick="showPanel('compliance',null);setTimeout(loadCMMC,400)" title="View CMMC detail"><div class="comp-header"><span class="comp-name" style="color:var(--amber)">CMMC Level 2 →</span><span class="comp-pct c-amber" id="cmmc-pct-link">—</span></div><div class="progress-bar"><div class="progress-fill" id="cmmc-bar-link" style="width:0%;background:var(--amber)"></div></div></div>
           </div>
         </div>
         <div class="card">
@@ -1697,7 +1697,7 @@ window.addEventListener('DOMContentLoaded', function(){
           <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--red);margin-bottom:8px;background:rgba(239,68,68,.03);cursor:pointer" onclick="showPanel('remediation',null)" title="View remediations"><span class="mono f10 fw7 c-red" style="white-space:nowrap;margin-top:2px">CRITICAL</span><span class="f12 c-t2">Remediate 1 critical finding immediately — SLA: 3 days. S3 bucket ACL allows public read/write. <span style="color:var(--red)">→ View remediations</span></span></div>
           <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--orange);margin-bottom:8px;background:rgba(249,115,22,.03);cursor:pointer" onclick="showPanel('findings',null);setTimeout(function(){document.getElementById('filter-severity').value='HIGH';document.getElementById('filter-search').value='';loadFindings(0);},300)" title="View high findings"><span class="mono f10 fw7 c-orange" style="white-space:nowrap;margin-top:2px">HIGH</span><span class="f12 c-t2">80 high-severity findings require attention within 14 days. Network exposure rules are the largest group. <span style="color:var(--orange)">→ View findings</span></span></div>
           <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--amber);margin-bottom:8px;background:rgba(245,158,11,.03);cursor:pointer" onclick="showPanel('remediation',null)" title="View remediations"><span class="mono f10 fw7 c-amber" style="white-space:nowrap;margin-top:2px">MEDIUM</span><span class="f12 c-t2"><span id="exec-rem-desc">— findings unassigned</span> — assign to engineering teams and set target resolution dates. <span style="color:var(--amber)">→ View remediations</span></span></div>
-          <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--cyan);background:rgba(6,182,212,.03);cursor:pointer" onclick="showPanel('compliance',null);setTimeout(loadFedRAMP,400)" title="View compliance"><span class="mono f10 fw7 c-cyan" style="white-space:nowrap;margin-top:2px">INFO</span><span class="f12 c-t2">FedRAMP at 62% and CMMC at 54% — schedule additional control coverage to reach 80% targets. <span style="color:var(--cyan)">→ View compliance</span></span></div>
+          <div style="display:flex;gap:12px;padding:10px;border-left:2px solid var(--cyan);background:rgba(6,182,212,.03);cursor:pointer" onclick="showPanel('compliance',null);setTimeout(loadFedRAMP,400)" title="View compliance"><span class="mono f10 fw7 c-cyan" style="white-space:nowrap;margin-top:2px">INFO</span><span class="f12 c-t2">FedRAMP and CMMC compliance loaded from real controls — schedule additional control coverage to reach 80% targets. <span style="color:var(--cyan)">→ View compliance</span></span></div>
         </div>
       </div>
     </div>
@@ -2790,6 +2790,14 @@ async function _loadComplianceData(type) {
     document.getElementById('comp-pct').style.color = color;
     document.getElementById('comp-bar').style.width = pct+'%';
     document.getElementById('comp-bar').style.background = color;
+    // Update gauge numbers
+    var gaugeEl = document.getElementById(isFed?'gv-fedramp':'gv-cmmc');
+    if (gaugeEl) { gaugeEl.textContent = pct+'%'; gaugeEl.style.color = color; }
+    // Update link row
+    var pctLink = document.getElementById(isFed?'fedramp-pct-link':'cmmc-pct-link');
+    var barLink = document.getElementById(isFed?'fedramp-bar-link':'cmmc-bar-link');
+    if (pctLink) { pctLink.textContent = pct+'%'; pctLink.style.color = color; }
+    if (barLink) { barLink.style.width = pct+'%'; }
     document.getElementById('comp-assessed').textContent = (d.assessed||0)+' assessed';
     document.getElementById('comp-total').textContent = (d.total_controls||d.total_practices||0)+' total';
     _setupCompFilters();
@@ -9280,7 +9288,7 @@ var _siemKPIpoll = setInterval(function() {
   setInterval(loadSIEMKPIs, 60000);
 }, 1000);
 </script>
-<script src="/vsp_upgrade_v100.js?v=1778736048"></script>
+<script src="/vsp_upgrade_v100.js?v=1778736915"></script>
 <!-- removed: vsp_gate_widget.js (file does not exist) -->
 <script>
 // ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
