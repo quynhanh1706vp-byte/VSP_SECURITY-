@@ -1819,7 +1819,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-header">'
       +'<div class="modal-title">Edit rule: '+rule.name+'</div>'
-      +'<button class="modal-close" onclick="document.getElementById('edit-rule-modal-gov').remove()">✕</button>'
+      +'<button class="modal-close" onclick="document.getElementById(\"edit-rule-modal-gov\").remove()">✕</button>'
       +'</div><div class="modal-body">'
       +'<div class="form-group mb8"><label class="form-label">Rule name <span style="color:var(--red)">*</span></label>'
       +'<input id="er-name-gov" class="form-ctrl" value="'+rule.name+'"></div>'
