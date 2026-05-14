@@ -652,6 +652,67 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 
 // ── boot ───────────────────────────────────────────────────────────────
 
+// ── alias handlers cho frontend sw_inventory.html ─────────────────────
+// Frontend gọi /inventory, /whitelist, /blacklist, /cracks, /licenses, /scan-history
+// Map về các endpoints thật của service
+
+func handleInventory(w http.ResponseWriter, r *http.Request) {
+	// /inventory → /hosts với format {items:[]}
+	store.RLock()
+	out := make([]map[string]any, 0, len(store.Hosts))
+	for _, h := range store.Hosts {
+		c, hi, m, l := h.CVECounts()
+		out = append(out, map[string]any{
+			"hostname":      h.Hostname,
+			"os":            h.OS,
+			"os_version":    h.OSVersion,
+			"ip_address":    h.IPAddress,
+			"package_count": len(h.Packages),
+			"cve_critical":  c,
+			"cve_high":      hi,
+			"cve_medium":    m,
+			"cve_low":       l,
+			"risk_score":    h.RiskScore(),
+			"last_seen":     h.LastSeen,
+		})
+	}
+	store.RUnlock()
+	writeJSON(w, 200, map[string]any{"items": out, "total": len(out)})
+}
+
+func handleWhitelist(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"items": []any{}})
+}
+
+func handleBlacklist(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"items": []any{}})
+}
+
+func handleCracks(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"items": []any{}})
+}
+
+func handleLicenses(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"items": []any{}, "total": 0})
+}
+
+func handleScanHistory(w http.ResponseWriter, r *http.Request) {
+	audit.RLock()
+	items := make([]map[string]any, 0, len(audit.Events))
+	for _, e := range audit.Events {
+		items = append(items, map[string]any{
+			"id":       e.ID,
+			"time":     e.Time,
+			"hostname": e.Hostname,
+			"action":   e.Action,
+			"status":   e.Status,
+		})
+	}
+	audit.RUnlock()
+	writeJSON(w, 200, map[string]any{"items": items, "total": len(items)})
+}
+
+
 func main() {
 	flag.Parse()
 
@@ -690,6 +751,13 @@ func main() {
 	mux.HandleFunc("/audit", cors(requireUIKey(handleAudit)))
 	mux.HandleFunc("/cve-match", cors(requireUIKey(handleCVEMatch)))
 	mux.HandleFunc("/export/csv", cors(requireUIKey(handleExportCSV)))
+	// Alias endpoints cho sw_inventory.html frontend
+	mux.HandleFunc("/inventory",    cors(requireUIKey(handleInventory)))
+	mux.HandleFunc("/whitelist",    cors(requireUIKey(handleWhitelist)))
+	mux.HandleFunc("/blacklist",    cors(requireUIKey(handleBlacklist)))
+	mux.HandleFunc("/cracks",       cors(requireUIKey(handleCracks)))
+	mux.HandleFunc("/licenses",     cors(requireUIKey(handleLicenses)))
+	mux.HandleFunc("/scan-history", cors(requireUIKey(handleScanHistory)))
 
 	srv := &http.Server{
 		Addr:              *addr,
