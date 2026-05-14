@@ -6240,6 +6240,33 @@ async function loadSOCv2() {
       tl.innerHTML = tlHtml;
     }
 
+    // ── Incident timeline từ real incidents ─────────────────────────────
+    var tl2 = document.getElementById('soc-incident-timeline');
+    if (tl2) {
+      fetch('/api/p4/ir/incidents', {headers:h}).then(function(r){ return r.json(); })
+        .then(function(d){
+          var incs = (d.incidents||[]).slice(0,5);
+          if (!incs.length) {
+            tl2.innerHTML = '<div style="padding:12px;color:var(--t3);font-size:10px">No incidents recorded</div>';
+            return;
+          }
+          var sMap = {open:'var(--red)',investigating:'var(--amber)',contained:'var(--amber)',resolved:'var(--green)',closed:'var(--t3)'};
+          var iMap = {open:'!',investigating:'?',contained:'⚑',resolved:'✓',closed:'·'};
+          tl2.innerHTML = incs.map(function(inc){
+            var s = (inc.status||'open').toLowerCase();
+            var c2 = sMap[s]||'var(--t3)';
+            var ic = iMap[s]||'·';
+            var dt = inc.detected_at ? new Date(inc.detected_at).toLocaleDateString('vi-VN') : '';
+            return '<div class="tl-item">'
+              +'<div class="tl-dot" style="background:var(--b2);border:1px solid '+c2+'33;color:'+c2+'">'+ic+'</div>'
+              +'<div class="tl-content">'
+              +'<div class="tl-title" style="font-size:11px">'+inc.title+'</div>'
+              +'<div class="tl-meta">'+inc.incident_id+' · '+(inc.severity||'').toUpperCase()+' · '+s+(dt?' · '+dt:'')+'</div>'
+              +'</div></div>';
+          }).join('');
+        }).catch(function(){});
+    }
+
   } catch(e) { console.error('SOC v2.0 error:', e); }
 }
 </script>
