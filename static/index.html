@@ -1411,9 +1411,9 @@ window.addEventListener('DOMContentLoaded', function(){
         </div>
         <div class="card" style="text-align:center">
           <div class="card-body">
-            <div class="gauge-wrap"><canvas id="gauge-soc2" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-red" id="gv-soc2">40%</div><div class="gauge-unit">score</div></div></div>
+            <div class="gauge-wrap"><canvas id="gauge-soc2" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-red" id="gv-soc2">—</div><div class="gauge-unit">score</div></div></div>
             <div class="f12 fw7 c-t2 mb8">SOC 2 Type II</div>
-            <div class="mono-sm">Score: 40 / 100</div>
+            <div class="mono-sm" id="soc2-ctrl-sub">— score</div>
           </div>
         </div>
       </div>
@@ -1430,20 +1430,17 @@ window.addEventListener('DOMContentLoaded', function(){
       <div class="card">
         <div class="card-head">
           <div><div class="card-title" id="comp-title">FedRAMP Moderate</div></div>
-          <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--cyan)" id="comp-pct">62%</div>
+          <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--cyan)" id="comp-pct">—</div>
         </div>
         <div style="padding:8px 16px">
-          <div class="progress-bar" style="height:6px;margin-bottom:8px"><div class="progress-fill" id="comp-bar" style="width:62%;background:var(--cyan)"></div></div>
-          <div class="flex-between mono-sm" style="margin-bottom:8px"><span id="comp-assessed">45 assessed</span><span id="comp-total">73 total</span></div>
+          <div class="progress-bar" style="height:6px;margin-bottom:8px"><div class="progress-fill" id="comp-bar" style="width:0%;background:var(--cyan)"></div></div>
+          <div class="flex-between mono-sm" style="margin-bottom:8px"><span id="comp-assessed">— assessed</span><span id="comp-total">— total</span></div>
         </div>
         <div class="tbl-wrap">
           <table>
             <thead><tr><th>ID</th><th>Family</th><th>Control</th><th>Tools</th><th>Status</th></tr></thead>
             <tbody id="comp-tbody" data-vsp-paginate="25">
-              <tr><td class="mono f10 c-blue">AC-1</td><td class="mono-sm">Access Control</td><td class="f12">Access Control Policy and Procedures</td><td class="mono-sm">checkov</td><td><span class="pill pill-pass">assessed</span></td></tr>
-              <tr><td class="mono f10 c-blue">SI-3</td><td class="mono-sm">System and Information</td><td class="f12">Malicious Code Protection</td><td class="mono-sm">kics, checkov</td><td><span class="pill pill-pass">assessed</span></td></tr>
-              <tr><td class="mono f10 c-blue">IA-5</td><td class="mono-sm">Identification and Auth</td><td class="f12">Authenticator Management</td><td class="mono-sm">gitleaks</td><td><span class="pill pill-pass">assessed</span></td></tr>
-              <tr><td class="mono f10 c-blue">SC-28</td><td class="mono-sm">System &amp; Comm Protection</td><td class="f12">Protection of Information at Rest</td><td class="mono-sm">—</td><td><span class="pill pill-queue">not assessed</span></td></tr>
+              <tr><td colspan="5" class="mono-sm c-t3" style="text-align:center;padding:16px">Loading controls…</td></tr>
             </tbody>
           </table>
         </div>
@@ -1999,7 +1996,7 @@ function showPanel(name, btn) {
     if (!window.TOKEN || window.TOKEN === '') return;
     if (name === 'dashboard')   { initDashboardCharts(); loadDashKPIs(); }
     if (name === 'governance')  initGovernance();
-    if (name === 'compliance')  { initGauges(); setTimeout(loadFedRAMP, 300); }
+    if (name === 'compliance')  { initGauges(); setTimeout(loadFedRAMP, 300); setTimeout(_loadSOC2Gauge, 600); }
     if (name === 'sbom') setTimeout(loadSBOM, 200);
     if (name === 'analytics') setTimeout(loadAnalytics, 300);
     if (name === 'sla') setTimeout(loadSLA, 200);
@@ -9360,7 +9357,7 @@ var _siemKPIpoll = setInterval(function() {
   setInterval(loadSIEMKPIs, 60000);
 }, 1000);
 </script>
-<script src="/vsp_upgrade_v100.js?v=1778737745"></script>
+<script src="/vsp_upgrade_v100.js?v=1778738617"></script>
 <!-- removed: vsp_gate_widget.js (file does not exist) -->
 <script>
 // ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
