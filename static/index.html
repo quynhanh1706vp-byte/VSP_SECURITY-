@@ -1365,7 +1365,7 @@ window.addEventListener('DOMContentLoaded', function(){
           </div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Severity</th><th>Rule</th><th>Control</th><th>Framework</th></tr></thead>
+              <thead><tr><th>Severity</th><th>Rule</th><th>Control</th><th>Framework</th><th>Status</th></tr></thead>
               <tbody id="gov-trace-tbody" data-vsp-paginate="20">
                 <tr><td colspan="4" class="mono-sm" style="color:var(--t3);text-align:center;padding:14px">Loading findings…</td></tr>
               </tbody>
@@ -1399,14 +1399,14 @@ window.addEventListener('DOMContentLoaded', function(){
           <div class="card-body">
             <div class="gauge-wrap"><canvas id="gauge-fedramp" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-cyan" id="gv-fedramp">—</div><div class="gauge-unit">coverage</div></div></div>
             <div class="f12 fw7 c-t2 mb8">FedRAMP Moderate</div>
-            <div class="mono-sm">45 / 73 controls</div>
+            <div class="mono-sm" id="fedramp-ctrl-sub">— controls</div>
           </div>
         </div>
         <div class="card" style="text-align:center">
           <div class="card-body">
             <div class="gauge-wrap"><canvas id="gauge-cmmc" width="100" height="100"></canvas><div class="gauge-overlay"><div class="gauge-num c-amber" id="gv-cmmc">—</div><div class="gauge-unit">coverage</div></div></div>
             <div class="f12 fw7 c-t2 mb8">CMMC Level 2</div>
-            <div class="mono-sm">59 / 110 practices</div>
+            <div class="mono-sm" id="cmmc-ctrl-sub">— practices</div>
           </div>
         </div>
         <div class="card" style="text-align:center">
@@ -2798,6 +2798,9 @@ async function _loadComplianceData(type) {
     var barLink = document.getElementById(isFed?'fedramp-bar-link':'cmmc-bar-link');
     if (pctLink) { pctLink.textContent = pct+'%'; pctLink.style.color = color; }
     if (barLink) { barLink.style.width = pct+'%'; }
+    // Update sub text
+    var subEl = document.getElementById(isFed?'fedramp-ctrl-sub':'cmmc-ctrl-sub');
+    if (subEl) subEl.textContent = (d.assessed||0)+' / '+(d.total_controls||d.total_practices||0)+(isFed?' controls':' practices');
     document.getElementById('comp-assessed').textContent = (d.assessed||0)+' assessed';
     document.getElementById('comp-total').textContent = (d.total_controls||d.total_practices||0)+' total';
     _setupCompFilters();
@@ -6505,7 +6508,7 @@ async function loadGovernanceV2() {
       byCtrl[key].rows.push(t);
     });
 
-    var tbody = document.getElementById('trace-table');
+    var tbody = document.getElementById('gov-trace-tbody');
     if (tbody) {
       // Show first 15 traces
       tbody.innerHTML = traces.slice(0,15).map(function(t) {
@@ -9288,7 +9291,7 @@ var _siemKPIpoll = setInterval(function() {
   setInterval(loadSIEMKPIs, 60000);
 }, 1000);
 </script>
-<script src="/vsp_upgrade_v100.js?v=1778736915"></script>
+<script src="/vsp_upgrade_v100.js?v=1778737224"></script>
 <!-- removed: vsp_gate_widget.js (file does not exist) -->
 <script>
 // ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
