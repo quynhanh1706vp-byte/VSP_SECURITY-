@@ -80,3 +80,16 @@ func (db *DB) SetPolicyRuleActive(ctx context.Context, tenantID, id string, acti
 		active, id, tenantID)
 	return err
 }
+
+// UpdatePolicyRule updates editable fields of a policy rule.
+func (db *DB) UpdatePolicyRule(ctx context.Context, tenantID string, r PolicyRule) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE policy_rules
+		SET name=$1, repo_pattern=$2, fail_on=$3, min_score=$4,
+		    max_high=$5, block_secrets=$6, block_critical=$7
+		WHERE id=$8 AND tenant_id=$9`,
+		r.Name, r.RepoPattern, r.FailOn, r.MinScore,
+		r.MaxHigh, r.BlockSecrets, r.BlockCritical,
+		r.ID, tenantID)
+	return err
+}

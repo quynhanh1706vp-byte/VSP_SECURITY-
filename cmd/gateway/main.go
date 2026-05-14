@@ -1288,6 +1288,7 @@ func main() {
 		r.Post("/api/v1/policy/rules", gateH.CreateRule)
 		r.Delete("/api/v1/policy/rules/{id}", gateH.DeleteRule)
 		r.Patch("/api/v1/policy/rules/{id}", gateH.ToggleRule)
+		r.Put("/api/v1/policy/rules/{id}", gateH.UpdateRule)
 
 		// Audit
 		r.Get("/api/v1/audit/log", auditH.List)
@@ -1888,11 +1889,6 @@ func main() {
 		r.Get("/api/v1/sbom", tiH.SBOMIndex)
 
 		// UI 404 FIX: stub routes (return empty/ok)
-		r.Get("/api/v1/settings/dast-targets", tiH.UISTubSettings)
-		r.Get("/api/v1/settings/scan-config", tiH.UISTubSettings)
-		r.Get("/api/v1/integrations", tiH.UISTubIntegrationsList)
-		r.Post("/api/v1/integrations/{provider}/test-pr-comment", tiH.UISTubIntegrationsTest)
-		r.Post("/api/v1/integrations/{provider}/test-ticket", tiH.UISTubIntegrationsTest)
 		r.Post("/api/v1/sw/report", tiH.UISTubSwReport)
 		r.With(requirePro).Post("/api/v1/ti/kev/refresh", tiH.RefreshKEV)
 		r.With(requirePro).Post("/api/v1/siem/webhooks", siemH.Create)
@@ -2069,7 +2065,6 @@ func main() {
 
 		// Remediation workflow
 		r.Get("/api/v1/remediation", remediationH.List)
-		r.Get("/api/v1/remediation/stats", remediationH.Stats)
 		r.Get("/api/v1/remediation/finding/{finding_id}", remediationH.Get)
 		r.Post("/api/v1/remediation/finding/{finding_id}", remediationH.Upsert)
 		// ── Phase 1: workflow endpoints (added 2026-05-04) ──
@@ -2407,7 +2402,6 @@ func main() {
 		// Public keys are non-sensitive verification material — keep open so
 		// downstream verifiers can fetch without a paid plan.
 		r.Get("/api/v1/supply-chain/key", supplyChainH.Key)
-		r.Get("/api/v1/supply-chain/public-key", supplyChainH.Key)
 		r.With(requirePro).Post("/api/v1/supply-chain/verify", supplyChainH.VerifyBundle)
 		// ─── CISA Secure Software Self-Attestation — Phase 3A ────────
 		r.Get("/api/v1/cisa-attestation/kpis", cisaAttestH.KPIs)

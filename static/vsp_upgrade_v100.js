@@ -1781,6 +1781,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
           +'<span>Fail on: <b>'+(tags.join(', ')||r.fail_on||'custom')+'</b></span>'
           +'<div style="display:flex;gap:6px">'
           +(created?'<span style="font-size:9px;color:var(--t3)">'+created+'</span>':'')
+          +'<button class="btn btn-ghost" style="font-size:9px;padding:2px 8px;color:var(--cyan)" onclick="_editPolicyRule(\''+r.id+'\',this)">Edit</button>'
           +'<button class="btn btn-ghost" style="font-size:9px;padding:2px 8px;color:var(--red)" onclick="_deletePolicyRule(\''+r.id+'\')">Delete</button>'
           +'</div></div></div>';
       }).join('');
@@ -1803,6 +1804,79 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       });
       showToast('Rule '+(active?'disabled':'enabled'),'info');
     } catch(e) { showToast('Update failed','error'); }
+  };
+
+  window._editPolicyRule = async function(id, btn) {
+    await ensureToken();
+    var resp = await fetch('/api/v1/policy/rules', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var data = await resp.json().catch(function(){return{rules:[]};});
+    var rule = (data.rules||[]).find(function(r){return r.id===id;});
+    if (!rule) { showToast('Rule not found','error'); return; }
+    var existing = document.getElementById('edit-rule-modal-gov');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.id = 'edit-rule-modal-gov';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-header">'
+      +'<div class="modal-title">Edit rule: '+rule.name+'</div>'
+      +'<button class="modal-close" onclick="document.getElementById('edit-rule-modal-gov').remove()">✕</button>'
+      +'</div><div class="modal-body">'
+      +'<div class="form-group mb8"><label class="form-label">Rule name <span style="color:var(--red)">*</span></label>'
+      +'<input id="er-name-gov" class="form-ctrl" value="'+rule.name+'"></div>'
+      +'<div class="g2 mb8">'
+      +'<div class="form-group"><label class="form-label">Fail on</label>'
+      +'<select id="er-failon-gov" class="form-ctrl">'
+      +'<option value="FAIL"'+(rule.fail_on==='FAIL'?' selected':'')+'>FAIL gate</option>'
+      +'<option value="WARN"'+(rule.fail_on==='WARN'?' selected':'')+'>WARN only</option>'
+      +'</select></div>'
+      +'<div class="form-group"><label class="form-label">Min score</label>'
+      +'<input id="er-score-gov" class="form-ctrl" type="number" value="'+(rule.min_score||0)+'" min="0" max="10"></div>'
+      +'</div>'
+      +'<div class="g2 mb8">'
+      +'<div class="form-group"><label class="form-label">Max HIGH findings</label>'
+      +'<input id="er-maxhigh-gov" class="form-ctrl" type="number" value="'+(rule.max_high||0)+'" min="-1"></div>'
+      +'<div class="form-group"><label class="form-label">Repo pattern</label>'
+      +'<input id="er-repo-gov" class="form-ctrl" value="'+(rule.repo_pattern||'*')+'"></div>'
+      +'</div>'
+      +'<div class="g2 mb8">'
+      +'<label class="form-label" style="display:flex;align-items:center;gap:6px;cursor:pointer">'
+      +'<input type="checkbox" id="er-blockcrit-gov"'+(rule.block_critical?' checked':'')+'>Block CRITICAL</label>'
+      +'<label class="form-label" style="display:flex;align-items:center;gap:6px;cursor:pointer">'
+      +'<input type="checkbox" id="er-blocksec-gov"'+(rule.block_secrets?' checked':'')+'>Block Secrets</label>'
+      +'</div>'
+      +'</div><div class="modal-footer">'
+      +'<button class="btn btn-ghost" onclick="document.getElementById('edit-rule-modal-gov').remove()">Cancel</button>'
+      +'<button class="btn btn-primary" onclick="_submitEditRule(''+rule.id+'')">Save changes</button>'
+      +'</div></div>';
+    document.body.appendChild(overlay);
+    setTimeout(function(){ overlay.classList.add('open'); }, 10);
+  };
+
+  window._submitEditRule = async function(id) {
+    var name = (document.getElementById('er-name-gov')||{}).value||'';
+    if (!name) { showToast('Rule name required','error'); return; }
+    var payload = {
+      name: name,
+      fail_on: (document.getElementById('er-failon-gov')||{}).value||'FAIL',
+      min_score: parseInt((document.getElementById('er-score-gov')||{}).value||'0'),
+      max_high: parseInt((document.getElementById('er-maxhigh-gov')||{}).value||'-1'),
+      repo_pattern: (document.getElementById('er-repo-gov')||{}).value||'*',
+      block_critical: !!(document.getElementById('er-blockcrit-gov')||{}).checked,
+      block_secrets: !!(document.getElementById('er-blocksec-gov')||{}).checked,
+    };
+    await ensureToken();
+    try {
+      var r = await fetch('/api/v1/policy/rules/'+id, {
+        method: 'PUT',
+        headers: {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if (!r.ok) { var e=await r.json().catch(function(){return{};}); showToast('Failed: '+(e.error||r.status),'error'); return; }
+      document.getElementById('edit-rule-modal-gov').remove();
+      showToast('Rule updated','success');
+      document.getElementById('panel-policy')._policyLoaded = false;
+      _loadPolicyFull();
+    } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
   window._deletePolicyRule = async function(id) {

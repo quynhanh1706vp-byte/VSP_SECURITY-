@@ -244,3 +244,39 @@ func (h *Gate) ToggleRule(w http.ResponseWriter, r *http.Request) {
 	logAudit(r, h.DB, "POLICY_RULE_TOGGLED", "policy_rules/"+id)
 	jsonOK(w, map[string]any{"id": id, "active": req.Active})
 }
+
+// PUT /api/v1/policy/rules/{id}
+func (h *Gate) UpdateRule(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !validateUUID(id) {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req store.PolicyRule
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.ID = id
+	req.TenantID = claims.TenantID
+	if req.Name == "" {
+		jsonError(w, "name required", http.StatusBadRequest)
+		return
+	}
+	if req.RepoPattern == "" {
+		req.RepoPattern = "*"
+	}
+	if req.FailOn == "" {
+		req.FailOn = "FAIL"
+	}
+	if err := h.DB.UpdatePolicyRule(r.Context(), claims.TenantID, req); err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	logAudit(r, h.DB, "POLICY_RULE_UPDATED", "policy_rules/"+id)
+	jsonOK(w, map[string]any{"ok": true, "id": id})
+}
