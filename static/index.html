@@ -6508,20 +6508,81 @@ async function loadGovernanceV2() {
       byCtrl[key].rows.push(t);
     });
 
-    var tbody = document.getElementById('gov-trace-tbody');
-    if (tbody) {
-      // Show first 15 traces
-      tbody.innerHTML = traces.slice(0,15).map(function(t) {
-        var sc = {CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'}[t.severity]||'sev-info';
-        var st = t.status==='open'?'pill-fail':'pill-pass';
-        return '<tr>'
-          +'<td><span class="sev '+sc+'">'+t.severity+'</span></td>'
-          +'<td class="mono f10 c-blue" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.rule_id.slice(0,8)+'</td>'
-          +'<td class="mono f10 c-purple">'+t.control+'</td>'
-          +'<td class="mono-sm">'+t.framework+'</td>'
-          +'<td><span class="pill '+st+'" style="font-size:8px">'+t.status+'</span></td>'
-          +'</tr>';
-      }).join('');
+    // ── Traceability chart — severity breakdown ─────────────────────────
+    var traceCard = document.querySelector('#gov-trace-count');
+    if (traceCard) traceCard.textContent = traces.length+' mappings';
+
+    // Build severity + status counts
+    var bySev = {CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0, INFO:0};
+    var byStatus = {open:0, monitor:0, resolved:0};
+    traces.forEach(function(t){
+      if (bySev[t.severity]!==undefined) bySev[t.severity]++;
+      if (byStatus[t.status]!==undefined) byStatus[t.status]++;
+    });
+
+    // Replace table with chart + mini table
+    var traceWrap = document.querySelector('#gov-trace-tbody');
+    if (traceWrap) {
+      var tbl = traceWrap.closest('.tbl-wrap');
+      if (tbl) {
+        tbl.innerHTML = ''
+          // Chart row
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px">'
+          // Severity bar chart
+          +'<div>'
+          +'<div style="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:8px;letter-spacing:.06em">BY SEVERITY</div>'
+          +['CRITICAL','HIGH','MEDIUM','LOW','INFO'].map(function(sev){
+            var cnt = bySev[sev]||0;
+            var pct = traces.length ? Math.round(cnt/traces.length*100) : 0;
+            var col = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--amber)',LOW:'var(--green)',INFO:'var(--t3)'}[sev];
+            return '<div style="margin-bottom:6px">'
+              +'<div style="display:flex;justify-content:space-between;margin-bottom:2px">'
+              +'<span style="font-size:9px;color:'+col+';font-weight:600">'+sev+'</span>'
+              +'<span style="font-size:9px;color:var(--t3)">'+cnt+' ('+pct+'%)</span>'
+              +'</div>'
+              +'<div style="height:6px;background:var(--border);border-radius:3px">'
+              +'<div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px;transition:width .4s"></div>'
+              +'</div></div>';
+          }).join('')
+          +'</div>'
+          // Status donut-like
+          +'<div>'
+          +'<div style="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:8px;letter-spacing:.06em">BY STATUS</div>'
+          +Object.entries(byStatus).map(function(kv){
+            var s=kv[0], cnt=kv[1];
+            var pct = traces.length ? Math.round(cnt/traces.length*100) : 0;
+            var col = s==='open'?'var(--red)':s==='monitor'?'var(--amber)':'var(--green)';
+            return '<div style="margin-bottom:8px">'
+              +'<div style="display:flex;justify-content:space-between;margin-bottom:2px">'
+              +'<span style="font-size:9px;color:'+col+';font-weight:600;text-transform:uppercase">'+s+'</span>'
+              +'<span style="font-size:9px;color:var(--t3)">'+cnt+' ('+pct+'%)</span>'
+              +'</div>'
+              +'<div style="height:6px;background:var(--border);border-radius:3px">'
+              +'<div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px;transition:width .4s"></div>'
+              +'</div></div>';
+          }).join('')
+          +'<div style="margin-top:12px;padding:8px;background:var(--b2);border-radius:6px;text-align:center">'
+          +'<div style="font-size:20px;font-weight:700;color:var(--cyan)">'+traces.length+'</div>'
+          +'<div style="font-size:9px;color:var(--t3)">total mappings</div>'
+          +'</div>'
+          +'</div>'
+          +'</div>'
+          // Top findings table
+          +'<div style="border-top:1px solid var(--border);padding:0">'
+          +'<table><thead><tr><th>Severity</th><th>Rule</th><th>Control</th><th>Framework</th><th>Status</th></tr></thead><tbody>'
+          +traces.slice(0,10).map(function(t){
+            var sc={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low',INFO:'sev-info'}[t.severity]||'sev-info';
+            var st=t.status==='open'?'pill-fail':t.status==='monitor'?'pill-warn':'pill-pass';
+            return '<tr>'
+              +'<td><span class="sev '+sc+'">'+t.severity+'</span></td>'
+              +'<td class="mono f10 c-blue">'+t.rule_id.slice(0,8)+'</td>'
+              +'<td class="mono f10 c-purple">'+t.control+'</td>'
+              +'<td class="mono-sm">'+t.framework+'</td>'
+              +'<td><span class="pill '+st+'" style="font-size:8px">'+t.status+'</span></td>'
+              +'</tr>';
+          }).join('')
+          +'</tbody></table></div>';
+      }
     }
 
     // ── RACI từ API thật ────────────────────────────────────────────────
@@ -9291,7 +9352,7 @@ var _siemKPIpoll = setInterval(function() {
   setInterval(loadSIEMKPIs, 60000);
 }, 1000);
 </script>
-<script src="/vsp_upgrade_v100.js?v=1778737224"></script>
+<script src="/vsp_upgrade_v100.js?v=1778737521"></script>
 <!-- removed: vsp_gate_widget.js (file does not exist) -->
 <script>
 // ── VSP UPGRADE: Smart polling + SSE-driven refresh ─────────────────────
