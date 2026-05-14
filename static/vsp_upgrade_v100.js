@@ -1846,7 +1846,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       +'</div>'
       +'</div><div class="modal-footer">'
       +'<button class="btn btn-ghost" onclick="document.getElementById(\"edit-rule-modal-gov\").remove()">Cancel</button>'
-      +'<button class="btn btn-primary" onclick="_submitEditRule(''+rule.id+'')">Save changes</button>'
+      +'<button class="btn btn-primary" onclick="_submitEditRule(\''+rule.id+'\')">Save changes</button>'
       +'</div></div>';
     document.body.appendChild(overlay);
     setTimeout(function(){ overlay.classList.add('open'); }, 10);
