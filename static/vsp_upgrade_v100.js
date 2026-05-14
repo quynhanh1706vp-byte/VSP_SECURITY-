@@ -1798,7 +1798,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     await ensureToken();
     try {
       await fetch('/api/v1/policy/rules/'+id, {
-        method:'PUT', headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+        method:'PATCH', headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
         body: JSON.stringify({active: !active})
       });
       showToast('Rule '+(active?'disabled':'enabled'),'info');
