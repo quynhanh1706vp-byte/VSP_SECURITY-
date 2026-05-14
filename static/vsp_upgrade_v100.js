@@ -2111,7 +2111,24 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
                 +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.message+'</span>'
                 +'</div>';
             }).join('')
-            +(unique.length>5?'<div style="font-size:10px;color:var(--t3);padding:4px 8px">...và '+(unique.length-5)+' CVEs khác (unique)</div>':'')
+            +(unique.length>5?'<div style="font-size:10px;color:var(--t3);padding:4px 8px;display:flex;align-items:center;justify-content:space-between">'
+            +'<span>...và '+(unique.length-5)+' CVEs khác (unique)</span>'
+            +'<button onclick="this.closest(\'.card-body\').querySelector(\'[data-cve-all]\').style.display=\'block\';this.parentElement.style.display=\'none\'" '
+            +'style="font-size:9px;padding:2px 8px;background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);border-radius:4px;cursor:pointer">Xem tất cả</button>'
+            +'</div>'
+            +'<div data-cve-all style="display:none">'
+            +unique.slice(5).map(function(f){
+              var sev=(f.severity||'').toUpperCase();
+              var sc=sev==='CRITICAL'?'var(--red)':sev==='HIGH'?'var(--amber)':'var(--t3)';
+              return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--b2);border-radius:6px;margin-bottom:4px">'
+                +'<span style="font-size:9px;font-weight:700;color:'+sc+'">'+sev+'</span>'
+                +'<span style="font-size:10px;font-family:var(--font-mono);color:var(--cyan)">'+f.rule_id+'</span>'
+                +'<span style="font-size:10px;flex:1;color:var(--t2)">'+f.message.slice(0,80)+'</span>'
+                +'<span style="font-size:9px;color:var(--t3)">×'+f.count+'</span>'
+                +'</div>';
+            }).join('')
+            +'</div>':'')
+
             +'</div>';
         })();
 
