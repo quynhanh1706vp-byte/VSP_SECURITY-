@@ -1260,6 +1260,7 @@ func main() {
 		r.Get("/api/v1/sso/providers", ssoOIDCH.Providers)
 		r.With(requirePro).Post("/api/v1/sso/providers", ssoOIDCH.Providers)
 		r.With(requirePro).Put("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.With(requirePro).Get("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
 		r.With(requirePro).Delete("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
 
 		// ─── Cloud Security Posture Management — PRO feature ────────────
@@ -1285,6 +1286,7 @@ func main() {
 		r.Get("/api/v1/policy/rules", gateH.ListRules)
 		r.Post("/api/v1/policy/rules", gateH.CreateRule)
 		r.Delete("/api/v1/policy/rules/{id}", gateH.DeleteRule)
+		r.Patch("/api/v1/policy/rules/{id}", gateH.ToggleRule)
 
 		// Audit
 		r.Get("/api/v1/audit/log", auditH.List)

@@ -72,3 +72,11 @@ func (db *DB) DeletePolicyRule(ctx context.Context, tenantID, id string) error {
 		id, tenantID)
 	return err
 }
+
+// SetPolicyRuleActive enables or disables a policy rule.
+func (db *DB) SetPolicyRuleActive(ctx context.Context, tenantID, id string, active bool) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE policy_rules SET active=$1 WHERE id=$2 AND tenant_id=$3`,
+		active, id, tenantID)
+	return err
+}

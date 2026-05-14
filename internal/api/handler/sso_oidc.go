@@ -108,6 +108,17 @@ func (h *SSOOIDCHandler) ProviderByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
+	case http.MethodGet:
+		p, err := sso.GetProvider(r.Context(), h.DB, id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				writeJSON2(w, http.StatusNotFound, map[string]string{"error": "not found"})
+				return
+			}
+			writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON2(w, http.StatusOK, p)
 	case http.MethodPut:
 		var p sso.Provider
 		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
@@ -142,7 +153,7 @@ func (h *SSOOIDCHandler) ProviderByID(w http.ResponseWriter, r *http.Request) {
 		writeJSON2(w, http.StatusOK, map[string]string{"status": "deleted"})
 
 	default:
-		w.Header().Set("Allow", "PUT, DELETE")
+		w.Header().Set("Allow", "GET, PUT, DELETE")
 		writeJSON2(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 	}
 }

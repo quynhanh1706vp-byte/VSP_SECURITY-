@@ -218,3 +218,29 @@ func runSummary(run *store.Run) scanner.Summary {
 		HasSecrets: toBool(m["HAS_SECRETS"]),
 	}
 }
+
+// PATCH /api/v1/policy/rules/{id}
+func (h *Gate) ToggleRule(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !validateUUID(id) {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Active bool `json:"active"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if err := h.DB.SetPolicyRuleActive(r.Context(), claims.TenantID, id, req.Active); err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	logAudit(r, h.DB, "POLICY_RULE_TOGGLED", "policy_rules/"+id)
+	jsonOK(w, map[string]any{"id": id, "active": req.Active})
+}
