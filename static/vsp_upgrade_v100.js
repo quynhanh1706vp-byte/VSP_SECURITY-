@@ -2113,7 +2113,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
             }).join('')
             +(unique.length>5?'<div style="font-size:10px;color:var(--t3);padding:4px 8px;display:flex;align-items:center;justify-content:space-between">'
             +'<span>...và '+(unique.length-5)+' CVEs khác (unique)</span>'
-            +'<button onclick="this.closest(\'.card-body\').querySelector(\'[data-cve-all]\').style.display=\'block\';this.parentElement.style.display=\'none\'" '
+            +'<button onclick="var n=this.parentElement.nextElementSibling;if(n){n.style.display=\'block\'};this.parentElement.style.display=\'none\'" '
             +'style="font-size:9px;padding:2px 8px;background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);border-radius:4px;cursor:pointer">Xem tất cả</button>'
             +'</div>'
             +'<div data-cve-all style="display:none">'
