@@ -1272,6 +1272,21 @@ window.addEventListener('DOMContentLoaded', function(){
           <div class="card-title">Hash chain integrity</div>
           <button class="btn btn-primary" onclick="verifyAudit()">Verify chain →</button>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <input id="audit-search" class="form-ctrl" style="flex:1;min-width:160px;font-size:11px" placeholder="Search action, resource, IP...">
+          <input id="audit-from" class="form-ctrl" type="date" style="width:130px;font-size:11px" title="From date">
+          <input id="audit-to" class="form-ctrl" type="date" style="width:130px;font-size:11px" title="To date">
+          <select id="audit-action-filter" class="form-ctrl" style="width:140px;font-size:11px">
+            <option value="">All actions</option>
+            <option value="LOGIN">Login</option>
+            <option value="SCAN">Scan</option>
+            <option value="POLICY">Policy</option>
+            <option value="RULE">Rule</option>
+            <option value="FINDING">Finding</option>
+          </select>
+          <button class="btn btn-ghost" style="font-size:11px" onclick="loadAuditReal()">🔄 Refresh</button>
+          <button class="btn btn-ghost" style="font-size:11px" onclick="_exportAuditCSV()">⬇ Export CSV</button>
+        </div>
         <div class="card-body"><div id="verify-result" class="mono f11 c-t3">Click verify to check audit log hash chain integrity.</div></div>
       </div>
 
@@ -5845,7 +5860,7 @@ window.verifyAudit = async function() {
 var _spAudit = window.showPanel;
 window.showPanel = function(name, btn) {
   _spAudit && _spAudit(name, btn);
-  if (name === 'audit') setTimeout(verifyAudit, 300);
+  if (name === 'audit') setTimeout(function(){ loadAuditReal(); }, 300);
 };
 </script>
 
@@ -9012,11 +9027,28 @@ window.loadRuns = async function() {
 async function loadAuditReal() {
   await ensureToken();
   var h = {'Authorization': 'Bearer ' + window.TOKEN};
-
   try {
-    // Fetch audit log
-    var d = await fetch('/api/v1/audit/log?limit=50', {headers: h}).then(function(r){ return r.json(); });
+    // Build query with filters
+    var params = 'limit=200';
+    var search = (document.getElementById('audit-search')||{}).value||'';
+    var from   = (document.getElementById('audit-from')||{}).value||'';
+    var to     = (document.getElementById('audit-to')||{}).value||'';
+    var action = (document.getElementById('audit-action-filter')||{}).value||'';
+    if (action) params += '&action='+encodeURIComponent(action);
+    if (from)   params += '&from='+encodeURIComponent(from);
+    if (to)     params += '&to='+encodeURIComponent(to);
+    var d = await fetch('/api/v1/audit/log?'+params, {headers: h}).then(function(r){ return r.json(); });
     var entries = d.entries || [];
+    // Client-side search filter
+    if (search) {
+      var q = search.toLowerCase();
+      entries = entries.filter(function(e){
+        return (e.action||'').toLowerCase().includes(q)
+          || (e.resource||'').toLowerCase().includes(q)
+          || (e.ip||'').toLowerCase().includes(q)
+          || (e.actor||'').toLowerCase().includes(q);
+      });
+    }
     var total   = d.total || entries.length;
 
     // KPI counts
@@ -9543,6 +9575,37 @@ function startMFATimer() {
     <script src="/vsp_uxstates.js"></script>
     <script src="/panels/vsp_pro_paginate.js?v=1"></script>
     <!-- VSP Advanced Features v7 Patch -->
-    <script src="/static/patches/vsp_advanced_features_v7.js"></script>
+    <script src="/static/patches/vsp_advanced_features_v7.js">
+window._exportAuditCSV = async function() {
+  await ensureToken();
+  var d = await fetch('/api/v1/audit/log?limit=1000', {
+    headers: {'Authorization': 'Bearer ' + window.TOKEN}
+  }).then(function(r){ return r.json(); }).catch(function(){ return {entries:[]}; });
+  var entries = d.entries || [];
+  var rows = [['seq','action','resource','ip','actor','created_at']];
+  entries.forEach(function(e){
+    rows.push([e.seq, e.action, e.resource, e.ip, e.actor||'', e.created_at]);
+  });
+  var csv = rows.map(function(r){ return r.map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'audit-log-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('Exported '+entries.length+' audit entries','success');
+};
+
+// Search on Enter + debounce
+(function(){
+  var t;
+  function onAuditFilter(){ clearTimeout(t); t = setTimeout(loadAuditReal, 400); }
+  document.addEventListener('DOMContentLoaded', function(){
+    ['audit-search','audit-from','audit-to','audit-action-filter'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', onAuditFilter);
+    });
+  });
+})();
+</script>
 </body>
 </html>

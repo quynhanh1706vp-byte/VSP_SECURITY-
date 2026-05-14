@@ -20,6 +20,8 @@ func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 50)
 	offset := queryInt(r, "offset", 0)
 	actionFilter := r.URL.Query().Get("action")
+	fromFilter    := r.URL.Query().Get("from")
+	toFilter      := r.URL.Query().Get("to")
 
 	// Sprint 12.7: resolve tenant slug → UUID. Pre-12.7 dev JWTs
 	// carrying tenant_id="default" caused SQLSTATE 22P02. Same root
@@ -31,8 +33,8 @@ func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entries, total, err := h.DB.ListAuditPaged(r.Context(),
-		tenantID, actionFilter, limit, offset)
+	entries, total, err := h.DB.ListAuditPagedFiltered(r.Context(),
+		tenantID, actionFilter, fromFilter, toFilter, limit, offset)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return

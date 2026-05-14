@@ -199,3 +199,44 @@ func (db *DB) UpdateAuditHashes(ctx context.Context, tenantID string, entries []
 	}
 	return nil
 }
+
+// ListAuditPagedFiltered — like ListAuditPaged but with from/to date filters.
+func (db *DB) ListAuditPagedFiltered(ctx context.Context, tenantID, actionFilter, fromFilter, toFilter string, limit, offset int) ([]AuditEntry, int64, error) {
+	if limit <= 0 || limit > 1000 { limit = 50 }
+	base := " WHERE tenant_id = $1"
+	args := []any{tenantID}
+	i := 2
+	if actionFilter != "" {
+		base += fmt.Sprintf(" AND action ILIKE $%d", i)
+		args = append(args, "%"+actionFilter+"%")
+		i++
+	}
+	if fromFilter != "" {
+		base += fmt.Sprintf(" AND created_at >= $%d", i)
+		args = append(args, fromFilter)
+		i++
+	}
+	if toFilter != "" {
+		base += fmt.Sprintf(" AND created_at <= $%d", i)
+		args = append(args, toFilter+" 23:59:59")
+		i++
+	}
+	var total int64
+	_ = db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM audit_log"+base, args...).Scan(&total)
+	args = append(args, limit, offset)
+	rows, err := db.pool.Query(ctx,
+		"SELECT seq, action, COALESCE(resource,''), COALESCE(ip,''), created_at"+
+		" FROM audit_log"+base+
+		fmt.Sprintf(" ORDER BY seq DESC LIMIT $%d OFFSET $%d", i, i+1),
+		args...)
+	if err != nil { return nil, 0, err }
+	defer rows.Close()
+	var out []AuditEntry
+	for rows.Next() {
+		var e AuditEntry
+		if err := rows.Scan(&e.Seq, &e.Action, &e.Resource, &e.IP, &e.CreatedAt); err == nil {
+			out = append(out, e)
+		}
+	}
+	return out, total, nil
+}
