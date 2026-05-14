@@ -31,6 +31,7 @@ import (
 
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/ticket"
+	"github.com/go-chi/chi/v5"
 	"github.com/spf13/viper"
 )
 
@@ -923,4 +924,40 @@ func handleSBOMSignatures(w http.ResponseWriter, r *http.Request) {
 		sigs = []map[string]any{}
 	}
 	json.NewEncoder(w).Encode(map[string]any{"signatures": sigs})
+}
+
+
+// handleFindingVEX — POST /api/v1/vsp/findings/{id}/vex
+func handleFindingVEX(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	fid := chi.URLParam(r, "id")
+	if fid == "" {
+		writeJSONErr(w, http.StatusBadRequest, "finding id required")
+		return
+	}
+	var req struct {
+		Status        string `json:"status"`
+		Justification string `json:"justification"`
+		Detail        string `json:"detail"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONErr(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if req.Status == "" {
+		req.Status = "under_investigation"
+	}
+	if p4SQLDB != nil {
+		p4SQLDB.Exec(`
+			INSERT INTO vex_statements (tenant_id, cve_id, status, justification, detail, author)
+			VALUES ($1, $2, $3, $4, $5, 'vsp-analyst')
+			ON CONFLICT (tenant_id, cve_id) DO UPDATE
+			SET status=$3, justification=$4, detail=$5, updated_at=NOW()`,
+			defaultTenantID(), fid, req.Status, req.Justification, req.Detail)
+	}
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":         true,
+		"finding_id": fid,
+		"status":     req.Status,
+	})
 }

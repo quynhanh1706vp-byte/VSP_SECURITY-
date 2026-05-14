@@ -395,3 +395,35 @@ func (h *ThreatHunt) ListResults(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]any{"results": out, "total": totalCount, "page_size": len(out)})
 }
+
+// GET /api/v1/threat-hunt/queries/{id}
+func (h *ThreatHunt) GetQuery(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	tenantID := h.resolveTenantUUID(r, claims.TenantID)
+	if tenantID == "" {
+		jsonError(w, "tenant not found", http.StatusForbidden)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	var q huntQuery
+	var techs string
+	err := h.DB.Pool().QueryRow(r.Context(),
+		`SELECT id, name, description, query, lookback_hours,
+		        COALESCE(schedule_cron,''), mitre_techniques, min_match_severity,
+		        enabled, created_by, last_run_at, created_at, updated_at
+		   FROM hunt_queries
+		  WHERE id = $1 AND tenant_id = $2`,
+		id, tenantID).Scan(&q.ID, &q.Name, &q.Description, &q.Query, &q.LookbackHours,
+		&q.ScheduleCron, &techs, &q.MinMatchSeverity, &q.Enabled, &q.CreatedBy,
+		&q.LastRunAt, &q.CreatedAt, &q.UpdatedAt)
+	if err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	q.MITRETechniques = splitCSV(techs)
+	jsonOK(w, q)
+}

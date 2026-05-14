@@ -1278,6 +1278,7 @@ func main() {
 		r.With(requirePro).Get("/api/v1/cspm/config", cspmH.GetConfig)
 		r.With(requirePro).Put("/api/v1/cspm/config", cspmH.UpdateConfig)
 		r.Get("/api/v1/vsp/findings/by-tool", findingsH.ByTool)
+		r.Post("/api/v1/vsp/findings/{id}/vex", handleFindingVEX)
 
 		// Gate + Policy
 		r.Get("/api/v1/vsp/gate/latest", gateH.Latest)
@@ -1493,6 +1494,7 @@ func main() {
 		threatHuntH := handler.NewThreatHunt(db)
 		r.With(requirePro).Get("/api/v1/threat-hunt/queries", threatHuntH.ListQueries)
 		r.With(requirePro).Post("/api/v1/threat-hunt/queries", threatHuntH.CreateQuery)
+		r.With(requirePro).Get("/api/v1/threat-hunt/queries/{id}", threatHuntH.GetQuery)
 		r.With(requirePro).Delete("/api/v1/threat-hunt/queries/{id}", threatHuntH.DeleteQuery)
 		r.With(requirePro).Post("/api/v1/threat-hunt/queries/{id}/run", threatHuntH.RunQuery)
 		r.With(requirePro).Get("/api/v1/threat-hunt/results", threatHuntH.ListResults)
