@@ -149,7 +149,7 @@ tr:hover td{background:var(--bg3)}
   <button class="tab" data-tab="provenance">SLSA Provenance</button>
   <button class="tab" data-tab="vex">VEX Statements</button>
   <button class="tab" data-tab="key">Public Key</button>
-  <button class="tab" data-tab="analytics">📊 Analytics</button>
+  <button class="tab" data-tab="analytics" onclick="setTimeout(loadStats,50)">📊 Analytics</button>
 </div>
 
 <!-- ══════ Tab: Sign ══════ -->
@@ -423,7 +423,7 @@ tr:hover td{background:var(--bg3)}
       <!-- SLSA level distribution -->
       <div style="margin-bottom:16px">
         <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">SLSA level distribution</div>
-        <div id="stat-slsa-bars" style="display:flex;gap:8px;align-items:flex-end;height:80px"></div>
+        <div id="stat-slsa-bars" style="display:flex;gap:8px;align-items:flex-end;height:90px;max-width:300px"></div>
       </div>
       <!-- Signatures per day sparkline -->
       <div>
@@ -1533,11 +1533,12 @@ async function loadStats() {
     if (slsaEl && d.slsa_distribution) {
       const max = Math.max(...d.slsa_distribution.map(s => s.count), 1);
       const colors = ['#6b7280','#3b82f6','#10b981','#f59e0b'];
+      slsaEl.style.height = '90px';
       slsaEl.innerHTML = d.slsa_distribution.map(s => {
-        const h = Math.round(s.count / max * 60) + 20;
-        return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+        const barH = Math.max(Math.round(s.count / max * 56), 4);
+        return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;flex:1;height:90px">
           <div style="font-size:10px;color:var(--t3)">${s.count}</div>
-          <div style="width:100%;height:${h}px;background:${colors[(s.level-1)%4]||'#888'};border-radius:3px 3px 0 0"></div>
+          <div style="width:100%;max-width:48px;height:${barH}px;background:${colors[(s.level-1)%4]||'#888'};border-radius:3px 3px 0 0"></div>
           <div style="font-size:10px;color:var(--t3)">L${s.level}</div>
         </div>`;
       }).join('');
@@ -1546,28 +1547,51 @@ async function loadStats() {
     // Sparkline signatures per day
     const canvas = el('stat-sig-chart');
     if (canvas && d.signatures_per_day && d.signatures_per_day.length) {
-      const ctx = canvas.getContext('2d');
       const data = d.signatures_per_day;
-      const W = canvas.offsetWidth || 600;
-      canvas.width = W;
-      const maxV = Math.max(...data.map(d => d.count), 1);
+      const dpr = window.devicePixelRatio || 1;
+      const W = Math.max(canvas.parentElement ? canvas.parentElement.offsetWidth - 32 : 600, 200);
+      const H = 60;
+      canvas.style.width  = W + 'px';
+      canvas.style.height = H + 'px';
+      canvas.width  = W * dpr;
+      canvas.height = H * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      const maxV = Math.max(...data.map(p => p.count), 1);
       const step = W / Math.max(data.length - 1, 1);
-      ctx.clearRect(0, 0, W, 60);
+      ctx.clearRect(0, 0, W, H);
+      // Fill
+      ctx.beginPath();
+      data.forEach((pt, i) => {
+        const x = i * step;
+        const y = (H - 8) - (pt.count / maxV * (H - 16));
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.lineTo((data.length - 1) * step, H);
+      ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(59,130,246,0.12)';
+      ctx.fill();
+      // Line
       ctx.beginPath();
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
       data.forEach((pt, i) => {
         const x = i * step;
-        const y = 55 - (pt.count / maxV * 45);
+        const y = (H - 8) - (pt.count / maxV * (H - 16));
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       });
       ctx.stroke();
-      // Fill under line
-      ctx.lineTo((data.length-1)*step, 60);
-      ctx.lineTo(0, 60);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(59,130,246,0.15)';
-      ctx.fill();
+      // Dots
+      ctx.fillStyle = '#3b82f6';
+      data.forEach((pt, i) => {
+        const x = i * step;
+        const y = (H - 8) - (pt.count / maxV * (H - 16));
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
     }
   } catch(e) {
     console.warn('[SC] loadStats failed:', e);
