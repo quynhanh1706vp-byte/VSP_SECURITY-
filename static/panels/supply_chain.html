@@ -446,7 +446,7 @@ async function loadKPIs() {
       safe(fetch('/api/v1/supply-chain/signatures')),
       safe(fetch('/api/v1/supply-chain/provenance')),
       safe(fetch('/api/p4/vex')),
-      safe(fetch('/api/v1/supply-chain/key'))
+      safe(fetch('/api/v1/supply-chain/key', {headers: {'Authorization': 'Bearer ' + (localStorage.getItem('vsp_token') || sessionStorage.getItem('vsp_token') || '')}}))
     ]);
     _scKPIClear();
     document.getElementById('kpi-sigs').textContent = sigs.count != null ? sigs.count : '—';
@@ -685,7 +685,7 @@ async function loadPublicKey() {
   if (algoEl) algoEl.classList.add('sc-shimmer');
 
   try {
-    const res = await fetch('/api/v1/supply-chain/key');
+    const res = await fetch('/api/v1/supply-chain/key', {headers: {'Authorization': 'Bearer ' + (localStorage.getItem('vsp_token') || '')}});
     if (!res.ok) {
       if (keyEl) { keyEl.classList.remove('sc-shimmer'); keyEl.textContent = '—'; }
       if (algoEl) { algoEl.classList.remove('sc-shimmer'); algoEl.textContent = '—'; }
