@@ -20,7 +20,6 @@
     if (window.VSP_DEBUG) console.log('[P4] auth bootstrapped');
   }
   window.VSP_API_BASE = window.location.origin;
-  window.VSP_P4_API_KEY = '634a9c4ebc792f44d7c50c0eea62da4a3f2a4f9e657048d070b6175187bdb0c2';
 })();
 </script>
 <style>
@@ -645,7 +644,8 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
             <div class="score-label">FEDRAMP MODERATE</div>
             <div class="score-val" id="ov-fedramp" style="color:var(--cyan)">—</div>
             <div class="score-sub" id="ov-fedramp-sub">loading...</div>
-            <div class="score-bar"><div class="score-bar-fill" id="ov-fedramp-bar" style="width:0%;background:var(--cyan)"></div></div>
+            <div class="score-bar"><div class="score-bar-fill" id="fedramp-families" style="margin-top:10px;font-size:11px"></div>
+<div id="ov-fedramp-bar" style="width:0%;background:var(--cyan)"></div></div>
           </div>
           <div class="score-card" onclick="switchTab('rmf',null)" style="cursor:pointer" title="View CMMC / RMF detail">
             <div class="score-label">CMMC LEVEL 2</div>
@@ -1338,6 +1338,32 @@ async function loadOverview() {
       safe(api('/api/p4/ato/expiry'))
     ]);
     zt = res[0]; pipe = res[1]; rmf = res[2]; fed = res[3]; cmmc = res[4]; ato = res[5];
+    // Fix 2: Family breakdown
+    if (fed && fed.controls) {
+      var families = {};
+      fed.controls.forEach(function(c) {
+        if (!families[c.family]) families[c.family] = {pass:0,warn:0,fail:0};
+        families[c.family][c.status] = (families[c.family][c.status]||0) + 1;
+      });
+      var famEl = document.getElementById('fedramp-families');
+      if (famEl) {
+        famEl.innerHTML = Object.entries(families).sort(function(a,b){
+          return (b[1].fail||0)-(a[1].fail||0);
+        }).slice(0,6).map(function(e){
+          var f=e[1], tot=(f.pass||0)+(f.warn||0)+(f.fail||0);
+          var pct = tot>0?Math.round((f.pass||0)/tot*100):0;
+          var col = pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+            +'<span style="font-size:11px;color:var(--t2);flex:1">'+e[0]+'</span>'
+            +'<span style="font-size:10px;color:var(--red)">'+f.fail+'✗</span>'
+            +'<span style="font-size:10px;color:var(--amber)">'+f.warn+'⚠</span>'
+            +'<span style="font-size:10px;color:var(--green)">'+f.pass+'✓</span>'
+            +'<div style="width:60px;height:4px;background:var(--border);border-radius:2px">'
+              +'<div style="width:'+pct+'%;height:4px;border-radius:2px;background:'+col+'"></div></div>'
+            +'</div>';
+        }).join('');
+      }
+    }
   } catch(e) {
     console.error('[FEAT-33] loadOverview failed:', e);
     if (hasUX) _p4Err('#ov-pillars', 'Network error loading overview', loadOverview);
@@ -2961,8 +2987,7 @@ async function downloadOSCAL() {
   if (btn) { btn.textContent = '⟳ Generating...'; btn.disabled = true; }
   try {
     const tok = window.TOKEN || '';
-    const p4key = window.VSP_P4_API_KEY || '';
-    const headers = tok ? {'Authorization':'Bearer '+tok} : p4key ? {'X-API-Key':p4key} : {};
+    const headers = tok ? {'Authorization':'Bearer '+tok} : {};
     const resp = await fetch(window.location.origin + '/api/p4/oscal/ssp', {headers});
     const data = await resp.json();
     const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
@@ -3701,5 +3726,34 @@ function switchTenant(id) {
 
 </script>
 <!-- VSP-CROSS-LINK-END -->
+<script>
+// Fix 4: Evidence quick upload
+async function uploadEvidence() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.docx,.xlsx,.png,.jpg,.txt';
+  input.onchange = async function() {
+    if (!input.files[0]) return;
+    var file = input.files[0];
+    var ctrl = prompt('Control ID (e.g. AC-2, CM-6):', '');
+    if (!ctrl) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('control_id', ctrl);
+    fd.append('label', file.name);
+    try {
+      var tok = window.TOKEN || await (typeof getToken==='function'?getToken():Promise.resolve(''));
+      var r = await fetch('/api/v1/compliance/evidence', {
+        method: 'POST',
+        headers: {'Authorization': 'Bearer '+tok},
+        body: fd
+      });
+      if (r.ok) { alert('Evidence uploaded for '+ctrl+' ✓'); }
+      else { var e=await r.json(); alert('Upload failed: '+(e.error||r.status)); }
+    } catch(e2) { alert('Error: '+e2.message); }
+  };
+  input.click();
+}
+</script>
 </body>
 </html>

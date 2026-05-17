@@ -174,7 +174,7 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
     </div>
     <div style="max-height:320px;overflow-y:auto">
       <table class="tbl">
-        <thead><tr><th>CVE</th><th>Severity</th><th>Count</th><th>Tools</th></tr></thead>
+        <thead><tr><th>CVE</th><th>Severity</th><th>CVSS</th><th>Count</th><th>Tools</th><th>CWE</th></tr></thead>
         <tbody id="cve-body"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--t3)">Loading…</td></tr></tbody>
       </table>
     </div>
@@ -210,6 +210,7 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
         <div style="font-size:15px;font-weight:700;font-family:var(--font-mono);color:var(--cyan)" id="cvd-id"></div>
         <div style="font-size:11px;color:var(--t3);margin-top:3px" id="cvd-sub"></div>
       </div>
+    <div id="cve-ext-links" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)"></div>
       <button class="modal-close" onclick="closeCVEDetail()">✕</button>
     </div>
     <div class="modal-body">
@@ -350,10 +351,12 @@ function filterCVEs() {
     // find original index for modal
     var origIdx = _cveData.indexOf(c);
     return '<tr onclick="openCVEDetail(' + origIdx + ')">'
-      + '<td style="font-family:var(--font-mono);font-size:10px">' + c.cve + (c.fixable ? '<span class="fixable-badge">fix ✓</span>' : '') + '</td>'
+      + '<td style="font-family:var(--font-mono);font-size:10px">' + c.cve + (c.fixable ? '<span class="fixable-badge" title="Upgrade to: ' + (c.fix_version||'latest') + '">✓ ' + (c.fix_version ? c.fix_version : 'fix avail') + '</span>' : '') + (c.kev ? '<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:rgba(239,68,68,.15);color:#ef4444;margin-left:3px">KEV</span>' : '') + '</td>'
       + '<td>' + sevPill(c.severity) + '</td>'
+      + '<td style="font-family:var(--font-mono);text-align:right;color:'+(c.cvss>=9?'var(--red)':c.cvss>=7?'var(--amber)':c.cvss>=4?'var(--blue)':'var(--t3)')+'"><b>'+(c.cvss>0?c.cvss.toFixed(1):'—')+'</b></td>'
       + '<td style="font-family:var(--font-mono);text-align:right">' + c.count + '</td>'
-      + '<td style="font-size:10px;color:var(--t3);max-width:140px;overflow:hidden;text-overflow:ellipsis" title="' + (c.tools||'') + '">' + (c.tools||'—') + '</td>'
+      + '<td style="font-size:10px;color:var(--t3);max-width:120px;overflow:hidden;text-overflow:ellipsis" title="' + (c.tools||'') + '">' + (c.tools||'—') + '</td>'
+      + (c.cwe ? '<td style="font-size:9px;color:var(--purple);font-family:var(--font-mono)">' + c.cwe + '</td>' : '<td></td>')
       + '</tr>';
   }).join('');
 }
@@ -520,12 +523,24 @@ function openCVEDetail(i) {
   var fixEl = document.getElementById('cvd-fix');
   if (cve.fixable) {
     fixEl.style.color = 'var(--green)';
-    fixEl.textContent = '✓ Fix available — update affected packages to the latest patched version';
+    fixEl.textContent = cve.fix_version
+      ? '✓ Fix available — upgrade to ' + cve.fix_version
+      : '✓ Fix available — update affected packages to the latest patched version';
   } else {
     fixEl.style.color = 'var(--amber)';
     fixEl.textContent = '⚠ No upstream fix yet — apply mitigations and monitor vendor advisories';
   }
 
+  // Add external reference links
+  var linksEl = document.getElementById('cve-ext-links');
+  if (linksEl) {
+    var cveId = cve.cve || '';
+    linksEl.innerHTML = cveId ?
+      '<a href="https://nvd.nist.gov/vuln/detail/' + cveId + '" target="_blank" style="color:var(--cyan);font-size:11px;margin-right:12px">🔗 NVD</a>' +
+      '<a href="https://www.cvedetails.com/cve/' + cveId + '" target="_blank" style="color:var(--cyan);font-size:11px;margin-right:12px">🔗 CVE Details</a>' +
+      '<a href="https://github.com/advisories?query=' + cveId + '" target="_blank" style="color:var(--cyan);font-size:11px">🔗 GitHub Advisories</a>'
+      : '';
+  }
   document.getElementById('cve-detail-modal').classList.add('open');
 }
 
@@ -1881,6 +1896,55 @@ renderSampleData();
 <script src="/static/js/vsp_bulk_f1.js" defer></script>
 <!-- VSP_F1_SCRIPT_END -->
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
+<div style="margin:24px 0 0">
+  <div style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:12px">📋 Remediation Status</div>
+  <div id="remedi-summary" style="color:var(--t3);font-size:12px">Loading remediation data...</div>
+</div>
+<script>
+// ─── Remediation Summary Widget ─────────────────────────────
+async function loadRemediationSummary() {
+  try {
+    var h = { Authorization: 'Bearer ' + (window.TOKEN || '') };
+    var r = await fetch('/api/v1/remediation/stats', { headers: h });
+    if (!r.ok) return;
+    var d = await r.json();
+    var el = document.getElementById('remedi-summary');
+    if (!el) return;
+    var slaR = await fetch('/api/v1/vsp/sla_tracker', { headers: h });
+    var sla = slaR.ok ? await slaR.json() : {};
+    var slaList = (sla.sla || []);
+    var breached = slaList.filter(function(s){return s.breach_count > 0;}).length;
+
+    el.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">' +
+        '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center">' +
+          '<div style="font-size:22px;font-weight:700;color:var(--red)">' + (d.open||0).toLocaleString() + '</div>' +
+          '<div style="font-size:10px;color:var(--t3)">Open findings</div></div>' +
+        '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center">' +
+          '<div style="font-size:22px;font-weight:700;color:var(--green)">' + (d.resolved||0).toLocaleString() + '</div>' +
+          '<div style="font-size:10px;color:var(--t3)">Resolved</div></div>' +
+        '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center">' +
+          '<div style="font-size:22px;font-weight:700;color:var(--amber)">' + (d.in_progress||0) + '</div>' +
+          '<div style="font-size:10px;color:var(--t3)">In progress</div></div>' +
+        '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center">' +
+          '<div style="font-size:22px;font-weight:700;color:var(--cyan)">' + (d.resolution_rate||0) + '%</div>' +
+          '<div style="font-size:10px;color:var(--t3)">Resolution rate</div></div>' +
+      '</div>' +
+      '<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--t1)">By severity</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">' +
+      (d.by_severity||[]).map(function(s){
+        var col = s.severity==='CRITICAL'?'#ef4444':s.severity==='HIGH'?'#f59e0b':s.severity==='MEDIUM'?'#3b82f6':s.severity==='LOW'?'#22c55e':'#71717a';
+        return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center">' +
+          '<div style="font-size:11px;font-weight:600;color:'+col+'">' + s.severity + '</div>' +
+          '<div style="font-size:16px;font-weight:700;color:'+col+'">' + (s.open||0) + '</div>' +
+          '<div style="font-size:9px;color:var(--t3)">' + s.pct + '% open</div></div>';
+      }).join('') +
+      '</div>' +
+      (breached > 0 ? '<div style="margin-top:12px;padding:8px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:6px;font-size:11px;color:var(--red)">⚠ ' + breached + ' SLA breach(es) detected</div>' : '<div style="margin-top:12px;padding:8px 12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:6px;font-size:11px;color:var(--green)">✓ All SLA targets on track</div>');
+  } catch(e) { console.warn('[remedi]', e); }
+}
+setTimeout(loadRemediationSummary, 1000);
+</script>
 </body>
 </html>

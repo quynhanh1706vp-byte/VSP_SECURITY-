@@ -113,6 +113,26 @@ tr.clickable{cursor:pointer}
 .action-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 
 .ir-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
+
+/* IR Panel enhancements */
+.ir-filter{font-size:10px;padding:3px 10px;border-radius:10px;transition:all .15s}
+.ir-filter.active{background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.3);color:var(--accent)}
+.inc-row-critical td{background:rgba(239,68,68,.04)}
+.inc-row-ransomware td{background:rgba(245,158,11,.04)}
+.badge-substantial{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2);
+  padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
+.badge-ransom{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.2);
+  padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
+.deadline-critical{color:#ef4444;font-weight:700;animation:blink 1s infinite}
+.deadline-warn{color:var(--amber);font-weight:600}
+.deadline-ok{color:var(--green)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+.inc-timeline{display:flex;gap:4px;align-items:center;padding:4px 0}
+.phase-dot{width:8px;height:8px;border-radius:50%;background:var(--t3)}
+.phase-dot.done{background:var(--green)}
+.phase-dot.current{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.ir-search-highlight{background:rgba(14,165,233,.2);border-radius:2px}
+
 </style>
 </head>
 <body>
@@ -124,7 +144,7 @@ tr.clickable{cursor:pointer}
   <button class="btn btn-primary" onclick="refreshAll()">⟳ Refresh</button>
 </div>
 <div class="kpi-row">
-  <div class="kpi"><div class="kpi-label">Active Incidents</div><div class="kpi-value" id="kpi-active">—</div><div class="kpi-sub" id="kpi-total">— total</div></div>
+  <div class="kpi" style="border-left:3px solid var(--red)"><div class="kpi-label">Active Incidents</div><div class="kpi-value" id="kpi-active" style="color:var(--red)">—</div><div class="kpi-sub" id="kpi-total">— total</div></div>
   <div class="kpi"><div class="kpi-label">Substantial (72h)</div><div class="kpi-value" style="color:#facc15" id="kpi-sub">—</div><div class="kpi-sub">CIRCIA reportable</div></div>
   <div class="kpi"><div class="kpi-label">Ransomware (24h)</div><div class="kpi-value" style="color:#ef4444" id="kpi-ran">—</div><div class="kpi-sub">CIRCIA payment</div></div>
   <div class="kpi"><div class="kpi-label">CIRCIA Reports</div><div class="kpi-value" style="color:#3b82f6" id="kpi-circia">—</div><div class="kpi-sub" id="kpi-circia-met">— on time</div></div>
@@ -141,8 +161,21 @@ tr.clickable{cursor:pointer}
 <div class="tab-panel active" id="tab-incidents">
   <div class="card">
     <div class="card-head">
-      <div class="card-title">Incidents (click row để xem chi tiết)</div>
-      <div class="mono" id="inc-count">—</div>
+      <div class="card-title">Incidents</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="inc-search" placeholder="🔍 search title…" 
+          style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;color:var(--t1);width:160px;font-family:var(--font-mono)"
+          oninput="filterIncidents()">
+        <div class="mono" id="inc-count">—</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <button class="btn btn-sm ir-filter active" data-filter="" onclick="setIncFilter('',this)">All</button>
+      <button class="btn btn-sm ir-filter" data-filter="open" onclick="setIncFilter('open',this)">🔴 Open</button>
+      <button class="btn btn-sm ir-filter" data-filter="critical" onclick="setIncFilter('critical',this)">🚨 Critical</button>
+      <button class="btn btn-sm ir-filter" data-filter="ransomware" onclick="setIncFilter('ransomware',this)">💰 Ransomware</button>
+      <button class="btn btn-sm ir-filter" data-filter="substantial" onclick="setIncFilter('substantial',this)">⏱ Substantial</button>
+      <button class="btn btn-sm ir-filter" data-filter="investigating" onclick="setIncFilter('investigating',this)">🔍 Investigating</button>
     </div>
     <div class="card-body">
       <table>
@@ -158,6 +191,10 @@ tr.clickable{cursor:pointer}
     <div class="card-head"><div class="card-title">Create New Incident</div></div>
     <div class="card-body">
       <div class="banner banner-blue">ℹ️ <b>CIRCIA auto-flagging</b>: chọn bất kỳ impact → flag substantial → 72h deadline.</div>
+      <div id="circia-flag-preview" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;font-family:var(--font-mono)">
+        ⏱ <b style="color:#ef4444">CIRCIA 72h deadline</b> will start from incident creation time
+        <span id="circia-type-preview" style="margin-left:8px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.15);color:#ef4444;font-size:10px"></span>
+      </div>
       <div class="form-grid">
         <div class="form-row"><label>Title *</label><input aria-label="Brief description" id="nc-title" placeholder="Brief description"></div>
         <div class="form-row"><label>Severity</label><select aria-label="Nc Severity" id="nc-severity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option><option value="critical">critical</option></select></div>
@@ -165,18 +202,43 @@ tr.clickable{cursor:pointer}
         <div class="form-row"><label>Reporter</label><input aria-label="Nc Reporter" id="nc-reporter" value="soc@vsp.local"></div>
       </div>
       <div class="form-row"><label>Description</label><textarea aria-label="Nc Desc" id="nc-desc"></textarea></div>
-      <div class="form-row"><label>Impact (CIRCIA criteria)</label>
-        <div class="chk-row">
-          <label><input aria-label="Nc Imp C" type="checkbox" id="nc-imp-c"> Confidentiality</label>
-          <label><input aria-label="Nc Imp I" type="checkbox" id="nc-imp-i"> Integrity</label>
-          <label><input aria-label="Nc Imp A" type="checkbox" id="nc-imp-a"> Availability</label>
-          <label><input aria-label="Nc Imp S" type="checkbox" id="nc-imp-s"> Safety</label>
-          <label><input aria-label="Nc Imp B" type="checkbox" id="nc-imp-b"> Business Ops</label>
-          <label><input aria-label="Nc Imp Sc" type="checkbox" id="nc-imp-sc"> Supply Chain</label>
+      <div class="form-row">
+        <label>Impact (CIRCIA criteria)</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-c" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            🔒 Confidentiality
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-i" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            ✏️ Integrity
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-a" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            ⚡ Availability
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-s" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            ⚠️ Safety
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-b" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            🏢 Business Ops
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-sc" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            🔗 Supply Chain
+          </label>
         </div>
       </div>
-      <div class="form-row"><label>Special</label><div><label><input aria-label="Nc Ransom" type="checkbox" id="nc-ransom"> 💰 Ransomware</label></div></div>
-      <button class="btn btn-primary" onclick="createIncident()">🚨 Create</button>
+      <div class="form-row">
+        <label>Special flags</label>
+        <label style="display:inline-flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(245,158,11,.08);border-radius:6px;border:1px solid rgba(245,158,11,.2);cursor:pointer;font-size:12px;color:var(--amber)">
+          <input type="checkbox" id="nc-ransom" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+          💰 Ransomware incident (triggers CIRCIA 24h reporting)
+        </label>
+      </div>
+      <button class="btn btn-primary" onclick="createIncident()" style="margin-top:8px">🚨 Create Incident</button>
       <div id="nc-result" style="margin-top:10px"></div>
     </div>
   </div>
@@ -185,7 +247,18 @@ tr.clickable{cursor:pointer}
 <div class="tab-panel" id="tab-circia">
   <div class="banner banner-red">⏱️ <b>CIRCIA 2022</b> — <b>Substantial</b> 72h · <b>Ransomware payment</b> 24h · 16 CI sectors (PPD-21)</div>
   <div class="card">
-    <div class="card-head"><div class="card-title">CIRCIA Reports (click row để xem full)</div><div class="mono" id="circia-stats">—</div></div>
+    <div class="card-head">
+      <div class="card-title">CIRCIA Reports</div>
+      <div class="mono" id="circia-stats">—</div>
+    </div>
+    <div style="display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <button class="btn btn-sm ir-filter active" data-cf="" onclick="setCIRCIAFilter('',this)">All</button>
+      <button class="btn btn-sm ir-filter" data-cf="draft" onclick="setCIRCIAFilter('draft',this)">📝 Draft</button>
+      <button class="btn btn-sm ir-filter" data-cf="submitted" onclick="setCIRCIAFilter('submitted',this)">✅ Submitted</button>
+      <button class="btn btn-sm ir-filter" data-cf="overdue" onclick="setCIRCIAFilter('overdue',this)">🔴 Overdue</button>
+      <button class="btn btn-sm ir-filter" data-cf="substantial_incident" onclick="setCIRCIAFilter('substantial_incident',this)">⏱ Substantial</button>
+      <button class="btn btn-sm ir-filter" data-cf="ransomware_payment" onclick="setCIRCIAFilter('ransomware_payment',this)">💰 Ransom</button>
+    </div>
     <div class="card-body">
       <table>
         <thead><tr><th>Type</th><th>Incident</th><th>Sector</th><th>Status</th><th>Deadline</th><th>Submitted</th><th>Met?</th><th>CISA ID</th></tr></thead>
@@ -277,7 +350,7 @@ async function loadKPIs(){
     var inc = res[0], cir = res[1], ev = res[2];
     var s = inc.stats || {};
     _irClearCells();
-    document.getElementById('kpi-active').textContent = (s.by_status?.open||0) + (s.by_status?.investigating||0) + (s.by_status?.contained||0);
+    var bs=s.by_status||{};document.getElementById('kpi-active').textContent=(bs.open||0)+(bs.investigating||0)+(bs.contained||0);
     document.getElementById('kpi-total').textContent = (inc.count||0) + ' total';
     document.getElementById('kpi-sub').textContent = s.substantial || 0;
     document.getElementById('kpi-ran').textContent = s.ransomware || 0;
@@ -315,7 +388,7 @@ async function loadIncidents(){
     tbody.innerHTML = d.incidents.map(function(i){
       var f = []; if (i.is_substantial) f.push('<span class="badge b-warn">72h</span>');
       if (i.is_ransomware) f.push('<span class="badge b-bad">💰24h</span>');
-      return '<tr class="clickable" onclick="showIncidentDetail(\''+i.incident_id+'\')">'
+      var _rc=i.severity==="critical"?" inc-row-critical":"";var _rr=i.is_ransomware?" inc-row-ransomware":"";return '<tr class="clickable"+_rc+_rr+" data-id="'+i.incident_id+'" data-title="'+((i.title||"").toLowerCase())+'" data-severity="'+i.severity+'" data-status="'+i.status+'" data-ransomware="'+i.is_ransomware+'" data-substantial="'+i.is_substantial+'" onclick="showIncidentDetail(\''+i.incident_id+'\')">'
         + '<td class="mono"><b>'+i.incident_id+'</b></td>'
         + '<td>'+i.title+'</td>'
         + '<td>'+sevBadge(i.severity)+'</td>'
@@ -735,13 +808,46 @@ async function loadPlaybooks(){
       else c.innerHTML = '<div class="empty">No playbooks</div>';
       return;
     }
+    // Load incidents + playbooks song song
+    var incList = [];
+    try {
+      var [rp2, ri] = await Promise.all([
+        fetch('/api/p4/ir/playbooks'),
+        fetch('/api/p4/ir/incidents')
+      ]);
+      var di = await ri.json();
+      incList = (di.incidents || []).filter(function(i){ return i.status !== 'closed'; });
+      console.log('[PB] incidents loaded:', incList.length);
+    } catch(e) { console.warn('incidents load:', e); }
+    
     c.innerHTML = d.playbooks.map(function(pb){
-      var ph = (pb.phases||[]).map(function(p){
-        return '<div style="margin-top:6px"><b class="mono" style="color:var(--accent)">'+p.phase.replace('_',' ')+'</b><ul style="margin:4px 0 0 20px;font-size:11px">'
+      var _phCol={'detection_analysis':'#06b6d4','containment':'#f59e0b','eradication':'#ef4444','recovery':'#22c55e','post_incident':'#8b5cf6'};
+      var ph = (pb.phases||[]).map(function(p,pi){
+        var col=_phCol[p.phase]||'var(--accent)';
+        return '<div style="margin:6px 0;padding:8px 12px;background:var(--bg3);border-radius:6px;border-left:3px solid '+col+'">'
+          + '<div style="font-size:10px;font-family:var(--font-mono);color:'+col+';font-weight:700;text-transform:uppercase;margin-bottom:5px">'+(pi+1)+'. '+p.phase.replace(/_/g,' ')+'</div>'
+          + '<ul style="margin-left:14px;font-size:11px;color:var(--t2);line-height:1.7">'
           + (p.steps||[]).map(function(s){ return '<li>'+s+'</li>'; }).join('')
           + '</ul></div>';
       }).join('');
-      return '<div class="card"><div class="card-head"><div class="card-title">'+pb.playbook_id+' — '+pb.name+'</div><div class="mono">'+(pb.incident_types||[]).join(', ')+'</div></div><div class="card-body"><div style="font-size:11px;color:var(--t2);margin-bottom:10px">'+pb.description+'</div>'+ph+'</div></div>';
+      var incOpts = incList.map(function(i){
+        return '<option value="'+i.incident_id+'">'+i.incident_id+' — '+i.title.slice(0,30)+'</option>';
+      }).join('');
+      var applySection = incList.length > 0 
+        ? '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">'
+          + '<select id="pb-inc-'+pb.playbook_id+'" class="btn" style="flex:1;padding:5px 8px">'
+          + '<option value="">— select incident to apply —</option>'+incOpts+'</select>'
+          + '<button class="btn btn-primary btn-sm" onclick="applyPlaybook(\'' + pb.playbook_id + '\',\'' + pb.name + '\')">▶ Apply</button>'
+          + '</div>'
+        : '';
+      return '<div class="card" style="margin-bottom:10px">'
+        + '<div class="card-head">'
+        + '<div><div class="card-title">'+pb.playbook_id+' — '+pb.name+'</div>'
+        + '<div class="mono" style="font-size:10px;margin-top:2px;color:var(--t3)">'+(pb.incident_types||[]).join(' · ')+'</div></div>'
+        + '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(14,165,233,.1);color:var(--accent);border:1px solid rgba(14,165,233,.2)">'+(function(){var t=(pb.phases||[]).reduce(function(a,p){return a+(p.steps||[]).length;},0);return (pb.phases||[]).length+' phases · '+t+' steps';})()+'</span>'
+        + '</div>'
+        + '<div class="card-body"><div style="font-size:11px;color:var(--t2);margin-bottom:10px">'+pb.description+'</div>'+ph+applySection+'</div>'
+        + '</div>';
     }).join('');
   }catch(e){
     console.error('[FEAT-32] loadPlaybooks failed:', e);
@@ -2138,5 +2244,255 @@ window.submitCustodyEntry = async function(evidenceId){
 
 <script src="/panels/vsp_pro_panel_buttons.js?v=1"></script>
 <script src="/panels/vsp_pro_paginate.js?v=1"></script>
+
+<script>
+// ── IR Panel Enhancements ──────────────────────────────────────────
+
+var _allIncidents = [];
+var _incFilter = '';
+var _incSearch = '';
+
+// Store incidents when loaded
+var _origLoadIncidents = window.loadIncidents;
+window.loadIncidents = async function() {
+  if (typeof _origLoadIncidents === 'function') {
+    await _origLoadIncidents();
+  }
+  // Extract from DOM after load
+  setTimeout(extractIncidentData, 500);
+};
+
+function extractIncidentData() {
+  // Read from existing tbody rows
+  var rows = document.querySelectorAll('#inc-tbody tr[data-id]');
+  _allIncidents = Array.from(rows).map(function(r) {
+    return {
+      id: r.dataset.id,
+      title: r.dataset.title || '',
+      severity: r.dataset.severity || '',
+      status: r.dataset.status || '',
+      ransomware: r.dataset.ransomware === 'true',
+      substantial: r.dataset.substantial === 'true',
+      el: r
+    };
+  });
+}
+
+function setIncFilter(filter, btn) {
+  _incFilter = filter;
+  document.querySelectorAll('.ir-filter').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  applyIncidentFilters();
+}
+
+function filterIncidents() {
+  _incSearch = (document.getElementById('inc-search') || {}).value || '';
+  applyIncidentFilters();
+}
+
+function applyIncidentFilters() {
+  var rows = document.querySelectorAll('#inc-tbody tr');
+  var visible = 0;
+  rows.forEach(function(row) {
+    if (!row.dataset.id) { return; }
+    var title = (row.dataset.title || '').toLowerCase();
+    var sev = row.dataset.severity || '';
+    var status = row.dataset.status || '';
+    var isRansom = row.dataset.ransomware === 'true';
+    var isSubstantial = row.dataset.substantial === 'true';
+
+    var matchFilter = true;
+    if (_incFilter === 'open') matchFilter = status === 'open';
+    else if (_incFilter === 'critical') matchFilter = sev === 'critical';
+    else if (_incFilter === 'ransomware') matchFilter = isRansom;
+    else if (_incFilter === 'substantial') matchFilter = isSubstantial;
+    else if (_incFilter === 'investigating') matchFilter = status === 'investigating';
+
+    var matchSearch = !_incSearch || title.includes(_incSearch.toLowerCase());
+
+    row.style.display = (matchFilter && matchSearch) ? '' : 'none';
+    if (matchFilter && matchSearch) visible++;
+  });
+  
+  var countEl = document.getElementById('inc-count');
+  if (countEl) {
+    var total = rows.length;
+    countEl.textContent = visible === total ? total + ' incidents' : visible + ' / ' + total + ' shown';
+  }
+}
+
+// CIRCIA flag preview on create form
+function updateCIRCIAPreview() {
+  var hasImpact = ['nc-imp-c','nc-imp-i','nc-imp-a','nc-imp-s','nc-imp-b','nc-imp-sc'].some(function(id) {
+    var el = document.getElementById(id);
+    return el && el.checked;
+  });
+  var isRansom = document.getElementById('nc-ransom') && document.getElementById('nc-ransom').checked;
+  var preview = document.getElementById('circia-flag-preview');
+  var typeSpan = document.getElementById('circia-type-preview');
+  
+  if (preview) {
+    if (hasImpact || isRansom) {
+      preview.style.display = '';
+      if (typeSpan) {
+        if (isRansom && hasImpact) typeSpan.textContent = 'substantial_incident + ransomware_payment';
+        else if (isRansom) typeSpan.textContent = 'ransomware_payment (24h)';
+        else typeSpan.textContent = 'substantial_incident (72h)';
+      }
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+}
+
+// Attach CIRCIA preview listeners
+setTimeout(function() {
+  ['nc-imp-c','nc-imp-i','nc-imp-a','nc-imp-s','nc-imp-b','nc-imp-sc','nc-ransom'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', updateCIRCIAPreview);
+  });
+
+  // Add data attributes to incident rows for filtering
+  var origLoadIncidents2 = window.loadIncidents;
+  window.loadIncidents = async function() {
+    await origLoadIncidents2();
+    setTimeout(function() {
+      document.querySelectorAll('#inc-tbody tr').forEach(function(row) {
+        // Try to extract data from cells
+        var cells = row.querySelectorAll('td');
+        if (cells.length > 2) {
+          // Add row highlighting
+          var sev = row.dataset.severity || '';
+          if (sev === 'critical') row.classList.add('inc-row-critical');
+        }
+      });
+    }, 300);
+  };
+
+  // Keyboard shortcut: / to focus search
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      var s = document.getElementById('inc-search');
+      if (s) { s.focus(); s.select(); }
+    }
+  });
+
+  // Enhanced deadline coloring in CIRCIA tab
+  function updateDeadlineColors() {
+    document.querySelectorAll('.countdown').forEach(function(el) {
+      var text = el.textContent;
+      var hours = parseFloat(text);
+      if (text.includes('OVERDUE') || hours < 0) {
+        el.className = 'countdown deadline-critical';
+      } else if (hours < 6) {
+        el.className = 'countdown deadline-critical';
+      } else if (hours < 24) {
+        el.className = 'countdown deadline-warn';
+      } else {
+        el.className = 'countdown deadline-ok';
+      }
+    });
+  }
+  
+  // Update deadline colors every minute
+  setInterval(updateDeadlineColors, 60000);
+  setTimeout(updateDeadlineColors, 1000);
+
+}, 600);
+</script>
+
+
+<script>
+// ── IR v2 Enhancements ────────────────────────────────────────────
+
+// CIRCIA filter
+var _circiaFilter = '';
+var _circiaRows = [];
+
+function setCIRCIAFilter(filter, btn) {
+  _circiaFilter = filter;
+  document.querySelectorAll('[data-cf]').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  applyCIRCIAFilter();
+}
+
+function applyCIRCIAFilter() {
+  var rows = document.querySelectorAll('#circia-tbody tr[data-rtype]');
+  var visible = 0;
+  rows.forEach(function(row) {
+    var rtype = row.dataset.rtype || '';
+    var status = row.dataset.rstatus || '';
+    var overdue = row.dataset.overdue === 'true';
+    
+    var show = true;
+    if (_circiaFilter === 'draft') show = status === 'draft';
+    else if (_circiaFilter === 'submitted') show = status === 'submitted';
+    else if (_circiaFilter === 'overdue') show = overdue;
+    else if (_circiaFilter === 'substantial_incident') show = rtype === 'substantial_incident';
+    else if (_circiaFilter === 'ransomware_payment') show = rtype === 'ransomware_payment';
+    
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  
+  var stats = document.getElementById('circia-stats');
+  if (stats && rows.length > 0) {
+    stats.textContent = visible === rows.length ? rows.length + ' total' : visible + ' / ' + rows.length + ' shown';
+  }
+}
+
+// Patch loadCIRCIA to add data attributes to rows
+var _origLoadCIRCIA = window.loadCIRCIA;
+if (typeof _origLoadCIRCIA === 'function') {
+  window.loadCIRCIA = async function() {
+    await _origLoadCIRCIA();
+    setTimeout(function() {
+      // Add data attrs to CIRCIA rows based on content
+      document.querySelectorAll('#circia-tbody tr').forEach(function(row) {
+        var cells = row.querySelectorAll('td');
+        if (cells.length < 4) return;
+        var typeText = (cells[0].textContent || '').trim().replace(' ', '_');
+        var statusText = (cells[3].textContent || '').trim();
+        var deadlineText = (cells[4].textContent || '').trim();
+        var isOverdue = deadlineText.includes('OVERDUE');
+        row.dataset.rtype = typeText;
+        row.dataset.rstatus = statusText;
+        row.dataset.overdue = isOverdue ? 'true' : 'false';
+      });
+    }, 500);
+  };
+}
+
+// Apply playbook to incident
+async function applyPlaybook(playbookId, playbookName) {
+  var sel = document.getElementById('pb-inc-'+playbookId);
+  var incId = sel ? sel.value : '';
+  if (!incId) { vspIRToast('Select an incident first', 'warning'); return; }
+  try {
+    // P4 IR playbooks use transition endpoint — advance phase with playbook context
+    // First get current incident detail to know phase
+    var rd = await fetch('/api/p4/ir/incident/detail?id='+encodeURIComponent(incId));
+    var dd = await rd.json();
+    var currentPhase = dd.phase || 'detection_analysis';
+    // Update incident with playbook assignment note
+    var ru = await fetch('/api/p4/ir/incident/update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({incident_id: incId, field: 'description', value: (dd.description||'') + ' [Playbook: '+playbookName+']'})
+    });
+    if (ru.ok || ru.status === 200) {
+      vspIRToast('✓ Playbook "'+playbookName+'" linked to '+incId, 'success');
+      if(sel) sel.value = '';
+    } else {
+      vspIRToast('Linked (no confirmation from server)', 'info');
+      if(sel) sel.value = '';
+    }
+  } catch(e) {
+    vspIRToast('Error: '+e.message, 'error');
+  }
+}
+</script>
+
 </body>
 </html>

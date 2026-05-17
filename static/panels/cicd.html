@@ -753,7 +753,12 @@ td{padding:7px 10px;vertical-align:middle}
     <div style="overflow-x:auto">
       <table>
         <thead><tr><th>Severity</th><th>Tool</th><th>Rule</th><th>Description</th><th>Fix type</th><th>Status</th><th></th></tr></thead>
-        <tbody id="autofix-tbody"></tbody>
+        <div id="llm-status-banner" style="font-size:12px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);margin-bottom:14px;color:var(--t2)">Checking AI AutoFix status...</div>
+<div id="dora-deploy-hint" style="display:none;font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#818cf8;margin-bottom:14px">
+  ℹ️ <b>Deploy Frequency = 0</b> — Integrate CI/CD to track deploys. 
+  <a href="#" style="color:var(--cyan)" onclick="showDoraSetup(event)">Setup guide →</a>
+</div>
+<tbody id="autofix-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -1222,6 +1227,26 @@ async function loadAutofixStats(){
   }
 
   await ensureToken();
+  // Fix 3: LLM status banner
+  try {
+    var modeR = await fetch('/api/v1/ai/mode', {headers: hdr()}).then(function(r){return r.json();}).catch(function(){return {};});
+    var banner = document.getElementById('llm-status-banner');
+    if (banner) {
+      if (modeR && modeR.enabled) {
+        banner.style.cssText = 'font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);color:#10b981;margin-bottom:14px';
+        banner.innerHTML = '\u2713 AI AutoFix active \u2014 <b>' + (modeR.provider||'LLM') + '</b> \u00b7 ' + (modeR.model||'') + ' \u00b7 mode: ' + (modeR.mode||'online');
+      } else {
+        banner.style.cssText = 'font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#f59e0b;margin-bottom:14px';
+        banner.innerHTML = '\u26a0 AI AutoFix disabled \u2014 set <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">LLM_ENABLED=true</code> \u00b7 <a href="#" style="color:var(--cyan)" onclick="showSetupGuide(event)">Setup guide \u2192</a>';
+      }
+    }
+  } catch(e) {}
+  // Fix 4: DORA deploy hint
+  try {
+    var doraR = await fetch('/api/v1/dora?days=30', {headers: hdr()}).then(function(r){return r.json();}).catch(function(){return {};});
+    var doraHint = document.getElementById('dora-deploy-hint');
+    if (doraHint) doraHint.style.display = (doraR && doraR.deploy_frequency && doraR.deploy_frequency.samples === 0) ? '' : 'none';
+  } catch(e) {}
   var findings = [];
   var fetchErr = null;
   try{
@@ -3925,6 +3950,38 @@ document.addEventListener('keydown', function(e){
 
 <script src="/static/js/vsp_h3_upgrade.js"></script>
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
+<script>
+// Fix 3: LLM setup guide
+function showSetupGuide() {
+  var guide = [
+    '1. Edit /etc/vsp/env.production',
+    '2. Set: LLM_ENABLED=true',
+    '3. Set: LLM_PROVIDER=ollama (or openai/anthropic)',
+    '4. Set: LLM_BASE_URL=http://127.0.0.1:11434',
+    '5. Set: LLM_MODEL=deepseek-coder-v2:16b',
+    '6. sudo systemctl restart vsp-gateway',
+  ].join('\n');
+  alert('LLM AutoFix Setup Guide:\n\n' + guide);
+}
+
+// Fix 4: DORA deploy setup guide
+function showDoraSetup() {
+  var guide = [
+    'DORA Deploy Frequency requires CI/CD integration:',
+    '',
+    'Option A — GitHub Actions:',
+    '  POST /api/v1/vsp/run after each deploy',
+    '  with mode=FULL and trigger=deploy',
+    '',
+    'Option B — GitLab CI:',
+    '  Add VSP_NOTIFY=true to .gitlab-ci.yml',
+    '',
+    'Option C — Manual:',
+    '  Use VSP API to record deploy events',
+  ].join('\n');
+  alert(guide);
+}
+</script>
 </body>
 </html>

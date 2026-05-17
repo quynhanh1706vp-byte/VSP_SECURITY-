@@ -161,5 +161,44 @@ async function loadDORA() {
 }
 loadDORA();
 </script>
+<div style="margin:24px 0 0">
+  <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:12px">📈 Quarterly Trend (MTTR · Deploy Freq · Change Fail Rate)</div>
+  <div id="dora-quarterly-chart" style="height:180px;background:var(--bg2);border-radius:10px;border:1px solid var(--border);padding:16px">
+    <div style="color:var(--t3);font-size:12px;text-align:center;padding-top:60px">Loading quarterly data...</div>
+  </div>
+</div>
+<script>
+async function loadDoraQuarterly() {
+  var tok = window.TOKEN || (typeof getToken==='function'?getToken():'') || '';
+  var h = { Authorization: 'Bearer ' + tok };
+  try {
+    var r = await fetch('/api/v1/improvement/quarters', { headers: h });
+    if (!r.ok) return;
+    var data = await r.json();
+    var quarters = (data.quarters||[]).filter(function(q){return q.quarter;});
+    if (!quarters.length) return;
+    var container = document.getElementById('dora-quarterly-chart');
+    if (!container) return;
+    container.innerHTML = '<canvas id="dora-q-canvas"></canvas>';
+    var ctx = document.getElementById('dora-q-canvas').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: quarters.map(function(q){return q.quarter;}),
+        datasets: [
+          {label:'MTTR (h)', data:quarters.map(function(q){return +(q.mttr_hours||0).toFixed(1);}), borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.08)', tension:.3, pointRadius:4},
+          {label:'Deploy/day', data:quarters.map(function(q){return +(q.deploy_freq_per_day||0).toFixed(3);}), borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.08)', tension:.3, pointRadius:4},
+          {label:'CFR %', data:quarters.map(function(q){return +(q.change_fail_rate_pct||0).toFixed(1);}), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.08)', tension:.3, pointRadius:4}
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#8899bb',font:{size:10}}}},
+        scales:{x:{ticks:{color:'#8899bb',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+                y:{ticks:{color:'#8899bb',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}}}}
+    });
+  } catch(e) { console.warn('[DORA quarterly]', e); }
+}
+setTimeout(loadDoraQuarterly, 800);
+</script>
 </body>
 </html>

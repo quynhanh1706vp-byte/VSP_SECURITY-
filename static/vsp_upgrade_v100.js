@@ -1260,23 +1260,21 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
         fetch('/api/v1/remediation/stats', {headers:h}).then(r=>r.json()).catch(()=>({}))
       ]);
       var rems = remD.remediations || [];
-      
-      // Count by status
+
+      // Update KPI từ statsD (all-time counts, not limited to 200 records)
+      var s = statsD || {};
+      var _el;
+      _el = document.getElementById('rem-k-open');       if(_el) _el.textContent = s.open        !== undefined ? s.open.toLocaleString()        : '—';
+      _el = document.getElementById('rem-k-inprogress'); if(_el) _el.textContent = s.in_progress !== undefined ? s.in_progress.toLocaleString()  : '—';
+      _el = document.getElementById('rem-k-resolved');   if(_el) _el.textContent = s.resolved    !== undefined ? s.resolved.toLocaleString()    : '—';
+      _el = document.getElementById('rem-k-accepted');   if(_el) _el.textContent = s.accepted    !== undefined ? s.accepted.toLocaleString()    : '0';
+      _el = document.getElementById('rem-k-fp');         if(_el) _el.textContent = s.false_positive !== undefined ? s.false_positive.toLocaleString() : '0';
+      _el = document.getElementById('rem-k-suppressed'); if(_el) _el.textContent = s.suppressed  !== undefined ? s.suppressed.toLocaleString()  : '0';
+      var cntEl = document.getElementById('rem-count');
+      if(cntEl) cntEl.textContent = (s.total||rems.length).toLocaleString()+' remediations · '+(s.resolution_rate||0)+'% resolved';
+
       var counts = {open:0,in_progress:0,resolved:0,accepted:0,false_positive:0,suppressed:0};
       rems.forEach(function(r){ if(counts[r.status]!==undefined) counts[r.status]++; });
-      
-      // Update KPIs
-      var map = {'rem-k-open':'open','rem-k-inprogress':'in_progress','rem-k-resolved':'resolved',
-                 'rem-k-accepted':'accepted','rem-k-fp':'false_positive','rem-k-suppressed':'suppressed'};
-      Object.keys(map).forEach(function(id){
-        var el=document.getElementById(id); if(el) el.textContent=counts[map[id]]||0;
-      });
-      
-      var total = rems.length;
-      var closed = counts.resolved+counts.accepted+counts.false_positive+counts.suppressed;
-      var rate = total>0?Math.round(closed/total*100):0;
-      var cntEl = document.getElementById('rem-count');
-      if(cntEl) cntEl.textContent = total+' remediations · '+rate+'% resolved';
 
       // Backend API `/api/v1/remediation` already JOINs findings server-side
       // and returns severity/tool/rule_id/title inline on each remediation row.

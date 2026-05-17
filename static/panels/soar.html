@@ -259,7 +259,7 @@ textarea.form-ctrl{font-family:var(--font-mono);font-size:10px;resize:vertical}
   function rowHTML(a){
     var id = a.id || a.approval_id || '';
     var runId = a.run_id || '';
-    var pbName = a.playbook_name || a.playbook || '(unknown playbook)';
+    var pbName = a.playbook_name || a.pb || a.playbook || '(unknown playbook)';
     var requestedBy = a.requested_by || a.triggered_by || '—';
     var requestedAt = fmtTime(a.requested_at || a.created_at);
     var prompt = a.prompt || a.message || '';
@@ -1103,11 +1103,31 @@ function loadRunHistory(){
       if(d.runs&&d.runs.length){
         d.runs.forEach(function(r){
           if(!RUN_HISTORY.find(function(x){return x.id===r.id;})){
-            RUN_HISTORY.push({id:r.id.slice(0,8).toUpperCase(),pb:r.pb||r.PlaybookName||'—',
-              pbId:'',status:r.status,ts:(r.ts||r.StartedAt||'').slice(11,19),
-              dur:'—',trigger:r.trigger||'manual',steps:[],log:[]});
+            RUN_HISTORY.push({id:r.id.slice(0,8).toUpperCase(),pb:r.pb||r.PlaybookName||r.playbook_name||'—',
+              pbId:r.playbook_id||'',status:r.status,ts:(r.ts||r.triggered_at||r.StartedAt||'').slice(11,19),
+              dur:r.finished_at?'done':'—',trigger:r.trigger||'manual',steps:[],log:[]});
           }
         });
+        // Fix 3: Run stats counter
+        var stats = {success:0, failed:0, running:0};
+        d.runs.forEach(function(r){ if(stats[r.status]!=null) stats[r.status]++; });
+        var statsEl = document.getElementById('run-stats-bar');
+        if (statsEl) {
+          statsEl.innerHTML =
+            '<span style="color:var(--green)">✓ '+stats.success+' ok</span> · ' +
+            '<span style="color:var(--red)">✗ '+stats.failed+' failed</span> · ' +
+            '<span style="color:var(--purple)">⟳ '+stats.running+' running</span>';
+        }
+        // Fix 5: Populate trigger filter with real triggers
+        var trigFilter = document.getElementById('run-trigger-filter');
+        if (trigFilter && trigFilter.options.length <= 1) {
+          var triggers = [...new Set(d.runs.map(function(r){return r.trigger||'manual';}))];
+          triggers.forEach(function(t){
+            var opt = document.createElement('option');
+            opt.value = t; opt.textContent = t;
+            trigFilter.appendChild(opt);
+          });
+        }
         loadRunHistory();
       }
     }).catch(function(){});
@@ -1775,7 +1795,7 @@ loadRunHistory();
 <script src="/static/inject_ux_v1.1.js"></script>
 
 <!-- VSP-SIEM-COMPANION — Configure + Notifications buttons (per-panel) -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>
 

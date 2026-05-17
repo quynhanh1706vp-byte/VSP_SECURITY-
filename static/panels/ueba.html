@@ -322,6 +322,21 @@ function renderAnomalies(){
 function openAnomDetail(type){var a=ANOMALIES.find(function(x){return x.type===type;});if(a)openAnomDetailObj(a);}
 function openAnomDetailObj(a){
   if(typeof a==='string')a=JSON.parse(a);
+  // Normalize source_refs fields → top-level for modal display
+  if (a.source_refs && typeof a.source_refs === 'object') {
+    var sr = a.source_refs;
+    if (a.score == null)         a.score         = sr.score        || 0;
+    if (a.baseline == null)      a.baseline       = sr.baseline     || 0;
+    if (a.current == null)       a.current        = sr.current      || 0;
+    if (a.deviation_pct == null) a.deviation_pct  = sr.deviation_pct|| 0;
+    if (!a.type)                 a.type           = sr.type         || '';
+    if (!a.message)              a.message        = a.title         || '';
+    // Extra context from source_refs
+    a._entity   = sr.entity   || '';
+    a._sr_count = sr.current  || 0;
+  }
+  // Fallback title → message
+  if (!a.message && a.title) a.message = a.title;
   var sev=(a.severity||'MEDIUM').toUpperCase();
   document.getElementById('amod-title').textContent=(a.type||'').replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
   document.getElementById('amod-sub').textContent=a.message||'';
@@ -1001,6 +1016,6 @@ renderChecks();loadBaseline();
 <div id="inject-toast" style="display:none"></div>
 <script src="/static/inject_ux_v1.1.js"></script>
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>

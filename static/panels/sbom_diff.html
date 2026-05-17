@@ -106,12 +106,99 @@ tr:hover td{background:var(--surface)}
 .trend-up{color:var(--red)}
 .trend-down{color:var(--green)}
 .trend-same{color:var(--amber)}
+
+/* SBOM Diff enhancements */
+.sev-breakdown{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.sev-card{padding:8px 10px;border-radius:6px;text-align:center;border:1px solid}
+.sev-card-crit{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2)}
+.sev-card-high{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2)}
+.sev-card-med{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2)}
+.sev-card-low{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2)}
+.sev-num{font-size:18px;font-weight:700;font-family:var(--font-mono)}
+.sev-lbl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em}
+.filter-bar{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.filter-btn{padding:3px 10px;border-radius:10px;font-size:10px;font-family:var(--font-mono);
+  border:1px solid var(--border2);background:transparent;color:var(--t3);cursor:pointer;transition:all .15s}
+.filter-btn.active{background:rgba(6,182,212,.15);border-color:rgba(6,182,212,.3);color:var(--cyan)}
+.export-bar{display:flex;gap:6px;align-items:center;padding:8px 0;border-top:1px solid var(--border);margin-top:12px}
+.export-lbl{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.config-row{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 10px;background:rgba(255,255,255,.03);border-radius:6px;border:1px solid var(--border)}
+.config-key{font-size:11px;color:var(--t2)}
+.config-val{font-size:11px;font-family:var(--font-mono);color:var(--cyan)}
+.sw-wrap{position:relative;width:32px;height:18px;flex-shrink:0}
+.sw-wrap input{opacity:0;position:absolute;inset:0;cursor:pointer;margin:0}
+.sw-track{position:absolute;inset:0;background:rgba(255,255,255,.1);border-radius:9px;transition:background .2s;pointer-events:none}
+.sw-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;background:#666;border-radius:50%;transition:transform .2s,background .2s;pointer-events:none}
+.sw-wrap input:checked~.sw-track{background:var(--green)}
+.sw-wrap input:checked~.sw-thumb{transform:translateX(14px);background:#fff}
+.toast-sbom{position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;
+  border-radius:6px;font-size:11px;font-family:var(--font-mono);
+  background:var(--bg2);border:1px solid var(--border2);color:var(--t1);
+  opacity:0;transition:opacity .3s;pointer-events:none}
+.toast-sbom.show{opacity:1}
+
 </style>
 </head>
 <body>
+<div class="toast-sbom" id="sbom-toast"></div>
 <div class="hdr">
-  <div><h2>SBOM Diff</h2><p>Visual comparison · new / fixed / persisted findings per run</p></div>
-  <button class="btn btn-primary" onclick="runDiff()" id="diff-btn">Compare ↗</button>
+  <div>
+    <h2>SBOM Diff</h2>
+    <p>Visual comparison · new / fixed / persisted findings · <span id="last-compared" style="color:var(--cyan)">select runs to compare</span></p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn" onclick="toggleConfig()" id="cfg-btn" title="SBOM Config">⚙</button>
+    <button class="btn" onclick="exportDiff('json')" id="export-json-btn" style="display:none" title="Export JSON">↓ JSON</button>
+    <button class="btn" onclick="exportDiff('csv')" id="export-csv-btn" style="display:none" title="Export CSV">↓ CSV</button>
+    <button class="btn btn-primary" onclick="runDiff()" id="diff-btn">Compare ↗</button>
+  </div>
+</div>
+
+<!-- SBOM Config panel -->
+<div id="sbom-config-panel" style="display:none;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:14px;margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:600">⚙ SBOM Configuration</div>
+    <span id="sbom-config-status" style="font-size:10px;color:var(--t3);font-family:var(--font-mono)"></span>
+  </div>
+  <div class="config-grid">
+    <div class="config-row">
+      <div>
+        <div class="config-key">Auto-generate SBOM</div>
+        <div style="font-size:10px;color:var(--t3)">Generate on every scan</div>
+      </div>
+      <label class="sw-wrap">
+        <input type="checkbox" id="cfg-auto-generate" onchange="saveConfig()">
+        <div class="sw-track"></div><div class="sw-thumb"></div>
+      </label>
+    </div>
+    <div class="config-row">
+      <div>
+        <div class="config-key">Alert on new critical</div>
+        <div style="font-size:10px;color:var(--t3)">Notify when CRITICAL appears</div>
+      </div>
+      <label class="sw-wrap">
+        <input type="checkbox" id="cfg-alert-critical" onchange="saveConfig()">
+        <div class="sw-track"></div><div class="sw-thumb"></div>
+      </label>
+    </div>
+    <div class="config-row">
+      <div class="config-key" style="margin-bottom:4px">SBOM Format</div>
+      <select id="cfg-format" class="filter-btn active" onchange="saveConfig()" style="width:100px">
+        <option value="cyclonedx">CycloneDX</option>
+        <option value="spdx">SPDX</option>
+      </select>
+    </div>
+    <div class="config-row">
+      <div class="config-key" style="margin-bottom:4px">Alert severity threshold</div>
+      <select id="cfg-alert-sev" class="filter-btn active" onchange="saveConfig()" style="width:100px">
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+      </select>
+    </div>
+  </div>
 </div>
 
 <div class="run-select">
@@ -135,10 +222,37 @@ tr:hover td{background:var(--surface)}
   <div class="kpi"><div class="kpi-val" id="k-trend" style="font-size:16px">—</div><div class="kpi-lbl">Trend</div></div>
 </div>
 
+<!-- Severity breakdown (shown after diff) -->
+<div class="sev-breakdown" id="sev-breakdown" style="display:none">
+  <div class="sev-card sev-card-crit">
+    <div class="sev-num" style="color:#ef4444" id="sev-critical">0</div>
+    <div class="sev-lbl">Critical</div>
+  </div>
+  <div class="sev-card sev-card-high">
+    <div class="sev-num" style="color:#f59e0b" id="sev-high">0</div>
+    <div class="sev-lbl">High</div>
+  </div>
+  <div class="sev-card sev-card-med">
+    <div class="sev-num" style="color:#3b82f6" id="sev-medium">0</div>
+    <div class="sev-lbl">Medium</div>
+  </div>
+  <div class="sev-card sev-card-low">
+    <div class="sev-num" style="color:#22c55e" id="sev-low">0</div>
+    <div class="sev-lbl">Low</div>
+  </div>
+</div>
+
 <div class="tabs" id="tabs" style="display:none">
   <button class="tab active" onclick="switchTab('new',this)">🔴 New (<span id="tc-new">0</span>)</button>
   <button class="tab" onclick="switchTab('fixed',this)">✅ Fixed (<span id="tc-fixed">0</span>)</button>
   <button class="tab" onclick="switchTab('persisted',this)">⚠ Persisted (<span id="tc-persisted">0</span>)</button>
+  <div style="margin-left:auto;display:flex;gap:4px;padding-bottom:4px" id="sev-filter-bar">
+    <button class="filter-btn active" data-sev="" onclick="filterBySev('',this)">All</button>
+    <button class="filter-btn" data-sev="CRITICAL" onclick="filterBySev('CRITICAL',this)">CRIT</button>
+    <button class="filter-btn" data-sev="HIGH" onclick="filterBySev('HIGH',this)">HIGH</button>
+    <button class="filter-btn" data-sev="MEDIUM" onclick="filterBySev('MEDIUM',this)">MED</button>
+    <button class="filter-btn" data-sev="LOW" onclick="filterBySev('LOW',this)">LOW</button>
+  </div>
 </div>
 
 <div id="tab-new" class="tab-content active">
@@ -189,12 +303,18 @@ function switchTab(name, btn){
 async function loadRuns(){
   if(!TOKEN)return;
   try{
-    var r=await fetch(API+'/api/v1/vsp/runs/index',{headers:{Authorization:'Bearer '+TOKEN}});
+    // Fix: use correct SBOM index endpoint
+    var r=await fetch(API+'/api/v1/sbom',{headers:{Authorization:'Bearer '+TOKEN}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
     var d=await r.json();
-    RUNS=(d.runs||[]).slice(0,50);
+    RUNS=(d.runs||[]).slice(0,100);
     var opts=RUNS.map(function(r){
-      var dt=r.started_at?new Date(r.started_at).toLocaleDateString('en-GB'):'';
-      return '<option value="'+r.rid+'">'+r.rid.slice(-20)+' · '+r.mode+' · '+r.gate+' · '+dt+'</option>';
+      var dt=r.created_at?new Date(r.created_at).toLocaleDateString('vi-VN'):'';
+      var gate=r.gate||r.status||'';
+      var gateColor=gate==='PASS'?'#22c55e':gate==='FAIL'?'#ef4444':'#8899bb';
+      return '<option value="'+r.rid+'">'+
+        r.rid.slice(-24)+' · '+(r.mode||'FULL')+' · '+dt+
+        '</option>';
     }).join('');
     document.getElementById('rid1').innerHTML='<option value="">— select run —</option>'+opts;
     document.getElementById('rid2').innerHTML='<option value="">— select baseline —</option>'+opts;
@@ -203,8 +323,13 @@ async function loadRuns(){
       document.getElementById('rid1').value=RUNS[0].rid;
       document.getElementById('rid2').value=RUNS[1].rid;
       updateMeta();
+      // Auto-run diff on load
+      runDiff();
     }
-  }catch(e){console.error('loadRuns',e);}
+  }catch(e){
+    console.error('loadRuns',e);
+    document.getElementById('rid1').innerHTML='<option value="">Error loading runs</option>';
+  }
 }
 
 function updateMeta(){
@@ -267,9 +392,38 @@ async function runDiff(){
     else renderRows(fixedItems,'tbl-fixed');
     if(persistedItems.length===0 && hasUX) VSPUXState.empty('#tbl-persisted', 'No persistent findings', runDiff);
     else renderRows(persistedItems,'tbl-persisted');
+    // Store for filter/export
+    _diffData = {new: newItems, fixed: fixedItems, persisted: persistedItems};
+    
+    // Severity breakdown from diff response
+    var diffMeta = d.diff || {};
+    var newBySev = diffMeta.new_by_sev || {};
+    var fixedBySev = diffMeta.fixed_by_sev || {};
+    
+    // Count new items by severity
+    var sevCount = {CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0};
+    newItems.forEach(function(i){ if(sevCount[i.severity]!==undefined) sevCount[i.severity]++; });
+    document.getElementById('sev-critical').textContent = newBySev.CRITICAL || sevCount.CRITICAL || 0;
+    document.getElementById('sev-high').textContent = newBySev.HIGH || sevCount.HIGH || 0;
+    document.getElementById('sev-medium').textContent = newBySev.MEDIUM || sevCount.MEDIUM || 0;
+    document.getElementById('sev-low').textContent = newBySev.LOW || sevCount.LOW || 0;
+    
+    // Update last compared label
+    var r1 = document.getElementById('rid1').value.slice(-16);
+    var r2 = document.getElementById('rid2').value.slice(-16);
+    var lc = document.getElementById('last-compared');
+    if(lc) lc.textContent = r1 + ' vs ' + r2;
+    
+    // Show export buttons
+    document.getElementById('export-json-btn').style.display = '';
+    document.getElementById('export-csv-btn').style.display = '';
+    
     // Show
     document.getElementById('kpi-row').style.display='';
     document.getElementById('tabs').style.display='';
+    document.getElementById('sev-breakdown').style.display='';
+    
+    showToastSBOM('Diff complete · '+total+' findings', 'success');
   }catch(e){
     if(hasUX){
       VSPUXState.error('#tbl-new', 'Diff failed: '+e.message, runDiff);
@@ -280,6 +434,119 @@ async function runDiff(){
     }
   }finally{
     btn.textContent='Compare ↗';btn.disabled=false;
+  }
+}
+
+// ── Enhanced features ─────────────────────────────────────────────
+
+var _diffData = {new:[], fixed:[], persisted:[]};
+var _currentSevFilter = '';
+var _currentTab = 'new';
+
+function filterBySev(sev, btn) {
+  _currentSevFilter = sev;
+  document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active')});
+  if(btn) btn.classList.add('active');
+  renderFilteredRows();
+}
+
+function renderFilteredRows() {
+  var items = _diffData[_currentTab] || [];
+  if (_currentSevFilter) {
+    items = items.filter(function(i){ return i.severity === _currentSevFilter; });
+  }
+  renderRows(items, 'tbl-' + _currentTab);
+}
+
+var _origSwitchTab = switchTab;
+switchTab = function(name, btn) {
+  _currentTab = name;
+  _origSwitchTab(name, btn);
+  renderFilteredRows();
+};
+
+function showToastSBOM(msg, type) {
+  var t = document.getElementById('sbom-toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.borderColor = type==='success'?'rgba(34,197,94,.4)':type==='error'?'rgba(239,68,68,.4)':'rgba(6,182,212,.3)';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2500);
+}
+
+function exportDiff(fmt) {
+  var all = [].concat(
+    _diffData.new.map(function(i){return Object.assign({},i,{diff_type:'new'})}),
+    _diffData.fixed.map(function(i){return Object.assign({},i,{diff_type:'fixed'})}),
+    _diffData.persisted.map(function(i){return Object.assign({},i,{diff_type:'persisted'})})
+  );
+  if (!all.length) { showToastSBOM('No data to export', 'error'); return; }
+  
+  if (fmt === 'json') {
+    var blob = new Blob([JSON.stringify({diff: _diffData, exported_at: new Date().toISOString()}, null, 2)], {type:'application/json'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'sbom-diff-'+Date.now()+'.json'; a.click();
+    showToastSBOM('Exported JSON ✓', 'success');
+  } else {
+    var rows = [['diff_type','severity','tool','rule_id','path','message']];
+    all.forEach(function(i){ rows.push([i.diff_type,i.severity,i.tool,i.rule_id,i.path,i.message]); });
+    var csv = rows.map(function(r){ return r.map(function(c){ return '"'+(c||'').replace(/"/g,'""')+'"'; }).join(','); }).join('
+');
+    var blob = new Blob([csv], {type:'text/csv'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'sbom-diff-'+Date.now()+'.csv'; a.click();
+    showToastSBOM('Exported CSV ✓', 'success');
+  }
+}
+
+// Config panel
+var _sbomConfig = {};
+async function loadConfig() {
+  try {
+    var r = await fetch(API+'/api/v1/sbom/config', {headers:{Authorization:'Bearer '+TOKEN}});
+    if (!r.ok) return;
+    _sbomConfig = await r.json();
+    document.getElementById('cfg-auto-generate').checked = !!_sbomConfig.auto_generate;
+    document.getElementById('cfg-alert-critical').checked = !!_sbomConfig.alert_on_new_critical;
+    document.getElementById('cfg-format').value = _sbomConfig.sbom_format || 'cyclonedx';
+    document.getElementById('cfg-alert-sev').value = _sbomConfig.diff_alert_severity || 'high';
+  } catch(e) {}
+}
+
+async function saveConfig() {
+  try {
+    var payload = {
+      auto_generate: document.getElementById('cfg-auto-generate').checked,
+      alert_on_new_critical: document.getElementById('cfg-alert-critical').checked,
+      sbom_format: document.getElementById('cfg-format').value,
+      diff_alert_severity: document.getElementById('cfg-alert-sev').value,
+    };
+    var r = await fetch(API+'/api/v1/sbom/config', {
+      method:'PUT', headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    var status = document.getElementById('sbom-config-status');
+    if (r.ok) {
+      if(status) { status.textContent = 'saved ✓'; setTimeout(function(){status.textContent='';},2000); }
+      showToastSBOM('Config saved ✓', 'success');
+    } else {
+      showToastSBOM('Save failed', 'error');
+    }
+  } catch(e) { showToastSBOM('Error: '+e.message, 'error'); }
+}
+
+function toggleConfig() {
+  var panel = document.getElementById('sbom-config-panel');
+  var btn = document.getElementById('cfg-btn');
+  if (panel.style.display === 'none') {
+    panel.style.display = '';
+    btn.style.background = 'rgba(6,182,212,.15)';
+    btn.style.color = 'var(--cyan)';
+    loadConfig();
+  } else {
+    panel.style.display = 'none';
+    btn.style.background = '';
+    btn.style.color = '';
   }
 }
 

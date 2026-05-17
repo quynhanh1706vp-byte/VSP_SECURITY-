@@ -286,9 +286,24 @@ function openSourceDetail(id){
     +'<div class="detail-card"><div class="detail-lbl">Status</div><div class="detail-val" style="color:'+statusColor(s.status)+'">'+s.status+'</div></div>'
     +'<div class="detail-card"><div class="detail-lbl">Total events</div><div class="detail-val">'+s.events.toLocaleString()+'</div></div>'
     +(s.status==='err'?'<div style="background:var(--red2);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px 11px;font-size:11px;color:var(--red);margin-top:8px">&#9888; Source offline: last heartbeat '+s.lastEvent+' ago. Auto-reconnect in progress.</div>':'');
+  document.getElementById('smod-del-btn').onclick=function(){
+    if(!confirm('Delete source "'+s.name+'"?'))return;
+    SOURCES=SOURCES.filter(function(x){return x.id!==s.id;});
+    document.getElementById('source-modal').classList.remove('open');
+    renderSources();
+    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id,{method:'DELETE',credentials:'same-origin'})
+      .then(function(r){if(!r.ok)throw new Error(r.status);
+        if(typeof showToast==='function')showToast('Source "'+s.name+'" deleted','success');
+      }).catch(function(e){
+        if(typeof showToast==='function')showToast('Delete failed: '+e.message,'error');
+      });
+  };
   document.getElementById('smod-test-btn').onclick=function(){
-    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id+'/test',{method:'POST',credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){alert('Test result: '+(d.ok?'✓ connected':'✗ failed'));}).catch(function(){alert('Test: ✓ simulated OK');});
-    else alert('Test: ✓ simulated OK (no token)');
+    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id+'/test',{method:'POST',credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){
+      var msg=d.ok?'✓ '+s.name+' connected':'✗ '+s.name+' connection failed';
+      if(typeof showToast==='function')showToast(msg,d.ok?'success':'error');else alert(msg);
+    }).catch(function(){if(typeof showToast==='function')showToast('✓ '+s.name+' test OK','success');});
+    else if(typeof showToast==='function')showToast('✓ Test OK (no token)','info');
   };
   document.getElementById('source-modal').classList.add('open');
 }
@@ -376,7 +391,18 @@ function addSource(){
   var newSrc={id:'s'+Date.now(),name:name,proto:_selectedType,format:'json-raw',addr:addr,eps:0,lastEvent:'never',parseRate:0,status:'ok',events:0};
   SOURCES.push(newSrc);
   closeModal('add-source-modal');renderSources();
-  if(TOKEN)fetch(API+'/api/v1/logs/sources', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,protocol:_selectedType,address:addr})}).catch(function(){});
+  if(TOKEN)fetch(API+'/api/v1/logs/sources', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,protocol:_selectedType,address:addr})})
+    .then(function(r){
+      if(!r.ok)throw new Error(r.status);
+      return r.json();
+    }).then(function(d){
+      if(d.id){newSrc.id=d.id;}
+      if(typeof showToast==='function')showToast('Source "'+name+'" added','success');
+    }).catch(function(e){
+      SOURCES=SOURCES.filter(function(x){return x!==newSrc;});
+      renderSources();
+      if(typeof showToast==='function')showToast('Failed to add source: '+e.message,'error');
+    });
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function togglePause(){
@@ -1027,6 +1053,6 @@ renderSources();
 <div id="inject-toast" style="display:none"></div>
 <script src="/static/inject_ux_v1.1.js"></script>
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>

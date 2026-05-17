@@ -104,7 +104,7 @@ function escapeHtml(s){ return (s||'').toString().replace(/[&<>"]/g, c => ({'&':
 function renderTactic(t) {
   if (!t.techniques || t.techniques.length === 0) {
     return `<div class="col">
-      <div class="col-header">
+      <div class="col-header" onclick="showTacticDetail('${t.id}')" style="cursor:pointer;transition:background .15s" title="Click to view details">
         <div class="tac-id">${t.id}</div>
         <div class="tac-name">${escapeHtml(t.name)}</div>
         <div class="tac-count" style="color:var(--t3)">no findings</div>
@@ -113,10 +113,10 @@ function renderTactic(t) {
   }
   const sorted = [...t.techniques].sort((a,b) => b.count - a.count);
   return `<div class="col">
-    <div class="col-header">
+    <div class="col-header" onclick="showTacticDetail('${t.id}')" style="cursor:pointer;transition:background .15s" title="Click to view details">
       <div class="tac-id">${t.id}</div>
       <div class="tac-name">${escapeHtml(t.name)}</div>
-      <div class="tac-count">${t.count} finding${t.count===1?'':'s'}</div>
+      <div class="tac-count">${t.count} finding${t.count===1?'':'s'} 🔍</div>
     </div>
     ${sorted.map(c => `
       <div class="cell ${c.max_severity || 'info'}" title="${c.id}: ${c.count} findings (max severity ${c.max_severity || 'info'})">
@@ -143,18 +143,66 @@ async function loadHeatmap() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     document.getElementById('stats').innerHTML = `
-      <div class="stat"><div class="v">${d.total_findings}</div><div class="l">Total findings</div></div>
-      <div class="stat"><div class="v">${d.mapped_findings}</div><div class="l">Mapped</div></div>
-      <div class="stat"><div class="v" style="color:var(--t3)">${d.unmapped}</div><div class="l">Unmapped</div></div>
+      <div class="stat"><div class="v">${d.total_findings.toLocaleString()}</div><div class="l">Total findings</div></div>
+      <div class="stat"><div class="v" style="color:var(--green)">${(d.mapped_findings||0).toLocaleString()}</div><div class="l">Mapped to ATT&CK</div></div>
+      <div class="stat"><div class="v" style="color:var(--t3)">${(d.unmapped||0).toLocaleString()}</div><div class="l">Unmapped</div></div>
+      <div class="stat"><div class="v" style="color:var(--amber)">${d.total_findings>0?Math.round((d.mapped_findings||0)/d.total_findings*100):0}%</div><div class="l">Coverage</div></div>
       <div class="stat"><div class="v" style="color:var(--accent)">${d.tactics_covered}/14</div><div class="l">Tactics seen</div></div>
       <div class="stat"><div class="v" style="color:var(--accent)">${d.techniques_covered}</div><div class="l">Techniques seen</div></div>`;
     grid.innerHTML = (d.tactics || []).map(renderTactic).join('');
+    // Store tactics for drill-down
+    window._attackTactics = d.tactics || [];
   } catch (e) {
     grid.innerHTML = `<div class="skeleton">Error: ${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div>`;
   }
 }
 
 loadHeatmap();
+
+// ─── Tactic drill-down ──────────────────────────────────────
+function showTacticDetail(tacticId) {
+  var t = (window._attackTactics||[]).find(function(x){return x.id===tacticId;});
+  if (!t) return;
+  var modal = document.getElementById('tactic-modal');
+  var body = document.getElementById('tactic-modal-body');
+  if (!modal || !body) return;
+  var techs = t.techniques || [];
+  body.innerHTML =
+    '<div style="margin-bottom:12px">' +
+      '<span style="font-size:13px;font-weight:600;color:var(--t1)">' + t.name + '</span>' +
+      '<span style="margin-left:8px;font-size:11px;color:var(--t3)">' + t.id + '</span>' +
+      '<span style="margin-left:8px;font-size:11px;color:var(--amber)">' + (t.count||0) + ' findings</span>' +
+    '</div>' +
+    (techs.length ?
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">' + techs.length + ' techniques mapped:</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+      techs.map(function(tech){
+        return '<a href="https://attack.mitre.org/techniques/' + tech + '" target="_blank" ' +
+          'style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(99,102,241,.15);color:#818cf8;text-decoration:none;font-family:var(--font-mono)">' +
+          tech + '</a>';
+      }).join('') + '</div>'
+    : '<div style="color:var(--t3);font-size:11px">No techniques mapped yet</div>') +
+    '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">' +
+      '<a href="https://attack.mitre.org/tactics/' + t.id + '" target="_blank" ' +
+         'style="color:var(--cyan);font-size:11px">🔗 MITRE ATT&CK: ' + t.name + '</a>' +
+    '</div>';
+  modal.style.display = 'flex';
+}
+document.addEventListener('keydown', function(e){
+  if (e.key==='Escape') { var m=document.getElementById('tactic-modal'); if(m) m.style.display='none'; }
+});
 </script>
+<!-- Tactic detail modal -->
+<div id="tactic-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:var(--t1)">Tactic Detail</div>
+      <button onclick="document.getElementById('tactic-modal').style.display='none'" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px">×</button>
+    </div>
+    <div id="tactic-modal-body"></div>
+  </div>
+</div>
+</body>
+</html>
 </body>
 </html>

@@ -276,8 +276,14 @@ async function loadProSavedQueries(){
       var btn=document.createElement('button');
       btn.className='sq-btn';
       btn.style.cssText='border-color:rgba(34,211,238,.3)';
-      btn.title=(q.description||'')+' · query: '+q.query;
+      var lastRunStr = q.last_run ? new Date(q.last_run).toLocaleDateString() : 'never run';
+      btn.title=(q.description||'')+' · query: '+q.query+' · last run: '+lastRunStr;
       btn.textContent=q.name;
+      // Add last_run indicator
+      var lbl = document.createElement('span');
+      lbl.style.cssText='font-size:9px;color:var(--t3);display:block;line-height:1.2;margin-top:1px';
+      lbl.textContent=(q.language && q.language !== 'vsp' ? '['+q.language.toUpperCase()+'] ' : '') + lastRunStr;
+      btn.appendChild(lbl);
       btn.onclick=function(){
         document.getElementById('hunt-q').value=q.query||'';
         runHunt();
@@ -336,6 +342,16 @@ async function saveCurrentQuery(){
         placeholder:'Optional context for SOC analysts.' },
       { id:'query', label:'Query expression', type:'readonly', value:q,
         hint:'Captured from the hunt input — edit there before saving.' },
+      { id:'language', label:'Query language', type:'select',
+        value:'vsp', required:false,
+        options:[
+          {value:'vsp',     label:'VSP native (key:value, default)'},
+          {value:'kql',     label:'KQL — Kibana Query Language'},
+          {value:'lucene',  label:'Lucene — full-text search'},
+          {value:'spl',     label:'SPL — Splunk Processing Language'},
+          {value:'sigma',   label:'Sigma — generic detection rules'}
+        ],
+        hint:'Language used to interpret the query expression.' },
       { id:'min_match_severity', label:'Surface results at', type:'select',
         value:'medium', required:true,
         options:[
@@ -349,7 +365,7 @@ async function saveCurrentQuery(){
       if(!v.name || v.name.length<1 || v.name.length>200) return 'Name 1–200 chars';
       return null;
     },
-    commit:function(v){ return doSaveQuery(v.name, v.description, q, v.min_match_severity); }
+    commit:function(v){ return doSaveQuery(v.name, v.description, q, v.min_match_severity, v.language); }
   }).then(function(v){
     if(v){
       // Reload saved queries
@@ -360,12 +376,12 @@ async function saveCurrentQuery(){
   });
 }
 
-async function doSaveQuery(name, desc, q, sev){
+async function doSaveQuery(name, desc, q, sev, lang){
   var r=await fetch('/api/v1/threat-hunt/queries',{
     method:'POST',
     credentials:'same-origin',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name:name, description:desc||'', query:q, min_match_severity:sev||'medium'})
+    body:JSON.stringify({name:name, description:desc||'', query:q, min_match_severity:sev||'medium', language:lang||'vsp'})
   });
   if(r.status===402){ throw new Error('Saved-query persistence requires a PRO plan.'); }
   if(!r.ok){ throw new Error('Save failed: HTTP '+r.status); }
@@ -435,8 +451,11 @@ async function runHunt(){
     document.getElementById('hunt-status').className='pill pill-'+(d.total>0?'blue':'gray');
 
     if(_results.length===0){
-      if(typeof VSPUXState!=='undefined'){VSPUXState.empty('#results-wrap','No events match these filters',runHunt);}
-      else{document.getElementById('results-wrap').innerHTML='<div class="empty">No results</div>';}
+      var emptyMsg = d.total === 0 && q
+        ? 'No log events found for "' + q + '" — ensure log sources are configured and ingesting data (<a href="#" onclick="window.parent.showPanel&&window.parent.showPanel('soc')">→ Log Sources</a>)'
+        : 'No events match these filters';
+      if(typeof VSPUXState!=='undefined'){VSPUXState.empty('#results-wrap', emptyMsg, runHunt);}
+      else{document.getElementById('results-wrap').innerHTML='<div class="empty">'+emptyMsg+'</div>';}
     } else {
       renderResults(q);
     }
@@ -1357,6 +1376,6 @@ if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, 
 </script>
 <!-- VSP-TH-SMART-END -->
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>

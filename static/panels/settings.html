@@ -118,6 +118,45 @@ td{padding:7px 10px;vertical-align:middle}
 .toast{position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);display:none}
 .health-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
 .h-ok{background:var(--green)}.h-warn{background:var(--amber)}.h-err{background:var(--red)}
+
+/* ── Settings UI Enhancements ── */
+.section-divider{display:flex;align-items:center;gap:10px;margin:16px 0 10px;color:var(--t3);font-size:10px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em}
+.section-divider::before,.section-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.status-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-size:10px;font-family:var(--font-mono);font-weight:600}
+.status-ok{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.status-warn{background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+.status-err{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.info-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(99,179,255,.05);font-size:11px}
+.info-row:last-child{border-bottom:none}
+.info-key{color:var(--t3);font-family:var(--font-mono);font-size:10px}
+.info-val{color:var(--t1);font-weight:500}
+.risk-high{color:var(--red)}
+.risk-med{color:var(--amber)}
+.risk-low{color:var(--green)}
+.copy-btn{padding:2px 8px;font-size:10px;border-radius:3px;border:1px solid var(--border);background:var(--bg3);color:var(--t3);cursor:pointer;font-family:var(--font-mono);transition:all .15s}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+.expiry-near{color:var(--amber);font-weight:600}
+.expiry-ok{color:var(--t3)}
+.expiry-expired{color:var(--red);font-weight:600}
+.health-service{padding:10px 12px;background:var(--bg1);border:1px solid var(--border);border-radius:6px;transition:border-color .2s}
+.health-service:hover{border-color:var(--border2)}
+.health-service-name{font-size:10px;color:var(--t3);margin-bottom:4px;font-family:var(--font-mono)}
+.health-service-status{font-size:13px;font-weight:700}
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.save-flash{animation:saveFlash .6s ease-out}
+@keyframes saveFlash{0%{background:rgba(34,197,94,.15)}100%{background:transparent}}
+.api-key-row td{padding:8px 10px;vertical-align:middle}
+.severity-critical{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600}
+.severity-high{background:rgba(249,115,22,.1);color:var(--orange);border:1px solid rgba(249,115,22,.2);padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600}
+.severity-any{background:var(--bg3);color:var(--t2);border:1px solid var(--border);padding:2px 7px;border-radius:10px;font-size:10px}
+.channel-tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;background:rgba(14,165,233,.08);color:var(--accent);border:1px solid rgba(14,165,233,.15);margin:1px}
+.sla-card{border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;position:relative;overflow:hidden}
+.sla-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sla-critical::before{background:var(--red)}
+.sla-high::before{background:var(--orange)}
+.sla-medium::before{background:var(--amber)}
+
 </style>
 </head>
 <body>
@@ -141,7 +180,10 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="g2">
     <div>
       <div class="card">
-        <div class="card-head"><div class="card-title">Platform info</div></div>
+        <div class="card-head">
+        <div class="card-title">Platform info</div>
+        <span id="platform-status-badge" class="status-badge status-ok">● operational</span>
+      </div>
         <div class="card-body">
           <div class="form-group">
             <div class="form-label">System name</div>
@@ -203,7 +245,47 @@ td{padding:7px 10px;vertical-align:middle}
       </div>
     </div>
   </div>
+
+
+<!-- ══ LANGUAGE & REGION ══ -->
+<div class="card" style="margin-top:10px">
+  <div class="card-head"><div class="card-title">🌐 Language & Region</div></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Display language</label>
+          <select id="locale-select" class="form-ctrl" style="width:100%">
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Primary region</label>
+          <select id="residency-primary" class="form-ctrl" style="width:100%">
+            <option value="">Select region</option>
+            <option value="vn-1">Vietnam — Hanoi (vn-1)</option>
+            <option value="vn-2">Vietnam — HCMC (vn-2)</option>
+            <option value="sg-1">Singapore (sg-1)</option>
+            <option value="jp-1">Tokyo (jp-1)</option>
+            <option value="us-east-1">US East (us-east-1)</option>
+            <option value="us-west-2">US West (us-west-2)</option>
+            <option value="eu-frankfurt">EU Frankfurt</option>
+            <option value="eu-paris">EU Paris</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Allowed egress regions (comma-separated)</label>
+          <input id="residency-egress" class="form-ctrl" placeholder="vn-1, sg-1, us-east-1" style="width:100%">
+        </div>
+      </div>
+      <button onclick="saveLocaleSettings();saveResidencySettings();" 
+        class="btn btn-primary" style="margin-top:10px;font-size:12px">
+        Save Language & Region
+      </button>
+  </div>
 </div>
+</div><!-- /tab-general -->
+
 
 <!-- ══ SCAN CONFIG ══ -->
 <div class="tab-panel" id="tab-scan">
@@ -230,29 +312,60 @@ td{padding:7px 10px;vertical-align:middle}
 
   <div class="g2">
     <div class="card">
-      <div class="card-head"><div class="card-title">Scan defaults</div></div>
+      <div class="card-head">
+        <div class="card-title">Scan defaults</div>
+        <span id="scan-defaults-badge" class="status-badge status-ok" style="display:none">saved ✓</span>
+      </div>
       <div class="card-body">
+
+        <!-- Quick presets -->
+        <div style="margin-bottom:14px">
+          <div class="form-label" style="margin-bottom:6px">Quick presets</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="applyPreset('strict')" title="FULL scan, DEEP profile, threshold 80">🔒 Strict</button>
+            <button class="btn btn-sm" onclick="applyPreset('standard')" title="FULL scan, STANDARD profile, threshold 70">⚖️ Standard</button>
+            <button class="btn btn-sm" onclick="applyPreset('fast')" title="SAST only, FAST profile, threshold 50">⚡ Fast CI</button>
+            <button class="btn btn-sm" onclick="applyPreset('iac')" title="IAC only, STANDARD profile, threshold 60">🏗️ IaC only</button>
+          </div>
+        </div>
+
         <div class="form-group">
           <div class="form-label">Default scan mode</div>
-          <select aria-label="Def Mode" class="form-ctrl" id="def-mode">
+          <select aria-label="Def Mode" class="form-ctrl" id="def-mode" onchange="updateScanHint()">
             <option>FULL</option><option>SAST</option><option>SCA</option><option>IAC</option>
           </select>
+          <div id="scan-mode-hint" style="font-size:10px;color:var(--t3);margin-top:3px;font-family:var(--font-mono)"></div>
         </div>
+
         <div class="form-group">
           <div class="form-label">Default profile</div>
-          <select aria-label="Def Profile" class="form-ctrl" id="def-profile">
+          <select aria-label="Def Profile" class="form-ctrl" id="def-profile" onchange="updateScanHint()">
             <option>STANDARD</option><option>FAST</option><option>DEEP</option>
           </select>
+          <div id="scan-profile-hint" style="font-size:10px;color:var(--t3);margin-top:3px;font-family:var(--font-mono)"></div>
         </div>
+
         <div class="form-group">
-          <div class="form-label">Gate threshold (score)</div>
-          <input aria-label="Gate Threshold" class="form-ctrl mono" id="gate-threshold" value="70" type="number" min="0" max="100">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div class="form-label" style="margin-bottom:0">Gate threshold (score)</div>
+            <span id="gate-threshold-val" style="font-size:13px;font-weight:700;font-family:var(--font-mono)">70</span>
+          </div>
+          <input type="range" id="gate-threshold" value="70" min="0" max="100" step="5"
+            oninput="updateGateThreshold(this.value)"
+            style="width:100%;accent-color:var(--accent);cursor:pointer;margin-bottom:4px">
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);font-family:var(--font-mono)">
+            <span>0 — permissive</span><span>50 — balanced</span><span>100 — strict</span>
+          </div>
+          <div id="gate-threshold-desc" style="font-size:10px;margin-top:5px;padding:4px 8px;border-radius:4px;font-family:var(--font-mono)"></div>
         </div>
+
         <div class="form-group">
           <div class="form-label">Max concurrent scans</div>
           <input aria-label="Max Scans" class="form-ctrl mono" id="max-scans" value="3" type="number" min="1" max="10">
+          <div style="font-size:10px;color:var(--t3);margin-top:3px;font-family:var(--font-mono)">Higher values use more system resources</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="saveScanDefaults()">Save</button>
+
+        <button class="btn btn-primary btn-sm" onclick="saveScanDefaultsEnhanced()">Save defaults</button>
       </div>
     </div>
 
@@ -264,12 +377,70 @@ td{padding:7px 10px;vertical-align:middle}
           <button class="btn btn-sm" onclick="resetToolConfig()" style="font-size:10px">Reset all</button>
         </div>
       </div>
-      <div class="card-body" id="tool-cfg-body" style="padding:8px 14px">
+      <div style="padding:8px 14px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:8px">
+          <button class="btn btn-sm tool-cat-tab" data-cat="all" onclick="setToolCatFilter('')"
+            style="font-size:10px;border-bottom:2px solid var(--accent);opacity:1">All</button>
+          <button class="btn btn-sm tool-cat-tab" data-cat="IAC" onclick="setToolCatFilter('IAC')"
+            style="font-size:10px;border-bottom:2px solid transparent;opacity:.5">🏗 IaC</button>
+          <button class="btn btn-sm tool-cat-tab" data-cat="SAST" onclick="setToolCatFilter('SAST')"
+            style="font-size:10px;border-bottom:2px solid transparent;opacity:.5">🔍 SAST</button>
+          <button class="btn btn-sm tool-cat-tab" data-cat="SCA" onclick="setToolCatFilter('SCA')"
+            style="font-size:10px;border-bottom:2px solid transparent;opacity:.5">📦 SCA</button>
+          <button class="btn btn-sm tool-cat-tab" data-cat="SECRETS" onclick="setToolCatFilter('SECRETS')"
+            style="font-size:10px;border-bottom:2px solid transparent;opacity:.5">🔐 Secrets</button>
+          <button class="btn btn-sm tool-cat-tab" data-cat="DAST" onclick="setToolCatFilter('DAST')"
+            style="font-size:10px;border-bottom:2px solid transparent;opacity:.5">🌐 DAST</button>
+          <button class="btn btn-sm tool-cat-tab" data-cat="NETWORK" onclick="setToolCatFilter('NETWORK')"
+            style="font-size:10px;border-bottom:2px solid transparent;opacity:.5">🔌 Network</button>
+          <button class="btn btn-sm tool-cat-tab" data-cat="PHASE4" onclick="setToolCatFilter('PHASE4')"
+            style="font-size:10px;border-bottom:2px solid transparent;opacity:.5">⚡ Phase4</button>
+        </div>
+      </div>
+      <div class="card-body" id="tool-cfg-body" style="padding:8px 14px;max-height:340px;overflow-y:auto">
         <div style="text-align:center;padding:30px 0;color:var(--t3);font-size:11px">Loading tool configuration…</div>
       </div>
     </div>
   </div>
+
+
+<!-- ══ POLICY RULES ══ -->
+<div class="card" style="margin-top:10px">
+  <div class="card-head" style="flex-wrap:wrap;gap:8px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title">📋 Gate Policy Rules</div>
+      <span id="policy-badge" style="font-size:10px;font-family:var(--font-mono);background:rgba(14,165,233,.1);color:var(--accent);padding:2px 8px;border-radius:4px;border:1px solid rgba(14,165,233,.2)">—</span>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <input id="policy-search" class="form-ctrl mono" placeholder="🔍 filter name / repo…"
+        style="width:180px;padding:4px 8px;font-size:11px" oninput="filterPolicyRules()">
+      <select id="policy-status-filter" class="form-ctrl" style="width:85px;padding:4px 8px;font-size:11px" onchange="filterPolicyRules()">
+        <option value="">All</option><option value="active">Active</option><option value="off">Off</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t3);cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="policy-hide-test" onchange="filterPolicyRules()" style="cursor:pointer"> Hide test rules
+      </label>
+      <button onclick="if(typeof loadPolicyRulesData==='function')loadPolicyRulesData()" class="btn btn-sm">↻ Refresh</button>
+    </div>
+  </div>
+  <div class="card-body" style="overflow-x:auto;padding:0">
+    <table>
+      <thead><tr>
+        <th style="cursor:pointer" onclick="sortPolicyRules('name')">Name ↕</th>
+        <th>Repo</th>
+        <th style="cursor:pointer;text-align:center" onclick="sortPolicyRules('score')">Min Score ↕</th>
+        <th style="text-align:center">Fail On</th>
+        <th style="text-align:center">Status</th>
+      </tr></thead>
+      <tbody id="policy-rules-body">
+        <tr><td colspan="5" style="padding:20px;text-align:center;color:var(--t3)">Loading...</td></tr>
+      </tbody>
+    </table>
+    <div id="policy-pagination" style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--t3)"></div>
+  </div>
 </div>
+</div><!-- /tab-scan -->
+
 
 <!-- ══ ALERT RULES ══ -->
 <div class="tab-panel" id="tab-alerts">
@@ -291,7 +462,7 @@ td{padding:7px 10px;vertical-align:middle}
     <div class="card-body">
       <div class="g3">
         <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--red)">
-          <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:6px">Critical SLA</div>
+          <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:6px">🔴 Critical SLA <span class="status-badge status-err">highest priority</span></div>
           <div class="form-group" style="margin-bottom:6px">
             <div class="form-label">SLA days</div>
             <input name="numeric-setting-default-3" aria-label="Numeric setting (default 3)" class="form-ctrl mono" value="3" type="number">
@@ -302,7 +473,7 @@ td{padding:7px 10px;vertical-align:middle}
           </div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--orange)">
-          <div style="font-size:11px;font-weight:600;color:var(--orange);margin-bottom:6px">High SLA</div>
+          <div style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:8px;display:flex;align-items:center;gap:6px">🟠 High SLA</div>
           <div class="form-group" style="margin-bottom:6px">
             <div class="form-label">SLA days</div>
             <input name="numeric-setting-default-14" aria-label="Numeric setting (default 14)" class="form-ctrl mono" value="14" type="number">
@@ -313,7 +484,7 @@ td{padding:7px 10px;vertical-align:middle}
           </div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--r-md);padding:10px 12px;border-left:2px solid var(--amber)">
-          <div style="font-size:11px;font-weight:600;color:var(--amber);margin-bottom:6px">Medium SLA</div>
+          <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:8px;display:flex;align-items:center;gap:6px">🟡 Medium SLA</div>
           <div class="form-group" style="margin-bottom:6px">
             <div class="form-label">SLA days</div>
             <input name="numeric-setting-default-30" aria-label="Numeric setting (default 30)" class="form-ctrl mono" value="30" type="number">
@@ -330,6 +501,7 @@ td{padding:7px 10px;vertical-align:middle}
 </div>
 
 <!-- ══ API KEYS ══ -->
+</div><!-- /tab-alerts -->
 <div class="tab-panel" id="tab-apikeys">
   <div class="card">
     <div class="card-head">
@@ -367,6 +539,7 @@ td{padding:7px 10px;vertical-align:middle}
 </div>
 
 <!-- ══ SECURITY ══ -->
+</div><!-- /tab-apikeys -->
 <div class="tab-panel" id="tab-security">
   <div class="g2">
     <div class="card">
@@ -397,7 +570,13 @@ td{padding:7px 10px;vertical-align:middle}
     </div>
 
     <div class="card">
-      <div class="card-head"><div class="card-title">SW Risk agent</div><div class="card-sub">Fix CSRF bypass issue</div></div>
+      <div class="card-head">
+        <div>
+          <div class="card-title">SW Risk agent</div>
+          <div class="card-sub">Fix CSRF bypass issue</div>
+        </div>
+        <span class="status-badge status-warn">⚠ action needed</span>
+      </div>
       <div class="card-body">
         <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:var(--r-md);padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--red)">
           BUG: GET /api/v1/software-inventory/report trả HTTP 200 nhưng thiếu CSRF cookie → agent bị từ chối. Fix bằng cách exempt endpoint.
@@ -420,7 +599,10 @@ td{padding:7px 10px;vertical-align:middle}
   </div>
 
   <div class="card">
-    <div class="card-head"><div class="card-title">Audit &amp; data retention</div></div>
+    <div class="card-head">
+        <div class="card-title">Audit &amp; data retention</div>
+        <span class="status-badge status-ok">NIST compliant</span>
+      </div>
     <div class="card-body">
       <div class="g3">
         <div class="form-group">
@@ -441,12 +623,19 @@ td{padding:7px 10px;vertical-align:middle}
   </div>
 </div>
 
+</div><!-- /tab-security -->
 <!-- ══ HEALTH ══ -->
 <div class="tab-panel" id="tab-health">
   <div class="card">
     <div class="card-head">
-      <div class="card-title">System health</div>
-      <button class="btn btn-sm" onclick="loadHealth()">↻ Refresh</button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="card-title">System health</div>
+        <span id="health-overall-badge" class="status-badge status-ok pulse">● all systems go</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono)" id="health-last-check">checking...</span>
+        <button class="btn btn-sm" onclick="loadHealthEnhanced()">↻ Refresh</button>
+      </div>
     </div>
     <div class="card-body" id="health-body">
       <div style="color:var(--t3);font-size:11px;font-family:var(--font-mono)">Loading health data…</div>
@@ -472,7 +661,109 @@ td{padding:7px 10px;vertical-align:middle}
       </div>
     </div>
   </div>
+
+<!-- Health Deep Status -->
+<div id="health-widget" style="margin:16px 0;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px">
+  <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:600">🏥 System Health</div>
+  <div id="health-details" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;font-size:11px"></div>
 </div>
+<script>
+async function loadHealthWidget() {
+  try {
+    var r = await fetch('/health/deep', {headers:{Authorization:'Bearer '+TOKEN}});
+    if (!r.ok) {
+      var r2 = await fetch('/health');
+      if (!r2.ok) return;
+      var d2 = await r2.json();
+      var el = document.getElementById('health-details');
+      if (el) el.innerHTML = '<div style="color:var(--green)">✓ '+d2.status+' · v'+d2.version+' · up '+d2.uptime+'</div>';
+      return;
+    }
+    var d = await r.json();
+    var el = document.getElementById('health-details');
+    if (!el) return;
+    var cards = [];
+    // DB
+    cards.push({name:'Database', status:d.db?'healthy':'error', extra:''});
+    // Agentic
+    if (d.agentic) cards.push({name:'Agentic', status:d.agentic.status,
+      extra:d.agentic.uptime_seconds?Math.round(d.agentic.uptime_seconds/60)+'m up':''});
+    // Remediation
+    if (d.remediation) cards.push({name:'Remediation', status:d.remediation.status,
+      extra:d.remediation.errors_total>0?d.remediation.errors_total+' errors':''});
+    // Overall
+    cards.push({name:'Overall', status:d.status, extra:''});
+    el.innerHTML = cards.map(function(c){
+      var col = c.status==='healthy'||c.status==='ok'?'var(--green)':c.status==='warn'?'var(--amber)':'var(--red)';
+      return '<div style="padding:8px;background:var(--bg1);border:1px solid var(--border);border-radius:6px">' +
+        '<div style="font-size:10px;color:var(--t3)">'+c.name+'</div>' +
+        '<div style="font-size:12px;font-weight:600;color:'+col+'">'+c.status+'</div>' +
+        (c.extra?'<div style="font-size:9px;color:var(--t3)">'+c.extra+'</div>':'') +
+        '</div>';
+    }).join('');
+  } catch(e) {}
+}
+loadHealthWidget();
+// Fix: defer loadPolicyRules until defined
+setTimeout(function(){ if(typeof loadPolicyRules==="function") loadPolicyRules(); }, 500);
+</script>
+
+<!-- Billing Status Widget -->
+<div id="billing-widget" style="margin:16px 0;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px">
+  <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:600">💳 Subscription</div>
+  <div id="billing-details" style="font-size:12px;color:var(--t2)">Loading...</div>
+</div>
+<script>
+async function loadBillingWidget() {
+  try {
+    var r = await fetch('/api/v1/billing/status', {headers:{Authorization:'Bearer '+TOKEN}});
+    if (!r.ok) return;
+    var d = await r.json();
+    var el = document.getElementById('billing-details');
+    if (!el) return;
+    var status = d.subscription_status || d.status || 'unknown';
+    var plan = (d.plan||'').toUpperCase();
+    var periodEnd = d.current_period_end ? new Date(d.current_period_end) : null;
+    var daysLeft = periodEnd ? Math.ceil((periodEnd - Date.now()) / 86400000) : null;
+    var statusCol = status==='active' ? 'var(--green)' : status==='trialing' ? 'var(--amber)' : 'var(--red)';
+    el.innerHTML =
+      '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">' +
+        '<div><span style="font-size:18px;font-weight:700;color:var(--accent)">' + plan + '</span>' +
+          '<span style="margin-left:6px;font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,.1);color:'+statusCol+'">'+status+'</span></div>' +
+        (daysLeft !== null ?
+          '<div style="font-size:11px;color:var(--t3)">Renews in <b style="color:var(--t1)">' + daysLeft + ' days</b> (' + periodEnd.toLocaleDateString() + ')</div>' : '') +
+        (d.cancel_at_period_end ?
+          '<div style="font-size:11px;color:var(--amber)">⚠ Cancels at period end</div>' : '') +
+      '</div>';
+  } catch(e) {}
+}
+loadBillingWidget();
+
+// Fix 2: Policy Rules (scan-config)
+async function loadPolicyRules() {
+  try {
+    var r = await fetch('/api/v1/settings/scan-config', {headers:{Authorization:'Bearer '+TOKEN}});
+    if (!r.ok) return;
+    var d = await r.json();
+    var el = document.getElementById('policy-rules-body');
+    if (!el) return;
+    var rules = d.rules || [];
+    if (!rules.length) { el.innerHTML = '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--t3)">No policy rules</td></tr>'; return; }
+    el.innerHTML = rules.map(function(r){
+      return '<tr>' +
+        '<td style="font-size:11px;font-family:var(--font-mono)">' + (r.name||r.id.slice(0,8)) + '</td>' +
+        '<td style="font-size:10px;color:var(--t3)">' + (r.repo_pattern||'*') + '</td>' +
+        '<td style="font-size:11px;font-family:var(--font-mono)">' + (r.min_score||0) + '</td>' +
+        '<td style="font-size:10px">' + (r.fail_on||'FAIL') + '</td>' +
+        '<td><span style="font-size:10px;padding:2px 6px;border-radius:3px;background:'+(r.active?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)')+';color:'+(r.active?'var(--green)':'var(--red)')+'">'+( r.active?'active':'off')+'</span></td>' +
+        '</tr>';
+    }).join('');
+  } catch(e) {}
+}
+</script>
+</div><!-- /tab-health -->
+
+</div><!-- /tab-health -->
 
 <div id="toast" class="toast"></div>
 
@@ -499,6 +790,7 @@ function sw(id,btn){
     if (typeof loadToolConfig === 'function') loadToolConfig();
     if (typeof loadDastTargets === 'function') loadDastTargets();
     if (typeof loadScanDefaults === 'function') loadScanDefaults();
+    if (typeof loadPolicyRulesData === 'function') loadPolicyRulesData();
   }
   if (id === 'tab-alerts' && typeof loadAlertRules === 'function') loadAlertRules();
 }
@@ -863,14 +1155,26 @@ async function submitAPIKey(){
   var label = (document.getElementById('ak-label').value || '').trim();
   var role = document.getElementById('ak-role').value;
   var expiry = parseInt(document.getElementById('ak-expiry').value, 10);
+  // Inline validation
+  var labelEl = document.getElementById('ak-label');
+  var errEl = document.getElementById('ak-label-err');
+  if (errEl) errEl.remove();
   if (!label) {
-    showToast('Label is required','error');
+    if (labelEl) {
+      labelEl.style.borderColor = 'rgba(239,68,68,.6)';
+      labelEl.insertAdjacentHTML('afterend', '<div id="ak-label-err" style="color:var(--red);font-size:10px;margin-top:3px;font-family:var(--font-mono)">⚠ Key label is required</div>');
+      labelEl.focus();
+    }
     return;
   }
   if (label.length > 100) {
-    showToast('Label too long (max 100 chars)','error');
+    if (labelEl) {
+      labelEl.style.borderColor = 'rgba(239,68,68,.6)';
+      labelEl.insertAdjacentHTML('afterend', '<div id="ak-label-err" style="color:var(--red);font-size:10px;margin-top:3px;font-family:var(--font-mono)">⚠ Max 100 characters</div>');
+    }
     return;
   }
+  if (labelEl) labelEl.style.borderColor = '';
   try {
     var token = (typeof window.vspToken === 'string' && window.vspToken)
       ? window.vspToken
@@ -1109,6 +1413,16 @@ async function loadToolConfig(){
   }
 }
 
+var _toolCatFilter = '';
+function setToolCatFilter(cat) {
+  _toolCatFilter = cat;
+  // Update tab active state
+  document.querySelectorAll('.tool-cat-tab').forEach(function(b){
+    b.style.opacity = (b.dataset.cat === cat || (cat==='' && b.dataset.cat==='all')) ? '1' : '0.4';
+    b.style.borderBottomColor = (b.dataset.cat === cat || (cat==='' && b.dataset.cat==='all')) ? 'var(--accent)' : 'transparent';
+  });
+  renderToolConfig();
+}
 function renderToolConfig(){
   var summaryEl = document.getElementById('tool-cfg-summary');
   if (summaryEl) summaryEl.textContent = _toolCfg.total_enabled + ' / ' + _toolCfg.total + ' enabled';
@@ -1123,6 +1437,7 @@ function renderToolConfig(){
 
   // Render in canonical category order
   var catOrder = ['IAC','SAST','SCA','SECRETS','DAST','NETWORK','PHASE4','OTHER'];
+  if (_toolCatFilter) catOrder = [_toolCatFilter];
   var html = '';
   catOrder.forEach(function(cat){
     if (!groups[cat]) return;
@@ -1239,10 +1554,160 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderAlertRules();
   renderAPIKeys();
   loadHealth();
+  loadLocaleSettings();
+  loadResidencySettings();
 });
+
+// Fix 2: Locale settings
+async function loadLocaleSettings() {
+  try {
+    var r = await fetch('/api/v1/locale', {headers:{Authorization:'Bearer '+TOKEN}});
+    if (!r.ok) return;
+    var d = await r.json();
+    var sel = document.getElementById('locale-select');
+    if (sel && d.current) sel.value = d.current;
+  } catch(e) {}
+}
+async function saveLocaleSettings() {
+  var sel = document.getElementById('locale-select');
+  if (!sel) return;
+  try {
+    var r = await fetch('/api/v1/locale', {
+      method: 'POST',
+      headers: {Authorization:'Bearer '+TOKEN, 'Content-Type':'application/json'},
+      body: JSON.stringify({locale: sel.value})
+    });
+    if (r.ok) showToast('Language saved ✓', 'success');
+    else showToast('Save failed', 'error');
+  } catch(e) { showToast('Error: '+e.message, 'error'); }
+}
+
+// Fix 2b: Residency settings
+async function loadResidencySettings() {
+  try {
+    var r = await fetch('/api/v1/residency/config', {headers:{Authorization:'Bearer '+TOKEN}});
+    if (!r.ok) return;
+    var d = await r.json();
+    var pr = document.getElementById('residency-primary');
+    var eg = document.getElementById('residency-egress');
+    if (pr && d.primary_region) pr.value = d.primary_region;
+    if (eg && d.allow_egress_regions) eg.value = (d.allow_egress_regions||[]).join(', ');
+  } catch(e) {}
+}
+async function saveResidencySettings() {
+  var pr = document.getElementById('residency-primary');
+  var eg = document.getElementById('residency-egress');
+  if (!pr) return;
+  var egress = (eg ? eg.value : '').split(',').map(s=>s.trim()).filter(Boolean);
+  try {
+    var r = await fetch('/api/v1/residency/config', {
+      method: 'POST',
+      headers: {Authorization:'Bearer '+TOKEN, 'Content-Type':'application/json'},
+      body: JSON.stringify({primary_region: pr.value, allow_egress_regions: egress})
+    });
+    var d = await r.json();
+    if (r.ok) showToast('Residency saved ✓', 'success');
+    else showToast('Error: '+(d.error||r.status), 'error');
+  } catch(e) { showToast('Error: '+e.message, 'error'); }
+}
 </script>
+
 <script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
+
+<script>
+// ── Policy Rules enhanced UI ──────────────────────────────────────
+var _policyAll = [];
+var _policySortKey = 'name';
+var _policySortAsc = true;
+var _policyPage = 1;
+var _policyPageSize = 15;
+
+async function loadPolicyRulesData() {
+  try {
+    await ensureToken();
+    var r = await fetch('/api/v1/settings/scan-config', {headers:{Authorization:'Bearer '+TOKEN}});
+    if (!r.ok) return;
+    var d = await r.json();
+    _policyAll = d.rules || [];
+    _policyPage = 1;
+    renderPolicyRules();
+  } catch(e) { console.warn('policy rules:', e); }
+}
+
+function filterPolicyRules() { _policyPage = 1; renderPolicyRules(); }
+
+function sortPolicyRules(key) {
+  if (_policySortKey === key) _policySortAsc = !_policySortAsc;
+  else { _policySortKey = key; _policySortAsc = true; }
+  renderPolicyRules();
+}
+
+function renderPolicyRules() {
+  var search = (document.getElementById('policy-search')||{}).value||'';
+  var statusF = (document.getElementById('policy-status-filter')||{}).value||'';
+  var hideTest = (document.getElementById('policy-hide-test')||{}).checked||false;
+
+  var filtered = _policyAll.filter(function(r) {
+    var name = (r.name||r.id||'').toLowerCase();
+    var repo = (r.repo_pattern||'').toLowerCase();
+    if (hideTest && /^(apitest_|e2e-test-rule-|test$|test_)/.test(name)) return false;
+    if (search && !name.includes(search.toLowerCase()) && !repo.includes(search.toLowerCase())) return false;
+    if (statusF === 'active' && !r.active) return false;
+    if (statusF === 'off' && r.active) return false;
+    return true;
+  });
+
+  filtered.sort(function(a, b) {
+    var va = _policySortKey === 'score' ? (a.min_score||0) : (a.name||a.id||'');
+    var vb = _policySortKey === 'score' ? (b.min_score||0) : (b.name||b.id||'');
+    if (va < vb) return _policySortAsc ? -1 : 1;
+    if (va > vb) return _policySortAsc ? 1 : -1;
+    return 0;
+  });
+
+  var badge = document.getElementById('policy-badge');
+  var activeCount = _policyAll.filter(function(r){return r.active;}).length;
+  if (badge) badge.textContent = activeCount + ' active / ' + _policyAll.length + ' total';
+
+  var total = filtered.length;
+  var totalPages = Math.max(1, Math.ceil(total / _policyPageSize));
+  if (_policyPage > totalPages) _policyPage = totalPages;
+  var start = (_policyPage - 1) * _policyPageSize;
+  var page = filtered.slice(start, start + _policyPageSize);
+
+  var tbody = document.getElementById('policy-rules-body');
+  if (!tbody) return;
+
+  if (!page.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--t3)">No rules match filter</td></tr>';
+  } else {
+    tbody.innerHTML = page.map(function(r) {
+      var name = r.name || (r.id||'').slice(0,12);
+      var isTest = /^(apitest_|e2e-test-rule-)/.test(name.toLowerCase());
+      var scoreColor = (r.min_score||0)>=70?'var(--red)':(r.min_score||0)>=50?'var(--amber)':'var(--green)';
+      return '<tr style="opacity:'+(isTest?'.5':'1')+'">' +
+        '<td style="font-size:11px;font-family:var(--font-mono);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+name+'">'+(isTest?'<span style="color:var(--t3)">'+name+'</span>':name)+'</td>' +
+        '<td style="font-size:10px;color:var(--t3)">'+(r.repo_pattern||'*')+'</td>' +
+        '<td style="text-align:center"><span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:'+scoreColor+'">'+(r.min_score||0)+'</span></td>' +
+        '<td style="text-align:center"><span style="font-size:10px;padding:2px 6px;border-radius:3px;background:rgba(99,179,255,.08);color:var(--t2)">'+(r.fail_on||'FAIL')+'</span></td>' +
+        '<td style="text-align:center"><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;background:'+(r.active?'rgba(34,197,94,.12)':'rgba(99,99,99,.1)')+';color:'+(r.active?'var(--green)':'var(--t3)')+'">'+( r.active?'● active':'○ off')+'</span></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  var pag = document.getElementById('policy-pagination');
+  if (pag && total > 0) {
+    pag.innerHTML =
+      '<span>'+( start+1)+'–'+Math.min(start+_policyPageSize,total)+' of '+total+' rules'+(total<_policyAll.length?' (filtered)':'')+' </span>' +
+      '<div style="display:flex;gap:4px">' +
+        '<button class="btn btn-sm" onclick="_policyPage=Math.max(1,_policyPage-1);renderPolicyRules()" '+(_policyPage<=1?'disabled':'')+'>‹</button>' +
+        '<span style="padding:3px 8px;font-family:var(--font-mono);font-size:10px">'+_policyPage+'/'+totalPages+'</span>' +
+        '<button class="btn btn-sm" onclick="_policyPage=Math.min('+totalPages+',_policyPage+1);renderPolicyRules()" '+(_policyPage>=totalPages?'disabled':'')+'>›</button>' +
+      '</div>';
+  } else if (pag) pag.innerHTML = '';
+}
+</script>
 
 
 <!-- VSP-UNI4-POLISH-START -->
@@ -1510,6 +1975,41 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // ─── PANEL: settings ─────────────────────────────────────────────────────
   function initSettings() {
+    // Load saved config vào form fields
+    (async function(){
+      var cfg = await loadSection('general');
+      var platform = (cfg && cfg.platform) || {};
+      var defaults = {
+        'sys-name':  'VSP Security Platform',
+        'sys-org':   'Agency Security Operations',
+        'sys-id':    '',
+        'sys-aoff':  '',
+        'sys-3pao':  '',
+        'sys-url':   window.location.origin
+      };
+      Object.keys(defaults).forEach(function(id){
+        var el = document.getElementById(id);
+        if (el && platform[id.replace('sys-','').replace('-','_')]) {
+          el.value = platform[id.replace('sys-','').replace('-','_')];
+        }
+      });
+      // Map đúng field names
+      if (platform.system_name && document.getElementById('sys-name'))
+        document.getElementById('sys-name').value = platform.system_name;
+      if (platform.organization && document.getElementById('sys-org'))
+        document.getElementById('sys-org').value = platform.organization;
+      if (platform.system_id && document.getElementById('sys-id'))
+        document.getElementById('sys-id').value = platform.system_id;
+      if (platform.authorizing && document.getElementById('sys-aoff'))
+        document.getElementById('sys-aoff').value = platform.authorizing;
+      if (platform.pao_assessor && document.getElementById('sys-3pao'))
+        document.getElementById('sys-3pao').value = platform.pao_assessor;
+      if (platform.platform_url && document.getElementById('sys-url'))
+        document.getElementById('sys-url').value = platform.platform_url;
+      // Load scan defaults too
+      if (typeof loadScanDefaults === 'function') loadScanDefaults();
+      if (typeof loadDastTargets === 'function') loadDastTargets();
+    })();
     setTimeout(() => {
       injectBanner('vsp-settings-banner', infoBanner('#a855f7', '⚙ System Settings',
         'Configure DAST targets, scan profiles, software inventory, retention policies. Changes audited per <b>NIST SP 800-53 CM-3</b> Configuration Change Control.'));
@@ -1652,8 +2152,209 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <!-- VSP-UNI4-POLISH-END -->
-<!-- FEAT-21 PATCH APPLIED --><script src="/static/patches/feat-21-settings.js"></script>
-<!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
+
+
+<script>
+// ── Settings UI Enhancements ──────────────────────────────────────
+
+// Platform save with feedback
+async function saveSysSettingsEnhanced() {
+  if (typeof saveSysSettings === 'function') {
+    await saveSysSettings();
+    var btn = document.getElementById('platform-save-btn');
+    if (btn) {
+      var orig = btn.textContent;
+      btn.textContent = '✓ Saved';
+      btn.style.background = 'rgba(34,197,94,.2)';
+      btn.style.borderColor = 'rgba(34,197,94,.4)';
+      setTimeout(function() {
+        btn.textContent = orig;
+        btn.style.background = '';
+        btn.style.borderColor = '';
+      }, 2000);
+    }
+  }
+}
+
+// Enhanced health check
+async function loadHealthEnhanced() {
+  if (typeof loadHealth === 'function') loadHealth();
+  var badge = document.getElementById('health-overall-badge');
+  var lastCheck = document.getElementById('health-last-check');
+  if (badge) { badge.className = 'status-badge status-warn pulse'; badge.textContent = '● checking…'; }
+  try {
+    await ensureToken();
+    var r = await fetch('/health/deep', {headers:{Authorization:'Bearer '+TOKEN}});
+    var d = r.ok ? await r.json() : null;
+    if (!d) { var r2 = await fetch('/health'); d = r2.ok ? await r2.json() : null; }
+    if (d) {
+      var ok = d.status === 'ok' || d.status === 'healthy';
+      if (badge) {
+        badge.className = 'status-badge ' + (ok ? 'status-ok' : 'status-err');
+        badge.textContent = ok ? '● all systems go' : '● degraded';
+      }
+      if (lastCheck) lastCheck.textContent = 'checked ' + new Date().toLocaleTimeString();
+    }
+  } catch(e) {
+    if (badge) { badge.className = 'status-badge status-err'; badge.textContent = '● unreachable'; }
+  }
+}
+
+// Enhanced API key expiry display
+function enhanceAPIKeyTable() {
+  var rows = document.querySelectorAll('#apikeys-tbody tr, [id*="api-key"] tr');
+  rows.forEach(function(row) {
+    var cells = row.querySelectorAll('td');
+    if (cells.length < 5) return;
+    var expiryCell = cells[4]; // expires column
+    var expiryText = expiryCell ? expiryCell.textContent.trim() : '';
+    if (!expiryText || expiryText === '—') return;
+    var expiry = new Date(expiryText);
+    var daysLeft = Math.ceil((expiry - Date.now()) / 86400000);
+    if (daysLeft < 0) {
+      expiryCell.innerHTML = '<span class="expiry-expired">⚠ expired</span>';
+    } else if (daysLeft < 30) {
+      expiryCell.innerHTML = '<span class="expiry-near">⚡ ' + daysLeft + 'd left</span>';
+    } else {
+      expiryCell.innerHTML = '<span class="expiry-ok">' + expiryText + '</span>';
+    }
+  });
+}
+
+// Auto-refresh health when tab-health active
+var _healthInterval = null;
+var _origSw = window.sw;
+window.sw = function(id, btn) {
+  if (typeof _origSw === 'function') _origSw(id, btn);
+  if (id === 'tab-health') {
+    loadHealthEnhanced();
+    _healthInterval = setInterval(loadHealthEnhanced, 30000);
+  } else {
+    if (_healthInterval) { clearInterval(_healthInterval); _healthInterval = null; }
+  }
+  if (id === 'tab-apikeys') {
+    setTimeout(enhanceAPIKeyTable, 500);
+  }
+};
+
+// Init on load
+setTimeout(function() {
+  // Check if health tab is active
+  var healthPanel = document.getElementById('tab-health');
+  if (healthPanel && healthPanel.classList.contains('active')) loadHealthEnhanced();
+  
+  // Enhance notification rule severity badges in alert table
+  document.querySelectorAll('#alert-rules-tbody td:nth-child(2)').forEach(function(td) {
+    var txt = td.textContent.trim().toUpperCase();
+    if (txt === 'CRITICAL') td.innerHTML = '<span class="severity-critical">CRITICAL</span>';
+    else if (txt === 'HIGH') td.innerHTML = '<span class="severity-high">HIGH</span>';
+    else if (txt === 'ANY' || txt === '') td.innerHTML = '<span class="severity-any">any</span>';
+  });
+
+  // Enhance channel tags
+  document.querySelectorAll('#alert-rules-tbody td:nth-child(3)').forEach(function(td) {
+    var channels = td.textContent.split(',').map(function(c){return c.trim();}).filter(Boolean);
+    if (channels.length > 0) {
+      td.innerHTML = channels.map(function(c){
+        return '<span class="channel-tag">'+c+'</span>';
+      }).join('');
+    }
+  });
+}, 800);
+</script>
+
+
+<script>
+// ── Scan config enhancements ──────────────────────────────────────
+
+var SCAN_MODE_HINTS = {
+  'FULL':  '▸ Runs all 26 tools — SAST · SCA · IaC · Secrets · DAST · Network',
+  'SAST':  '▸ Source code analysis only — bandit · codeql · gosec · semgrep',
+  'SCA':   '▸ Dependency & SBOM scan — cosign · grype · govulncheck',
+  'IAC':   '▸ Infrastructure-as-code — checkov · hadolint · kics',
+};
+var PROFILE_HINTS = {
+  'STANDARD': '▸ Balanced depth/speed — recommended for most pipelines',
+  'FAST':     '▸ ~3× faster, reduced depth — good for PR checks',
+  'DEEP':     '▸ Maximum depth, slower — use for release gates',
+};
+
+function updateScanHint() {
+  var mode = (document.getElementById('def-mode')||{}).value||'';
+  var profile = (document.getElementById('def-profile')||{}).value||'';
+  var mh = document.getElementById('scan-mode-hint');
+  var ph = document.getElementById('scan-profile-hint');
+  if (mh) mh.textContent = SCAN_MODE_HINTS[mode]||'';
+  if (ph) ph.textContent = PROFILE_HINTS[profile]||'';
+}
+
+function updateGateThreshold(val) {
+  val = parseInt(val, 10);
+  var el = document.getElementById('gate-threshold-val');
+  var desc = document.getElementById('gate-threshold-desc');
+  if (el) {
+    el.textContent = val;
+    el.style.color = val >= 80 ? 'var(--red)' : val >= 60 ? 'var(--amber)' : 'var(--green)';
+  }
+  if (desc) {
+    if (val >= 80) {
+      desc.textContent = '🔴 Strict — most pipelines will fail; only high-quality code passes';
+      desc.style.background = 'rgba(239,68,68,.08)'; desc.style.color = 'var(--red)';
+    } else if (val >= 60) {
+      desc.textContent = '🟡 Balanced — recommended for production gates';
+      desc.style.background = 'rgba(245,158,11,.08)'; desc.style.color = 'var(--amber)';
+    } else if (val >= 40) {
+      desc.textContent = '🟢 Lenient — suitable for early development';
+      desc.style.background = 'rgba(34,197,94,.08)'; desc.style.color = 'var(--green)';
+    } else {
+      desc.textContent = '⚪ Permissive — almost all scans pass; not recommended for production';
+      desc.style.background = 'var(--bg3)'; desc.style.color = 'var(--t3)';
+    }
+  }
+}
+
+function applyPreset(name) {
+  var presets = {
+    strict:   {mode:'FULL', profile:'DEEP',     threshold:80, maxScans:2},
+    standard: {mode:'FULL', profile:'STANDARD', threshold:70, maxScans:3},
+    fast:     {mode:'SAST', profile:'FAST',     threshold:50, maxScans:5},
+    iac:      {mode:'IAC',  profile:'STANDARD', threshold:60, maxScans:3},
+  };
+  var p = presets[name]; if (!p) return;
+  var modeEl = document.getElementById('def-mode');
+  var profEl = document.getElementById('def-profile');
+  var thrEl  = document.getElementById('gate-threshold');
+  var maxEl  = document.getElementById('max-scans');
+  if (modeEl) { modeEl.value = p.mode; }
+  if (profEl) { profEl.value = p.profile; }
+  if (thrEl)  { thrEl.value = p.threshold; updateGateThreshold(p.threshold); }
+  if (maxEl)  { maxEl.value = p.maxScans; }
+  updateScanHint();
+  showToast('Preset "'+name+'" applied — click Save to confirm', 'info');
+}
+
+async function saveScanDefaultsEnhanced() {
+  if (typeof saveScanDefaults === 'function') {
+    await saveScanDefaults();
+    var badge = document.getElementById('scan-defaults-badge');
+    if (badge) {
+      badge.style.display = 'inline-flex';
+      setTimeout(function(){ badge.style.display = 'none'; }, 2500);
+    }
+  }
+}
+
+// Init scan tab hints on load
+setTimeout(function() {
+  updateScanHint();
+  var thr = document.getElementById('gate-threshold');
+  if (thr) updateGateThreshold(thr.value || 70);
+}, 1000);
+</script>
+
+</body>
+</html>
+
 </body>
 </html>

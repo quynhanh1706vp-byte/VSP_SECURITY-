@@ -111,6 +111,51 @@ function _cspmKPIDash() {
   });
 }
 
+async function loadCSPMPosture() {
+  try {
+    var token = window.TOKEN || await (typeof getToken==='function'?getToken():Promise.resolve(''));
+    var r = await fetch('/api/v1/cspm/posture', {headers:{'Authorization':'Bearer '+token}});
+    if (!r.ok) return;
+    var d = await r.json();
+    var posture = d.posture || [];
+    if (!posture.length) return;
+    // Populate real provider scores
+    posture.forEach(function(p) {
+      var prov = p.provider;
+      var scoreEl = document.getElementById(prov+'-score');
+      if (scoreEl) {
+        scoreEl.textContent = p.score;
+        scoreEl.className = 'cspm-score-big ' + (p.score>=80?'sev-l':p.score>=60?'sev-m':p.score>=40?'sev-h':'sev-c');
+      }
+      ['critical','high','medium','low'].forEach(function(sev){
+        var el = document.getElementById(prov+'-'+sev[0]);
+        if (el) el.textContent = (p[sev]||0).toLocaleString();
+      });
+    });
+    // Update provider count badge
+    var badge = document.getElementById('cspm-providers-count');
+    if (badge) badge.textContent = d.total_providers + ' provider' + (d.total_providers===1?'':'s');
+  } catch(e) { console.warn('[cspm posture]', e); }
+}
+
+// Fix 5: Add cloud account
+async function addCSPMAccount() {
+  var prov = prompt('Provider (aws/gcp/azure/k8s):', 'aws');
+  if (!prov) return;
+  var name = prompt('Account name:', prov+'-prod');
+  if (!name) return;
+  try {
+    var token = window.TOKEN || await (typeof getToken==='function'?getToken():Promise.resolve(''));
+    var r = await fetch('/api/v1/cspm/accounts', {
+      method: 'POST',
+      headers: {'Authorization':'Bearer '+token, 'Content-Type':'application/json'},
+      body: JSON.stringify({provider: prov, name: name, enabled: true})
+    });
+    if (r.ok) { alert('Account added! Sync will start shortly.'); loadCSPM();
+loadCSPMPosture(); loadCSPMPosture(); }
+    else { var e = await r.json(); alert('Error: '+(e.error||r.status)); }
+  } catch(e2) { alert('Error: '+e2.message); }
+}
 async function loadCSPM() {
   var hasUX = typeof VSPUXState !== 'undefined';
   if (hasUX) VSPUXState.skeleton('#cspm-tbody', { rows: 4, kind: 'table' });
@@ -145,7 +190,21 @@ async function loadCSPM() {
 
     if (totalIaC === 0) {
       _cspmKPIDash();
-      if (hasUX) VSPUXState.empty('#cspm-tbody', 'No IaC findings yet — run a scan', loadCSPM);
+      // Fix 4: Try real cspm_findings table first
+      try {
+        var cspmR = await fetch('/api/v1/cspm/findings', {headers: {'Authorization': 'Bearer ' + token}});
+        if (cspmR.ok) {
+          var cspmD = await cspmR.json();
+          if (cspmD.total > 0) {
+            if (hasUX) VSPUXState.empty('#cspm-tbody', cspmD.total + ' CSPM findings — cloud accounts connected', loadCSPM);
+            return;
+          }
+        }
+      } catch(e2) {}
+      var emptyMsg = 'No IaC/CSPM findings yet — ' +
+        '<a href="#" style="color:var(--cyan)" onclick="window.parent.showPanel&&window.parent.showPanel('vuln_mgmt')">run an IaC scan</a> ' +
+        'or <a href="#" style="color:var(--cyan)" onclick="window.parent.showPanel&&window.parent.showPanel('settings')">connect cloud accounts</a>';
+      if (hasUX) VSPUXState.empty('#cspm-tbody', emptyMsg, loadCSPM);
       else renderFallback();
       return;
     }
@@ -184,10 +243,20 @@ async function loadCSPM() {
 
     var tbody = document.getElementById('cspm-tbody');
     if (tbody) {
-      tbody.innerHTML =
-        '<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--t3)">' +
-        'Real-time data: ' + totalIaC.toLocaleString() +
-        ' IaC findings aggregated from kics+checkov+hadolint scans</td></tr>';
+      // Fix 5: Real breakdown per IaC tool
+      tbody.innerHTML = iacFindings.map(function(t){
+        var tool = (t.tool||'').toUpperCase();
+        var tot = t.total || t.count || 0;
+        var crit = t.critical||0, high=t.high||0, med=t.medium||0, low=t.low||0;
+        return '<tr><td style="font-weight:500">' + tool + '</td>' +
+          '<td style="color:#ef4444">' + crit + '</td>' +
+          '<td style="color:#f59e0b">' + high + '</td>' +
+          '<td style="color:#3b82f6">' + med + '</td>' +
+          '<td style="color:var(--t3)">' + tot + ' total</td></tr>';
+      }).join('') +
+      '<tr style="border-top:1px solid var(--border);font-weight:600">' +
+        '<td>Total IaC</td><td colspan="3"></td>' +
+        '<td>' + totalIaC.toLocaleString() + '</td></tr>';
     }
   } catch (e) {
     _cspmKPIDash();

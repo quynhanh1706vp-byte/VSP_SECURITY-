@@ -230,9 +230,11 @@ function renderIOCs(){
     return true;
   });
   document.getElementById('ioc-list').innerHTML=list.map(function(i){
+    i.severity = i.severity || i.sev || 'UNKNOWN';
+    i.val = i.val || i.value || '';
     var cls=i.matched?'matched':sevClass(i.severity);
     return '<div class="ioc '+cls+'" data-id="'+i.id+'" onclick="openIOCDetail(this.dataset.id)">'
-      +'<div class="ioc-hdr"><span class="ioc-type">'+i.type+'</span>'+sevBadge(i.severity)+(i.matched?'<span class="pill pill-green">&#10003; matched</span>':'')+'<span class="ioc-val">'+i.val+'</span></div>'
+      +'<div class="ioc-hdr"><span class="ioc-type">'+i.type+'</span>'+sevBadge(i.severity)+(i.matched?'<span class="pill pill-green">&#10003; matched</span>':'')+(i.kev||i.type==='cve'&&i.val&&(window._kevSet&&window._kevSet.has(i.val))?'<span class="pill pill-red" style="font-size:9px">🔴 KEV</span>':'')+'<span class="ioc-val">'+i.val+'</span></div>'
       +'<div class="ioc-feed">feed: '+i.feed+'</div>'
       +'<div class="ioc-tags">'+(i.mitre||[]).map(function(m){return '<span class="pill pill-purple">'+m+'</span>';}).join('')+'</div>'
       +'</div>';
@@ -243,7 +245,7 @@ function renderFeeds(){
   var statusColor={ok:'var(--green)',warn:'var(--amber)',offline:'var(--red)'};
   document.getElementById('feeds-list').innerHTML=FEEDS.map(function(f){
     return '<div class="feed-item"><div class="feed-dot" style="background:'+statusColor[f.status]+'"></div>'
-      +'<div><div class="feed-name">'+f.name+'</div><div class="feed-count">'+f.count+' indicators · last sync: '+f.lastSync+'</div></div>'
+      +'<div style="display:flex;align-items:center">'+'<div><div class="feed-name">'+f.name+'</div><div class="feed-count">'+(f.iocs||f.count||0)+' indicators · last: '+(f.last||f.lastSync||'—')+'</div></div>'+(f.status?'<span style="margin-left:auto;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500;background:'+(f.status==='ok'?'rgba(16,185,129,.15)':f.status==='warn'?'rgba(245,158,11,.15)':'rgba(239,68,68,.15)')+';color:'+(f.status==='ok'?'#10b981':f.status==='warn'?'#f59e0b':'#ef4444')+'">'+(f.status==='ok'?'✓ ok':f.status==='warn'?'⚠ warn':'✗ err')+'</span>':'')+'</div>'
       +'<span class="pill '+(f.status==='ok'?'pill-green':f.status==='warn'?'pill-amber':'pill-red')+'">'+f.status+'</span>'
       +'</div>';
   }).join('');
@@ -293,7 +295,8 @@ async function openIOCDetail(id){
   document.getElementById('imod-title').textContent=ioc.type+': '+ioc.val.slice(0,40)+(ioc.val.length>40?'…':'');
   document.getElementById('imod-sub').textContent='Feed: '+ioc.feed+' · Source: Threat Intelligence DB';
   document.getElementById('imod-sev').innerHTML=sevBadge(ioc.severity);
-  document.getElementById('imod-matched').innerHTML=ioc.matched?'<span class="pill pill-green">&#10003; matched in scans</span>':'<span class="pill pill-gray">not matched</span>';
+  var kevBadge = (ioc.kev || (window._kevSet && window._kevSet.has(ioc.val))) ? '<span class="pill pill-red" style="margin-left:6px">🔴 CISA KEV</span>' : '';
+  document.getElementById('imod-matched').innerHTML=(ioc.matched?'<span class="pill pill-green">&#10003; matched in scans</span>':'<span class="pill pill-gray">not matched</span>')+kevBadge;
   document.getElementById('imod-kpis').innerHTML=[
     {lbl:'Type',val:ioc.type,color:'var(--cyan)'},{lbl:'Severity',val:ioc.severity,color:sevColor(ioc.severity)},{lbl:'Feed',val:ioc.feed,color:'var(--t1)'},
   ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
@@ -380,6 +383,10 @@ async function loadFromAPI(){
     ]);
     if(res[4]&&Array.isArray(res[4].tactics)){
       var byId={}; res[4].tactics.forEach(function(t){ byId[t.id]=t.count||0; });
+      // Build KEV set từ IOCs type=cve có feed chứa KEV
+      window._kevSet = new Set((res[0]&&res[0].iocs||[]).filter(function(i){
+        return i.type==='cve' && (i.feed||'').toUpperCase().includes('KEV');
+      }).map(function(i){return i.val;}));
       MITRE.forEach(function(m){ if(byId[m.id]!=null) m.count=byId[m.id]; });
       renderMITRE();
     }
@@ -398,7 +405,17 @@ async function loadFromAPI(){
       VSPUXState.empty('#feeds-list', 'No feeds configured', loadFromAPI);
     }
     // Matches KPI
-    if(res[2]&&res[2].matches)document.getElementById('k-matches').textContent=res[2].matches.length||0;
+    if(res[2]&&res[2].matches) {
+      // Normalize field names: sev→severity, val→value alias
+      res[2].matches = res[2].matches.map(function(m){
+        return Object.assign({}, m, {
+          severity: m.severity || m.sev || 'UNKNOWN',
+          finding_id: m.finding_id || m.id,
+          matched_ioc: m.matched_ioc || m.val
+        });
+      });
+      document.getElementById('k-matches').textContent = res[2].matches.length || 0;
+    }
     // CVEs (NEW — was missing in original)
     if(res[3]&&res[3].cves&&res[3].cves.length){
       CVES=res[3].cves.map(function(c){return Object.assign({id:c.cve||c.id||'CVE-?',matched:false,kev:c.kev||false,findings:[]},c);});
@@ -991,6 +1008,6 @@ if(typeof VSPUXState!=='undefined'){
 <div id="inject-toast" style="display:none"></div>
 <script src="/static/inject_ux_v1.1.js"></script>
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>

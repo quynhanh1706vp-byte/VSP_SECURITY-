@@ -88,6 +88,12 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 .sched-item{border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:10px;transition:all .15s;position:relative}
 .sched-item:hover{border-color:var(--border2);background:rgba(255,255,255,.01)}
 .sched-item.enabled{border-left:3px solid var(--green)}.sched-item.disabled{border-left:3px solid var(--t4);opacity:.65}
+.last-badge{font-size:10px;padding:2px 7px;border-radius:4px;margin-left:6px;font-weight:500}
+.last-pass{background:rgba(16,185,129,.15);color:var(--green)}
+.last-fail{background:rgba(239,68,68,.15);color:var(--red)}
+.last-done{background:rgba(99,102,241,.12);color:#818cf8}
+.last-never{background:var(--bg3);color:var(--t4)}
+.countdown-badge{font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(245,158,11,.12);color:var(--amber);margin-left:4px;font-weight:500}
 .sched-hdr{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .sched-name{font-size:13px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sched-cron{font-size:10px;font-family:var(--font-mono);color:var(--cyan);background:var(--cyan2);padding:2px 7px;border-radius:4px;white-space:nowrap}
@@ -370,7 +376,8 @@ function renderSchedules() {
       + '<div class="sched-meta">'
       + '<span class="sched-cron">' + s.cron + '</span>'
       + '<span>' + cronDescribe(s.cron) + '</span>'
-      + (s.enabled && s.next_run !== '—' ? '<span class="next-badge">next: ' + s.next_run + '</span>' : '')
+      + (s.enabled && s.next_run !== '—' ? '<span class="next-badge">next: ' + s.next_run + '</span>' + (s.countdown ? '<span class="countdown-badge">⏱ ' + s.countdown + '</span>' : '') : '')
+      + (s.last_run !== 'never' && s.last_run !== '—' ? '<span class="last-badge ' + (s.last_gate === 'PASS' ? 'last-pass' : s.last_gate === 'FAIL' ? 'last-fail' : 'last-done') + '">last: ' + s.last_run + (s.last_gate && s.last_gate !== '—' ? ' · ' + s.last_gate : '') + '</span>' : '<span class="last-badge last-never">never run</span>')
       + '</div>'
       + '<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + s.src + '">' + s.src + '</div>'
       + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
@@ -452,6 +459,19 @@ function toggleSched(idx) {
   if (!s) return;
   s.enabled = !s.enabled;
   if (!s.enabled) s.next_run = '—';
+  // Countdown: tính thời gian còn lại đến next_run
+  if (s.next_run_at && s.enabled) {
+    var msLeft = new Date(s.next_run_at) - new Date();
+    if (msLeft > 0) {
+      var hLeft = Math.floor(msLeft/3600000);
+      var mLeft = Math.floor((msLeft%3600000)/60000);
+      s.countdown = hLeft > 0 ? 'in ' + hLeft + 'h ' + mLeft + 'm' : 'in ' + mLeft + 'm';
+    } else {
+      s.countdown = 'overdue';
+    }
+  } else {
+    s.countdown = null;
+  }
   renderSchedules();
   showToast(s.name + ' ' + (s.enabled ? 'enabled' : 'disabled'), 'success');
   if (TOKEN) {
@@ -1342,6 +1362,6 @@ renderRecentRuns();
 </script>
 <!-- VSP-UNI3-POLISH-END -->
 <!-- VSP-SIEM-COMPANION — Configure + Notifications buttons (per-panel) -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>

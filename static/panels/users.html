@@ -72,7 +72,7 @@ select.form-ctrl option{background:var(--bg2)}
     </div>
     <div style="overflow-x:auto">
       <table class="user-table">
-        <thead><tr><th>User</th><th>Role</th><th>Last login</th><th>Status</th><th>MFA</th><th>Actions</th></tr></thead>
+        <thead><tr><th>User</th><th>Role</th><th>Last Login</th><th>MFA</th><th>Last login</th><th>Status</th><th>MFA</th><th>Actions</th></tr></thead>
         <tbody id="user-tbody"></tbody>
       </table>
     </div>
@@ -212,6 +212,8 @@ function renderUsers(){
       +'<div><div style="font-weight:500">'+displayName+'</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+(u.email||'—')+'</div></div>'
       +'</div></td>'
       +'<td>'+roleBadge(u.role)+'</td>'
+      +'<td style="color:var(--t3);font-size:11px">'+(u.last_login ? new Date(u.last_login).toLocaleString() : '<span style="color:var(--t4)">never</span>')+'</td>'
+      +'<td style="color:var(--t3);font-size:11px">'+(u.mfa_enabled ? '<span style="color:var(--green)">✓ MFA</span>' : '<span style="color:var(--amber)">no MFA</span>')+'</td>'
       +'<td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+(u.last_login||'—')+'</td>'
       +'<td>'+statusBadge(u.status)+'</td>'
       +'<td>'+(u.mfa?'<span class="pill pill-green">MFA on</span>':'<span class="pill pill-amber">no MFA</span>')+'</td>'
@@ -874,6 +876,6 @@ if(typeof VSPUXState!=='undefined'){VSPUXState.skeleton('#users-tbody',{rows:6})
 <div id="inject-toast" style="display:none"></div>
 <script src="/static/inject_ux_v1.1.js"></script>
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>

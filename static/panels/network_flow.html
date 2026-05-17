@@ -92,6 +92,9 @@ canvas{display:block}
 </style>
 </head>
 <body>
+<div id="netcap-status-banner" style="display:none;font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#f59e0b;margin:8px 0"></div>
+<div id="netcap-kpi" style="font-size:11px;color:var(--t3);margin:4px 0 8px"></div>
+
 <div class="hdr">
   <div><h2>Network flow / NDR</h2><p>Netflow v9 · connection map · protocol breakdown · anomaly detection</p></div>
   <div style="display:flex;gap:8px;align-items:center">
@@ -166,6 +169,31 @@ canvas{display:block}
 <script>
 var TOKEN='',API='',_showSusOnly=false,_selectedNode=null;
 
+async function startNetcap(e) {
+  if (e) e.preventDefault();
+  try {
+    // Fix 2: Fetch available interfaces first
+    var h = {Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json'};
+    var ifaceList = ['eth0','ens3','ens4','lo','wlan0'];
+    try {
+      var ifR = await fetch(API+'/api/v1/netcap/interfaces', {headers:h});
+      if (ifR.ok) {
+        var ifD = await ifR.json();
+        if (ifD.interfaces && ifD.interfaces.length) ifaceList = ifD.interfaces.map(function(i){return i.name||i;});
+      }
+    } catch(e3) {}
+    var iface = prompt('Select interface:\n' + ifaceList.join('\n'), ifaceList[0]||'eth0');
+    if (!iface) return;
+    var r = await fetch(API + '/api/v1/netcap/start', {method:'POST', headers:h, body:JSON.stringify({iface:iface})});
+    if (r.ok) {
+      alert('Network capture started on ' + iface);
+      loadNetworkFlow();
+    } else {
+      var err = await r.json().catch(()=>({}));
+      alert('Failed to start: ' + (err.error||r.status));
+    }
+  } catch(e2) { alert('Error: ' + e2.message); }
+}
 async function loadNetworkFlow(){
   var hasUX = typeof VSPUXState !== 'undefined';
   if(hasUX){
@@ -184,6 +212,31 @@ async function loadNetworkFlow(){
   var h={Authorization:'Bearer '+TOKEN};
   try{
     var d=null;
+    // Fix 1: Check netcap engine status
+    try {
+      var ns = await fetch(API+'/api/v1/netcap/stats', {headers:h}).then(r=>r.json()).catch(()=>({}));
+      var ncBanner = document.getElementById('netcap-status-banner');
+      if (ncBanner) {
+        if (ns && ns.running) {
+          ncBanner.style.display = 'none';
+        } else {
+          ncBanner.style.display = '';
+          ncBanner.innerHTML = '⚠ Network capture engine is <b>offline</b> — showing log-based flow data. ' +
+            '<a href="#" style="color:var(--cyan)" onclick="startNetcap(event)">▶ Start capture</a>';
+        }
+      }
+      // Fix 2: Merge netcap flows if running
+      if (ns && ns.running) {
+        var nf2 = await fetch(API+'/api/v1/netcap/flows', {headers:h}).then(r=>r.json()).catch(()=>({}));
+        if (nf2 && nf2.top_hosts && nf2.top_hosts.length) {
+          var kpiEl = document.getElementById('netcap-kpi');
+          if (kpiEl) kpiEl.innerHTML =
+            '<span style="color:var(--cyan)">⚡ ' + (ns.active_flows||0) + ' active flows</span> · ' +
+            '<span style="color:var(--green)">' + (ns.pps||0) + ' pkt/s</span> · ' +
+            '<span style="color:var(--amber)">' + (ns.anomalies||0) + ' anomalies</span>';
+        }
+      }
+    } catch(e) {}
     try{
       var nr=await fetch(API+'/api/v1/logs/network-flow',{headers:h});
       if(nr.ok) d=await nr.json();
@@ -203,6 +256,15 @@ async function loadNetworkFlow(){
 
     if(!d){
       // Fallback: build from log_events
+      // Fix 1: Also fetch netcap anomalies for NDR alerts
+      var ncAnom = await fetch(API+'/api/v1/netcap/anomalies',{headers:h})
+        .then(r=>r.json()).catch(()=>({anomalies:[]}));
+      if (ncAnom.anomalies && ncAnom.anomalies.length) {
+        NDR_ALERTS = ncAnom.anomalies.map(function(a){
+          return {sev:(a.severity||'medium').toLowerCase(), msg:a.description||a.message||a.type||'Anomaly', ts:a.detected_at||'now'};
+        });
+        if (typeof renderAlerts==='function') renderAlerts();
+      }
       var hunt=await fetch(API+'/api/v1/logs/hunt?limit=500&hours=24',{headers:h})
         .then(r=>r.json()).catch(()=>({events:[],total:0}));
       var evts=hunt.events||[];
@@ -1067,6 +1129,6 @@ renderProtos();renderAlerts();renderConns();
 <div id="inject-toast" style="display:none"></div>
 <script src="/static/inject_ux_v1.1.js"></script>
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>

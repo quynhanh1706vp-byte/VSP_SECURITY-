@@ -280,8 +280,9 @@ function renderAssets(){
   }
   document.getElementById('asset-tbody').innerHTML=list.map(function(a){
     var sc=a.risk_score||0,rc=riskColor(sc);
-    return '<tr data-id="'+a.id+'" onclick="openAssetModal(this.dataset.id)">'
-      +'<td><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+' · '+a.tool+'</div></td>'
+    return '<tr data-id="'+a.id+'">'
+      +'<td style="width:32px;padding:8px 6px"><input type="checkbox" class="asset-chk" data-id="'+a.id+'" onclick="event.stopPropagation()" style="cursor:pointer"></td>'
+      +'<td onclick="openAssetModal(''+a.id+'')" style="cursor:pointer"><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+(a.ip?' · '+a.ip:'')+(a.env?' · '+a.env:'')+'</div></td>'
       +'<td>'+envBadge(a.env)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--red);font-weight:700">'+(a.critical||0)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--amber);font-weight:700">'+(a.high||0)+'</td>'
@@ -395,6 +396,46 @@ function openFindingModal(id){
   document.getElementById('finding-modal').classList.add('open');
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+async function loadEOLBanner(){
+  try {
+    var r = await authFetch('/api/v1/software-inventory/stats');
+    var d = await r.json();
+    var banner = document.getElementById('eol-banner');
+    if (!banner) return;
+    if (d && d.eol_total > 0) {
+      banner.style.display = '';
+      banner.innerHTML = '<span style="color:var(--amber)">⚠ ' + d.eol_total + ' EOL packages detected across ' + d.total_assets + ' assets</span> — <a href="#" style="color:var(--cyan)" onclick="window.parent.showPanel&&window.parent.showPanel('software_inventory')">View software inventory →</a>';
+    } else if (banner) {
+      banner.style.display = 'none';
+    }
+  } catch(e) {}
+}
+function updateBulkBar(){
+  var checked = document.querySelectorAll('.asset-chk:checked');
+  var bar = document.getElementById('bulk-bar');
+  var cnt = document.getElementById('bulk-count');
+  if (bar) bar.style.display = checked.length > 0 ? 'flex' : 'none';
+  if (cnt) cnt.textContent = checked.length + ' selected';
+}
+function clearAssetSelection(){
+  document.querySelectorAll('.asset-chk:checked').forEach(function(c){c.checked=false;});
+  updateBulkBar();
+}
+async function bulkDeleteAssets(){
+  var ids = Array.from(document.querySelectorAll('.asset-chk:checked')).map(function(c){return c.dataset.id;});
+  if (!ids.length) return;
+  if (!confirm('Delete ' + ids.length + ' asset(s)?')) return;
+  var ok = 0;
+  for (var i=0; i<ids.length; i++){
+    var r = await fetch(API+'/api/v1/assets/'+ids[i], {method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}});
+    if (r.ok) ok++;
+  }
+  alert('Deleted ' + ok + '/' + ids.length + ' assets');
+  loadAssets();
+}
+document.addEventListener('change', function(e){
+  if (e.target && e.target.classList.contains('asset-chk')) updateBulkBar();
+});
 async function loadAssets(){
   var hasUX = typeof VSPUXState !== 'undefined';
   if(!TOKEN){
@@ -417,6 +458,7 @@ async function loadAssets(){
     }
     ASSETS=d.assets.map(function(a){return Object.assign({},a,{tool:a.tool||'scanner',findings_count:a.total_findings||a.findings_count||0,risk_score:a.risk_score||Math.round((a.critical||0)*20+(a.high||0)*8+(a.medium||0)*3+(a.low||0)),status:a.critical>0?'critical':a.high>0?'high':a.medium>0?'medium':'clean'});});
     updateKPIs();renderHeatmap();renderAssets();
+  loadEOLBanner();
     /* FIXME(FEAT-34b): the next line causes self-recursion — kept for backward-compat, see followup commit */
     if(TOKEN){/* loadAssets(); */}else{var tb=document.getElementById('asset-tbody');if(tb)tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">Waiting for authentication…</td></tr>';}
     // Also load findings
@@ -990,6 +1032,6 @@ updateKPIs();renderHeatmap();renderAssets();
 <div id="inject-toast" style="display:none"></div>
 <script src="/static/inject_ux_v1.1.js"></script>
 <!-- VSP-SIEM-COMPANION -->
-<script src="/vsp_siem_companion.js"></script>
+
 </body>
 </html>

@@ -415,12 +415,12 @@
 
   async function loadControlsData() {
     // Wait for token if not ready yet (up to 3s)
-    if (!window.TOKEN && !window.VSP_P4_API_KEY) {
+    if (!window.TOKEN) {
       await new Promise(resolve => {
         let attempts = 0;
         const check = setInterval(() => {
           attempts++;
-          if (window.TOKEN || window.VSP_P4_API_KEY || attempts > 30) {
+          if (window.TOKEN || attempts > 30) {
             clearInterval(check); resolve();
           }
         }, 100);
@@ -432,9 +432,7 @@
       const apiBase = window.VSP_API_BASE || window.location.origin;
       // P4 page blocks localStorage — use window.TOKEN or API key directly
       const tok = window.TOKEN || '';
-      const p4key = window.VSP_P4_API_KEY || '';
-      const headers = tok ? {'Authorization': 'Bearer ' + tok}
-                    : p4key ? {'X-API-Key': p4key} : {};
+      const headers = tok ? {'Authorization': 'Bearer ' + tok} : {};
       const res = await fetch(apiBase + '/api/p4/pipeline/latest', { headers });
       if (res.ok) {
         const d = await res.json();
