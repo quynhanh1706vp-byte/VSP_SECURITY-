@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -139,4 +141,40 @@ func (h *APIKeys) Delete(w http.ResponseWriter, r *http.Request) {
 		_, _, _ = h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: tenantID, UserID: &userID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: remoteIP, PrevHash: prevHash})
 	}()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/v1/admin/api-keys/{id}
+func (h *APIKeys) Update(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok { jsonError(w, "unauthorized", http.StatusUnauthorized); return }
+	id := chi.URLParam(r, "id")
+	var req struct {
+		Label      string `json:"label"`
+		Role       string `json:"role"`
+		ExpiryDays int    `json:"expiry_days"`
+	}
+	if !decodeJSON(w, r, &req) { return }
+	sets := []string{}
+	args := []any{}
+	i := 1
+	if req.Label != "" {
+		sets = append(sets, fmt.Sprintf("label=$%d", i))
+		args = append(args, req.Label); i++
+	}
+	if req.Role != "" {
+		sets = append(sets, fmt.Sprintf("role=$%d", i))
+		args = append(args, req.Role); i++
+	}
+	if req.ExpiryDays > 0 {
+		sets = append(sets, fmt.Sprintf("expires_at=NOW()+($%d::int * interval '1 day')", i))
+		args = append(args, req.ExpiryDays); i++
+	}
+	if len(sets) == 0 { jsonError(w, "nothing to update", http.StatusBadRequest); return }
+	// updated_at column does not exist in api_keys table
+	args = append(args, claims.TenantID, id)
+	q := fmt.Sprintf("UPDATE api_keys SET %s WHERE tenant_id=$%d AND id=$%d",
+		strings.Join(sets, ","), i, i+1)
+	_, err := h.DB.Pool().Exec(r.Context(), q, args...)
+	if err != nil { jsonError(w, "update failed: "+err.Error(), http.StatusInternalServerError); return }
+	jsonOK(w, map[string]string{"id": id, "status": "updated"})
 }

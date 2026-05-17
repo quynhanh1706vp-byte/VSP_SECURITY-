@@ -24,6 +24,7 @@ package auth
 
 import (
 	"context"
+	"net"
 	"strings"
 	"time"
 
@@ -152,12 +153,14 @@ func (d *AnomalyDetector) revokeUser(ctx context.Context, userID, reason string)
 		Msg("anomaly_revoke: all sessions revoked")
 }
 
-// normalizeIP strips ports and IPv6 brackets so set-membership works.
+// normalizeIP strips ports from host:port strings so set-membership works.
+// Uses net.SplitHostPort to handle IPv4, IPv6, and bracketed IPv6 correctly.
 func normalizeIP(s string) string {
 	s = strings.TrimSpace(s)
-	if i := strings.LastIndexByte(s, ':'); i >= 0 && !strings.Contains(s, "::") {
-		s = s[:i]
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		return host
 	}
+	// Already a bare IP (no port) — strip any stray brackets.
 	s = strings.TrimPrefix(s, "[")
 	s = strings.TrimSuffix(s, "]")
 	return s

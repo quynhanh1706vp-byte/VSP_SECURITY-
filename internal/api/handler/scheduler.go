@@ -125,18 +125,34 @@ func (h *Scheduler) DriftEvents(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/schedules/{id}/run-now  — manual trigger
 func (h *Scheduler) RunNow(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	scheds := h.Engine.ListSchedules(r.Context())
 	id := chi.URLParam(r, "id")
-	for _, s := range scheds {
+	// Try in-memory cache first, fallback to DB
+	var found *store.StoreSchedule
+	scheds := h.Engine.ListSchedules(r.Context())
+	for i, s := range scheds {
 		if s.ID == id && s.TenantID == claims.TenantID {
-			// Trigger immediately
-			h.Engine.TriggerNow(r.Context(), s)
-			logAudit(r, h.DB, "SCHEDULE_RUN_NOW", "scan_schedules/run_now")
-			jsonOK(w, map[string]string{"status": "triggered", "schedule": s.Name})
-			return
+			found = &scheds[i]
+			break
 		}
 	}
-	jsonError(w, "schedule not found", http.StatusNotFound)
+	if found == nil {
+		all, err := h.DB.ListStoreSchedules(r.Context(), claims.TenantID)
+		if err == nil {
+			for i, s := range all {
+				if s.ID == id {
+					found = &all[i]
+					break
+				}
+			}
+		}
+	}
+	if found == nil {
+		jsonError(w, "schedule not found", http.StatusNotFound)
+		return
+	}
+	h.Engine.TriggerNow(r.Context(), *found)
+	logAudit(r, h.DB, "SCHEDULE_RUN_NOW", "scan_schedules/run_now")
+	jsonOK(w, map[string]string{"status": "triggered", "schedule": found.Name})
 }
 
 // PATCH /api/v1/schedules/{id} — update schedule fields
@@ -168,6 +184,16 @@ func (h *Scheduler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAudit(r, h.DB, "SCHEDULE_UPDATED", "scan_schedules/update")
+	// Return updated object from DB
+	all, err2 := h.DB.ListStoreSchedules(r.Context(), claims.TenantID)
+	if err2 == nil {
+		for _, s := range all {
+			if s.ID == id {
+				jsonOK(w, s)
+				return
+			}
+		}
+	}
 	jsonOK(w, map[string]string{"id": id, "status": "updated"})
 }
 
@@ -175,16 +201,33 @@ func (h *Scheduler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *Scheduler) Toggle(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	id := chi.URLParam(r, "id")
+	// Try in-memory cache first, fallback to DB
+	var found *store.StoreSchedule
 	scheds := h.Engine.ListSchedules(r.Context())
-	for _, s := range scheds {
+	for i, s := range scheds {
 		if s.ID == id && s.TenantID == claims.TenantID {
-			s.Enabled = !s.Enabled
-			h.DB.UpdateScheduleEnabled(r.Context(), claims.TenantID, id, s.Enabled) //nolint
-			// engine reloads on next tick
-			logAudit(r, h.DB, "SCHEDULE_TOGGLED", "scan_schedules/toggle")
-			jsonOK(w, map[string]any{"id": id, "enabled": s.Enabled})
-			return
+			found = &scheds[i]
+			break
 		}
 	}
-	jsonError(w, "schedule not found", http.StatusNotFound)
+	if found == nil {
+		// Fallback: load from DB (new schedules not yet in memory)
+		all, err := h.DB.ListStoreSchedules(r.Context(), claims.TenantID)
+		if err == nil {
+			for i, s := range all {
+				if s.ID == id {
+					found = &all[i]
+					break
+				}
+			}
+		}
+	}
+	if found == nil {
+		jsonError(w, "schedule not found", http.StatusNotFound)
+		return
+	}
+	newEnabled := !found.Enabled
+	h.DB.UpdateScheduleEnabled(r.Context(), claims.TenantID, id, newEnabled) //nolint
+	logAudit(r, h.DB, "SCHEDULE_TOGGLED", "scan_schedules/toggle")
+	jsonOK(w, map[string]any{"id": id, "enabled": newEnabled})
 }

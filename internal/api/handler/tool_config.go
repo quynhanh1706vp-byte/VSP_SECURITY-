@@ -89,19 +89,28 @@ func (h *ToolConfig) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Build response: every known tool + status (default enabled if no row)
 	all := allKnownTools()
+	// Default timeouts per tool category
+	defaultTimeouts := map[string]int{
+		"sast": 300, "sca": 180, "secrets": 120, "iac": 180,
+		"dast": 600, "network": 300, "container": 240, "misc": 120,
+	}
 	type item struct {
-		Name      string `json:"name"`
-		Category  string `json:"category"`
-		Enabled   bool   `json:"enabled"`
-		Default   bool   `json:"default"` // true = no explicit row, using default-on
-		UpdatedAt string `json:"updated_at,omitempty"`
-		UpdatedBy string `json:"updated_by,omitempty"`
+		Name       string `json:"name"`
+		Category   string `json:"category"`
+		Enabled    bool   `json:"enabled"`
+		Default    bool   `json:"default"`
+		TimeoutSec int    `json:"timeout_sec"`
+		UpdatedAt  string `json:"updated_at,omitempty"`
+		UpdatedBy  string `json:"updated_by,omitempty"`
 	}
 	tools := make([]item, 0, len(all))
 	enabledCount, disabledCount := 0, 0
 
 	for _, name := range all {
-		it := item{Name: name, Category: toolCategory(name), Enabled: true, Default: true}
+		cat := toolCategory(name)
+		defTimeout := defaultTimeouts[cat]
+		if defTimeout == 0 { defTimeout = 180 }
+		it := item{Name: name, Category: cat, Enabled: true, Default: true, TimeoutSec: defTimeout}
 		if c, exists := overrides[name]; exists {
 			it.Enabled = c.Enabled
 			it.Default = false

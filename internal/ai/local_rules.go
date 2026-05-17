@@ -60,6 +60,30 @@ func matchTemplate(controlID, findingSummary string) localTemplate {
 	if strings.HasPrefix(id, "RA-") {
 		return tmplRiskAssessment(id)
 	}
+	// System & Communications
+	if strings.HasPrefix(id, "SC-") || strings.Contains(finding, "encrypt") || strings.Contains(finding, "tls") || strings.Contains(finding, "ssl") || strings.Contains(finding, "certificate") || strings.Contains(finding, "https") || strings.Contains(finding, "network") {
+		return tmplSystemComms(id)
+	}
+	// Incident Response
+	if strings.HasPrefix(id, "IR-") || strings.Contains(finding, "incident") || strings.Contains(finding, "breach") {
+		return tmplIncidentResponse(id)
+	}
+	// Contingency Planning
+	if strings.HasPrefix(id, "CP-") || strings.Contains(finding, "backup") || strings.Contains(finding, "recovery") {
+		return tmplContingency(id)
+	}
+	// Physical
+	if strings.HasPrefix(id, "PE-") || strings.Contains(finding, "physical") || strings.Contains(finding, "media") {
+		return tmplPhysical(id)
+	}
+	// Supply Chain
+	if strings.HasPrefix(id, "SR-") || strings.HasPrefix(id, "SA-") || strings.Contains(finding, "supply chain") || strings.Contains(finding, "dependency") {
+		return tmplSupplyChain(id)
+	}
+	// Secrets
+	if strings.Contains(finding, "secret") || strings.Contains(finding, "api key") || strings.Contains(finding, "token") || strings.Contains(finding, "credential") {
+		return tmplSecrets(id)
+	}
 	// SBV-specific
 	if strings.Contains(id, "TT09") || strings.Contains(id, "SBV") {
 		return tmplSBV(id)
@@ -200,5 +224,102 @@ func tmplGeneric(id string) localTemplate {
 		Evidence:   "Finding remediation tracked in ticket <TICKET_ID>. Code/config change in commit <HASH>. Re-scan evidence: run <RUN_ID> shows gate passing.",
 		References: []string{id},
 		RiskAccept: "If remediation cannot be completed within policy timeline, document an interim compensating control and a target completion date approved by the system owner.",
+	}
+}
+
+func tmplSystemComms(id string) localTemplate {
+	return localTemplate{
+		Remediation: `### System & communications protection
+
+1. **Enable TLS 1.2+ everywhere** — audit all service-to-service and client-to-server connections.
+2. **Enforce network segmentation** — separate production, staging, and development VPCs/VLANs.
+3. **Deploy WAF rules** for public-facing endpoints; block OWASP Top 10 patterns.
+4. **Encrypt data at rest** — verify all S3 buckets, RDS instances, and volumes use AES-256.
+5. **Certificate rotation** — automate via Let's Encrypt or internal PKI; alert 30 days before expiry.`,
+		Effort:     EffortHours{Junior: 16, Mid: 8, Senior: 4},
+		Evidence:   "TLS audit completed <DATE>. WAF rules deployed in <ENV>. Encryption-at-rest verified in scan run <RUN_ID>.",
+		References: []string{id, "SC-8", "SC-13", "SC-28", "ISO 27001 A.8.24"},
+		RiskAccept: "Any unencrypted channel must be documented with a compensating control (e.g., VPN tunnel) and remediated within 30 days.",
+	}
+}
+
+func tmplIncidentResponse(id string) localTemplate {
+	return localTemplate{
+		Remediation: `### Incident response remediation
+
+1. **Activate IR plan** — notify the incident commander and open an IR ticket.
+2. **Contain the incident** — isolate affected systems, revoke compromised credentials.
+3. **Collect forensic evidence** — preserve logs, memory dumps, and network captures (chain of custody).
+4. **Eradicate the threat** — patch the vector, remove malware, rotate all secrets.
+5. **Document lessons learned** — complete post-incident report within 5 business days.
+6. **CIRCIA reporting** — if substantial, notify CISA within 72 hours; ransomware within 24 hours.`,
+		Effort:     EffortHours{Junior: 24, Mid: 12, Senior: 6},
+		Evidence:   "IR ticket <INC_ID> opened at <TIMESTAMP>. Containment completed at <TIMESTAMP>. Post-incident report at <LINK>.",
+		References: []string{id, "IR-4", "IR-6", "IR-8", "ISO 27001 A.5.26"},
+		RiskAccept: "If containment cannot be achieved within 4 hours, escalate to CISO and consider emergency change-control for system shutdown.",
+	}
+}
+
+func tmplContingency(id string) localTemplate {
+	return localTemplate{
+		Remediation: `### Contingency planning remediation
+
+1. **Test backup restoration** — run a full restore drill in a non-production environment quarterly.
+2. **Verify RTO/RPO targets** — ensure recovery time and point objectives are documented and tested.
+3. **Update BCP/DRP** — review and sign off the Business Continuity Plan annually.
+4. **Automate failover** — configure auto-scaling and multi-AZ deployments for critical services.
+5. **Tabletop exercise** — conduct annual scenario-based DR exercise with all stakeholders.`,
+		Effort:     EffortHours{Junior: 16, Mid: 8, Senior: 4},
+		Evidence:   "Backup restore drill completed <DATE>. RTO achieved: <N> hours (target: <TARGET>). BCP signed off by <NAME> on <DATE>.",
+		References: []string{id, "CP-4", "CP-9", "CP-10", "ISO 27001 A.8.13"},
+		RiskAccept: "Any RTO/RPO gap must be documented with an interim manual failover procedure and a remediation timeline approved by the system owner.",
+	}
+}
+
+func tmplSecrets(id string) localTemplate {
+	return localTemplate{
+		Remediation: `### Secrets management remediation
+
+1. **Revoke the exposed secret immediately** — rotate API keys, tokens, and passwords now.
+2. **Scan git history** — run ` + "`vsp scan --mode SECRETS`" + ` across all branches; purge secrets from history with git-filter-repo.
+3. **Move to secrets manager** — store all credentials in HashiCorp Vault, AWS Secrets Manager, or equivalent.
+4. **Enable pre-commit hooks** — deploy gitleaks or trufflehog as a pre-commit gate.
+5. **Audit access logs** — check if the secret was used by unauthorized parties.`,
+		Effort:     EffortHours{Junior: 4, Mid: 2, Senior: 1},
+		Evidence:   "Secret rotated at <TIMESTAMP>. Git history cleaned in commit <HASH>. Secrets manager migration completed for <N> credentials.",
+		References: []string{id, "IA-5", "SC-12", "ISO 27001 A.8.24"},
+		RiskAccept: "If rotation cannot be immediate, restrict the secret's scope to minimum required permissions and monitor for anomalous usage.",
+	}
+}
+
+func tmplSupplyChain(id string) localTemplate {
+	return localTemplate{
+		Remediation: `### Supply chain security remediation
+
+1. **Generate SBOM** — run ` + "`vsp scan --mode SCA`" + ` to produce a CycloneDX 1.5 SBOM for all components.
+2. **Pin dependency versions** — lock all transitive dependencies; enable Dependabot/Renovate auto-PRs.
+3. **Verify artifact signatures** — use cosign to verify all container images before deployment.
+4. **Audit third-party packages** — review licenses and known vulnerabilities via OSV Scanner.
+5. **Establish vendor SLAs** — require SOC 2 Type II or equivalent from critical suppliers.`,
+		Effort:     EffortHours{Junior: 12, Mid: 6, Senior: 3},
+		Evidence:   "SBOM generated for run <RUN_ID>. All images verified with cosign at <DATE>. Vendor assessments completed for <N> suppliers.",
+		References: []string{id, "SR-3", "SR-4", "SA-12", "ISO 27001 A.5.19"},
+		RiskAccept: "Unverified third-party components must be isolated in a sandbox environment until verification is complete.",
+	}
+}
+
+func tmplPhysical(id string) localTemplate {
+	return localTemplate{
+		Remediation: `### Physical & environmental security
+
+1. **Audit physical access logs** — review badge entry records for the past 90 days.
+2. **Enable CCTV coverage** — ensure all server rooms and data center entry points are monitored.
+3. **Implement clean-desk policy** — no sensitive data left unattended; enforce screen lock after 5 minutes.
+4. **Secure media disposal** — use NIST 800-88 compliant wiping or physical destruction.
+5. **Environmental controls** — verify UPS, fire suppression, and temperature monitoring are operational.`,
+		Effort:     EffortHours{Junior: 8, Mid: 4, Senior: 2},
+		Evidence:   "Physical access audit completed <DATE>. CCTV coverage verified at <LOCATION>. Media disposal log at <LINK>.",
+		References: []string{id, "PE-2", "PE-6", "PE-17", "ISO 27001 A.7.1"},
+		RiskAccept: "Any physical security gap must be escalated to the facilities team with a remediation timeline not exceeding 30 days.",
 	}
 }

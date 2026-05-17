@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -167,14 +169,18 @@ func (h *OSCALModels) AssessmentResults(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// Top findings (highest CVSS, capped at 100 for performance)
+	// Findings for AR — all CRITICAL/HIGH first, then others up to 500.
+	// FedRAMP AR must include all critical/high findings; soft cap at 500 total.
 	topRows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT id, tool, severity, COALESCE(rule_id,'') AS rule_id,
 		        COALESCE(message,'') AS message, COALESCE(path,'') AS path,
 		        COALESCE(cwe,'') AS cwe, COALESCE(cvss,0) AS cvss
 		 FROM findings WHERE tenant_id=$1
-		 ORDER BY cvss DESC NULLS LAST, severity DESC
-		 LIMIT 100`, tenant)
+		 ORDER BY
+		   CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1
+		                 WHEN 'MEDIUM' THEN 2 ELSE 3 END,
+		   cvss DESC NULLS LAST
+		 LIMIT 500`, tenant)
 	if err != nil {
 		jsonInternalError(w, r, "top findings query", err)
 		return
@@ -244,7 +250,7 @@ func (h *OSCALModels) AssessmentResults(w http.ResponseWriter, r *http.Request) 
 							{"include-all": map[string]interface{}{}},
 						},
 					},
-					"findings":        oscal2TruncateFindings(findings, 50),
+					"findings":        findings,
 					"finding-summary": riskSummary,
 					"local-definitions": map[string]interface{}{
 						"components": []map[string]interface{}{
@@ -271,15 +277,16 @@ func (h *OSCALModels) POAM(w http.ResponseWriter, r *http.Request) {
 	docUUID := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	// p4_poam_items uses TEXT tenant_id, not UUID — query both
+	// Strict tenant isolation — no cross-tenant OR fallbacks.
+	// FedRAMP requires each tenant's POA&M to be strictly scoped.
 	rows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT id, COALESCE(weakness_name,'') AS wn, COALESCE(control_id,'') AS cid,
 		        COALESCE(severity,'') AS sev, COALESCE(status,'open') AS st,
 		        COALESCE(mitigation_plan,'') AS mp, COALESCE(finding_id,'') AS fid,
 		        scheduled_completion, created_at
 		 FROM p4_poam_items
-		 WHERE tenant_id = $1 OR tenant_id = 'default' OR tenant_id IS NULL
-		 ORDER BY created_at DESC LIMIT 200`, tenant)
+		 WHERE tenant_id = $1
+		 ORDER BY created_at DESC LIMIT 500`, tenant)
 	if err != nil {
 		jsonInternalError(w, r, "poam query", err)
 		return
@@ -423,12 +430,26 @@ func oscal2FindingDesc(tool, cwe, path string) string {
 	return desc
 }
 
-// Save generated doc to oscal_documents table (best-effort cache)
-func oscal2SaveCache(db *store.DB, ctx context.Context, tenant string, modelType string, docUUID string, title string, doc map[string]interface{}) {
+// oscal2CacheUUID returns a deterministic UUID per (tenant, modelType) so
+// ON CONFLICT actually works and the cache stays to 1 row per tenant+type.
+// Format: sha256(tenant+":"+modelType) truncated to UUID v5 shape.
+func oscal2CacheUUID(tenant, modelType string) string {
+	h := sha256.Sum256([]byte(tenant + ":" + modelType))
+	b := h[:]
+	// Format as UUID: xxxxxxxx-xxxx-5xxx-yxxx-xxxxxxxxxxxx
+	return fmt.Sprintf("%08x-%04x-5%03x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// Save generated doc to oscal_documents table (best-effort cache).
+// Uses deterministic UUID per tenant+modelType so ON CONFLICT hits correctly.
+func oscal2SaveCache(db *store.DB, ctx context.Context, tenant string, modelType string, _ string, title string, doc map[string]interface{}) {
+	cacheUUID := oscal2CacheUUID(tenant, modelType)
 	docJSON, _ := json.Marshal(doc)
 	_, _ = db.Pool().Exec(ctx,
 		`INSERT INTO oscal_documents (tenant_id, model_type, document_uuid, title, version, oscal_version, document_json, generated_at)
 		 VALUES ($1::uuid, $2, $3, $4, '1.0', '1.1.2', $5::jsonb, NOW())
-		 ON CONFLICT (document_uuid) DO UPDATE SET document_json=EXCLUDED.document_json, generated_at=NOW()`,
-		tenant, modelType, docUUID, title, string(docJSON))
+		 ON CONFLICT (document_uuid) DO UPDATE
+		   SET document_json=EXCLUDED.document_json, generated_at=NOW(), title=EXCLUDED.title`,
+		tenant, modelType, cacheUUID, title, string(docJSON))
 }

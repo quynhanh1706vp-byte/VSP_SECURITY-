@@ -63,6 +63,18 @@ type PlaybookRun struct {
 	FinishedAt   *time.Time `json:"finished_at,omitempty"`
 }
 
+func (r PlaybookRun) MarshalJSON() ([]byte, error) {
+	type Alias PlaybookRun
+	return json.Marshal(&struct {
+		Alias
+		PlaybookNameAlias string `json:"playbook_name"`
+	}{
+		Alias:             (Alias)(r),
+		PlaybookNameAlias: r.PlaybookName,
+	})
+}
+
+
 type LogSource struct {
 	ID        string     `json:"id"`
 	TenantID  string     `json:"tenant_id"`

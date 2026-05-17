@@ -8,44 +8,44 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/sso"
+	"github.com/vsp/platform/internal/store"
 )
 
-// SSOOIDCHandler exposes the OIDC SSO REST + auth endpoints.
 type SSOOIDCHandler struct {
+	StoreDB   *store.DB
 	DB        *sql.DB
 	JWTSecret string
 	JWTTTL    time.Duration
 	IssueJWT  func(secret string, claims auth.Claims, ttl time.Duration) (string, error)
 }
 
-// NewSSOOIDCHandler constructs the handler. issueJWT comes from internal/auth.
 func NewSSOOIDCHandler(db *sql.DB, secret string, ttl time.Duration,
 	issueFn func(string, auth.Claims, time.Duration) (string, error)) *SSOOIDCHandler {
-	return &SSOOIDCHandler{
-		DB:        db,
-		JWTSecret: secret,
-		JWTTTL:    ttl,
-		IssueJWT:  issueFn,
-	}
+	return &SSOOIDCHandler{DB: db, JWTSecret: secret, JWTTTL: ttl, IssueJWT: issueFn}
 }
 
-// ─── Provider CRUD (admin only) ─────────────────────────────────────
+// providerRequest is used for POST/PUT/PATCH to allow client_secret input.
+// sso.Provider has ClientSecret json:"-" to prevent leaking in GET responses,
+// so we use this wrapper for write operations only.
+type providerRequest struct {
+	sso.Provider
+	ClientSecretInput string `json:"client_secret"`
+}
 
-// Providers: GET list, POST create.
-// Path: /api/v1/sso/providers
 func (h *SSOOIDCHandler) Providers(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := tenantStr(r)
 	if !ok {
 		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-
 	switch r.Method {
 	case http.MethodGet:
 		list, err := sso.ListProviders(r.Context(), h.DB, tenantID)
@@ -54,24 +54,22 @@ func (h *SSOOIDCHandler) Providers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON2(w, http.StatusOK, map[string]any{"providers": list, "count": len(list)})
-
 	case http.MethodPost:
-		var p sso.Provider
-		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		var req providerRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 			return
+		}
+		p := req.Provider
+		if req.ClientSecretInput != "" {
+			p.ClientSecret = req.ClientSecretInput
 		}
 		p.TenantID = tenantID
 		if p.Type == "" {
 			p.Type = "oidc"
 		}
-		// Reject template placeholders so we don't get the
-		// "discovery failed: YOUR-TENANT-ID 400" runtime error
-		// surfaced in the user's screenshot. The sso_admin.html
-		// dropdown pre-fills these strings as a hint; the user must
-		// replace them with the real org tenant id before saving.
-		if msg := validateProviderTemplate(p); msg != "" {
-			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": msg})
+		if msg := validateProvider(p); msg != "" {
+			writeJSON2(w, http.StatusUnprocessableEntity, map[string]string{"error": msg})
 			return
 		}
 		id, err := sso.CreateProvider(r.Context(), h.DB, p)
@@ -79,34 +77,25 @@ func (h *SSOOIDCHandler) Providers(w http.ResponseWriter, r *http.Request) {
 			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
+		h.auditSSO(r, "SSO_PROVIDER_CREATED", fmt.Sprintf("sso/providers/%d", id))
 		writeJSON2(w, http.StatusCreated, map[string]any{"id": id})
-
 	default:
 		w.Header().Set("Allow", "GET, POST")
 		writeJSON2(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 	}
 }
 
-// ProviderByID: PUT update, DELETE.
-// Path: /api/v1/sso/providers/{id}
 func (h *SSOOIDCHandler) ProviderByID(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := tenantStr(r)
 	if !ok {
 		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 5 {
-		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "bad path"})
-		return
-	}
-	id, err := strconv.ParseInt(parts[len(parts)-1], 10, 64)
+	id, err := parseIDParam(r)
 	if err != nil {
 		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
 		return
 	}
-
 	switch r.Method {
 	case http.MethodGet:
 		p, err := sso.GetProvider(r.Context(), h.DB, id)
@@ -120,15 +109,19 @@ func (h *SSOOIDCHandler) ProviderByID(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON2(w, http.StatusOK, p)
 	case http.MethodPut:
-		var p sso.Provider
-		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		var req providerRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 			return
 		}
+		p := req.Provider
+		if req.ClientSecretInput != "" {
+			p.ClientSecret = req.ClientSecretInput
+		}
 		p.ID = id
 		p.TenantID = tenantID
-		if msg := validateProviderTemplate(p); msg != "" {
-			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": msg})
+		if msg := validateProvider(p); msg != "" {
+			writeJSON2(w, http.StatusUnprocessableEntity, map[string]string{"error": msg})
 			return
 		}
 		if err := sso.UpdateProvider(r.Context(), h.DB, p); err != nil {
@@ -140,7 +133,35 @@ func (h *SSOOIDCHandler) ProviderByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON2(w, http.StatusOK, map[string]string{"status": "updated"})
-
+	case http.MethodPatch:
+		existing, err := sso.GetProvider(r.Context(), h.DB, id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				writeJSON2(w, http.StatusNotFound, map[string]string{"error": "not found"})
+				return
+			}
+			writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if existing.TenantID != tenantID {
+			writeJSON2(w, http.StatusNotFound, map[string]string{"error": "not found"})
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(existing); err != nil {
+			writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		existing.ID = id
+		existing.TenantID = tenantID
+		if msg := validateProvider(*existing); msg != "" {
+			writeJSON2(w, http.StatusUnprocessableEntity, map[string]string{"error": msg})
+			return
+		}
+		if err := sso.UpdateProvider(r.Context(), h.DB, *existing); err != nil {
+			writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON2(w, http.StatusOK, map[string]string{"status": "updated"})
 	case http.MethodDelete:
 		if err := sso.DeleteProvider(r.Context(), h.DB, id, tenantID); err != nil {
 			if err == sql.ErrNoRows {
@@ -150,25 +171,20 @@ func (h *SSOOIDCHandler) ProviderByID(w http.ResponseWriter, r *http.Request) {
 			writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
+		h.auditSSO(r, "SSO_PROVIDER_DELETED", fmt.Sprintf("sso/providers/%d", id))
 		writeJSON2(w, http.StatusOK, map[string]string{"status": "deleted"})
-
 	default:
-		w.Header().Set("Allow", "GET, PUT, DELETE")
+		w.Header().Set("Allow", "GET, PUT, PATCH, DELETE")
 		writeJSON2(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 	}
 }
 
-// ─── Login flow (no auth required) ──────────────────────────────────
-
-// Login: GET /api/v1/auth/sso/login?provider_id=N&redirect=/dashboard
-// Redirects to IdP authorize endpoint.
 func (h *SSOOIDCHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", "GET")
 		writeJSON2(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
-
 	pidStr := r.URL.Query().Get("provider_id")
 	if pidStr == "" {
 		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "provider_id required"})
@@ -179,7 +195,6 @@ func (h *SSOOIDCHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid provider_id"})
 		return
 	}
-
 	p, err := sso.GetProvider(r.Context(), h.DB, pid)
 	if err != nil {
 		writeJSON2(w, http.StatusNotFound, map[string]string{"error": "provider not found"})
@@ -189,214 +204,292 @@ func (h *SSOOIDCHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON2(w, http.StatusForbidden, map[string]string{"error": "provider disabled"})
 		return
 	}
-
+	if p.RedirectURI == "" {
+		writeJSON2(w, http.StatusUnprocessableEntity, map[string]string{
+			"error": "provider redirect_uri not configured — edit provider first",
+		})
+		return
+	}
+	if p.ClientID == "" || p.IssuerURL == "" {
+		writeJSON2(w, http.StatusUnprocessableEntity, map[string]string{
+			"error": "provider configuration incomplete",
+		})
+		return
+	}
 	disc, err := sso.FetchDiscovery(r.Context(), h.DB, p)
 	if err != nil {
 		writeJSON2(w, http.StatusBadGateway, map[string]string{"error": "discovery failed: " + err.Error()})
 		return
 	}
-
 	redirAfter := safeRedirectPath(r.URL.Query().Get("redirect"))
-
 	ls, err := sso.CreateLoginState(r.Context(), h.DB, p.ID, redirAfter)
 	if err != nil {
 		writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-
 	authzURL := sso.AuthorizeURL(disc, p, ls)
-	// #nosec G710 -- authzURL is built from the IdP discovery doc + our
-	// configured provider record (cfg.AuthURL / cfg.TokenURL), not from
-	// request data. The only request-tainted piece is the `state`
-	// parameter inside the query string, which is meant to be there.
-	// nosemgrep: go.lang.security.injection.open-redirect.open-redirect
+	// #nosec G710 nosemgrep: go.lang.security.injection.open-redirect.open-redirect
 	http.Redirect(w, r, authzURL, http.StatusFound)
 }
 
-// Callback: GET /api/v1/auth/sso/callback?code=...&state=...
-// Exchanges code → tokens → resolves user → issues VSP JWT.
 func (h *SSOOIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", "GET")
 		writeJSON2(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
-
 	q := r.URL.Query()
 	if errCode := q.Get("error"); errCode != "" {
-		desc := q.Get("error_description")
 		writeJSON2(w, http.StatusBadRequest, map[string]string{
-			"error":             errCode,
-			"error_description": desc,
+			"error": errCode, "error_description": q.Get("error_description"),
 		})
 		return
 	}
-
-	code := q.Get("code")
-	state := q.Get("state")
+	code, state := q.Get("code"), q.Get("state")
 	if code == "" || state == "" {
 		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "code and state required"})
 		return
 	}
-
 	ls, err := sso.ConsumeLoginState(r.Context(), h.DB, state)
 	if err != nil {
 		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-
 	p, err := sso.GetProvider(r.Context(), h.DB, ls.ProviderID)
 	if err != nil {
 		writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": "provider lookup failed"})
 		return
 	}
-
 	disc, err := sso.FetchDiscovery(r.Context(), h.DB, p)
 	if err != nil {
 		writeJSON2(w, http.StatusBadGateway, map[string]string{"error": "discovery: " + err.Error()})
 		return
 	}
-
 	tokens, err := sso.ExchangeCode(r.Context(), disc, p, ls, code)
 	if err != nil {
 		writeJSON2(w, http.StatusBadGateway, map[string]string{"error": "token exchange: " + err.Error()})
 		return
 	}
-
-	// Phase 5.2: Full JWKS-based ID token signature verification.
-	// Verifies RSA/ECDSA signature against provider's published keys,
-	// plus iss/aud/exp/nbf claims. Replaces unsafe parse-only path.
 	claims, err := sso.VerifyIDToken(r.Context(), tokens.IDToken, disc.JWKSURI, p.IssuerURL, p.ClientID)
 	if err != nil {
 		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "id_token verify: " + err.Error()})
 		return
 	}
-
-	// ValidateClaims still checks nonce (binds token to login request)
 	if err := sso.ValidateClaims(claims, p, ls.Nonce); err != nil {
 		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "id_token invalid: " + err.Error()})
 		return
 	}
-
-	// Domain restriction
 	if len(p.AllowedDomains) > 0 {
-		ok := false
+		allowed := false
+		emailLower := strings.ToLower(claims.Email)
 		for _, dom := range p.AllowedDomains {
-			if strings.HasSuffix(strings.ToLower(claims.Email), "@"+strings.ToLower(dom)) {
-				ok = true
+			if strings.HasSuffix(emailLower, "@"+strings.ToLower(dom)) {
+				allowed = true
 				break
 			}
 		}
-		if !ok {
+		if !allowed {
 			writeJSON2(w, http.StatusForbidden, map[string]string{"error": "email domain not allowed"})
 			return
 		}
 	}
-
-	// Resolve user — auto-provision if not exists
 	userID, role, err := h.resolveOrProvisionUser(r.Context(), p.TenantID, claims.Email, claims.Name, p.DefaultRole)
 	if err != nil {
 		writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": "user provision: " + err.Error()})
 		return
 	}
-
-	// Issue VSP JWT
-	jwtClaims := auth.Claims{
-		UserID:   userID,
-		TenantID: p.TenantID,
-		Role:     role,
-		Email:    claims.Email,
-	}
-	token, err := h.IssueJWT(h.JWTSecret, jwtClaims, h.JWTTTL)
+	token, err := h.IssueJWT(h.JWTSecret, auth.Claims{
+		UserID: userID, TenantID: p.TenantID, Role: role, Email: claims.Email,
+	}, h.JWTTTL)
 	if err != nil {
 		writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": "jwt issue: " + err.Error()})
 		return
 	}
-
-	// Set HttpOnly cookie + redirect
-	// #nosec G124 — Secure is set conditionally on TLS detection. HTTPS prod
-	// gets Secure=true; HTTP dev/k8s-internal gets Secure=false so the cookie
-	// actually round-trips. Unconditional Secure breaks bootstrapping behind
-	// non-TLS load balancers; the X-Forwarded-Proto check handles those.
+	// Audit SSO login — required for AnomalyDetector (scans LOGIN_SSO_OK)
+	// and compliance: NIST 800-53 AU-2, FedRAMP AC-17, SOC2 CC6.1.
+	h.auditSSO(r, "LOGIN_SSO_OK", "sso/provider/"+p.Name+"/user/"+claims.Email)
+	// #nosec G124
 	http.SetCookie(w, &http.Cookie{
-		Name:     "vsp_token",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
+		Name: "vsp_token", Value: token, Path: "/", HttpOnly: true,
 		Secure:   r.TLS != nil || strings.HasPrefix(r.Header.Get("X-Forwarded-Proto"), "https"),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(h.JWTTTL.Seconds()),
 	})
-
-	redirAfter := safeRedirectPath(ls.RedirectAfter)
-	// #nosec G710 -- redirAfter is sanitized by safeRedirectPath: must
-	// start with single "/", reject "//" / backslash. gosec's taint
-	// analysis can't see the sanitizer, but the value here is guaranteed
-	// to be a same-origin path or "/".
-	// nosemgrep: go.lang.security.injection.open-redirect.open-redirect
-	http.Redirect(w, r, redirAfter, http.StatusFound)
+	// #nosec G710 nosemgrep: go.lang.security.injection.open-redirect.open-redirect
+	http.Redirect(w, r, safeRedirectPath(ls.RedirectAfter), http.StatusFound)
 }
 
-// safeRedirectPath enforces same-origin redirects. A user-supplied
-// `?redirect=` could otherwise be `https://attacker.example/phish`
-// or `//attacker.example/phish` (protocol-relative, which browsers
-// follow off-origin). Anything not starting with a single `/` is
-// coerced to `/`. Empty string also maps to `/`.
-//
-// We don't try to allowlist protocols — the only safe answer for a
-// login post-redirect is an in-app path. If an attacker can put a
-// crafted absolute URL in the query and have it pass through, that's
-// a phishing oracle: the victim sees the legit login UI, then lands
-// on a clone after auth.
+func (h *SSOOIDCHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := tenantStr(r)
+	if !ok {
+		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	id, err := parseIDParam(r)
+	if err != nil {
+		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		return
+	}
+	p, err := sso.GetProvider(r.Context(), h.DB, id)
+	if err != nil || p.TenantID != tenantID {
+		writeJSON2(w, http.StatusNotFound, map[string]string{"error": "provider not found"})
+		return
+	}
+	start := time.Now()
+	_, discErr := sso.FetchDiscoveryFresh(r.Context(), h.DB, p)
+	latency := time.Since(start).Milliseconds()
+	if discErr != nil {
+		writeJSON2(w, http.StatusOK, map[string]any{
+			"ok": false, "latency_ms": latency,
+			"error": discErr.Error(), "issuer_url": p.IssuerURL,
+		})
+		return
+	}
+	writeJSON2(w, http.StatusOK, map[string]any{
+		"ok": true, "latency_ms": latency,
+		"issuer_url": p.IssuerURL, "provider": p.Name,
+	})
+}
+
+func (h *SSOOIDCHandler) ToggleProvider(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := tenantStr(r)
+	if !ok {
+		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	id, err := parseIDParam(r)
+	if err != nil {
+		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		return
+	}
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		return
+	}
+	if req.Enabled {
+		p, err := sso.GetProvider(r.Context(), h.DB, id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				writeJSON2(w, http.StatusNotFound, map[string]string{"error": "not found"})
+				return
+			}
+			writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if p.TenantID != tenantID {
+			writeJSON2(w, http.StatusNotFound, map[string]string{"error": "not found"})
+			return
+		}
+		if msg := validateProvider(*p); msg != "" {
+			writeJSON2(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "cannot enable: " + msg,
+			})
+			return
+		}
+	}
+	res, err := h.DB.ExecContext(r.Context(),
+		"UPDATE sso_providers SET enabled=$1, updated_at=now() WHERE id=$2 AND tenant_id=$3",
+		req.Enabled, id, tenantID)
+	if err != nil {
+		writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeJSON2(w, http.StatusNotFound, map[string]string{"error": "not found"})
+		return
+	}
+	writeJSON2(w, http.StatusOK, map[string]any{"id": id, "enabled": req.Enabled})
+}
+
 func safeRedirectPath(p string) string {
-	if p == "" {
+	if p == "" || p[0] != '/' {
 		return "/"
 	}
-	if len(p) < 1 || p[0] != '/' {
-		return "/"
-	}
-	// Reject protocol-relative `//evil.com/path` — browsers treat that
-	// as cross-origin.
 	if len(p) >= 2 && p[1] == '/' {
 		return "/"
 	}
-	// Reject backslash variants some browsers normalise to `/`.
 	if strings.Contains(p, `\`) {
 		return "/"
 	}
 	return p
 }
 
-// resolveOrProvisionUser finds the VSP user by email or auto-creates one.
-// Returns (user_id, role, error).
 func (h *SSOOIDCHandler) resolveOrProvisionUser(ctx context.Context,
 	tenantID, email, name, defaultRole string) (string, string, error) {
-
 	var userID, role string
-	err := h.DB.QueryRowContext(ctx, `
-		SELECT id::text, role FROM users
-		WHERE tenant_id = $1::uuid AND email = $2
-	`, tenantID, email).Scan(&userID, &role)
+	err := h.DB.QueryRowContext(ctx,
+		`SELECT id::text, role FROM users WHERE tenant_id = $1::uuid AND email = $2`,
+		tenantID, email).Scan(&userID, &role)
 	if err == nil {
 		return userID, role, nil
 	}
 	if err != sql.ErrNoRows {
 		return "", "", err
 	}
-
-	// Auto-provision with a random password hash (user logs in via SSO only)
+	if defaultRole == "" {
+		defaultRole = "analyst"
+	}
+	// Sentinel pw_hash "!" — convention from /etc/shadow for locked accounts.
+	// bcrypt hashes always start with "$2", so this can never match.
 	err = h.DB.QueryRowContext(ctx, `
 		INSERT INTO users (tenant_id, email, pw_hash, role)
-		VALUES ($1::uuid, $2, $3, $4)
+		VALUES ($1::uuid, $2, '!sso-only-account', $3)
+		ON CONFLICT (tenant_id, email) DO UPDATE SET role = EXCLUDED.role
 		RETURNING id::text, role
-	`, tenantID, email, "$2b$12$ssoonlyaccountsdonotloginbypassword", defaultRole).Scan(&userID, &role)
+	`, tenantID, email, defaultRole).Scan(&userID, &role)
 	if err != nil {
 		return "", "", fmt.Errorf("provision: %w", err)
 	}
 	return userID, role, nil
 }
 
-// ─── helpers ────────────────────────────────────────────────────────
+func validateProvider(p sso.Provider) string {
+	if p.Name == "" {
+		return "name is required"
+	}
+	if p.IssuerURL == "" {
+		return "issuer_url is required"
+	}
+	if p.ClientID == "" {
+		return "client_id is required"
+	}
+	if p.RedirectURI == "" {
+		return "redirect_uri is required"
+	}
+	if _, err := url.ParseRequestURI(p.IssuerURL); err != nil {
+		return "issuer_url must be a valid absolute URL"
+	}
+	if _, err := url.ParseRequestURI(p.RedirectURI); err != nil {
+		return "redirect_uri must be a valid absolute URL"
+	}
+	placeholders := []string{
+		"YOUR-TENANT-ID", "YOUR_TENANT_ID",
+		"YOUR-ORG", "YOUR_ORG",
+		"YOUR-REALM", "YOUR_REALM",
+		"YOUR-TENANT.auth0",
+		"example.com/oauth2/default",
+		"tenant.b2clogin.com",
+	}
+	for _, ph := range placeholders {
+		if strings.Contains(p.IssuerURL, ph) {
+			return "issuer_url still contains placeholder " + ph + " — fill in your real tenant/org id before saving"
+		}
+		if strings.Contains(p.ClientID, ph) {
+			return "client_id still contains placeholder " + ph
+		}
+		if strings.Contains(p.ClientSecret, ph) {
+			return "client_secret still contains placeholder " + ph
+		}
+	}
+	return ""
+}
+
+func parseIDParam(r *http.Request) (int64, error) {
+	return strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+}
 
 func tenantStr(r *http.Request) (string, bool) {
 	claims, ok := auth.FromContext(r.Context())
@@ -412,43 +505,61 @@ func writeJSON2(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
-// validateProviderTemplate rejects placeholder strings shipped by the
-// SSO Admin "+ Add provider" preset dropdown (static/panels/sso_admin.html
-// lines 201-209). Without this guard, a user accepts the Azure / Okta /
-// Keycloak / Auth0 template, hits Save, and the row lands in DB with
-// the literal "YOUR-TENANT-ID" / "YOUR-ORG.okta.com" / "YOUR-REALM"
-// inside the issuer_url. Any subsequent /auth/sso/login?provider_id=N
-// then fails the OIDC discovery fetch with 400 — exactly the error the
-// user surfaced ("discovery failed: ... YOUR-TENANT-ID/v2.0/.well-known/
-// openid-configuration returned 400").
-//
-// Returns "" when the provider is OK to persist; otherwise a
-// user-facing message describing which field still has a placeholder.
-func validateProviderTemplate(p sso.Provider) string {
-	if p.Name == "" {
-		return "name is required"
+// ─── audit support ───────────────────────────────────────────────────
+
+// SetAuditDB injects the store.DB needed for audit logging.
+// Call after NewSSOOIDCHandler, same pattern as AIAdvisorHandler.
+func (h *SSOOIDCHandler) SetAuditDB(db *store.DB) {
+	h.StoreDB = db
+}
+
+func (h *SSOOIDCHandler) auditSSO(r *http.Request, action, resource string) {
+	if h.StoreDB == nil {
+		return
 	}
-	if p.IssuerURL == "" {
-		return "issuer_url is required"
+	logAudit(r, h.StoreDB, action, resource)
+}
+
+// RotateSecret: PATCH /api/v1/sso/providers/{id}/rotate-secret
+// Rotates client_secret with 5-minute grace period for in-flight exchanges.
+// The old secret is kept in client_secret_prev during the grace window.
+func (h *SSOOIDCHandler) RotateSecret(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := tenantStr(r)
+	if !ok {
+		writeJSON2(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
 	}
-	if p.ClientID == "" {
-		return "client_id is required"
+	id, err := parseIDParam(r)
+	if err != nil {
+		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		return
 	}
-	tmplPatterns := []string{
-		"YOUR-TENANT-ID", "YOUR_TENANT_ID",
-		"YOUR-ORG", "YOUR_ORG",
-		"YOUR-REALM", "YOUR_REALM",
-		"YOUR-TENANT.auth0",
-		"example.com/oauth2/default",
+	var req struct {
+		NewSecret string `json:"new_secret"`
 	}
-	for _, t := range tmplPatterns {
-		if strings.Contains(p.IssuerURL, t) {
-			return "issuer_url still contains placeholder " + t +
-				" — fill in your real tenant/org id before saving"
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.NewSecret == "" {
+		writeJSON2(w, http.StatusBadRequest, map[string]string{"error": "new_secret required"})
+		return
+	}
+	if err := sso.RotateSecret(r.Context(), h.DB, id, tenantID, req.NewSecret); err != nil {
+		if err == sql.ErrNoRows {
+			writeJSON2(w, http.StatusNotFound, map[string]string{"error": "not found"})
+			return
 		}
-		if strings.Contains(p.ClientID, t) {
-			return "client_id still contains placeholder " + t
-		}
+		writeJSON2(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
 	}
-	return ""
+	// Audit — secret rotation is a security-sensitive event (SOC2 CC6.1).
+	h.auditSSO(r, "SSO_SECRET_ROTATED", fmt.Sprintf("sso/providers/%d", id))
+	// Schedule grace-period commit after 5 minutes.
+	go func() {
+		time.Sleep(5 * time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = sso.CommitRotation(ctx, h.DB, id, tenantID)
+	}()
+	writeJSON2(w, http.StatusOK, map[string]any{
+		"status":       "rotated",
+		"grace_period": "5m — old secret still valid during this window",
+	})
 }

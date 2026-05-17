@@ -128,8 +128,13 @@ func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]
 		        COALESCE(f.message,'') as title, COALESCE(f.severity,'') as severity,
 		        COALESCE(f.tool,'') as tool, COALESCE(f.rule_id,'') as rule_id
 		 FROM remediations r
-		 LEFT JOIN findings f ON f.id=r.finding_id
-		 WHERE `+where+` ORDER BY r.updated_at DESC LIMIT 200`,
+		 LEFT JOIN findings f ON f.id=r.finding_id AND f.tenant_id=r.tenant_id
+		 WHERE `+where+`
+		 ORDER BY
+		   CASE r.status WHEN 'in_progress' THEN 0 WHEN 'open' THEN 1 ELSE 2 END,
+		   CASE COALESCE(f.severity,'') WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'INFO' THEN 4 WHEN 'LOW' THEN 5 ELSE 6 END,
+		   r.updated_at DESC
+		 LIMIT 200`,
 		args...)
 	if err != nil {
 		return nil, err

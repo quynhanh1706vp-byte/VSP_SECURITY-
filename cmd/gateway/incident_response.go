@@ -101,12 +101,14 @@ func handleIRIncidentsList(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&incID, &title, &phase, &severity, &category, &status,
 			&isSub, &isRan, &ransomPaid, &detected, &closed, &assignedTo); err == nil {
 			list = append(list, map[string]any{
+				"id":             incID,
 				"incident_id":    incID,
 				"title":          title,
 				"phase":          phase,
 				"severity":       severity,
 				"category":       category.String,
 				"status":         status,
+				"created_at":     detected,
 				"is_substantial": isSub,
 				"is_ransomware":  isRan,
 				"ransom_paid":    ransomPaid,
@@ -126,7 +128,11 @@ func handleIRIncidentsList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if list == nil {
+		list = []map[string]any{}
+	}
 	_ = json.NewEncoder(w).Encode(map[string]any{
+		"total":     len(list),
 		"incidents": list,
 		"count":     len(list),
 		"stats": map[string]any{

@@ -3,9 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/auth"
@@ -33,10 +33,12 @@ func (h *CISAAttestation) KPIs(w http.ResponseWriter, r *http.Request) {
 	pool := h.DB.Pool()
 	out := attKPIs{}
 
-	_ = pool.QueryRow(ctx, `SELECT COUNT(*) FROM ssdf_practices`).Scan(&out.Total)
 	_ = pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM ssdf_practices WHERE status IN ('implemented','partial')`).
-		Scan(&out.Attestable)
+		`SELECT COUNT(*) FROM ssdf_practices WHERE tenant_id=$1`, claims.TenantID).
+		Scan(&out.Total)
+	_ = pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM ssdf_practices WHERE tenant_id=$1 AND status IN ('implemented','partial')`,
+		claims.TenantID).Scan(&out.Attestable)
 	if out.Total > 0 {
 		out.Pct = (out.Attestable * 100) / out.Total
 	}
@@ -73,15 +75,17 @@ func (h *CISAAttestation) Practices(w http.ResponseWriter, r *http.Request) {
 		groupFilter = g
 	}
 
+	claims2, _ := auth.FromContext(r.Context())
 	rows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT practice_id, group_code, name, COALESCE(description,''), status,
 		        COALESCE(evidence_refs,'[]'::jsonb), COALESCE(implementation_notes,''),
 		        COALESCE(responsible_role,''), COALESCE(last_assessed, NOW())
 		 FROM ssdf_practices
-		 WHERE ($1::text IS NULL OR status = $1)
-		   AND ($2::text IS NULL OR group_code = $2)
+		 WHERE tenant_id = $1
+		   AND ($2::text IS NULL OR status = $2)
+		   AND ($3::text IS NULL OR group_code = $3)
 		 ORDER BY group_code, practice_id`,
-		statusFilter, groupFilter)
+		claims2.TenantID, statusFilter, groupFilter)
 	if err != nil {
 		log.Warn().Err(err).Msg("attestation: practices query failed")
 		jsonError(w, "query failed", http.StatusInternalServerError)
@@ -138,9 +142,8 @@ func (h *CISAAttestation) UpdatePractice(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	id := strings.TrimPrefix(r.URL.Path, "/api/v1/cisa-attestation/practices/")
-	id = strings.TrimSuffix(id, "/")
-	if id == "" || strings.Contains(id, "/") {
+	id := chi.URLParam(r, "id")
+	if id == "" {
 		jsonError(w, "invalid practice_id", http.StatusBadRequest)
 		return
 	}
@@ -169,8 +172,8 @@ func (h *CISAAttestation) UpdatePractice(w http.ResponseWriter, r *http.Request)
 		     evidence_refs = COALESCE($3::jsonb, evidence_refs),
 		     updated_at = NOW(),
 		     last_assessed = NOW()
-		 WHERE practice_id=$4`,
-		req.Status, req.ImplementationNotes, req.EvidenceRefs, id)
+		 WHERE practice_id=$4 AND tenant_id=$5`,
+		req.Status, req.ImplementationNotes, req.EvidenceRefs, id, claims.TenantID)
 	if err != nil {
 		log.Warn().Err(err).Msg("attestation: practice update failed")
 		jsonError(w, "update failed", http.StatusInternalServerError)
@@ -258,9 +261,8 @@ func (h *CISAAttestation) Forms(w http.ResponseWriter, r *http.Request) {
 // ─── GET /api/v1/cisa-attestation/forms/{uuid} ─────────────────────────────
 func (h *CISAAttestation) FormDetail(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
-	uuidStr := strings.TrimPrefix(r.URL.Path, "/api/v1/cisa-attestation/forms/")
-	uuidStr = strings.TrimSuffix(uuidStr, "/")
-	if uuidStr == "" || strings.Contains(uuidStr, "/") {
+	uuidStr := chi.URLParam(r, "uuid")
+	if uuidStr == "" {
 		jsonError(w, "invalid form_uuid", http.StatusBadRequest)
 		return
 	}
@@ -326,7 +328,7 @@ func (h *CISAAttestation) GenerateDraft(w http.ResponseWriter, r *http.Request) 
 	// Auto-snapshot current SSDF practice statuses
 	rows, err := h.DB.Pool().Query(r.Context(),
 		`SELECT practice_id, status, COALESCE(implementation_notes,'')
-		 FROM ssdf_practices`)
+		 FROM ssdf_practices WHERE tenant_id=$1`, claims.TenantID)
 	if err != nil {
 		jsonError(w, "snapshot query failed", http.StatusInternalServerError)
 		return
@@ -382,10 +384,8 @@ func (h *CISAAttestation) SignForm(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1/cisa-attestation/forms/")
-	path = strings.TrimSuffix(path, "/sign")
-	uuidStr := strings.TrimSuffix(path, "/")
-	if uuidStr == "" || strings.Contains(uuidStr, "/") {
+	uuidStr := chi.URLParam(r, "uuid")
+	if uuidStr == "" {
 		jsonError(w, "invalid form_uuid", http.StatusBadRequest)
 		return
 	}
@@ -462,6 +462,79 @@ func (h *CISAAttestation) CurrentDraft(w http.ResponseWriter, r *http.Request) {
 		"producer_name":     producerName,
 		"ssdf_attestations": ssdf,
 	})
+}
+
+
+// ─── PATCH /api/v1/cisa-attestation/forms/{uuid} ──────────────────────────
+// Update draft form content (product name, version, notes).
+func (h *CISAAttestation) UpdateForm(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	uuidStr := chi.URLParam(r, "uuid")
+	if uuidStr == "" {
+		jsonError(w, "invalid form_uuid", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		ProductName    string `json:"product_name"`
+		ProductVersion string `json:"product_version"`
+		ProducerName   string `json:"producer_name"`
+		ProducerWeb    string `json:"producer_website"`
+		ProductDesc    string `json:"product_description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	tag, err := h.DB.Pool().Exec(r.Context(), `
+		UPDATE attestation_forms
+		SET product_name    = COALESCE(NULLIF($1,''), product_name),
+		    product_version = COALESCE(NULLIF($2,''), product_version),
+		    producer_name   = COALESCE(NULLIF($3,''), producer_name),
+		    producer_website= COALESCE(NULLIF($4,''), producer_website),
+		    product_description = COALESCE(NULLIF($5,''), product_description),
+		    updated_at = NOW()
+		WHERE form_uuid=$6 AND tenant_id=$7 AND status='draft'`,
+		req.ProductName, req.ProductVersion, req.ProducerName,
+		req.ProducerWeb, req.ProductDesc, uuidStr, claims.TenantID)
+	if err != nil {
+		jsonInternalError(w, r, "update failed", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonError(w, "form not found or already signed", http.StatusNotFound)
+		return
+	}
+	logAudit(r, h.DB, "ATTEST_FORM_UPDATED", "cisa_attestation/forms/"+uuidStr)
+	jsonOK(w, map[string]any{"form_uuid": uuidStr, "updated": true})
+}
+
+// ─── DELETE /api/v1/cisa-attestation/forms/{uuid} ──────────────────────────
+// Delete a draft form. Signed/submitted forms cannot be deleted.
+func (h *CISAAttestation) DeleteForm(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	uuidStr := chi.URLParam(r, "uuid")
+	tag, err := h.DB.Pool().Exec(r.Context(),
+		`DELETE FROM attestation_forms
+		 WHERE form_uuid=$1 AND tenant_id=$2 AND status='draft'`,
+		uuidStr, claims.TenantID)
+	if err != nil {
+		jsonInternalError(w, r, "delete failed", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonError(w, "form not found or already signed (cannot delete)", http.StatusNotFound)
+		return
+	}
+	logAudit(r, h.DB, "ATTEST_FORM_DELETED", "cisa_attestation/forms/"+uuidStr)
+	jsonOK(w, map[string]string{"status": "deleted", "form_uuid": uuidStr})
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────────

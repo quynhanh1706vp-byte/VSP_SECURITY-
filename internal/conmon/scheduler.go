@@ -94,6 +94,8 @@ func (s *Scheduler) tick(ctx context.Context) {
 	for _, sch := range due {
 		s.triggerOne(ctx, sch)
 	}
+	// Purge expired SSO login states — accumulate when users abandon login flow.
+	_, _ = s.DB.ExecContext(ctx, `DELETE FROM sso_login_states WHERE expires_at < now()`)
 }
 
 func (s *Scheduler) dueSchedules(ctx context.Context) ([]Schedule, error) {

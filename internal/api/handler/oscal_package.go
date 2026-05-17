@@ -6,12 +6,16 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"strconv"
+	"io"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/vsp/platform/internal/auth"
 	"github.com/vsp/platform/internal/store"
 )
 
@@ -29,7 +33,7 @@ type packageManifest struct {
 	TotalModels    int                    `json:"total_models"`
 	TotalSizeBytes int                    `json:"total_size_bytes"`
 	Models         []packageManifestEntry `json:"models"`
-	Signing        map[string]interface{} `json:"signing,omitempty"`
+	Integrity      map[string]interface{} `json:"integrity,omitempty"`
 }
 
 type packageManifestEntry struct {
@@ -72,11 +76,16 @@ func (h *OSCALPackage) BuildPackage(w http.ResponseWriter, r *http.Request) {
 
 	totalSize := 0
 	authHeader := r.Header.Get("Authorization")
+	// Build base URL from incoming request — avoids hardcoding port 8921.
+	baseURL := "http://" + r.Host
+	if r.Host == "" {
+		baseURL = "http://127.0.0.1:8921"
+	}
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	for _, m := range models {
 		req, err := http.NewRequestWithContext(r.Context(), "GET",
-			"http://127.0.0.1:8921"+m.Endpoint, nil)
+			baseURL+m.Endpoint, nil)
 		if err != nil {
 			continue
 		}
@@ -91,10 +100,11 @@ func (h *OSCALPackage) BuildPackage(w http.ResponseWriter, r *http.Request) {
 			resp.Body.Close()
 			continue
 		}
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(resp.Body)
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 		resp.Body.Close()
-		body := buf.Bytes()
+		if err != nil {
+			continue
+		}
 
 		hash := sha256.Sum256(body)
 		fp := "sha256:" + hex.EncodeToString(hash[:])
@@ -128,7 +138,7 @@ func (h *OSCALPackage) BuildPackage(w http.ResponseWriter, r *http.Request) {
 	}
 	manifest.TotalModels = len(manifest.Models)
 
-	manifest.Signing = h.signManifest(r.Context(), manifest)
+	manifest.Integrity = h.integrityCheck(r.Context(), manifest)
 
 	manifestBytes, _ := json.MarshalIndent(manifest, "", "  ")
 	if mf, err := zw.Create("manifest.json"); err == nil {
@@ -178,7 +188,10 @@ Total size: %d bytes (%.1f KB)
 	w.Write(zipBuf.Bytes())
 }
 
-func (h *OSCALPackage) signManifest(ctx context.Context, m packageManifest) map[string]interface{} {
+// integrityCheck computes a SHA-256 integrity fingerprint over all model fingerprints.
+// NOTE: This is an integrity check, NOT a cryptographic signature.
+// Field is named "integrity" to avoid misleading FedRAMP reviewers.
+func (h *OSCALPackage) integrityCheck(ctx context.Context, m packageManifest) map[string]interface{} {
 	concat := ""
 	for _, e := range m.Models {
 		concat += e.Fingerprint
@@ -201,9 +214,163 @@ func (h *OSCALPackage) signManifest(ctx context.Context, m packageManifest) map[
 
 	return map[string]interface{}{
 		"manifest_fingerprint": manifestFP,
-		"signed_by":            keyID,
-		"algorithm":            algo,
-		"signed_at":            time.Now().UTC().Format(time.RFC3339),
-		"note":                 "Manifest fingerprint computed from concatenated model SHA-256s",
+		"computed_by":          keyID,
+		"algorithm":            "SHA-256-concat",
+		"computed_at":          time.Now().UTC().Format(time.RFC3339),
+		"note":                 "SHA-256 of concatenated model fingerprints — integrity check only, not a cryptographic signature",
 	}
+}
+
+// ─── OSCAL Document Store endpoints ──────────────────────────────────────────
+
+// ListDocuments: GET /api/v1/oscal/documents?type=ssp&limit=20
+// Returns cached OSCAL documents for the tenant.
+func (h *OSCALPackage) ListDocuments(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		writeOSCALJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	modelType := r.URL.Query().Get("type")
+	limitStr := r.URL.Query().Get("limit")
+	limit := 20
+	if limitStr != "" {
+		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+
+	query := `
+		SELECT document_uuid, model_type, title, version, oscal_version,
+		       generated_at, published, COALESCE(generated_by,'')
+		FROM oscal_documents
+		WHERE tenant_id = $1`
+	args := []any{claims.TenantID}
+
+	if modelType != "" {
+		query += " AND model_type = $2 ORDER BY generated_at DESC LIMIT $3"
+		args = append(args, modelType, limit)
+	} else {
+		query += " ORDER BY generated_at DESC LIMIT $2"
+		args = append(args, limit)
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(), query, args...)
+	if err != nil {
+		writeOSCALJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type docMeta struct {
+		UUID        string    `json:"uuid"`
+		ModelType   string    `json:"model_type"`
+		Title       string    `json:"title"`
+		Version     string    `json:"version"`
+		OSCALVersion string   `json:"oscal_version"`
+		GeneratedAt time.Time `json:"generated_at"`
+		Published   bool      `json:"published"`
+		GeneratedBy string    `json:"generated_by,omitempty"`
+	}
+	var docs []docMeta
+	for rows.Next() {
+		var d docMeta
+		if err := rows.Scan(&d.UUID, &d.ModelType, &d.Title, &d.Version,
+			&d.OSCALVersion, &d.GeneratedAt, &d.Published, &d.GeneratedBy); err == nil {
+			docs = append(docs, d)
+		}
+	}
+	if docs == nil {
+		docs = []docMeta{}
+	}
+	writeOSCALJSON(w, http.StatusOK, map[string]any{"documents": docs, "count": len(docs)})
+}
+
+// GetDocument: GET /api/v1/oscal/documents/{uuid}
+// Returns the full OSCAL document JSON.
+func (h *OSCALPackage) GetDocument(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		writeOSCALJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	docUUID := chi.URLParam(r, "uuid")
+	if docUUID == "" {
+		writeOSCALJSON(w, http.StatusBadRequest, map[string]string{"error": "uuid required"})
+		return
+	}
+
+	var docJSON []byte
+	var modelType, title string
+	err := h.DB.Pool().QueryRow(r.Context(), `
+		SELECT document_json, model_type, title
+		FROM oscal_documents
+		WHERE document_uuid = $1 AND tenant_id = $2
+	`, docUUID, claims.TenantID).Scan(&docJSON, &modelType, &title)
+	if err != nil {
+		writeOSCALJSON(w, http.StatusNotFound, map[string]string{"error": "document not found"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-OSCAL-Model-Type", modelType)
+	w.Header().Set("X-OSCAL-Title", title)
+	w.WriteHeader(http.StatusOK)
+	w.Write(docJSON)
+}
+
+// PublishDocument: PATCH /api/v1/oscal/documents/{uuid}/publish
+// Marks a document as published (ready for FedRAMP submission).
+func (h *OSCALPackage) PublishDocument(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		writeOSCALJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	docUUID := chi.URLParam(r, "uuid")
+	res, err := h.DB.Pool().Exec(r.Context(), `
+		UPDATE oscal_documents SET published = true, generated_by = $1
+		WHERE document_uuid = $2 AND tenant_id = $3
+	`, claims.Email, docUUID, claims.TenantID)
+	if err != nil {
+		writeOSCALJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if res.RowsAffected() == 0 {
+		writeOSCALJSON(w, http.StatusNotFound, map[string]string{"error": "document not found"})
+		return
+	}
+	writeOSCALJSON(w, http.StatusOK, map[string]any{"uuid": docUUID, "published": true})
+}
+
+// DeleteDocument: DELETE /api/v1/oscal/documents/{uuid}
+// Removes a cached document (does not affect live data).
+func (h *OSCALPackage) DeleteDocument(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		writeOSCALJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	docUUID := chi.URLParam(r, "uuid")
+	res, err := h.DB.Pool().Exec(r.Context(), `
+		DELETE FROM oscal_documents
+		WHERE document_uuid = $1 AND tenant_id = $2 AND published = false
+	`, docUUID, claims.TenantID)
+	if err != nil {
+		writeOSCALJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if res.RowsAffected() == 0 {
+		writeOSCALJSON(w, http.StatusNotFound, map[string]string{
+			"error": "document not found or already published (cannot delete published documents)",
+		})
+		return
+	}
+	writeOSCALJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func writeOSCALJSON(w http.ResponseWriter, status int, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(body)
 }

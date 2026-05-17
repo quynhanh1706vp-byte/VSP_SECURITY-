@@ -307,7 +307,7 @@ func handleConMonReport(w http.ResponseWriter, r *http.Request) {
 
 	// Load data that từ DB
 	conmonScore := 94
-	fedrampPct, cmmcPct, nistPct := 91.67, 86.67, 75.0
+	fedrampPct, cmmcPct, nistPct := 0.0, 0.0, 0.0
 	controlsTotal, controlsPass, controlsFail := 52, 47, 0
 	highOpen, medOpen, lowOpen := 3, 0, 1
 	driftEvents := 0

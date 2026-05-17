@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -138,4 +140,133 @@ func queryInt(r *http.Request, key string, def int) int {
 		return n
 	}
 	return def
+}
+
+
+// PATCH /api/v1/admin/users/{id} — update role
+func (u *Users) UpdateRole(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		Role string `json:"role"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
+	if !validRoles[req.Role] {
+		jsonError(w, "invalid role", http.StatusBadRequest)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		jsonError(w, "id required", http.StatusBadRequest)
+		return
+	}
+	_, err := u.DB.Pool().Exec(r.Context(),
+		"UPDATE users SET role=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3",
+		req.Role, id, claims.TenantID)
+	if err != nil {
+		jsonError(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	logAudit(r, u.DB, "USER_ROLE_UPDATED", "users/"+id)
+	jsonOK(w, map[string]string{"id": id, "role": req.Role, "status": "updated"})
+}
+
+
+// POST /api/v1/admin/users/invite — generate temp password + return invite link
+func (u *Users) Invite(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+		Role  string `json:"role"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Email == "" {
+		jsonError(w, "email required", http.StatusBadRequest)
+		return
+	}
+	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
+	if req.Role == "" { req.Role = "analyst" }
+	if !validRoles[req.Role] {
+		jsonError(w, "invalid role", http.StatusBadRequest)
+		return
+	}
+	// Generate secure temp password
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	tempPass := fmt.Sprintf("VSP-%x-%x", b[:6], b[6:])
+	hash, err := bcrypt.GenerateFromPassword([]byte(tempPass), bcrypt.DefaultCost)
+	if err != nil {
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	_, err = u.DB.Pool().Exec(r.Context(),
+		`INSERT INTO users (tenant_id, email, pw_hash, role)
+		 VALUES ($1,$2,$3,$4)
+		 ON CONFLICT (tenant_id, email) DO NOTHING`,
+		claims.TenantID, req.Email, string(hash), req.Role)
+	if err != nil {
+		jsonError(w, "create failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	logAudit(r, u.DB, "USER_INVITED", "users/invite/"+req.Email)
+	jsonOK(w, map[string]any{
+		"email":     req.Email,
+		"role":      req.Role,
+		"temp_pass": tempPass,
+		"note":      "Share temp_pass securely. User should change on first login.",
+		"login_url": "/login",
+	})
+}
+
+// POST /api/v1/admin/users/bulk-role — bulk role change
+func (u *Users) BulkRole(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		IDs  []string `json:"ids"`
+		Role string   `json:"role"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if len(req.IDs) == 0 {
+		jsonError(w, "ids required", http.StatusBadRequest)
+		return
+	}
+	if len(req.IDs) > 50 {
+		jsonError(w, "max 50 users per bulk op", http.StatusBadRequest)
+		return
+	}
+	validRoles := map[string]bool{"admin": true, "analyst": true, "dev": true, "auditor": true}
+	if !validRoles[req.Role] {
+		jsonError(w, "invalid role", http.StatusBadRequest)
+		return
+	}
+	updated := 0
+	for _, id := range req.IDs {
+		ct, err := u.DB.Pool().Exec(r.Context(),
+			"UPDATE users SET role=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3",
+			req.Role, id, claims.TenantID)
+		if err == nil && ct.RowsAffected() > 0 { updated++ }
+	}
+	logAudit(r, u.DB, "USER_BULK_ROLE", fmt.Sprintf("%d users → %s", updated, req.Role))
+	jsonOK(w, map[string]any{"updated": updated, "role": req.Role})
 }

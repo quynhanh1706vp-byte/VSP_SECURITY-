@@ -314,6 +314,55 @@ func (h *SOAR) TogglePlaybook(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"id": id, "enabled": enabled})
 }
 
+
+// DELETE /api/v1/soar/playbooks/{id}
+func (h *SOAR) DeletePlaybook(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok { jsonError(w, "unauthorized", http.StatusUnauthorized); return }
+	id := chi.URLParam(r, "id")
+	_, err := h.DB.Pool().Exec(r.Context(),
+		"DELETE FROM playbooks WHERE id=$1 AND tenant_id=$2", id, claims.TenantID)
+	if err != nil { jsonError(w, "delete failed", http.StatusInternalServerError); return }
+	logAudit(r, h.DB, "PLAYBOOK_DELETED", "playbooks/"+id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/v1/soar/playbooks/{id}
+func (h *SOAR) UpdatePlaybook(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok { jsonError(w, "unauthorized", http.StatusUnauthorized); return }
+	id := chi.URLParam(r, "id")
+	var req struct {
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		Trigger     string          `json:"trigger"`
+		SevFilter   string          `json:"sev_filter"`
+		Steps       json.RawMessage `json:"steps"`
+		Enabled     *bool           `json:"enabled"`
+	}
+	if !decodeJSON(w, r, &req) { return }
+	_, err := h.DB.Pool().Exec(r.Context(),
+		`UPDATE playbooks SET
+		 name=COALESCE(NULLIF($3,''), name),
+		 description=COALESCE(NULLIF($4,''), description),
+		 trigger_event=COALESCE(NULLIF($5,''), trigger_event),
+		 sev_filter=COALESCE(NULLIF($6,''), sev_filter),
+		 steps=COALESCE($7::jsonb, steps),
+		 enabled=COALESCE($8, enabled),
+		 updated_at=NOW()
+		 WHERE id=$1 AND tenant_id=$2`,
+		id, claims.TenantID, req.Name, req.Description, req.Trigger,
+		req.SevFilter, nullJSON(req.Steps), req.Enabled)
+	if err != nil { jsonError(w, "update failed: "+err.Error(), http.StatusInternalServerError); return }
+	logAudit(r, h.DB, "PLAYBOOK_UPDATED", "playbooks/"+id)
+	jsonOK(w, map[string]string{"id": id, "status": "updated"})
+}
+
+func nullJSON(b json.RawMessage) interface{} {
+	if len(b) == 0 || string(b) == "null" { return nil }
+	return string(b)
+}
+
 func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 	id := chi.URLParam(r, "id")
@@ -542,7 +591,7 @@ func (h *LogSources) Stats(w http.ResponseWriter, r *http.Request) {
 	// Count queue (events in last 5s not yet processed)
 	var queue int
 	h.DB.Pool().QueryRow(r.Context(),
-		`SELECT COUNT(*) FROM log_events WHERE tenant_id=$1 AND created_at >= NOW()-interval'5 seconds'`,
+		`SELECT COUNT(*) FROM log_events WHERE tenant_id=$1 AND ts >= NOW()-interval'5 seconds'`,
 		claims.TenantID).Scan(&queue) //nolint:errcheck
 	jsonOK(w, map[string]any{
 		"total": total, "online": online, "errors": errCount,

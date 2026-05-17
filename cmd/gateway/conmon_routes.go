@@ -10,9 +10,9 @@ import (
 // Caller must pass the same db pointer used by the rest of the gateway,
 // and an authentication middleware to wrap the handlers.
 func registerConMonRoutes(mux *http.ServeMux, h *handler.ConMonHandler, withAuth func(http.HandlerFunc) http.HandlerFunc) {
-	mux.HandleFunc("/api/v1/conmon/schedules", withAuth(h.Schedules))
-	mux.HandleFunc("/api/v1/conmon/deviations", withAuth(h.Deviations))
-	mux.HandleFunc("/api/v1/conmon/cadence", withAuth(h.CadenceStatus))
+	mux.HandleFunc("/api/v1/conmon/schedules", withAuth(methodGuard([]string{"GET","POST"}, h.Schedules)))
+	mux.HandleFunc("/api/v1/conmon/deviations", withAuth(methodGuard([]string{"GET"}, h.Deviations)))
+	mux.HandleFunc("/api/v1/conmon/cadence", withAuth(methodGuard([]string{"GET"}, h.CadenceStatus)))
 
 	// Acknowledgement uses a path with an embedded id:
 	//   POST /api/v1/conmon/deviations/{id}/acknowledge
@@ -24,6 +24,19 @@ func registerConMonRoutes(mux *http.ServeMux, h *handler.ConMonHandler, withAuth
 		}
 		h.AckDeviation(w, r)
 	}))
+}
+
+func methodGuard(allowed []string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		for _, m := range allowed {
+			if r.Method == m {
+				next(w, r)
+				return
+			}
+		}
+		w.Header().Set("Allow", allowed[0])
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func endsWith(s, suf string) bool {

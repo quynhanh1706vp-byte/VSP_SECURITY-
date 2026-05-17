@@ -561,7 +561,10 @@ func main() {
 				{"id":"5","seq":5,"action":"SCAN_COMPLETE","user":"system","resource":"scan","ip":"127.0.0.1","detail":"Daily scan complete — 104 findings","created_at":"2026-04-15T02:30:00Z","level":"info"}
 			],"total":5}`))
 		})
-		r.Get("/audit/stats", stubHandler("audit.stats"))
+		r.Get("/audit/stats", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"total":3078,"last_24h":25,"last_7d":1100,"last_30d":2800,"unique_users":5,"unique_actions":66,"oldest":"2026-03-31T00:00:00Z","newest":"2026-05-16T12:00:00Z","archivable":0}`)
+		})
 		r.Get("/audit/monthly", stubHandler("audit.monthly"))
 		r.Post("/audit/rotate", stubHandler("audit.rotate"))
 
