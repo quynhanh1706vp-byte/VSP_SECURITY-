@@ -272,3 +272,4 @@ static/panels/csv
 scripts/mint_jwt.sh
 scripts/start-devstub.sh
 scripts/stop-devstub.sh
+gateway_bin
