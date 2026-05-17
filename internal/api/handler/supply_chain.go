@@ -3,6 +3,12 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"fmt"
+	"encoding/pem"
+	"crypto/x509"
+	"crypto/rand"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"os"
 	"strings"
 	"time"
@@ -780,4 +786,236 @@ func (h *SupplyChain) DeleteVEX(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ─── POST /api/v1/supply-chain/key/rotate ── IMPROVEMENT ───────────────────
+// Tạo ECDSA P-256 key mới, revoke key cũ, encrypt + lưu vào DB.
+// Chỉ admin mới được gọi endpoint này.
+func (h *SupplyChain) RotateKey(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.Role != "admin" {
+		jsonError(w, "admin role required for key rotation", http.StatusForbidden)
+		return
+	}
+
+	passphrase := os.Getenv("VSP_KEY_PASSPHRASE")
+	if passphrase == "" {
+		jsonError(w, "VSP_KEY_PASSPHRASE not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Generate new ECDSA P-256 key
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		jsonInternalError(w, r, "key generation failed", err)
+		return
+	}
+
+	// Encode private key → PEM
+	privDER, err := x509.MarshalECPrivateKey(privKey)
+	if err != nil {
+		jsonInternalError(w, r, "marshal private key failed", err)
+		return
+	}
+	privPEM := string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: privDER}))
+
+	// Encode public key → PEM
+	pubDER, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	if err != nil {
+		jsonInternalError(w, r, "marshal public key failed", err)
+		return
+	}
+	pubPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER}))
+
+	keyID := fmt.Sprintf("vsp-signing-%d", time.Now().Unix())
+
+	// Encrypt private key với pgcrypto trong DB transaction
+	tx, err := h.DB.Pool().Begin(r.Context())
+	if err != nil {
+		jsonInternalError(w, r, "begin transaction failed", err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	// Revoke tất cả key cũ
+	if _, err := tx.Exec(r.Context(),
+		`UPDATE signing_keys SET revoked=true, revoked_at=NOW() WHERE revoked=false`); err != nil {
+		jsonInternalError(w, r, "revoke old keys failed", err)
+		return
+	}
+
+	// Insert key mới với encrypted private key
+	var newID string
+	if err := tx.QueryRow(r.Context(),
+		`INSERT INTO signing_keys
+		   (key_id, algorithm, public_key_pem, private_key_enc, key_material_src, usage)
+		 VALUES ($1, $2, $3, pgp_sym_encrypt($4, $5), 'db_encrypted', 'artifact_signing')
+		 RETURNING id::text`,
+		keyID, "ECDSA_P256", pubPEM, privPEM, passphrase).Scan(&newID); err != nil {
+		jsonInternalError(w, r, "insert new key failed", err)
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		jsonInternalError(w, r, "commit failed", err)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"id":         newID,
+		"key_id":     keyID,
+		"algorithm":  "ECDSA_P256",
+		"public_key": pubPEM,
+		"rotated_at": time.Now().UTC().Format(time.RFC3339),
+		"message":    "key rotated successfully; old keys revoked",
+	})
+}
+
+// ─── GET /api/v1/supply-chain/stats ── IMPROVEMENT ─────────────────────────
+// Chart data: signatures per day (30 ngày), VEX by status, SLSA level dist.
+func (h *SupplyChain) Stats(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	ctx := r.Context()
+
+	// Signatures per day — 30 ngày gần nhất
+	sigRows, err := h.DB.Pool().Query(ctx,
+		`SELECT DATE(signed_at)::text as day, COUNT(*) as cnt
+		 FROM supply_chain_signatures
+		 WHERE tenant_id=$1 AND signed_at >= NOW() - INTERVAL '30 days'
+		 GROUP BY DATE(signed_at)
+		 ORDER BY day ASC`,
+		claims.TenantID)
+	sigPerDay := []map[string]any{}
+	if err == nil {
+		defer sigRows.Close()
+		for sigRows.Next() {
+			var day string
+			var cnt int64
+			if sigRows.Scan(&day, &cnt) == nil {
+				sigPerDay = append(sigPerDay, map[string]any{"day": day, "count": cnt})
+			}
+		}
+	}
+
+	// VEX by status
+	vexRows, err := h.DB.Pool().Query(ctx,
+		`SELECT status, COUNT(*) as cnt FROM vex_statements
+		 WHERE tenant_id=$1 GROUP BY status ORDER BY cnt DESC`,
+		claims.TenantID)
+	vexByStatus := []map[string]any{}
+	if err == nil {
+		defer vexRows.Close()
+		for vexRows.Next() {
+			var status string
+			var cnt int64
+			if vexRows.Scan(&status, &cnt) == nil {
+				vexByStatus = append(vexByStatus, map[string]any{"status": status, "count": cnt})
+			}
+		}
+	}
+
+	// SLSA level distribution
+	slsaRows, err := h.DB.Pool().Query(ctx,
+		`SELECT slsa_level, COUNT(*) as cnt FROM slsa_provenance
+		 WHERE tenant_id=$1 GROUP BY slsa_level ORDER BY slsa_level ASC`,
+		claims.TenantID)
+	slsaDist := []map[string]any{}
+	if err == nil {
+		defer slsaRows.Close()
+		for slsaRows.Next() {
+			var level int
+			var cnt int64
+			if slsaRows.Scan(&level, &cnt) == nil {
+				slsaDist = append(slsaDist, map[string]any{"level": level, "count": cnt})
+			}
+		}
+	}
+
+	// Verified vs unverified ratio
+	var verified, unverified int64
+	_ = h.DB.Pool().QueryRow(ctx,
+		`SELECT COUNT(*) FILTER (WHERE verified=true),
+		        COUNT(*) FILTER (WHERE verified=false)
+		 FROM supply_chain_signatures WHERE tenant_id=$1`,
+		claims.TenantID).Scan(&verified, &unverified)
+
+	// Key expiry warning
+	var expiresAt *time.Time
+	var keyID string
+	_ = h.DB.Pool().QueryRow(ctx,
+		`SELECT key_id, expires_at FROM signing_keys
+		 WHERE revoked=false ORDER BY created_at DESC LIMIT 1`).
+		Scan(&keyID, &expiresAt)
+
+	keyWarning := ""
+	if expiresAt != nil {
+		days := int(time.Until(*expiresAt).Hours() / 24)
+		if days < 0 {
+			keyWarning = "EXPIRED"
+		} else if days < 30 {
+			keyWarning = fmt.Sprintf("expires in %d days", days)
+		}
+	}
+
+	jsonOK(w, map[string]any{
+		"signatures_per_day": sigPerDay,
+		"vex_by_status":      vexByStatus,
+		"slsa_distribution":  slsaDist,
+		"verified_ratio": map[string]any{
+			"verified":   verified,
+			"unverified": unverified,
+			"total":      verified + unverified,
+		},
+		"key_warning": keyWarning,
+		"key_id":      keyID,
+	})
+}
+
+// ─── GET /api/v1/supply-chain/sbom ── IMPROVEMENT ──────────────────────────
+// SBOM endpoint stub — trả danh sách SBOMs từ sw_inventory hoặc sbom table.
+// Đây là bridge giữa supply chain tab và SBOM tab.
+type sbomRow struct {
+	ID        string    `json:"id"`
+	Artifact  string    `json:"artifact"`
+	Format    string    `json:"format"`
+	Version   string    `json:"version"`
+	Component int       `json:"component_count"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (h *SupplyChain) SBOM(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	limit := queryInt(r, "limit", 50)
+	if limit > 500 {
+		limit = 500
+	}
+
+	// Query từ sbom_documents table nếu tồn tại, fallback trả empty
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT id::text, COALESCE(artifact_name,''), COALESCE(format,'cyclonedx'),
+		        COALESCE(spec_version,'1.4'), COALESCE(component_count,0), created_at
+		 FROM sbom_documents
+		 WHERE tenant_id=$1
+		 ORDER BY created_at DESC LIMIT $2`,
+		claims.TenantID, limit)
+
+	out := []sbomRow{}
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var s sbomRow
+			if rows.Scan(&s.ID, &s.Artifact, &s.Format, &s.Version, &s.Component, &s.CreatedAt) == nil {
+				out = append(out, s)
+			}
+		}
+	}
+	// err != nil nghĩa là table chưa tồn tại — trả empty list, không trả 500
+	jsonOK(w, map[string]any{
+		"sboms": out,
+		"total": len(out),
+	})
 }

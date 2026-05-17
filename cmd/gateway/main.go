@@ -2538,6 +2538,10 @@ func main() {
 		r.With(requirePro).Get("/api/v1/supply-chain/vex", supplyChainH.VEX)
 		// FIX #7: NEW endpoints — DELETE/PATCH/POST
 		r.With(requirePro).Post("/api/v1/supply-chain/vex", supplyChainH.CreateVEX)
+		// IMPROVEMENT: key rotation, stats/charts, SBOM bridge
+		r.With(requirePro).Post("/api/v1/supply-chain/key/rotate", supplyChainH.RotateKey)
+		r.With(requirePro).Get("/api/v1/supply-chain/stats", supplyChainH.Stats)
+		r.With(requirePro).Get("/api/v1/supply-chain/sbom", supplyChainH.SBOM)
 		r.With(requirePro).Patch("/api/v1/supply-chain/vex/{id}", supplyChainH.PatchVEX)
 		r.With(requirePro).Delete("/api/v1/supply-chain/vex/{id}", supplyChainH.DeleteVEX)
 		r.With(requirePro).Delete("/api/v1/supply-chain/signatures/{id}", supplyChainH.DeleteSignature)

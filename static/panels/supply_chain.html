@@ -149,6 +149,7 @@ tr:hover td{background:var(--bg3)}
   <button class="tab" data-tab="provenance">SLSA Provenance</button>
   <button class="tab" data-tab="vex">VEX Statements</button>
   <button class="tab" data-tab="key">Public Key</button>
+  <button class="tab" data-tab="analytics">📊 Analytics</button>
 </div>
 
 <!-- ══════ Tab: Sign ══════ -->
@@ -391,6 +392,58 @@ tr:hover td{background:var(--bg3)}
   </div>
 </div>
 
+<!-- ══════ Tab: Analytics ══════ -->
+<div class="tab-panel" id="tab-analytics">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">📊 Supply Chain Analytics</div>
+      <div><button class="btn btn-sm" onclick="loadStats()">↻ Refresh</button></div>
+    </div>
+    <div class="card-body">
+      <!-- Verified ratio -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+        <div style="background:var(--bg2,#18181b);border-radius:6px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Verified</div>
+          <div style="font-size:22px;font-weight:700;color:var(--green)" id="stat-verified">—</div>
+        </div>
+        <div style="background:var(--bg2,#18181b);border-radius:6px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Unverified</div>
+          <div style="font-size:22px;font-weight:700;color:var(--amber)" id="stat-unverified">—</div>
+        </div>
+        <div style="background:var(--bg2,#18181b);border-radius:6px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Key warning</div>
+          <div style="font-size:13px;font-weight:700" id="stat-key-warn">—</div>
+        </div>
+      </div>
+      <!-- VEX by status -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">VEX by status</div>
+        <div id="stat-vex-bars" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+      <!-- SLSA level distribution -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">SLSA level distribution</div>
+        <div id="stat-slsa-bars" style="display:flex;gap:8px;align-items:flex-end;height:80px"></div>
+      </div>
+      <!-- Signatures per day sparkline -->
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Signatures — last 30 days</div>
+        <canvas id="stat-sig-chart" height="60" style="width:100%;border-radius:4px;background:var(--bg2,#18181b)"></canvas>
+      </div>
+      <!-- Key rotation -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Key management</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1;font-size:12px;color:var(--t3)" id="stat-current-key">Loading…</div>
+          <button class="btn btn-sm" style="color:var(--amber);border-color:var(--amber)"
+            onclick="rotateKey()" id="btn-rotate-key">⟳ Rotate key</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
 // ═══ Tab switching ═══
 document.querySelectorAll('.tab').forEach(t => {
@@ -449,6 +502,8 @@ async function loadKPIs() {
     document.getElementById('kpi-vex').textContent = vex.count != null ? vex.count : '—';
     document.getElementById('kpi-key').textContent = (key.key_id || '—').slice(0, 18) + (key.key_id ? '…' : '');
     document.getElementById('kpi-algo').textContent = key.algorithm || '—';
+    // Load stats/charts async sau KPIs
+    loadStats().catch(() => {});
   } catch(e) {
     _scKPIDash();
     console.error('[FEAT-27] loadKPIs failed:', e);
@@ -1433,5 +1488,119 @@ loadSignatures();
 <!-- VSP-SC-POLISH-END -->
 <script src="/panels/vsp_pro_panel_buttons.js?v=1"></script>
 <script src="/panels/vsp_pro_paginate.js?v=1"></script>
+<script>
+
+async function loadStats() {
+  const token = localStorage.getItem('vsp_token') || '';
+  const h = {'Authorization': 'Bearer ' + token};
+  try {
+    const d = await fetch('/api/v1/supply-chain/stats', {headers: h}).then(r => r.json());
+
+    // Verified ratio
+    const vr = d.verified_ratio || {};
+    const el = id => document.getElementById(id);
+    if (el('stat-verified'))   el('stat-verified').textContent   = vr.verified   ?? '—';
+    if (el('stat-unverified')) el('stat-unverified').textContent = vr.unverified ?? '—';
+    if (el('stat-key-warn')) {
+      const w = d.key_warning || '';
+      el('stat-key-warn').textContent  = w || '✓ OK';
+      el('stat-key-warn').style.color  = w === 'EXPIRED' ? 'var(--red)' : w ? 'var(--amber)' : 'var(--green)';
+    }
+    if (el('stat-current-key')) {
+      el('stat-current-key').textContent = d.key_id ? 'Active key: ' + d.key_id : 'No active key';
+    }
+
+    // VEX bars
+    const vexEl = el('stat-vex-bars');
+    if (vexEl && d.vex_by_status) {
+      const colors = {affected:'#ef4444', not_affected:'#10b981', fixed:'#3b82f6', under_investigation:'#f59e0b'};
+      const total = d.vex_by_status.reduce((s, v) => s + v.count, 0) || 1;
+      vexEl.innerHTML = d.vex_by_status.map(v => {
+        const pct = Math.round(v.count / total * 100);
+        const c = colors[v.status] || '#888';
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:11px">
+          <div style="width:110px;color:var(--t2);font-family:var(--font-mono)">${v.status}</div>
+          <div style="flex:1;height:14px;background:var(--bg2,#18181b);border-radius:3px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${c};border-radius:3px;transition:width .4s"></div>
+          </div>
+          <div style="width:40px;text-align:right;color:var(--t3)">${v.count}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // SLSA bars
+    const slsaEl = el('stat-slsa-bars');
+    if (slsaEl && d.slsa_distribution) {
+      const max = Math.max(...d.slsa_distribution.map(s => s.count), 1);
+      const colors = ['#6b7280','#3b82f6','#10b981','#f59e0b'];
+      slsaEl.innerHTML = d.slsa_distribution.map(s => {
+        const h = Math.round(s.count / max * 60) + 20;
+        return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+          <div style="font-size:10px;color:var(--t3)">${s.count}</div>
+          <div style="width:100%;height:${h}px;background:${colors[(s.level-1)%4]||'#888'};border-radius:3px 3px 0 0"></div>
+          <div style="font-size:10px;color:var(--t3)">L${s.level}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Sparkline signatures per day
+    const canvas = el('stat-sig-chart');
+    if (canvas && d.signatures_per_day && d.signatures_per_day.length) {
+      const ctx = canvas.getContext('2d');
+      const data = d.signatures_per_day;
+      const W = canvas.offsetWidth || 600;
+      canvas.width = W;
+      const maxV = Math.max(...data.map(d => d.count), 1);
+      const step = W / Math.max(data.length - 1, 1);
+      ctx.clearRect(0, 0, W, 60);
+      ctx.beginPath();
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      data.forEach((pt, i) => {
+        const x = i * step;
+        const y = 55 - (pt.count / maxV * 45);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      // Fill under line
+      ctx.lineTo((data.length-1)*step, 60);
+      ctx.lineTo(0, 60);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(59,130,246,0.15)';
+      ctx.fill();
+    }
+  } catch(e) {
+    console.warn('[SC] loadStats failed:', e);
+  }
+}
+
+async function rotateKey() {
+  if (!confirm('Rotate signing key? All existing signatures will remain valid but new signatures will use the new key.')) return;
+  const token = localStorage.getItem('vsp_token') || '';
+  const btn = document.getElementById('btn-rotate-key');
+  if (btn) { btn.disabled = true; btn.textContent = 'Rotating…'; }
+  try {
+    const r = await fetch('/api/v1/supply-chain/key/rotate', {
+      method: 'POST',
+      headers: {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'}
+    });
+    const d = await r.json();
+    if (r.ok) {
+      if (typeof window.showToast === 'function') window.showToast('✓ Key rotated: ' + d.key_id, 'success');
+      else alert('Key rotated: ' + d.key_id);
+      loadStats();
+      loadKPIs();
+    } else {
+      alert('Rotate failed: ' + (d.error || r.status));
+    }
+  } catch(e) {
+    alert('Network error: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ Rotate key'; }
+  }
+}
+
+
+</script>
 </body>
 </html>
