@@ -74,7 +74,7 @@
       verified:    { c: 'var(--green)',  t: '✓ VERIFIED' },
       tampered:    { c: 'var(--red)',    t: '✗ TAMPERED' }, // real attack
       unsigned:    { c: 'var(--t3)',     t: '○ UNSIGNED' }, // expected in dev
-      not_found:   { c: 'var(--amber)',  t: '? NOT FOUND' }, // registry issue
+      not_found:   { c: 'var(--amber)',  t: '? REGISTRY UNREACHABLE' }, // localhost:5000 offline
       unavailable: { c: 'var(--amber)',  t: '! UNAVAILABLE' }, // ops issue
       failed:      { c: 'var(--red)',    t: '✗ FAILED' },
     };
@@ -100,7 +100,7 @@
     if (panel.dataset.realApi === '1') return; // idempotent
     panel.dataset.realApi = '1';
 
-    const lastImg = localStorage.getItem(STORE_KEY) || 'nginx:1.25-alpine';
+    const lastImg = localStorage.getItem(STORE_KEY) || 'ghcr.io/sigstore/cosign:v2.2.3';
 
     panel.insertAdjacentHTML('afterbegin', `
       <div class="card mb14" id="sc-controls">
@@ -119,7 +119,7 @@
 
         <div style="padding:14px;display:grid;grid-template-columns:1fr auto auto auto;gap:8px">
           <input aria-label="image:tag — e.g. ghcr.io/org/api:1.2.3" id="sc-image" class="form-ctrl"
-                 placeholder="image:tag — e.g. ghcr.io/org/api:1.2.3"
+                 placeholder="e.g. ghcr.io/org/api:1.2.3 or ttl.sh/myimage:1h"
                  value="${esc(lastImg)}"
                  style="font-family:var(--font-mono);font-size:12px">
           <button class="btn btn-primary btn-sm" id="sc-btn-sign">Sign</button>
@@ -215,8 +215,7 @@
     if (!el) return;
     try {
       const h = await api('/healthz');
-      el.innerHTML = `<span style="color:var(--green)">●</span> healthy
-        · <span style="color:var(--t3)">${h.signatures} signatures stored</span>`;
+      el.innerHTML = `<span style="color:var(--green)">●</span> healthy · <span style="color:var(--t3)">${h.signatures} signatures stored</span> · <span style="color:var(--amber)">registry: use public OCI (ghcr.io / docker.io)</span>`;
     } catch (e) {
       el.innerHTML = `<span style="color:var(--red)">●</span> unreachable
         — <span style="color:var(--t3)">is vsp-cosign-api running on :8091?</span>`;
