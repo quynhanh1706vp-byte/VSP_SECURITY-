@@ -59,6 +59,7 @@ import (
 	"github.com/vsp/platform/internal/siem"
 	"github.com/vsp/platform/internal/soar"
 	"github.com/vsp/platform/internal/store"
+	"github.com/vsp/platform/internal/sso"
 	"github.com/vsp/platform/internal/telemetry"
 	"github.com/vsp/platform/internal/ticket"
 )
@@ -323,21 +324,6 @@ func main() {
 		jwtTTL = 24 * time.Hour
 	}
 
-	// SSO/OIDC config (optional — disabled by default)
-	ssoConfig := auth.OIDCConfig{
-		Enabled:      viper.GetBool("sso.enabled"),
-		ProviderName: viper.GetString("sso.provider"),
-		ClientID:     viper.GetString("sso.client_id"),
-		ClientSecret: viper.GetString("sso.client_secret"),
-		RedirectURL:  viper.GetString("sso.redirect_url"),
-		AuthURL:      viper.GetString("sso.auth_url"),
-		TokenURL:     viper.GetString("sso.token_url"),
-		UserInfoURL:  viper.GetString("sso.userinfo_url"),
-		DefaultRole:  viper.GetString("sso.default_role"),
-	}
-	viper.SetDefault("sso.enabled", false)
-	viper.SetDefault("sso.provider", "google")
-	viper.SetDefault("sso.default_role", "analyst")
 
 	// Đọc Redis config trực tiếp từ env để đảm bảo Docker env vars được dùng
 	redisAddr := os.Getenv("REDIS_ADDR")
@@ -375,6 +361,23 @@ func main() {
 	// impossible-travel + rapid-IP-rotation patterns and revokes all
 	// tokens for the affected user.
 	go auth.NewAnomalyDetector(db.Pool(), tokenBlacklist, time.Minute).Run(ctx)
+
+	// JWKS warm-up — pre-fetch public keys for all enabled SSO providers
+	// so the first user login after restart doesn't pay the fetch latency.
+	go func() {
+		wCtx, wCancel := context.WithTimeout(ctx, 30*time.Second)
+		defer wCancel()
+		providers, err := sso.ListEnabledProviders(wCtx, p4DB)
+		if err != nil || len(providers) == 0 {
+			return
+		}
+		for _, p := range providers {
+			if disc, err := sso.FetchDiscovery(wCtx, p4DB, &p); err == nil && disc.JWKSURI != "" {
+				_, _ = sso.FetchJWKS(wCtx, disc.JWKSURI)
+			}
+		}
+		log.Info().Int("providers", len(providers)).Msg("sso: JWKS warm-up complete")
+	}()
 
 	authH := &handler.Auth{
 		DB:         db,
@@ -523,7 +526,6 @@ func main() {
 	sandboxH := &handler.Sandbox{DB: db}
 	importsH := &handler.Imports{DB: db}
 	remediationH := &handler.Remediation{DB: db}
-	ssoH := handler.NewSSO(ssoConfig, authH, db)
 
 	// Scheduler engine
 	schedEngine := scheduler.New(db, func(rid, tenantID, mode, profile, src, url string) {
@@ -752,10 +754,20 @@ func main() {
 			"uptime": time.Since(startTime).Round(time.Second).String(),
 		})
 	})
-	// SSO routes (public)
-	r.Get("/auth/sso/providers", ssoH.Providers)
-	r.Get("/auth/sso/login", ssoH.Login)
-	r.Get("/auth/sso/callback", ssoH.Callback)
+	// SSO legacy routes — deprecated, redirect to /api/v1/auth/sso/*.
+	// Kept for backward compat; remove after all clients migrate.
+	redirectSSO := func(target string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			dst := target
+			if r.URL.RawQuery != "" {
+				dst += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, dst, http.StatusMovedPermanently)
+		}
+	}
+	r.Get("/auth/sso/providers", redirectSSO("/api/v1/sso/providers"))
+	r.Get("/auth/sso/login", redirectSSO("/api/v1/auth/sso/login"))
+	r.Get("/auth/sso/callback", redirectSSO("/api/v1/auth/sso/callback"))
 	r.Get("/api/docs", handler.SwaggerUI)
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
@@ -954,10 +966,24 @@ func main() {
 	// Phase 2 (docs/CSP_HARDENING_ROADMAP.md) will migrate panels to the
 	// strict nonce policy after inline handlers are refactored.
 	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		for _, ext := range []string{".bak", ".backup", ".tmp", ".old", ".orig"} {
+			if strings.Contains(p, ext) {
+				http.NotFound(w, r)
+				return
+			}
+		}
 		http.StripPrefix("/static/panels/",
 			http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
 	})
 	r.Get("/panels/*", func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		for _, ext := range []string{".bak", ".backup", ".tmp", ".old", ".orig"} {
+			if strings.Contains(p, ext) {
+				http.NotFound(w, r)
+				return
+			}
+		}
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
 		http.StripPrefix("/panels/",
@@ -993,12 +1019,10 @@ func main() {
 
 	// ═══ Supply Chain Integrity (Milestone 1) ═══
 	// Sigstore-compatible artifact signing + SLSA provenance + CycloneDX VEX
-	r.Post("/api/v1/supply-chain/sign", p4AuthMiddleware(handleSignArtifact))
-	r.Post("/api/v1/supply-chain/verify", p4AuthMiddleware(handleVerifyArtifact))
-	r.Get("/api/v1/supply-chain/signatures", p4AuthMiddleware(handleListSignatures))
-	r.Get("/api/v1/supply-chain/public-key", handlePublicKey) // public — no auth
-	r.Post("/api/v1/supply-chain/provenance", p4AuthMiddleware(handleGenProvenance))
-	r.Get("/api/v1/supply-chain/provenance", p4AuthMiddleware(handleListProvenance))
+	// FIX #6: old supply-chain handlers removed — consolidated into supplyChainH (lines below).
+	// handleSignArtifact, handleVerifyArtifact, handleListSignatures,
+	// handleGenProvenance, handleListProvenance → xem block supplyChainH.
+	// /api/v1/supply-chain/public-key → đổi thành /api/v1/supply-chain/key (supplyChainH.Key)
 	r.Post("/api/p4/vex", p4AuthMiddleware(handleCreateVEX))
 	r.Get("/api/p4/vex", p4AuthMiddleware(handleListVEX))
 
@@ -1166,9 +1190,10 @@ func main() {
 		jwtTTL,
 		auth.IssueJWT,
 	)
+	ssoOIDCH.SetAuditDB(db) // enable SSO login audit (LOGIN_SSO_OK)
 	// ─── SSO public endpoints (no auth required) — Phase 4.5.3 ───
-	r.Get("/api/v1/auth/sso/login", ssoOIDCH.Login)
-	r.Get("/api/v1/auth/sso/callback", ssoOIDCH.Callback)
+	r.With(vspMW.StrictLimiter(20, time.Minute)).Get("/api/v1/auth/sso/login", ssoOIDCH.Login)
+	r.With(vspMW.StrictLimiter(20, time.Minute)).Get("/api/v1/auth/sso/callback", ssoOIDCH.Callback)
 
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
@@ -1204,13 +1229,27 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireRole("admin"))
 			r.Get("/api/v1/admin/users", usersH.List)
+			r.Get("/api/v1/admin/roles", func(w http.ResponseWriter, r *http.Request) {
+				jsonOK(w, map[string]any{
+					"roles": []map[string]string{
+						{"id":"admin",   "name":"Admin",   "desc":"Full access"},
+						{"id":"analyst", "name":"Analyst", "desc":"Read + scan"},
+						{"id":"dev",     "name":"Dev",     "desc":"Scan + findings"},
+						{"id":"auditor", "name":"Auditor", "desc":"Read only"},
+					},
+				})
+			})
 			// PRO gating — adding/removing users is a tenant-management
 			// concern, free tier stays read-only.
 			r.With(requirePro).Post("/api/v1/admin/users", usersH.Create)
 			r.With(requirePro).Delete("/api/v1/admin/users/{id}", usersH.Delete)
+			r.With(requirePro).Patch("/api/v1/admin/users/{id}", usersH.UpdateRole)
+			r.With(requirePro).Post("/api/v1/admin/users/invite", usersH.Invite)
+			r.With(requirePro).Post("/api/v1/admin/users/bulk-role", usersH.BulkRole)
 			r.Get("/api/v1/admin/api-keys", apiKeysH.List)
 			r.Post("/api/v1/admin/api-keys", apiKeysH.Create)
 			r.Delete("/api/v1/admin/api-keys/{id}", apiKeysH.Delete)
+			r.Patch("/api/v1/admin/api-keys/{id}", apiKeysH.Update)
 			r.Get("/api/v1/admin/tenants", usersH.ListAllTenants)
 			r.Post("/api/v1/admin/tenants", usersH.CreateTenant)
 			r.Put("/api/v1/admin/tenants/{id}/plan", usersH.UpdatePlan)
@@ -1263,10 +1302,14 @@ func main() {
 		// Reading existing providers is allowed for any auth'd user (so the
 		// login screen can render available IdPs); mutations require PRO.
 		r.Get("/api/v1/sso/providers", ssoOIDCH.Providers)
-		r.With(requirePro).Post("/api/v1/sso/providers", ssoOIDCH.Providers)
-		r.With(requirePro).Put("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
-		r.With(requirePro).Get("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
-		r.With(requirePro).Delete("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Post("/api/v1/sso/providers", ssoOIDCH.Providers)
+		r.Get("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Put("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Delete("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Patch("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Get("/api/v1/sso/providers/{id}/test", ssoOIDCH.TestProvider)
+		r.Patch("/api/v1/sso/providers/{id}/toggle", ssoOIDCH.ToggleProvider)
+		r.Patch("/api/v1/sso/providers/{id}/rotate-secret", ssoOIDCH.RotateSecret)
 
 		// ─── Cloud Security Posture Management — PRO feature ────────────
 		// Real persistence in cspm_accounts / cspm_findings / cspm_config
@@ -1334,6 +1377,40 @@ func main() {
 		featureCfgH := handler.NewFeatureConfig(db)
 		r.With(requirePro).Get("/api/v1/features/{id}/config", featureCfgH.Get)
 		r.With(requirePro).Put("/api/v1/features/{id}/config", featureCfgH.Put)
+		r.Get("/api/v1/settings/export", func(w http.ResponseWriter, req *http.Request) {
+			claims, ok := auth.FromContext(req.Context())
+			if !ok { w.WriteHeader(401); w.Write([]byte(`{"error":"unauthorized"}`)); return }
+			rows, err := db.Pool().Query(req.Context(),
+				"SELECT feature_id, config::text FROM feature_config WHERE tenant_id=$1",
+				claims.TenantID)
+			if err != nil { w.WriteHeader(500); w.Write([]byte(`{"error":"db error"}`)); return }
+			defer rows.Close()
+			cfgs := map[string]json.RawMessage{}
+			for rows.Next() {
+				var fid string; var cfg []byte
+				if rows.Scan(&fid, &cfg) == nil { cfgs[fid] = json.RawMessage(cfg) }
+			}
+			w.Header().Set("Content-Disposition", "attachment; filename=vsp-settings-export.json")
+			jsonOK(w, map[string]any{"tenant_id": claims.TenantID, "exported_at": time.Now(), "configs": cfgs})
+		})
+		r.Post("/api/v1/settings/import", func(w http.ResponseWriter, req *http.Request) {
+			claims, ok := auth.FromContext(req.Context())
+			if !ok { w.WriteHeader(401); w.Write([]byte(`{"error":"unauthorized"}`)); return }
+			var body struct { Configs map[string]json.RawMessage `json:"configs"` }
+			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+				w.WriteHeader(400); w.Write([]byte(`{"error":"invalid JSON"}`)); return
+			}
+			imported := 0
+			for fid, cfg := range body.Configs {
+				_, err := db.Pool().Exec(req.Context(),
+					`INSERT INTO feature_config (tenant_id, feature_id, config)
+					 VALUES ($1,$2,$3::jsonb)
+					 ON CONFLICT (tenant_id, feature_id) DO UPDATE SET config=EXCLUDED.config`,
+					claims.TenantID, fid, string(cfg))
+				if err == nil { imported++ }
+			}
+			jsonOK(w, map[string]any{"imported": imported, "total": len(body.Configs)})
+		})
 
 		// Analytics summary — server-side aggregation for the Analytics panel.
 		// Free tier keeps the client-side fallback (loops over /vsp/runs/index);
@@ -1507,9 +1584,54 @@ func main() {
 
 		// ── Asset inventory ─────────────────────────────────────
 		r.Get("/api/v1/assets", assetsH.List)
+		r.Get("/api/v1/assets/stats", assetsH.Summary)
+		// /api/v1/vulns — alias to findings with vuln filter
+		r.Get("/api/v1/vulns", func(w http.ResponseWriter, r *http.Request) {
+			// Proxy to findings with severity filter for vuln view
+			r.URL.RawQuery = r.URL.RawQuery
+			http.Redirect(w, r, "/api/v1/vsp/findings?"+r.URL.RawQuery, http.StatusFound)
+		})
+		r.Get("/api/v1/vulns/stats", func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := auth.FromContext(r.Context())
+			if !ok { w.WriteHeader(401); return }
+			tenantID := claims.TenantID
+			type sevRow struct {
+				Severity string `json:"severity"`
+				Open     int    `json:"open"`
+				Total    int    `json:"total"`
+			}
+			rows, err := db.Pool().Query(r.Context(),
+				`SELECT severity,
+				        COUNT(*) FILTER(WHERE remediation_id IS NULL) as open,
+				        COUNT(*) as total
+				 FROM findings WHERE tenant_id=$1
+				 GROUP BY severity ORDER BY
+				 CASE severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2
+				 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END`,
+				tenantID)
+			if err != nil { w.WriteHeader(500); return }
+			defer rows.Close()
+			var bySev []sevRow
+			var totalOpen, totalAll int
+			for rows.Next() {
+				var row sevRow
+				if rows.Scan(&row.Severity, &row.Open, &row.Total) == nil {
+					bySev = append(bySev, row)
+					totalOpen += row.Open
+					totalAll += row.Total
+				}
+			}
+			jsonOK(w, map[string]any{
+				"by_severity": bySev,
+				"total_open":  totalOpen,
+				"total":       totalAll,
+			})
+		})
 		r.Post("/api/v1/assets", assetsH.Create)
 		r.Get("/api/v1/assets/summary", assetsH.Summary)
 		r.Get("/api/v1/assets/{id}/findings", assetsH.Findings)
+		r.Delete("/api/v1/assets/{id}", assetsH.Delete)
+		r.Patch("/api/v1/assets/{id}", assetsH.Update)
 
 		// Endpoint Agents (JWT-protected — UI manages enrollments)
 		r.Post("/api/v1/agents/enroll", agentsH.Enroll)
@@ -1521,6 +1643,9 @@ func main() {
 		r.With(requirePro).Get("/api/v1/soar/playbooks", soarH.ListPlaybooks)
 		r.With(requirePro).Post("/api/v1/soar/playbooks", soarH.CreatePlaybook)
 		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/toggle", soarH.TogglePlaybook)
+		r.With(requirePro).Delete("/api/v1/soar/playbooks/{id}", soarH.DeletePlaybook)
+		r.With(requirePro).Patch("/api/v1/soar/playbooks/{id}", soarH.UpdatePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/run", soarH.RunPlaybook)
 		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/run", soarV2H.ExecutePlaybook)
 		r.With(requirePro).Post("/api/v1/soar/trigger", soarH.Trigger)
 		r.With(requirePro).Get("/api/v1/soar/runs", soarH.ListRuns)
@@ -1601,16 +1726,23 @@ func main() {
 			claims, _ := auth.FromContext(r.Context())
 			ctx := r.Context()
 			type CVERow struct {
-				CVE      string `json:"cve"`
-				Severity string `json:"severity"`
-				Count    int    `json:"count"`
-				Tools    string `json:"tools"`
-				Fixable  bool   `json:"fixable"`
+				CVE        string  `json:"cve"`
+				Severity   string  `json:"severity"`
+				CVSS       float64 `json:"cvss"`
+				Count      int     `json:"count"`
+				Tools      string  `json:"tools"`
+				Fixable    bool    `json:"fixable"`
+				FixVersion string  `json:"fix_version,omitempty"`
+				CWE        string  `json:"cwe,omitempty"`
 			}
 			rows, err := db.Pool().Query(ctx, `
-				SELECT rule_id, MAX(severity), COUNT(*),
+				SELECT rule_id, MAX(severity), ROUND(MAX(cvss)::numeric, 1), COUNT(*),
 				       STRING_AGG(DISTINCT tool, ', '),
-				       BOOL_OR(fix_signal='fix_available')
+				       BOOL_OR(fix_signal IS NOT NULL AND fix_signal != '' AND fix_signal ILIKE 'upgrade to%'),
+				       MAX(CASE WHEN fix_signal ILIKE 'upgrade to%'
+				                THEN TRIM(SUBSTRING(fix_signal FROM 12))
+				                ELSE NULL END),
+				       MAX(cwe)
 				FROM findings WHERE tenant_id=$1 AND rule_id ILIKE 'CVE-%'
 				GROUP BY rule_id
 				ORDER BY CASE MAX(severity)
@@ -1625,7 +1757,7 @@ func main() {
 			var cves []CVERow
 			for rows.Next() {
 				var c CVERow
-				_ = rows.Scan(&c.CVE, &c.Severity, &c.Count, &c.Tools, &c.Fixable) //nolint:errcheck
+				_ = rows.Scan(&c.CVE, &c.Severity, &c.CVSS, &c.Count, &c.Tools, &c.Fixable, &c.FixVersion, &c.CWE) //nolint:errcheck
 				cves = append(cves, c)
 			}
 			if cves == nil {
@@ -2404,6 +2536,12 @@ func main() {
 		r.With(requirePro).Get("/api/v1/supply-chain/provenance", supplyChainH.Provenance)
 		r.With(requirePro).Post("/api/v1/supply-chain/provenance/generate", supplyChainH.GenerateProvenance)
 		r.With(requirePro).Get("/api/v1/supply-chain/vex", supplyChainH.VEX)
+		// FIX #7: NEW endpoints — DELETE/PATCH/POST
+		r.With(requirePro).Post("/api/v1/supply-chain/vex", supplyChainH.CreateVEX)
+		r.With(requirePro).Patch("/api/v1/supply-chain/vex/{id}", supplyChainH.PatchVEX)
+		r.With(requirePro).Delete("/api/v1/supply-chain/vex/{id}", supplyChainH.DeleteVEX)
+		r.With(requirePro).Delete("/api/v1/supply-chain/signatures/{id}", supplyChainH.DeleteSignature)
+		r.With(requirePro).Delete("/api/v1/supply-chain/provenance/{id}", supplyChainH.DeleteProvenance)
 		// Public keys are non-sensitive verification material — keep open so
 		// downstream verifiers can fetch without a paid plan.
 		r.Get("/api/v1/supply-chain/key", supplyChainH.Key)
@@ -2416,11 +2554,18 @@ func main() {
 		r.Get("/api/v1/cisa-attestation/forms", cisaAttestH.Forms)
 		r.Post("/api/v1/cisa-attestation/forms", cisaAttestH.GenerateDraft)
 		r.Get("/api/v1/cisa-attestation/forms/{uuid}", cisaAttestH.FormDetail)
+		r.Patch("/api/v1/cisa-attestation/forms/{uuid}", cisaAttestH.UpdateForm)
+		r.Delete("/api/v1/cisa-attestation/forms/{uuid}", cisaAttestH.DeleteForm)
 		r.Post("/api/v1/cisa-attestation/forms/{uuid}/sign", cisaAttestH.SignForm)
 		r.Get("/api/v1/cisa-attestation/draft", cisaAttestH.CurrentDraft)
 		// PHASE3-ROUTES-END
 		// PHASE3F-ROUTES-BEGIN
 		r.Get("/api/v1/oscal/package", oscalPackageH.BuildPackage)
+		// OSCAL Document Store
+		r.Get("/api/v1/oscal/documents", oscalPackageH.ListDocuments)
+		r.Get("/api/v1/oscal/documents/{uuid}", oscalPackageH.GetDocument)
+		r.Patch("/api/v1/oscal/documents/{uuid}/publish", oscalPackageH.PublishDocument)
+		r.Delete("/api/v1/oscal/documents/{uuid}", oscalPackageH.DeleteDocument)
 		// PHASE3F-ROUTES-END
 		// PHASE3G-ROUTES-BEGIN
 		r.Get("/api/p4/oscal/ap", oscalModelsH.AssessmentPlan)
@@ -2554,7 +2699,7 @@ func main() {
 					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours'),"+
 					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days'),"+
 					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days'),"+
-					"COUNT(DISTINCT user_id),COUNT(DISTINCT action),"+
+					"COUNT(DISTINCT COALESCE(user_id::text, ip)),COUNT(DISTINCT action),"+
 					"COALESCE(MIN(created_at)::text,'—'),COALESCE(MAX(created_at)::text,'—'),"+
 					"COUNT(*) FILTER (WHERE created_at < NOW() - INTERVAL '90 days')"+
 														" FROM audit_log WHERE tenant_id=$1", claims.TenantID).

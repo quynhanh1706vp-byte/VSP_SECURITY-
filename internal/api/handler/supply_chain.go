@@ -39,9 +39,13 @@ func (h *SupplyChain) KPIs(w http.ResponseWriter, r *http.Request) {
 	_ = pool.QueryRow(ctx,
 		`SELECT COUNT(*) FROM vex_statements WHERE tenant_id=$1`,
 		claims.TenantID).Scan(&out.VEX)
+	// FIX #3: signing_keys.tenant_id column ditambahkan di migration 022.
+	// Filter theo tenant để tránh cross-tenant key metadata leak.
 	_ = pool.QueryRow(ctx,
-		`SELECT key_id, algorithm FROM signing_keys WHERE revoked=false ORDER BY created_at DESC LIMIT 1`).
-		Scan(&out.KeyName, &out.KeyAlgorithm)
+		`SELECT key_id, algorithm FROM signing_keys
+		 WHERE revoked=false AND (tenant_id=$1 OR tenant_id IS NULL)
+		 ORDER BY created_at DESC LIMIT 1`,
+		claims.TenantID).Scan(&out.KeyName, &out.KeyAlgorithm)
 
 	jsonOK(w, out)
 }
@@ -197,14 +201,18 @@ func (h *SupplyChain) Verify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// FIX #2: crypto_verified=false — DB-only mark, chưa gọi cosign.VerifyBundle() thật.
+	// TODO: implement cosign.VerifyBundle() trước UPDATE, trả 422 nếu fail.
 	jsonOK(w, map[string]any{
-		"id":          id,
-		"verified":    true,
-		"verified_at": time.Now().UTC().Format(time.RFC3339),
+		"id":              id,
+		"verified":        true,
+		"crypto_verified": false,
+		"warning":         "DB-only mark; cryptographic verification not yet implemented",
+		"verified_at":     time.Now().UTC().Format(time.RFC3339),
 		"trust_chain": []map[string]string{
-			{"step": "Sigstore Root CA", "status": "valid"},
-			{"step": "Fulcio Intermediate", "status": "valid"},
-			{"step": "Artifact signature", "status": "valid"},
+			{"step": "Sigstore Root CA", "status": "pending"},
+			{"step": "Fulcio Intermediate", "status": "pending"},
+			{"step": "Artifact signature", "status": "pending"},
 		},
 	})
 }
@@ -236,17 +244,23 @@ func (h *SupplyChain) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get active signing key
-	var keyID, pubKey string
+	// Get active signing key (including private key for signing)
+	// FIX #1 partial: private_key_pem dibaca untuk sign — JANGAN expose ke response.
+	// TODO: migrate ke private_key_enc (pgcrypto) hoặc KMS setelah migration 016.
+	var keyID, pubKey, privKeyPEM string
 	if err := h.DB.Pool().QueryRow(r.Context(),
-		`SELECT key_id, public_key_pem FROM signing_keys
-		 WHERE revoked=false ORDER BY created_at DESC LIMIT 1`).Scan(&keyID, &pubKey); err != nil {
+		`SELECT key_id, public_key_pem, COALESCE(private_key_pem,'') FROM signing_keys
+		 WHERE revoked=false ORDER BY created_at DESC LIMIT 1`).Scan(&keyID, &pubKey, &privKeyPEM); err != nil {
 		jsonError(w, "no active signing key", http.StatusServiceUnavailable)
 		return
 	}
 
-	// Generate deterministic-ish signature (placeholder for real cosign.Sign)
-	sigB64 := "MEUCIQD" + req.Digest[7:39] + "AiBxN" + req.Digest[39:55]
+	// FIX #5: dùng crypto/ecdsa thật thay placeholder string.
+	sigB64, err := signDigestECDSA(privKeyPEM, req.Digest)
+	if err != nil {
+		jsonInternalError(w, r, "signing failed", err)
+		return
+	}
 	bundle := map[string]any{
 		"base64Signature": sigB64,
 		"cert":            nil,
@@ -256,11 +270,11 @@ func (h *SupplyChain) Sign(w http.ResponseWriter, r *http.Request) {
 	bundleJSON, _ := json.Marshal(bundle)
 
 	var newID string
-	err := h.DB.Pool().QueryRow(r.Context(),
+	err = h.DB.Pool().QueryRow(r.Context(),
 		`INSERT INTO supply_chain_signatures
 		   (tenant_id, artifact_name, artifact_digest, signature_bytes, signature_b64,
 		    public_key_pem, bundle_json, signed_by, algorithm, verified)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false) -- FIX #5: false until Rekor verification
 		 RETURNING id::text`,
 		claims.TenantID, req.Artifact, req.Digest,
 		[]byte(sigB64), sigB64, pubKey, bundleJSON, claims.Email,
@@ -276,7 +290,7 @@ func (h *SupplyChain) Sign(w http.ResponseWriter, r *http.Request) {
 		"digest":        req.Digest,
 		"signature_b64": sigB64,
 		"key_id":        keyID,
-		"verified":      true,
+		"verified":      false,
 		"bundle":        bundle,
 	})
 }
@@ -322,17 +336,15 @@ func (h *SupplyChain) Provenance(w http.ResponseWriter, r *http.Request) {
 			out = append(out, p)
 		}
 	}
-	var totalCount int
+	// FIX #4: bỏ fallback — nếu DB trả 0 thì total = 0, không che giấu empty state.
+	var total int64
 	_ = h.DB.Pool().QueryRow(r.Context(),
 		`SELECT COUNT(*) FROM slsa_provenance WHERE tenant_id = $1`,
-		claims.TenantID).Scan(&totalCount)
-	if totalCount == 0 {
-		totalCount = len(out)
-	}
+		claims.TenantID).Scan(&total)
 	jsonOK(w, map[string]any{
 		"provenance": out,
-		"total":      totalCount,
-		"count":      len(out), // safe-len: legacy page count; total is honest
+		"total":      total,
+		"count":      total,
 		"page_size":  len(out),
 	})
 }
@@ -462,19 +474,17 @@ func (h *SupplyChain) VEX(w http.ResponseWriter, r *http.Request) {
 			out = append(out, v)
 		}
 	}
-	var totalCount int
+	// FIX #4: bỏ fallback — nếu DB trả 0 thì total = 0, không che giấu empty state.
+	var total int64
 	_ = h.DB.Pool().QueryRow(r.Context(),
 		`SELECT COUNT(*) FROM vex_statements
 		 WHERE tenant_id = $1
 		   AND ($2::text IS NULL OR status = $2)`,
-		claims.TenantID, statusFilter).Scan(&totalCount)
-	if totalCount == 0 {
-		totalCount = len(out)
-	}
+		claims.TenantID, statusFilter).Scan(&total)
 	jsonOK(w, map[string]any{
 		"vex":       out,
-		"total":     totalCount,
-		"count":     len(out), // safe-len: legacy page count; total is honest
+		"total":     total,
+		"count":     total,
 		"page_size": len(out),
 	})
 }
@@ -542,14 +552,215 @@ func (h *SupplyChain) VerifyBundle(w http.ResponseWriter, r *http.Request) {
 
 	// In production, this would call cosign.VerifyBundle.
 	// For now: accept bundle as valid if it has the expected fields.
+	// FIX #2: crypto_verified=false — structural check only, chưa verify thật.
 	jsonOK(w, map[string]any{
-		"valid":     true,
-		"algorithm": keyAlgo,
-		"payload":   req.Bundle,
+		"valid":           true,
+		"crypto_verified": false,
+		"warning":         "structural check only; cryptographic verification not yet implemented",
+		"algorithm":       keyAlgo,
+		"payload":         req.Bundle,
 		"trust_chain": []map[string]string{
-			{"step": "Sigstore Root CA", "status": "valid"},
-			{"step": "Fulcio Intermediate", "status": "valid"},
-			{"step": "Bundle signature", "status": "valid"},
+			{"step": "Sigstore Root CA", "status": "pending"},
+			{"step": "Fulcio Intermediate", "status": "pending"},
+			{"step": "Bundle signature", "status": "pending"},
 		},
 	})
+}
+
+// ─── DELETE /api/v1/supply-chain/signatures/{id} ── FIX #7 ─────────────────
+func (h *SupplyChain) DeleteSignature(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/supply-chain/signatures/")
+	id = strings.TrimSuffix(id, "/")
+	if id == "" || strings.Contains(id, "/") {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	tag, err := h.DB.Pool().Exec(r.Context(),
+		`DELETE FROM supply_chain_signatures WHERE id=$1::uuid AND tenant_id=$2`,
+		id, claims.TenantID)
+	if err != nil {
+		jsonInternalError(w, r, "delete failed", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonError(w, "signature not found", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ─── DELETE /api/v1/supply-chain/provenance/{id} ── FIX #7 ─────────────────
+func (h *SupplyChain) DeleteProvenance(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/supply-chain/provenance/")
+	id = strings.TrimSuffix(id, "/")
+	if id == "" || strings.Contains(id, "/") {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	tag, err := h.DB.Pool().Exec(r.Context(),
+		`DELETE FROM slsa_provenance WHERE id=$1::uuid AND tenant_id=$2`,
+		id, claims.TenantID)
+	if err != nil {
+		jsonInternalError(w, r, "delete failed", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonError(w, "provenance not found", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ─── POST /api/v1/supply-chain/vex ── FIX #7 ───────────────────────────────
+type vexCreateReq struct {
+	Product       string `json:"product"`
+	Version       string `json:"version"`
+	Component     string `json:"component"`
+	CompVersion   string `json:"component_version"`
+	CVE           string `json:"cve_id"`
+	Status        string `json:"status"`
+	Justification string `json:"justification"`
+	Detail        string `json:"detail"`
+}
+
+var validVexStatuses = map[string]bool{
+	"not_affected": true, "affected": true,
+	"fixed": true, "under_investigation": true,
+}
+
+func nullIfEmpty(s string) any {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return s
+}
+
+func (h *SupplyChain) CreateVEX(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req vexCreateReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.Product = strings.TrimSpace(req.Product)
+	req.Component = strings.TrimSpace(req.Component)
+	if req.Product == "" || req.Component == "" {
+		jsonError(w, "product and component required", http.StatusBadRequest)
+		return
+	}
+	if !validVexStatuses[req.Status] {
+		req.Status = "under_investigation"
+	}
+	// Build statement_json (VEX CSAF-style minimal statement)
+	stmtJSON, _ := json.Marshal(map[string]any{
+		"product":       req.Product,
+		"version":       req.Version,
+		"component":     req.Component,
+		"cve_id":        req.CVE,
+		"status":        req.Status,
+		"justification": req.Justification,
+		"detail":        req.Detail,
+		"author":        claims.Email,
+	})
+	var newID string
+	if err := h.DB.Pool().QueryRow(r.Context(),
+		`INSERT INTO vex_statements
+		   (tenant_id, product_name, product_version, component_name, component_version,
+		    cve_id, status, justification, detail, author, analysis_date, statement_json)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),$11)
+		 RETURNING id::text`,
+		claims.TenantID, req.Product, req.Version, req.Component, nullIfEmpty(req.CompVersion),
+		nullIfEmpty(req.CVE), req.Status, nullIfEmpty(req.Justification),
+		nullIfEmpty(req.Detail), claims.Email, stmtJSON).Scan(&newID); err != nil {
+		jsonInternalError(w, r, "insert failed", err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, map[string]any{"id": newID, "status": req.Status})
+}
+
+// ─── PATCH /api/v1/supply-chain/vex/{id} ── FIX #7 ─────────────────────────
+type vexPatchReq struct {
+	Status        string `json:"status"`
+	Justification string `json:"justification"`
+	Detail        string `json:"detail"`
+}
+
+func (h *SupplyChain) PatchVEX(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/supply-chain/vex/")
+	id = strings.TrimSuffix(id, "/")
+	if id == "" || strings.Contains(id, "/") {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req vexPatchReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Status != "" && !validVexStatuses[req.Status] {
+		jsonError(w, "invalid status; valid: not_affected, affected, fixed, under_investigation", http.StatusBadRequest)
+		return
+	}
+	tag, err := h.DB.Pool().Exec(r.Context(),
+		`UPDATE vex_statements SET
+		   status        = COALESCE(NULLIF($3,''), status),
+		   justification = COALESCE(NULLIF($4,''), justification),
+		   detail        = COALESCE(NULLIF($5,''), detail),
+		   analysis_date = NOW()
+		 WHERE id=$1::uuid AND tenant_id=$2`,
+		id, claims.TenantID, req.Status, req.Justification, req.Detail)
+	if err != nil {
+		jsonInternalError(w, r, "update failed", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonError(w, "vex statement not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]any{"id": id, "updated": true})
+}
+
+// ─── DELETE /api/v1/supply-chain/vex/{id} ── FIX #7 ────────────────────────
+func (h *SupplyChain) DeleteVEX(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/supply-chain/vex/")
+	id = strings.TrimSuffix(id, "/")
+	if id == "" || strings.Contains(id, "/") {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	tag, err := h.DB.Pool().Exec(r.Context(),
+		`DELETE FROM vex_statements WHERE id=$1::uuid AND tenant_id=$2`,
+		id, claims.TenantID)
+	if err != nil {
+		jsonInternalError(w, r, "delete failed", err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonError(w, "vex statement not found", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
