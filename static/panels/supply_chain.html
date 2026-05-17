@@ -162,21 +162,18 @@ tr:hover td{background:var(--bg3)}
       <div class="form-grid">
         <div class="form-row">
           <label for="sign-name">Artifact name *</label>
-          <input id="sign-name" placeholder="vsp-gateway:v1.0" value="vsp-gateway:v1.0">
+          <input id="sign-name" placeholder="vsp-gateway:v1.0" value="">
         </div>
         <div class="form-row">
           <label for="sign-digest">Artifact digest (sha256) *</label>
-          <input id="sign-digest" placeholder="sha256:abc..." value="sha256:06f22db4a8c5e9c7f2b1a3d4e5f6c7b8a9e0f1d2c3b4a5968775849302817263">
+          <input id="sign-digest" placeholder="sha256:abc..." value="">
         </div>
       </div>
       <div class="form-row" style="margin-bottom:10px">
         <label for="sign-payload">Payload (JSON)</label>
-        <textarea id="sign-payload">{"build_id":"vsp-build-001","builder":"local","commit":"06f22db"}</textarea>
+        <textarea id="sign-payload">{}</textarea>
       </div>
-      <div class="form-row" style="margin-bottom:10px">
-        <label for="sign-by">Signed by</label>
-        <input id="sign-by" value="" placeholder="signer@your-org.com">
-      </div>
+      <!-- sign-by removed: backend uses authenticated user email from JWT claims -->
       <button class="btn btn-primary" onclick="signArtifact()">🔏 Sign</button>
     </div>
   </div>
@@ -236,11 +233,11 @@ tr:hover td{background:var(--bg3)}
       <div class="form-grid">
         <div class="form-row">
           <label for="prov-name">Artifact name</label>
-          <input id="prov-name" value="vsp-gateway:v1.0">
+          <input id="prov-name" value="">
         </div>
         <div class="form-row">
           <label for="prov-digest">Artifact digest</label>
-          <input id="prov-digest" value="sha256:06f22db...">
+          <input id="prov-digest" value="">
         </div>
         <div class="form-row">
           <label for="prov-source">Source URI</label>
@@ -248,7 +245,7 @@ tr:hover td{background:var(--bg3)}
         </div>
         <div class="form-row">
           <label for="prov-commit">Source commit</label>
-          <input id="prov-commit" value="06f22db">
+          <input id="prov-commit" value="">
         </div>
         <div class="form-row">
           <label for="prov-builder">Builder ID</label>
@@ -289,7 +286,7 @@ tr:hover td{background:var(--bg3)}
   <div class="card">
     <div class="card-head">
       <div class="card-title">📋 Create VEX Statement</div>
-      <div class="mono">POST /api/p4/vex — CycloneDX VEX 1.4</div>
+      <div class="mono">POST /api/v1/supply-chain/vex — CycloneDX VEX 1.4</div>
     </div>
     <div class="card-body">
       <div class="form-grid">
@@ -320,8 +317,6 @@ tr:hover td{background:var(--bg3)}
             <option value="affected">affected</option>
             <option value="fixed">fixed</option>
             <option value="under_investigation">under_investigation</option>
-            <option value="exploitable">exploitable</option>
-            <option value="not_exploitable">not_exploitable</option>
           </select>
         </div>
         <div class="form-row">
@@ -445,7 +440,7 @@ async function loadKPIs() {
     const [sigs, prov, vex, key] = await Promise.all([
       safe(fetch('/api/v1/supply-chain/signatures')),
       safe(fetch('/api/v1/supply-chain/provenance')),
-      safe(fetch('/api/p4/vex')),
+      safe(fetch('/api/v1/supply-chain/vex', {headers: {'Authorization': 'Bearer ' + (localStorage.getItem('vsp_token') || '')}})),
       safe(fetch('/api/v1/supply-chain/key', {headers: {'Authorization': 'Bearer ' + (localStorage.getItem('vsp_token') || sessionStorage.getItem('vsp_token') || '')}}))
     ]);
     _scKPIClear();
@@ -466,7 +461,7 @@ async function signArtifact() {
     artifact_name: document.getElementById('sign-name').value,
     artifact_digest: document.getElementById('sign-digest').value,
     payload: JSON.parse(document.getElementById('sign-payload').value || '{}'),
-    signed_by: document.getElementById('sign-by').value
+    signed_by: '' /* set by backend from JWT claims */
   };
   try {
     const res = await fetch('/api/v1/supply-chain/sign', {
@@ -625,7 +620,7 @@ async function createVEX() {
     alert('Component name and status are required'); return;
   }
   try {
-    const res = await fetch('/api/p4/vex', {
+    const res = await fetch('/api/v1/supply-chain/vex', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
     });
     if (!res.ok) throw new Error('VEX creation failed');
@@ -644,7 +639,7 @@ async function loadVEX() {
   if (hasUX && !hasData) VSPUXState.skeleton('#vex-tbody', { rows: 3, kind: 'table' });
 
   try {
-    const res = await fetch('/api/p4/vex');
+    const res = await fetch('/api/v1/supply-chain/vex');
     if (!res.ok) {
       if (hasUX && !hasData) VSPUXState.error('#vex-tbody', 'HTTP ' + res.status, loadVEX);
       return;
@@ -859,7 +854,7 @@ loadSignatures();
       payloadInput.value = JSON.stringify({
         build_id: 'vsp-build-' + Date.now().toString().slice(-6),
         builder: 'local',
-        commit: '06f22db',
+        commit: '',
         builtAt: new Date().toISOString()
       }, null, 2);
     }
@@ -1198,7 +1193,7 @@ loadSignatures();
       window.__vspVexWrap = true;
       window.loadVEX = async function() {
         try {
-          const res = await authFetch('/api/p4/vex');
+          const res = await fetch('/api/v1/supply-chain/vex', {headers: {'Authorization': 'Bearer ' + (localStorage.getItem('vsp_token') || '')}});
           const d = await res.json();
           vexCache = d.vex || [];
           const s = d.statistics || {};
