@@ -1518,7 +1518,7 @@ async function loadStats() {
       vexEl.innerHTML = d.vex_by_status.map(v => {
         const pct = Math.round(v.count / total * 100);
         const c = colors[v.status] || '#888';
-        return `<div style="display:flex;align-items:center;gap:8px;font-size:11px">
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;max-width:500px">
           <div style="width:110px;color:var(--t2);font-family:var(--font-mono)">${v.status}</div>
           <div style="flex:1;height:14px;background:var(--bg2,#18181b);border-radius:3px;overflow:hidden">
             <div style="width:${pct}%;height:100%;background:${c};border-radius:3px;transition:width .4s"></div>
@@ -1550,7 +1550,7 @@ async function loadStats() {
       const data = d.signatures_per_day;
       const dpr = window.devicePixelRatio || 1;
       const W = Math.max(canvas.parentElement ? canvas.parentElement.offsetWidth - 32 : 600, 200);
-      const H = 60;
+      const H = 80;
       canvas.style.width  = W + 'px';
       canvas.style.height = H + 'px';
       canvas.width  = W * dpr;
