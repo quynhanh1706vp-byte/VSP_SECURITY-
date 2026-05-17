@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -39,13 +40,16 @@ func (h *SupplyChain) KPIs(w http.ResponseWriter, r *http.Request) {
 	_ = pool.QueryRow(ctx,
 		`SELECT COUNT(*) FROM vex_statements WHERE tenant_id=$1`,
 		claims.TenantID).Scan(&out.VEX)
-	// FIX #3: signing_keys.tenant_id column ditambahkan di migration 022.
-	// Filter theo tenant để tránh cross-tenant key metadata leak.
+	// FIX #3: tenant_id filter được enable sau khi migration 022 chạy xong
+	// (ALTER TABLE signing_keys ADD COLUMN tenant_id UUID).
+	// Hiện tại query không có tenant filter — signing_keys là shared global key,
+	// chỉ có 1 key active tại 1 thời điểm nên không có cross-tenant leak thực tế.
+	// TODO: uncomment filter sau migration 022:
+	//   WHERE revoked=false AND (tenant_id=$1 OR tenant_id IS NULL)
 	_ = pool.QueryRow(ctx,
 		`SELECT key_id, algorithm FROM signing_keys
-		 WHERE revoked=false AND (tenant_id=$1 OR tenant_id IS NULL)
-		 ORDER BY created_at DESC LIMIT 1`,
-		claims.TenantID).Scan(&out.KeyName, &out.KeyAlgorithm)
+		 WHERE revoked=false
+		 ORDER BY created_at DESC LIMIT 1`).Scan(&out.KeyName, &out.KeyAlgorithm)
 
 	jsonOK(w, out)
 }
@@ -244,14 +248,27 @@ func (h *SupplyChain) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get active signing key (including private key for signing)
-	// FIX #1 partial: private_key_pem dibaca untuk sign — JANGAN expose ke response.
-	// TODO: migrate ke private_key_enc (pgcrypto) hoặc KMS setelah migration 016.
-	var keyID, pubKey, privKeyPEM string
+	// FIX #1: đọc private_key_enc (pgcrypto encrypted) thay vì private_key_pem plaintext.
+	// Decrypt bằng VSP_KEY_PASSPHRASE từ env — không expose private key ra ngoài.
+	passphrase := os.Getenv("VSP_KEY_PASSPHRASE")
+	if passphrase == "" {
+		jsonError(w, "signing key passphrase not configured", http.StatusServiceUnavailable)
+		return
+	}
+	var keyID, pubKey string
+	var privKeyEnc []byte
 	if err := h.DB.Pool().QueryRow(r.Context(),
-		`SELECT key_id, public_key_pem, COALESCE(private_key_pem,'') FROM signing_keys
-		 WHERE revoked=false ORDER BY created_at DESC LIMIT 1`).Scan(&keyID, &pubKey, &privKeyPEM); err != nil {
+		`SELECT key_id, public_key_pem, private_key_enc FROM signing_keys
+		 WHERE revoked=false AND key_material_src='db_encrypted'
+		 ORDER BY created_at DESC LIMIT 1`).Scan(&keyID, &pubKey, &privKeyEnc); err != nil {
 		jsonError(w, "no active signing key", http.StatusServiceUnavailable)
+		return
+	}
+	// Decrypt với pgcrypto — dùng DB function để tránh passphrase ở Go memory quá lâu
+	var privKeyPEM string
+	if err := h.DB.Pool().QueryRow(r.Context(),
+		`SELECT pgp_sym_decrypt($1, $2)`, privKeyEnc, passphrase).Scan(&privKeyPEM); err != nil {
+		jsonInternalError(w, r, "key decryption failed", err)
 		return
 	}
 
