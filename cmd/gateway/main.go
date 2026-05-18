@@ -223,6 +223,20 @@ func main() {
 	defer db.Close()
 	log.Info().Msg("database connected ✓")
 
+	// Background: timeout stuck SOAR playbook runs every 5 minutes
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			n, err := db.TimeoutStuckRuns(context.Background(), 15*time.Minute)
+			if err != nil {
+				log.Warn().Err(err).Msg("TimeoutStuckRuns error")
+			} else if n > 0 {
+				log.Info().Int64("count", n).Msg("timed out stuck SOAR runs")
+			}
+		}
+	}()
+
 	// Auto-run migrations
 	stdDB, err2 := sql.Open("pgx", viper.GetString("database.url"))
 	if err2 != nil {

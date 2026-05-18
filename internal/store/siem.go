@@ -713,3 +713,19 @@ func (db *DB) CountEventsInWindow(ctx context.Context, tenantID string, since ti
 	err := db.pool.QueryRow(ctx, q, args...).Scan(&count, &hosts)
 	return count, hosts, err
 }
+
+// TimeoutStuckRuns marks playbook_runs stuck in 'running' > maxAge as failed.
+// Call periodically (e.g. every 5 minutes) from gateway background worker.
+func (db *DB) TimeoutStuckRuns(ctx context.Context, maxAge time.Duration) (int64, error) {
+	tag, err := db.Pool().Exec(ctx,
+		`UPDATE playbook_runs
+		 SET status='failed', finished_at=NOW(),
+		     error='timeout: run exceeded max duration'
+		 WHERE status='running'
+		   AND started_at < NOW() - $1::interval`,
+		maxAge.String())
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
