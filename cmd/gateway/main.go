@@ -1988,6 +1988,88 @@ func main() {
 				procs = []ProcStat{}
 			}
 
+			// Enrich with netcap engine data for connection map + protocol breakdown
+			type NetNode struct {
+				ID    string `json:"id"`
+				Label string `json:"label"`
+				Count int    `json:"count"`
+				Type  string `json:"type"`
+				Color string `json:"color"`
+				Bg    string `json:"bg"`
+			}
+			type NetEdge struct {
+				From  string `json:"from"`
+				To    string `json:"to"`
+				Src   string `json:"src"`
+				Dst   string `json:"dst"`
+				Bytes int64  `json:"bytes"`
+				Proto string `json:"proto"`
+			}
+			type ConnRow struct {
+				Src   string `json:"src"`
+				Dst   string `json:"dst"`
+				Proto string `json:"proto"`
+				Port  int    `json:"port"`
+				Bytes int64  `json:"bytes"`
+			}
+			type ProtoRow struct {
+				Proto string `json:"proto"`
+				Count int    `json:"count"`
+				Bytes int64  `json:"bytes"`
+			}
+			var nodes []NetNode
+			var edges []NetEdge
+			var conns []ConnRow
+			var protos []ProtoRow
+			ncFlows := netCapEngine.GetFlows(200, "", "")
+			ipCount := map[string]int{}
+			edgeMap := map[string]*NetEdge{}
+			protoMap := map[string]*ProtoRow{}
+			for _, f := range ncFlows {
+				ipCount[f.SrcIP]++
+				ipCount[f.DstIP]++
+				ek := f.SrcIP + "->" + f.DstIP + "/" + string(f.Proto)
+				if edgeMap[ek] == nil {
+					edgeMap[ek] = &NetEdge{From: f.SrcIP, To: f.DstIP, Src: f.SrcIP, Dst: f.DstIP, Proto: string(f.Proto)}
+				}
+				edgeMap[ek].Bytes += f.Bytes
+				if protoMap[string(f.Proto)] == nil {
+					protoMap[string(f.Proto)] = &ProtoRow{Proto: string(f.Proto)}
+				}
+				protoMap[string(f.Proto)].Count++
+				protoMap[string(f.Proto)].Bytes += f.Bytes
+				if len(conns) < 50 {
+					conns = append(conns, ConnRow{
+						Src: f.SrcIP, Dst: f.DstIP,
+						Proto: string(f.Proto), Port: int(f.DstPort),
+						Bytes: f.Bytes,
+					})
+				}
+			}
+			for ip, cnt := range ipCount {
+				nodeType := "internal"
+				nodeColor := "rgb(99,179,237)"
+				nodeBg := "rgba(99,179,237,0.1)"
+				// Simple external IP check
+				if !strings.HasPrefix(ip, "127.") && !strings.HasPrefix(ip, "10.") &&
+					!strings.HasPrefix(ip, "192.168.") && !strings.HasPrefix(ip, "172.") {
+					nodeType = "external"
+					nodeColor = "rgb(239,68,68)"
+					nodeBg = "rgba(239,68,68,0.1)"
+				}
+				nodes = append(nodes, NetNode{ID: ip, Label: ip, Count: cnt,
+					Type: nodeType, Color: nodeColor, Bg: nodeBg})
+			}
+			for _, e := range edgeMap {
+				edges = append(edges, *e)
+			}
+			for _, p := range protoMap {
+				protos = append(protos, *p)
+			}
+			if nodes == nil { nodes = []NetNode{} }
+			if edges == nil { edges = []NetEdge{} }
+			if conns == nil { conns = []ConnRow{} }
+			if protos == nil { protos = []ProtoRow{} }
 			w.Header().Set("Content-Type", "application/json") //nolint:errcheck
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"flows_per_min": totalFlows / 60,
@@ -1995,6 +2077,10 @@ func main() {
 				"suspicious":    suspicious,
 				"top_hosts":     hosts,
 				"top_processes": procs,
+				"nodes":         nodes,
+				"edges":         edges,
+				"connections":   conns,
+				"protocols":     protos,
 			}) //nolint:errcheck
 		})
 
