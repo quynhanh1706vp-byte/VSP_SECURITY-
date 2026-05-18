@@ -1098,9 +1098,11 @@ function loadRunHistory(){
       +'<span class="run-dur">'+r.dur+'</span>'
       +'</div>';
   }).join('');
-  if(TOKEN) fetch(API+'/api/v1/soar/runs?limit=20', {credentials:'same-origin'})
+  if(TOKEN) fetch(API+'/api/v1/soar/runs?limit=50', {credentials:'same-origin',headers:{'Authorization':'Bearer '+TOKEN}})
     .then(function(r){return r.json();}).then(function(d){
       if(d.runs&&d.runs.length){
+        // Clear and replace — avoids stale runs after refresh
+        RUN_HISTORY=[];
         d.runs.forEach(function(r){
           if(!RUN_HISTORY.find(function(x){return x.id===r.id;})){
             RUN_HISTORY.push({id:r.id.slice(0,8).toUpperCase(),pb:r.pb||r.PlaybookName||r.playbook_name||'—',
@@ -1111,6 +1113,11 @@ function loadRunHistory(){
         // Fix 3: Run stats counter
         var stats = {success:0, failed:0, running:0};
         d.runs.forEach(function(r){ if(stats[r.status]!=null) stats[r.status]++; });
+        document.getElementById('history-sub').textContent=RUN_HISTORY.length+' runs';
+        document.getElementById('run-history').innerHTML=RUN_HISTORY.map(function(r){
+          var sc=r.status==='success'?'pill-green':r.status==='running'?'pill-blue':'pill-red';
+          return '<div class="run-item" onclick="openRunDetail(\''+r.id+'\')">'+'<span class="run-id">'+r.id+'</span>'+'<span class="run-pb">'+r.pb+'</span>'+'<span class="pill '+sc+'">'+r.status+'</span>'+'<span class="pill pill-gray" style="font-size:9px">'+trigLabel(r.trigger)+'</span>'+'<span class="run-ts">'+r.ts+'</span>'+'<span class="run-dur">'+r.dur+'</span>'+'</div>';
+        }).join('');
         var statsEl = document.getElementById('run-stats-bar');
         if (statsEl) {
           statsEl.innerHTML =
