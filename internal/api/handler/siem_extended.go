@@ -161,8 +161,7 @@ func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
 		SourceRefs json.RawMessage `json:"source_refs"`
 	}
 	if !decodeJSON(w, r, &req) {
-		jsonError(w, "invalid body", http.StatusBadRequest)
-		return
+		return // decodeJSON already wrote error
 	}
 	if req.Title == "" {
 		jsonError(w, "title required", http.StatusBadRequest)
@@ -189,9 +188,10 @@ func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
 	logAudit(r, h.DB, "INCIDENT_CREATED", "incidents/create")
-	jsonOK(w, map[string]any{"id": id, "status": "created"})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "created"})
 }
 
 func (h *Correlation) ResolveIncident(w http.ResponseWriter, r *http.Request) {
