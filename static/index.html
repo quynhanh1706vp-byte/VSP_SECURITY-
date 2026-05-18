@@ -3113,6 +3113,7 @@ async function loadExecutive() {
       fetch('/api/v1/vsp/sla_tracker',{headers:h}).then(r=>r.json()).catch(()=>({sla:[]})),
       fetch('/api/v1/compliance/fedramp',{headers:h}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
       fetch('/api/v1/compliance/cmmc',{headers:h}).then(r=>r.json()).catch(()=>({coverage_pct:0})),
+      fetch('/api/v1/vsp/runs/index',{headers:h}).then(r=>r.json()).catch(()=>({total:0,runs:[]})),
     ]);
 
     // Score ring
