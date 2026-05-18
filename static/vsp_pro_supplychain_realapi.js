@@ -137,7 +137,19 @@
             <div class="card-title">Signature ledger</div>
             <div class="card-sub" id="sc-ledger-sub">loading…</div>
           </div>
-          <button class="btn btn-sm" id="sc-btn-refresh">↻ Refresh</button>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="sc-ledger-filter" onchange="filterLedger()"
+              style="font-size:11px;padding:3px 6px;border-radius:4px;
+                     background:var(--bg2,#18181b);border:1px solid var(--border);
+                     color:var(--t2);cursor:pointer">
+              <option value="">All</option>
+              <option value="signed">✓ Signed</option>
+              <option value="verified">✓ Verified</option>
+              <option value="failed">✗ Failed</option>
+              <option value="not_found">? Unreachable</option>
+            </select>
+            <button class="btn btn-sm" id="sc-btn-refresh">↻ Refresh</button>
+          </div>
         </div>
         <div style="padding:0">
           <table class="data-table" style="width:100%;border-collapse:collapse">
@@ -320,7 +332,7 @@
     if (sub)  sub.textContent = 'loading…';
     try {
       const j = await api('/signatures');
-      const arr = j.signatures || [];
+      const arr = j.signatures || []; _ledgerCache = arr;
       if (sub) sub.textContent = arr.length + ' record' + (arr.length === 1 ? '' : 's');
       if (!arr.length) {
         rows.innerHTML = `<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3)">
@@ -329,7 +341,7 @@
       }
       rows.innerHTML = arr.slice(0, 100).map(s => `
         <tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:8px 12px;font-family:var(--font-mono);font-size:11px">${esc(s.image)}</td>
+          <td style="padding:8px 12px;font-family:var(--font-mono);font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.image)}">${esc(s.image)}</td>
           <td style="padding:8px 12px">${statusPill(s.status)}</td>
           <td style="padding:8px 12px;font-family:var(--font-mono);font-size:10px;color:var(--t3)">
               ${esc(s.digest || '—').slice(0, 24)}${s.digest && s.digest.length > 24 ? '…' : ''}</td>
@@ -341,6 +353,32 @@
       rows.innerHTML = `<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--red)">
         ✗ ${esc(e.message)}</td></tr>`;
     }
+  }
+
+  // Cache for filter
+  let _ledgerCache = [];
+
+  function filterLedger() {
+    const filter = document.getElementById('sc-ledger-filter');
+    const rows = $('sc-ledger-rows');
+    if (!filter || !rows || !_ledgerCache.length) return;
+    const val = filter.value;
+    const filtered = val ? _ledgerCache.filter(s => s.status === val) : _ledgerCache;
+    if (!filtered.length) {
+      rows.innerHTML = `<tr><td colspan="5" style="padding:18px;text-align:center;color:var(--t3)">
+        no matching records</td></tr>`;
+      return;
+    }
+    rows.innerHTML = filtered.slice(0, 100).map(s => `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 12px;font-family:var(--font-mono);font-size:11px;max-width:300px;
+                   overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.image)}">${esc(s.image)}</td>
+        <td style="padding:8px 12px">${statusPill(s.status)}</td>
+        <td style="padding:8px 12px;font-family:var(--font-mono);font-size:10px;color:var(--t3)">
+            ${esc(s.digest || '—').slice(0, 24)}${s.digest && s.digest.length > 24 ? '…' : ''}</td>
+        <td style="padding:8px 12px;font-size:11px;color:var(--t3)">${fmtTime(s.created_at)}</td>
+        <td style="padding:8px 12px;font-family:var(--font-mono);font-size:10px;color:var(--t3)">${esc(s.id)}</td>
+      </tr>`).join('');
   }
 
   // ── SBOM diff ───────────────────────────────────────────────────────────
