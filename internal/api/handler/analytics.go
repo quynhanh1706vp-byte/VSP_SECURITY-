@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -84,7 +85,7 @@ func (h *Analytics) Summary(w http.ResponseWriter, r *http.Request) {
 		  WHERE tenant_id = $1 AND created_at >= $2
 		  GROUP BY severity`,
 		tenantID, cutoff)
-	bySev := map[string]int64{"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+	bySev := map[string]int64{"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "INFO": 0}
 	if err == nil {
 		for rows.Next() {
 			var sev string
@@ -141,4 +142,189 @@ func (h *Analytics) Summary(w http.ResponseWriter, r *http.Request) {
 	out["mttr_hours"] = mttrHours
 
 	jsonOK(w, out)
+}
+
+// ─── GET /api/v1/analytics/trends?days=N ───────────────────────────────────
+// Per-day breakdown — sparkline/chart data cho frontend
+func (h *Analytics) Trends(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	days := queryInt(r, "days", 30)
+	if days < 1 || days > 365 {
+		days = 30
+	}
+	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
+
+	tenantID := claims.TenantID
+	if len(tenantID) != 36 {
+		var id string
+		_ = h.DB.Pool().QueryRow(r.Context(),
+			`SELECT id::text FROM tenants WHERE slug=$1 LIMIT 1`, tenantID).Scan(&id)
+		if id != "" {
+			tenantID = id
+		}
+	}
+
+	// Per-day run counts
+	type dayRun struct {
+		Day    string `json:"day"`
+		Total  int64  `json:"total"`
+		Failed int64  `json:"failed"`
+	}
+	var runs []dayRun
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT DATE(created_at)::text,
+		        COUNT(*),
+		        COUNT(*) FILTER (WHERE COALESCE(gate,'') NOT IN ('PASS','PASSED'))
+		 FROM runs
+		 WHERE tenant_id=$1 AND created_at>=$2
+		 GROUP BY DATE(created_at)
+		 ORDER BY DATE(created_at) ASC`,
+		tenantID, cutoff)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var d dayRun
+			if rows.Scan(&d.Day, &d.Total, &d.Failed) == nil {
+				runs = append(runs, d)
+			}
+		}
+	}
+	if runs == nil {
+		runs = []dayRun{}
+	}
+
+	// Per-day finding counts by severity
+	type dayFinding struct {
+		Day      string `json:"day"`
+		Critical int64  `json:"critical"`
+		High     int64  `json:"high"`
+		Medium   int64  `json:"medium"`
+		Low      int64  `json:"low"`
+	}
+	var findings []dayFinding
+	rows2, err := h.DB.Pool().Query(r.Context(),
+		`SELECT DATE(created_at)::text,
+		        COUNT(*) FILTER (WHERE severity='CRITICAL'),
+		        COUNT(*) FILTER (WHERE severity='HIGH'),
+		        COUNT(*) FILTER (WHERE severity='MEDIUM'),
+		        COUNT(*) FILTER (WHERE severity='LOW')
+		 FROM findings
+		 WHERE tenant_id=$1 AND created_at>=$2
+		 GROUP BY DATE(created_at)
+		 ORDER BY DATE(created_at) ASC`,
+		tenantID, cutoff)
+	if err == nil {
+		defer rows2.Close()
+		for rows2.Next() {
+			var d dayFinding
+			if rows2.Scan(&d.Day, &d.Critical, &d.High, &d.Medium, &d.Low) == nil {
+				findings = append(findings, d)
+			}
+		}
+	}
+	if findings == nil {
+		findings = []dayFinding{}
+	}
+
+	jsonOK(w, map[string]any{
+		"window_days": days,
+		"since":       cutoff.UTC().Format(time.RFC3339),
+		"runs":        runs,
+		"findings":    findings,
+	})
+}
+
+// ─── GET /api/v1/analytics/export?days=N&format=csv|json ───────────────────
+// Export analytics summary as CSV or JSON
+func (h *Analytics) Export(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	days := queryInt(r, "days", 30)
+	if days < 1 || days > 365 {
+		days = 30
+	}
+	format := r.URL.Query().Get("format")
+	if format != "csv" {
+		format = "json"
+	}
+	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
+
+	tenantID := claims.TenantID
+	if len(tenantID) != 36 {
+		var id string
+		_ = h.DB.Pool().QueryRow(r.Context(),
+			`SELECT id::text FROM tenants WHERE slug=$1 LIMIT 1`, tenantID).Scan(&id)
+		if id != "" {
+			tenantID = id
+		}
+	}
+
+	type exportRow struct {
+		Day      string `json:"day"`
+		Runs     int64  `json:"runs"`
+		Failed   int64  `json:"failed"`
+		Critical int64  `json:"critical"`
+		High     int64  `json:"high"`
+		Medium   int64  `json:"medium"`
+		Low      int64  `json:"low"`
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT
+		   DATE(r.created_at)::text,
+		   COUNT(DISTINCT r.id),
+		   COUNT(DISTINCT r.id) FILTER (WHERE COALESCE(r.gate,'') NOT IN ('PASS','PASSED')),
+		   COUNT(f.id) FILTER (WHERE f.severity='CRITICAL'),
+		   COUNT(f.id) FILTER (WHERE f.severity='HIGH'),
+		   COUNT(f.id) FILTER (WHERE f.severity='MEDIUM'),
+		   COUNT(f.id) FILTER (WHERE f.severity='LOW')
+		 FROM runs r
+		 LEFT JOIN findings f ON f.tenant_id=r.tenant_id
+		   AND DATE(f.created_at)=DATE(r.created_at)
+		 WHERE r.tenant_id=$1 AND r.created_at>=$2
+		 GROUP BY DATE(r.created_at)
+		 ORDER BY DATE(r.created_at) ASC`,
+		tenantID, cutoff)
+
+	var data []exportRow
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var row exportRow
+			if rows.Scan(&row.Day, &row.Runs, &row.Failed,
+				&row.Critical, &row.High, &row.Medium, &row.Low) == nil {
+				data = append(data, row)
+			}
+		}
+	}
+	if data == nil {
+		data = []exportRow{}
+	}
+
+	if format == "csv" {
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition",
+			"attachment; filename=analytics-export.csv")
+		fmt.Fprintln(w, "day,runs,failed,critical,high,medium,low")
+		for _, row := range data {
+			fmt.Fprintf(w, "%s,%d,%d,%d,%d,%d,%d\n",
+				row.Day, row.Runs, row.Failed,
+				row.Critical, row.High, row.Medium, row.Low)
+		}
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"window_days": days,
+		"format":      format,
+		"rows":        data,
+		"exported_at": time.Now().UTC().Format(time.RFC3339),
+	})
 }

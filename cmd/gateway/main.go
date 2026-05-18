@@ -1418,6 +1418,8 @@ func main() {
 		// without shipping thousands of run rows over the wire.
 		analyticsH := handler.NewAnalytics(db)
 		r.With(requirePro).Get("/api/v1/analytics/summary", analyticsH.Summary)
+		r.With(requirePro).Get("/api/v1/analytics/trends", analyticsH.Trends)
+		r.With(requirePro).Get("/api/v1/analytics/export", analyticsH.Export)
 		// Billing
 		r.Get("/api/v1/billing/status", billingH.Status)
 		r.With(vspMW.StrictLimiter(5, time.Minute)).Post("/api/v1/billing/checkout", billingH.CreateCheckout)
