@@ -1204,7 +1204,7 @@ function _onTokenReady(){
   ]).then(function(res){
     if(res[0]&&res[0].playbooks&&res[0].playbooks.length){
       PLAYBOOKS=res[0].playbooks.map(function(p){
-        return Object.assign({},p,{steps:p.steps||[],runs:p.runs||p.RunCount||0,success:p.success||p.SuccessCount||0,last:'—'});
+        return Object.assign({},p,{steps:p.steps||[],runs:p.runs||p.RunCount||0,success:p.success||p.SuccessCount||0,last:'—',desc:p.description||p.desc||''});
       });
       renderList();
     }
@@ -1214,7 +1214,7 @@ function _onTokenReady(){
 function _onData(d){
   if(d.playbooks&&d.playbooks.playbooks&&d.playbooks.playbooks.length){
     PLAYBOOKS=d.playbooks.playbooks.map(function(p){
-      return Object.assign({},p,{steps:p.steps||[],runs:p.runs||p.RunCount||0,success:p.success||p.SuccessCount||0,last:'—'});
+      return Object.assign({},p,{steps:p.steps||[],runs:p.runs||p.RunCount||0,success:p.success||p.SuccessCount||0,last:'—',desc:p.description||p.desc||''});
     });
     renderList();if(activePB)renderDetail();
   }
