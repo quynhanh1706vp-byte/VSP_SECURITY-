@@ -1247,8 +1247,22 @@ if(window.parent!==window) window.parent.postMessage({type:'vsp:request_theme'},
 
 // ── Init ───────────────────────────────────────────────────
 renderList();
-selectPB('pb-001');
-loadRunHistory();
+// TOKEN may not be available yet — _onTokenReady() will re-render when token arrives
+// Try immediate fetch if TOKEN already set (e.g. same-origin reload)
+if(typeof TOKEN !== 'undefined' && TOKEN && TOKEN.length > 20) {
+  _onTokenReady();
+} else {
+  // Poll for TOKEN from localStorage (set by parent frame)
+  var _soarTokenPoll = setInterval(function() {
+    var tk = localStorage.getItem('vsp_token') || '';
+    if(tk && tk.length > 20) {
+      TOKEN = tk;
+      clearInterval(_soarTokenPoll);
+      _onTokenReady();
+    }
+  }, 200);
+  setTimeout(function(){ clearInterval(_soarTokenPoll); }, 5000);
+}
 </script>
 <script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
