@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
 	"strings"
@@ -9,6 +10,20 @@ import (
 
 const csrfHeader = "X-CSRF-Token"
 const csrfCookie = "vsp_csrf"
+
+// csrfExemptPaths lists endpoints that bypass CSRF entirely.
+// Reason for each:
+//
+//	/auth/login              — no auth context yet, sets the cookie
+//	/auth/refresh            — refresh tokens are origin-bound by SameSite
+//	/software-inventory/report — agent endpoint (Bearer + HMAC, no browser)
+//	/siem/                   — SIEM ingestion (Bearer + IP allowlist)
+var csrfExemptPaths = []string{
+	"/api/v1/auth/login",
+	"/api/v1/auth/refresh",
+	"/api/v1/software-inventory/report",
+}
+var csrfExemptPrefixes = []string{"/api/v1/siem/"}
 
 // CSRFProtect validates the double-submit CSRF cookie pattern.
 //
@@ -43,29 +58,44 @@ func CSRFProtect(next http.Handler) http.Handler {
 			return
 		}
 
-		// Skip auth endpoints — CSRF not applicable to token-based auth login
-		// Agent endpoint: SW Risk agent POSTs dpkg/rpm inventory here.
-		// Agent auth = Bearer token + HMAC signature (see cmd/vsp-agent).
-		// No browser cookie flow -> CSRF not applicable. Exact path match.
-		if r.URL.Path == "/api/v1/software-inventory/report" {
+		// Exact-match exempt paths
+		for _, p := range csrfExemptPaths {
+			if r.URL.Path == p {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+		// Prefix exempts
+		for _, p := range csrfExemptPrefixes {
+			if strings.HasPrefix(r.URL.Path, p) {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		// X-Agent-Key bypass — endpoint agents authenticate via this header
+		// per request and never carry browser cookies, so double-submit CSRF
+		// doesn't apply. Handler verifies the key against agents.api_key_hash
+		// before doing anything stateful (store.GetAgentByAPIKeyHash).
+		if k := r.Header.Get("X-Agent-Key"); k != "" && len(k) >= 16 {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		if r.URL.Path == "/api/v1/auth/login" ||
-			r.URL.Path == "/api/v1/auth/refresh" ||
-			strings.HasPrefix(r.URL.Path, "/api/v1/siem/") {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// Skip if using Bearer token auth (API clients, not browser)
-		// Browser sessions use cookies; API clients use Authorization header
+		// Bearer token bypass — but only for non-empty tokens.
+		// FIX 2026-04-29: "Bearer " (with empty/whitespace token) previously
+		// bypassed CSRF, allowing attacker to inject empty Authorization header
+		// and skip CSRF validation. Now require non-empty token after the prefix.
 		auth := r.Header.Get("Authorization")
 		if strings.HasPrefix(auth, "Bearer ") {
-			// Bearer token present — CSRF not required (custom header = implicit protection)
-			next.ServeHTTP(w, r)
-			return
+			token := strings.TrimSpace(strings.TrimPrefix(auth, "Bearer "))
+			if token != "" {
+				// Real Bearer token present — CSRF not required
+				// (custom Authorization header = implicit cross-origin protection)
+				next.ServeHTTP(w, r)
+				return
+			}
+			// "Bearer " with empty token falls through to CSRF check below
 		}
 
 		// Validate double-submit cookie
@@ -75,7 +105,13 @@ func CSRFProtect(next http.Handler) http.Handler {
 			return
 		}
 		header := r.Header.Get(csrfHeader)
-		if header == "" || header != cookie.Value {
+		// Constant-time compare to deny byte-by-byte timing brute-force.
+		// Length-equal precheck is required because ConstantTimeCompare
+		// returns 0 (no match) immediately on length mismatch, which is
+		// itself non-secret information here; we only need the equality
+		// proof to leak no per-byte timing.
+		if header == "" || len(header) != len(cookie.Value) ||
+			subtle.ConstantTimeCompare([]byte(header), []byte(cookie.Value)) != 1 {
 			http.Error(w, "CSRF token mismatch", http.StatusForbidden)
 			return
 		}

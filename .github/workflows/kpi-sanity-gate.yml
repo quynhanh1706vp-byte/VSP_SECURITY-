@@ -1,0 +1,83 @@
+# KPI Sanity Release Gate (Sprint 10.4)
+#
+# Hard release blocker: before any tag-triggered or manual release
+# workflow runs, hit /api/v1/kpi/sanity on staging. HTTP 409 = stop
+# the train. This satisfies DSOMM L4's "automated quality gates"
+# requirement (one of the three "process automation" criteria the
+# 3PAO will look for).
+#
+# Required GitHub Actions secrets:
+#   STAGING_BASE_URL     — e.g. https://staging.vsp.vn
+#   STAGING_SANITY_TOKEN — short-lived JWT from cmd/vsp-cli (analyst role)
+#
+# Workflow exit codes:
+#   0  — all assertions passed; release proceeds
+#   1  — HTTP 409 returned; one or more invariants violated
+#   2  — endpoint unreachable; treat as fail-closed (don't release blind)
+
+name: KPI Sanity Release Gate
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe staging KPI sanity
+        id: probe
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          TOKEN:    ${{ secrets.STAGING_SANITY_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [[ -z "${BASE_URL:-}" || -z "${TOKEN:-}" ]]; then
+            echo "::error::STAGING_BASE_URL or STAGING_SANITY_TOKEN secret missing"
+            exit 2
+          fi
+          # 5s connect, 25s total — endpoint should respond fast.
+          status=$(curl -s -o body.json -w '%{http_code}' \
+                  --connect-timeout 5 --max-time 25 \
+                  -H "Authorization: Bearer $TOKEN" \
+                  "$BASE_URL/api/v1/kpi/sanity") || true
+
+          if [[ -z "$status" || "$status" == "000" ]]; then
+            echo "::error::endpoint unreachable; failing closed (DSOMM L4: do not release blind)"
+            exit 2
+          fi
+
+          echo "HTTP $status from /api/v1/kpi/sanity:"
+          cat body.json || true
+          echo
+
+          if [[ "$status" == "200" ]]; then
+            echo "::notice::KPI sanity green — release may proceed"
+            exit 0
+          fi
+          if [[ "$status" == "409" ]]; then
+            echo "::error::KPI sanity reports release-blocking invariant violations"
+            # Surface the failure detail in the run summary.
+            jq -r '.assertions[] | select(.passed==false) |
+                   "- " + .label + " — " + .detail' body.json \
+                   >> "$GITHUB_STEP_SUMMARY" || true
+            exit 1
+          fi
+          echo "::error::Unexpected HTTP $status — failing closed"
+          exit 2
+
+      - name: Annotate release readiness
+        if: success()
+        run: |
+          {
+            echo "## KPI Sanity Result"
+            echo
+            echo "All assertions passed against $STAGING_BASE_URL."
+            echo "Release pipeline may proceed."
+          } >> "$GITHUB_STEP_SUMMARY"

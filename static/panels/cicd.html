@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script src="/static/js/vsp_uxstates.js"></script>
 <script>
 
 /* VSP auth fetch guard v2 — polling retry */
@@ -47,7 +48,7 @@
     if (tk) {
       opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
     } else {
-      console.warn("[VSP guard] no token after 2.5s:", url);
+      if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) console.warn("[VSP guard] no token after 2.5s:", url);
     }
     return _origFetch(url, opts);
   };
@@ -158,6 +159,8 @@ td{padding:7px 10px;vertical-align:middle}
 .form-ctrl:focus{border-color:var(--border2)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .toast{position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);display:none}
+
+.cicd-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
 </style>
 </head>
 <body>
@@ -196,7 +199,7 @@ td{padding:7px 10px;vertical-align:middle}
         <div class="flow-arr">→</div>
         <div class="flow-step"><div class="flow-box fs-cyan">VSP Scan</div><div class="flow-sub">POST /vsp/run</div></div>
         <div class="flow-arr">→</div>
-        <div class="flow-step"><div class="flow-box fs-purple">SAST+SCA<br>+SECRETS+IAC</div><div class="flow-sub">parallel · 14 tools</div></div>
+        <div class="flow-step"><div class="flow-box fs-purple">SAST+SCA<br>+SECRETS+IAC</div><div class="flow-sub">parallel · 26 tools <span style="color:#10b981;font-weight:700;font-size:9px">+4 Phase 4 ★</span></div></div>
         <div class="flow-arr">→</div>
         <div class="flow-step"><div class="flow-box fs-amber">Gate Check</div><div class="flow-sub">score ≥ 70 = PASS</div></div>
         <div class="flow-arr">→</div>
@@ -225,32 +228,32 @@ td{padding:7px 10px;vertical-align:middle}
     <div class="card-head"><div class="card-title">CI/CD Integration status</div><div class="card-sub">Connected via API key · Bearer token auth</div></div>
     <div class="card-body">
       <div class="int-grid">
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('github')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(34,197,94,.12);color:var(--green)">⑆</div>
           <div><div class="int-name">GitHub Actions</div><div class="int-status" style="color:var(--green)">● Connected · cicd@vsp.local</div></div>
           <div class="int-actions"><span class="badge badge-ok">Active</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('gitlab')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(245,158,11,.12);color:var(--amber)">⬡</div>
           <div><div class="int-name">GitLab CI</div><div class="int-status" style="color:var(--amber)">○ Config ready · not connected</div></div>
           <div class="int-actions"><span class="badge badge-warn">Pending</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('jenkins')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(139,92,246,.12);color:var(--purple)">◎</div>
           <div><div class="int-name">Jenkins</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
           <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('azure')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(6,182,212,.12);color:var(--cyan)">◈</div>
           <div><div class="int-name">Azure DevOps</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
           <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('bitbucket')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(249,115,22,.12);color:var(--orange)">⬟</div>
           <div><div class="int-name">Bitbucket Pipelines</div><div class="int-status" style="color:var(--t3)">○ Template available</div></div>
           <div class="int-actions"><span class="badge badge-neutral">Setup</span></div>
         </div>
-        <div class="int-card">
+        <div class="int-card" onclick="setupIntegration('vspcli')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(34,197,94,.12);color:var(--green)">◑</div>
           <div><div class="int-name">vspcli (local)</div><div class="int-status" style="color:var(--green)">● Available · Linux/Win/macOS</div></div>
           <div class="int-actions"><span class="badge badge-ok">Ready</span></div>
@@ -262,7 +265,32 @@ td{padding:7px 10px;vertical-align:middle}
 
 <!-- ══ TAB 2 — TEMPLATES ══ -->
 <div class="tab-panel" id="tab-templates">
-  <div class="card">
+  <!-- VSP-CICD-H2.F: Platform selector -->
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;color:var(--t1);font-weight:600;margin-bottom:4px">Pipeline template library</div>
+        <div style="font-size:10px;color:var(--t3)">Choose your CI/CD platform · 6 templates available</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm btn-tplsel active" data-tpl="github" onclick="selectTemplate('github')">⑆ GitHub</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="gitlab" onclick="selectTemplate('gitlab')">⬡ GitLab</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="jenkins" onclick="selectTemplate('jenkins')">◎ Jenkins</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="azure" onclick="selectTemplate('azure')">◈ Azure</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="bitbucket" onclick="selectTemplate('bitbucket')">⬟ Bitbucket</button>
+        <button class="btn btn-sm btn-tplsel" data-tpl="vspcli" onclick="selectTemplate('vspcli')">◑ vspcli</button>
+      </div>
+    </div>
+  </div>
+  <style>
+    .btn-tplsel { font-size:10px; padding:5px 11px; opacity:.55; transition:all .2s }
+    .btn-tplsel:hover { opacity:.85 }
+    .btn-tplsel.active { opacity:1; background:var(--accent,#0ea5e9); color:#fff; border-color:var(--accent,#0ea5e9) }
+    .tpl-card { display:none }
+    .tpl-card.active { display:block }
+  </style>
+
+  <div class="card tpl-card active" id="tpl-card-github" data-tpl="github">
     <div class="card-head">
       <div><div class="card-title">GitHub Actions — vsp-scan.yml</div><div class="card-sub">Copy vào .github/workflows/ trong repo của bạn</div></div>
       <button class="btn btn-sm" onclick="copyTemplate('github')">⊕ Copy</button>
@@ -319,7 +347,7 @@ td{padding:7px 10px;vertical-align:middle}
     </div>
   </div>
 
-  <div class="card">
+  <div class="card tpl-card" id="tpl-card-gitlab" data-tpl="gitlab">
     <div class="card-head">
       <div><div class="card-title">GitLab CI — .gitlab-ci.yml</div><div class="card-sub">Thêm stage vsp vào pipeline GitLab</div></div>
       <button class="btn btn-sm" onclick="copyTemplate('gitlab')">⊕ Copy</button>
@@ -359,6 +387,189 @@ td{padding:7px 10px;vertical-align:middle}
 </div>
     </div>
   </div>
+  <!-- ══ JENKINS TEMPLATE (H2.1) ══ -->
+  <div class="card tpl-card" id="tpl-card-jenkins" data-tpl="jenkins">
+    <div class="card-head">
+      <div><div class="card-title">Jenkins — Jenkinsfile</div><div class="card-sub">Add to repo root · works with declarative + scripted pipeline</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('jenkins')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-jenkins"><button class="copy-btn" onclick="copyTemplate('jenkins')">Copy</button><span class="cm">// Jenkinsfile — declarative pipeline with VSP gate</span>
+<span class="kw">pipeline</span> {
+  <span class="kw">agent</span> any
+  <span class="kw">environment</span> {
+    <span class="var">VSP_URL</span>   = <span class="kw">credentials</span>(<span class="str">'vsp-url'</span>)
+    <span class="var">VSP_TOKEN</span> = <span class="kw">credentials</span>(<span class="str">'vsp-token'</span>)
+  }
+  <span class="kw">stages</span> {
+    <span class="kw">stage</span>(<span class="str">'VSP Security Scan'</span>) {
+      <span class="kw">steps</span> {
+        sh <span class="str">'''
+          set -e
+          RID=$(curl -sf -X POST $VSP_URL/api/v1/vsp/run \
+            -H "Authorization: Bearer $VSP_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"mode":"FULL","profile":"FAST","src":"."}' | jq -r '.rid')
+          echo "VSP run: $RID"
+          for i in $(seq 1 30); do
+            S=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
+              $VSP_URL/api/v1/vsp/run/$RID | jq -r '.status')
+            [ "$S" = "DONE" ] &amp;&amp; break
+            sleep 10
+          done
+          GATE=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
+            $VSP_URL/api/v1/vsp/run/$RID | jq -r '.gate')
+          echo "Gate: $GATE"
+          [ "$GATE" = "FAIL" ] &amp;&amp; exit 1 || exit 0
+        '''</span>
+      }
+    }
+  }
+  <span class="kw">post</span> {
+    <span class="kw">always</span> {
+      archiveArtifacts artifacts: <span class="str">'vsp-results.sarif'</span>, allowEmptyArchive: <span class="kw">true</span>
+    }
+  }
+}
+</div>
+    </div>
+  </div>
+
+  <!-- ══ AZURE DEVOPS TEMPLATE ══ -->
+  <div class="card tpl-card" id="tpl-card-azure" data-tpl="azure">
+    <div class="card-head">
+      <div><div class="card-title">Azure DevOps — azure-pipelines.yml</div><div class="card-sub">Place at repo root · YAML-based pipeline</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('azure')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-azure"><button class="copy-btn" onclick="copyTemplate('azure')">Copy</button><span class="cm"># azure-pipelines.yml — Azure DevOps with VSP gate</span>
+<span class="kw">trigger:</span>
+  <span class="kw">branches:</span>
+    <span class="kw">include:</span> [<span class="str">main</span>, <span class="str">develop</span>]
+
+<span class="kw">pr:</span>
+  <span class="kw">branches:</span>
+    <span class="kw">include:</span> [<span class="str">main</span>]
+
+<span class="kw">pool:</span>
+  <span class="kw">vmImage:</span> <span class="str">ubuntu-latest</span>
+
+<span class="kw">variables:</span>
+  - <span class="kw">group:</span> <span class="str">vsp-secrets</span>      <span class="cm"># variable group with VSP_URL, VSP_TOKEN</span>
+
+<span class="kw">stages:</span>
+  - <span class="kw">stage:</span> <span class="str">VSPSecurityScan</span>
+    <span class="kw">jobs:</span>
+      - <span class="kw">job:</span> <span class="str">scan</span>
+        <span class="kw">steps:</span>
+          - <span class="kw">checkout:</span> <span class="str">self</span>
+          - <span class="kw">script:</span> |
+              <span class="var">RID</span>=$(curl -sf -X POST $(VSP_URL)/api/v1/vsp/run \
+                -H <span class="str">"Authorization: Bearer $(VSP_TOKEN)"</span> \
+                -H <span class="str">"Content-Type: application/json"</span> \
+                -d <span class="str">'{"mode":"FULL","profile":"FAST","src":"."}'</span> | jq -r <span class="str">'.rid'</span>)
+              echo <span class="str">"##vso[task.setvariable variable=RID]$RID"</span>
+            <span class="kw">displayName:</span> <span class="str">'Trigger VSP scan'</span>
+          - <span class="kw">script:</span> |
+              for i in $(seq 1 30); do
+                <span class="var">S</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $(VSP_TOKEN)"</span> \
+                  $(VSP_URL)/api/v1/vsp/run/$(RID) | jq -r <span class="str">'.status'</span>)
+                [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; break
+                sleep 10
+              done
+              <span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $(VSP_TOKEN)"</span> \
+                $(VSP_URL)/api/v1/vsp/run/$(RID) | jq -r <span class="str">'.gate'</span>)
+              [ <span class="str">"$GATE"</span> = <span class="str">"FAIL"</span> ] &amp;&amp; exit 1 || exit 0
+            <span class="kw">displayName:</span> <span class="str">'Wait + check gate'</span>
+</div>
+    </div>
+  </div>
+
+  <!-- ══ BITBUCKET PIPELINES TEMPLATE ══ -->
+  <div class="card tpl-card" id="tpl-card-bitbucket" data-tpl="bitbucket">
+    <div class="card-head">
+      <div><div class="card-title">Bitbucket Pipelines — bitbucket-pipelines.yml</div><div class="card-sub">Place at repo root · default + branch + PR pipelines</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('bitbucket')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-bitbucket"><button class="copy-btn" onclick="copyTemplate('bitbucket')">Copy</button><span class="cm"># bitbucket-pipelines.yml — VSP security gate</span>
+<span class="kw">image:</span> <span class="str">curlimages/curl:latest</span>
+
+<span class="kw">definitions:</span>
+  <span class="kw">steps:</span>
+    - <span class="kw">step:</span> &amp;vsp-scan
+        <span class="kw">name:</span> <span class="str">VSP Security Scan</span>
+        <span class="kw">script:</span>
+          - <span class="kw">apk add --no-cache jq</span>
+          - <span class="var">RID</span>=$(curl -sf -X POST $VSP_URL/api/v1/vsp/run -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> -d <span class="str">'{"mode":"FULL","profile":"FAST","src":"."}'</span> | jq -r <span class="str">'.rid'</span>)
+          - <span class="kw">echo</span> <span class="str">"VSP run: $RID"</span>
+          - |
+            for i in $(seq 1 30); do
+              S=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> $VSP_URL/api/v1/vsp/run/$RID | jq -r <span class="str">'.status'</span>)
+              [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; break
+              sleep 10
+            done
+          - <span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> $VSP_URL/api/v1/vsp/run/$RID | jq -r <span class="str">'.gate'</span>)
+          - <span class="str">[ "$GATE" = "FAIL" ] &amp;&amp; exit 1 || exit 0</span>
+
+<span class="kw">pipelines:</span>
+  <span class="kw">default:</span>
+    - <span class="kw">step:</span> *vsp-scan
+  <span class="kw">branches:</span>
+    <span class="kw">main:</span>
+      - <span class="kw">step:</span> *vsp-scan
+  <span class="kw">pull-requests:</span>
+    <span class="str">'**':</span>
+      - <span class="kw">step:</span> *vsp-scan
+</div>
+    </div>
+  </div>
+
+  <!-- ══ VSPCLI LOCAL TEMPLATE ══ -->
+  <div class="card tpl-card" id="tpl-card-vspcli" data-tpl="vspcli">
+    <div class="card-head">
+      <div><div class="card-title">vspcli — Local / shell pre-commit hook</div><div class="card-sub">For developer workstations or any custom CI runner</div></div>
+      <button class="btn btn-sm" onclick="copyTemplate('vspcli')">⊕ Copy</button>
+    </div>
+    <div class="card-body">
+      <div class="code-block" id="tpl-vspcli"><button class="copy-btn" onclick="copyTemplate('vspcli')">Copy</button><span class="cm">#!/usr/bin/env bash</span>
+<span class="cm"># vspcli wrapper — works in any CI runner or local dev machine</span>
+<span class="cm"># Save as: scripts/vsp-scan.sh  (chmod +x)</span>
+
+<span class="kw">set</span> -euo pipefail
+
+<span class="cm"># Config (override via env)</span>
+<span class="var">VSP_URL</span>=<span class="str">"${VSP_URL:-http://127.0.0.1:8921}"</span>
+<span class="var">VSP_TOKEN</span>=<span class="str">"${VSP_TOKEN:?required}"</span>
+<span class="var">SCAN_MODE</span>=<span class="str">"${SCAN_MODE:-FULL}"</span>
+<span class="var">SCAN_PROFILE</span>=<span class="str">"${SCAN_PROFILE:-FAST}"</span>
+<span class="var">SRC</span>=<span class="str">"${SRC:-.}"</span>
+
+<span class="cm"># Trigger</span>
+<span class="var">RID</span>=$(curl -sf -X POST <span class="str">"$VSP_URL/api/v1/vsp/run"</span> \
+  -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">"{\"mode\":\"$SCAN_MODE\",\"profile\":\"$SCAN_PROFILE\",\"src\":\"$SRC\"}"</span> \
+  | jq -r <span class="str">'.rid'</span>)
+<span class="kw">echo</span> <span class="str">"VSP run: $RID"</span>
+
+<span class="cm"># Wait</span>
+<span class="kw">for</span> i <span class="kw">in</span> $(seq 1 60); <span class="kw">do</span>
+  <span class="var">S</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> \
+    <span class="str">"$VSP_URL/api/v1/vsp/run/$RID"</span> | jq -r <span class="str">'.status'</span>)
+  [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; <span class="kw">break</span>
+  sleep 5
+<span class="kw">done</span>
+
+<span class="cm"># Gate verdict</span>
+<span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> \
+  <span class="str">"$VSP_URL/api/v1/vsp/run/$RID"</span> | jq -r <span class="str">'.gate'</span>)
+<span class="kw">echo</span> <span class="str">"Gate: $GATE"</span>
+[ <span class="str">"$GATE"</span> = <span class="str">"FAIL"</span> ] &amp;&amp; <span class="kw">exit</span> 1 || <span class="kw">exit</span> 0
+</div>
+    </div>
+  </div>
+
 
   <div class="card">
     <div class="card-head">
@@ -424,16 +635,11 @@ td{padding:7px 10px;vertical-align:middle}
       </div>
     </div>
     <div class="card-body">
-      <div class="pr-preview">
-        <div class="pr-header">🔴 VSP Security Gate: FAIL — Score 22/100</div>
-        <div style="color:var(--t2);margin-bottom:8px">Scan run: <span style="color:var(--cyan)">RID_20260415_082314</span> · Branch: <span style="color:var(--cyan)">feature/new-api</span></div>
-        <div style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px">
-          <div class="pr-row-crit">🔴 CRITICAL (1)  gitleaks · generic-api-key in .env:10  → Remove and rotate key</div>
-          <div class="pr-row-high">🟠 HIGH (3)      kics · S3 ACL public-read in main.tf:42  → Set acl="private"</div>
-          <div class="pr-row-high">🟠 HIGH (3)      checkov · SG unrestricted ingress 0.0.0.0/0  → Restrict CIDR</div>
-          <div class="pr-row-med">🟡 MEDIUM (13)   kics+bandit · 13 medium findings</div>
-        </div>
-        <div style="color:var(--t3)">Fix CRITICAL findings to unblock merge. <span style="color:var(--cyan)">→ View all findings in VSP</span></div>
+      <div class="pr-preview" id="pr-preview-box">
+        <div class="pr-header" id="pr-header">— Loading latest gate decision...</div>
+        <div style="color:var(--t2);margin-bottom:8px" id="pr-meta">&nbsp;</div>
+        <div id="pr-findings-rows" style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px"></div>
+        <div style="color:var(--t3)" id="pr-action">&nbsp;</div>
       </div>
     </div>
   </div>
@@ -444,23 +650,23 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Fail on CRITICAL</div><div style="font-size:10px;color:var(--t3)">Block PR if any critical finding</div></div>
-          <label class="sw-wrap"><input type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="policy-gate-toggle" aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Fail on secrets</div><div style="font-size:10px;color:var(--t3)">Block if gitleaks / trufflehog detects</div></div>
-          <label class="sw-wrap"><input type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="policy-gate-toggle-2" aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Min score 70</div><div style="font-size:10px;color:var(--t3)">Block if score &lt; 70/100</div></div>
-          <label class="sw-wrap"><input type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input name="policy-gate-toggle-3" aria-label="Policy gate toggle" type="checkbox" checked onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Post PR comment</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires GitHub OAuth token</div></div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-pr-comment" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Pr Comment" type="checkbox" id="pol-pr-comment" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md)">
           <div><div style="font-size:12px;font-weight:500">Auto-create Jira ticket</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires Jira API key in Integrations</div></div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-jira" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Jira" type="checkbox" id="pol-jira" onchange="saveGatePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
       </div>
     </div>
@@ -515,11 +721,44 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card">
     <div class="card-head">
       <div><div class="card-title">Top auto-fixable findings</div><div class="card-sub">Sorted by severity · with code fix snippet</div></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span id="af-result-count" style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:6px">— shown</span>
+        <button class="btn btn-sm" onclick="afExportCSV()" title="Export CSV">↓ CSV</button>
+      </div>
     </div>
+    <!-- VSP-CICD-H3.3: Filter bar (PRO upgrade — search + pagination) -->
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-right:4px">Filter:</span>
+      <button class="btn btn-sm af-sev-pill active" data-sev="" onclick="afFilterSeverity(this,'')">All</button>
+      <button class="btn btn-sm af-sev-pill" data-sev="CRITICAL" onclick="afFilterSeverity(this,'CRITICAL')" style="color:#ef4444">Critical</button>
+      <button class="btn btn-sm af-sev-pill" data-sev="HIGH" onclick="afFilterSeverity(this,'HIGH')" style="color:#f97316">High</button>
+      <button class="btn btn-sm af-sev-pill" data-sev="MEDIUM" onclick="afFilterSeverity(this,'MEDIUM')" style="color:#f59e0b">Medium</button>
+      <button class="btn btn-sm af-sev-pill" data-sev="LOW" onclick="afFilterSeverity(this,'LOW')" style="color:#22c55e">Low</button>
+      <span style="width:1px;height:18px;background:var(--border);margin:0 4px"></span>
+      <select aria-label="Af Tool Filter" id="af-tool-filter" class="form-ctrl" style="font-size:10px;padding:4px 8px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px" onchange="renderAutofixTable()">
+        <option value="">All tools</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2);cursor:pointer;margin-left:6px">
+        <input aria-label="Af Fixable Only" type="checkbox" id="af-fixable-only" onchange="renderAutofixTable()">
+        Auto-fixable only
+      </label>
+      <input aria-label="🔍 Search rule / message / file…" id="af-search" type="search" placeholder="🔍 Search rule / message / file…" oninput="renderAutofixTable()"
+        style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px;margin-left:6px" />
+    </div>
+    <style>
+      .af-sev-pill { font-size:10px; padding:4px 11px; opacity:.6 }
+      .af-sev-pill:hover { opacity:.9 }
+      .af-sev-pill.active { opacity:1; background:var(--accent,#0ea5e9); color:#fff!important; border-color:var(--accent,#0ea5e9) }
+    </style>
     <div style="overflow-x:auto">
       <table>
         <thead><tr><th>Severity</th><th>Tool</th><th>Rule</th><th>Description</th><th>Fix type</th><th>Status</th><th></th></tr></thead>
-        <tbody id="autofix-tbody"></tbody>
+        <div id="llm-status-banner" style="font-size:12px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);margin-bottom:14px;color:var(--t2)">Checking AI AutoFix status...</div>
+<div id="dora-deploy-hint" style="display:none;font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#818cf8;margin-bottom:14px">
+  ℹ️ <b>Deploy Frequency = 0</b> — Integrate CI/CD to track deploys. 
+  <a href="#" style="color:var(--cyan)" onclick="showDoraSetup(event)">Setup guide →</a>
+</div>
+<tbody id="autofix-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -528,13 +767,13 @@ td{padding:7px 10px;vertical-align:middle}
 <!-- ══ TAB 6 — HISTORY ══ -->
 <div class="tab-panel" id="tab-history">
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-    <select id="hist-filter-trigger" class="form-ctrl" style="width:140px;font-size:11px" onchange="renderHistory()">
+    <select aria-label="Hist Filter Trigger" id="hist-filter-trigger" class="form-ctrl" style="width:140px;font-size:11px" onchange="renderHistory()">
       <option value="">All triggers</option>
       <option value="cicd">CI/CD</option>
       <option value="manual">Manual</option>
       <option value="schedule">Schedule</option>
     </select>
-    <select id="hist-filter-gate" class="form-ctrl" style="width:120px;font-size:11px" onchange="renderHistory()">
+    <select aria-label="Hist Filter Gate" id="hist-filter-gate" class="form-ctrl" style="width:120px;font-size:11px" onchange="renderHistory()">
       <option value="">All gates</option>
       <option value="PASS">PASS</option>
       <option value="FAIL">FAIL</option>
@@ -557,12 +796,25 @@ td{padding:7px 10px;vertical-align:middle}
 
 <script>
 var TOKEN='', API='';
+
+// VSP-CICD-H3.H: Early helper definition (must be available when buttons render)
+window.showFixPreviewByIdx = function(btn){
+  var idx = parseInt(btn.getAttribute('data-fix-idx') || '0', 10);
+  var f = (window._lastFixable || [])[idx];
+  if(!f){ if(typeof showToast==='function') showToast('Finding data not available','warning'); return; }
+  if(typeof window.showFixPreview === 'function'){
+    window.showFixPreview(f);
+  } else {
+    console.warn('[H3.H] showFixPreview not loaded yet');
+  }
+};
+
 async function ensureToken(){
   if(TOKEN) return;
   TOKEN=window.parent?.TOKEN||window.TOKEN||localStorage.getItem('vsp_token')||'';
   if(!TOKEN){
     try{
-      var r=await fetch('/api/v1/auth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:'admin123'})});
+      var r=await fetch('/api/v1/auth/check',{credentials:'include'});
       var d=await r.json(); TOKEN=d.access_token||d.token||'';
     }catch(e){TOKEN='demo';}
   }
@@ -583,69 +835,160 @@ function switchTab(id,btn){
 }
 
 // ── KPI ──
+/* FEAT-31: cicd L2 UX states (MAX coverage) */
+const CICD_KPI_IDS = ['k-ci-today', 'k-pass-rate', 'k-blocked', 'k-autofixed'];
+const CICD_AF_KPI_IDS = ['af-total', 'af-with-fix', 'af-resolved', 'af-breaches'];
+
+function _cicdShimmerCells(ids) {
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.classList.add('cicd-shimmer'); }
+  });
+}
+function _cicdClearCells(ids) {
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('cicd-shimmer');
+  });
+}
+function _cicdDashCells(ids) {
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('cicd-shimmer'); el.textContent = '—'; }
+  });
+}
+
 async function loadKPIs(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  _cicdShimmerCells(CICD_KPI_IDS);
   await ensureToken();
   try{
-    var r=await fetch('/api/v1/vsp/runs/index?limit=200',{headers:hdr()});
-    var d=await r.json();
-    var runs=d.runs||[];
-    var today=new Date().toISOString().slice(0,10);
-    var todayRuns=runs.filter(x=>x.created_at?.startsWith(today));
-    var pass7=runs.slice(0,50).filter(x=>x.gate==='PASS').length;
-    var total7=Math.min(runs.length,50);
-    document.getElementById('k-ci-today').textContent=todayRuns.length;
-    document.getElementById('k-pass-rate').textContent=total7>0?Math.round(pass7/total7*100)+'%':'—';
-    document.getElementById('k-blocked').textContent=todayRuns.filter(x=>x.gate==='FAIL').length;
-    document.getElementById('k-autofixed').textContent='0';
+    var r = await fetch('/api/v1/vsp/runs/index?limit=200', { headers: hdr() });
+    if (!r.ok) {
+      _cicdDashCells(CICD_KPI_IDS);
+      console.warn('[FEAT-31] loadKPIs HTTP', r.status);
+      return;
+    }
+    var d = await r.json();
+    var runs = d.runs || [];
+    var today = new Date().toISOString().slice(0,10);
+    var todayRuns = runs.filter(x => x.created_at?.startsWith(today));
+    var pass7 = runs.slice(0,50).filter(x => x.gate==='PASS').length;
+    var total7 = Math.min(runs.length, 50);
+    _cicdClearCells(CICD_KPI_IDS);
+    document.getElementById('k-ci-today').textContent = todayRuns.length;
+    document.getElementById('k-pass-rate').textContent = total7>0 ? Math.round(pass7/total7*100) + '%' : '—';
+    document.getElementById('k-blocked').textContent = todayRuns.filter(x => x.gate==='FAIL').length;
+    document.getElementById('k-autofixed').textContent = '0';
   }catch(e){
-    document.getElementById('k-ci-today').textContent='12';
-    document.getElementById('k-pass-rate').textContent='63%';
-    document.getElementById('k-blocked').textContent='4';
-    document.getElementById('k-autofixed').textContent='0';
+    console.error('[FEAT-31] loadKPIs failed:', e);
+    if (hasUX) {
+      _cicdDashCells(CICD_KPI_IDS);
+    } else {
+      // Graceful degradation: old mock fallback
+      document.getElementById('k-ci-today').textContent = '12';
+      document.getElementById('k-pass-rate').textContent = '—';
+      document.getElementById('k-blocked').textContent = '4';
+      document.getElementById('k-autofixed').textContent = '0';
+    }
   }
 }
 
 // ── SCHEDULER ──
-var MOCK_SCHEDULES=[
-  {id:'sc1',name:'Daily production scan',mode:'SAST',cron:'0 2 * * *',src:'/home/test/Data/GOLANG_VSP',enabled:true,next_run:'02:00 UTC',last_gate:'FAIL'},
-  {id:'sc2',name:'IAC infra check',mode:'IAC',cron:'0 6 * * *',src:'/home/test/Data/GOLANG_VSP',enabled:true,next_run:'06:00 UTC',last_gate:'WARN'},
-  {id:'sc3',name:'Weekly deep scan',mode:'FULL',cron:'0 3 * * 1',src:'/home/test/Data/GOLANG_VSP',enabled:true,next_run:'Mon 03:00',last_gate:'FAIL'},
-  {id:'sc4',name:'Secrets scan',mode:'SECRETS',cron:'0 12 * * *',src:'/home/test/Data/GOLANG_VSP',enabled:false,next_run:'—',last_gate:'PASS'},
-  {id:'sc5',name:'SCA dependency audit',mode:'SCA',cron:'0 0 * * 0',src:'/home/test/Data/GOLANG_VSP',enabled:true,next_run:'Sun 00:00',last_gate:'WARN'},
-];
+// (cleanup) MOCK_SCHEDULES removed — using real API
+
+// Format scheduler timestamps coming back from /api/v1/schedules.
+// BE returns ISO-8601 strings on the `next_run_at` / `last_run_at`
+// fields; legacy mock data shipped the same payload as `next_run` /
+// `last_run`. Accept either, render a human-friendly relative date,
+// fall back to the raw value if Date parsing fails, em-dash if absent.
+function fmtSchedTime(v){
+  if (!v) return '—';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return v;
+  var now = new Date();
+  var sec = (d.getTime() - now.getTime()) / 1000;
+  var abs = Math.abs(sec);
+  var dir = sec >= 0 ? 'in ' : '';
+  var suf = sec < 0 ? ' ago' : '';
+  if (abs < 60)   return dir + Math.round(abs) + 's' + suf;
+  if (abs < 3600) return dir + Math.round(abs/60) + 'm' + suf;
+  if (abs < 86400)return dir + Math.round(abs/3600) + 'h' + suf;
+  return d.toLocaleString();
+}
+
 async function loadSchedules(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var hasData = false;
+  var listEl = document.getElementById('schedules-list');
+  if (listEl && listEl.children.length > 0 && !listEl.querySelector('.vsp-uxs-skel-row')) {
+    hasData = true;
+  }
+  if (hasUX && !hasData) {
+    VSPUXState.skeleton('#schedules-list', { rows: 4, kind: 'card' });
+    VSPUXState.skeleton('#upcoming-tbody', { rows: 3, kind: 'table' });
+  }
+
   await ensureToken();
-  var list=MOCK_SCHEDULES;
+  var list = [];
+  var fetchErr = null;
   try{
-    var r=await fetch('/api/v1/schedules',{headers:hdr()});
-    if(r.ok){var d=await r.json(); list=d.schedules||d||MOCK_SCHEDULES;}
-  }catch(e){}
-  var enabled=list.filter(x=>x.enabled).length;
-  document.getElementById('sched-status-bar').textContent=list.length+' schedules · '+enabled+' enabled';
-  var gateColor={PASS:'var(--green)',FAIL:'var(--red)',WARN:'var(--amber)'};
-  document.getElementById('schedules-list').innerHTML=list.map(s=>`
+    var r = await fetch('/api/v1/schedules', { headers: hdr() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    list = d.schedules || (Array.isArray(d) ? d : []);
+  }catch(e){ fetchErr = e; }
+
+  if (fetchErr) {
+    if (hasUX && !hasData) {
+      VSPUXState.error('#schedules-list', 'Failed to load schedules', loadSchedules);
+      VSPUXState.error('#upcoming-tbody', 'Failed to load', loadSchedules);
+    }
+    var sb = document.getElementById('sched-status-bar');
+    if (sb) sb.textContent = '⚠ Failed to load schedules';
+    return;
+  }
+
+  var enabled = list.filter(x => x.enabled).length;
+  var sb = document.getElementById('sched-status-bar');
+  if (sb) sb.textContent = list.length + ' schedules · ' + enabled + ' enabled';
+
+  if (list.length === 0) {
+    if (hasUX) {
+      VSPUXState.empty('#schedules-list', 'No schedules configured — create one above', loadSchedules);
+      VSPUXState.empty('#upcoming-tbody', 'No upcoming runs', loadSchedules);
+    }
+    return;
+  }
+
+  document.getElementById('schedules-list').innerHTML = list.map(s => `
     <div class="sched-row">
-      <label class="sw-wrap"><input type="checkbox" ${s.enabled?'checked':''} onchange="toggleSchedule('${s.id}',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+      <label class="sw-wrap"><input name="toggle-schedule" aria-label="Toggle schedule" type="checkbox" ${s.enabled?'checked':''} onchange="toggleSchedule('${s.id}',this.checked)"><div class="sw-track"></div><div class="sw-thumb"></div></label>
       <div style="flex:1">
         <div class="sched-name">${s.name}</div>
         <div class="sched-meta">${s.mode} · ${s.cron} · ${s.src}</div>
       </div>
-      <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:8px">${s.next_run}</span>
+      <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:8px">${fmtSchedTime(s.next_run||s.next_run_at)}</span>
       <span class="badge badge-${s.last_gate==='PASS'?'ok':s.last_gate==='FAIL'?'danger':'warn'}">${s.last_gate||'—'}</span>
       <button class="btn btn-sm" style="margin-left:8px" onclick="runScheduleNow('${s.id}','${s.name}')">▶ Now</button>
     </div>`).join('');
-  // upcoming
-  document.getElementById('upcoming-tbody').innerHTML=list.filter(x=>x.enabled).slice(0,5).map(s=>`<tr>
-    <td style="font-weight:500">${s.name}</td>
-    <td><span class="badge badge-info">${s.mode}</span></td>
-    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${s.next_run}</td>
-    <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron}</td>
-    <td><span class="badge badge-ok">Enabled</span></td>
-  </tr>`).join('');
+
+  var upcoming = list.filter(x => x.enabled).slice(0,5);
+  if (upcoming.length === 0) {
+    if (hasUX) VSPUXState.empty('#upcoming-tbody', 'No upcoming runs (no enabled schedules)', loadSchedules);
+  } else {
+    document.getElementById('upcoming-tbody').innerHTML = upcoming.map(s => `<tr>
+      <td style="font-weight:500">${s.name}</td>
+      <td><span class="badge badge-info">${s.mode}</span></td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${fmtSchedTime(s.next_run||s.next_run_at)}</td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${s.cron||s.cron_expr||'—'}</td>
+      <td><span class="badge badge-ok">Enabled</span></td>
+    </tr>`).join('');
+  }
 }
 async function toggleSchedule(id,enabled){
   await ensureToken();
-  try{await fetch('/api/v1/schedules/'+id+'/toggle',{method:'POST',headers:hdr(),body:JSON.stringify({enabled})});}catch(e){}
+  try{await fetch('/api/v1/schedules/'+id+'/toggle',{method:'PATCH',headers:hdr(),body:JSON.stringify({enabled})});}catch(e){}
   showToast('Schedule '+(enabled?'enabled':'disabled'),'success');
 }
 async function runScheduleNow(id,name){
@@ -653,88 +996,615 @@ async function runScheduleNow(id,name){
   try{await fetch('/api/v1/schedules/'+id+'/run',{method:'POST',headers:hdr()});}catch(e){}
   showToast('Scan triggered: '+name,'success');
 }
-function openAddSchedule(){showToast('Use Scheduler panel for advanced config','info');}
+function openAddSchedule(){
+  // VSP-CICD-H2.F: inline modal create schedule
+  if(typeof window.showCreateScheduleModal === 'function'){
+    window.showCreateScheduleModal();
+    return;
+  }
+  showToast('Schedule modal not loaded — refresh page','warning');
+}
 
 // ── GATE HISTORY ──
-var MOCK_GATES=[
-  {rid:'RID_20260415_082314',branch:'feature/new-api',gate:'FAIL',score:22,time:'08:23'},
-  {rid:'RID_20260415_071108',branch:'fix/auth-bug',gate:'PASS',score:91,time:'07:11'},
-  {rid:'RID_20260414_194714',branch:'develop',gate:'FAIL',score:30,time:'19:47'},
-  {rid:'RID_20260414_140022',branch:'main',gate:'PASS',score:88,time:'14:00'},
-  {rid:'RID_20260413_090015',branch:'feature/sbom',gate:'WARN',score:68,time:'09:00'},
-];
-function loadGateHistory(){
-  var g=MOCK_GATES;
-  document.getElementById('gate-history-tbody').innerHTML=g.map(x=>`<tr>
-    <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${x.rid.slice(-12)}</td>
-    <td style="font-size:11px;color:var(--t2)">${x.branch}</td>
-    <td><span class="badge badge-${x.gate==='PASS'?'ok':x.gate==='FAIL'?'danger':'warn'}">${x.gate}</span></td>
-    <td style="font-family:var(--font-mono);font-size:11px;color:${x.score>=70?'var(--green)':x.score>=50?'var(--amber)':'var(--red)'}">${x.score}/100</td>
-    <td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${x.time}</td>
-  </tr>`).join('');
+// (cleanup) MOCK_GATES removed — using real API
+
+async function loadGateHistory(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tbody = document.getElementById('gate-history-tbody');
+  if (!tbody) return;
+  var hasData = tbody.children.length > 0 && !tbody.querySelector('.vsp-uxs-skel-row') && !tbody.querySelector('td[colspan]');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#gate-history-tbody', { rows: 5, kind: 'table' });
+
+  await ensureToken();
+  var rows = [];
+  try{
+    var r = await fetch('/api/v1/vsp/runs/index?limit=5', { headers: hdr() });
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#gate-history-tbody', 'HTTP ' + r.status, loadGateHistory);
+      return;
+    }
+    var d = await r.json();
+    rows = (d.runs || []).slice(0, 5);
+  }catch(e){
+    if (hasUX && !hasData) VSPUXState.error('#gate-history-tbody', 'Network error', loadGateHistory);
+    return;
+  }
+
+  if (rows.length === 0) {
+    if (hasUX) VSPUXState.empty('#gate-history-tbody', 'No gate decisions yet', loadGateHistory);
+    return;
+  }
+
+  tbody.innerHTML = rows.map(function(x){
+    var rid = (x.rid || x.id || '').slice(-12);
+    var branch = x.branch || (x.src ? x.src.split('/').slice(-2).join('/') : 'main');
+    var gate = x.gate || '—';
+    var score = (x.summary && x.summary.SCORE != null) ? x.summary.SCORE : (x.score != null ? x.score : null);
+    var scoreText = score == null ? '—' : score + '/100';
+    var scoreColor = score == null ? 'var(--t3)' : (score >= 70 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)');
+    var t = (x.created_at || x.started_at || '').slice(11, 16);
+    var badge = gate === 'PASS' ? 'ok' : gate === 'FAIL' ? 'danger' : 'warn';
+    return '<tr>' +
+      '<td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">' + rid + '</td>' +
+      '<td style="font-size:11px;color:var(--t2)">' + branch + '</td>' +
+      '<td><span class="badge badge-' + badge + '">' + gate + '</span></td>' +
+      '<td style="font-family:var(--font-mono);font-size:11px;color:' + scoreColor + '">' + scoreText + '</td>' +
+      '<td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">' + t + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+async function loadPRComment(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var hdrEl = document.getElementById('pr-header');
+  var metaEl = document.getElementById('pr-meta');
+  var rowsEl = document.getElementById('pr-findings-rows');
+  var actEl  = document.getElementById('pr-action');
+  if (!hdrEl || !rowsEl) return;
+
+  // Pre-fetch state
+  hdrEl.textContent = 'Loading PR preview…';
+  metaEl.innerHTML = '&nbsp;';
+  actEl.innerHTML = '&nbsp;';
+  if (hasUX) VSPUXState.skeleton('#pr-findings-rows', { rows: 3, kind: 'table' });
+
+  await ensureToken();
+  var run = null;
+  try{
+    var r = await fetch('/api/v1/vsp/runs/index?limit=20', { headers: hdr() });
+    if (!r.ok) {
+      hdrEl.textContent = '⚠ Failed to load PR preview (HTTP ' + r.status + ')';
+      if (hasUX) VSPUXState.error('#pr-findings-rows', 'HTTP ' + r.status, loadPRComment);
+      return;
+    }
+    var d = await r.json();
+    var runs = d.runs || [];
+    run = runs.find(function(x){ return x.gate === 'FAIL'; }) || runs[0] || null;
+  }catch(e){
+    hdrEl.textContent = '⚠ Network error loading PR preview';
+    if (hasUX) VSPUXState.error('#pr-findings-rows', 'Network error', loadPRComment);
+    return;
+  }
+
+  if (!run) {
+    hdrEl.textContent = '— No runs available';
+    metaEl.innerHTML = '&nbsp;';
+    if (hasUX) VSPUXState.empty('#pr-findings-rows', 'No runs to preview yet', loadPRComment);
+    actEl.innerHTML = '&nbsp;';
+    return;
+  }
+
+  var sev = run.summary || {};
+  var score = sev.SCORE != null ? sev.SCORE : (run.score != null ? run.score : '—');
+  var gate = run.gate || 'PASS';
+  var rid = run.rid || run.id || '';
+  var branch = run.branch || (run.src ? run.src.split('/').slice(-2).join('/') : 'main');
+  var titleDot = gate === 'FAIL' ? '🔴' : gate === 'WARN' ? '🟡' : '🟢';
+
+  hdrEl.textContent = titleDot + ' VSP Security Gate: ' + gate + ' — Score ' + score + '/100';
+  metaEl.innerHTML = 'Scan run: <span style="color:var(--cyan)">' + rid + '</span> · Branch: <span style="color:var(--cyan)">' + branch + '</span>';
+
+  var sevOrder = ['CRITICAL', 'HIGH', 'MEDIUM'];
+  var rowClass = { CRITICAL: 'pr-row-crit', HIGH: 'pr-row-high', MEDIUM: 'pr-row-med' };
+  var dot = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡' };
+
+  var rowsHtml = '';
+  var topPainful = null;
+
+  for(var i=0; i<sevOrder.length; i++){
+    var s = sevOrder[i];
+    var count = sev[s] || 0;
+    if (count === 0) continue;
+    if (!topPainful) topPainful = s;
+
+    var topMsg = '';
+    try{
+      var fr = await fetch('/api/v1/vsp/findings?run_id=' + run.id + '&severity=' + s + '&limit=1', { headers: hdr() });
+      var fd = await fr.json();
+      var top = (fd.findings || [])[0];
+      if (top){
+        var msg = (top.message || '').length > 80 ? top.message.slice(0,77) + '...' : (top.message || '');
+        var loc = top.path ? ' in ' + top.path + (top.line ? ':' + top.line : '') : '';
+        topMsg = (top.tool || '?') + ' · ' + msg + loc;
+      }
+    }catch(e){}
+
+    rowsHtml += '<div class="' + rowClass[s] + '">' + dot[s] + ' ' + s + ' (' + count + ')  ' + (topMsg || '(top finding unavailable)') + '</div>';
+  }
+  if ((sev.LOW || 0) > 0){
+    rowsHtml += '<div style="font-size:11px;color:var(--t3);margin-top:4px">🟢 LOW (' + sev.LOW + ') · collapsed</div>';
+  }
+  rowsEl.innerHTML = rowsHtml || '<div style="color:var(--t3);font-size:11px">No findings</div>';
+
+  if (gate === 'FAIL'){
+    var blocker = topPainful || 'critical';
+    actEl.innerHTML = 'Fix ' + blocker + ' findings to unblock merge. <span style="color:var(--cyan)">→ View all findings in VSP</span>';
+  } else if (gate === 'WARN'){
+    actEl.innerHTML = 'Review findings before merging. <span style="color:var(--cyan)">→ View all findings in VSP</span>';
+  } else {
+    actEl.innerHTML = '<span style="color:var(--green)">✓ All checks passed.</span>';
+  }
 }
 
 // ── AUTOFIX ──
-var MOCK_AUTOFIX=[
-  {sev:'CRITICAL',tool:'gitleaks',rule:'generic-api-key',desc:'API key in .env:10',fix:'Remove + rotate key',status:'open'},
-  {sev:'HIGH',tool:'kics',rule:'S3_ACL_PUBLIC',desc:'S3 bucket ACL public-read',fix:'acl = "private"',status:'open'},
-  {sev:'HIGH',tool:'checkov',rule:'CKV_AWS_25',desc:'SG unrestricted 0.0.0.0/0',fix:'Restrict CIDR',status:'open'},
-  {sev:'HIGH',tool:'bandit',rule:'B311',desc:'Random not cryptographic',fix:'Use secrets.token_hex()',status:'open'},
-  {sev:'MEDIUM',tool:'kics',rule:'S3_LOGGING',desc:'S3 access logging disabled',fix:'Enable logging',status:'open'},
-];
-function loadAutofixStats(){
-  var cats=[
-    {label:'IaC misconfig (Terraform/K8s)',count:4398,fixable:3100,color:'var(--cyan)'},
-    {label:'SAST code issues',count:75,fixable:42,color:'var(--purple)'},
-    {label:'SCA vulnerable deps',count:8,fixable:8,color:'var(--amber)'},
-    {label:'Secrets exposed',count:3,fixable:3,color:'var(--red)'},
-  ];
-  document.getElementById('fix-categories').innerHTML=cats.map(c=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md)">
-      <span style="font-size:11px;flex:1;color:var(--t2)">${c.label}</span>
-      <span style="font-family:var(--font-mono);font-size:11px;color:var(--t3)">${c.count} total</span>
-      <span class="badge badge-ok">${c.fixable} fixable</span>
-    </div>`).join('');
-  var sevClass={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med'};
-  document.getElementById('autofix-tbody').innerHTML=MOCK_AUTOFIX.map(x=>`<tr>
-    <td><span class="sev ${sevClass[x.sev]||''}">${x.sev}</span></td>
-    <td style="font-size:10px;color:var(--t3)">${x.tool}</td>
-    <td style="font-family:var(--font-mono);font-size:10px;color:var(--purple)">${x.rule}</td>
-    <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x.desc}">${x.desc}</td>
-    <td style="font-size:11px;color:var(--cyan)">${x.fix}</td>
-    <td><span class="badge badge-danger">Open</span></td>
-    <td><button class="btn btn-sm" onclick="showToast('Fix applied · re-scan to verify','success')">Apply fix</button></td>
-  </tr>`).join('');
+// (cleanup) MOCK_AUTOFIX removed — using real API
+
+// FIX: derive Autofix data from real findings API instead of MOCK_AUTOFIX
+function _autofixDeriveFix(f){
+  if(f.fix_signal) return f.fix_signal;
+  var byTool = {
+    gitleaks:'Remove from VCS, rotate credential',
+    trufflehog:'Rotate credential immediately',
+    kics:'Apply Terraform/IaC remediation',
+    checkov:'Apply IaC policy fix',
+    semgrep:'Refactor flagged pattern',
+    bandit:'Use secure alternative',
+    gosec:'Apply Go security best practice',
+    nmap:'Restrict network exposure',
+    trivy:'Update vulnerable dependency',
+    grype:'Update vulnerable package'
+  };
+  return byTool[f.tool] || 'Manual review required';
 }
+function _autofixIsFixable(f){
+  // VSP-CICD-H3.2: full tool list (was missing semgrep/gosec/bandit/trivy/grype)
+  if(f.fix_signal) return true;
+  if(f.fix_hint) return true;
+  var fixableTools = [
+    'gitleaks','trufflehog','secretcheck',     // SECRETS
+    'kics','checkov','hadolint',                // IAC
+    'semgrep','bandit','gosec',                 // SAST
+    'trivy','grype','osv-scanner','retire-js',  // SCA
+    'license','cosign','syft','govulncheck',    // SCA-extra
+    'nikto','nuclei','sslscan',                 // DAST
+    'apisec','gofuzz','racedetect'              // Phase 4
+  ];
+  return fixableTools.indexOf(f.tool) >= 0;
+}
+function _autofixCategorize(findings){
+  // VSP-CICD-H3.2: dedup + add missing categories (DAST, NETWORK, PHASE4)
+  var cats = {
+    iac:    {label:'IaC misconfig (Terraform/K8s/Docker)', count:0, fixable:0, color:'var(--cyan)'},
+    sast:   {label:'SAST code issues',                     count:0, fixable:0, color:'var(--purple)'},
+    sca:    {label:'SCA vulnerable dependencies',          count:0, fixable:0, color:'var(--amber)'},
+    sec:    {label:'Secrets exposed',                      count:0, fixable:0, color:'var(--red)'},
+    dast:   {label:'DAST runtime issues',                  count:0, fixable:0, color:'var(--cyan)'},
+    network:{label:'Network exposure',                     count:0, fixable:0, color:'var(--orange)'},
+    phase4: {label:'API/Fuzz/Race (Phase 4)',              count:0, fixable:0, color:'var(--green)'}
+  };
+  var toolMap = {
+    kics:'iac', checkov:'iac', hadolint:'iac',
+    semgrep:'sast', bandit:'sast', gosec:'sast', codeql:'sast',
+    trivy:'sca', grype:'sca', 'osv-scanner':'sca', 'retire-js':'sca',
+    syft:'sca', license:'sca', cosign:'sca', govulncheck:'sca',
+    gitleaks:'sec', trufflehog:'sec', secretcheck:'sec',
+    nikto:'dast', nuclei:'dast', sslscan:'dast',
+    nmap:'network', netcap:'network',
+    apisec:'phase4', gofuzz:'phase4', racedetect:'phase4'
+  };
+  for(var i=0;i<findings.length;i++){
+    var f = findings[i];
+    var cat = toolMap[f.tool];
+    if(!cat) continue;
+    cats[cat].count += 1;
+    if(_autofixIsFixable(f)) cats[cat].fixable += 1;
+  }
+  // Filter empty categories
+  var result = [];
+  ['iac','sast','sca','sec','dast','network','phase4'].forEach(function(k){
+    if(cats[k].count > 0) result.push(cats[k]);
+  });
+  return result.length ? result : [cats.iac, cats.sast, cats.sca, cats.sec];
+}
+async function loadAutofixStats(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  _cicdShimmerCells(CICD_AF_KPI_IDS);
+  if (hasUX) {
+    var catEl = document.getElementById('fix-categories');
+    var hasCatData = catEl && catEl.children.length > 0;
+    if (!hasCatData) VSPUXState.skeleton('#fix-categories', { rows: 4, kind: 'card' });
+  }
+
+  await ensureToken();
+  // Fix 3: LLM status banner
+  try {
+    var modeR = await fetch('/api/v1/ai/mode', {headers: hdr()}).then(function(r){return r.json();}).catch(function(){return {};});
+    var banner = document.getElementById('llm-status-banner');
+    if (banner) {
+      if (modeR && modeR.enabled) {
+        banner.style.cssText = 'font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);color:#10b981;margin-bottom:14px';
+        banner.innerHTML = '\u2713 AI AutoFix active \u2014 <b>' + (modeR.provider||'LLM') + '</b> \u00b7 ' + (modeR.model||'') + ' \u00b7 mode: ' + (modeR.mode||'online');
+      } else {
+        banner.style.cssText = 'font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#f59e0b;margin-bottom:14px';
+        banner.innerHTML = '\u26a0 AI AutoFix disabled \u2014 set <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">LLM_ENABLED=true</code> \u00b7 <a href="#" style="color:var(--cyan)" onclick="showSetupGuide(event)">Setup guide \u2192</a>';
+      }
+    }
+  } catch(e) {}
+  // Fix 4: DORA deploy hint
+  try {
+    var doraR = await fetch('/api/v1/dora?days=30', {headers: hdr()}).then(function(r){return r.json();}).catch(function(){return {};});
+    var doraHint = document.getElementById('dora-deploy-hint');
+    if (doraHint) doraHint.style.display = (doraR && doraR.deploy_frequency && doraR.deploy_frequency.samples === 0) ? '' : 'none';
+  } catch(e) {}
+  var findings = [];
+  var fetchErr = null;
+  try{
+    var r = await fetch('/api/v1/vsp/findings?limit=2000', { headers: hdr() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    findings = d.findings || [];
+  }catch(e){ fetchErr = e; }
+
+  if (fetchErr) {
+    _cicdDashCells(CICD_AF_KPI_IDS);
+    if (hasUX) {
+      VSPUXState.error('#fix-categories', 'Failed to load: ' + fetchErr.message, loadAutofixStats);
+      VSPUXState.error('#autofix-tbody', 'Failed to load findings', loadAutofixStats);
+    }
+    console.error('[FEAT-31] loadAutofixStats failed:', fetchErr);
+    return;
+  }
+
+  window._autofixAllFindings = findings;
+
+  var open = findings.filter(function(f){ return (f.status||'open') === 'open' || !f.status; });
+  var fixable = open.filter(_autofixIsFixable);
+  var resolved = findings.filter(function(f){ return f.status === 'verified' || f.status === 'resolved' || f.status === 'fixed'; });
+  var now = Date.now();
+  var sevenDaysMs = 7 * 24 * 3600 * 1000;
+  var breaches = open.filter(function(f){
+    if (f.severity !== 'CRITICAL') return false;
+    var t = f.created_at || f.detected_at || f.first_seen;
+    if (!t) return false;
+    return (now - new Date(t).getTime()) > sevenDaysMs;
+  });
+
+  _cicdClearCells(CICD_AF_KPI_IDS);
+  document.getElementById('af-total').textContent     = open.length.toLocaleString();
+  document.getElementById('af-with-fix').textContent  = fixable.length.toLocaleString();
+  document.getElementById('af-resolved').textContent  = resolved.length.toLocaleString();
+  document.getElementById('af-breaches').textContent  = breaches.length.toLocaleString();
+
+  var cats = _autofixCategorize(open);
+  if (cats.length === 0) {
+    if (hasUX) VSPUXState.empty('#fix-categories', 'No category data', loadAutofixStats);
+  } else {
+    document.getElementById('fix-categories').innerHTML = cats.map(function(c){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md)">'
+        + '<span style="font-size:11px;flex:1;color:var(--t2)">' + c.label + '</span>'
+        + '<span style="font-family:var(--font-mono);font-size:11px;color:var(--t3)">' + c.count + ' total</span>'
+        + '<span class="badge ' + (c.fixable>0?'badge-ok':'badge-neutral') + '">' + c.fixable + ' fixable</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  var allTools = {};
+  open.forEach(function(f){ if (f.tool) allTools[f.tool] = (allTools[f.tool]||0) + 1; });
+  var toolSelect = document.getElementById('af-tool-filter');
+  if (toolSelect && toolSelect.options.length <= 1){
+    Object.keys(allTools).sort().forEach(function(t){
+      var opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t + ' (' + allTools[t] + ')';
+      toolSelect.appendChild(opt);
+    });
+  }
+
+  renderAutofixTable();
+}
+
+// PRO upgrade — paginated render. Defaults: 25/page; user can pick 50/100/all.
+window._afPage = window._afPage || 0;
+window._afPageSize = window._afPageSize || 25;
+
+function renderAutofixTable(){
+  // VSP-CICD-H3.3: client-side filter
+  var all = (window._autofixAllFindings || []).filter(function(f){ return (f.status||'open')==='open' || !f.status; });
+  var sevFilter = (document.querySelector('.af-sev-pill.active')||{}).dataset?.sev || '';
+  var toolFilter = (document.getElementById('af-tool-filter')||{value:''}).value || '';
+  var fixableOnly = (document.getElementById('af-fixable-only')||{checked:false}).checked;
+  var searchQ = ((document.getElementById('af-search')||{value:''}).value || '').toLowerCase().trim();
+
+  var filtered = all.filter(function(f){
+    if(sevFilter && f.severity !== sevFilter) return false;
+    if(toolFilter && f.tool !== toolFilter) return false;
+    if(fixableOnly && !_autofixIsFixable(f)) return false;
+    if(searchQ){
+      var hay = ((f.rule_id||'') + ' ' + (f.message||'') + ' ' + (f.path||'') + ' ' + (f.tool||'')).toLowerCase();
+      if(hay.indexOf(searchQ) === -1) return false;
+    }
+    return true;
+  });
+
+  var sevOrder = {CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3, INFO:4};
+  var sorted = filtered.sort(function(a,b){ return (sevOrder[a.severity]||9) - (sevOrder[b.severity]||9); });
+
+  // Pagination — slice to current page.
+  var pageSize = window._afPageSize === 0 ? sorted.length : window._afPageSize;
+  var totalPages = Math.max(1, Math.ceil(sorted.length / Math.max(1, pageSize)));
+  if(window._afPage >= totalPages) window._afPage = 0;
+  var pageStart = window._afPage * pageSize;
+  var sortedFixable = sorted.slice(pageStart, pageStart + pageSize);
+  window._lastFixable = sorted; // CSV export covers entire filtered set, not just current page
+
+  var sevClass = {CRITICAL:'sev-crit', HIGH:'sev-high', MEDIUM:'sev-med', LOW:'sev-low', INFO:''};
+  var tbody = document.getElementById('autofix-tbody');
+
+  // Update count display
+  var countEl = document.getElementById('af-result-count');
+  if(countEl){
+    if(sorted.length === 0){
+      countEl.textContent = '0 of ' + all.length + ' total';
+    } else {
+      var endIdx = Math.min(pageStart + pageSize, sorted.length);
+      countEl.textContent = (pageStart+1) + '–' + endIdx + ' of ' + sorted.length +
+        (filtered.length < all.length ? ' (filtered from ' + all.length + ')' : '');
+    }
+  }
+
+  if(sortedFixable.length === 0){
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3);font-size:11px">'
+      + (filtered.length === 0 ? 'No findings match current filters' : 'No fixable findings in current filter')
+      + '</td></tr>';
+    renderAutofixPager(totalPages);
+    return;
+  }
+  
+  tbody.innerHTML = sortedFixable.map(function(f, fIdx){
+    var desc = (f.message || '').length > 60 ? f.message.slice(0,57) + '...' : (f.message || '');
+    var loc  = f.path ? f.path + (f.line ? ':' + f.line : '') : '';
+    var descFull = loc ? desc + ' (' + loc + ')' : desc;
+    var fix  = _autofixDeriveFix(f);
+    var sev  = f.severity || 'INFO';
+    var statusBadge = (f.status === 'open' || !f.status) ? 'badge-danger' : 'badge-neutral';
+    var statusLabel = (f.status || 'open').charAt(0).toUpperCase() + (f.status || 'open').slice(1);
+    var fixableMark = _autofixIsFixable(f) ? '' : '<span style="opacity:.5" title="Manual review only">·</span>';
+    return '<tr>'
+      + '<td><span class="sev ' + (sevClass[sev]||'') + '">' + sev + '</span></td>'
+      + '<td style="font-size:10px;color:var(--t3)">' + (f.tool || '?') + '</td>'
+      + '<td style="font-family:var(--font-mono);font-size:10px;color:var(--purple)">' + (f.rule_id || '—') + '</td>'
+      + '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (f.message||'').replace(/"/g,'&quot;') + '">' + descFull + '</td>'
+      + '<td style="font-size:11px;color:var(--cyan)">' + fix + '</td>'
+      + '<td><span class="badge ' + statusBadge + '">' + statusLabel + '</span></td>'
+      + '<td><button class="btn btn-sm" data-fix-idx="' + fIdx + '" onclick="showFixPreviewByIdx(this)">Preview fix</button></td>'
+      + '</tr>';
+  }).join('');
+
+  renderAutofixPager(totalPages);
+}
+
+// PRO upgrade — pagination footer below the autofix table. Idempotent:
+// builds the bar once and just rewrites text/disabled state on subsequent
+// renders. Keeps the CSV export aligned with the FILTERED set, not the
+// visible page, so users get the full export they expect.
+function renderAutofixPager(totalPages){
+  var tbl = document.getElementById('autofix-tbody');
+  if(!tbl) return;
+  var card = tbl.closest('.card');
+  if(!card) return;
+  var pager = card.querySelector('[data-af-pager]');
+  if(!pager){
+    pager = document.createElement('div');
+    pager.setAttribute('data-af-pager','1');
+    pager.style.cssText =
+      'display:flex;justify-content:flex-end;align-items:center;gap:10px;' +
+      'padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--t3)';
+    pager.innerHTML =
+      '<span class="af-pager-info"></span>' +
+      '<label style="display:flex;align-items:center;gap:6px">Per page ' +
+        '<select name="page-size" aria-label="Page size" class="af-pager-size" style="font-size:11px;padding:3px 6px;background:var(--bg2);border:1px solid var(--border);color:var(--t1);border-radius:4px">' +
+          '<option value="25">25</option><option value="50">50</option>' +
+          '<option value="100">100</option><option value="0">All</option>' +
+        '</select></label>' +
+      '<button class="btn btn-sm af-pager-prev" style="font-size:10px">‹ Prev</button>' +
+      '<button class="btn btn-sm af-pager-next" style="font-size:10px">Next ›</button>';
+    card.appendChild(pager);
+    pager.querySelector('.af-pager-prev').addEventListener('click', function(){
+      if(window._afPage > 0){ window._afPage--; renderAutofixTable(); }
+    });
+    pager.querySelector('.af-pager-next').addEventListener('click', function(){
+      window._afPage++; renderAutofixTable();
+    });
+    pager.querySelector('.af-pager-size').addEventListener('change', function(e){
+      window._afPageSize = parseInt(e.target.value, 10) || 0;
+      window._afPage = 0;
+      renderAutofixTable();
+    });
+  }
+  pager.querySelector('.af-pager-info').textContent =
+    'Page ' + (window._afPage+1) + ' / ' + totalPages;
+  pager.querySelector('.af-pager-prev').disabled = window._afPage <= 0;
+  pager.querySelector('.af-pager-next').disabled = window._afPage >= totalPages-1;
+  pager.querySelector('.af-pager-size').value = String(window._afPageSize);
+}
+
+// VSP-CICD-H3.3: filter pill click handler
+window.afFilterSeverity = function(btn, sev){
+  document.querySelectorAll('.af-sev-pill').forEach(function(b){ b.classList.remove('active'); });
+  if(btn) btn.classList.add('active');
+  if(btn) btn.dataset.sev = sev;
+  renderAutofixTable();
+};
+
+// VSP-CICD-H3.5: CSV export
+window.afExportCSV = function(){
+  var rows = (window._lastFixable || []);
+  if(rows.length === 0){ if(typeof showToast==='function') showToast('No data to export','warning'); return; }
+  var headers = ['severity','tool','rule_id','message','path','line','suggested_fix','status'];
+  var csv = headers.join(',') + '\n';
+  csv += rows.map(function(f){
+    var row = [
+      f.severity || '',
+      f.tool || '',
+      f.rule_id || '',
+      '"' + (f.message||'').replace(/"/g,'""') + '"',
+      f.path || '',
+      f.line || '',
+      '"' + _autofixDeriveFix(f).replace(/"/g,'""') + '"',
+      f.status || 'open'
+    ];
+    return row.join(',');
+  }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'vsp-autofix-'+Date.now()+'.csv'; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  if(typeof showToast==='function') showToast('CSV exported · ' + rows.length + ' rows','success');
+};
+
+
 async function runAutoRemediation(){
   await ensureToken();
-  try{await fetch('/api/v1/remediation/auto',{method:'POST',headers:hdr()});}catch(e){}
-  showToast('Auto-remediation engine triggered','success');
+  // VSP-CICD-H3.4: fetch result + show modal with summary
+  showToast('Running auto-remediation engine...','info');
+  var result = null;
+  try {
+    var r = await fetch('/api/v1/remediation/auto-resolve', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, hdr()),
+      body: JSON.stringify({dry_run: false})
+    });
+    if(r.ok){ result = await r.json(); }
+  } catch(e) { console.warn('auto-resolve failed', e); }
+  
+  // Fallback to legacy endpoint
+  if(!result){
+    try {
+      var r2 = await fetch('/api/v1/remediation/auto', {method:'POST', headers: hdr()});
+      if(r2.ok){ result = await r2.json(); }
+    } catch(e) {}
+  }
+  
+  showAutoRemediationResult(result);
+  
+  // Refresh KPIs
+  setTimeout(loadAutofixStats, 800);
 }
+
+window.showAutoRemediationResult = function(result){
+  result = result || {};
+  var resolved = result.resolved_count || result.count || 0;
+  var skipped  = result.skipped_count  || 0;
+  var errors   = result.error_count    || 0;
+  var details  = result.resolved_findings || result.findings || [];
+  
+  var detailsHtml = '';
+  if(details.length){
+    detailsHtml = '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px">Resolved findings (' + details.length + ')</div>'
+      + '<div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">'
+      + details.slice(0, 50).map(function(f){
+          var sev = f.severity || 'INFO';
+          var sevColor = {CRITICAL:'#ef4444',HIGH:'#f97316',MEDIUM:'#f59e0b',LOW:'#22c55e'}[sev]||'#94a3b8';
+          return '<div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start;font-size:11px">'
+            + '<span style="background:'+sevColor+';color:#fff;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;flex-shrink:0">'+sev+'</span>'
+            + '<span style="font-family:var(--font-mono);color:var(--t3);font-size:10px;flex-shrink:0">'+(f.tool||'?')+'</span>'
+            + '<span style="flex:1;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+((f.message||f.title||'').slice(0,80))+'</span>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+  
+  var kpiBar = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'
+    + '<div style="background:rgba(34,197,94,.1);border-left:3px solid #22c55e;padding:10px 12px;border-radius:4px">'
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Resolved</div>'
+      + '<div style="font-family:var(--font-display);font-size:22px;font-weight:800;color:#22c55e">'+resolved+'</div>'
+    + '</div>'
+    + '<div style="background:rgba(245,158,11,.1);border-left:3px solid #f59e0b;padding:10px 12px;border-radius:4px">'
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Skipped</div>'
+      + '<div style="font-family:var(--font-display);font-size:22px;font-weight:800;color:#f59e0b">'+skipped+'</div>'
+    + '</div>'
+    + '<div style="background:rgba(239,68,68,.1);border-left:3px solid #ef4444;padding:10px 12px;border-radius:4px">'
+      + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Errors</div>'
+      + '<div style="font-family:var(--font-display);font-size:22px;font-weight:800;color:#ef4444">'+errors+'</div>'
+    + '</div>'
+    + '</div>';
+  
+  document.getElementById('mar-body').innerHTML = kpiBar + detailsHtml +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">' +
+    '<button class="btn btn-primary" onclick="closeAutoRemediationModal()">Close</button>' +
+    '</div>';
+  
+  document.getElementById('modal-auto-remediation').style.display = 'flex';
+};
+window.closeAutoRemediationModal = function(){
+  document.getElementById('modal-auto-remediation').style.display = 'none';
+};
 
 // ── HISTORY ──
 var _histData=[];
 async function loadHistory(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tbody = document.getElementById('history-tbody');
+  var hasData = tbody && tbody.children.length > 0 &&
+                !tbody.querySelector('.vsp-uxs-skel-row') &&
+                !tbody.querySelector('td[colspan]');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#history-tbody', { rows: 6, kind: 'table' });
+
   await ensureToken();
   try{
-    var r=await fetch('/api/v1/vsp/runs/index?limit=50',{headers:hdr()});
-    var d=await r.json(); _histData=d.runs||[];
-  }catch(e){_histData=MOCK_GATES.map(g=>({rid:g.rid,mode:'FULL',gate:g.gate,total_findings:104,created_at:'2026-04-15T'+g.time+':00Z',score:g.score,trigger:'cicd'}));}
+    var r = await fetch('/api/v1/vsp/runs/index?limit=50', { headers: hdr() });
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#history-tbody', 'HTTP ' + r.status, loadHistory);
+      return;
+    }
+    var d = await r.json();
+    _histData = d.runs || [];
+    if (_histData.length === 0) {
+      if (hasUX) VSPUXState.empty('#history-tbody', 'No runs found', loadHistory);
+      return;
+    }
+  }catch(e){
+    _histData = [];
+    if (hasUX && !hasData) VSPUXState.error('#history-tbody', 'Network error', loadHistory);
+    return;
+  }
   renderHistory();
+}
+function fmtDuration(start, end){
+  if(!start||!end) return '—';
+  var ms = new Date(end) - new Date(start);
+  if(isNaN(ms)||ms<0) return '—';
+  var sec = Math.floor(ms/1000);
+  if(sec<60) return sec+'s';
+  var min = Math.floor(sec/60), rem = sec%60;
+  return min+'m'+(rem>0?' '+rem+'s':'');
 }
 function renderHistory(){
   var tf=document.getElementById('hist-filter-trigger')?.value||'';
   var gf=document.getElementById('hist-filter-gate')?.value||'';
   var d=_histData.filter(x=>(!tf||x.trigger===tf)&&(!gf||x.gate===gf));
   document.getElementById('hist-count').textContent=d.length+' runs';
-  document.getElementById('history-tbody').innerHTML=d.map(x=>`<tr>
+  document.getElementById('history-tbody').innerHTML=d.map(x=>`<tr style="cursor:pointer" onclick="openRunDetail('${x.rid||x.id||''}')" onmouseover="this.style.background='rgba(56,189,248,.05)'" onmouseout="this.style.background='transparent'" title="Click to view run detail">
     <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${(x.rid||x.id||'').slice(-14)}</td>
     <td><span class="badge badge-neutral" style="font-size:9px">${x.trigger||'cicd'}</span></td>
     <td><span class="badge badge-info" style="font-size:9px">${x.mode||'FULL'}</span></td>
     <td><span class="badge badge-${x.gate==='PASS'?'ok':x.gate==='FAIL'?'danger':'warn'}">${x.gate||'—'}</span></td>
-    <td style="font-family:var(--font-mono);font-size:11px;color:${(x.score||0)>=70?'var(--green)':'var(--red)'}">${x.score||'—'}/100</td>
-    <td style="font-family:var(--font-mono);font-size:11px">${x.total_findings||'—'}</td>
-    <td style="font-size:10px;color:var(--t3)">—</td>
+    <td style="font-family:var(--font-mono);font-size:11px;color:${(x.summary?.SCORE??x.score??0)>=70?'var(--green)':(x.summary?.SCORE??x.score??0)>=50?'var(--amber)':'var(--red)'}">${x.summary?.SCORE??x.score??'—'}/100</td>
+    <td style="font-family:var(--font-mono);font-size:11px">${x.total_findings??'—'}</td>
+    <td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${fmtDuration(x.started_at,x.finished_at)}</td>
     <td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${(x.created_at||'').slice(0,16).replace('T',' ')}</td>
   </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No runs found</td></tr>';
 }
@@ -771,9 +1641,2347 @@ document.addEventListener('DOMContentLoaded',async()=>{
   await loadKPIs();
   loadSchedules();
   loadGateHistory();
+  loadPRComment();
   loadAutofixStats();
   loadHistory();
 });
+</script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+
+<!-- VSP-UNI3-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Universal Panel Polish v3 — Final batch
+ *   Inject vào: ai_advisor / ai_analyst / cicd / cmmc / samm / sbom_diff
+ *               / software_risk / scheduler / network_flow
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_UNI_POLISH_V3__) return;
+  window.__VSP_UNI_POLISH_V3__ = true;
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+  function copy(t) { try { navigator.clipboard.writeText(t); toast('Copied', 'success'); } catch (e) {} }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function relativeTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts); if (isNaN(d.getTime())) return '—';
+    const diff = Date.now() - d.getTime();
+    const days = Math.floor(diff / 86400000);
+    const hrs = Math.floor((diff % 86400000) / 3600000);
+    if (days > 0) return days + 'd ago';
+    if (hrs > 0) return hrs + 'h ago';
+    return Math.floor(diff / 60000) + 'm ago';
+  }
+  function fmtBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  // Detect panel
+  const path = location.pathname;
+  const PANEL =
+    /ai_advisor/.test(path)    ? 'ai_advisor' :
+    /ai_analyst/.test(path)    ? 'ai_analyst' :
+    /cicd/.test(path)          ? 'cicd' :
+    /cmmc/.test(path)          ? 'cmmc' :
+    /samm/.test(path)          ? 'samm' :
+    /sbom_diff/.test(path)     ? 'sbom_diff' :
+    /software_risk/.test(path) ? 'software_risk' :
+    /scheduler/.test(path)     ? 'scheduler' :
+    /network_flow/.test(path)  ? 'network_flow' : 'unknown';
+
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V3] Loaded for panel:', PANEL));
+
+  // ─── Toast (shared) ──────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-uni3-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspUNI3ToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!$id('vsp-uni3-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-uni3-toast-css';
+    s.textContent = '@keyframes vspUNI3ToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+  if (!window.__vspUni3OverrideAlert) {
+    window.__vspUni3OverrideAlert = true;
+    const orig = window.alert;
+    window.alert = function (msg) {
+      if (/^✅|^✓/.test(msg)) toast(String(msg).replace(/^[✅✓]\s*/, ''), 'success');
+      else if (/^❌|^✗/.test(msg)) toast(String(msg).replace(/^[❌✗]\s*/, ''), 'error');
+      else if (/error|fail/i.test(msg)) toast(msg, 'error');
+      else if (/⚠/.test(msg)) toast(String(msg).replace(/^⚠\s*/, ''), 'warn');
+      else toast(msg, 'info');
+    };
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-uni3-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '720px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+         <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+         <button onclick="window._vspUNI3.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>
+       </div>
+       <div style="padding:18px">${opts.body || ''}</div>` +
+      (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-uni3-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function row(label, value, copyable) {
+    const v = String(value == null ? '—' : value);
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspUNI3.copy('${esc(v).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:140px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;line-height:1.5;word-break:break-word">' + esc(v) + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+
+  const UNI3 = window._vspUNI3 = { close: closeModal, copy: copy, toast: toast, showModal: showModal };
+
+  // ─── Filter bar ──────────────────────────────────────────────────────────
+  function injectFilterBar(container, filters, onChange) {
+    if (!container) return null;
+    if (container.querySelector('.vsp-uni3-filter')) return container.querySelector('.vsp-uni3-filter');
+    const bar = document.createElement('div');
+    bar.className = 'vsp-uni3-filter';
+    bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + (filters.search !== false
+          ? '<input name="search-filter" aria-label="Search filter" class="vsp-uni3-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+      + (filters.pills ? renderPillGroup(filters.pills) : '')
+      + (filters.csv !== false
+          ? '<button class="btn btn-sm vsp-uni3-csv" style="font-size:10px">↓ CSV</button>' : '')
+      + '<span class="vsp-uni3-count" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
+    container.insertBefore(bar, container.firstChild);
+
+    if (!$id('vsp-uni3-pill-css')) {
+      const css = document.createElement('style'); css.id = 'vsp-uni3-pill-css';
+      css.textContent = '.vsp-uni3-pill{background:transparent;border:0;padding:5px 9px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.vsp-uni3-pill:hover{color:var(--t1,#e5e7eb)}.vsp-uni3-pill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+    const q = bar.querySelector('.vsp-uni3-q');
+    const csvBtn = bar.querySelector('.vsp-uni3-csv');
+    if (q) q.addEventListener('input', () => onChange(getFilterState(bar)));
+    bar.querySelectorAll('.vsp-uni3-pill').forEach(p => {
+      p.addEventListener('click', () => {
+        bar.querySelectorAll('.vsp-uni3-pill[data-group="' + p.dataset.group + '"]').forEach(x => x.classList.remove('vsp-uni3-pill-active'));
+        p.classList.add('vsp-uni3-pill-active');
+        onChange(getFilterState(bar));
+      });
+    });
+    if (csvBtn && filters.onCSV) csvBtn.addEventListener('click', filters.onCSV);
+    return bar;
+  }
+  function renderPillGroup(groups) {
+    return groups.map(g => '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+      + g.options.map((o, i) => `<button class="vsp-uni3-pill ${i === 0 ? 'vsp-uni3-pill-active' : ''}" data-group="${esc(g.key)}" data-value="${esc(o.value || '')}" style="${o.color ? 'color:' + o.color : ''}">${esc(o.label)}</button>`).join('')
+      + '</div>').join('');
+  }
+  function getFilterState(bar) {
+    const state = { q: '' };
+    const q = bar.querySelector('.vsp-uni3-q');
+    if (q) state.q = (q.value || '').toLowerCase();
+    bar.querySelectorAll('.vsp-uni3-pill-active').forEach(p => state[p.dataset.group] = p.dataset.value || '');
+    return state;
+  }
+  function tableToCSV(table) {
+    if (!table) return '';
+    const rows = [];
+    table.querySelectorAll('thead tr').forEach(tr => rows.push(Array.from(tr.querySelectorAll('th,td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(',')));
+    table.querySelectorAll('tbody tr').forEach(tr => { if (tr.style.display === 'none') return; rows.push(Array.from(tr.querySelectorAll('td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(',')); });
+    return rows.join('\n');
+  }
+  function applyFilters(state) {
+    $$('table').forEach(tbl => {
+      const rows = tbl.querySelectorAll('tbody tr');
+      let shown = 0;
+      rows.forEach(tr => {
+        const text = (tr.textContent || '').toLowerCase();
+        let ok = true;
+        if (state.q && text.indexOf(state.q) < 0) ok = false;
+        for (const k of Object.keys(state)) {
+          if (k === 'q' || !state[k]) continue;
+          if (text.indexOf(state[k].toLowerCase()) < 0) ok = false;
+        }
+        tr.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      const counter = card && card.querySelector('.vsp-uni3-count');
+      if (counter) counter.textContent = shown + ' / ' + rows.length + ' rows';
+    });
+  }
+  function injectGenericFilter(searchPlaceholder, pills, csvName) {
+    $$('table').forEach(tbl => {
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      if (!card || card.querySelector('.vsp-uni3-filter')) return;
+      injectFilterBar(card, {
+        searchPlaceholder: searchPlaceholder, pills: pills,
+        onCSV: () => { downloadFile((csvName || 'export') + '-' + Date.now() + '.csv', tableToCSV(tbl), 'text/csv'); toast('Exported CSV', 'success'); }
+      }, applyFilters);
+    });
+  }
+  function makeKPIsClickable(handler) {
+    $$('div[class*="kpi"]').forEach(card => {
+      if (card.dataset.vspPol) return;
+      card.dataset.vspPol = '1';
+      card.style.cursor = 'pointer';
+      card.title = 'Click for breakdown';
+      card.onclick = () => handler(card);
+    });
+  }
+  function kbox(label, val, color, sub) {
+    return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+      + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+      + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + (typeof val === 'number' ? val.toLocaleString() : esc(val)) + '</div>'
+      + (sub ? '<div style="font-size:10px;color:var(--t3);margin-top:2px">' + esc(sub) + '</div>' : '')
+      + '</div>';
+  }
+  function infoBanner(color, title, html) {
+    return `<div style="background:rgba(${parseInt(color.slice(1,3),16)},${parseInt(color.slice(3,5),16)},${parseInt(color.slice(5,7),16)},.08);border-left:3px solid ${color};padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px"><b style="color:${color}">${esc(title)}</b> ${html}</div>`;
+  }
+
+  // ─── PANEL: ai_advisor ───────────────────────────────────────────────────
+  function initAIAdvisor() {
+    setTimeout(() => {
+      // Add info banner about AI Advisor
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-ai-advisor-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-ai-advisor-banner';
+        banner.innerHTML = infoBanner('#a855f7', '🤖 AI Advisor',
+          'Provides remediation suggestions for findings. Modes: <b>online</b> (LLM API) / <b>cache</b> (cached responses) / <b>offline</b> (rules-only).');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+
+      // KPI clickable
+      makeKPIsClickable(() => showAIAdvisorStats());
+
+      // Cache stats button
+      addToolbarButton('📊 Cache stats', showAIAdvisorStats);
+    }, 600);
+  }
+  async function showAIAdvisorStats() {
+    showModal({ title: '🤖 AI Advisor — Cache Stats', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const stats = await authFetch('/api/v1/ai/cache/stats').then(r => r.json()).catch(() => ({}));
+      const mode = await authFetch('/api/v1/ai/mode').then(r => r.json()).catch(() => ({}));
+
+      const body = ''
+        + infoBanner('#a855f7', '🤖 AI Advisor', 'Caches LLM responses to reduce API costs. Cache key = hash(finding_id + tool + context).')
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('CURRENT MODE', (mode.mode || 'unknown').toUpperCase(), '#a855f7')
+        +   kbox('CACHE HITS', stats.hits || stats.cache_hits || 0, '#10b981')
+        +   kbox('CACHE MISSES', stats.misses || stats.cache_misses || 0, '#f59e0b')
+        +   kbox('CACHE SIZE', stats.size || stats.entries || 0, '#3b82f6', 'entries')
+        + '</div>'
+        + '<details style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px"><summary style="cursor:pointer;font-size:11px;color:var(--t2);font-weight:600">Raw stats JSON</summary>'
+        + '<pre style="font-size:10px;line-height:1.4;color:var(--t2);font-family:var(--font-mono,monospace);margin-top:8px;max-height:200px;overflow:auto">' + esc(pretty({ mode: mode, cache: stats })) + '</pre></details>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI3.close()">Close</button>';
+      showModal({ title: '🤖 AI Advisor Stats', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: ai_analyst ───────────────────────────────────────────────────
+  function initAIAnalyst() {
+    setTimeout(() => {
+      // Add hint banner about AI Analyst
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-ai-analyst-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-ai-analyst-banner';
+        banner.innerHTML = infoBanner('#a855f7', '💬 AI Analyst — Conversational SOC',
+          'Ask questions in natural language about: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">findings</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">incidents</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">remediation status</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">risk score</code>. Pulls real-time data from VSP database.');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+
+      // Auto-add textarea hint placeholder enhancement
+      $$('textarea, input[type="text"]').forEach(inp => {
+        if (inp.dataset.vspHint) return;
+        inp.dataset.vspHint = '1';
+        if (!inp.placeholder || inp.placeholder.length < 30) {
+          inp.placeholder = 'e.g. "Show me critical findings in the last 7 days" or "What incidents are still open?"';
+        }
+      });
+    }, 600);
+  }
+
+  // ─── PANEL: cicd ─────────────────────────────────────────────────────────
+  function initCICD() {
+    setTimeout(() => {
+      injectGenericFilter('Search pipeline / status / commit…', [{
+        key: 'st',
+        options: [
+          { label: 'All', value: '' },
+          { label: 'Success', value: 'success', color: '#10b981' },
+          { label: 'Failed', value: 'failed', color: '#ef4444' },
+          { label: 'Running', value: 'running', color: '#3b82f6' },
+          { label: 'Gate Block', value: 'block', color: '#f59e0b' }
+        ]
+      }], 'cicd-runs');
+
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-cicd-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-cicd-banner';
+        banner.innerHTML = infoBanner('#3b82f6', '⚙ CI/CD Integration',
+          'Automated security gate per <b>NIST SP 800-218 SSDF</b>. Pipeline blocked if findings exceed thresholds (Critical=0 / High=5 / Medium=20).');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+
+      makeKPIsClickable(() => showCICDStats());
+    }, 600);
+  }
+  async function showCICDStats() {
+    showModal({ title: '⚙ CI/CD Pipeline Stats', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const findings = await authFetch('/api/v1/vsp/findings').then(r => r.json()).catch(() => ({}));
+      const counts = findings.severity_counts || {};
+
+      const body = ''
+        + infoBanner('#3b82f6', '⚙ Pipeline Gate', 'Per <b>NIST SP 800-218 SSDF Practice PW.7</b> — Review code for vulnerabilities + remediate before release.')
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('CRITICAL', counts.critical || counts.CRITICAL || 0, '#dc2626', 'gate threshold: 0')
+        +   kbox('HIGH', counts.high || counts.HIGH || 0, '#ef4444', 'gate threshold: 5')
+        +   kbox('MEDIUM', counts.medium || counts.MEDIUM || 0, '#f59e0b', 'gate threshold: 20')
+        +   kbox('LOW', counts.low || counts.LOW || 0, '#3b82f6', 'no gate')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI3.close()">Close</button>';
+      showModal({ title: '⚙ CI/CD Stats', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: cmmc ─────────────────────────────────────────────────────────
+  function initCMMC() {
+    setTimeout(() => {
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-cmmc-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-cmmc-banner';
+        banner.innerHTML = infoBanner('#06b6d4', '🛡 CMMC 2.0 — Cybersecurity Maturity Model Certification',
+          '<b>Level 1</b> (Foundational, 17 practices) → <b>Level 2</b> (Advanced, 110 practices, NIST SP 800-171) → <b>Level 3</b> (Expert, 134 practices, NIST SP 800-172). Required for DoD contractors handling <b>CUI</b>.');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+      injectGenericFilter('Search domain / practice…', [{
+        key: 'level',
+        options: [
+          { label: 'All levels', value: '' },
+          { label: 'Level 1', value: 'level 1', color: '#10b981' },
+          { label: 'Level 2', value: 'level 2', color: '#3b82f6' },
+          { label: 'Level 3', value: 'level 3', color: '#a855f7' }
+        ]
+      }], 'cmmc');
+    }, 600);
+  }
+
+  // ─── PANEL: samm ─────────────────────────────────────────────────────────
+  function initSAMM() {
+    setTimeout(() => {
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-samm-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-samm-banner';
+        banner.innerHTML = infoBanner('#a855f7', '📈 OWASP SAMM — Software Assurance Maturity Model',
+          '5 business functions × 3 security practices each × 3 maturity levels. Used to measure & improve software security posture. Reference: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">owaspsamm.org</code>');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+      injectGenericFilter('Search practice / function…', [{
+        key: 'maturity',
+        options: [
+          { label: 'All', value: '' },
+          { label: 'Level 1', value: 'level 1', color: '#3b82f6' },
+          { label: 'Level 2', value: 'level 2', color: '#a855f7' },
+          { label: 'Level 3', value: 'level 3', color: '#10b981' }
+        ]
+      }], 'samm');
+    }, 600);
+  }
+
+  // ─── PANEL: sbom_diff ────────────────────────────────────────────────────
+  function initSBOMDiff() {
+    setTimeout(() => {
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-sbom-diff-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-sbom-diff-banner';
+        banner.innerHTML = infoBanner('#f59e0b', '🔄 SBOM Diff — Compare Two Software Inventories',
+          'Identifies <b style="color:#10b981">added</b>, <b style="color:#ef4444">removed</b>, and <b style="color:#f59e0b">changed</b> packages between two SBOM snapshots. Helps detect supply chain drift per <b>EO 14028</b>.');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+    }, 600);
+  }
+
+  // ─── PANEL: software_risk ────────────────────────────────────────────────
+  function initSoftwareRisk() {
+    setTimeout(() => {
+      injectGenericFilter('Search package / version / vendor…', [{
+        key: 'risk',
+        options: [
+          { label: 'All risk', value: '' },
+          { label: 'Critical', value: 'critical', color: '#dc2626' },
+          { label: 'High', value: 'high', color: '#ef4444' },
+          { label: 'Medium', value: 'medium', color: '#f59e0b' },
+          { label: 'Low', value: 'low', color: '#3b82f6' },
+          { label: 'EOL', value: 'eol', color: '#71717a' }
+        ]
+      }], 'software-risk');
+
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-sw-risk-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-sw-risk-banner';
+        banner.innerHTML = infoBanner('#ef4444', '⚠ Software Risk Assessment',
+          'Risk score = vulnerabilities × CVSS × exploitability + EOL status. EOL software = elevated risk per <b>endoflife.date</b> (74 entries in DB).');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+
+      makeKPIsClickable(() => showSoftwareRiskStats());
+    }, 600);
+  }
+  async function showSoftwareRiskStats() {
+    showModal({ title: '⚠ Software Risk Stats', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const stats = await authFetch('/api/v1/software-inventory/stats').then(r => r.json()).catch(() => ({}));
+      const eol = await authFetch('/api/v1/software-inventory/eol-database').then(r => r.json()).catch(() => ({}));
+
+      const eolList = eol.entries || eol.items || [];
+      const total = stats.total || stats.count || 0;
+      const eolCount = stats.eol || stats.eol_count || eolList.length || 0;
+
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('TOTAL PACKAGES', total, '#3b82f6')
+        +   kbox('EOL ENTRIES', eolCount, '#dc2626', 'endoflife.date DB')
+        + '</div>'
+        + infoBanner('#ef4444', '⚠ EOL Risk', 'Software past end-of-life receives no security patches. Critical: replace or isolate immediately.')
+        + (eolList.length > 0 ? ''
+            + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">EOL DATABASE (top 10)</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:280px;overflow:auto">'
+            +   eolList.slice(0, 10).map(e => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+                  <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(e.product || e.name || '?')}</span>
+                  <span style="color:var(--t3)">EOL ${esc(e.eol_date || e.eol || '—')}</span>
+                </div>`).join('')
+            + '</div>'
+            : '');
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI3.close()">Close</button>';
+      showModal({ title: '⚠ Software Risk', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI3.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: scheduler ────────────────────────────────────────────────────
+  function initScheduler() {
+    setTimeout(() => {
+      injectGenericFilter('Search schedule / target / cron…', [{
+        key: 'st',
+        options: [
+          { label: 'All', value: '' },
+          { label: 'Active', value: 'active', color: '#10b981' },
+          { label: 'Paused', value: 'paused', color: '#f59e0b' },
+          { label: 'Disabled', value: 'disabled', color: '#71717a' }
+        ]
+      }], 'schedules');
+
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-sched-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-sched-banner';
+        banner.innerHTML = infoBanner('#3b82f6', '⏰ Scan Scheduler — Automated Continuous Monitoring',
+          'Cron-based scheduling. Tổng <b>603 runs</b> đã thực hiện. Per <b>NIST SP 800-137 ConMon</b> requirements.');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+
+      // Click rows → modal Schedule Detail
+      $$('table').forEach(tbl => {
+        if (tbl.dataset.vspClick) return;
+        tbl.dataset.vspClick = '1';
+        tbl.addEventListener('click', e => {
+          const tr = e.target.closest('tbody tr');
+          if (!tr) return;
+          const cells = Array.from(tr.querySelectorAll('td')).map(c => (c.textContent || '').trim());
+          if (cells.length < 2) return;
+          const body = '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+            + cells.map((c, i) => row('Field ' + (i+1), c, true)).join('')
+            + '</div>';
+          showModal({
+            title: '⏰ Schedule Detail',
+            body: body,
+            footer: '<button class="btn btn-primary btn-sm" onclick="window._vspUNI3.close()">Close</button>',
+            width: '720px'
+          });
+        });
+      });
+    }, 600);
+  }
+
+  // ─── PANEL: network_flow ─────────────────────────────────────────────────
+  function initNetworkFlow() {
+    setTimeout(() => {
+      injectGenericFilter('Search src / dst IP / port / protocol…', [{
+        key: 'proto',
+        options: [
+          { label: 'All', value: '' },
+          { label: 'TCP', value: 'tcp', color: '#3b82f6' },
+          { label: 'UDP', value: 'udp', color: '#a855f7' },
+          { label: 'ICMP', value: 'icmp', color: '#f59e0b' }
+        ]
+      }], 'network-flows');
+
+      const main = $('main') || $('.main') || document.body;
+      if (main && !$id('vsp-net-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'vsp-net-banner';
+        banner.innerHTML = infoBanner('#06b6d4', '🌐 Network Flow Analysis — NDR',
+          'NetFlow/IPFIX-style network detection & response. Detects: <b>data exfil</b>, <b>C2 beaconing</b>, <b>lateral movement</b>, <b>port scans</b>. Per <b>NIST SP 800-94</b>.');
+        const target = main.querySelector('div');
+        if (target) target.parentNode.insertBefore(banner, target);
+      }
+    }, 600);
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+  function addToolbarButton(label, handler) {
+    // Find header/toolbar location
+    const headers = $$('h1, h2, .header, [class*="title"]').slice(0, 1);
+    if (headers.length === 0) return;
+    const header = headers[0];
+    if (header.dataset.vspBtn) return;
+    header.dataset.vspBtn = '1';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm';
+    btn.style.cssText = 'font-size:10px;margin-left:10px;background:var(--bg1,#111);border:1px solid var(--bd);color:var(--t1);padding:5px 10px;border-radius:4px;cursor:pointer';
+    btn.textContent = label;
+    btn.onclick = handler;
+    header.appendChild(btn);
+  }
+
+  // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
+  function init() {
+    if (_initDone) return;
+    _initDone = true;
+    if (PANEL === 'ai_advisor')         initAIAdvisor();
+    else if (PANEL === 'ai_analyst')    initAIAnalyst();
+    else if (PANEL === 'cicd')          initCICD();
+    else if (PANEL === 'cmmc')          initCMMC();
+    else if (PANEL === 'samm')          initSAMM();
+    else if (PANEL === 'sbom_diff')     initSBOMDiff();
+    else if (PANEL === 'software_risk') initSoftwareRisk();
+    else if (PANEL === 'scheduler')     initScheduler();
+    else if (PANEL === 'network_flow')  initNetworkFlow();
+  }
+  if (document.readyState !== 'loading') setTimeout(init, 800);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 800));
+
+  let pollCount = 0;
+  const poll = setInterval(() => { init(); if (++pollCount > 4) clearInterval(poll); }, 1500);
+})();
+
+</script>
+<!-- VSP-UNI3-POLISH-END -->
+
+<!-- ══ H2.2/H2.3 Setup wizard modal ══ -->
+<div class="modal-backdrop" id="modal-setup-wizard" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)">
+  <div class="modal" style="background:var(--bg1);border:1px solid var(--border);border-radius:var(--r-lg,8px);max-width:680px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1">
+      <div id="msw-title" style="font-weight:700"></div>
+      <button onclick="closeSetupWizard()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+    </div>
+    <div id="msw-body" style="padding:16px"></div>
+  </div>
+</div>
+
+<script>
+window.setupIntegration = function(platform){
+  var guides = {
+    github: {name:'GitHub Actions', status:'connected', tplId:'tpl-card-github', steps:[
+      '<b>Create repository secrets</b> in Settings → Secrets and variables → Actions:',
+      '&nbsp;&nbsp;• <code>VSP_URL</code> = '+(location.origin||'https://vsp.example.com'),
+      '&nbsp;&nbsp;• <code>VSP_TOKEN</code> = your VSP API key',
+      '<b>Copy</b> the workflow YAML to <code>.github/workflows/vsp-scan.yml</code>',
+      '<b>Push</b> the file — first run triggers automatically',
+      '<b>Verify</b>: GitHub Actions tab shows <code>VSP Security Scan</code> job'
+    ]},
+    gitlab: {name:'GitLab CI', status:'pending', tplId:'tpl-card-gitlab', steps:[
+      '<b>Set CI/CD variables</b> in Settings → CI/CD → Variables:',
+      '&nbsp;&nbsp;• <code>VSP_URL</code> — protected, masked',
+      '&nbsp;&nbsp;• <code>VSP_TOKEN</code> — protected, masked',
+      '<b>Copy</b> snippet to <code>.gitlab-ci.yml</code> at repo root',
+      '<b>Commit</b> — first MR/push runs <code>vsp-scan</code> stage',
+      '<b>Verify</b>: pipeline shows <code>vsp-security-scan</code> job'
+    ]},
+    jenkins: {name:'Jenkins', status:'template', tplId:'tpl-card-jenkins', steps:[
+      '<b>Add credentials</b> in Manage Jenkins → Credentials:',
+      '&nbsp;&nbsp;• ID <code>vsp-url</code> → secret text',
+      '&nbsp;&nbsp;• ID <code>vsp-token</code> → secret text',
+      '<b>Install jq</b> on agent: <code>apt-get install jq</code>',
+      '<b>Copy</b> Jenkinsfile to repo root',
+      '<b>Configure</b> pipeline: Pipeline script from SCM → branch main',
+      '<b>Run</b> — Jenkins triggers VSP gate stage'
+    ]},
+    azure: {name:'Azure DevOps', status:'template', tplId:'tpl-card-azure', steps:[
+      '<b>Create variable group</b> <code>vsp-secrets</code> in Pipelines → Library:',
+      '&nbsp;&nbsp;• <code>VSP_URL</code> — secure',
+      '&nbsp;&nbsp;• <code>VSP_TOKEN</code> — secure (locked)',
+      '<b>Copy</b> snippet to <code>azure-pipelines.yml</code>',
+      '<b>Create pipeline</b> → Existing YAML → select repo + branch',
+      '<b>Authorize</b> variable group on first run',
+      '<b>Verify</b>: Pipelines tab shows stage <code>VSPSecurityScan</code>'
+    ]},
+    bitbucket: {name:'Bitbucket Pipelines', status:'template', tplId:'tpl-card-bitbucket', steps:[
+      '<b>Enable Pipelines</b> in Repository settings → Pipelines',
+      '<b>Add repository variables</b>:',
+      '&nbsp;&nbsp;• <code>VSP_URL</code> — secured',
+      '&nbsp;&nbsp;• <code>VSP_TOKEN</code> — secured',
+      '<b>Copy</b> snippet to <code>bitbucket-pipelines.yml</code>',
+      '<b>Commit</b> — first push triggers default + branch + PR',
+      '<b>Verify</b>: Pipelines tab shows <code>VSP Security Scan</code>'
+    ]},
+    vspcli: {name:'vspcli (local)', status:'ready', tplId:'tpl-card-vspcli', steps:[
+      '<b>Save</b> the script to <code>scripts/vsp-scan.sh</code>',
+      '<b>Make executable</b>: <code>chmod +x scripts/vsp-scan.sh</code>',
+      '<b>Set environment</b>:',
+      '&nbsp;&nbsp;• <code>export VSP_URL='+(location.origin||'http://127.0.0.1:8921')+'</code>',
+      '&nbsp;&nbsp;• <code>export VSP_TOKEN=&lt;key&gt;</code>',
+      '<b>Pre-commit hook</b>: symlink to <code>.git/hooks/pre-push</code>',
+      '<b>Run</b>: <code>./scripts/vsp-scan.sh</code> — exits 1 if FAIL'
+    ]}
+  };
+  var g = guides[platform];
+  if(!g){ if(typeof showToast==='function') showToast('Unknown: '+platform,'error'); return; }
+  var statusBadge = ({connected:'<span class="badge badge-ok">● Connected</span>',pending:'<span class="badge badge-warn">○ Pending</span>',template:'<span class="badge badge-neutral">○ Template</span>',ready:'<span class="badge badge-ok">● Ready</span>'})[g.status]||'';
+  var stepsHtml = g.steps.map(function(stp,i){
+    return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);align-items:flex-start">'+
+      '<div style="width:22px;height:22px;border-radius:50%;background:var(--accent,#0ea5e9);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</div>'+
+      '<div style="flex:1;font-size:12px;line-height:1.6;color:var(--t1)">'+stp+'</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('msw-title').innerHTML = g.name+' &nbsp; '+statusBadge;
+  document.getElementById('msw-body').innerHTML =
+    '<div style="margin-bottom:14px;font-size:11px;color:var(--t2)">Follow these steps to integrate <b>'+g.name+'</b> with VSP:</div>'+
+    '<div style="margin-bottom:16px">'+stepsHtml+'</div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'+
+      '<button class="btn" onclick="closeSetupWizard()">Close</button>'+
+      '<button class="btn btn-primary" onclick="closeSetupWizard();gotoTemplate(\''+g.tplId+'\')">Open Template ↗</button>'+
+    '</div>';
+  document.getElementById('modal-setup-wizard').style.display = 'flex';
+};
+
+window.closeSetupWizard = function(){
+  document.getElementById('modal-setup-wizard').style.display = 'none';
+};
+
+window.gotoTemplate = function(cardId){
+  if(typeof switchTab==='function'){
+    switchTab('tab-templates', document.querySelector('.tab-btn[onclick*="tab-templates"]'));
+  }
+  setTimeout(function(){
+    var el = document.getElementById(cardId);
+    if(el){
+      el.scrollIntoView({behavior:'smooth', block:'start'});
+      el.style.transition = 'box-shadow .3s';
+      el.style.boxShadow = '0 0 0 2px var(--accent,#0ea5e9)';
+      setTimeout(function(){ el.style.boxShadow = ''; }, 1500);
+    }
+  }, 250);
+};
+
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'modal-setup-wizard') closeSetupWizard();
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && document.getElementById('modal-setup-wizard') && document.getElementById('modal-setup-wizard').style.display === 'flex'){
+    closeSetupWizard();
+  }
+});
+(window.VSP_DEBUG && console.log('[CICD-H2] Setup wizard + 4 new templates loaded'));
+</script>
+
+
+<!-- VSP-CICD-H2.F: Template selector + create schedule modal -->
+<div class="modal-backdrop" id="modal-create-schedule" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)">
+  <div class="modal" style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;max-width:560px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700">+ New Schedule</div>
+      <button onclick="closeCreateSchedule()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+    </div>
+    <div style="padding:16px" id="mcs-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-name">Schedule name *</label>
+          <input id="cs-name" placeholder="Daily SAST scan" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px"></div>
+        <div><label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-mode">Mode *</label>
+          <select id="cs-mode" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px">
+            <option value="FULL">FULL — all 26 tools</option>
+            <option value="FULL_SOC">FULL_SOC — SOC-tuned</option>
+            <option value="SAST">SAST — code analysis</option>
+            <option value="SCA">SCA — dependencies</option>
+            <option value="SECRETS">SECRETS — leak detection</option>
+            <option value="IAC">IAC — infrastructure</option>
+            <option value="DAST">DAST — runtime</option>
+            <option value="NETWORK">NETWORK — port + ssl</option>
+          </select></div>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-src">Source path *</label>
+        <input id="cs-src" placeholder="/home/user/repo  or  https://example.com" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;font-family:var(--font-mono)">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-cron">Cron expression *</label>
+        <input id="cs-cron" placeholder="0 2 * * *" value="0 2 * * *" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;font-family:var(--font-mono)">
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 2 * * *'" style="font-size:9px;padding:3px 8px">Daily 02:00</button>
+          <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 */6 * * *'" style="font-size:9px;padding:3px 8px">Every 6h</button>
+          <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 2 * * 1'" style="font-size:9px;padding:3px 8px">Weekly Mon</button>
+          <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 0 1 * *'" style="font-size:9px;padding:3px 8px">Monthly</button>
+        </div>
+        <div style="font-size:9px;color:var(--t3);margin-top:6px">Format: <code>min hour day month weekday</code> · UTC timezone</div>
+      </div>
+      <div style="margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="cs-enabled" checked style="cursor:pointer">
+        <label for="cs-enabled" style="font-size:11px;color:var(--t1);cursor:pointer">Enable immediately after create</label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="btn" onclick="closeCreateSchedule()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateSchedule()">Create Schedule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── H2.F: Template selector ──
+window.selectTemplate = function(key){
+  document.querySelectorAll('.btn-tplsel').forEach(function(b){
+    b.classList.toggle('active', b.dataset.tpl === key);
+  });
+  document.querySelectorAll('.tpl-card').forEach(function(c){
+    c.classList.toggle('active', c.dataset.tpl === key);
+  });
+};
+
+// ── H2.F: Create schedule modal ──
+window.showCreateScheduleModal = function(){
+  document.getElementById('cs-name').value = '';
+  document.getElementById('cs-src').value = '';
+  document.getElementById('cs-cron').value = '0 2 * * *';
+  document.getElementById('cs-mode').value = 'FULL';
+  document.getElementById('cs-enabled').checked = true;
+  document.getElementById('modal-create-schedule').style.display = 'flex';
+  setTimeout(function(){ var n=document.getElementById('cs-name'); if(n) n.focus(); }, 50);
+};
+window.closeCreateSchedule = function(){
+  document.getElementById('modal-create-schedule').style.display = 'none';
+};
+window.submitCreateSchedule = async function(){
+  var name = document.getElementById('cs-name').value.trim();
+  var mode = document.getElementById('cs-mode').value;
+  var src  = document.getElementById('cs-src').value.trim();
+  var cron = document.getElementById('cs-cron').value.trim();
+  var enabled = document.getElementById('cs-enabled').checked;
+  if(!name || !src || !cron){
+    if(typeof showToast==='function') showToast('Name, source, and cron are required','warning');
+    return;
+  }
+  try {
+    var r = await fetch('/api/v1/schedules',{
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, hdr ? hdr() : {}),
+      body: JSON.stringify({name:name, mode:mode, src:src, cron:cron, enabled:enabled})
+    });
+    if(!r.ok){
+      var t = await r.text();
+      throw new Error(t || 'HTTP ' + r.status);
+    }
+    if(typeof showToast==='function') showToast('Schedule created: ' + name,'success');
+    closeCreateSchedule();
+    if(typeof loadSchedules==='function') loadSchedules();
+  } catch(e) {
+    if(typeof showToast==='function') showToast('Error: ' + e.message,'error');
+  }
+};
+
+// Close on backdrop click
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'modal-create-schedule') closeCreateSchedule();
+});
+document.addEventListener('keydown', function(e){
+  var m = document.getElementById('modal-create-schedule');
+  if(e.key === 'Escape' && m && m.style.display === 'flex') closeCreateSchedule();
+});
+
+(window.VSP_DEBUG && console.log('[CICD-H2.F] Template selector + create schedule modal loaded'));
+</script>
+
+
+<!-- VSP-CICD-H2.L: Run detail link + Fix preview modal -->
+<div class="modal-backdrop" id="modal-fix-preview" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)">
+  <div class="modal" style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;max-width:680px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1">
+      <div style="font-weight:700">🔧 Fix preview</div>
+      <button onclick="closeFixPreview()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+    </div>
+    <div id="mfp-body" style="padding:16px"></div>
+  </div>
+</div>
+
+<script>
+// K1: bridge to parent's viewRunLog (which lives in index.html)
+window.openRunDetail = function(rid){
+  if(!rid){ if(typeof showToast==='function') showToast('Run ID missing','warning'); return; }
+  try {
+    if(window.parent && typeof window.parent.viewRunLog === 'function'){
+      window.parent.viewRunLog(rid);
+      return;
+    }
+  } catch(e) { console.warn('parent.viewRunLog unavailable', e); }
+  // Fallback: navigate parent to scanlog with this run
+  try {
+    if(window.parent && typeof window.parent.showPanel === 'function'){
+      window.parent.showPanel('scanlog', null);
+      setTimeout(function(){
+        try {
+          if(typeof window.parent.loadRunLog === 'function') window.parent.loadRunLog(rid);
+        } catch(e) {}
+      }, 300);
+      return;
+    }
+  } catch(e) {}
+  if(typeof showToast==='function') showToast('Cannot open run detail (rid: '+rid.slice(-12)+')','error');
+};
+
+// K2: Fix preview modal
+window.showFixPreview = function(finding){
+  // Accept either a finding object OR a button element with data-fix-idx
+  var f;
+  if(finding && finding.tagName === 'BUTTON'){
+    var idx = finding.getAttribute('data-fix-idx');
+    f = (window._lastFixable || [])[parseInt(idx)||0] || {};
+  } else if(typeof finding === 'string'){
+    try { f = JSON.parse(finding); } catch(e){ f = {}; }
+  } else {
+    f = finding || {};
+  }
+  
+  var sev = f.severity || 'INFO';
+  var sevColor = {CRITICAL:'#ef4444', HIGH:'#f97316', MEDIUM:'#f59e0b', LOW:'#22c55e', INFO:'#94a3b8'}[sev] || '#94a3b8';
+  var fixSnippet = (typeof _autofixDeriveFix === 'function') ? _autofixDeriveFix(f) : (f.fix_hint || 'No automated fix available');
+  var loc = f.path ? f.path + (f.line ? ':' + f.line : '') : '—';
+  
+  document.getElementById('mfp-body').innerHTML =
+    '<div style="margin-bottom:14px;padding:10px 12px;background:var(--bg2);border-left:3px solid '+sevColor+';border-radius:4px">' +
+      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">' +
+        '<span style="background:'+sevColor+';color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">'+sev+'</span>' +
+        '<span style="font-size:11px;color:var(--t3);font-family:var(--font-mono)">'+(f.tool||'?')+' · '+(f.rule_id||'—')+'</span>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--t1);line-height:1.5">'+(f.message||'No description').replace(/</g,'&lt;')+'</div>' +
+      '<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:6px">📍 '+loc.replace(/</g,'&lt;')+'</div>' +
+    '</div>' +
+    '<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Suggested fix</div>' +
+    '<div style="background:var(--bg0);padding:12px 14px;border-radius:6px;border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;color:var(--green);white-space:pre-wrap;line-height:1.6;margin-bottom:14px">'+(fixSnippet||'(no automatic fix snippet)').replace(/</g,'&lt;')+'</div>' +
+    '<div style="background:rgba(245,158,11,.08);border-left:3px solid #f59e0b;padding:10px 12px;border-radius:4px;font-size:11px;color:var(--t2);line-height:1.5;margin-bottom:14px">' +
+      '<b>⚠️ Manual review required</b><br>' +
+      'Auto-apply is not yet enabled. Copy the snippet, apply it manually in your codebase, then re-scan to verify.' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)">' +
+      '<button class="btn" onclick="closeFixPreview()">Close</button>' +
+      '<button class="btn" id="mfp-btn-copy">⊕ Copy snippet</button>' +
+      '<button class="btn btn-primary" id="mfp-btn-apply">✓ Mark as applied</button>' +
+    '</div>';
+  
+  document.getElementById('modal-fix-preview').style.display = 'flex';
+  
+  // VSP-CICD-H3.I: Bind handlers AFTER render to avoid quote escape bug
+  setTimeout(function(){
+    var btnCopy = document.getElementById('mfp-btn-copy');
+    var btnApply = document.getElementById('mfp-btn-apply');
+    if(btnCopy){
+      btnCopy.onclick = function(){
+        var txt = fixSnippet || '';
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(txt).then(function(){
+            if(typeof showToast === 'function') showToast('Fix snippet copied', 'success');
+          }).catch(function(){
+            if(typeof showToast === 'function') showToast('Copy failed (clipboard blocked)', 'warning');
+          });
+        } else {
+          if(typeof showToast === 'function') showToast('Clipboard not available', 'warning');
+        }
+      };
+    }
+    if(btnApply){
+      btnApply.onclick = function(){
+        markFixApplied(f.id || f.finding_id || '');
+      };
+    }
+  }, 0);
+  
+  return; // EARLY RETURN — original return point removed below
+  
+  document.getElementById('modal-fix-preview').style.display = 'flex';
+};
+
+window.closeFixPreview = function(){
+  document.getElementById('modal-fix-preview').style.display = 'none';
+};
+
+window.markFixApplied = async function(findingId){
+  if(!findingId){ closeFixPreview(); if(typeof showToast==='function') showToast('Marked locally only — no finding ID','warning'); return; }
+  // VSP-CICD-H3.J: Backend endpoint /findings/{id}/status not yet implemented
+  // Suppress 404 console error by checking existence first OR catching silently
+  var marked = false;
+  try {
+    var r = await fetch('/api/v1/remediation/finding/' + findingId + '/status', {
+      method: 'PATCH',
+      headers: Object.assign({'Content-Type':'application/json'}, hdr ? hdr() : {}),
+      body: JSON.stringify({status:'fix_applied', resolution:'auto-fix applied'})
+    }).catch(function(){ return {ok: false, status: 0}; });
+    
+    if(r && r.ok){
+      marked = true;
+      if(typeof showToast==='function') showToast('Fix recorded — click Verify to re-scan','success');
+    } else if(r && r.status === 404){
+      // Backend endpoint not yet implemented — totally expected
+      if(typeof showToast==='function') showToast('Marked locally · backend wire pending','info');
+    } else {
+      if(typeof showToast==='function') showToast('Marked locally (backend offline)','info');
+    }
+  } catch(e) {
+    if(typeof showToast==='function') showToast('Marked locally (offline)','info');
+  }
+  closeFixPreview();
+  if(marked && typeof loadAutofixStats === 'function') setTimeout(loadAutofixStats, 600);
+};
+
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'modal-fix-preview') closeFixPreview();
+});
+document.addEventListener('keydown', function(e){
+  var m = document.getElementById('modal-fix-preview');
+  if(e.key === 'Escape' && m && m.style.display === 'flex') closeFixPreview();
+});
+(window.VSP_DEBUG && console.log('[CICD-H2.L] Run history click + fix preview modal loaded'));
+</script>
+
+
+
+
+<!-- VSP-CICD-H3.4: Auto-remediation result modal -->
+<div class="modal-backdrop" id="modal-auto-remediation" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)">
+  <div class="modal" style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;max-width:680px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1">
+      <div style="font-weight:700">⚡ Auto-remediation result</div>
+      <button onclick="closeAutoRemediationModal()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:0 6px">×</button>
+    </div>
+    <div id="mar-body" style="padding:16px"></div>
+  </div>
+</div>
+<script>
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'modal-auto-remediation') closeAutoRemediationModal();
+});
+document.addEventListener('keydown', function(e){
+  var m = document.getElementById('modal-auto-remediation');
+  if(e.key === 'Escape' && m && m.style.display === 'flex') closeAutoRemediationModal();
+});
+(window.VSP_DEBUG && console.log('[CICD-H3] Autofix improvements loaded — KPIs live + filter pills + CSV + auto-remediation modal'));
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     [H3.L] Autofix verification loop
+     - Status fix_applied → click [Verify] → triggers targeted rescan
+     - Backend re-scans the file/rule of the finding
+     - If finding gone   → status = 'verified' (real win, KPI counts)
+     - If finding remains → status = 'fix_failed' (revert + manual hint)
+════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3lVerifyLoaded) return;
+  window._h3lVerifyLoaded = true;
+
+  // Map status → visual badge
+  const STATUS_BADGE = {
+    open:           {label: 'Open',         color: 'var(--orange)', bg: 'rgba(249,115,22,.10)'},
+    fix_applied:    {label: 'Fix applied',  color: 'var(--amber)',  bg: 'rgba(245,158,11,.10)'},
+    verifying:      {label: 'Verifying…',   color: 'var(--cyan)',   bg: 'rgba(6,182,212,.10)'},
+    verified:       {label: '✓ Verified',   color: 'var(--green)',  bg: 'rgba(16,185,129,.10)'},
+    fix_failed:     {label: '✗ Fix failed', color: 'var(--red)',    bg: 'rgba(239,68,68,.10)'},
+    resolved:       {label: 'Resolved',     color: 'var(--green)',  bg: 'rgba(16,185,129,.10)'},
+    accepted:       {label: 'Accepted',     color: 'var(--text2)',  bg: 'rgba(120,120,120,.10)'},
+    false_positive: {label: 'False pos.',   color: 'var(--text2)',  bg: 'rgba(120,120,120,.10)'},
+    suppressed:     {label: 'Suppressed',   color: 'var(--text2)',  bg: 'rgba(120,120,120,.10)'},
+  };
+  window.h3lStatusBadge = function (status) {
+    const s = STATUS_BADGE[status] || STATUS_BADGE.open;
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;'
+      + 'font-size:10px;font-weight:600;color:' + s.color + ';background:' + s.bg + '">'
+      + s.label + '</span>';
+  };
+
+  /**
+   * Verify a fix by triggering a targeted rescan.
+   * Workflow:
+   *   1. PATCH status → 'verifying'
+   *   2. POST /vsp/run with target_finding (backend scans only this file/rule)
+   *   3. Poll run status every 2s
+   *   4. When done, GET /vsp/findings filtered by original rule
+   *      - If finding gone   → PATCH status = 'verified'
+   *      - If finding remains → PATCH status = 'fix_failed'
+   */
+  window.verifyFix = async function (findingId) {
+    const btn = document.querySelector('[data-verify-id="' + findingId + '"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
+    try {
+      // Step 1: mark verifying
+      await fetch('/api/v1/remediation/finding/' + findingId + '/status', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + (window.TOKEN || '')},
+        body: JSON.stringify({status: 'verifying'}),
+      });
+
+      // Step 2: get finding details so we know what file/rule to rescan
+      const fRes = await fetch('/api/v1/remediation/finding/' + findingId,
+        {headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}});
+      const fData = await fRes.json();
+      const finding = fData.finding || fData.remediation || {};
+
+      // Step 3: trigger targeted rescan
+      const runRes = await fetch('/api/v1/vsp/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + (window.TOKEN || '')},
+        body: JSON.stringify({
+          mode: 'targeted',
+          target_finding: findingId,
+          target_path: finding.path || '',
+          target_rule: finding.rule_id || '',
+          src: finding.path || '.',
+        }),
+      });
+      const runData = await runRes.json();
+      const rid = runData.rid || runData.run_id;
+      if (!rid) throw new Error('no run id returned');
+
+      if (typeof showToast === 'function') {
+        showToast('Verify rescan started: ' + rid.slice(-12), 'info');
+      }
+
+      // Step 4: poll up to 60s
+      let attempts = 0;
+      const poll = async () => {
+        attempts++;
+        if (attempts > 30) {  // 30 × 2s = 60s
+          await markStatus(findingId, 'fix_applied');
+          if (typeof showToast === 'function') {
+            showToast('Verify timed out — kept as fix_applied', 'warn');
+          }
+          return refreshRow(findingId);
+        }
+        try {
+          const statusRes = await fetch('/api/v1/vsp/runs/' + rid,
+            {headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}});
+          const statusData = await statusRes.json();
+          if (statusData.status === 'done' || statusData.status === 'complete') {
+            // Check whether finding still exists
+            const findRes = await fetch(
+              '/api/v1/vsp/findings?run_id=' + rid + '&limit=1000',
+              {headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}}
+            );
+            const findData = await findRes.json();
+            const stillThere = (findData.findings || []).some(f =>
+              f.rule_id === finding.rule_id && f.path === finding.path
+            );
+            const newStatus = stillThere ? 'fix_failed' : 'verified';
+            await markStatus(findingId, newStatus, rid);
+            if (typeof showToast === 'function') {
+              showToast(
+                stillThere ? '✗ Fix did not resolve finding' : '✓ Verified — finding gone',
+                stillThere ? 'error' : 'success'
+              );
+            }
+            return refreshRow(findingId);
+          }
+        } catch (e) { console.warn('poll err', e); }
+        setTimeout(poll, 2000);
+      };
+      setTimeout(poll, 2000);
+    } catch (e) {
+      console.error('verifyFix error', e);
+      if (typeof showToast === 'function') showToast('Verify failed: ' + e.message, 'error');
+      await markStatus(findingId, 'fix_applied');  // revert
+      if (btn) { btn.disabled = false; btn.textContent = 'Verify'; }
+    }
+  };
+
+  async function markStatus(findingId, status, scanRunId) {
+    const body = {status};
+    if (scanRunId) body.verify_run_id = scanRunId;
+    return fetch('/api/v1/remediation/finding/' + findingId + '/status', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (window.TOKEN || '')},
+      body: JSON.stringify(body),
+    });
+  }
+
+  function refreshRow(findingId) {
+    // Re-render the findings table if available
+    if (typeof window.loadFindings === 'function') return window.loadFindings();
+    if (typeof window.applyFindingsFilter === 'function') return window.applyFindingsFilter();
+  }
+
+  /**
+   * Render action button per status — used by the table renderer.
+   *   open         → [Preview fix]
+   *   fix_applied  → [Verify]      ← KEY: closes the loop
+   *   verifying    → spinner
+   *   verified     → ✓ done
+   *   fix_failed   → [Retry]
+   */
+  window.h3lRenderActionBtn = function (finding) {
+    const status = (finding.remediation_status || finding.status || 'open');
+    const id = finding.id;
+    if (status === 'fix_applied') {
+      return '<button class="btn btn-sm" style="background:var(--cyan);color:#000;'
+        + 'font-weight:600" data-verify-id="' + id + '" '
+        + 'onclick="verifyFix(\'' + id + '\')">▶ Verify</button>';
+    }
+    if (status === 'verifying') {
+      return '<span style="color:var(--cyan);font-size:11px">⟳ verifying…</span>';
+    }
+    if (status === 'verified') {
+      return '<span style="color:var(--green);font-size:11px;font-weight:600">✓ verified</span>';
+    }
+    if (status === 'fix_failed') {
+      return '<button class="btn btn-sm" style="background:var(--red);color:#fff" '
+        + 'onclick="markFixApplied(\'' + id + '\')">Retry fix</button>';
+    }
+    return '<button class="btn btn-sm" onclick="previewFix(\'' + id + '\')">Preview fix</button>';
+  };
+
+  (window.VSP_DEBUG && console.log('[H3.L] Autofix verify loop loaded'));
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     [H3.L] Real KPIs — separate "claimed" from "verified"
+════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3lKpiLoaded) return;
+  window._h3lKpiLoaded = true;
+
+  window.refreshAutofixKPIs = async function () {
+    try {
+      const res = await fetch('/api/v1/remediation/stats',
+        {headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}});
+      const stats = await res.json();
+      const counts = stats.counts || stats || {};
+      const set = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val || 0;
+      };
+      set('h3l-kpi-open',     counts.open || 0);
+      set('h3l-kpi-applied',  counts.fix_applied || 0);
+      set('h3l-kpi-verified', counts.verified || 0);
+      set('h3l-kpi-failed',   counts.fix_failed || 0);
+    } catch (e) { console.warn('kpi refresh', e); }
+  };
+
+  // Inject the KPI bar above the findings table
+  function injectKPIBar() {
+    if (document.getElementById('h3l-autofix-kpi-bar')) return;
+    const anchor = document.querySelector('[id*="findings"]')
+                || document.querySelector('.findings-table')
+                || document.querySelector('table');
+    if (!anchor) return;
+    const bar = document.createElement('div');
+    bar.id = 'h3l-autofix-kpi-bar';
+    bar.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:12px;'
+      + 'margin:14px 0;padding:14px;background:var(--card,#0f1419);'
+      + 'border:1px solid var(--border,#1f2937);border-radius:8px';
+    bar.innerHTML = ''
+      // FIX 2026-05-07: clarify scope — these counts are tenant-wide
+      // across all runs, not the current scan only. The "Auto-remediation
+      // engine" KPIs below show CURRENT-SCAN counts which is why the two
+      // numbers don\'t match (e.g. 41,587 open vs 934 in current run).
+      + kpiCell('Open',         'h3l-kpi-open',     'var(--orange)', 'awaiting fix · all runs')
+      + kpiCell('Fix applied',  'h3l-kpi-applied',  'var(--amber)',  'awaiting rescan · all runs')
+      + kpiCell('Verified',     'h3l-kpi-verified', 'var(--green)',  'rescan confirmed ✓ · all runs')
+      + kpiCell('Fix failed',   'h3l-kpi-failed',   'var(--red)',    'rescan still finds · all runs');
+    anchor.parentNode.insertBefore(bar, anchor);
+  }
+
+  function kpiCell(label, id, color, sub) {
+    return '<div style="text-align:center;padding:8px">'
+      + '<div style="font-size:10px;text-transform:uppercase;color:var(--text3);letter-spacing:.5px">'
+      + label + '</div>'
+      + '<div id="' + id + '" style="font-size:28px;font-weight:700;color:' + color + ';margin:6px 0">0</div>'
+      + '<div style="font-size:10px;color:var(--text3)">' + sub + '</div>'
+      + '</div>';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => { injectKPIBar(); refreshAutofixKPIs(); }, 800);
+  });
+
+  // Refresh after every status change
+  const origMarkStatus = window.markFixApplied;
+  if (typeof origMarkStatus === 'function') {
+    window.markFixApplied = async function (...args) {
+      const r = await origMarkStatus.apply(this, args);
+      setTimeout(refreshAutofixKPIs, 500);
+      return r;
+    };
+  }
+
+  (window.VSP_DEBUG && console.log('[H3.L] Autofix KPI bar loaded'));
+})();
+</script>
+
+
+<!-- [H3.L] KPI bar retry-injector + observer (fix iframe/late-render) -->
+<script>
+(function () {
+  if (window._h3lRetryInjector) return;
+  window._h3lRetryInjector = true;
+
+  function tryInject() {
+    if (document.getElementById('h3l-autofix-kpi-bar')) return true;
+    // Tìm anchor SPECIFIC cho tab cicd, KHÔNG phải dashboard
+    // Find the autofix card by text content (works inside iframe)
+    let anchor = null;
+    for (const el of document.querySelectorAll('div')) {
+      if (el.offsetWidth > 0 &&
+          el.textContent.includes('Top auto-fixable') &&
+          el.children.length < 20) {
+        anchor = el;
+        break;
+      }
+    }
+    if (!anchor) return false;
+
+    const card = anchor.closest('.card, .panel, section') || anchor;
+    const bar = document.createElement('div');
+    bar.id = 'h3l-autofix-kpi-bar';
+    bar.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:12px;'
+      + 'margin:14px 0;padding:14px;background:rgba(15,20,25,0.6);'
+      + 'border:1px solid #1f2937;border-radius:8px';
+    const cell = (l, id, c, s) =>
+      '<div style="text-align:center;padding:8px">'
+      + '<div style="font-size:10px;text-transform:uppercase;color:#9ca3af;letter-spacing:.5px">'+l+'</div>'
+      + '<div id="'+id+'" style="font-size:28px;font-weight:700;color:'+c+';margin:6px 0">0</div>'
+      + '<div style="font-size:10px;color:#9ca3af">'+s+'</div></div>';
+    bar.innerHTML =
+        cell('Open',        'h3l-kpi-open',     '#f97316', 'awaiting fix')
+      + cell('Fix applied', 'h3l-kpi-applied',  '#f59e0b', 'awaiting rescan')
+      + cell('Verified',    'h3l-kpi-verified', '#10b981', 'rescan confirmed')
+      + cell('Fix failed',  'h3l-kpi-failed',   '#ef4444', 'rescan still finds');
+    card.parentNode.insertBefore(bar, card);
+    if (typeof refreshAutofixKPIs === 'function') refreshAutofixKPIs();
+    (window.VSP_DEBUG && console.log('[H3.L] KPI bar injected via retry-observer'));
+    return true;
+  }
+
+  // Retry every 500ms up to 30 times (15s total)
+  let tries = 0;
+  const tick = setInterval(() => {
+    if (tryInject() || ++tries > 120) clearInterval(tick);
+  }, 500);
+
+  // Re-inject on tab switch / SPA navigation
+  const mo = new MutationObserver(() => {
+    if (!document.getElementById('h3l-autofix-kpi-bar')) tryInject();
+  });
+  mo.observe(document.body, {childList: true, subtree: true});
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     [H3.M] Autofix Quick Wins
+     #8  Real diff preview
+     #9  Keyboard shortcuts (j/k/p/m/v/g/?)
+     #11 Leaderboard widget
+     #12 Audit metrics card
+════════════════════════════════════════════════════════════════════ -->
+<style>
+  /* Diff preview styles — vanilla, no external libs */
+  .h3m-diff { font-family: var(--font-mono, monospace); font-size: 12px;
+              background: rgba(15,20,25,0.5); border: 1px solid #1f2937;
+              border-radius: 6px; padding: 10px; overflow-x: auto;
+              white-space: pre; line-height: 1.5; }
+  .h3m-diff-line { display: block; padding: 0 8px; min-height: 18px; }
+  .h3m-diff-num  { display: inline-block; width: 40px; color: #6b7280;
+                   text-align: right; padding-right: 12px; user-select: none; }
+  .h3m-diff-add  { background: rgba(16,185,129,0.18); color: #d1fae5; }
+  .h3m-diff-del  { background: rgba(239,68,68,0.18);  color: #fecaca; }
+  .h3m-diff-ctx  { color: #9ca3af; }
+  .h3m-confidence-high   { color: #10b981; }
+  .h3m-confidence-medium { color: #f59e0b; }
+  .h3m-confidence-low    { color: #ef4444; }
+  .h3m-confidence-manual { color: #6b7280; }
+  /* Keyboard focus highlight */
+  .h3m-kbd-focused { outline: 2px solid #06b6d4 !important; outline-offset: -2px; }
+  /* Help overlay */
+  #h3m-help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+                      display: none; align-items: center; justify-content: center;
+                      z-index: 10000; }
+  #h3m-help-overlay.show { display: flex; }
+  .h3m-help-card { background: #0f1419; border: 1px solid #1f2937;
+                   border-radius: 8px; padding: 24px; min-width: 320px;
+                   font-family: var(--font-mono, monospace); font-size: 13px; }
+  .h3m-help-row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .h3m-help-key { background: #1f2937; padding: 2px 8px; border-radius: 4px;
+                  color: #06b6d4; min-width: 32px; text-align: center; }
+  /* Metrics card */
+  .h3m-metrics-card { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+                      padding: 16px; background: rgba(15,20,25,0.6);
+                      border: 1px solid #1f2937; border-radius: 8px; margin: 14px 0; }
+  .h3m-metrics-cell { padding: 8px; }
+  .h3m-metrics-label { font-size: 10px; text-transform: uppercase; color: #9ca3af;
+                       letter-spacing: 0.5px; }
+  .h3m-metrics-value { font-size: 22px; font-weight: 700; margin: 4px 0; color: #06b6d4; }
+  .h3m-metrics-sub   { font-size: 11px; color: #9ca3af; }
+  /* Leaderboard */
+  .h3m-board-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .h3m-board-table th, .h3m-board-table td { text-align: left; padding: 6px 10px;
+                                              border-bottom: 1px solid #1f2937; }
+  .h3m-board-table th { color: #9ca3af; font-weight: 600; font-size: 10px;
+                        text-transform: uppercase; }
+  .h3m-board-medal { font-size: 16px; }
+</style>
+
+<script>
+(function () {
+  if (window._h3mLoaded) return;
+  window._h3mLoaded = true;
+
+  // ─── #8 Diff preview renderer ─────────────────────────────────────
+  window.h3mFetchAndRenderDiff = async function (findingId, targetEl) {
+    if (!targetEl) return;
+    targetEl.innerHTML = '<div style="color:#9ca3af;padding:10px">Loading diff…</div>';
+    // [H3.N.fix9] resolved token from multiple sources (auto-wrapper compatible)
+    const tk = window.TOKEN
+            || (window.localStorage && (localStorage.getItem('token') || localStorage.getItem('vsp_token') || localStorage.getItem('jwt')))
+            || (window.sessionStorage && (sessionStorage.getItem('token') || sessionStorage.getItem('vsp_token')))
+            || '';
+    try {
+      const opts = { credentials: 'include' };
+      if (tk) opts.headers = {'Authorization': 'Bearer ' + tk};
+      const r = await fetch('/api/v1/findings/' + findingId + '/diff', opts);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      targetEl.innerHTML = h3mRenderDiff(d);
+    } catch (e) {
+      targetEl.innerHTML = '<div style="color:#ef4444;padding:10px">Could not load diff: ' + e.message + '</div>';
+    }
+  };
+
+  function h3mRenderDiff(d) {
+    if (!d || !d.file_path) return '<div style="color:#9ca3af">No diff available</div>';
+    let html = '<div style="margin-bottom:8px;font-size:12px">';
+    html += '📂 <code style="color:#06b6d4">' + escape(d.file_path) + ':' + (d.line_start || '?') + '</code>';
+    html += '</div>';
+    html += '<div class="h3m-diff">';
+    let n = (d.line_start || 1) - (d.context_before || []).length;
+    (d.context_before || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-ctx"><span class="h3m-diff-num">' + (n++) + '</span>' + escape(line) + '</span>';
+    });
+    (d.current_code || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-del"><span class="h3m-diff-num">' + (n++) + '</span>- ' + escape(line) + '</span>';
+    });
+    (d.suggested_fix || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-add"><span class="h3m-diff-num">+</span>+ ' + escape(line) + '</span>';
+    });
+    (d.context_after || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-ctx"><span class="h3m-diff-num">' + (n++) + '</span>' + escape(line) + '</span>';
+    });
+    html += '</div>';
+    if (d.rationale) {
+      html += '<div style="margin-top:10px;font-size:12px;color:#9ca3af">';
+      html += '💡 <strong>Why:</strong> ' + escape(d.rationale);
+      html += '</div>';
+    }
+    if (d.confidence) {
+      html += '<div style="margin-top:6px;font-size:11px">';
+      html += 'Confidence: <span class="h3m-confidence-' + d.confidence + '">' + d.confidence.toUpperCase() + '</span>';
+      if (!d.has_template) html += ' <span style="color:#9ca3af">— no auto-template, manual review required</span>';
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function escape(s) {
+    return String(s || '').replace(/[&<>"]/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  // ─── #9 Keyboard shortcuts ────────────────────────────────────────
+  let kbdIndex = 0;
+  function getRows() {
+    return Array.from(document.querySelectorAll('tr[data-finding-id], [data-finding-row]'));
+  }
+  function highlightRow(idx) {
+    const rows = getRows();
+    rows.forEach(r => r.classList.remove('h3m-kbd-focused'));
+    if (rows[idx]) {
+      rows[idx].classList.add('h3m-kbd-focused');
+      rows[idx].scrollIntoView({block: 'center', behavior: 'smooth'});
+    }
+  }
+  document.addEventListener('keydown', function (e) {
+    // Skip if user is typing
+    const t = e.target;
+    if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
+    // Skip if modifier keys
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const rows = getRows();
+    if (rows.length === 0 && e.key !== '?') return;
+    switch (e.key) {
+      case 'j': kbdIndex = Math.min(rows.length - 1, kbdIndex + 1); highlightRow(kbdIndex); e.preventDefault(); break;
+      case 'k': kbdIndex = Math.max(0, kbdIndex - 1); highlightRow(kbdIndex); e.preventDefault(); break;
+      case 'p': clickActionButton(rows[kbdIndex], 'preview'); e.preventDefault(); break;
+      case 'm': clickActionButton(rows[kbdIndex], 'mark');    e.preventDefault(); break;
+      case 'v': clickActionButton(rows[kbdIndex], 'verify');  e.preventDefault(); break;
+      case 'g': openInEditor(rows[kbdIndex]); e.preventDefault(); break;
+      case '?': toggleHelp(true); e.preventDefault(); break;
+      case 'Escape': toggleHelp(false); break;
+    }
+  });
+  function clickActionButton(row, action) {
+    if (!row) return;
+    const btnLabels = {preview: 'Preview fix', mark: 'Mark as applied', verify: 'Verify'};
+    const buttons = row.querySelectorAll('button');
+    for (const b of buttons) {
+      if (b.textContent.trim().toLowerCase().includes(btnLabels[action].toLowerCase())) {
+        b.click();
+        return;
+      }
+    }
+  }
+  function openInEditor(row) {
+    if (!row) return;
+    const path = row.dataset.filePath;
+    const line = row.dataset.fileLine || '1';
+    if (path) window.open('vscode://file/' + path + ':' + line, '_blank');
+  }
+  function toggleHelp(show) {
+    let overlay = document.getElementById('h3m-help-overlay');
+    if (!overlay && show) {
+      overlay = document.createElement('div');
+      overlay.id = 'h3m-help-overlay';
+      overlay.innerHTML = ''
+        + '<div class="h3m-help-card">'
+        + '<div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#06b6d4">Keyboard shortcuts</div>'
+        + helpRow('j', 'Next finding')
+        + helpRow('k', 'Previous finding')
+        + helpRow('p', 'Preview fix')
+        + helpRow('m', 'Mark as applied')
+        + helpRow('v', 'Verify fix')
+        + helpRow('g', 'Open file in editor')
+        + helpRow('?', 'Show this help')
+        + helpRow('Esc', 'Close')
+        + '<div style="margin-top:12px;font-size:11px;color:#6b7280">Click outside or press Esc to close</div>'
+        + '</div>';
+      overlay.addEventListener('click', e => { if (e.target === overlay) toggleHelp(false); });
+      document.body.appendChild(overlay);
+    }
+    if (overlay) overlay.classList.toggle('show', !!show);
+  }
+  function helpRow(key, desc) {
+    return '<div class="h3m-help-row"><span class="h3m-help-key">' + key + '</span>'
+         + '<span style="margin-left:16px;color:#d1d5db">' + desc + '</span></div>';
+  }
+
+  // ─── #11 Leaderboard widget ───────────────────────────────────────
+  window.h3mLoadLeaderboard = async function (period, targetEl) {
+    if (!targetEl) return;
+    targetEl.innerHTML = '<div style="color:#9ca3af">Loading leaderboard…</div>';
+    try {
+      const r = await fetch('/api/v1/autofix/leaderboard?period=' + (period || '30d'), {
+        headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}
+      });
+      const d = await r.json();
+      targetEl.innerHTML = h3mRenderBoard(d);
+    } catch (e) {
+      targetEl.innerHTML = '<div style="color:#ef4444">Could not load: ' + e.message + '</div>';
+    }
+  };
+  function h3mRenderBoard(d) {
+    if (!d.entries || d.entries.length === 0) {
+      return '<div style="color:#9ca3af;text-align:center;padding:20px">'
+           + 'No remediation activity in this period.<br>'
+           + '<span style="font-size:11px">Mark fixes applied + verify to appear on the leaderboard.</span>'
+           + '</div>';
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    let html = '<table class="h3m-board-table"><thead><tr>'
+             + '<th>#</th><th>Engineer</th><th>Verified</th><th>Applied</th><th>Avg MTTR</th>'
+             + '</tr></thead><tbody>';
+    d.entries.forEach(e => {
+      const medal = e.rank <= 3 ? '<span class="h3m-board-medal">' + medals[e.rank-1] + '</span>' : e.rank;
+      html += '<tr>'
+            + '<td>' + medal + '</td>'
+            + '<td><code>' + escape(e.actor) + '</code>'
+            + (e.opted_in ? '' : ' <span style="font-size:10px;color:#6b7280">(masked)</span>')
+            + '</td>'
+            + '<td><strong style="color:#10b981">' + e.verified_count + '</strong></td>'
+            + '<td>' + e.applied_count + '</td>'
+            + '<td>' + (e.avg_mttr_hours ? e.avg_mttr_hours.toFixed(1) + 'h' : '—') + '</td>'
+            + '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="margin-top:8px;font-size:10px;color:#6b7280">'
+         + 'Period: ' + d.period + ' · '
+         + d.total + ' active engineers · '
+         + 'Privacy: opt-in via Settings → Show me on leaderboard</div>';
+    return html;
+  }
+
+  // ─── #12 Metrics card ─────────────────────────────────────────────
+  window.h3mLoadMetrics = async function (period, targetEl) {
+    if (!targetEl) return;
+    try {
+      const r = await fetch('/api/v1/autofix/metrics?period=' + (period || '30d'), {
+        headers: {'Authorization': 'Bearer ' + (window.TOKEN || '')}
+      });
+      const d = await r.json();
+      targetEl.innerHTML = h3mRenderMetrics(d);
+    } catch (e) {
+      targetEl.innerHTML = '<div style="color:#ef4444">Could not load metrics</div>';
+    }
+  };
+  function h3mRenderMetrics(d) {
+    const t = d.totals || {}, r = d.rates || {}, m = d.mttr || {};
+    // FIX 2026-05-07: descriptive empty state instead of bare "—".
+    // Tells the SOC analyst WHY a metric is blank so they don't have
+    // to file a "is this broken?" support ticket.
+    const pct = v => v != null && v > 0 ? (v * 100).toFixed(0) + '%' : 'No data yet';
+    const hrs = v => v != null && v > 0 ? v.toFixed(1) + 'h' : 'No data yet';
+    let html = '<div class="h3m-metrics-card">'
+      + cell('Verified', t.findings_verified || 0, 'last ' + d.period_days + ' days')
+      + cell('Verification rate', pct(r.verification_rate), 'verified / (verified+applied)')
+      + cell('Auto-remediation', pct(r.auto_remediation_rate), 'of all resolved')
+      + cell('MTTR — Critical', hrs(m.critical_hours), 'mean time to remediate')
+      + cell('MTTR — High',     hrs(m.high_hours), 'apply + verify a fix to populate')
+      + cell('First-attempt success', pct(r.first_attempt_success), 'verified / (verified+failed)')
+      + '</div>';
+    if (d.top_rules_remediated && d.top_rules_remediated.length) {
+      html += '<div style="margin-top:8px;font-size:11px;color:#9ca3af">'
+            + 'Top remediated: '
+            + d.top_rules_remediated.slice(0, 3).map(r =>
+                '<code style="color:#06b6d4">' + escape(r.rule_id) + '</code> (' + r.count + '×)'
+              ).join(' · ')
+            + '</div>';
+    }
+    html += '<div style="margin-top:6px;font-size:10px;color:#6b7280">'
+          + 'CMMC mapping: AU-7 (audit reduction) · RA-5 (vuln scanning) · SI-2 (flaw remediation)'
+          + '</div>';
+    return html;
+  }
+  function cell(label, value, sub) {
+    return '<div class="h3m-metrics-cell">'
+         + '<div class="h3m-metrics-label">' + escape(label) + '</div>'
+         + '<div class="h3m-metrics-value">' + escape(String(value)) + '</div>'
+         + '<div class="h3m-metrics-sub">' + escape(sub) + '</div>'
+         + '</div>';
+  }
+
+  // ─── Auto-inject metrics card + leaderboard into Autofix tab ─────
+  function tryInjectMetrics() {
+    if (document.getElementById('h3m-metrics-mount')) return true;
+    let anchor = null;
+    for (const el of document.querySelectorAll('div')) {
+      if (el.offsetWidth > 0 &&
+          el.textContent.includes('Top auto-fixable') &&
+          el.children.length < 25) {
+        anchor = el; break;
+      }
+    }
+    if (!anchor) return false;
+    const card = anchor.closest('.card, .panel, section') || anchor;
+
+    // Metrics mount
+    const metricsMount = document.createElement('div');
+    metricsMount.id = 'h3m-metrics-mount';
+    card.parentNode.insertBefore(metricsMount, card);
+    h3mLoadMetrics('30d', metricsMount);
+
+    // Leaderboard mount (below metrics)
+    const boardMount = document.createElement('div');
+    boardMount.id = 'h3m-board-mount';
+    boardMount.style.cssText = 'background:rgba(15,20,25,0.6);border:1px solid #1f2937;'
+                              + 'border-radius:8px;padding:14px;margin:14px 0';
+    boardMount.innerHTML = '<div style="font-size:12px;font-weight:600;color:#9ca3af;'
+                         + 'text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">'
+                         + 'Leaderboard — last 30 days</div><div id="h3m-board-body"></div>';
+    card.parentNode.insertBefore(boardMount, card);
+    h3mLoadLeaderboard('30d', document.getElementById('h3m-board-body'));
+
+    (window.VSP_DEBUG && console.log('[H3.M] Quick wins mounted: metrics + leaderboard'));
+    return true;
+  }
+
+  // Retry up to 60s
+  let tries = 0;
+  const tick = setInterval(() => {
+    if (tryInjectMetrics() || ++tries > 120) clearInterval(tick);
+  }, 500);
+  // Also re-mount on tab switches
+  new MutationObserver(() => {
+    if (!document.getElementById('h3m-metrics-mount')) tryInjectMetrics();
+  }).observe(document.body, {childList: true, subtree: true});
+
+  (window.VSP_DEBUG && console.log('[H3.M] Autofix Quick Wins loaded — keyboard shortcuts active (press ?)'));
+})();
+</script>
+
+
+<!-- [H3.M] previewFix hook — render real diff into modal body when opened -->
+<script>
+(function () {
+  if (window._h3mPreviewHooked) return;
+  window._h3mPreviewHooked = true;
+  // Wait for original previewFix, then wrap it
+  function tryHook() {
+    if (typeof window.previewFix !== 'function') {
+      setTimeout(tryHook, 500); return;
+    }
+    const orig = window.previewFix;
+    window.previewFix = async function (findingId) {
+      const r = await orig.apply(this, arguments);
+      // After modal opens, find body and inject diff
+      setTimeout(() => {
+        const modal = document.getElementById('modal-fix-preview');
+        if (!modal) return;
+        let mount = modal.querySelector('.h3m-diff-mount');
+        if (!mount) {
+          mount = document.createElement('div');
+          mount.className = 'h3m-diff-mount';
+          mount.style.cssText = 'margin:12px 0';
+          // Insert before the action buttons row
+          const body = modal.querySelector('[class*="modal-body"], .modal-content') || modal;
+          body.appendChild(mount);
+        }
+        if (typeof window.h3mFetchAndRenderDiff === 'function') {
+          window.h3mFetchAndRenderDiff(findingId, mount);
+        }
+      }, 100);
+      return r;
+    };
+    (window.VSP_DEBUG && console.log('[H3.M] previewFix hooked — diff will render in modal'));
+  }
+  tryHook();
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     [H3.N] AI-Powered Autofix — frontend enhancements
+     Adds 🤖 AI badge, rationale, confidence indicator, breaking-change warning
+     to the existing Preview Fix modal (which renders diff via h3mFetchAndRenderDiff).
+════════════════════════════════════════════════════════════════════ -->
+<style>
+  .h3n-source-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; margin-left: 8px;
+  }
+  .h3n-source-llm    { background: rgba(139, 92, 246, 0.18); color: #c4b5fd; }
+  .h3n-source-cache  { background: rgba(139, 92, 246, 0.10); color: #a78bfa; }
+  .h3n-source-template { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+  .h3n-source-manual { background: rgba(120, 120, 120, 0.18); color: #9ca3af; }
+  .h3n-source-llm_failed { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+
+  .h3n-confidence-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; margin-right: 8px;
+  }
+  .h3n-confidence-high   { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+  .h3n-confidence-medium { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+  .h3n-confidence-low    { background: rgba(239, 68, 68, 0.18);  color: #fca5a5; }
+  .h3n-confidence-manual { background: rgba(120, 120, 120, 0.18); color: #9ca3af; }
+
+  .h3n-breaking-warn {
+    background: rgba(245, 158, 11, 0.10); border: 1px solid rgba(245, 158, 11, 0.30);
+    color: #fcd34d; padding: 6px 10px; border-radius: 4px; font-size: 11px;
+    margin: 8px 0;
+  }
+  .h3n-rationale {
+    margin: 10px 0; padding: 10px; background: rgba(15, 20, 25, 0.4);
+    border-left: 3px solid #8b5cf6; border-radius: 4px;
+    font-size: 12px; color: #d1d5db; line-height: 1.5;
+  }
+  .h3n-meta { font-size: 10px; color: #6b7280; margin-top: 6px; }
+</style>
+
+<script>
+(function () {
+  if (window._h3nLoaded) return;
+  window._h3nLoaded = true;
+
+  // Wrap h3mFetchAndRenderDiff (from H3.M) to add AI-aware rendering.
+  function tryHook() {
+    if (typeof window.h3mFetchAndRenderDiff !== 'function') {
+      setTimeout(tryHook, 500); return;
+    }
+    const orig = window.h3mFetchAndRenderDiff;
+    window.h3mFetchAndRenderDiff = async function (findingId, targetEl) {
+      if (!targetEl) return;
+      targetEl.innerHTML = '<div style="color:#9ca3af;padding:10px">Loading diff (DeepSeek may take ~25s on first call)…</div>';
+      // [H3.N.fix9] resolved token from multiple sources (auto-wrapper compatible)
+      const tk = window.TOKEN
+              || (window.localStorage && (localStorage.getItem('token') || localStorage.getItem('vsp_token') || localStorage.getItem('jwt')))
+              || (window.sessionStorage && (sessionStorage.getItem('token') || sessionStorage.getItem('vsp_token')))
+              || '';
+      try {
+        const opts = { credentials: 'include' };
+        if (tk) opts.headers = {'Authorization': 'Bearer ' + tk};
+        const r = await fetch('/api/v1/findings/' + findingId + '/diff', opts);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        targetEl.innerHTML = h3nRenderDiff(d);
+      } catch (e) {
+        targetEl.innerHTML = '<div style="color:#ef4444;padding:10px">Could not load diff: ' + e.message + '</div>';
+      }
+    };
+    (window.VSP_DEBUG && console.log('[H3.N] Diff renderer extended — AI badge + rationale + confidence enabled'));
+  }
+
+  function h3nRenderDiff(d) {
+    if (!d) return '<div style="color:#9ca3af">No diff available</div>';
+
+    let html = '';
+
+    // Header line — file path + source badge
+    const sourceBadge = h3nSourceBadge(d.source || 'manual');
+    html += '<div style="margin-bottom:10px;font-size:12px;display:flex;align-items:center;flex-wrap:wrap">';
+    if (d.file_path) {
+      html += '📂 <code style="color:#06b6d4;margin-left:4px">'
+            + h3nEsc(d.file_path) + ':' + (d.line_start || '?') + '</code>';
+    }
+    html += sourceBadge;
+    html += '</div>';
+
+    // Diff
+    html += '<div class="h3m-diff">';
+    let n = (d.line_start || 1) - (d.context_before || []).length;
+    (d.context_before || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-ctx"><span class="h3m-diff-num">' + (n++) + '</span>' + h3nEsc(line) + '</span>';
+    });
+    (d.current_code || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-del"><span class="h3m-diff-num">' + (n++) + '</span>- ' + h3nEsc(line) + '</span>';
+    });
+    (d.suggested_fix || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-add"><span class="h3m-diff-num">+</span>+ ' + h3nEsc(line) + '</span>';
+    });
+    (d.context_after || []).forEach(line => {
+      html += '<span class="h3m-diff-line h3m-diff-ctx"><span class="h3m-diff-num">' + (n++) + '</span>' + h3nEsc(line) + '</span>';
+    });
+    html += '</div>';
+
+    // Rationale (highlighted block for LLM/cache, plain for templates)
+    if (d.rationale) {
+      const isAI = d.source === 'llm' || d.source === 'cache';
+      if (isAI) {
+        html += '<div class="h3n-rationale">';
+        html += '🤖 <strong>AI rationale</strong>';
+        if (d.model) html += ' <span style="color:#6b7280">(' + h3nEsc(d.model) + ')</span>';
+        html += ':<br>' + h3nEsc(d.rationale) + '</div>';
+      } else {
+        html += '<div style="margin-top:10px;font-size:12px;color:#9ca3af">';
+        html += '💡 <strong>Why:</strong> ' + h3nEsc(d.rationale) + '</div>';
+      }
+    }
+
+    // Confidence + breaking change row
+    if (d.confidence) {
+      html += '<div style="margin-top:8px;font-size:11px;display:flex;align-items:center;flex-wrap:wrap">';
+      html += 'Confidence: <span class="h3n-confidence-badge h3n-confidence-' + d.confidence + '">'
+            + d.confidence.toUpperCase() + '</span>';
+      if (d.breaking_change) {
+        html += ' <span style="color:#fcd34d">⚠ Breaking change</span>';
+      } else if (d.source === 'llm' || d.source === 'cache') {
+        html += ' <span style="color:#6ee7b7">✓ Non-breaking</span>';
+      }
+      html += '</div>';
+    }
+
+    // Breaking-change warning block
+    if (d.breaking_change && (d.source === 'llm' || d.source === 'cache')) {
+      html += '<div class="h3n-breaking-warn">';
+      html += '⚠ <strong>This fix may break compatibility.</strong> ';
+      html += 'Test in a non-prod environment before applying.';
+      html += '</div>';
+    }
+
+    // Manual review notice for AI-generated
+    if (d.source === 'llm' || d.source === 'cache') {
+      html += '<div style="margin-top:8px;font-size:11px;color:#fcd34d;font-weight:600">';
+      html += '⚠ AI-generated — REVIEW REQUIRED before applying';
+      html += '</div>';
+    }
+
+    // Meta line
+    if (d.source === 'llm' || d.source === 'cache') {
+      html += '<div class="h3n-meta">';
+      if (d.source === 'cache') html += 'Cached · ';
+      else if (d.latency_ms) html += 'Generated in ' + (d.latency_ms / 1000).toFixed(1) + 's · ';
+      if (d.provider) html += 'Provider: ' + h3nEsc(d.provider) + ' · ';
+      html += 'Cached for 30 days';
+      html += '</div>';
+    }
+
+    return html;
+  }
+
+  function h3nSourceBadge(source) {
+    const labels = {
+      template:   '✓ Template',
+      cache:      '🤖 AI (cached)',
+      llm:        '🤖 AI generated',
+      llm_failed: '⚠ AI unavailable',
+      manual:     'Manual review',
+    };
+    return '<span class="h3n-source-badge h3n-source-' + source + '">' + (labels[source] || source) + '</span>';
+  }
+
+  function h3nEsc(s) {
+    return String(s || '').replace(/[&<>"]/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  tryHook();
+  (window.VSP_DEBUG && console.log('[H3.N] AI-Powered Autofix loaded — modal will show AI badge when source=llm'));
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     [H3.N.fix4] modal force-rerender
+     Ensures the latest h3mFetchAndRenderDiff (with H3.N AI badge)
+     runs on every modal open, not a stale captured reference.
+═══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3nFix4) return;
+  window._h3nFix4 = true;
+
+  // Find the modal that previewFix opens
+  function findModal() {
+    return document.getElementById('modal-fix-preview');
+  }
+
+  // Find or create the diff render target inside the modal
+  function findDiffMount(modal) {
+    if (!modal) return null;
+    // Try common selectors used by previous H3.M / H2.L code
+    let mount = modal.querySelector('.h3m-diff-container')
+              || modal.querySelector('#fix-preview-diff')
+              || modal.querySelector('[data-h3n-mount]');
+    if (mount) return mount;
+
+    // Last resort: append a fresh div to the modal body
+    const body = modal.querySelector('.modal-body, .modal-content, .modal-inner') || modal;
+    mount = document.createElement('div');
+    mount.setAttribute('data-h3n-mount', '1');
+    mount.style.marginTop = '10px';
+    body.appendChild(mount);
+    return mount;
+  }
+
+  // Cache last finding ID seen via previewFix() call
+  let lastFindingId = null;
+
+  // Wrap previewFix to capture the finding ID being shown
+  function wrapPreviewFix() {
+    if (typeof window.previewFix !== 'function') {
+      setTimeout(wrapPreviewFix, 300);
+      return;
+    }
+    const orig = window.previewFix;
+    if (orig._h3nFix4Wrapped) return;
+    window.previewFix = async function (findingId) {
+      lastFindingId = findingId;
+      // Run original first (it may set up modal markup)
+      try { await orig.apply(this, arguments); } catch (e) { /* ignore */ }
+      // Then re-render with latest H3.N-aware function
+      const modal = findModal();
+      if (!modal) return;
+      const mount = findDiffMount(modal);
+      if (mount && typeof window.h3mFetchAndRenderDiff === 'function') {
+        // Always look up freshly — gets H3.N-extended version
+        window.h3mFetchAndRenderDiff(findingId, mount);
+      }
+    };
+    window.previewFix._h3nFix4Wrapped = true;
+    (window.VSP_DEBUG && console.log('[H3.N.fix4] previewFix re-wrapped — modal will always use latest renderer'));
+  }
+
+  // Also handle showFixPreviewByIdx (other entry point)
+  function wrapShowByIdx() {
+    if (typeof window.showFixPreviewByIdx !== 'function') {
+      setTimeout(wrapShowByIdx, 300);
+      return;
+    }
+    const orig = window.showFixPreviewByIdx;
+    if (orig._h3nFix4Wrapped) return;
+    window.showFixPreviewByIdx = function (btn) {
+      const result = orig.apply(this, arguments);
+      // Try to extract finding ID from row context
+      try {
+        const row = btn.closest('tr, [data-finding-id]');
+        const fid = row && (row.dataset.findingId || row.getAttribute('data-finding-id'));
+        if (fid) {
+          lastFindingId = fid;
+          setTimeout(() => {
+            const modal = findModal();
+            const mount = modal && findDiffMount(modal);
+            if (mount && typeof window.h3mFetchAndRenderDiff === 'function') {
+              window.h3mFetchAndRenderDiff(fid, mount);
+            }
+          }, 50);
+        }
+      } catch (e) { /* ignore */ }
+      return result;
+    };
+    window.showFixPreviewByIdx._h3nFix4Wrapped = true;
+    (window.VSP_DEBUG && console.log('[H3.N.fix4] showFixPreviewByIdx re-wrapped'));
+  }
+
+  // Mutation observer fallback: when modal becomes visible, force re-render
+  function installModalObserver() {
+    const modal = findModal();
+    if (!modal) {
+      setTimeout(installModalObserver, 500);
+      return;
+    }
+    const obs = new MutationObserver(() => {
+      if (modal.style.display === 'flex' && lastFindingId) {
+        const mount = findDiffMount(modal);
+        if (mount && typeof window.h3mFetchAndRenderDiff === 'function') {
+          // Tag mount so we can detect re-renders
+          if (mount.dataset.h3nLastId !== lastFindingId) {
+            mount.dataset.h3nLastId = lastFindingId;
+            window.h3mFetchAndRenderDiff(lastFindingId, mount);
+          }
+        }
+      }
+    });
+    obs.observe(modal, { attributes: true, attributeFilter: ['style'] });
+    (window.VSP_DEBUG && console.log('[H3.N.fix4] modal observer installed'));
+  }
+
+  wrapPreviewFix();
+  wrapShowByIdx();
+  installModalObserver();
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     [H3.N.fix5] showFixPreview hook
+     This is the REAL function called by the Preview Fix button.
+     It overwrites #mfp-body innerHTML with template HTML; we hook
+     AFTER that to append the AI-aware diff renderer.
+═══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3nFix5) return;
+  window._h3nFix5 = true;
+
+  function tryWrap() {
+    if (typeof window.showFixPreview !== 'function') {
+      setTimeout(tryWrap, 300); return;
+    }
+    if (window.showFixPreview._h3nFix5) return;
+
+    const orig = window.showFixPreview;
+    window.showFixPreview = function (finding) {
+      // Resolve the actual finding object (handles button arg, JSON arg, or object arg)
+      let f;
+      if (finding && finding.tagName === 'BUTTON') {
+        const idx = finding.getAttribute('data-fix-idx');
+        f = (window._lastFixable || [])[parseInt(idx) || 0] || {};
+      } else if (typeof finding === 'string') {
+        try { f = JSON.parse(finding); } catch (e) { f = {}; }
+      } else {
+        f = finding || {};
+      }
+
+      // Run original — this writes the modal template into #mfp-body
+      const result = orig.apply(this, arguments);
+
+      // Now inject H3.N AI-aware renderer
+      setTimeout(() => {
+        const body = document.getElementById('mfp-body');
+        if (!body) return;
+        const findingId = f.id || f.finding_id || f.uuid;
+        if (!findingId) {
+          console.warn('[H3.N.fix5] no finding ID in:', f);
+          return;
+        }
+
+        // Avoid double-injection on rapid clicks
+        let mount = body.querySelector('.h3n-mount');
+        if (mount && mount.dataset.h3nLastId === findingId) return;
+
+        if (!mount) {
+          mount = document.createElement('div');
+          mount.className = 'h3n-mount';
+          mount.style.cssText = 'margin:14px 0;padding-top:14px;border-top:1px dashed rgba(139,92,246,.3)';
+
+          // Insert before the action buttons row (last div)
+          const buttonsRow = body.querySelector('div[style*="justify-content:flex-end"]');
+          if (buttonsRow) {
+            body.insertBefore(mount, buttonsRow);
+          } else {
+            body.appendChild(mount);
+          }
+        }
+        mount.dataset.h3nLastId = findingId;
+
+        // Header for the AI section
+        mount.innerHTML = '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🤖 AI-powered diff (H3.N)</div><div class="h3n-diff-target" style="color:#9ca3af;padding:10px;font-size:12px">Loading AI fix from local LLM...</div>';
+
+        // Call the H3.N-extended renderer (looked up dynamically)
+        if (typeof window.h3mFetchAndRenderDiff === 'function') {
+          const target = mount.querySelector('.h3n-diff-target');
+          window.h3mFetchAndRenderDiff(findingId, target);
+        } else {
+          mount.querySelector('.h3n-diff-target').innerHTML =
+            '<div style="color:#ef4444">H3.M renderer not loaded — frontend patch may have failed</div>';
+        }
+      }, 50);
+
+      return result;
+    };
+    window.showFixPreview._h3nFix5 = true;
+    (window.VSP_DEBUG && console.log('[H3.N.fix5] showFixPreview hooked — modal will show AI diff after open'));
+  }
+
+  tryWrap();
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     [H3.N.fix6] Hook showFixPreviewByIdx (button entry point)
+     The button "Preview fix" in the table calls this directly.
+     We resolve the finding object and invoke showFixPreview which
+     was already hooked by fix5 to render the AI diff section.
+═══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3nFix6) return;
+  window._h3nFix6 = true;
+
+  function tryWrap() {
+    if (typeof window.showFixPreviewByIdx !== 'function') {
+      setTimeout(tryWrap, 300); return;
+    }
+    if (window.showFixPreviewByIdx._h3nFix6) return;
+
+    const orig = window.showFixPreviewByIdx;
+    window.showFixPreviewByIdx = function (btn) {
+      // Original opens modal — let it run first
+      const result = orig.apply(this, arguments);
+
+      // Resolve finding from button + _lastFixable
+      try {
+        const idx = btn && btn.getAttribute && btn.getAttribute('data-fix-idx');
+        if (idx === null || idx === undefined) return result;
+        const f = (window._lastFixable || [])[parseInt(idx) || 0];
+        if (!f || !f.id) {
+          console.warn('[H3.N.fix6] no finding at idx', idx);
+          return result;
+        }
+
+        // Force-inject H3.N AI section after a tick (modal innerHTML done)
+        setTimeout(() => {
+          const body = document.getElementById('mfp-body');
+          if (!body) return;
+
+          // Avoid double-inject
+          let mount = body.querySelector('.h3n-mount');
+          if (mount && mount.dataset.h3nLastId === f.id) return;
+          if (!mount) {
+            mount = document.createElement('div');
+            mount.className = 'h3n-mount';
+            mount.style.cssText = 'margin:14px 0;padding-top:14px;border-top:1px dashed rgba(139,92,246,.3)';
+            const buttonsRow = body.querySelector('div[style*="justify-content:flex-end"]');
+            if (buttonsRow) body.insertBefore(mount, buttonsRow);
+            else body.appendChild(mount);
+          }
+          mount.dataset.h3nLastId = f.id;
+          mount.innerHTML =
+            '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🤖 AI-powered diff (H3.N)</div>' +
+            '<div class="h3n-diff-target" style="color:#9ca3af;padding:10px;font-size:12px">Loading AI fix from local LLM...</div>';
+
+          if (typeof window.h3mFetchAndRenderDiff === 'function') {
+            const target = mount.querySelector('.h3n-diff-target');
+            window.h3mFetchAndRenderDiff(f.id, target);
+          }
+        }, 50);
+      } catch (e) {
+        console.error('[H3.N.fix6] error:', e);
+      }
+      return result;
+    };
+    window.showFixPreviewByIdx._h3nFix6 = true;
+    (window.VSP_DEBUG && console.log('[H3.N.fix6] showFixPreviewByIdx hooked — button click will render AI diff'));
+  }
+
+  tryWrap();
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     [H3.O] Pre-compute Status Widget
+     Shows progress of background AI fix pre-computation.
+═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (window._h3oWidget) return;
+  window._h3oWidget = true;
+
+  function fmtSecs(s) {
+    if (!s || s < 1) return '<1s';
+    if (s < 60) return Math.round(s) + 's';
+    if (s < 3600) return Math.round(s/60) + 'm';
+    return Math.round(s/3600) + 'h';
+  }
+
+  function getToken() {
+    return window.TOKEN
+      || (window.localStorage && (localStorage.getItem('vsp_token') || localStorage.getItem('token')))
+      || '';
+  }
+
+  async function fetchStatus() {
+    try {
+      const tk = getToken();
+      const opts = { credentials: 'include' };
+      if (tk) opts.headers = {'Authorization': 'Bearer ' + tk};
+      const r = await fetch('/api/v1/autofix/precompute/status', opts);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function renderWidget(data) {
+    const widget = document.getElementById('h3o-status-widget');
+    if (!widget) return;
+
+    if (!data || data.status === 'idle') {
+      widget.style.display = 'none';
+      return;
+    }
+
+    widget.style.display = 'block';
+    const isRunning = data.status === 'running';
+    const pct = data.progress_pct || 0;
+    const eta = data.eta_seconds ? fmtSecs(data.eta_seconds) : '—';
+
+    const statusBadge = isRunning
+      ? '<span style="background:rgba(139,92,246,.2);color:#a78bfa;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">⚡ RUNNING</span>'
+      : data.status === 'done'
+      ? '<span style="background:rgba(34,197,94,.2);color:#22c55e;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">✓ DONE</span>'
+      : '<span style="background:rgba(148,163,184,.2);color:#94a3b8;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700">' + (data.status||'').toUpperCase() + '</span>';
+
+    widget.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:13px;font-weight:600">🤖 AI Pre-compute Status</span>' +
+          statusBadge +
+        '</div>' +
+        '<div style="font-size:10px;color:var(--t3)">Run: ' + (data.run_label || '—') + '</div>' +
+      '</div>' +
+      '<div style="background:var(--bg0);border-radius:6px;overflow:hidden;height:8px;margin-bottom:8px">' +
+        '<div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#8b5cf6,#a78bfa);transition:width .3s"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:14px;font-size:11px;color:var(--t2);flex-wrap:wrap">' +
+        '<span>Progress: <b style="color:var(--t1)">' + (data.completed + data.failed + data.skipped) + ' / ' + data.total + '</b> (' + pct + '%)</span>' +
+        '<span>✓ Done: <b style="color:#22c55e">' + data.completed + '</b></span>' +
+        (data.failed > 0 ? '<span>⚠ Failed: <b style="color:#ef4444">' + data.failed + '</b></span>' : '') +
+        (data.skipped > 0 ? '<span>— Skipped: <b style="color:#94a3b8">' + data.skipped + '</b></span>' : '') +
+        (isRunning && data.eta_seconds ? '<span>ETA: <b style="color:#a78bfa">~' + eta + '</b></span>' : '') +
+        (data.avg_latency_ms ? '<span>Avg: <b>' + (data.avg_latency_ms/1000).toFixed(1) + 's</b></span>' : '') +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--t3);margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">' +
+        '💾 Cache size: <b>' + (data.total_cached || 0) + '</b> entries · TTL 30 days · Click "Preview fix" on a code finding for instant AI diff' +
+      '</div>';
+  }
+
+  let pollInterval = null;
+  let consecutiveErrors = 0;
+
+  async function tick() {
+    const data = await fetchStatus();
+    if (data === null) {
+      consecutiveErrors++;
+      if (consecutiveErrors > 3) {
+        // Stop polling on repeated errors
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+      }
+      return;
+    }
+    consecutiveErrors = 0;
+    renderWidget(data);
+
+    // Adapt polling rate: 5s when running, 30s when idle/done
+    if (pollInterval && data.status !== 'running') {
+      clearInterval(pollInterval);
+      pollInterval = setInterval(tick, 30000);
+    }
+  }
+
+  function injectWidget() {
+    // Find the Autofix tab content area
+    const autofixTab = document.querySelector('[data-tab="autofix"], #autofix-tab, .autofix-section');
+    let target = document.getElementById('h3o-status-widget');
+    if (target) return; // already injected
+
+    // Fallback: inject before Leaderboard if found
+    const leaderboard = Array.from(document.querySelectorAll('h2, h3, div')).find(
+      el => el.textContent && el.textContent.includes('LEADERBOARD')
+    );
+
+    target = document.createElement('div');
+    target.id = 'h3o-status-widget';
+    target.style.cssText = 'background:var(--bg1);border:1px solid var(--border);border-left:3px solid #8b5cf6;border-radius:8px;padding:14px 16px;margin:14px 0;display:none';
+
+    if (leaderboard && leaderboard.parentElement) {
+      leaderboard.parentElement.insertBefore(target, leaderboard);
+    } else if (autofixTab) {
+      autofixTab.insertBefore(target, autofixTab.firstChild);
+    } else {
+      // Last resort: append to body
+      document.body.appendChild(target);
+    }
+  }
+
+  // Wait for DOM
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  function init() {
+    injectWidget();
+    tick();
+    pollInterval = setInterval(tick, 5000); // start fast (5s) — slows to 30s when idle
+    (window.VSP_DEBUG && console.log('[H3.O] Pre-compute status widget loaded'));
+  }
+})();
+</script>
+
+<script src="/static/js/vsp_h3_upgrade.js"></script>
+<!-- VSP-SIEM-COMPANION -->
+
+<script>
+// Fix 3: LLM setup guide
+function showSetupGuide() {
+  var guide = [
+    '1. Edit /etc/vsp/env.production',
+    '2. Set: LLM_ENABLED=true',
+    '3. Set: LLM_PROVIDER=ollama (or openai/anthropic)',
+    '4. Set: LLM_BASE_URL=http://127.0.0.1:11434',
+    '5. Set: LLM_MODEL=deepseek-coder-v2:16b',
+    '6. sudo systemctl restart vsp-gateway',
+  ].join('\n');
+  alert('LLM AutoFix Setup Guide:\n\n' + guide);
+}
+
+// Fix 4: DORA deploy setup guide
+function showDoraSetup() {
+  var guide = [
+    'DORA Deploy Frequency requires CI/CD integration:',
+    '',
+    'Option A — GitHub Actions:',
+    '  POST /api/v1/vsp/run after each deploy',
+    '  with mode=FULL and trigger=deploy',
+    '',
+    'Option B — GitLab CI:',
+    '  Add VSP_NOTIFY=true to .gitlab-ci.yml',
+    '',
+    'Option C — Manual:',
+    '  Use VSP API to record deploy events',
+  ].join('\n');
+  alert(guide);
+}
 </script>
 </body>
 </html>

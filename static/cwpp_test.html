@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VSP PRO — CWPP Standalone Test</title>
+<style>
+  body {
+    margin: 0;
+    background: #0a0e1a;
+    color: #cbd5e1;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  header {
+    padding: 14px 24px;
+    background: linear-gradient(180deg, #0f1729, #0a0e1a);
+    border-bottom: 1px solid #1e293b;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #22d3ee;
+    letter-spacing: 0.5px;
+  }
+  header .sub {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+  .container {
+    max-width: 1400px;
+    margin: 24px auto;
+    padding: 0 24px;
+  }
+  .panel {
+    background: #0f1729;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #7d8aa0;
+    margin: 0 0 12px;
+    font-weight: 600;
+  }
+  .btn {
+    display: inline-block;
+    padding: 8px 14px;
+    background: #1e293b;
+    color: #22d3ee;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    margin-right: 8px;
+    transition: all 0.15s;
+  }
+  .btn:hover {
+    background: #334155;
+    border-color: #22d3ee;
+  }
+  .btn.primary {
+    background: #155e75;
+    color: #fff;
+    border-color: #22d3ee;
+  }
+  .btn.danger {
+    background: #7f1d1d;
+    color: #fca5a5;
+    border-color: #ef4444;
+  }
+  pre.log {
+    background: #020617;
+    color: #94a3b8;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow: auto;
+    margin: 0;
+  }
+  pre.log .ok { color: #4ade80; }
+  pre.log .err { color: #f87171; }
+  pre.log .info { color: #22d3ee; }
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    padding: 8px 14px;
+    background: #020617;
+    border-radius: 6px;
+    font-size: 11px;
+    margin-bottom: 14px;
+  }
+  .status-bar span { color: #64748b; }
+  .status-bar strong { color: #22d3ee; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>VSP PRO — Container Security (CWPP) Standalone</h1>
+  <div class="sub">Direct test page — bypasses auth, calls Trivy API on :8090 directly</div>
+</header>
+
+<div class="container">
+
+  <div class="panel">
+    <h2>Status</h2>
+    <div class="status-bar">
+      <span>Backend: <strong id="be-status">checking…</strong></span>
+      <span>VSP_PRO: <strong id="pro-status">loading…</strong></span>
+      <span>Images: <strong id="img-count">-</strong></span>
+    </div>
+    <button class="btn primary" onclick="loadAndOpen()">▶ Open CWPP module</button>
+    <button class="btn" onclick="seedDemo()">+ Seed 4 demo</button>
+    <button class="btn" onclick="testAPI()">↻ Test API</button>
+    <button class="btn" onclick="clearAll()" style="float:right">⌫ Reset all data</button>
+  </div>
+
+  <div class="panel">
+    <h2>Console log</h2>
+    <pre class="log" id="log">Ready. Click "Test API" to verify backend, then "Open CWPP module".\n</pre>
+  </div>
+
+</div>
+
+<script>
+// ─── Logger ──────────────────────────────────────────
+const logEl = document.getElementById('log');
+function log(msg, cls){
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ─── API tests ──────────────────────────────────────
+async function testAPI(){
+  log('Testing http://127.0.0.1:8090/api/v1/container/images …', 'info');
+  try {
+    const r = await fetch('http://127.0.0.1:8090/api/v1/container/images');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    log('✓ Backend OK — returned ' + data.length + ' images', 'ok');
+    document.getElementById('be-status').textContent = '✓ online (port 8090)';
+    document.getElementById('be-status').style.color = '#4ade80';
+    document.getElementById('img-count').textContent = data.length;
+
+    let total = data.reduce((a,b) => a + (b.total_cve||0), 0);
+    let crit = data.reduce((a,b) => a + (b.crit||0), 0);
+    log('  Total CVE: ' + total + '  (CRIT: ' + crit + ')', 'info');
+
+    data.forEach(img => {
+      log('  • ' + img.ref + ' — ' + (img.total_cve||0) + ' CVE  [C:' + (img.crit||0) + ' H:' + (img.high||0) + ']', 'info');
+    });
+  } catch(e) {
+    log('✗ Backend ERROR: ' + e.message, 'err');
+    document.getElementById('be-status').textContent = '✗ offline';
+    document.getElementById('be-status').style.color = '#f87171';
+  }
+}
+
+async function seedDemo(){
+  log('POST /api/v1/container/seed …', 'info');
+  try {
+    const r = await fetch('http://127.0.0.1:8090/api/v1/container/seed', {method:'POST'});
+    const data = await r.json();
+    log('✓ Seed queued: ' + data.images.join(', '), 'ok');
+    log('  Wait 30-60s, then click Test API', 'info');
+  } catch(e) {
+    log('✗ Seed ERROR: ' + e.message, 'err');
+  }
+}
+
+function clearAll(){
+  if (!confirm('Reset all VSP PRO state? (Reload page)')) return;
+  location.reload();
+}
+
+// ─── Load VSP PRO scripts dynamically ─────────────────
+function loadScript(url){
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => res();
+    s.onerror = () => rej(new Error('load fail: ' + url));
+    document.body.appendChild(s);
+  });
+}
+
+async function loadAndOpen(){
+  if (!window.VSP_PRO) {
+    log('Loading vsp_pro_100.js…', 'info');
+    try {
+      await loadScript('/vsp_pro_100.js');
+    } catch(e) {
+      log('✗ ' + e.message, 'err');
+      return;
+    }
+    log('Loading vsp_pro_cwpp_realapi.js…', 'info');
+    try {
+      await loadScript('/vsp_pro_cwpp_realapi.js');
+    } catch(e) {
+      log('⚠ realapi patch not loaded (will use mock)', 'err');
+    }
+  }
+
+  if (window.VSP_PRO) {
+    log('✓ VSP_PRO loaded — version ' + window.VSP_PRO.version, 'ok');
+    log('  Modules: ' + Object.keys(window.VSP_PRO.modules).join(', '), 'info');
+    document.getElementById('pro-status').textContent = '✓ v' + window.VSP_PRO.version;
+    document.getElementById('pro-status').style.color = '#4ade80';
+
+    log('Opening CWPP overlay…', 'info');
+    try {
+      window.VSP_PRO.openPanel('cwpp');
+      log('✓ Overlay opened', 'ok');
+    } catch(e) {
+      log('✗ openPanel error: ' + e.message, 'err');
+    }
+  } else {
+    log('✗ VSP_PRO still undefined after load', 'err');
+  }
+}
+
+// ─── Auto-test on page load ──────────────────────────
+window.addEventListener('load', () => {
+  log('Page loaded. Auto-testing backend in 1s…', 'info');
+  setTimeout(testAPI, 1000);
+});
+</script>
+
+</body>
+</html>

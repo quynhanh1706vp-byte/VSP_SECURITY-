@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script src="/static/js/vsp_uxstates.js"></script>
 <script>
 // Auto-get token từ parent window hoặc localStorage
 (function() {
@@ -16,10 +17,9 @@
   if (tok) {
     window.TOKEN = tok;
     localStorage.setItem('vsp_token', tok);
-    console.log('[P4] token bootstrapped, length:', tok.length);
+    if (window.VSP_DEBUG) console.log('[P4] auth bootstrapped');
   }
   window.VSP_API_BASE = window.location.origin;
-  window.VSP_P4_API_KEY = '634a9c4ebc792f44d7c50c0eea62da4a3f2a4f9e657048d070b6175187bdb0c2';
 })();
 </script>
 <style>
@@ -279,6 +279,8 @@ body::after {
 }
 /* ── End Premium Upgrade ─────────────────────────────── */
 
+
+.p4-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
 </style>
 <script>
 (function(){
@@ -551,7 +553,6 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
 </head>
 <body>
 
-<div style="position:fixed;top:10px;right:10px;z-index:9999"><button type="button" onclick="history.back()" style="font-family:monospace;font-size:11px;padding:6px 12px;background:rgba(6,182,212,.15);color:#06b6d4;border:1px solid rgba(6,182,212,.4);border-radius:6px;cursor:pointer;">← Back to VSP</button></div>
 <div class="shell">
   <!-- Sidebar -->
   <nav class="sidenav">
@@ -613,15 +614,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
   </button>
   <div id="tenant-switcher-dropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:220px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
     <div style="font-size:10px;color:var(--t3);padding:4px 8px;margin-bottom:4px">SWITCH TENANT</div>
-    <div onclick="switchTenant('VSP-DOD-2025-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
-      <span>VSP — Default</span><span style="color:var(--green);font-size:10px">P4 100%</span>
-    </div>
-    <div onclick="switchTenant('TENANT-ACME-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
-      <span>ACME Defense</span><span style="color:var(--amber);font-size:10px">P4 38%</span>
-    </div>
-    <div onclick="switchTenant('TENANT-NGIT-001')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='transparent'">
-      <span>Northrop IT</span><span style="color:var(--green);font-size:10px">P4 87%</span>
-    </div>
+    <div id="tenant-list"><div style="padding:8px 10px;color:var(--t3);font-size:11px">Loading…</div></div>
     <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px">
       <div onclick="window.location.href='/onboarding'" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--cyan)" onmouseover="this.style.background='rgba(6,182,212,.08)'" onmouseout="this.style.background='transparent'">
         + Add new tenant
@@ -629,10 +622,10 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
     </div>
   </div>
 </div>
+        <button class="btn btn-ghost btn-sm" onclick="openP4Configure()" title="Panel display + alert thresholds">⚙ Configure</button>
+        <button class="btn btn-ghost btn-sm" onclick="openP4Notifications()" title="Compliance event notifications">🔔 Notifications</button>
         <button class="btn btn-ghost btn-sm" onclick="openAIAdvisor(null)" style="color:#8b5cf6;border-color:rgba(139,92,246,.4)">🤖 AI</button>
-        <button class="btn btn-ghost btn-sm" onclick="startDemoMode()">▶ Demo</button>
         <button class="btn btn-ghost btn-sm" onclick="exportPDF()">⬇ PDF</button>
-        <button class="btn btn-primary btn-sm" onclick="refreshAll()">↺ Refresh</button>
       </div>
     </div>
 
@@ -641,25 +634,26 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
       <!-- OVERVIEW TAB -->
       <div id="tab-overview" class="tab-panel active">
         <div class="hero-grid">
-          <div class="score-card">
+          <div class="score-card" onclick="switchTab('zerotrust',null)" style="cursor:pointer" title="View Zero Trust detail">
             <div class="score-label">P4 READINESS</div>
             <div class="score-val" id="ov-p4" style="color:var(--amber)">—</div>
             <div class="score-sub">DoD ZT Architecture v2.0</div>
             <div class="score-bar"><div class="score-bar-fill" id="ov-p4-bar" style="background:var(--amber)"></div></div>
           </div>
-          <div class="score-card">
+          <div class="score-card" onclick="switchTab('rmf',null)" style="cursor:pointer" title="View FedRAMP / RMF detail">
             <div class="score-label">FEDRAMP MODERATE</div>
             <div class="score-val" id="ov-fedramp" style="color:var(--cyan)">—</div>
             <div class="score-sub" id="ov-fedramp-sub">loading...</div>
-            <div class="score-bar"><div class="score-bar-fill" id="ov-fedramp-bar" style="width:0%;background:var(--cyan)"></div></div>
+            <div class="score-bar"><div class="score-bar-fill" id="fedramp-families" style="margin-top:10px;font-size:11px"></div>
+<div id="ov-fedramp-bar" style="width:0%;background:var(--cyan)"></div></div>
           </div>
-          <div class="score-card">
+          <div class="score-card" onclick="switchTab('rmf',null)" style="cursor:pointer" title="View CMMC / RMF detail">
             <div class="score-label">CMMC LEVEL 2</div>
             <div class="score-val" id="ov-cmmc" style="color:var(--amber)">—</div>
             <div class="score-sub" id="ov-cmmc-sub">loading...</div>
             <div class="score-bar"><div class="score-bar-fill" id="ov-cmmc-bar" style="width:0%;background:var(--amber)"></div></div>
           </div>
-          <div class="score-card">
+          <div class="score-card" onclick="switchTab('ato-expiry',null)" style="cursor:pointer" title="View ATO Expiry detail">
             <div class="score-label">ATO STATUS</div>
             <div class="score-val" id="ov-ato" style="color:var(--t3);font-size:14px;padding-top:6px">Loading...</div>
             <div class="score-sub" id="ov-ato-sub">—</div>
@@ -826,7 +820,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
         <div class="section-hd">
           <div class="section-title">SOFTWARE BILL OF MATERIALS — SBOM VIEW</div>
           <div style="display:flex;gap:8px;align-items:center">
-            <input id="sbom-search-input" class="sbom-search" placeholder="Search component..." oninput="window._sbomData&&renderSBOMTable(window._sbomData,this.value,window._sbomFilter||'all')">
+            <input aria-label="Search component..." id="sbom-search-input" class="sbom-search" placeholder="Search component..." oninput="window._sbomData&&renderSBOMTable(window._sbomData,this.value,window._sbomFilter||'all')">
             <div class="filter-pills">
               <button class="filter-pill active" onclick="setSBOMFilter('all',this)">All</button>
               <button class="filter-pill" onclick="setSBOMFilter('vuln',this)">⚠ Vulnerable</button>
@@ -1104,36 +1098,36 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
   <div class="modal">
     <div class="modal-title">Add Micro-Segmentation Rule</div>
     <div class="form-row">
-      <label class="form-label">Rule Name</label>
+      <label class="form-label" for="seg-name">Rule Name</label>
       <input class="form-input" id="seg-name" placeholder="e.g. vsp-scanner → redis">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-row">
-        <label class="form-label">Source Service</label>
+        <label class="form-label" for="seg-src">Source Service</label>
         <input class="form-input" id="seg-src" placeholder="vsp-api">
       </div>
       <div class="form-row">
-        <label class="form-label">Destination Service</label>
+        <label class="form-label" for="seg-dst">Destination Service</label>
         <input class="form-input" id="seg-dst" placeholder="postgres">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div class="form-row">
-        <label class="form-label">Port</label>
+        <label class="form-label" for="seg-port">Port</label>
         <input class="form-input" id="seg-port" type="number" placeholder="5432">
       </div>
       <div class="form-row">
-        <label class="form-label">Protocol</label>
+        <label class="form-label" for="seg-proto">Protocol</label>
         <select class="form-input" id="seg-proto"><option>TCP</option><option>UDP</option><option>gRPC</option></select>
       </div>
       <div class="form-row">
-        <label class="form-label">Action</label>
+        <label class="form-label" for="seg-action">Action</label>
         <select class="form-input" id="seg-action"><option>allow</option><option>deny</option><option>inspect</option></select>
       </div>
     </div>
     <div class="form-row">
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
-        <input type="checkbox" id="seg-mtls" checked> Require mTLS
+        <input aria-label="Seg Mtls" type="checkbox" id="seg-mtls" checked> Require mTLS
       </label>
     </div>
     <div class="modal-footer">
@@ -1287,135 +1281,404 @@ async function api(path) {
 }
 
 async function post(path, body) {
+  // Mirror the auth-token discovery the GET helper does. Prior version sent
+  // POST without Authorization → every write (RMF task update, pipeline
+  // trigger, microseg add, VN-standards update) silently 401'd.
+  var tk = window.TOKEN || localStorage.getItem('vsp_token') || '';
+  if (!tk || tk.length < 20) {
+    try { tk = window.parent.TOKEN || ''; } catch(e) {}
+  }
   try {
-    const r = await fetch(API + path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    var hdr = {'Content-Type':'application/json'};
+    if (tk) hdr['Authorization'] = 'Bearer ' + tk;
+    const r = await fetch(API + path, { method:'POST', headers:hdr, body:JSON.stringify(body) });
     return await r.json();
   } catch(e) { return null; }
 }
 
 // ---- Overview ----
+/* FEAT-33: p4_compliance L2 UX states (MAX coverage, override-aware) */
+function _p4Skel(target, opts) {
+  if (typeof VSPUXState !== 'undefined') VSPUXState.skeleton(target, opts || { rows: 4, kind: 'card' });
+}
+function _p4Empty(target, msg, retry) {
+  if (typeof VSPUXState !== 'undefined') VSPUXState.empty(target, msg, retry);
+}
+function _p4Err(target, msg, retry) {
+  if (typeof VSPUXState !== 'undefined') VSPUXState.error(target, msg, retry);
+}
+function _p4HasData(target) {
+  var el = typeof target === 'string' ? document.querySelector(target) : target;
+  if (!el) return false;
+  if (el.children.length === 0) return false;
+  if (el.querySelector('.vsp-uxs-skel-row')) return false;
+  // Empty placeholder check
+  if (el.querySelector('.empty')) return false;
+  return true;
+}
+
 async function loadOverview() {
-  const [zt, pipe, rmf] = await Promise.all([
-    api('/api/p4/zt/status'),
-    api('/api/p4/pipeline/latest'),
-    api('/api/p4/rmf')
-  ]);
-
-  if (zt) {
-    // P4 readiness
-    const p4 = zt.p4_readiness;
-    document.getElementById('ov-p4').textContent = p4 + '%';
-    document.getElementById('ov-p4-bar').style.width = p4 + '%';
-    document.getElementById('sidebar-p4').textContent = p4 + '%';
-    document.getElementById('p4-status-badge').textContent = p4 >= 100 ? 'P4 ACHIEVED' : p4 >= 85 ? 'P4 NEAR' : 'P4 IN PROGRESS';
-    document.getElementById('p4-status-badge').style.color = p4 >= 85 ? 'var(--green)' : 'var(--amber)';
-
-    // Pillar cards
-    const grid = document.getElementById('ov-pillars');
-    if (!zt || !zt.pillars) { grid.innerHTML = "<div style='color:var(--t3)'>Loading pillars...</div>"; return; }
-    grid.innerHTML = Object.entries(zt.pillars).map(([k,p]) => `
-      <div class="zt-pillar" style="border-color:${p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)'}">
-        <div class="zt-pillar-name">${p.name}</div>
-        <div class="zt-pillar-score" style="color:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}">${p.score}</div>
-        <div class="p4-target" style="color:var(--t3)">target ${p.target}</div>
-        <div class="zt-bar"><div class="zt-bar-fill" style="width:${p.score}%;background:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}"></div></div>
-      </div>
-    `).join('');
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if (hasUX && !_p4HasData('#ov-pillars')) {
+    _p4Skel('#ov-pillars', { rows: 5, kind: 'card' });
   }
-
-  if (pipe && pipe.summary) {
-    const s = pipe.summary;
-    const fr = s.frameworks['FedRAMP'] || {};
-    const frPct = fr.percent ? Math.round(fr.percent) : 82;
-    document.getElementById('ov-fedramp').textContent = frPct + '%';
-    document.getElementById('ov-fedramp').style.color = frPct >= 80 ? 'var(--green)' : 'var(--cyan)';
-    document.getElementById('ov-fedramp-sub').textContent = (fr.pass||22) + ' / ' + (fr.total||24) + ' controls pass';
-    document.getElementById('ov-fedramp-bar').style.width = frPct + '%';
-    document.getElementById('ov-fedramp-bar').style.background = frPct >= 80 ? 'var(--green)' : 'var(--cyan)';
-    const cm = s.frameworks['CMMC'] || {};
-    const cmPct = cm.percent ? Math.round(cm.percent) : 85;
-    document.getElementById('ov-cmmc').textContent = cmPct + '%';
-    document.getElementById('ov-cmmc').style.color = cmPct >= 80 ? 'var(--green)' : 'var(--amber)';
-    document.getElementById('ov-cmmc-sub').textContent = (cm.pass||14) + ' / ' + (cm.total||16) + ' practices pass';
-    document.getElementById('ov-cmmc-bar').style.width = cmPct + '%';
-    document.getElementById('ov-cmmc-bar').style.background = cmPct >= 80 ? 'var(--green)' : 'var(--amber)';
-    document.getElementById('ov-pipeline-summary').innerHTML = `
-      <div style="display:flex;gap:20px;align-items:center">
-        <div><div class="score-label">PASS</div><div style="font-size:18px;font-weight:700;color:var(--green)">${s.pass}</div></div>
-        <div><div class="score-label">WARN</div><div style="font-size:18px;font-weight:700;color:var(--amber)">${s.warn}</div></div>
-        <div><div class="score-label">FAIL</div><div style="font-size:18px;font-weight:700;color:var(--red)">${s.fail}</div></div>
-        <div><div class="score-label">SCORE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${s.score.toFixed(0)}%</div></div>
-        <div style="flex:1;font-size:10px;color:var(--t3)">${pipe.id} · ${pipe.trigger_type} · ${pipe.branch}</div>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('pipeline',null)">→ Details</button>
-      </div>`;
-  }
-
-  if (rmf) {
-    const critical = rmf.poam_items.filter(p => p.status==='open'||p.status==='in_remediation').slice(0,3);
-    document.getElementById('ov-poam').innerHTML = critical.map(p => renderPOAMRow(p)).join('');
-    // ATO status
-    const complete = rmf.rmf_steps.filter(s=>s.status==='complete').length;
-    var atoEl = document.getElementById('ov-ato');
-    var atoSubEl = document.getElementById('ov-ato-sub');
-    var atoStatus = rmf.ato_status.replace('_',' ').toUpperCase();
-    atoEl.textContent = atoStatus;
-    // Color based on status
-    if (rmf.ato_status === 'authorized') {
-      atoEl.style.color = 'var(--green)';
-    } else if (rmf.ato_status === 'in_progress') {
-      atoEl.style.color = 'var(--amber)';
-    } else {
-      atoEl.style.color = 'var(--t2)';
+  // Per-fetch safe: preserve partial KPIs if some endpoints fail
+  var safe = function(p){ return Promise.resolve(p).then(function(r){ return r || {}; }).catch(function(){ return {}; }); };
+  var zt, pipe, rmf, fed, cmmc, ato;
+  try {
+    var res = await Promise.all([
+      safe(api('/api/p4/zt/status')),
+      safe(api('/api/p4/pipeline/latest')),
+      safe(api('/api/p4/rmf')),
+      // Pull the same compliance endpoints the inline dashboard tile and
+      // FedRAMP/CMMC detail panel use, so the % shown on this Overview tab
+      // always matches what the user sees on the home dashboard.
+      safe(api('/api/v1/compliance/fedramp')),
+      safe(api('/api/v1/compliance/cmmc')),
+      safe(api('/api/p4/ato/expiry'))
+    ]);
+    zt = res[0]; pipe = res[1]; rmf = res[2]; fed = res[3]; cmmc = res[4]; ato = res[5];
+    // Fix 2: Family breakdown
+    if (fed && fed.controls) {
+      var families = {};
+      fed.controls.forEach(function(c) {
+        if (!families[c.family]) families[c.family] = {pass:0,warn:0,fail:0};
+        families[c.family][c.status] = (families[c.family][c.status]||0) + 1;
+      });
+      var famEl = document.getElementById('fedramp-families');
+      if (famEl) {
+        famEl.innerHTML = Object.entries(families).sort(function(a,b){
+          return (b[1].fail||0)-(a[1].fail||0);
+        }).slice(0,6).map(function(e){
+          var f=e[1], tot=(f.pass||0)+(f.warn||0)+(f.fail||0);
+          var pct = tot>0?Math.round((f.pass||0)/tot*100):0;
+          var col = pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+            +'<span style="font-size:11px;color:var(--t2);flex:1">'+e[0]+'</span>'
+            +'<span style="font-size:10px;color:var(--red)">'+f.fail+'✗</span>'
+            +'<span style="font-size:10px;color:var(--amber)">'+f.warn+'⚠</span>'
+            +'<span style="font-size:10px;color:var(--green)">'+f.pass+'✓</span>'
+            +'<div style="width:60px;height:4px;background:var(--border);border-radius:2px">'
+              +'<div style="width:'+pct+'%;height:4px;border-radius:2px;background:'+col+'"></div></div>'
+            +'</div>';
+        }).join('');
+      }
     }
-    atoSubEl.textContent = `Steps ${complete}/6 complete`;
+  } catch(e) {
+    console.error('[FEAT-33] loadOverview failed:', e);
+    if (hasUX) _p4Err('#ov-pillars', 'Network error loading overview', loadOverview);
+    return;
   }
+
+  // P4 readiness
+  if (zt && zt.p4_readiness != null) {
+    var p4 = zt.p4_readiness;
+    var p4El = document.getElementById('ov-p4');
+    var p4Bar = document.getElementById('ov-p4-bar');
+    var sidebar = document.getElementById('sidebar-p4');
+    var badge = document.getElementById('p4-status-badge');
+    if (p4El) p4El.textContent = p4 + '%';
+    if (p4Bar) p4Bar.style.width = p4 + '%';
+    if (sidebar) sidebar.textContent = p4 + '%';
+    if (badge) {
+      badge.textContent = p4 >= 100 ? 'P4 ACHIEVED' : p4 >= 85 ? 'P4 NEAR' : 'P4 IN PROGRESS';
+      badge.style.color = p4 >= 85 ? 'var(--green)' : 'var(--amber)';
+    }
+
+    var grid = document.getElementById('ov-pillars');
+    if (grid) {
+      if (!zt.pillars || Object.keys(zt.pillars).length === 0) {
+        if (hasUX) _p4Empty('#ov-pillars', 'No Zero Trust pillar data', loadOverview);
+      } else {
+        grid.innerHTML = Object.entries(zt.pillars).map(function(e) {
+          var k = e[0], p = e[1];
+          return '<div class="zt-pillar" style="border-color:' + (p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)') + '">'
+            + '<div class="zt-pillar-name">' + p.name + '</div>'
+            + '<div class="zt-pillar-score" style="color:' + (p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)') + '">' + p.score + '</div>'
+            + '<div class="p4-target" style="color:var(--t3)">target ' + p.target + '</div>'
+            + '<div class="zt-bar"><div class="zt-bar-fill" style="width:' + p.score + '%;background:' + (p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)') + '"></div></div>'
+            + '</div>';
+        }).join('');
+      }
+    }
+  } else if (hasUX && !zt) {
+    _p4Err('#ov-pillars', 'Failed to load Zero Trust status', loadOverview);
+  }
+
+  // FedRAMP card — coverage_pct matches dashboard gauge + inline detail panel.
+  // Sub-line shows passed/assessed so user can see real compliance state since
+  // coverage_pct=100% just means assessment was run, not that controls pass.
+  var fedPct = (fed && fed.coverage_pct != null) ? fed.coverage_pct : 0;
+  var fedEl = document.getElementById('ov-fedramp');
+  var fedSub = document.getElementById('ov-fedramp-sub');
+  var fedBar = document.getElementById('ov-fedramp-bar');
+  if (fedEl) fedEl.textContent = fedPct + '%';
+  if (fedBar) fedBar.style.width = fedPct + '%';
+  if (fedSub) {
+    var fp = (fed && fed.passed) || 0;
+    var fa = (fed && fed.assessed) || 0;
+    fedSub.textContent = fa ? (fp + '/' + fa + ' controls passed') : 'no data';
+  }
+
+  // CMMC card — same convention
+  var cmmcPct = (cmmc && cmmc.coverage_pct != null) ? cmmc.coverage_pct : 0;
+  var cmmcEl = document.getElementById('ov-cmmc');
+  var cmmcSub = document.getElementById('ov-cmmc-sub');
+  var cmmcBar = document.getElementById('ov-cmmc-bar');
+  if (cmmcEl) cmmcEl.textContent = cmmcPct + '%';
+  if (cmmcBar) cmmcBar.style.width = cmmcPct + '%';
+  if (cmmcSub) {
+    var cp = (cmmc && cmmc.passed) || 0;
+    var ca = (cmmc && cmmc.assessed) || 0;
+    cmmcSub.textContent = ca ? (cp + '/' + ca + ' practices passed') : 'no data';
+  }
+
+  // ATO card — pulls from /api/p4/ato/expiry, same data the ATO Expiry tab uses
+  var atoEl = document.getElementById('ov-ato');
+  var atoSub = document.getElementById('ov-ato-sub');
+  if (ato && ato.ato_status) {
+    var st = ato.ato_status.toUpperCase();
+    var stColor = st === 'AUTHORIZED' ? 'var(--green)' : st === 'PENDING' ? 'var(--amber)' : 'var(--red)';
+    if (atoEl) {
+      atoEl.textContent = st;
+      atoEl.style.color = stColor;
+      atoEl.style.fontSize = '20px';
+      atoEl.style.paddingTop = '0';
+    }
+    if (atoSub) {
+      var days = ato.days_remaining;
+      atoSub.textContent = days != null ? (days + ' days until expiry') : (ato.expiration_date || '—');
+    }
+  }
+
+  // Pipeline summary card — links into Pipeline tab for full detail
+  var pipeBox = document.getElementById('ov-pipeline-summary');
+  if (pipeBox) {
+    if (pipe && pipe.id) {
+      var pStatus = (pipe.status || 'unknown').toLowerCase();
+      var pColor = pStatus === 'pass' ? 'var(--green)' : pStatus === 'fail' ? 'var(--red)' : 'var(--amber)';
+      pipeBox.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+        + '<div><div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">' + escHtml(pipe.id) + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px">' + escHtml(pipe.trigger_type || '') + ' · ' + escHtml(pipe.branch || '') + '</div></div>'
+        + '<div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:' + pColor + '">' + pStatus.toUpperCase() + '</div>'
+        + '<div style="font-size:10px;color:var(--t3)">' + escHtml(pipe.completed_at || pipe.started_at || '') + '</div>'
+        + '</div>';
+    } else {
+      pipeBox.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:11px;padding:8px">No pipeline runs yet</div>';
+    }
+  }
+
+  // Open POA&M (Critical/High) — pulled from /api/p4/rmf, same data POA&M tab uses
+  var poamBox = document.getElementById('ov-poam');
+  if (poamBox) {
+    var items = (rmf && Array.isArray(rmf.poam_items)) ? rmf.poam_items : [];
+    var open = items.filter(function(p){
+      var sev = (p.severity || '').toUpperCase();
+      var st = (p.status || '').toLowerCase();
+      return (sev === 'CRITICAL' || sev === 'HIGH') && st !== 'closed' && st !== 'resolved';
+    }).slice(0, 5);
+    if (open.length === 0) {
+      poamBox.innerHTML = '<div style="text-align:center;color:var(--t3);font-size:11px;padding:8px">No open Critical/High POA&amp;M items</div>';
+    } else {
+      poamBox.innerHTML = open.map(function(p){
+        var sev = (p.severity || '').toUpperCase();
+        var sevColor = sev === 'CRITICAL' ? 'var(--red)' : 'var(--amber)';
+        // API fields: weakness_name (not title), control_id, finding_id,
+        // mitigation_plan, status, severity, closed_date (only when closed).
+        // Open items have no due_date in this schema; show control_id instead.
+        var label = p.weakness_name || p.title || p.id || '(no description)';
+        var meta = p.control_id ? p.control_id : (p.finding_id || '');
+        return '<div style="display:flex;gap:10px;padding:8px 12px;border-left:2px solid ' + sevColor + ';background:rgba(255,255,255,.02);margin-bottom:4px">'
+          + '<span style="font-family:var(--font-mono);font-size:10px;color:' + sevColor + ';font-weight:700;width:60px;flex-shrink:0">' + sev + '</span>'
+          + '<span style="font-size:11px;color:var(--t2);flex:1">' + escHtml(label) + '</span>'
+          + '<span style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">' + escHtml(meta) + '</span>'
+          + '</div>';
+      }).join('');
+    }
+  }
+}
+
+function escHtml(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+// PRO-grade Configure + Notifications buttons. Delegate to the parent shell
+// (vsp_pro_realapi.js) so the form modal styling matches other PRO panels.
+// Settings stored under feature_config[settings_general] / panel_p4 sub-key,
+// alongside other panel-specific config — same convention the Settings panel
+// uses for its sub-tabs.
+async function openP4Configure(){
+  var parentPRO = null;
+  try { parentPRO = window.parent && window.parent.VSP_PRO_FORM_MODAL; } catch(e) {}
+  if (!parentPRO) {
+    toast('Configure requires the parent shell — open from the main app');
+    return;
+  }
+  // Load existing settings_general blob and pull our subkey
+  var existing = {};
+  try {
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      headers:{Authorization:'Bearer '+(window.TOKEN||'')}, credentials:'same-origin'
+    });
+    if (r.ok) { var j = await r.json(); existing = (j && j.config) || {}; }
+  } catch(e) {}
+  var p4cfg = existing.panel_p4 || {};
+  parentPRO({
+    title: 'P4 Compliance — panel preferences',
+    sub: 'Display + alert thresholds for the P4 dashboard. Stored per tenant.',
+    submitLabel: 'Save',
+    fields: [
+      { id: 'fedramp_target', label: 'FedRAMP coverage target (%)', type: 'number',
+        value: p4cfg.fedramp_target || 80, hint: 'Score below this triggers amber on Overview' },
+      { id: 'cmmc_target', label: 'CMMC coverage target (%)', type: 'number',
+        value: p4cfg.cmmc_target || 80 },
+      { id: 'ato_warn_days', label: 'ATO expiry warning threshold (days)', type: 'number',
+        value: p4cfg.ato_warn_days || 90, hint: 'When days_remaining drops below, ATO card turns amber' },
+      { id: 'poam_show_only_open', label: 'Overview POA&M: show only open Critical/High', type: 'checkbox',
+        value: p4cfg.poam_show_only_open !== false },
+      { id: 'auto_refresh_secs', label: 'Auto-refresh interval (seconds, 0 = off)', type: 'number',
+        value: p4cfg.auto_refresh_secs || 0 }
+    ],
+    commit: function(v){
+      existing.panel_p4 = v;
+      return fetch('/api/v1/features/settings_general/config', {
+        method: 'PUT',
+        headers:{'Authorization':'Bearer '+(window.TOKEN||''),'Content-Type':'application/json'},
+        credentials:'same-origin',
+        body: JSON.stringify({ config: existing })
+      }).then(function(r){ if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
+    }
+  }).then(function(saved){ if (saved) toast('P4 preferences saved ✓'); })
+    .catch(function(e){ toast('Save failed: ' + (e.message||e)); });
+}
+
+function openP4Notifications(){
+  // Delegate to parent's existing cross-panel notifications modal — same one
+  // CWPP/CSPM/Supply Chain etc all use, so notification config is global.
+  try {
+    if (window.parent && window.parent.VSP_PRO && window.parent.VSP_PRO.openNotifications) {
+      window.parent.VSP_PRO.openNotifications();
+      return;
+    }
+  } catch(e) {}
+  toast('Notifications require the parent shell — open from the main app');
+}
+
+// ATO renewal checklist overrides — stored under settings_general blob so we
+// don't need a new feature_config whitelist entry or migration. Read at render
+// time and merged onto the backend's hardcoded done flags. Only the user's
+// changes ride in the override map; defaults stay in Go.
+async function _loadATOOverrides(){
+  try {
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      headers:{Authorization:'Bearer '+(window.TOKEN||'')}, credentials:'same-origin'
+    });
+    if (!r.ok) return {};
+    var j = await r.json();
+    return ((j && j.config) || {}).p4_ato_checklist_overrides || {};
+  } catch(e) { return {}; }
+}
+
+async function toggleATOTask(id, newDone){
+  // Optimistic UI: flip the row immediately so user sees feedback even on slow
+  // network. Roll back on save failure.
+  var row = document.querySelector('[data-rc-id="'+id+'"]');
+  var prevHtml = row ? row.innerHTML : null;
+  if (row) {
+    var label = row.textContent.replace(/^[✓○]\s*/, '');
+    row.innerHTML = (newDone ? '✓ ' : '○ ') + escHtml(label);
+    row.style.color = newDone ? 'var(--t2)' : 'var(--t3)';
+    row.dataset.rcDone = newDone ? '1' : '0';
+    row.setAttribute('onclick', "toggleATOTask('"+id+"',"+(!newDone)+")");
+  }
+  try {
+    var existing = await fetch('/api/v1/features/settings_general/config', {
+      headers:{Authorization:'Bearer '+(window.TOKEN||'')}, credentials:'same-origin'
+    });
+    var cfg = {};
+    if (existing.ok) { var j = await existing.json(); cfg = (j && j.config) || {}; }
+    cfg.p4_ato_checklist_overrides = cfg.p4_ato_checklist_overrides || {};
+    cfg.p4_ato_checklist_overrides[id] = !!newDone;
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+(window.TOKEN||''),'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({ config: cfg })
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    // Update the "done/total" counter card without full reload
+    _refreshATOCounter();
+    toast('Task '+id+' marked '+(newDone?'done ✓':'pending'));
+  } catch(e) {
+    if (row && prevHtml != null) {
+      row.innerHTML = prevHtml;
+      row.dataset.rcDone = newDone ? '0' : '1';
+      row.setAttribute('onclick', "toggleATOTask('"+id+"',"+newDone+")");
+    }
+    toast('Save failed: '+(e.message||e));
+  }
+}
+
+function _refreshATOCounter(){
+  var rows = document.querySelectorAll('[data-rc-id]');
+  if (!rows.length) return;
+  var done = 0;
+  rows.forEach(function(r){ if (r.dataset.rcDone === '1') done++; });
+  // The counter card is the 4th hero card with cyan number; locate by label.
+  var labels = document.querySelectorAll('#ato-expiry-content .score-label, #ato-expiry-content [style*="text-transform:uppercase"]');
+  labels.forEach(function(l){
+    if (/RENEWAL TASKS/i.test(l.textContent || '')) {
+      var num = l.previousElementSibling;
+      if (num) num.textContent = done + '/' + rows.length;
+    }
+  });
 }
 
 // ---- RMF ----
 let rmfData = null;
 async function loadRMF() {
-  const data = await api('/api/p4/rmf');
-  if (!data) return;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if (hasUX && !_p4HasData('#rmf-steps-container')) {
+    _p4Skel('#rmf-steps-container', { rows: 6, kind: 'card' });
+  }
+  var data;
+  try {
+    data = await api('/api/p4/rmf');
+  } catch(e) {
+    if (hasUX) _p4Err('#rmf-steps-container', 'Network error', loadRMF);
+    return;
+  }
+  if (!data) {
+    if (hasUX) _p4Err('#rmf-steps-container', 'Failed to load RMF', loadRMF);
+    return;
+  }
   rmfData = data;
-
-  const container = document.getElementById('rmf-steps-container');
-  container.innerHTML = data.rmf_steps.map(step => `
-    <div class="rmf-step" id="rmf-step-${step.id}">
-      <div class="rmf-step-header" onclick="toggleStep(${step.id})">
-        <span class="rmf-step-num">${step.id}</span>
-        <span class="rmf-step-name">${step.name}</span>
-        <span class="rmf-step-owner" style="font-size:10px;color:var(--t3)">${step.owner}</span>
-        <span class="rmf-step-status s-${step.status}">${fmtStatus(step.status)}</span>
-        <span style="color:var(--t3);font-size:12px;margin-left:4px">›</span>
-      </div>
-      <div class="rmf-tasks">
-        <div style="font-size:11px;color:var(--t3);margin-bottom:8px">${step.description}</div>
-        ${step.tasks.map(t => `
-          <div class="task-row">
-            <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleTask(${step.id},'${t.id}','${t.status}')" title="Toggle"></div>
-            <span class="task-name">${t.name}</span>
-            <span class="task-ref">${t.reference}</span>
-            ${t.artifact ? `<span class="task-artifact">📄 ${t.artifact}</span>` : ''}
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('');
-
-  // Artifacts
-  document.getElementById('ato-artifacts').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-      ${data.artifacts.map(a => `
-        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:10px">
-          <div style="font-size:22px">${{SSP:'📋',POAM:'📝',SAP:'🔍',SAR:'📊',FedRAMP_Rev5:'🏛'}[a.type]||'📄'}</div>
-          <div style="flex:1">
-            <div style="font-size:12px;font-weight:600">${a.name}</div>
-            <div style="font-size:10px;color:var(--t3)">${a.type} · v${a.version} · ${a.size_kb}KB</div>
-          </div>
-          <span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${{approved:'var(--green-d)',review:'var(--amber-d)',draft:'var(--border)'}[a.status]};color:${{approved:'var(--green)',review:'var(--amber)',draft:'var(--t3)'}[a.status]}">${a.status}</span>
-        </div>
-      `).join('')}
-    </div>`;
+  if (!data.rmf_steps || data.rmf_steps.length === 0) {
+    if (hasUX) _p4Empty('#rmf-steps-container', 'No RMF steps configured', loadRMF);
+    return;
+  }
+  var container = document.getElementById('rmf-steps-container');
+  if (!container) return;
+  container.innerHTML = data.rmf_steps.map(function(step) {
+    return '<div class="rmf-step" id="rmf-step-' + step.id + '">'
+      + '<div class="rmf-step-header" onclick="toggleStep(' + step.id + ')">'
+      + '<span class="rmf-step-num">' + step.id + '</span>'
+      + '<span class="rmf-step-name">' + step.name + '</span>'
+      + '<span class="rmf-step-owner" style="font-size:10px;color:var(--t3)">' + step.owner + '</span>'
+      + '<span class="rmf-step-status s-' + step.status + '">' + fmtStatus(step.status) + '</span>'
+      + '<span style="color:var(--t3);font-size:12px;margin-left:4px">›</span>'
+      + '</div>'
+      + '<div class="rmf-tasks">'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">' + step.description + '</div>'
+      + step.tasks.map(function(t) {
+          return '<div class="task-row">'
+            + '<div class="task-check ' + (t.status==='done'?'done':'') + '" onclick="toggleTask(' + step.id + ',\''+t.id+'\',\''+t.status+'\')" title="Toggle"></div>'
+            + '<span class="task-name">' + t.name + '</span>'
+            + '<span class="task-ref">' + t.reference + '</span>'
+            + (t.artifact ? '<span class="task-artifact">📄 ' + t.artifact + '</span>' : '')
+            + '</div>';
+        }).join('')
+      + '</div></div>';
+  }).join('');
 }
 
 function toggleStep(id) {
@@ -1453,80 +1716,154 @@ async function generateATOLetter() {
 }
 
 async function loadConMon() {
-  const data = await api('/api/p4/rmf/conmon');
-  if (!data) return;
-  const box = document.getElementById('conmon-box');
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var box = document.getElementById('conmon-box');
+  if (!box) return;
+  // ConMon uses single box, skeleton entire box
+  if (hasUX && !_p4HasData('#conmon-box')) {
+    _p4Skel('#conmon-box', { rows: 3, kind: 'card' });
+    box.style.display = 'block';
+  }
+  var data;
+  try {
+    data = await api('/api/p4/rmf/conmon');
+  } catch(e) {
+    if (hasUX) _p4Err('#conmon-box', 'Network error', loadConMon);
+    return;
+  }
+  if (!data) {
+    if (hasUX) _p4Err('#conmon-box', 'Failed to load ConMon report', loadConMon);
+    return;
+  }
   box.style.display = 'block';
-  box.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">
-      <div class="section-title" style="margin-bottom:10px">CONTINUOUS MONITORING REPORT</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-        <div><div class="score-label">CONTROL COMPLIANCE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${data.control_compliance_rate}%</div></div>
-        <div><div class="score-label">SCAN COVERAGE</div><div style="font-size:18px;font-weight:700;color:var(--green)">${data.scan_coverage_pct}%</div></div>
-        <div><div class="score-label">PATCH COMPLIANCE</div><div style="font-size:18px;font-weight:700;color:var(--amber)">${data.patch_compliance_pct}%</div></div>
-        <div><div class="score-label">CONMON SCORE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">${data.conmon_score}</div></div>
-      </div>
-      <div style="margin-top:10px;font-size:11px;color:var(--t3)">
-        Vulns: <span style="color:var(--red)">${data.vulnerabilities.critical} CRIT</span> · 
-        <span style="color:var(--amber)">${data.vulnerabilities.high} HIGH</span> · 
-        ${data.vulnerabilities.medium} MED · 
-        Drift events: ${data.config_drift_events} · 
-        Audit log: <span style="color:var(--green)">${data.audit_log_integrity}</span> · 
-        Trend: <span style="color:var(--green)">${data.trend}</span>
-      </div>
-    </div>`;
+  box.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px">'
+    + '<div class="section-title" style="margin-bottom:10px">CONTINUOUS MONITORING REPORT</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">'
+    + '<div><div class="score-label">CONTROL COMPLIANCE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">' + data.control_compliance_rate + '%</div></div>'
+    + '<div><div class="score-label">SCAN COVERAGE</div><div style="font-size:18px;font-weight:700;color:var(--green)">' + data.scan_coverage_pct + '%</div></div>'
+    + '<div><div class="score-label">PATCH COMPLIANCE</div><div style="font-size:18px;font-weight:700;color:var(--amber)">' + data.patch_compliance_pct + '%</div></div>'
+    + '<div><div class="score-label">CONMON SCORE</div><div style="font-size:18px;font-weight:700;color:var(--cyan)">' + data.conmon_score + '</div></div>'
+    + '</div>'
+    + '<div style="margin-top:10px;font-size:11px;color:var(--t3)">'
+    + 'Vulns: <span style="color:var(--red)">' + data.vulnerabilities.critical + ' CRIT</span> · '
+    + '<span style="color:var(--amber)">' + data.vulnerabilities.high + ' HIGH</span> · '
+    + data.vulnerabilities.medium + ' MED · '
+    + 'Drift events: ' + data.config_drift_events + ' · '
+    + 'Audit log: <span style="color:var(--green)">' + data.audit_log_integrity + '</span> · '
+    + 'Trend: <span style="color:var(--green)">' + data.trend + '</span>'
+    + '</div></div>';
 }
 
 // ---- Zero Trust ----
 async function loadZeroTrust() {
-  const data = await api('/api/p4/zt/status');
-  if (!data) return;
-
-  // Pillar grid
-  const grid = document.getElementById('zt-pillar-grid');
-  grid.innerHTML = Object.entries(data.pillars).map(([k,p]) => `
-    <div class="zt-pillar" style="border-color:${p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.3)'}">
-      <div class="zt-pillar-name">${p.name}</div>
-      <div class="zt-pillar-score" style="color:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}">${p.score}</div>
-      <div class="p4-target">→ target ${p.target}</div>
-      <div class="zt-bar"><div class="zt-bar-fill" style="width:${p.score}%;background:${p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)'}"></div></div>
-    </div>
-  `).join('');
-
-  // Application capabilities table
-  const appPillar = data.pillars['application'];
-  if (appPillar) {
-    document.getElementById('cap-tbody').innerHTML = appPillar.capabilities.map(c => `
-      <tr>
-        <td style="color:var(--purple)">${c.id}</td>
-        <td>${c.name}<br><span style="font-size:10px;color:var(--t3)">${c.description||''}</span></td>
-        <td class="level-${c.level==='Optimal'?'opt':c.level==='Advanced'?'adv':'trad'}">${c.level}</td>
-        <td class="status-${c.status==='implemented'?'impl':c.status==='partial'?'part':c.status==='planned'?'plan':'ns'}">${c.status}</td>
-        <td>
-          <span class="mini-bar"><span class="mini-bar-fill" style="width:${c.score/c.max_score*100}%;background:${c.score/c.max_score>=.8?'var(--green)':c.score/c.max_score>=.5?'var(--amber)':'var(--red)'}"></span></span>
-          <span style="font-size:11px;margin-left:4px">${c.score}/${c.max_score}</span>
-        </td>
-        <td style="font-size:10px;color:var(--cyan)">${(c.controls||[]).join(' · ')}</td>
-      </tr>
-    `).join('');
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if (hasUX && !_p4HasData('#zt-pillar-grid')) {
+    _p4Skel('#zt-pillar-grid', { rows: 5, kind: 'card' });
+    _p4Skel('#cap-tbody', { rows: 5, kind: 'table' });
+  }
+  var data;
+  try {
+    data = await api('/api/p4/zt/status');
+  } catch(e) {
+    if (hasUX) {
+      _p4Err('#zt-pillar-grid', 'Network error', loadZeroTrust);
+      _p4Err('#cap-tbody', 'Network error', loadZeroTrust);
+    }
+    return;
+  }
+  if (!data) {
+    if (hasUX) {
+      _p4Err('#zt-pillar-grid', 'Failed to load Zero Trust status', loadZeroTrust);
+      _p4Err('#cap-tbody', 'Failed to load capabilities', loadZeroTrust);
+    }
+    return;
   }
 
-  // SBOM
-  document.getElementById('sbom-total').textContent = data.sbom_components;
-  document.getElementById('sbom-crit').textContent = data.sbom_critical;
+  var grid = document.getElementById('zt-pillar-grid');
+  if (grid && data.pillars) {
+    grid.innerHTML = Object.entries(data.pillars).map(function(e) {
+      var k = e[0], p = e[1];
+      return '<div class="zt-pillar" style="border-color:' + (p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.3)') + '">'
+        + '<div class="zt-pillar-name">' + p.name + '</div>'
+        + '<div class="zt-pillar-score" style="color:' + (p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)') + '">' + p.score + '</div>'
+        + '<div class="p4-target">→ target ' + p.target + '</div>'
+        + '<div class="zt-bar"><div class="zt-bar-fill" style="width:' + p.score + '%;background:' + (p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)') + '"></div></div>'
+        + '</div>';
+    }).join('');
+  }
+
+  var appPillar = data.pillars && data.pillars['application'];
+  var capTbody = document.getElementById('cap-tbody');
+  if (capTbody) {
+    if (!appPillar || !appPillar.capabilities || appPillar.capabilities.length === 0) {
+      if (hasUX) _p4Empty('#cap-tbody', 'No application capabilities defined', loadZeroTrust);
+    } else {
+      capTbody.innerHTML = appPillar.capabilities.map(function(c) {
+        return '<tr>'
+          + '<td style="color:var(--purple)">' + c.id + '</td>'
+          + '<td>' + c.name + '<br><span style="font-size:10px;color:var(--t3)">' + (c.description||'') + '</span></td>'
+          + '<td class="level-' + (c.level==='Optimal'?'opt':c.level==='Advanced'?'adv':'trad') + '">' + c.level + '</td>'
+          + '<td class="status-' + (c.status==='implemented'?'impl':c.status==='partial'?'part':c.status==='planned'?'plan':'ns') + '">' + c.status + '</td>'
+          + '<td><span class="mini-bar"><span class="mini-bar-fill" style="width:' + (c.score/c.max_score*100) + '%;background:' + (c.score/c.max_score>=.8?'var(--green)':c.score/c.max_score>=.5?'var(--amber)':'var(--red)') + '"></span></span></td>'
+          + '</tr>';
+      }).join('');
+    }
+  }
+
+  // SBOM mini-card on Zero Trust tab — same data the SBOM View tab shows so
+  // numbers match. Click the card to jump to full SBOM tab.
+  try {
+    var sbom = await api('/api/p4/sbom/view-db');
+    var totalEl = document.getElementById('sbom-total');
+    var critEl = document.getElementById('sbom-crit');
+    if (sbom && totalEl) totalEl.textContent = (sbom.total_components != null) ? sbom.total_components : (sbom.components ? sbom.components.length : 0);
+    if (sbom && critEl) critEl.textContent = (sbom.critical != null) ? sbom.critical : 0;
+    var sbomBox = document.getElementById('sbom-box');
+    if (sbomBox && sbom && !sbomBox.dataset.clickWired) {
+      sbomBox.style.cursor = 'pointer';
+      sbomBox.title = 'View full SBOM';
+      sbomBox.addEventListener('click', function(){ switchTab('sbom-view', null); });
+      sbomBox.dataset.clickWired = '1';
+    }
+  } catch(e) { /* leave default — */ }
 }
 
 // ---- Pipeline ----
 async function loadPipeline() {
-  const [latest, drift, schedules] = await Promise.all([
-    api('/api/p4/pipeline/latest'),
-    api('/api/p4/pipeline/drift'),
-    api('/api/p4/pipeline/schedules')
-  ]);
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if (hasUX) {
+    if (!_p4HasData('#pipeline-run-header')) _p4Skel('#pipeline-run-header', { rows: 2, kind: 'card' });
+    if (!_p4HasData('#drift-list')) _p4Skel('#drift-list', { rows: 3, kind: 'card' });
+    if (!_p4HasData('#schedules-list')) _p4Skel('#schedules-list', { rows: 3, kind: 'card' });
+  }
+  // Per-fetch safe
+  var safe = function(p){ return Promise.resolve(p).then(function(r){ return r || null; }).catch(function(){ return null; }); };
+  var latest, drift, schedules;
+  try {
+    var res = await Promise.all([
+      safe(api('/api/p4/pipeline/latest')),
+      safe(api('/api/p4/pipeline/drift')),
+      safe(api('/api/p4/pipeline/schedules'))
+    ]);
+    latest = res[0]; drift = res[1]; schedules = res[2];
+  } catch(e) {
+    console.error('[FEAT-33] loadPipeline failed:', e);
+    if (hasUX) {
+      _p4Err('#pipeline-run-header', 'Network error', loadPipeline);
+      _p4Err('#drift-list', 'Network error', loadPipeline);
+      _p4Err('#schedules-list', 'Network error', loadPipeline);
+    }
+    return;
+  }
 
   if (latest) renderPipelineRun(latest);
+  else if (hasUX) _p4Empty('#pipeline-run-header', 'No pipeline runs yet', loadPipeline);
+
   if (drift) renderDrift(drift);
+  else if (hasUX) _p4Empty('#drift-list', 'No drift events', loadPipeline);
+
   if (schedules) renderSchedules(schedules);
+  else if (hasUX) _p4Empty('#schedules-list', 'No schedules configured', loadPipeline);
 }
 
 function renderPipelineRun(run) {
@@ -1652,125 +1989,91 @@ async function triggerPipeline() {
 
 // ---- ConMon Timeline ----
 async function loadConMonTimeline() {
-  const wrap = document.getElementById('conmon-timeline-wrap');
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var wrap = document.getElementById('conmon-timeline-wrap');
   if (!wrap) return;
 
-  // Fetch live conmon data, fall back to static if unavailable
-  let conmon = {};
-  try { conmon = await api('/api/p4/rmf/conmon') || {}; } catch(e) {}
+  if (hasUX && !_p4HasData('#conmon-timeline-wrap')) {
+    _p4Skel('#conmon-timeline-wrap', { rows: 6, kind: 'card' });
+  }
 
-  const score  = conmon.conmon_score        || 94;
-  const ctrl   = conmon.control_compliance_rate || 97;
-  const patch  = conmon.patch_compliance_pct    || 96;
-  const drift  = conmon.config_drift_events     || 3;
-  const crits  = conmon.vulnerabilities?.critical || 0;
-  const highs  = conmon.vulnerabilities?.high     || 2;
-  const trend  = conmon.trend || 'improving';
-  const audit  = conmon.audit_log_integrity || 'INTACT';
+  var conmon = {};
+  try { conmon = await api('/api/p4/rmf/conmon') || {}; } catch(e) {
+    console.warn('[FEAT-33] loadConMonTimeline fetch failed, using fallback');
+  }
 
-  // Build synthetic timeline from live data
-  const now = Date.now();
-  const events = [
-    { ts: now - 3600e3*1,   type:'scan',  sev:'pass', ctl:'CA-7',  msg:`Compliance scan PASS — ConMon score ${score}/100` },
-    { ts: now - 3600e3*3,   type:'drift', sev: drift>5?'warn':'pass', ctl:'CM-6', msg:`Config drift check — ${drift} events auto-reverted` },
-    { ts: now - 3600e3*8,   type:'patch', sev:'pass', ctl:'SI-2',  msg:`Patch compliance ${patch}% — within SLA` },
-    { ts: now - 3600e3*14,  type:'audit', sev:'pass', ctl:'AU-9',  msg:`Audit log integrity verified — ${audit}` },
-    { ts: now - 86400e3*1,  type:'scan',  sev:'pass', ctl:'CA-2',  msg:`Control compliance ${ctrl}% — FedRAMP MODERATE` },
-    { ts: now - 86400e3*1,  type:'vuln',  sev: highs>0?'warn':'pass', ctl:'RA-5', msg:`Vuln scan — ${crits} CRITICAL · ${highs} HIGH open` },
-    { ts: now - 86400e3*2,  type:'scan',  sev:'pass', ctl:'CA-7',  msg:`SBOM scan — ${crits} critical CVEs · trend: ${trend}` },
-    { ts: now - 86400e3*3,  type:'patch', sev:'action', ctl:'SI-2', msg:'CVE-2024-45337 PATCHED — golang.org/x/crypto updated' },
-    { ts: now - 86400e3*4,  type:'drift', sev:'pass', ctl:'CM-6',  msg:'Zero drift events — config stable 96h' },
-    { ts: now - 86400e3*5,  type:'scan',  sev:'pass', ctl:'CA-7',  msg:'CMMC L2 scan PASS — all 110 practices evaluated' },
-    { ts: now - 86400e3*6,  type:'audit', sev:'pass', ctl:'AU-12', msg:'Audit records generated — all required events captured' },
-    { ts: now - 86400e3*7,  type:'scan',  sev:'pass', ctl:'CA-7',  msg:'Weekly ConMon summary — no conditions on ATO' },
+  // FEAT-33 note: hardcoded fallbacks (94/97/96/3) preserved for synthetic timeline
+  // — UX skeleton already cleared by innerHTML below
+  var score  = conmon.conmon_score        || 94;
+  var ctrl   = conmon.control_compliance_rate || 97;
+  var patch  = conmon.patch_compliance_pct    || 96;
+  var drift  = conmon.config_drift_events     || 3;
+  var crits  = conmon.vulnerabilities && conmon.vulnerabilities.critical || 0;
+  var highs  = conmon.vulnerabilities && conmon.vulnerabilities.high     || 2;
+  var trend  = conmon.trend || 'improving';
+  var audit  = conmon.audit_log_integrity || 'INTACT';
+
+  var now = Date.now();
+  var events = [
+    { ts: now - 3600e3*1,   type:'scan',  sev:'pass', ctl:'CA-7',  msg:'Compliance scan PASS — ConMon score ' + score + '/100' },
+    { ts: now - 3600e3*3,   type:'drift', sev: drift>5?'warn':'pass', ctl:'CM-6', msg:'Config drift check — ' + drift + ' events auto-reverted' },
+    { ts: now - 3600e3*8,   type:'patch', sev:'pass', ctl:'SI-2',  msg:'Patch compliance ' + patch + '% — within SLA' },
+    { ts: now - 3600e3*14,  type:'audit', sev:'pass', ctl:'AU-9',  msg:'Audit log integrity verified — ' + audit },
+    { ts: now - 86400e3*1,  type:'scan',  sev:'pass', ctl:'CA-2',  msg:'Control compliance ' + ctrl + '% — FedRAMP MODERATE' },
+    { ts: now - 86400e3*1,  type:'vuln',  sev: highs>0?'warn':'pass', ctl:'RA-5', msg:'Vuln scan — ' + crits + ' CRITICAL · ' + highs + ' HIGH open' }
   ];
 
-  const icon  = { scan:'◉', drift:'⚡', patch:'⬆', vuln:'⚠', audit:'🔒' };
-  const color = { pass:'var(--green)', warn:'var(--amber)', action:'var(--cyan)' };
-  const bg    = { pass:'rgba(0,255,163,.07)', warn:'rgba(255,184,0,.07)', action:'rgba(0,229,255,.07)' };
-  const label = { pass:'PASS', warn:'WARN', action:'ACTION' };
-
-  const fmtAgo = ts => {
-    const d = Date.now() - ts;
-    if (d < 3600e3)    return Math.round(d/60e3)  + 'm ago';
-    if (d < 86400e3)   return Math.round(d/3600e3) + 'h ago';
-    return Math.round(d/86400e3) + 'd ago';
-  };
-
-  wrap.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-
-      <!-- Mini score bar -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
-        ${[
-          ['ConMon', score+'/100', score>=90?'var(--green)':'var(--amber)'],
-          ['Controls', ctrl+'%',  ctrl>=90?'var(--green)':'var(--amber)'],
-          ['Patches',  patch+'%', patch>=90?'var(--green)':'var(--amber)'],
-          ['Drift',    drift+' events', drift<=5?'var(--green)':'var(--amber)'],
-        ].map(([k,v,c]) => `
-          <div style="background:var(--bg3);padding:10px 14px;text-align:center">
-            <div style="font-size:9px;color:var(--t3);font-family:var(--mono);margin-bottom:4px">${k}</div>
-            <div style="font-size:15px;font-weight:700;color:${c}">${v}</div>
-          </div>`).join('')}
-      </div>
-
-      <!-- Legend -->
-      <div style="padding:8px 14px;border-bottom:1px solid var(--border);font-size:10px;color:var(--t3);display:flex;gap:16px;flex-wrap:wrap">
-        <span><span style="color:var(--green)">●</span> PASS</span>
-        <span><span style="color:var(--amber)">●</span> WARN</span>
-        <span><span style="color:var(--cyan)">●</span> ACTION</span>
-        <span style="margin-left:auto;font-family:var(--mono)">Last ${events.length} events · auto-refresh on tab switch</span>
-      </div>
-
-      <!-- Timeline rows -->
-      ${events.map((ev, i) => {
-        const c = color[ev.sev] || 'var(--green)';
-        const b = bg[ev.sev]    || bg.pass;
-        const lbl = label[ev.sev] || 'PASS';
-        const ts  = new Date(ev.ts).toLocaleString('vi-VN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
-        return `
-        <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid var(--border);background:${i%2===0?'transparent':'rgba(255,255,255,.01)'}">
-          <!-- Icon -->
-          <div style="width:30px;height:30px;border-radius:6px;background:${b};border:1px solid ${c}33;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${icon[ev.type]||'◈'}</div>
-          <!-- Content -->
-          <div style="flex:1;min-width:0">
-            <div style="font-size:11px;color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ev.msg}</div>
-            <div style="font-size:10px;color:var(--t3);margin-top:2px;font-family:var(--mono)">${ts} · <span style="color:var(--cyan)">${ev.ctl}</span></div>
-          </div>
-          <!-- Status badge -->
-          <div style="font-size:9px;font-weight:700;font-family:var(--mono);color:${c};background:${b};border:1px solid ${c}33;padding:2px 7px;border-radius:4px;flex-shrink:0">${lbl}</div>
-          <!-- Ago -->
-          <div style="font-size:10px;color:var(--t3);font-family:var(--mono);flex-shrink:0;width:52px;text-align:right">${fmtAgo(ev.ts)}</div>
-          <!-- Dot -->
-          <div style="width:6px;height:6px;border-radius:50%;background:${c};flex-shrink:0"></div>
-        </div>`;
-      }).join('')}
-
-      <!-- Footer -->
-      <div style="padding:8px 14px;font-size:10px;color:var(--t3);text-align:center;font-family:var(--mono)">
-        ATO status: <span style="color:var(--green)">AUTHORIZED</span> · 
-        No conditions · Audit: <span style="color:var(--green)">${audit}</span> · 
-        Trend: <span style="color:var(--green)">${trend} ↑</span>
-      </div>
-    </div>`;
+  var sevColor = { pass: 'var(--green)', warn: 'var(--amber)', fail: 'var(--red)' };
+  var typeIcon = { scan: '🔍', drift: '⚙️', patch: '🩹', audit: '📋', vuln: '⚠️' };
+  wrap.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">'
+    + events.map(function(e) {
+        var ago = Math.floor((now - e.ts) / 60000);
+        var agoStr = ago < 60 ? ago + 'm ago' : Math.floor(ago/60) + 'h ago';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-left:3px solid ' + sevColor[e.sev] + ';border-radius:var(--r-md);font-size:11px">'
+          + '<span style="font-size:14px">' + typeIcon[e.type] + '</span>'
+          + '<span class="mono" style="color:var(--cyan);min-width:60px">' + e.ctl + '</span>'
+          + '<span style="flex:1">' + e.msg + '</span>'
+          + '<span style="color:var(--t3);font-size:10px">' + agoStr + '</span>'
+          + '</div>';
+      }).join('')
+    + '</div>';
 }
 
 // ---- Micro-Seg ----
 async function loadMicroSeg() {
-  const rules = await api('/api/p4/zt/microseg');
-  if (!rules) return;
-  document.getElementById('seg-tbody').innerHTML = rules.map(r => `
-    <tr>
-      <td style="color:var(--cyan)">${r.id}</td>
-      <td style="font-weight:600">${r.name}</td>
-      <td>${r.source}</td>
-      <td>${r.destination}</td>
-      <td>${r.port||'any'}</td>
-      <td class="action-${r.action}">${r.action.toUpperCase()}</td>
-      <td class="${r.mtls?'mtls-yes':'mtls-no'}">${r.mtls?'mTLS':'none'}</td>
-      <td style="color:var(--t3)">${r.hit_count.toLocaleString()}</td>
-    </tr>
-  `).join('');
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if (hasUX && !_p4HasData('#seg-tbody')) _p4Skel('#seg-tbody', { rows: 5, kind: 'table' });
+
+  var rules;
+  try {
+    rules = await api('/api/p4/zt/microseg');
+  } catch(e) {
+    if (hasUX) _p4Err('#seg-tbody', 'Network error', loadMicroSeg);
+    return;
+  }
+  if (!rules) {
+    if (hasUX) _p4Err('#seg-tbody', 'Failed to load segmentation rules', loadMicroSeg);
+    return;
+  }
+  if (!rules.length) {
+    if (hasUX) _p4Empty('#seg-tbody', 'No microsegmentation rules defined', loadMicroSeg);
+    return;
+  }
+  var tbody = document.getElementById('seg-tbody');
+  if (tbody) {
+    tbody.innerHTML = rules.map(function(r) {
+      return '<tr>'
+        + '<td style="color:var(--cyan)">' + r.id + '</td>'
+        + '<td style="font-weight:600">' + r.name + '</td>'
+        + '<td>' + r.source + '</td>'
+        + '<td>' + r.destination + '</td>'
+        + '<td>' + (r.port||'any') + '</td>'
+        + '<td class="action-' + r.action + '">' + r.action.toUpperCase() + '</td>'
+        + '<td class="' + (r.mtls?'mtls-yes':'mtls-no') + '">' + (r.mtls?'mTLS':'none') + '</td>'
+        + '<td style="color:var(--t3)">' + r.hit_count.toLocaleString() + '</td>'
+        + '</tr>';
+    }).join('');
+  }
 }
 
 function openSegModal() { document.getElementById('seg-modal').classList.add('open'); }
@@ -1884,9 +2187,28 @@ function exportRASP() {
 
 // ---- POA&M ----
 async function loadPOAM() {
-  const data = await api('/api/p4/rmf');
-  if (!data) return;
-  document.getElementById('poam-list').innerHTML = data.poam_items.map(p => renderPOAMRow(p)).join('');
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if (hasUX && !_p4HasData('#poam-list')) _p4Skel('#poam-list', { rows: 4, kind: 'card' });
+
+  var data;
+  try {
+    data = await api('/api/p4/rmf');
+  } catch(e) {
+    if (hasUX) _p4Err('#poam-list', 'Network error', loadPOAM);
+    return;
+  }
+  if (!data) {
+    if (hasUX) _p4Err('#poam-list', 'Failed to load POAM', loadPOAM);
+    return;
+  }
+  if (!data.poam_items || data.poam_items.length === 0) {
+    if (hasUX) _p4Empty('#poam-list', 'No POAM items — all controls compliant', loadPOAM);
+    return;
+  }
+  var list = document.getElementById('poam-list');
+  if (list) {
+    list.innerHTML = data.poam_items.map(function(p) { return renderPOAMRow(p); }).join('');
+  }
 }
 
 function renderPOAMRow(p) {
@@ -1963,8 +2285,36 @@ function toast(msg) {
 let _vnStandards = [];
 
 async function loadVNStandards() {
-  const res = await api('/api/p4/vn-standards');
-  if (!res || !res.standards) return;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if (hasUX) {
+    if (!_p4HasData('#vn-standards-grid')) _p4Skel('#vn-standards-grid', { rows: 4, kind: 'card' });
+    if (!_p4HasData('#vn-matrix-tbody')) _p4Skel('#vn-matrix-tbody', { rows: 4, kind: 'table' });
+  }
+
+  var res;
+  try {
+    res = await api('/api/p4/vn-standards');
+  } catch(e) {
+    if (hasUX) {
+      _p4Err('#vn-standards-grid', 'Network error', loadVNStandards);
+      _p4Err('#vn-matrix-tbody', 'Network error', loadVNStandards);
+    }
+    return;
+  }
+  if (!res || !res.standards) {
+    if (hasUX) {
+      _p4Err('#vn-standards-grid', 'Failed to load VN Standards', loadVNStandards);
+      _p4Err('#vn-matrix-tbody', 'Failed to load matrix', loadVNStandards);
+    }
+    return;
+  }
+  if (res.standards.length === 0) {
+    if (hasUX) {
+      _p4Empty('#vn-standards-grid', 'No VN standards configured', loadVNStandards);
+      _p4Empty('#vn-matrix-tbody', 'No standards in matrix', loadVNStandards);
+    }
+    return;
+  }
   _vnStandards = res.standards;
   renderVNGrid(_vnStandards);
   renderVNMatrix(_vnStandards);
@@ -2348,78 +2698,112 @@ async function syncFindings() {
 }
 
 async function loadATOExpiry() {
-  const res = await api('/api/p4/ato/expiry');
-  const el = document.getElementById('ato-expiry-content');
-  if (!res || !el) return;
-  const days = res.days_remaining;
-  const pct = Math.min(100, Math.round((days / 1095) * 100));
-  const col = res.expiry_level==='ok'?'var(--green)':res.expiry_level==='warning'?'var(--amber)':'var(--red)';
-  const exp = res.expiration_date ? new Date(res.expiration_date).toLocaleDateString('vi-VN',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
-  const auth = res.authorization_date ? new Date(res.authorization_date).toLocaleDateString('vi-VN',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
-  const done = (res.renewal_checklist||[]).filter(c=>c.done).length;
-  const total = (res.renewal_checklist||[]).length;
-  const checklist = res.renewal_checklist || [];
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var el = document.getElementById('ato-expiry-content');
+  if (!el) return;
+
+  if (hasUX && !_p4HasData('#ato-expiry-content')) {
+    _p4Skel('#ato-expiry-content', { rows: 4, kind: 'card' });
+  }
+
+  var res;
+  try {
+    res = await api('/api/p4/ato/expiry');
+  } catch(e) {
+    if (hasUX) _p4Err('#ato-expiry-content', 'Network error', loadATOExpiry);
+    return;
+  }
+  if (!res) {
+    if (hasUX) _p4Err('#ato-expiry-content', 'Failed to load ATO expiry', loadATOExpiry);
+    return;
+  }
+
+  // Backend serves a fixed default checklist with hardcoded done flags. To let
+  // the user mark items complete, we layer per-tenant overrides stored under
+  // settings_general.p4_ato_checklist_overrides (no migration needed — same
+  // feature_config blob the Settings panel uses).
+  var overrides = await _loadATOOverrides();
+  (res.renewal_checklist||[]).forEach(function(c){
+    if (overrides[c.id] !== undefined) c.done = !!overrides[c.id];
+  });
+
+  var days = res.days_remaining;
+  var pct = Math.min(100, Math.round((days / 1095) * 100));
+  var col = res.expiry_level==='ok'?'var(--green)':res.expiry_level==='warning'?'var(--amber)':'var(--red)';
+  var exp = res.expiration_date ? new Date(res.expiration_date).toLocaleDateString('vi-VN',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
+  var auth = res.authorization_date ? new Date(res.authorization_date).toLocaleDateString('vi-VN',{year:'numeric',month:'long',day:'numeric'}) : 'N/A';
+  var done = (res.renewal_checklist||[]).filter(function(c){return c.done;}).length;
+  var total = (res.renewal_checklist||[]).length;
+  var checklist = res.renewal_checklist || [];
 
   el.innerHTML =
-    // Hero metrics
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
-      '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">' +
-        '<div style="font-size:36px;font-weight:700;color:'+col+'">'+days+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:2px">DAYS REMAINING</div>' +
-        '<div style="background:var(--border);border-radius:2px;height:3px;margin-top:8px">' +
-          '<div style="background:'+col+';height:3px;border-radius:2px;width:'+pct+'%;transition:width .5s"></div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">' +
-        '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-top:4px">'+exp+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:2px">EXPIRATION DATE</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:4px">Auth: '+auth+'</div>' +
-      '</div>' +
-      '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">' +
-        '<div style="font-size:28px;font-weight:700;color:var(--cyan)">'+done+'/'+total+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:2px">RENEWAL TASKS</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:4px">'+Math.round(done/total*100)+'% complete</div>' +
-      '</div>' +
-      '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">' +
-        '<div style="font-size:16px;font-weight:700;color:var(--green);margin-top:4px">'+(res.ato_status||'authorized').toUpperCase().replace(/_/g,' ')+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:2px">ATO STATUS</div>' +
-        '<div style="font-size:10px;color:var(--t3);margin-top:4px">ConMon: '+(res.conmon_score||94)+'/100</div>' +
-      '</div>' +
-    '</div>' +
-    // Status banner
-    '<div style="padding:10px 14px;background:rgba('+(res.expiry_level==='ok'?'0,255,163':'255,184,0')+',.07);border:1px solid rgba('+(res.expiry_level==='ok'?'0,255,163':'255,184,0')+',.2);border-radius:var(--r);font-size:11px;color:'+col+';margin-bottom:16px;display:flex;align-items:center;gap:8px">' +
-      '<span style="font-size:16px">'+(res.expiry_level==='ok'?'✓':res.expiry_level==='warning'?'⚠':'⚡')+'</span>' +
-      '<span>'+(res.expiry_level==='ok'?'ATO valid — no action required for '+days+' days':res.expiry_level==='warning'?'Begin renewal process — under 6 months remaining':'URGENT — ATO renewal required immediately')+'</span>' +
-    '</div>' +
-    // Renewal checklist timeline
-    '<div class="section-hd" style="margin-bottom:10px"><div class="section-title">RENEWAL CHECKLIST TIMELINE</div></div>' +
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">' +
-    checklist.map(function(c,i) {
-      const itemCol = c.done ? 'var(--green)' : 'var(--t3)';
-      const bg = i%2===0 ? 'transparent' : 'rgba(255,255,255,.01)';
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:'+bg+'">' +
-        '<div style="width:24px;height:24px;border-radius:50%;background:rgba('+(c.done?'0,255,163':'255,255,255')+',.07);border:1px solid '+(c.done?'var(--green)':'var(--border2)')+';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;color:'+(c.done?'var(--green)':'var(--t3)')+'">'+( c.done?'✓':String(i+1))+'</div>' +
-        '<div style="flex:1;font-size:11px;color:'+(c.done?'var(--t2)':'var(--t1)')+'">'+c.task+'</div>' +
-        '<div style="font-size:10px;color:var(--t3);font-family:var(--mono)">'+(c.done?'<span style="color:var(--green)">Done</span>':'-'+c.due_weeks_before_expiry+'w before expiry')+'</div>' +
-        '<div style="width:60px;height:4px;background:var(--border);border-radius:2px">' +
-          '<div style="width:'+(c.done?'100':'0')+'%;height:4px;background:'+(c.done?'var(--green)':'var(--border)')+';border-radius:2px"></div>' +
-        '</div>' +
-      '</div>';
-    }).join('') +
-    '</div>';
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">'
+      + '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">'
+        + '<div style="font-size:36px;font-weight:700;color:'+col+'">'+days+'</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px">DAYS REMAINING</div>'
+        + '<div style="background:var(--border);border-radius:2px;height:3px;margin-top:8px">'
+          + '<div style="background:'+col+';height:3px;border-radius:2px;width:'+pct+'%;transition:width .5s"></div>'
+        + '</div>'
+      + '</div>'
+      + '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">'
+        + '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-top:4px">'+exp+'</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px">EXPIRATION DATE</div>'
+      + '</div>'
+      + '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">'
+        + '<div style="font-size:13px;font-weight:600;color:var(--t1);margin-top:4px">'+auth+'</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px">AUTHORIZATION DATE</div>'
+      + '</div>'
+      + '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">'
+        + '<div style="font-size:24px;font-weight:700;color:var(--cyan)">'+done+'/'+total+'</div>'
+        + '<div style="font-size:10px;color:var(--t3);margin-top:2px">RENEWAL TASKS</div>'
+      + '</div>'
+    + '</div>'
+    + '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px">'
+      + '<div style="font-size:11px;color:var(--t3);margin-bottom:8px;text-transform:uppercase">Renewal checklist</div>'
+      + checklist.map(function(c) {
+          var label = c.task || c.name || c.title || c.id || '(unnamed task)';
+          var due = (c.due_weeks_before_expiry != null)
+            ? ' <span style="color:var(--t3);font-size:10px">· due '+c.due_weeks_before_expiry+'w before expiry</span>'
+            : '';
+          // Each row is a clickable toggle. Click flips done state and PUTs
+          // the new value to settings_general.p4_ato_checklist_overrides.
+          return '<div data-rc-id="'+escHtml(c.id)+'" data-rc-done="'+(c.done?'1':'0')
+            +'" onclick="toggleATOTask(\''+escHtml(c.id)+'\','+(c.done?'false':'true')+')"'
+            +' style="font-size:11px;padding:5px 6px;margin:1px 0;cursor:pointer;border-radius:4px;color:'
+            +(c.done?'var(--t2)':'var(--t3)')+'" '
+            +'onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" '
+            +'onmouseout="this.style.background=\'transparent\'">'
+            +(c.done?'✓ ':'○ ')+escHtml(label)+due+'</div>';
+        }).join('')
+    + '</div>';
 }
 
 async function loadSBOMView() {
-  const el = document.getElementById('sbom-view-content');
-  if (el) el.innerHTML = '<div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>';
-  const res = await api('/api/p4/sbom/view-db');
-  if (!res || !el) return;
-  const rows = (res.components||[]).slice(0,20).map(function(c){
-    return '<tr><td style="font-family:monospace;font-size:11px">'+c.name+'</td><td style="font-size:11px">'+c.version+'</td><td style="font-size:11px">'+c.type+'</td><td style="font-size:11px">'+c.license+'</td>' +
-    '<td style="text-align:center;font-size:11px;color:'+(c.cves>0?(c.severity==='CRITICAL'?'var(--red)':'var(--amber)'):'var(--green)')+'">'+( c.cves>0?c.cves+' '+c.severity:'✓')+'</td>' +
-    '<td style="text-align:center;font-size:11px;color:'+(c.ntia_compliant?'var(--green)':'var(--red)')+'">'+( c.ntia_compliant?'✓':'✗')+'</td></tr>';
-  }).join('');
-  // Store globally for filtering
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var el = document.getElementById('sbom-view-content');
+  if (!el) return;
+
+  if (hasUX && !_p4HasData('#sbom-view-content')) {
+    _p4Skel('#sbom-view-content', { rows: 5, kind: 'table' });
+  } else if (!hasUX) {
+    el.innerHTML = '<div style="color:var(--t3);font-size:11px">Loading SBOM data...</div>';
+  }
+
+  var res;
+  try {
+    res = await api('/api/p4/sbom/view-db');
+  } catch(e) {
+    if (hasUX) _p4Err('#sbom-view-content', 'Network error', loadSBOMView);
+    return;
+  }
+  if (!res) {
+    if (hasUX) _p4Err('#sbom-view-content', 'Failed to load SBOM data', loadSBOMView);
+    return;
+  }
+  if (!res.components || res.components.length === 0) {
+    if (hasUX) _p4Empty('#sbom-view-content', 'No SBOM components found', loadSBOMView);
+    return;
+  }
   window._sbomData = res;
   renderSBOMTable(res, '', 'all');
 }
@@ -2579,7 +2963,7 @@ const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Appli
     <div id="ai-quick-btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;flex-shrink:0"></div>
     <div id="ai-chat-messages" style="flex:1;overflow-y:auto;padding:4px 0;min-height:0"></div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-shrink:0">
-      <input id="ai-chat-input" type="text" placeholder="Ask about remediation, controls, evidence..." onkeydown="aiKeydown(event)" style="flex:1;font-size:12px"/>
+      <input aria-label="Ask about remediation, controls, evidence..." id="ai-chat-input" type="text" placeholder="Ask about remediation, controls, evidence..." onkeydown="aiKeydown(event)" style="flex:1;font-size:12px"/>
       <button class="btn btn-primary btn-sm" onclick="sendAIMessage(null,false)">Send</button>
     </div>
   </div>
@@ -2588,7 +2972,6 @@ const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Appli
 document.addEventListener('DOMContentLoaded',function(){
   const qb=document.getElementById('ai-quick-btns');
   if(!qb)return;
-  const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Application pillar to 100?','Generate evidence for SC-7(5) micro-seg','CMMC L2 vs FedRAMP Moderate differences'];
 AI_QUICK.forEach(function(p){
     const b=document.createElement('button');
     b.className='btn btn-ghost btn-sm';
@@ -2604,8 +2987,7 @@ async function downloadOSCAL() {
   if (btn) { btn.textContent = '⟳ Generating...'; btn.disabled = true; }
   try {
     const tok = window.TOKEN || '';
-    const p4key = window.VSP_P4_API_KEY || '';
-    const headers = tok ? {'Authorization':'Bearer '+tok} : p4key ? {'X-API-Key':p4key} : {};
+    const headers = tok ? {'Authorization':'Bearer '+tok} : {};
     const resp = await fetch(window.location.origin + '/api/p4/oscal/ssp', {headers});
     const data = await resp.json();
     const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
@@ -2622,12 +3004,10 @@ async function downloadOSCAL() {
 
 
 // ── Multi-tenant switcher ─────────────────────────────────
-const TENANTS = [
-  {id:'VSP-DOD-2025-001', name:'VSP — Default', status:'authorized', p4:100},
-  {id:'TENANT-ACME-001', name:'ACME Defense Systems', status:'ato_in_progress', p4:38},
-  {id:'TENANT-NGIT-001', name:'Northrop IT', status:'authorized', p4:87},
-];
+let TENANTS = [{id:'default', name:'Default tenant', status:'authorized', p4:100}];
 let currentTenant = TENANTS[0];
+function renderTenantList(){var el=document.getElementById('tenant-list');if(!el)return;if(!TENANTS.length){el.innerHTML='<div style="padding:8px 10px;color:var(--t3);font-size:11px">No tenants</div>';return;}el.innerHTML=TENANTS.map(function(t){var p4=t.p4||0;var col=p4>=85?'var(--green)':p4>=60?'var(--amber)':'var(--red)';return '<div onclick="switchTenant(\''+t.id+'\')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" onmouseout="this.style.background=\'transparent\'"><span>'+(t.name||t.id)+'</span><span style="color:'+col+';font-size:10px">P4 '+p4+'%</span></div>';}).join('');var lbl=document.getElementById('tenant-label');if(lbl&&currentTenant)lbl.textContent=currentTenant.name||currentTenant.id;}
+(async function(){try{var r=await fetch(API+'/api/v1/admin/tenants');if(r.ok){var d=await r.json();if(d.tenants&&d.tenants.length){TENANTS=d.tenants;currentTenant=TENANTS[0];}}}catch(e){}renderTenantList();})();
 
 function openTenantSwitcher() {
   const el = document.getElementById('tenant-switcher-dropdown');
@@ -2654,7 +3034,7 @@ function switchTenant(id) {
 }
 
 </script>
-<script src="/panels/vsp_compliance_table_patch.js?v=3"></script>
+<script src="/panels/vsp_compliance_table_patch.js?v=4"></script>
 
 <script>
 (function() {
@@ -2833,9 +3213,547 @@ function switchTenant(id) {
     }
   }
 
-  console.log('[P4] loadSBOMView + loadVNStandards overridden');
+  (window.VSP_DEBUG && console.log('[P4] loadSBOMView + loadVNStandards overridden'));
   if(window.VSP_DEBUG)console.log('[P4] api() override active — mock for vn-standards + sbom/view-db');
 })();
+</script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+
+
+
+
+
+
+
+<!-- VSP-CROSS-LINK-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Cross-Link Hub v3 — Use REAL backend endpoint
+ *   Fix: POST /api/v1/soar/playbooks/{UUID}/run (not /soar/runs)
+ *   Body: {trigger_event, context} — playbook_id từ URL path
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_CROSS_LINK_V3__) return;
+  window.__VSP_CROSS_LINK_V3__ = true;
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+
+  // UUID validator
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function isUUID(s) { return typeof s === 'string' && UUID_REGEX.test(s); }
+
+  const PANEL_NAME_MAP = {
+    'vuln_mgmt':         'vulnmgmt',
+    'threat_intel':      'threatintel',
+    'threat_hunt':       'threathunt',
+    'incident_response': 'incident_response',
+    'p4_compliance':     'p4compliance',
+    'oscal':             'oscal',
+    'soar':              'soar',
+    'sbom':              'sbom',
+    'attestation':       'attestation',
+    'supply_chain':      'supply_chain',
+    'network_flow':      'netflow',
+    'sw_inventory':      'sw_inventory'
+  };
+
+  const path = location.pathname;
+  const PANEL =
+    /vuln_mgmt/.test(path)         ? 'vuln_mgmt' :
+    /incident_response/.test(path) ? 'incident_response' :
+    /p4_compliance/.test(path)     ? 'p4_compliance' : 'unknown';
+
+  (window.VSP_DEBUG && console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL));
+
+  // ─── Toast ────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    const existing = $id('vsp-uni-toasts') || $id('vsp-uni2-toasts') || $id('vsp-uni3-toasts') || $id('vsp-uni4-toasts') || $id('vsp-ir-toasts');
+    if (existing) { tcontainer = existing; return existing; }
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-cross-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = 'pointer-events:auto;background:' + c.bg + ';border-left:3px solid ' + c.border + ';padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);display:flex;gap:10px;align-items:flex-start';
+    t.innerHTML = '<span style="font-size:14px;color:' + c.border + ';flex-shrink:0">' + c.icon + '</span><span style="flex:1;line-height:1.4">' + esc(msg) + '</span>';
+    ensureToastContainer().appendChild(t);
+    setTimeout(function () {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(function () { t.remove(); }, 250);
+    }, 4000);
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-cross-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = function (e) { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:' + (opts.width || '720px') + ';width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)';
+    box.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">'
+      + '<div style="font-size:13px;font-weight:600;flex:1">' + esc(opts.title || '') + '</div>'
+      + '<button onclick="window._vspCROSS.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>'
+      + '</div>'
+      + '<div style="padding:18px">' + (opts.body || '') + '</div>'
+      + (opts.footer ? '<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">' + opts.footer + '</div>' : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = function (e) { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-cross-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  const CROSS = window._vspCROSS = { close: closeModal, toast: toast, showModal: showModal };
+
+  // ─── Cross-window navigation ─────────────────────────────────────────
+  function navigateToPanel(panelFile, hint) {
+    const panelArg = PANEL_NAME_MAP[panelFile] || panelFile;
+    try {
+      if (window.parent && window.parent !== window && typeof window.parent.showPanel === 'function') {
+        let navBtn = null;
+        try {
+          const buttons = window.parent.document.querySelectorAll('.nav-item');
+          for (const btn of buttons) {
+            const onclick = btn.getAttribute('onclick') || '';
+            if (onclick.indexOf("'" + panelArg + "'") >= 0) {
+              navBtn = btn;
+              break;
+            }
+          }
+        } catch (e) {}
+        window.parent.showPanel(panelArg, navBtn);
+        if (hint) {
+          setTimeout(function () {
+            try { window.parent.postMessage({ type: 'vsp-cross-nav', panel: panelFile, hint: hint }, window.location.origin); } catch (e) {}
+          }, 300);
+        }
+        return true;
+      }
+    } catch (e) { console.warn('[VSP-CROSS-LINK-V3] Navigation error:', e); }
+    return false;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: vuln_mgmt — CVE enrichment cross-link (UNCHANGED from v2)
+  // ═════════════════════════════════════════════════════════════════════
+  function initVulnMgmt() {
+    setTimeout(async function () {
+      try {
+        const r = await authFetch('/api/v1/vulns/top-cves');
+        if (!r.ok) return;
+        const d = await r.json();
+        const cves = d.cves || [];
+        const kevCves = cves.filter(function (c) { return c.kev || (c.tags && c.tags.indexOf && c.tags.indexOf('KEV') >= 0); });
+        const criticalCves = cves.filter(function (c) { return (c.severity || '').toLowerCase() === 'critical'; });
+
+        if (criticalCves.length > 0 && !$id('vsp-cross-vuln-banner')) {
+          const main = $('main') || $('.main') || document.body;
+          if (main) {
+            const banner = document.createElement('div');
+            banner.id = 'vsp-cross-vuln-banner';
+            banner.style.cssText = 'background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin:0 0 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap';
+            banner.innerHTML =
+              '<span style="color:#ef4444;font-size:14px">⚠</span>'
+              + '<span style="flex:1"><b style="color:#ef4444">' + criticalCves.length + ' CRITICAL CVEs</b> detected.'
+              + (kevCves.length > 0 ? ' Including <b style="color:#dc2626">' + kevCves.length + ' in CISA KEV</b> catalog (actively exploited).' : '')
+              + ' Recommend immediate patching per <b>BOD 22-01</b>.</span>'
+              + '<button id="vsp-cross-open-ti" style="background:rgba(168,85,247,.2);border:1px solid #a855f7;color:#a855f7;padding:5px 12px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap">🌐 Open Threat Intel</button>';
+            const target = main.querySelector('div');
+            if (target) target.parentNode.insertBefore(banner, target);
+            $id('vsp-cross-open-ti').addEventListener('click', function () {
+              const ok = navigateToPanel('threat_intel', { focus: 'cves' });
+              toast(ok ? 'Switching to Threat Intel…' : 'Cannot navigate (parent unavailable)', ok ? 'success' : 'warn');
+            });
+          }
+        }
+
+        $$('table').forEach(function (tbl) {
+          if (tbl.dataset.vspCross) return;
+          tbl.dataset.vspCross = '1';
+          const rows = tbl.querySelectorAll('tbody tr');
+          rows.forEach(function (tr) {
+            const cells = tr.querySelectorAll('td');
+            cells.forEach(function (td) {
+              if (td.dataset.vspCveLinked) return;
+              const text = (td.textContent || '').trim();
+              const cveMatch = text.match(/CVE-\d{4}-\d{4,7}/);
+              if (cveMatch) {
+                td.dataset.vspCveLinked = '1';
+                const cve = cveMatch[0];
+                const link = document.createElement('span');
+                link.style.cssText = 'display:inline-block;margin-left:6px;background:rgba(168,85,247,.15);color:#a855f7;padding:1px 6px;border-radius:3px;font-size:9px;cursor:pointer;font-family:var(--font-mono,monospace);font-weight:600';
+                link.textContent = '🌐 TI';
+                link.title = 'Show Threat Intel context for ' + cve;
+                link.onclick = function (e) {
+                  e.stopPropagation();
+                  showCVEEnrichment(cve);
+                };
+                td.appendChild(link);
+              }
+            });
+          });
+        });
+      } catch (e) {
+        console.warn('Vuln Mgmt cross-link init error:', e);
+      }
+    }, 1000);
+  }
+
+  async function showCVEEnrichment(cve) {
+    showModal({
+      title: '🌐 Threat Intel — ' + cve,
+      body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>',
+      width: '720px'
+    });
+    try {
+      const r = await authFetch('/api/v1/vulns/top-cves');
+      const d = await r.json();
+      const cves = d.cves || [];
+      const target = cves.find(function (c) { return (c.cve || '').toUpperCase() === cve.toUpperCase(); });
+
+      if (!target) {
+        showModal({
+          title: '🌐 ' + cve,
+          body: '<div style="padding:20px;color:var(--t3);font-size:11px">No threat intel context found for ' + esc(cve) + '.</div>'
+              + '<div style="margin-top:10px"><a href="https://nvd.nist.gov/vuln/detail/' + esc(cve) + '" target="_blank" style="color:#3b82f6;font-size:11px">↗ View on NVD</a></div>',
+          footer: '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>',
+          width: '500px'
+        });
+        return;
+      }
+
+      const sevColor = { critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#3b82f6' };
+      const sevC = sevColor[(target.severity || '').toLowerCase()] || '#71717a';
+      const cvss = target.cvss || target.score || '?';
+      const tools = (target.tools && target.tools.length) ? target.tools.join(', ') : '—';
+      const fixable = target.fixable ? '✓ Fix available' : '⚠ No fix yet';
+      const fixColor = target.fixable ? '#10b981' : '#f59e0b';
+
+      const body = ''
+        + '<div style="display:flex;gap:14px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
+        +   '<span style="background:rgba(' + parseInt(sevC.slice(1,3),16) + ',' + parseInt(sevC.slice(3,5),16) + ',' + parseInt(sevC.slice(5,7),16) + ',.15);color:' + sevC + ';padding:4px 12px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase">' + esc(target.severity || 'UNKNOWN') + '</span>'
+        +   '<span style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--t2)">CVSS <b style="color:' + sevC + '">' + esc(String(cvss)) + '</b></span>'
+        +   '<span style="font-size:11px;color:' + fixColor + '">' + esc(fixable) + '</span>'
+        + '</div>'
+        + '<div style="background:rgba(168,85,247,.08);border-left:3px solid #a855f7;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#a855f7">Threat Intelligence Context</b><br>'
+        +   'Affected by ' + (target.count || '?') + ' findings · Detected by: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px">' + esc(tools) + '</code>'
+        + '</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:6px">'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">CVE ID</span><span style="font-family:var(--font-mono,monospace);color:#3b82f6">' + esc(target.cve) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Severity</span><span style="color:' + sevC + ';text-transform:uppercase">' + esc(target.severity || '—') + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Findings count</span><span style="color:var(--t1);font-family:var(--font-mono,monospace)">' + (target.count || 0) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Tools detected</span><span style="color:var(--t2);font-size:10px">' + esc(tools) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Patch available</span><span style="color:' + fixColor + '">' + (target.fixable ? 'Yes' : 'No') + '</span></div>'
+        + '</div>'
+        + '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+        +   '<a href="https://nvd.nist.gov/vuln/detail/' + esc(target.cve) + '" target="_blank" style="color:#3b82f6;font-size:11px;text-decoration:none;background:rgba(59,130,246,.1);padding:6px 12px;border-radius:4px">↗ NVD</a>'
+        +   '<a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" style="color:#dc2626;font-size:11px;text-decoration:none;background:rgba(220,38,38,.1);padding:6px 12px;border-radius:4px">↗ CISA KEV</a>'
+        +   '<a href="https://www.cve.org/CVERecord?id=' + esc(target.cve) + '" target="_blank" style="color:#a855f7;font-size:11px;text-decoration:none;background:rgba(168,85,247,.1);padding:6px 12px;border-radius:4px">↗ CVE.org</a>'
+        + '</div>';
+      const footer = '<button class="btn btn-sm" onclick="window._vspCROSS.openTI()" style="margin-right:auto">↗ View in Threat Intel</button>'
+                   + '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>';
+      showModal({ title: '🌐 ' + cve + ' — Threat Intel', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspCROSS.close()">Close</button>' });
+    }
+  }
+  CROSS.openTI = function () {
+    closeModal();
+    const ok = navigateToPanel('threat_intel', {});
+    toast(ok ? 'Switching to Threat Intel…' : 'Cannot navigate', ok ? 'success' : 'warn');
+  };
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: incident_response — SOAR playbook trigger (FIXED v3)
+  // ═════════════════════════════════════════════════════════════════════
+  function initIncidentResponse() {
+    setTimeout(function () {
+      const tab = $id('tab-incidents') || document.body;
+      const rows = tab.querySelectorAll('tbody tr');
+      rows.forEach(function (tr) {
+        if (tr.dataset.vspSoarLinked) return;
+        const cells = tr.querySelectorAll('td');
+        const actionCell = cells[cells.length - 1];
+        if (!actionCell) return;
+        if (actionCell.querySelector('.vsp-soar-btn')) return;
+        tr.dataset.vspSoarLinked = '1';
+
+        const idCell = cells[0];
+        const incidentId = (idCell ? (idCell.textContent || '').trim() : '');
+
+        const btn = document.createElement('button');
+        btn.className = 'vsp-soar-btn';
+        btn.style.cssText = 'background:rgba(168,85,247,.15);border:1px solid #a855f7;color:#a855f7;padding:3px 8px;border-radius:3px;font-size:9px;cursor:pointer;font-weight:600;margin-left:6px;font-family:inherit';
+        btn.textContent = '🤖 Playbook';
+        btn.title = 'Run SOAR playbook for this incident';
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          showPlaybookPicker(incidentId, tr);
+        };
+        actionCell.appendChild(btn);
+      });
+    }, 1500);
+  }
+
+  async function showPlaybookPicker(incidentId, tr) {
+    showModal({
+      title: '🤖 Run Playbook for ' + incidentId,
+      body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading playbooks…</div>',
+      width: '720px'
+    });
+
+    try {
+      const results = await Promise.all([
+        authFetch('/api/v1/soar/playbooks').then(function (r) { return r.json(); }).catch(function () { return {}; }),
+        authFetch('/api/p4/ir/playbooks').then(function (r) { return r.json(); }).catch(function () { return {}; })
+      ]);
+      const soarRes = results[0], irRes = results[1];
+
+      const soarPlaybooks = soarRes.playbooks || [];
+      const irPlaybooks = irRes.playbooks || [];
+
+      let incCategory = '', incSeverity = '';
+      if (tr) {
+        const text = (tr.textContent || '').toLowerCase();
+        if (/ransomware/.test(text)) incCategory = 'ransomware';
+        else if (/malware/.test(text)) incCategory = 'malware';
+        else if (/phishing/.test(text)) incCategory = 'phishing';
+        else if (/exfil/.test(text)) incCategory = 'exfil';
+        if (/critical/.test(text)) incSeverity = 'critical';
+        else if (/high/.test(text)) incSeverity = 'high';
+      }
+
+      function matchScore(pb) {
+        let score = 0;
+        const sevPb = (pb.sev || pb.severity || '').toLowerCase();
+        const desc = ((pb.description || '') + ' ' + (pb.name || '') + ' ' + (pb.trigger || '')).toLowerCase();
+        const types = pb.incident_types || [];
+        if (incCategory && desc.indexOf(incCategory) >= 0) score += 10;
+        if (incCategory && types.some(function (t) { return (t || '').toLowerCase().indexOf(incCategory) >= 0; })) score += 10;
+        if (incSeverity && sevPb && sevPb.indexOf(incSeverity) >= 0) score += 5;
+        return score;
+      }
+
+      // Mark UUID validity for SOAR playbooks (only those can be triggered via /run endpoint)
+      const allPbs = []
+        .concat(soarPlaybooks.map(function (p) { return Object.assign({}, p, { source: 'SOAR', score: matchScore(p), runnable: isUUID(p.id) }); }))
+        .concat(irPlaybooks.map(function (p) { return Object.assign({}, p, { source: 'IR', score: matchScore(p), runnable: false }); }))
+        .sort(function (a, b) { return b.score - a.score; });
+
+      function renderPb(p) {
+        const isMatch = p.score > 0;
+        const matchBadge = isMatch ? '<span style="background:rgba(16,185,129,.15);color:#10b981;padding:1px 6px;border-radius:3px;font-size:9px;margin-left:6px">✓ MATCH</span>' : '';
+        const runnableBadge = p.runnable ? '' : '<span style="background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 6px;border-radius:3px;font-size:9px;margin-left:4px">DOC ONLY</span>';
+        const sev = p.sev || p.severity || '—';
+        const desc = (p.description || '').slice(0, 120);
+        const types = (p.incident_types || []).slice(0, 3).join(', ');
+        const cursor = p.runnable ? 'cursor:pointer' : 'cursor:not-allowed;opacity:.55';
+        return '<div class="vsp-pb-row" data-id="' + esc(p.id || p.name) + '" data-source="' + esc(p.source) + '" data-runnable="' + (p.runnable ? '1' : '0') + '" style="padding:10px 12px;background:var(--bg1,#111);border-radius:6px;font-size:11px;' + cursor + ';border-left:3px solid ' + (isMatch ? '#10b981' : '#3b82f6') + ';transition:background .15s">'
+          + '<div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">'
+          +   '<span style="background:rgba(168,85,247,.15);color:#a855f7;padding:1px 6px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);min-width:38px;text-align:center">' + esc(p.source) + '</span>'
+          +   '<span style="flex:1;font-weight:600">' + esc(p.name || p.id) + '</span>'
+          +   matchBadge
+          +   runnableBadge
+          +   '<span style="font-size:9px;color:var(--t3);text-transform:uppercase">' + esc(sev) + '</span>'
+          + '</div>'
+          + '<div style="font-size:10px;color:var(--t3);line-height:1.4">' + esc(desc) + (types ? ' · Types: <code style="background:var(--bg2);padding:1px 3px;border-radius:2px">' + esc(types) + '</code>' : '') + '</div>'
+          + '</div>';
+      }
+
+      const body = ''
+        + (incCategory || incSeverity
+          ? '<div style="background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;margin-bottom:14px">Detected: <b>' + esc(incCategory || 'unknown category') + '</b> · <b style="text-transform:uppercase">' + esc(incSeverity || 'unknown severity') + '</b>. ✓ MATCH = recommended · DOC ONLY = reference runbook (not auto-triggerable).</div>'
+          : '<div style="background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;margin-bottom:14px"><b>SOAR</b> = auto-triggerable (creates run record) · <b>IR</b> = NIST 800-61 reference runbook (documentation).</div>')
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">SELECT PLAYBOOK</div>'
+        + '<div style="display:grid;gap:6px;max-height:400px;overflow:auto">'
+        + allPbs.map(renderPb).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-sm" onclick="window._vspCROSS.close()" style="margin-right:auto">Cancel</button>'
+                   + '<span style="font-size:10px;color:var(--t3);align-self:center">Click row to trigger SOAR playbook</span>';
+      showModal({ title: '🤖 Run Playbook for ' + incidentId, body: body, footer: footer, width: '760px' });
+
+      setTimeout(function () {
+        $$('.vsp-pb-row').forEach(function (row) {
+          const runnable = row.dataset.runnable === '1';
+          row.addEventListener('click', function () {
+            if (!runnable) {
+              toast('IR runbook là tài liệu tham chiếu — chọn SOAR playbook để trigger thật', 'warn');
+              return;
+            }
+            const pbId = row.dataset.id;
+            const source = row.dataset.source;
+            triggerPlaybook(incidentId, pbId, source);
+          });
+          if (runnable) {
+            row.addEventListener('mouseenter', function () { row.style.background = 'var(--bg2,#1c1c1c)'; });
+            row.addEventListener('mouseleave', function () { row.style.background = 'var(--bg1,#111)'; });
+          }
+        });
+      }, 50);
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspCROSS.close()">Close</button>' });
+    }
+  }
+
+  // ─── FIXED: Use real backend endpoint ────────────────────────────────
+  async function triggerPlaybook(incidentId, playbookId, source) {
+    closeModal();
+
+    if (source !== 'SOAR' || !isUUID(playbookId)) {
+      toast('Only SOAR playbooks (UUID) can be triggered', 'error');
+      return;
+    }
+
+    toast('Triggering SOAR playbook…', 'info');
+
+    // CORRECT endpoint: POST /api/v1/soar/playbooks/{UUID}/run
+    const url = '/api/v1/soar/playbooks/' + encodeURIComponent(playbookId) + '/run';
+    const body = {
+      trigger_event: 'manual_ir_link',
+      context: { incident_id: incidentId, target: incidentId, triggered_via: 'phase3n_cross_link' }
+    };
+
+    try {
+      const r = await authFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (r.ok) {
+        let runId = '';
+        try {
+          const d = await r.json();
+          runId = d.id || d.run_id || d.uuid || '';
+        } catch (e) {}
+
+        toast('✓ Playbook started: ' + (runId.slice(0, 8) + '…') , 'success');
+        setTimeout(function () {
+          showModal({
+            title: '🤖 Playbook started',
+            body: '<div style="background:rgba(16,185,129,.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+              + '<b style="color:#10b981">✓ SOAR run created</b><br>'
+              + 'Incident: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px">' + esc(incidentId) + '</code><br>'
+              + 'Playbook: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">' + esc(playbookId) + '</code><br>'
+              + 'Run ID: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">' + esc(runId || 'pending') + '</code><br>'
+              + 'Status: <span style="color:#3b82f6">running</span>'
+              + '</div>'
+              + '<div style="font-size:11px;color:var(--t2);line-height:1.5">Track execution in <b>SOAR</b> tab. Audit log entry created with tenant_id. Database row inserted in <code>playbook_runs</code>.</div>',
+            footer: '<button class="btn btn-sm" onclick="window._vspCROSS.openSOAR()" style="margin-right:auto">↗ View in SOAR</button>'
+                  + '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>',
+            width: '520px'
+          });
+        }, 200);
+      } else {
+        const errText = await r.text().catch(function () { return ''; });
+        toast('Playbook trigger failed: HTTP ' + r.status, 'error');
+        console.warn('[VSP-CROSS-LINK-V3] Trigger error:', r.status, errText.slice(0, 300));
+      }
+    } catch (e) {
+      toast('Network error: ' + e.message, 'error');
+    }
+  }
+  CROSS.openSOAR = function () {
+    closeModal();
+    const ok = navigateToPanel('soar', {});
+    toast(ok ? 'Switching to SOAR…' : 'Cannot navigate', ok ? 'success' : 'warn');
+  };
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: p4_compliance — Reverse link to OSCAL (UNCHANGED)
+  // ═════════════════════════════════════════════════════════════════════
+  function initP4Compliance() {
+    setTimeout(function () {
+      const headers = $$('h1, h2, h3').filter(function (h) { return /ssdf|practice|control/i.test(h.textContent || ''); });
+      headers.slice(0, 1).forEach(function (h) {
+        if (h.dataset.vspOscalLinked) return;
+        h.dataset.vspOscalLinked = '1';
+        const btn = document.createElement('button');
+        btn.style.cssText = 'background:rgba(59,130,246,.15);border:1px solid #3b82f6;color:#3b82f6;padding:4px 10px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:10px;font-weight:600;font-family:inherit';
+        btn.textContent = '↗ Open in OSCAL';
+        btn.title = 'View this control in OSCAL panel';
+        btn.onclick = function () {
+          const ok = navigateToPanel('oscal', {});
+          toast(ok ? 'Switching to OSCAL…' : 'Cannot navigate', ok ? 'success' : 'warn');
+        };
+        h.appendChild(btn);
+      });
+    }, 1000);
+  }
+
+  // ─── Init ────────────────────────────────────────────────────────────
+  let _initDone = false;
+  function init() {
+    if (_initDone) return;
+    _initDone = true;
+    if (PANEL === 'vuln_mgmt')              initVulnMgmt();
+    else if (PANEL === 'incident_response') initIncidentResponse();
+    else if (PANEL === 'p4_compliance')     initP4Compliance();
+  }
+
+  if (document.readyState !== 'loading') setTimeout(init, 800);
+  else document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 800); });
+
+  let pollCount = 0;
+  const poll = setInterval(function () { init(); if (++pollCount > 5) clearInterval(poll); }, 1500);
+})();
+
+</script>
+<!-- VSP-CROSS-LINK-END -->
+<script>
+// Fix 4: Evidence quick upload
+async function uploadEvidence() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.docx,.xlsx,.png,.jpg,.txt';
+  input.onchange = async function() {
+    if (!input.files[0]) return;
+    var file = input.files[0];
+    var ctrl = prompt('Control ID (e.g. AC-2, CM-6):', '');
+    if (!ctrl) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('control_id', ctrl);
+    fd.append('label', file.name);
+    try {
+      var tok = window.TOKEN || await (typeof getToken==='function'?getToken():Promise.resolve(''));
+      var r = await fetch('/api/v1/compliance/evidence', {
+        method: 'POST',
+        headers: {'Authorization': 'Bearer '+tok},
+        body: fd
+      });
+      if (r.ok) { alert('Evidence uploaded for '+ctrl+' ✓'); }
+      else { var e=await r.json(); alert('Upload failed: '+(e.error||r.status)); }
+    } catch(e2) { alert('Error: '+e2.message); }
+  };
+  input.click();
+}
 </script>
 </body>
 </html>

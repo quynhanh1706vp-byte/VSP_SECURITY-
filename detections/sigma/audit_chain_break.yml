@@ -1,0 +1,28 @@
+title: VSP — Audit chain integrity break
+id: 9d51ce82-6ad1-4c83-c2d4-vsp003
+status: stable
+description: |
+  CHAIN_BROKEN audit row indicates the SHA-256 hash chain on
+  audit_log diverged. This is either a write-side bug (rare) or
+  someone tampering with audit history. Either way, P0 — KPI sanity
+  endpoint will return HTTP 409 within 5 minutes via the watchdog.
+references:
+  - internal/audit/chain.go
+  - internal/api/handler/audit.go
+author: VSP Engineering (security@vsp.vn)
+date: 2026-05-08
+tags:
+  - attack.defense_evasion
+  - attack.t1070.002
+  - cve_audit_evidence
+logsource:
+  product: vsp
+  service: audit_log
+detection:
+  selection:
+    action: CHAIN_BROKEN
+  condition: selection
+falsepositives:
+  - Direct DB tampering for testing (should be coordinated; never run in prod)
+  - Migration script bug — investigate before assuming malicious
+level: critical

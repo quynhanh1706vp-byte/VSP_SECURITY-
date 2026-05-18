@@ -219,6 +219,10 @@ func (h *Assets) Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: asset creation expands the tenant's monitored surface;
+	// log so a reviewer can correlate "new asset added" with later
+	// finding burst on it.
+	logAudit(r, h.DB, "ASSET_CREATED", "log_sources/"+id+":"+req.Name)
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{"id": id, "name": req.Name})
 }
@@ -246,4 +250,45 @@ func calcRisk(crit, high, total int) int {
 		score = 100
 	}
 	return score
+}
+
+// DELETE /api/v1/assets/{id}
+func (h *Assets) Delete(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	id := chi.URLParam(r, "id")
+	_, err := h.DB.Pool().Exec(r.Context(),
+		"DELETE FROM log_sources WHERE id=$1 AND tenant_id=$2", id, claims.TenantID)
+	if err != nil {
+		jsonError(w, "delete failed", http.StatusInternalServerError)
+		return
+	}
+	logAudit(r, h.DB, "ASSET_DELETED", "log_sources/"+id)
+	jsonOK(w, map[string]string{"id": id, "status": "deleted"})
+}
+
+// PATCH /api/v1/assets/{id}
+func (h *Assets) Update(w http.ResponseWriter, r *http.Request) {
+	claims, _ := auth.FromContext(r.Context())
+	id := chi.URLParam(r, "id")
+	var req struct {
+		Name string   `json:"name"`
+		IP   string   `json:"ip"`
+		Env  string   `json:"env"`
+		Tags []string `json:"tags"`
+	}
+	if !decodeJSON(w, r, &req) { return }
+	_, err := h.DB.Pool().Exec(r.Context(),
+		`UPDATE log_sources SET
+		 name=COALESCE(NULLIF($3,''), name),
+		 host=COALESCE(NULLIF($4,''), host),
+		 tags=COALESCE($5, tags),
+		 updated_at=NOW()
+		 WHERE id=$1 AND tenant_id=$2`,
+		id, claims.TenantID, req.Name, req.IP, req.Tags)
+	if err != nil {
+		jsonError(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	logAudit(r, h.DB, "ASSET_UPDATED", "log_sources/"+id)
+	jsonOK(w, map[string]string{"id": id, "status": "updated"})
 }

@@ -1,0 +1,63 @@
+id: pb-intl-phish-triage
+name: User-reported phishing triage
+description: When user reports phishing via mailbox, auto-triage and quarantine across users
+trigger: manual
+sev_filter: any
+enabled: true
+tags: [email, phishing, m365, gsuite, ir]
+steps:
+  - type: enrich
+    name: Parse reported email
+    desc: Extract headers, URLs, attachments, sender reputation
+    config: |
+      parsers: [eml_headers, url_extractor, attachment_hash, dkim_spf_dmarc]
+      include_routing_chain: true
+  - type: enrich
+    name: Reputation lookup
+    desc: Check URLs/sender via threat intel
+    config: |
+      sources: [virustotal, urlhaus, phishtank, abuseipdb]
+      vt_api_key: ${VIRUSTOTAL_API_KEY}
+      cache_minutes: 60
+  - type: condition
+    name: Classify as phish?
+    desc: Threshold-based classification
+    config: |
+      expr: |
+        url.malicious_score > 0.6 OR
+        attachment.malicious_hash=true OR
+        sender.spoofed=true
+      else_action: ticket_for_review
+  - type: remediate
+    name: Mailbox-wide quarantine
+    desc: Search and quarantine across all mailboxes (M365 or Google)
+    config: |
+      provider_match:
+        - if: tenant.email=m365
+          provider: microsoft_graph
+          action: ediscovery_search_and_purge
+          tenant_id: ${M365_TENANT_ID}
+          client_id: ${M365_CLIENT_ID}
+          client_secret: ${M365_CLIENT_SECRET}
+        - if: tenant.email=gsuite
+          provider: google_workspace
+          action: vault_takeout_and_purge
+          delegated_admin: ${GSUITE_ADMIN_EMAIL}
+          sa_key: ${GSUITE_SA_KEY}
+  - type: block
+    name: Add to email gateway blocklist
+    desc: Block sender + URL at gateway level
+    config: |
+      providers: [proofpoint, mimecast, m365_atp]
+      block_sender: "${email.sender}"
+      block_urls: "${email.urls}"
+      ttl_days: 30
+  - type: notify
+    name: Thank reporter, notify SOC
+    desc: Auto-reply to reporter, notify SOC channel
+    config: |
+      provider: email
+      reply_to_reporter: true
+      reply_template: phish_thanks_reporter
+      soc_slack_channel: "#email-security"
+      soc_slack_webhook: ${SLACK_SOC_WEBHOOK}

@@ -6,22 +6,331 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	jwt "github.com/golang-jwt/jwt/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	apimw "github.com/vsp/platform/internal/api/middleware"
 )
+
+// init đăng ký MIME types đúng chuẩn để Chrome strict MIME checking không
+// chặn .js/.css. http.FileServer và http.ServeFile đều dùng mime.TypeByExtension().
+func init() {
+	mime.AddExtensionType(".js", "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".mjs", "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".css", "text/css; charset=utf-8")
+	mime.AddExtensionType(".html", "text/html; charset=utf-8")
+	mime.AddExtensionType(".json", "application/json; charset=utf-8")
+	mime.AddExtensionType(".svg", "image/svg+xml")
+	mime.AddExtensionType(".woff", "font/woff")
+	mime.AddExtensionType(".woff2", "font/woff2")
+	mime.AddExtensionType(".map", "application/json")
+}
+
+// --- Dev-stub handlers for enhanced testing ---
+func HandleContainerScan(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	id := chi.URLParam(r, "id")
+	// simple mock: report completed with a couple of findings
+	resp := map[string]interface{}{
+		"id":           id,
+		"status":       "COMPLETED",
+		"progress":     100,
+		"started_at":   time.Now().Add(-2 * time.Minute).UTC().Format(time.RFC3339),
+		"completed_at": time.Now().UTC().Format(time.RFC3339),
+		"findings": []map[string]interface{}{
+			{"id": "f1", "severity": "HIGH", "title": "Outdated base image (CVE-2025-0001)"},
+			{"id": "f2", "severity": "MEDIUM", "title": "Missing user namespace"},
+		},
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func HandleSBOM(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	rid := chi.URLParam(r, "rid")
+	// Return a minimal CycloneDX-like SBOM
+	sbom := map[string]interface{}{
+		"bomFormat":    "CycloneDX",
+		"specVersion":  "1.4",
+		"serialNumber": "urn:uuid:sbom-" + rid,
+		"components": []map[string]interface{}{
+			{"type": "library", "name": "libfoo", "version": "1.2.3", "purl": "pkg:golang/github.com/example/libfoo@1.2.3"},
+		},
+	}
+	_ = json.NewEncoder(w).Encode(sbom)
+}
+
+func HandleSBOMDiff(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	rid := chi.URLParam(r, "rid")
+	diff := map[string]interface{}{
+		"run_id": rid,
+		"ops": []map[string]interface{}{
+			{"op": "remove", "component": "libold", "version": "0.9.0"},
+			{"op": "add", "component": "libfoo", "version": "1.2.3"},
+		},
+	}
+	_ = json.NewEncoder(w).Encode(diff)
+}
+
+func HandleJWKS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	// Minimal public JWKS (dummy key) for front-end OIDC/JWKs usage
+	jwks := map[string]interface{}{
+		"keys": []map[string]interface{}{
+			{"kty": "RSA", "kid": "dev-1", "use": "sig", "alg": "RS256", "n": "somerandommodulus", "e": "AQAB"},
+		},
+	}
+	_ = json.NewEncoder(w).Encode(jwks)
+}
+
+func HandleIDPs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	idps := []map[string]interface{}{
+		{"name": "LocalOIDC", "type": "oidc", "issuer": "http://localhost:8080/api/v1/auth", "jwks_uri": "http://localhost:8080/api/v1/auth/jwks"},
+		{"name": "Okta", "type": "saml", "metadata_url": "https://example.okta.com/metadata"},
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"idps": idps})
+}
+
+func HandleContainerImages(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	role := roleFromRequest(r)
+	images := []map[string]interface{}{
+		{"id": "img-1", "ref": "vsp/api:v1.4.2", "size": "123MB", "vulns": 3},
+		{"id": "img-2", "ref": "acme/service:2.1.0", "size": "520MB", "vulns": 0},
+	}
+	if role != "admin" {
+		// non-admin: hide exact refs
+		for _, im := range images {
+			im["ref"] = "REDACTED"
+		}
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"images": images, "total": len(images)})
+}
+
+func HandleContainerAttestations(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	attest := []map[string]interface{}{
+		{"image_id": "img-1", "slsa_level": 3, "builder": "in-toto", "attested_at": time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)},
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"attestations": attest})
+}
+
+// Mock findings list and summary for frontend testing
+func HandleMockFindings(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	findings := []map[string]interface{}{
+		{"id": "F-001", "title": "RCE in widget", "severity": "CRITICAL", "tool": "gosec", "status": "open"},
+		{"id": "F-002", "title": "Outdated dependency", "severity": "HIGH", "tool": "trivy", "status": "open"},
+		{"id": "F-003", "title": "Weak permissions", "severity": "MEDIUM", "tool": "kics", "status": "in_remediation"},
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"findings": findings, "total": len(findings)})
+}
+
+func HandleMockFindingsSummary(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	summary := map[string]interface{}{"critical": 1, "high": 1, "medium": 1, "low": 0, "total": 3}
+	_ = json.NewEncoder(w).Encode(summary)
+}
+
+func HandleMockBuilds(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	builds := []map[string]interface{}{
+		{"id": "B-1001", "artifact": "vsp/api:v1.4.2", "status": "success", "slsa": 3},
+		{"id": "B-1002", "artifact": "acme/service:2.0.0", "status": "failed", "slsa": 0},
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"builds": builds, "total": len(builds)})
+}
+
+func HandleMockCSPMSummary(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	summary := map[string]interface{}{"accounts": 3, "critical": 2, "high": 10, "medium": 20}
+	_ = json.NewEncoder(w).Encode(summary)
+}
+
+func HandleMockSecrets(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	secrets := []map[string]interface{}{
+		{"name": "github-ci-token", "status": "exposed", "location": ".env"},
+		{"name": "db-password", "status": "rotated", "location": "secrets-manager"},
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"secrets": secrets, "total": len(secrets)})
+}
+
+func HandleMockMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	metrics := map[string]interface{}{"mttr_critical": 1.2, "mttr_high": 5.4, "sla_breach_rate": 0.04}
+	_ = json.NewEncoder(w).Encode(metrics)
+}
+
+// Supply-chain / SLSA mock endpoints
+func HandleSupplySign(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req map[string]interface{}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	// Return a signed bundle (base64 payload + signature placeholder)
+	out := map[string]interface{}{
+		"bundle": map[string]interface{}{
+			"payload":         req,
+			"base64Signature": "BASE64_SIGNATURE_PLACEHOLDER",
+			"publicKey":       "ssh-ed25519 AAAA...dev-key",
+			"signed_at":       time.Now().UTC().Format(time.RFC3339),
+		},
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+func HandleSupplyVerify(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	// Always return verified:true for dev-stub
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"verified": true, "trusted": true})
+}
+
+func HandleProvenanceCreate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req map[string]interface{}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	// Echo back with generated id and slsa level
+	out := map[string]interface{}{
+		"id":         fmt.Sprintf("prov-%d", time.Now().UnixNano()),
+		"artifact":   req["artifact"],
+		"slsa_level": req["slsa_level"],
+		"builder":    req["builder"],
+		"created_at": time.Now().UTC().Format(time.RFC3339),
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+func HandleProvenanceList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	// Return a couple of provenance entries including SLSA level 3 example
+	prov := []map[string]interface{}{
+		{"id": "prov-1001", "artifact": "vsp/api:v1.4.2", "slsa_level": 3, "builder": "in-toto", "created_at": time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)},
+		{"id": "prov-1002", "artifact": "acme/service:2.0.0", "slsa_level": 2, "builder": "tekton", "created_at": time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)},
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"provenance": prov, "total": len(prov)})
+}
+
+// CycloneDX VEX POST compatibility route (legacy path used by panel)
+func HandleVEXPost(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req map[string]interface{}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "vex_id": fmt.Sprintf("vex-%d", time.Now().Unix())})
+}
+
+// Generic handler for legacy /api/p4/* endpoints used by frontend panels.
+func HandleP4Generic(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	path := r.URL.Path
+	switch {
+	case strings.HasPrefix(path, "/api/p4/sbom/view-db") || strings.HasPrefix(path, "/api/p4/sbom/view"):
+		// Return a small SBOM view payload
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"artifact":   "vsp/api:v1.4.2",
+			"components": []map[string]string{{"name": "libfoo", "version": "1.2.3"}},
+		})
+	case strings.HasPrefix(path, "/api/p4/rmf"):
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ato_status": "partial", "tasks": []map[string]interface{}{{"id": "t1", "status": "open"}}})
+	case strings.HasPrefix(path, "/api/p4/pipeline/latest"):
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"id": "pl-100", "artifact": "vsp/api:v1.4.2", "status": "success", "slsa": 3})
+	case strings.HasPrefix(path, "/api/p4/zt/status"):
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"zero_trust": "enabled", "last_eval": "2026-05-06T00:00:00Z"})
+	case strings.HasPrefix(path, "/api/p4/ir/incidents"):
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"incidents": []map[string]interface{}{{"id": "inc-1", "severity": "HIGH", "title": "Simulated incident"}}})
+	case strings.HasPrefix(path, "/api/p4/pipeline/drift") || strings.HasPrefix(path, "/api/p4/pipeline/schedules"):
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+	default:
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "path": path})
+	}
+}
+
+// MintTokenHandler issues a simple HS256 JWT for dev testing.
+// POST /auth/mint with JSON {"role":"admin"} returns {"token":"..."}
+func MintTokenHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req struct {
+		Role string `json:"role"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	role := req.Role
+	if role == "" {
+		role = r.URL.Query().Get("role")
+	}
+	if role == "" {
+		role = "viewer"
+	}
+	// secret from env or default
+	secret := os.Getenv("DEV_JWT_SECRET")
+	if secret == "" {
+		secret = "dev-secret-please-change"
+	}
+	now := time.Now().UTC()
+	claims := jwt.MapClaims{
+		"sub":       "dev@vsp.local",
+		"email":     "dev@vsp.local",
+		"role":      role,
+		"tenant_id": "default",
+		"iat":       now.Unix(),
+		"exp":       now.Add(24 * time.Hour).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString([]byte(secret))
+	if err != nil {
+		http.Error(w, "failed to sign token", http.StatusInternalServerError)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]string{"token": signed})
+}
+
+// helper: extract role from Authorization Bearer token using DEV_JWT_SECRET
+func roleFromRequest(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		return ""
+	}
+	parts := strings.SplitN(auth, " ", 2)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return ""
+	}
+	tokenStr := parts[1]
+	secret := os.Getenv("DEV_JWT_SECRET")
+	if secret == "" {
+		secret = "dev-secret-please-change"
+	}
+	t, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !t.Valid {
+		return ""
+	}
+	if mc, ok := t.Claims.(jwt.MapClaims); ok {
+		if rcl, ok := mc["role"].(string); ok {
+			return rcl
+		}
+	}
+	return ""
+}
 
 func main() {
 	// ── Logger ────────────────────────────────────────────────
@@ -56,7 +365,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
-		log.Fatal().Err(err).Str("db_url", dbURL).Msg("database ping failed")
+		log.Warn().Err(err).Str("db_url", dbURL).Msg("database ping failed — continuing in dev-stub mode")
 	}
 	var dbName, dbUser string
 	db.QueryRowContext(ctx, "SELECT current_database(), current_user").Scan(&dbName, &dbUser)
@@ -69,10 +378,13 @@ func main() {
 	// ── Router ────────────────────────────────────────────────
 	r := chi.NewRouter()
 
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	// Security headers (CSP, nosniff, frame options) for dev and local testing
+	r.Use(apimw.SecurityHeaders)
+
+	r.Use(chiMiddleware.RequestID)
+	r.Use(chiMiddleware.RealIP)
+	r.Use(chiMiddleware.Logger)
+	r.Use(chiMiddleware.Recoverer)
 	// Timeout middleware - exempt SSE endpoint
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -80,13 +392,17 @@ func main() {
 				next.ServeHTTP(w, r)
 				return
 			}
-			middleware.Timeout(60*time.Second)(next).ServeHTTP(w, r)
+			chiMiddleware.Timeout(60*time.Second)(next).ServeHTTP(w, r)
 		})
 	})
-	r.Use(middleware.Compress(5, "text/html", "application/json", "text/css", "application/javascript"))
+	r.Use(chiMiddleware.Compress(5, "text/html", "application/json", "text/css", "application/javascript"))
 	r.Use(func(next http.Handler) http.Handler {
 		return CSRFMiddleware(next)
 	})
+
+	// Top-level compatibility for legacy /api/p4 endpoints used by some panels
+	r.Post("/api/p4/vex", HandleVEXPost)
+	// Note: detailed /api/p4 routes are registered in p4_real.go via RegisterP4RoutesReal
 
 	// ── Static files ──────────────────────────────────────────
 	staticDir := "./static"
@@ -129,6 +445,7 @@ func main() {
 		r.Post("/auth/password/change", stubHandler("auth.password.change"))
 		r.Post("/auth/mfa/setup", stubHandler("auth.mfa.setup"))
 		r.Post("/auth/mfa/verify", stubHandler("auth.mfa.verify"))
+		r.Post("/auth/mint", MintTokenHandler)
 
 		// VSP scan & runs
 		r.Post("/vsp/run", stubHandler("vsp.run"))
@@ -151,16 +468,29 @@ func main() {
 		r.Get("/vsp/findings/by-tool", HandleFindingsByTool(db))
 		r.Get("/vsp/run/{rid}/log", HandleRunLog(db))
 
-		// Admin
+		// Admin - role-aware response
 		r.Get("/admin/users", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"users":[
-				{"id":"u1","email":"admin@vsp.local","role":"admin","tenant_id":"default","status":"active","last_login":"2026-04-16T07:24:00Z","mfa_enabled":true},
-				{"id":"u2","email":"analyst@vsp.local","role":"analyst","tenant_id":"default","status":"active","last_login":"2026-04-15T09:00:00Z","mfa_enabled":false},
-				{"id":"u3","email":"cicd@vsp.local","role":"api","tenant_id":"default","status":"active","last_login":"2026-04-16T02:00:00Z","mfa_enabled":false},
-				{"id":"u4","email":"sec-eng@vsp.local","role":"analyst","tenant_id":"default","status":"active","last_login":"2026-04-14T14:00:00Z","mfa_enabled":true},
-				{"id":"u5","email":"viewer@vsp.local","role":"viewer","tenant_id":"default","status":"inactive","last_login":"2026-03-01T10:00:00Z","mfa_enabled":false}
-			],"total":5}`))
+			role := roleFromRequest(r)
+			if role == "admin" {
+				_, _ = w.Write([]byte(`{"users":[
+					{"id":"u1","email":"admin@vsp.local","role":"admin","tenant_id":"default","status":"active","last_login":"2026-04-16T07:24:00Z","mfa_enabled":true},
+					{"id":"u2","email":"analyst@vsp.local","role":"analyst","tenant_id":"default","status":"active","last_login":"2026-04-15T09:00:00Z","mfa_enabled":false},
+					{"id":"u3","email":"cicd@vsp.local","role":"api","tenant_id":"default","status":"active","last_login":"2026-04-16T02:00:00Z","mfa_enabled":false},
+					{"id":"u4","email":"sec-eng@vsp.local","role":"analyst","tenant_id":"default","status":"active","last_login":"2026-04-14T14:00:00Z","mfa_enabled":true},
+					{"id":"u5","email":"viewer@vsp.local","role":"viewer","tenant_id":"default","status":"inactive","last_login":"2026-03-01T10:00:00Z","mfa_enabled":false}
+				],"total":5}`))
+				return
+			}
+			if role == "analyst" {
+				_, _ = w.Write([]byte(`{"users":[
+					{"id":"u2","email":"analyst@vsp.local","role":"analyst","tenant_id":"default","status":"active","last_login":"2026-04-15T09:00:00Z","mfa_enabled":false},
+					{"id":"u4","email":"sec-eng@vsp.local","role":"analyst","tenant_id":"default","status":"active","last_login":"2026-04-14T14:00:00Z","mfa_enabled":true}
+				],"total":2}`))
+				return
+			}
+			// viewer or unauthenticated: minimal info
+			_, _ = w.Write([]byte(`{"users":[{"id":"u5","email":"viewer@vsp.local","role":"viewer","tenant_id":"default","status":"inactive"}],"total":1}`))
 		})
 		r.Post("/admin/users", stubHandler("admin.users.create"))
 
@@ -231,7 +561,10 @@ func main() {
 				{"id":"5","seq":5,"action":"SCAN_COMPLETE","user":"system","resource":"scan","ip":"127.0.0.1","detail":"Daily scan complete — 104 findings","created_at":"2026-04-15T02:30:00Z","level":"info"}
 			],"total":5}`))
 		})
-		r.Get("/audit/stats", stubHandler("audit.stats"))
+		r.Get("/audit/stats", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"total":3078,"last_24h":25,"last_7d":1100,"last_30d":2800,"unique_users":5,"unique_actions":66,"oldest":"2026-03-31T00:00:00Z","newest":"2026-05-16T12:00:00Z","archivable":0}`)
+		})
 		r.Get("/audit/monthly", stubHandler("audit.monthly"))
 		r.Post("/audit/rotate", stubHandler("audit.rotate"))
 
@@ -364,8 +697,31 @@ func main() {
 		})
 
 		// SBOM
-		r.Get("/sbom/{rid}", stubHandler("sbom"))
-		r.Get("/sbom/{rid}/diff", stubHandler("sbom.diff"))
+		r.Get("/sbom/{rid}", HandleSBOM)
+		r.Get("/sbom/{rid}/diff", HandleSBOMDiff)
+
+		// Container / CWPP mocks
+		r.Get("/container/scan/{id}", HandleContainerScan)
+		r.Get("/container/images", HandleContainerImages)
+		r.Get("/container/attestations", HandleContainerAttestations)
+
+		// Supply-chain (SLSA / signing / provenance)
+		r.Post("/supply-chain/sign", HandleSupplySign)
+		r.Post("/supply-chain/verify", HandleSupplyVerify)
+		r.Post("/supply-chain/provenance", HandleProvenanceCreate)
+		r.Get("/supply-chain/provenance", HandleProvenanceList)
+
+		// Mock endpoint collection for frontend contract testing
+		r.Get("/mock/findings", HandleMockFindings)
+		r.Get("/mock/findings/summary", HandleMockFindingsSummary)
+		r.Get("/mock/builds", HandleMockBuilds)
+		r.Get("/mock/cspm/summary", HandleMockCSPMSummary)
+		r.Get("/mock/secrets", HandleMockSecrets)
+		r.Get("/mock/metrics", HandleMockMetrics)
+
+		// Auth IDP discovery and JWKS for frontend OIDC tests
+		r.Get("/auth/idps", HandleIDPs)
+		r.Get("/auth/jwks", HandleJWKS)
 
 		// Remediation - proxy từ remediations table
 		r.Get("/remediation", HandleRemediationListReal(db))
@@ -544,24 +900,33 @@ func main() {
 	})
 
 	// Health check
-	// Proxy /api/v1/* và /api/p4/* → gateway:8921 (single auth source of truth)
-	gwTarget, _ := url.Parse("http://127.0.0.1:8921")
-	gwProxy := httputil.NewSingleHostReverseProxy(gwTarget)
-	r.HandleFunc("/api/v1/*", func(w http.ResponseWriter, r *http.Request) {
-		r.Host = gwTarget.Host
-		gwProxy.ServeHTTP(w, r)
-	})
-	r.HandleFunc("/api/p4/*", func(w http.ResponseWriter, r *http.Request) {
-		r.Host = gwTarget.Host
-		gwProxy.ServeHTTP(w, r)
-	})
+	// By default the dev-stub will NOT proxy /api/v1/* to the real gateway so
+	// local mock handlers are used. To enable proxying to a running gateway
+	// set DEVSTUB_PROXY_GATEWAY=1 in the environment.
+	if os.Getenv("DEVSTUB_PROXY_GATEWAY") == "1" {
+		gwTarget, _ := url.Parse("http://127.0.0.1:8921")
+		gwProxy := httputil.NewSingleHostReverseProxy(gwTarget)
+		r.HandleFunc("/api/v1/*", func(w http.ResponseWriter, r *http.Request) {
+			r.Host = gwTarget.Host
+			gwProxy.ServeHTTP(w, r)
+		})
+		r.HandleFunc("/api/p4/*", func(w http.ResponseWriter, r *http.Request) {
+			r.Host = gwTarget.Host
+			gwProxy.ServeHTTP(w, r)
+		})
+	}
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok","service":"VSP Security Platform","version":"v0.10.0"}`))
 	})
 
 	// ── Server ────────────────────────────────────────────────
-	addr := fmt.Sprintf("%s:%s", viper.GetString("server.host"), viper.GetString("server.port"))
+	// Allow quick override for dev-stub port via DEVSTUB_PORT env var
+	port := viper.GetString("server.port")
+	if dp := os.Getenv("DEVSTUB_PORT"); dp != "" {
+		port = dp
+	}
+	addr := fmt.Sprintf("%s:%s", viper.GetString("server.host"), port)
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      r,
@@ -597,5 +962,3 @@ func stubHandler(name string) http.HandlerFunc {
 		fmt.Fprintf(w, `{"ok":true,"stub":%q,"note":"wire real handler"}`, name)
 	}
 }
-
-func init() {}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -30,7 +31,11 @@ func (h *SIEM) List(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/siem/webhooks
 func (h *SIEM) Create(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req struct {
 		Label  string `json:"label"`
 		Type   string `json:"type"`
@@ -85,7 +90,11 @@ func (h *SIEM) Create(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/v1/siem/webhooks/{id}
 func (h *SIEM) Delete(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	h.DB.DeleteSIEMWebhook(r.Context(), claims.TenantID, id) //nolint:errcheck
 	logAudit(r, h.DB, "WEBHOOK_DELETED", "/siem/webhooks/"+id)
@@ -121,6 +130,12 @@ func (h *SIEM) Test(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 		Src:       "test",
 	}
-	go siem.Deliver(r.Context(), h.DB, testEvent)
+	// SIEM webhook delivery must survive the response — r.Context()
+	// race would silently drop the outbound HTTP POST in production.
+	go func(ev siem.Event) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		siem.Deliver(ctx, h.DB, ev)
+	}(testEvent)
 	jsonOK(w, map[string]string{"status": "test event fired", "webhook": target.Label})
 }

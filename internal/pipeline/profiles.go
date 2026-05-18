@@ -35,6 +35,14 @@ var aggrTools = map[string]bool{
 	"trivy": true, "grype": true, "license": true,
 	"gitleaks": true, "secretcheck": true,
 	"nikto": true, "nuclei": true, "sslscan": true,
+	"gosec":       true,
+	"trufflehog":  true,
+	"nmap":        true,
+	"syft":        true,
+	"govulncheck": true,
+	"osv-scanner": true,
+	"cosign":      true,
+	"retire-js":   true,
 }
 
 func filterRunners(runners []scanner.Runner, allowed map[string]bool) []scanner.Runner {
@@ -73,24 +81,30 @@ func TimeoutForProfile(profile Profile) int {
 func ToolNamesForMode(mode Mode) []string {
 	switch mode {
 	case ModeSAST:
-		return []string{"bandit", "semgrep", "codeql"}
+		return []string{"bandit", "semgrep", "codeql", "gosec"}
 	case ModeSCA:
-		return []string{"trivy", "grype", "license"}
+		// Must match RunnersFor(ModeSCA) exactly — 8 tools.
+		// cosign was missing here before 2026-05-11 → SCA runs showed 8/7.
+		return []string{"trivy", "grype", "license", "syft", "govulncheck", "osv-scanner", "cosign", "retire-js"}
 	case ModeSecrets:
-		return []string{"gitleaks", "secretcheck"}
+		return []string{"gitleaks", "secretcheck", "trufflehog"}
 	case ModeIAC:
 		return []string{"kics", "checkov", "hadolint"}
 	case ModeDAST:
 		return []string{"nikto", "nuclei", "sslscan"}
 	case ModeNetwork:
-		return []string{"netcap", "sslscan"}
-	case ModeFull:
+		return []string{"sslscan", "nmap", "netcap"}
+	case ModeFull, ModeFullSOC:
+		// 26 tools — must match pipeline.RunnersFor(ModeFull) exactly.
+		// Order: IAC · SAST · SCA · SECRETS · DAST · NETWORK · PHASE4
 		return []string{
 			"kics", "checkov", "hadolint",
-			"bandit", "semgrep", "codeql",
-			"trivy", "grype", "license",
-			"gitleaks", "secretcheck",
+			"bandit", "semgrep", "codeql", "gosec",
+			"trivy", "grype", "license", "osv-scanner", "cosign", "retire-js", "syft", "govulncheck",
+			"gitleaks", "secretcheck", "trufflehog",
 			"nikto", "nuclei", "sslscan",
+			"nmap", "netcap",
+			"apisec", "gofuzz", "racedetect",
 		}
 	default:
 		return []string{"bandit", "semgrep", "trivy", "grype", "gitleaks", "secretcheck"}

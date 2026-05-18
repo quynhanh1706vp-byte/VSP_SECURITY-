@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -95,6 +96,25 @@ func (db *DB) UpsertRemediation(ctx context.Context, r Remediation) (*Remediatio
 	return &out, nil
 }
 
+// CountRemediations — true row count for the tenant, optionally filtered
+// by status (mirrors ListRemediations filter semantics). The list query
+// caps at LIMIT 200; without this helper the handler reports
+// "total: len(list)" which jams at 200 even when the tenant has the
+// 55,712 remediations we actually see on the dashboard.
+func (db *DB) CountRemediations(ctx context.Context, tenantID, status string) (int, error) {
+	var statusFilter any
+	if status != "" {
+		statusFilter = status
+	}
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM remediations
+		WHERE tenant_id = $1
+		  AND ($2::text IS NULL OR status = $2)
+	`, tenantID, statusFilter).Scan(&n)
+	return n, err
+}
+
 func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]Remediation, error) {
 	where := "r.tenant_id=$1"
 	args := []any{tenantID}
@@ -108,8 +128,13 @@ func (db *DB) ListRemediations(ctx context.Context, tenantID, status string) ([]
 		        COALESCE(f.message,'') as title, COALESCE(f.severity,'') as severity,
 		        COALESCE(f.tool,'') as tool, COALESCE(f.rule_id,'') as rule_id
 		 FROM remediations r
-		 LEFT JOIN findings f ON f.id=r.finding_id
-		 WHERE `+where+` ORDER BY r.updated_at DESC LIMIT 200`,
+		 LEFT JOIN findings f ON f.id=r.finding_id AND f.tenant_id=r.tenant_id
+		 WHERE `+where+`
+		 ORDER BY
+		   CASE r.status WHEN 'in_progress' THEN 0 WHEN 'open' THEN 1 ELSE 2 END,
+		   CASE COALESCE(f.severity,'') WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'INFO' THEN 4 WHEN 'LOW' THEN 5 ELSE 6 END,
+		   r.updated_at DESC
+		 LIMIT 200`,
 		args...)
 	if err != nil {
 		return nil, err
@@ -226,4 +251,140 @@ func (db *DB) BulkUpsertRemediations(ctx context.Context, items []Remediation) e
 		return fmt.Errorf("bulk upsert remediation close: %w", err)
 	}
 	return tx.Commit(ctx)
+}
+
+// UpdateRemediationFields applies a partial update to a remediation row.
+// Only the keys present in `fields` are written to SQL — zero-value defaults
+// for omitted keys do NOT clobber existing data. Used by PATCH endpoints
+// where clients send only the fields they want to change.
+//
+// Allowed columns are whitelisted to prevent SQL injection via field name.
+// resolved_at is auto-set when status transitions to a terminal value.
+func (db *DB) UpdateRemediationFields(ctx context.Context, findingID, tenantID string, fields map[string]any) (*Remediation, error) {
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	allowed := map[string]bool{
+		"status": true, "assignee": true, "priority": true,
+		"notes": true, "ticket_url": true, "due_date": true,
+	}
+
+	setParts := []string{"updated_at = NOW()"}
+	args := []any{findingID, tenantID}
+	i := 3
+
+	for col, val := range fields {
+		if !allowed[col] {
+			continue
+		}
+		setParts = append(setParts, fmt.Sprintf("%s=$%d", col, i))
+		args = append(args, val)
+		i++
+	}
+
+	if len(setParts) == 1 { // only updated_at — no real fields after whitelist
+		return nil, fmt.Errorf("no allowed fields to update")
+	}
+
+	q := fmt.Sprintf(`
+		UPDATE remediations 
+		SET %s,
+		    resolved_at = CASE 
+		        WHEN status IN ('resolved','false_positive') AND resolved_at IS NULL THEN NOW()
+		        ELSE resolved_at 
+		    END
+		WHERE finding_id=$1::uuid AND tenant_id=$2::uuid
+		RETURNING id, finding_id, tenant_id, status, assignee, priority, due_date,
+		          notes, ticket_url, resolved_at, created_at, updated_at`,
+		strings.Join(setParts, ", "))
+
+	var out Remediation
+	err := db.pool.QueryRow(ctx, q, args...).Scan(
+		&out.ID, &out.FindingID, &out.TenantID, &out.Status,
+		&out.Assignee, &out.Priority, &out.DueDate, &out.Notes,
+		&out.TicketURL, &out.ResolvedAt, &out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("remediation not found for finding_id=%s", findingID)
+		}
+		return nil, fmt.Errorf("partial update remediation: %w", err)
+	}
+	return &out, nil
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Phase 1 — History audit + KPIs (added 2026-05-04)
+// ════════════════════════════════════════════════════════════════════
+
+// RemediationHistoryEntry — audit row
+type RemediationHistoryEntry struct {
+	ID        int64     `json:"id"`
+	RemID     string    `json:"rem_id"`
+	Actor     string    `json:"actor"`
+	Action    string    `json:"action"`
+	FromValue string    `json:"from"`
+	ToValue   string    `json:"to"`
+	Note      string    `json:"note"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// WriteRemediationHistory — insert audit row.
+// remID phải là remediations.id (UUID), không phải finding_id.
+func (db *DB) WriteRemediationHistory(ctx context.Context, remID, actor, action, fromV, toV, note string) error {
+	if remID == "" {
+		return fmt.Errorf("rem_id required")
+	}
+	if len(actor) > 200 {
+		actor = actor[:200]
+	}
+	if len(note) > 5000 {
+		note = note[:5000]
+	}
+	_, err := db.pool.Exec(ctx, `
+		INSERT INTO remediation_history(rem_id, actor, action, from_value, to_value, note)
+		VALUES ($1,$2,$3,$4,$5,$6)
+	`, remID, actor, action, fromV, toV, note)
+	return err
+}
+
+// ListRemediationHistory — return audit rows for a remediation, newest first.
+func (db *DB) ListRemediationHistory(ctx context.Context, remID string, limit int) ([]RemediationHistoryEntry, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 200
+	}
+	rows, err := db.pool.Query(ctx, `
+		SELECT id, rem_id, actor, action, from_value, to_value, note, created_at
+		FROM remediation_history
+		WHERE rem_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`, remID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []RemediationHistoryEntry{}
+	for rows.Next() {
+		var e RemediationHistoryEntry
+		if err := rows.Scan(&e.ID, &e.RemID, &e.Actor, &e.Action,
+			&e.FromValue, &e.ToValue, &e.Note, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// CountOverdueRemediations — items có sla_due quá hạn và còn open/in_progress.
+func (db *DB) CountOverdueRemediations(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM remediations
+		WHERE tenant_id = $1
+		  AND status IN ('open','in_progress')
+		  AND sla_due IS NOT NULL AND sla_due < NOW()
+	`, tenantID).Scan(&n)
+	return n, err
 }

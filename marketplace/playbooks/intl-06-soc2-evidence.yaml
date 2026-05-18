@@ -1,0 +1,52 @@
+id: pb-intl-soc2-evidence-collect
+name: SOC2 — quarterly evidence collection
+description: Pull SOC2 control evidence on schedule, package for audit
+trigger: manual
+sev_filter: any
+enabled: true
+tags: [soc2, compliance, audit, evidence]
+steps:
+  - type: enrich
+    name: Pull control catalog
+    desc: Load SOC2 Trust Services Criteria controls + evidence map
+    config: |
+      framework: soc2_tsc_2017
+      controls: [cc6, cc7, cc8, a1]
+      evidence_map: soc2_tsc_evidence_map.yaml
+  - type: enrich
+    name: Collect technical evidence
+    desc: Aggregate logs, scan results, access reviews
+    config: |
+      sources:
+        - vsp_scan_runs: 90d
+        - audit_logs: 90d
+        - access_reviews: latest
+        - vuln_remediation_sla: latest
+        - incident_summaries: 90d
+      redact_pii: true
+  - type: remediate
+    name: Render evidence package
+    desc: Generate audit-ready PDF + raw evidence ZIP
+    config: |
+      template: soc2_evidence_package
+      output_format: [pdf, zip]
+      output_path: /var/vsp/audit/soc2/${quarter}/
+      sign_with: ${AUDIT_SIGNING_KEY}
+  - type: ticket
+    name: Compliance review ticket
+    desc: Internal review ticket before sending to auditor
+    config: |
+      provider: jira
+      project: COMPLIANCE
+      priority: P2
+      labels: [soc2, audit, ${quarter}]
+      assignee: ${COMPLIANCE_LEAD_EMAIL}
+      sla_days: 5
+  - type: notify
+    name: Email compliance + CISO
+    desc: Notify with package link
+    config: |
+      to: [${COMPLIANCE_LEAD_EMAIL}, ${CISO_EMAIL}]
+      cc: [audit@company.com]
+      subject: "SOC2 ${quarter} evidence package ready for review"
+      attach: ${pdf_path}

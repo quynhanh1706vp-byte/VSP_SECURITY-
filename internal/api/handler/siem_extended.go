@@ -16,6 +16,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	aiPkg "github.com/vsp/platform/internal/ai"
+	"github.com/vsp/platform/internal/integrations/virustotal"
 	licenseScanner "github.com/vsp/platform/internal/scanner/license"
 	"github.com/vsp/platform/internal/scanner/secretcheck"
 	"github.com/vsp/platform/internal/store"
@@ -36,7 +37,11 @@ func (h *Correlation) ListRules(w http.ResponseWriter, r *http.Request) {
 	if rules == nil {
 		rules = []store.CorrelationRule{}
 	}
-	jsonOK(w, map[string]any{"rules": rules, "total": len(rules)})
+	totalCount, _ := h.DB.CountCorrelationRules(r.Context(), claims.TenantID)
+	if totalCount == 0 {
+		totalCount = len(rules)
+	}
+	jsonOK(w, map[string]any{"rules": rules, "total": totalCount, "page_size": len(rules)})
 }
 
 func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
@@ -50,8 +55,7 @@ func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
 		Enabled   bool     `json:"enabled"`
 	}
 	if !decodeJSON(w, r, &req) {
-		jsonError(w, "invalid body", http.StatusBadRequest)
-		return
+		return // decodeJSON already wrote the error response
 	}
 	if req.Name == "" {
 		jsonError(w, "name required", http.StatusBadRequest)
@@ -92,19 +96,29 @@ func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Correlation) ToggleRule(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	enabled, err := h.DB.ToggleCorrelationRule(r.Context(), claims.TenantID, id)
 	if err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	logAudit(r, h.DB, "CORRELATION_RULE_TOGGLED", "correlation_rules/toggle")
 	jsonOK(w, map[string]any{"id": id, "enabled": enabled})
 }
 
 func (h *Correlation) DeleteRule(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	h.DB.DeleteCorrelationRule(r.Context(), claims.TenantID, chi.URLParam(r, "id")) //nolint:errcheck
+	logAudit(r, h.DB, "CORRELATION_RULE_DELETED", "correlation_rules/delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -126,7 +140,16 @@ func (h *Correlation) ListIncidents(w http.ResponseWriter, r *http.Request) {
 	if incidents == nil {
 		incidents = []store.Incident{}
 	}
-	jsonOK(w, map[string]any{"incidents": incidents, "total": len(incidents)})
+	totalCount, _ := h.DB.CountIncidents(r.Context(), claims.TenantID,
+		r.URL.Query().Get("status"), r.URL.Query().Get("severity"))
+	if totalCount == 0 {
+		totalCount = len(incidents)
+	}
+	jsonOK(w, map[string]any{
+		"incidents": incidents,
+		"total":     totalCount,
+		"page_size": len(incidents),
+	})
 }
 
 func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
@@ -138,8 +161,7 @@ func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
 		SourceRefs json.RawMessage `json:"source_refs"`
 	}
 	if !decodeJSON(w, r, &req) {
-		jsonError(w, "invalid body", http.StatusBadRequest)
-		return
+		return // decodeJSON already wrote error
 	}
 	if req.Title == "" {
 		jsonError(w, "title required", http.StatusBadRequest)
@@ -166,12 +188,18 @@ func (h *Correlation) CreateIncident(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	logAudit(r, h.DB, "INCIDENT_CREATED", "incidents/create")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	jsonOK(w, map[string]any{"id": id, "status": "created"})
+	_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "created"})
 }
 
 func (h *Correlation) ResolveIncident(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	var req struct {
 		Status string `json:"status"`
@@ -216,11 +244,19 @@ func (h *SOAR) ListPlaybooks(w http.ResponseWriter, r *http.Request) {
 	if pbs == nil {
 		pbs = []store.Playbook{}
 	}
-	jsonOK(w, map[string]any{"playbooks": pbs, "total": len(pbs)})
+	totalCount, _ := h.DB.CountPlaybooks(r.Context(), claims.TenantID)
+	if totalCount == 0 {
+		totalCount = len(pbs)
+	}
+	jsonOK(w, map[string]any{"playbooks": pbs, "total": totalCount, "page_size": len(pbs)})
 }
 
 func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req struct {
 		Name        string          `json:"name"`
 		Description string          `json:"description"`
@@ -257,18 +293,73 @@ func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logAudit(r, h.DB, "PLAYBOOK_CREATED", "playbooks/create")
 	jsonOK(w, map[string]any{"id": id, "name": req.Name, "status": "created"})
 }
 
 func (h *SOAR) TogglePlaybook(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	enabled, err := h.DB.TogglePlaybook(r.Context(), claims.TenantID, id)
 	if err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	logAudit(r, h.DB, "PLAYBOOK_TOGGLED", "playbooks/toggle")
 	jsonOK(w, map[string]any{"id": id, "enabled": enabled})
+}
+
+
+// DELETE /api/v1/soar/playbooks/{id}
+func (h *SOAR) DeletePlaybook(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok { jsonError(w, "unauthorized", http.StatusUnauthorized); return }
+	id := chi.URLParam(r, "id")
+	_, err := h.DB.Pool().Exec(r.Context(),
+		"DELETE FROM playbooks WHERE id=$1 AND tenant_id=$2", id, claims.TenantID)
+	if err != nil { jsonError(w, "delete failed", http.StatusInternalServerError); return }
+	logAudit(r, h.DB, "PLAYBOOK_DELETED", "playbooks/"+id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/v1/soar/playbooks/{id}
+func (h *SOAR) UpdatePlaybook(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok { jsonError(w, "unauthorized", http.StatusUnauthorized); return }
+	id := chi.URLParam(r, "id")
+	var req struct {
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		Trigger     string          `json:"trigger"`
+		SevFilter   string          `json:"sev_filter"`
+		Steps       json.RawMessage `json:"steps"`
+		Enabled     *bool           `json:"enabled"`
+	}
+	if !decodeJSON(w, r, &req) { return }
+	_, err := h.DB.Pool().Exec(r.Context(),
+		`UPDATE playbooks SET
+		 name=COALESCE(NULLIF($3,''), name),
+		 description=COALESCE(NULLIF($4,''), description),
+		 trigger_event=COALESCE(NULLIF($5,''), trigger_event),
+		 sev_filter=COALESCE(NULLIF($6,''), sev_filter),
+		 steps=COALESCE($7::jsonb, steps),
+		 enabled=COALESCE($8, enabled),
+		 updated_at=NOW()
+		 WHERE id=$1 AND tenant_id=$2`,
+		id, claims.TenantID, req.Name, req.Description, req.Trigger,
+		req.SevFilter, nullJSON(req.Steps), req.Enabled)
+	if err != nil { jsonError(w, "update failed: "+err.Error(), http.StatusInternalServerError); return }
+	logAudit(r, h.DB, "PLAYBOOK_UPDATED", "playbooks/"+id)
+	jsonOK(w, map[string]string{"id": id, "status": "updated"})
+}
+
+func nullJSON(b json.RawMessage) interface{} {
+	if len(b) == 0 || string(b) == "null" { return nil }
+	return string(b)
 }
 
 func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
@@ -353,7 +444,11 @@ func (h *SOAR) RunPlaybook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SOAR) Trigger(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req struct {
 		Trigger  string `json:"trigger"`
 		Severity string `json:"severity"`
@@ -397,7 +492,11 @@ func (h *SOAR) ListRuns(w http.ResponseWriter, r *http.Request) {
 	if runs == nil {
 		runs = []store.PlaybookRun{}
 	}
-	jsonOK(w, map[string]any{"runs": runs, "total": len(runs)})
+	totalCount, _ := h.DB.CountPlaybookRuns(r.Context(), claims.TenantID)
+	if totalCount == 0 {
+		totalCount = len(runs)
+	}
+	jsonOK(w, map[string]any{"runs": runs, "total": totalCount, "page_size": len(runs)})
 }
 
 // ── Log sources ───────────────────────────────────────────────
@@ -414,11 +513,19 @@ func (h *LogSources) List(w http.ResponseWriter, r *http.Request) {
 	if sources == nil {
 		sources = []store.LogSource{}
 	}
-	jsonOK(w, map[string]any{"sources": sources, "total": len(sources)})
+	totalCount, _ := h.DB.CountLogSources(r.Context(), claims.TenantID)
+	if totalCount == 0 {
+		totalCount = len(sources)
+	}
+	jsonOK(w, map[string]any{"sources": sources, "total": totalCount, "page_size": len(sources)})
 }
 
 func (h *LogSources) Create(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req store.LogSource
 	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -444,17 +551,27 @@ func (h *LogSources) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logAudit(r, h.DB, "LOG_SOURCE_CREATED", "log_sources/create")
 	jsonOK(w, map[string]any{"id": id, "name": req.Name, "status": "created"})
 }
 
 func (h *LogSources) Delete(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	h.DB.DeleteLogSource(r.Context(), claims.TenantID, chi.URLParam(r, "id")) //nolint:errcheck
+	logAudit(r, h.DB, "LOG_SOURCE_DELETED", "log_sources/delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *LogSources) Test(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	if err := h.DB.TestLogSource(r.Context(), claims.TenantID, chi.URLParam(r, "id")); err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
@@ -473,7 +590,7 @@ func (h *LogSources) Stats(w http.ResponseWriter, r *http.Request) {
 	// Count queue (events in last 5s not yet processed)
 	var queue int
 	h.DB.Pool().QueryRow(r.Context(),
-		`SELECT COUNT(*) FROM log_events WHERE tenant_id=$1 AND created_at >= NOW()-interval'5 seconds'`,
+		`SELECT COUNT(*) FROM log_events WHERE tenant_id=$1 AND ts >= NOW()-interval'5 seconds'`,
 		claims.TenantID).Scan(&queue) //nolint:errcheck
 	jsonOK(w, map[string]any{
 		"total": total, "online": online, "errors": errCount,
@@ -501,7 +618,11 @@ func (h *ThreatIntel) ListIOCs(w http.ResponseWriter, r *http.Request) {
 	if iocs == nil {
 		iocs = []store.IOC{}
 	}
-	jsonOK(w, map[string]any{"iocs": iocs, "total": len(iocs)})
+	totalCount, _ := h.DB.CountIOCs(r.Context(), r.URL.Query().Get("type"))
+	if totalCount == 0 {
+		totalCount = len(iocs)
+	}
+	jsonOK(w, map[string]any{"iocs": iocs, "total": totalCount, "page_size": len(iocs)})
 }
 
 func (h *ThreatIntel) ListFeeds(w http.ResponseWriter, r *http.Request) {
@@ -521,7 +642,8 @@ func (h *ThreatIntel) ListFeeds(w http.ResponseWriter, r *http.Request) {
 		}
 		feeds[i] = Feed{Name: name, Status: status, IOCs: cnt, Last: "5m"}
 	}
-	jsonOK(w, map[string]any{"feeds": feeds, "total": len(feeds)})
+	// feeds is an in-memory hardcoded list of 6 sources; len(feeds) IS total.
+	jsonOK(w, map[string]any{"feeds": feeds, "total": len(feeds)}) // safe-len: in-memory derived
 }
 
 func (h *ThreatIntel) Matches(w http.ResponseWriter, r *http.Request) {
@@ -540,7 +662,11 @@ func (h *ThreatIntel) Matches(w http.ResponseWriter, r *http.Request) {
 			matched = append(matched, ioc)
 		}
 	}
-	jsonOK(w, map[string]any{"matches": matched, "total": len(matched)})
+	totalCount, _ := h.DB.CountMatchedIOCs(r.Context())
+	if totalCount == 0 {
+		totalCount = len(matched)
+	}
+	jsonOK(w, map[string]any{"matches": matched, "total": totalCount, "page_size": len(matched)})
 }
 
 func (h *ThreatIntel) MITRE(w http.ResponseWriter, r *http.Request) {
@@ -574,7 +700,14 @@ func (h *ThreatIntel) MITRE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ThreatIntel) SyncFeeds(w http.ResponseWriter, r *http.Request) {
-	go h.DB.SeedIOCsFromFindings(r.Context())
+	// IOC seed can take 10s+ on a large findings table — way past the
+	// HTTP response cycle. Pre-fix it raced r.Context() and never
+	// completed under any non-trivial dataset.
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		h.DB.SeedIOCsFromFindings(ctx)
+	}()
 	jsonOK(w, map[string]any{"status": "sync_started", "started_at": time.Now()})
 }
 
@@ -598,7 +731,7 @@ func (h *ThreatIntel) Enrich(w http.ResponseWriter, r *http.Request) {
 	}
 	enr, err := _tiClient.EnrichCVE(r.Context(), cveID)
 	if err != nil {
-		jsonError(w, err.Error(), http.StatusBadGateway)
+		jsonError(w, err.Error(), http.StatusBadGateway) // safe-err-leak: upstream webhook fetch
 		return
 	}
 	jsonOK(w, enr)
@@ -621,7 +754,8 @@ func (h *ThreatIntel) EnrichBatch(w http.ResponseWriter, r *http.Request) {
 		req.CVEs = req.CVEs[:50]
 	}
 	results := _tiClient.EnrichBatch(r.Context(), req.CVEs)
-	jsonOK(w, map[string]any{"enrichments": results, "total": len(results)})
+	// Caller-driven: results is 1-to-1 with req.CVEs (capped at 50). len IS total.
+	jsonOK(w, map[string]any{"enrichments": results, "total": len(results)}) // safe-len: input-driven
 }
 
 // GET /api/v1/vsp/findings/dedup — deduplicated findings với fingerprint
@@ -677,9 +811,11 @@ func (h *ThreatIntel) ExploitChains(w http.ResponseWriter, r *http.Request) {
 	if chains == nil {
 		chains = []threatintel.ExploitChain{}
 	}
+	// chains is the algorithm output over the 5000-finding sample. Sampled.
 	jsonOK(w, map[string]any{
-		"chains": chains,
-		"total":  len(chains),
+		"chains":      chains,
+		"total":       len(chains), // safe-len: derived (5k-finding sample)
+		"sample_size": 5000,
 	})
 }
 
@@ -733,7 +869,7 @@ func (h *ThreatIntel) SemanticAnalyze(w http.ResponseWriter, r *http.Request) {
 	analyzer := aiPkg.NewSemanticAnalyzer()
 	result, err := analyzer.AnalyzeBatch(r.Context(), findings, req.MaxItems)
 	if err != nil {
-		jsonError(w, err.Error(), http.StatusServiceUnavailable)
+		jsonError(w, err.Error(), http.StatusServiceUnavailable) // safe-err-leak: upstream NVD/EPSS fetch
 		return
 	}
 
@@ -807,7 +943,8 @@ func (h *ThreatIntel) CheckSecretBatch(w http.ResponseWriter, r *http.Request) {
 	if results == nil {
 		results = []result{}
 	}
-	jsonOK(w, map[string]any{"results": results, "total": len(results)})
+	// results derived from 100-finding gitleaks scan; reported total is sample-bound.
+	jsonOK(w, map[string]any{"results": results, "total": len(results)}) // safe-len: derived (100-finding sample)
 }
 
 // GET /api/v1/compliance/license — scan license compliance
@@ -822,8 +959,486 @@ func (h *ThreatIntel) LicenseCompliance(w http.ResponseWriter, r *http.Request) 
 	sc := licenseScanner.NewScanner(licenseScanner.DefaultPolicy)
 	result, err := sc.Scan(projectPath)
 	if err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "internal error", err)
 		return
 	}
 	jsonOK(w, result)
+}
+
+// Stats returns observability info about threat intel state.
+// GET /api/v1/ti/stats
+func (h *ThreatIntel) Stats(w http.ResponseWriter, r *http.Request) {
+	stats := _tiClient.Stats()
+	jsonOK(w, stats)
+}
+
+// RefreshKEV triggers immediate KEV catalog reload (admin only).
+// POST /api/v1/ti/kev/refresh
+func (h *ThreatIntel) RefreshKEV(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if user.Role != "admin" {
+		jsonError(w, "admin role required", http.StatusForbidden)
+		return
+	}
+	if err := _tiClient.RefreshKEV(r.Context()); err != nil {
+		jsonError(w, err.Error(), http.StatusBadGateway) // safe-err-leak: upstream webhook fetch
+		return
+	}
+	jsonOK(w, _tiClient.Stats())
+}
+
+// _vtClient is package-level singleton for VirusTotal integration.
+// Initialized once on package load. API key from VSP_VT_API_KEY env.
+var _vtClient = virustotal.NewClient()
+
+// ComponentThreat returns VirusTotal threat assessment for a SW component.
+// GET /api/v1/sw/component/:hash/threat
+// Returns 200 with verdict if VT configured, 503 if not configured,
+// 400 for invalid hash, 502 for VT API errors.
+func (h *ThreatIntel) ComponentThreat(w http.ResponseWriter, r *http.Request) {
+	hash := strings.TrimSpace(chi.URLParam(r, "hash"))
+	if hash == "" {
+		jsonError(w, "hash param required", http.StatusBadRequest)
+		return
+	}
+
+	if !_vtClient.Configured() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"error":   "virustotal not configured",
+			"hint":    "set VSP_VT_API_KEY environment variable",
+			"verdict": "unavailable",
+		})
+		return
+	}
+
+	report, err := _vtClient.GetFileReport(r.Context(), hash)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadGateway) // safe-err-leak: upstream webhook fetch
+		return
+	}
+	jsonOK(w, report)
+}
+
+// VTStats returns observability info for VirusTotal client.
+// GET /api/v1/integrations/virustotal/stats
+func (h *ThreatIntel) VTStats(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, _vtClient.Stats())
+}
+
+// ─── UI 404 FIX: Stub handlers for missing routes ─────────────────
+// These return empty data to prevent panel 404s.
+// Full implementation deferred to next sprint.
+
+// UISTubSettings serves GET /api/v1/settings/* with empty config.
+// Used by: settings panel (dast-targets, scan-config)
+func (h *ThreatIntel) UISTubSettings(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]any{
+		"items":   []any{},
+		"enabled": false,
+		"note":    "Stub endpoint — real settings storage pending",
+	})
+}
+
+// UISTubSwReport serves POST /api/v1/sw/report with stub success.
+// Used by: sw_inventory panel "Send Report" action
+func (h *ThreatIntel) UISTubSwReport(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]any{
+		"received": true,
+		"note":     "Stub endpoint — report storage pending",
+	})
+}
+
+// UISTubIntegrationsList serves GET /api/v1/integrations/* with empty list.
+// Used by: integrations panel
+func (h *ThreatIntel) UISTubIntegrationsList(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]any{
+		"integrations": []any{},
+		"note":         "Stub — only VirusTotal active. Other integrations pending.",
+	})
+}
+
+// UISTubIntegrationsTest serves POST /api/v1/integrations/{provider}/test-*
+// with stub "test passed".
+func (h *ThreatIntel) UISTubIntegrationsTest(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	if provider == "" {
+		provider = "unknown"
+	}
+	jsonOK(w, map[string]any{
+		"ok":       false,
+		"provider": provider,
+		"note":     "Stub — real test integration pending",
+	})
+}
+
+// ─── UI Real Data Handlers ─────────────────────────────────────────
+// Pattern: h.DB.Pool().QueryRow(ctx, ...) — pgx (not database/sql)
+
+// IntegrationsList serves GET /api/v1/integrations
+// Returns webhooks from siem_webhooks table.
+func (h *ThreatIntel) IntegrationsList(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT id::text, label, type, url, min_sev, active,
+		        COALESCE(last_fired::text, ''), fire_count
+		 FROM siem_webhooks
+		 WHERE tenant_id = $1
+		 ORDER BY type, label`,
+		claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type integration struct {
+		ID        string `json:"id"`
+		Label     string `json:"label"`
+		Type      string `json:"type"`
+		URL       string `json:"url"`
+		MinSev    string `json:"min_severity"`
+		Active    bool   `json:"active"`
+		LastFired string `json:"last_fired,omitempty"`
+		FireCount int    `json:"fire_count"`
+	}
+	var items []integration
+	for rows.Next() {
+		var it integration
+		if scanErr := rows.Scan(&it.ID, &it.Label, &it.Type, &it.URL,
+			&it.MinSev, &it.Active, &it.LastFired, &it.FireCount); scanErr == nil {
+			// Mask URL — show domain only
+			if idx := strings.Index(it.URL, "://"); idx > 0 {
+				rest := it.URL[idx+3:]
+				if slash := strings.Index(rest, "/"); slash > 0 {
+					it.URL = it.URL[:idx+3] + rest[:slash] + "/***"
+				}
+			}
+			items = append(items, it)
+		}
+	}
+	if items == nil {
+		items = []integration{}
+	}
+
+	providers := map[string]bool{
+		"slack":      false,
+		"teams":      false,
+		"smtp":       false,
+		"github":     false,
+		"jira":       false,
+		"servicenow": false,
+		"pagerduty":  false,
+		"virustotal": _vtClient.Configured(),
+	}
+	for _, it := range items {
+		providers[it.Type] = true
+	}
+
+	// SQL has no LIMIT — `items` is the complete set.
+	jsonOK(w, map[string]any{
+		"integrations": items,
+		"providers":    providers,
+		"total":        len(items), // safe-len: unlimited query
+	})
+}
+
+// IntegrationsTestProvider serves POST /api/v1/integrations/{provider}/test-*
+func (h *ThreatIntel) IntegrationsTestProvider(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	provider := chi.URLParam(r, "provider")
+
+	var url, providerType string
+	var active bool
+	err := h.DB.Pool().QueryRow(r.Context(),
+		`SELECT url, type, active FROM siem_webhooks
+		 WHERE tenant_id = $1 AND type = $2
+		 LIMIT 1`, claims.TenantID, provider).Scan(&url, &providerType, &active)
+
+	if err != nil {
+		jsonOK(w, map[string]any{
+			"ok":       false,
+			"provider": provider,
+			"error":    "no integration configured for this provider",
+			"hint":     "configure in integrations panel first",
+		})
+		return
+	}
+
+	if !active {
+		jsonOK(w, map[string]any{
+			"ok":       false,
+			"provider": provider,
+			"error":    "integration is disabled",
+		})
+		return
+	}
+
+	// SSRF guard: tenant-supplied webhook URL must pass the same
+	// allowlist used by the delivery path (private/loopback/RFC1918,
+	// metadata aliases, NXDOMAIN-fail-closed). Pre-fix this handler
+	// did a HEAD straight to whatever the tenant configured — letting
+	// "Test integration" pivot to 169.254.169.254 cloud-metadata.
+	if err := siem.ValidateWebhookURL(url); err != nil {
+		jsonOK(w, map[string]any{
+			"ok":       false,
+			"provider": provider,
+			"error":    "URL blocked by SSRF policy",
+		})
+		return
+	}
+
+	// HEAD ping (5s timeout)
+	req, _ := http.NewRequestWithContext(r.Context(), http.MethodHead, url, nil)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, pingErr := client.Do(req)
+	if pingErr != nil {
+		// Don't echo the network error string — it leaks the resolved
+		// URL and DNS infrastructure (the previous "endpoint
+		// unreachable: dial tcp ..." reply happily told the caller
+		// which internal IP an attacker-controlled hostname pointed at).
+		log.Warn().Err(pingErr).Str("provider", provider).Msg("integration test: ping failed")
+		jsonOK(w, map[string]any{
+			"ok":       false,
+			"provider": provider,
+			"error":    "endpoint unreachable",
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	jsonOK(w, map[string]any{
+		"ok":          resp.StatusCode < 500,
+		"provider":    provider,
+		"http_status": resp.StatusCode,
+	})
+}
+
+// SettingsScanConfig serves GET /api/v1/settings/scan-config
+// Queries policy_rules table.
+func (h *ThreatIntel) SettingsScanConfig(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT id::text, name, repo_pattern, fail_on, min_score,
+		        max_high, block_secrets, block_critical, active
+		 FROM policy_rules
+		 WHERE tenant_id = $1
+		 ORDER BY name`, claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type policyRule struct {
+		ID            string `json:"id"`
+		Name          string `json:"name"`
+		RepoPattern   string `json:"repo_pattern"`
+		FailOn        string `json:"fail_on"`
+		MinScore      int    `json:"min_score"`
+		MaxHigh       int    `json:"max_high"`
+		BlockSecrets  bool   `json:"block_secrets"`
+		BlockCritical bool   `json:"block_critical"`
+		Active        bool   `json:"active"`
+	}
+	var items []policyRule
+	for rows.Next() {
+		var p policyRule
+		if scanErr := rows.Scan(&p.ID, &p.Name, &p.RepoPattern, &p.FailOn,
+			&p.MinScore, &p.MaxHigh, &p.BlockSecrets, &p.BlockCritical, &p.Active); scanErr == nil {
+			items = append(items, p)
+		}
+	}
+	if items == nil {
+		items = []policyRule{}
+	}
+
+	// SQL has no LIMIT — items is the complete policy_rules set.
+	jsonOK(w, map[string]any{"rules": items, "total": len(items)}) // safe-len: unlimited query
+}
+
+// SettingsDastTargets serves GET /api/v1/settings/dast-targets
+// Derives from runs.target_url history.
+func (h *ThreatIntel) SettingsDastTargets(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT target_url, MAX(created_at)::text as last_scan,
+		        COUNT(*)::int as scan_count
+		 FROM runs
+		 WHERE tenant_id = $1
+		   AND target_url IS NOT NULL
+		   AND target_url != ''
+		 GROUP BY target_url
+		 ORDER BY last_scan DESC
+		 LIMIT 50`, claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type dastTarget struct {
+		URL       string `json:"url"`
+		LastScan  string `json:"last_scan"`
+		ScanCount int    `json:"scan_count"`
+	}
+	var targets []dastTarget
+	for rows.Next() {
+		var t dastTarget
+		if scanErr := rows.Scan(&t.URL, &t.LastScan, &t.ScanCount); scanErr == nil {
+			targets = append(targets, t)
+		}
+	}
+	if targets == nil {
+		targets = []dastTarget{}
+	}
+
+	totalCount, _ := h.DB.CountDastTargets(r.Context(), claims.TenantID)
+	if totalCount == 0 {
+		totalCount = len(targets)
+	}
+	jsonOK(w, map[string]any{"targets": targets, "total": totalCount, "page_size": len(targets)})
+}
+
+// SBOMIndex serves GET /api/v1/sbom — list runs với SBOM URLs.
+func (h *ThreatIntel) SBOMIndex(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool().Query(r.Context(),
+		`SELECT rid, created_at::text, mode, status, total_findings
+		 FROM runs
+		 WHERE tenant_id = $1 AND status = 'DONE'
+		 ORDER BY created_at DESC
+		 LIMIT 50`, claims.TenantID)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type sbomRun struct {
+		RID           string `json:"rid"`
+		CreatedAt     string `json:"created_at"`
+		Mode          string `json:"mode"`
+		Status        string `json:"status"`
+		TotalFindings int    `json:"total_findings"`
+		SBOMURL       string `json:"sbom_url"`
+		GrypeURL      string `json:"grype_url"`
+		DiffURL       string `json:"diff_url"`
+	}
+	var runs []sbomRun
+	for rows.Next() {
+		var s sbomRun
+		if scanErr := rows.Scan(&s.RID, &s.CreatedAt, &s.Mode, &s.Status, &s.TotalFindings); scanErr == nil {
+			s.SBOMURL = "/api/v1/sbom/" + s.RID
+			s.GrypeURL = "/api/v1/sbom/" + s.RID + "/grype"
+			s.DiffURL = "/api/v1/sbom/" + s.RID + "/diff"
+			runs = append(runs, s)
+		}
+	}
+	if runs == nil {
+		runs = []sbomRun{}
+	}
+
+	totalCount, _ := h.DB.CountSBOMRuns(r.Context(), claims.TenantID)
+	if totalCount == 0 {
+		totalCount = len(runs)
+	}
+	jsonOK(w, map[string]any{
+		"runs":      runs,
+		"total":     totalCount,
+		"page_size": len(runs),
+		"format":    "CycloneDX 1.5 (JSON)",
+	})
+}
+
+// OSCALIndex serves GET /api/p4/oscal — list of OSCAL endpoints.
+func (h *ThreatIntel) OSCALIndex(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, map[string]any{
+		"available_endpoints": []map[string]string{
+			{"path": "/api/p4/oscal/catalog", "description": "NIST 800-53 control catalog"},
+			{"path": "/api/p4/oscal/profile", "description": "VSP system profile"},
+			{"path": "/api/p4/oscal/ssp", "description": "System Security Plan"},
+			{"path": "/api/p4/oscal/ssp/extended", "description": "Extended SSP"},
+			{"path": "/api/p4/oscal/poam-extended", "description": "POA&M with metadata"},
+			{"path": "/api/p4/oscal/assessment-plan", "description": "SAP"},
+			{"path": "/api/p4/oscal/assessment-results", "description": "SAR"},
+		},
+		"version": "OSCAL 1.0.4",
+		"format":  "JSON",
+	})
+}
+
+// IntegrationsSaveProvider serves POST /api/v1/integrations/{provider}
+// Upserts webhook config into siem_webhooks table.
+func (h *ThreatIntel) IntegrationsSaveProvider(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	provider := chi.URLParam(r, "provider")
+	if provider == "" {
+		jsonError(w, "provider required", http.StatusBadRequest)
+		return
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	// Extract URL — field name differs per provider
+	urlVal := ""
+	for _, k := range []string{"url", "webhook_url", "token", "key"} {
+		if v, ok := body[k]; ok {
+			if s, ok := v.(string); ok && s != "" {
+				urlVal = s
+				break
+			}
+		}
+	}
+	label := provider
+	if n, ok := body["name"].(string); ok && n != "" {
+		label = n
+	}
+
+	_, err := h.DB.Pool().Exec(r.Context(), `
+		INSERT INTO siem_webhooks (tenant_id, label, type, url, min_sev, active)
+		VALUES ($1, $2, $3, $4, 'LOW', true)`,
+		claims.TenantID, label, provider, urlVal)
+	if err != nil {
+		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{"ok": true, "provider": provider})
 }

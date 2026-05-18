@@ -1,0 +1,108 @@
+version: 1
+generated_at: "2026-05-05"
+source: vsp-marketplace-bootstrap-batch-1
+total: 20
+templates:
+  # === VN-specific (10) ===
+  - file: vn-01-cmc-soc-handoff.yaml
+    id: pb-vn-cmc-soc-handoff
+    region: vn
+    category: ticketing
+    summary: Forward CRITICAL/HIGH findings to CMC SOC ticketing system
+  - file: vn-02-bottt-tt13-report.yaml
+    id: pb-vn-bottt-compliance-report
+    region: vn
+    category: compliance
+    summary: Auto-generate Bộ TT&TT TT13/2023 incident report (Vietnamese)
+  - file: vn-03-viettel-cloud-isolate.yaml
+    id: pb-vn-viettel-cloud-isolate
+    region: vn
+    category: containment
+    summary: Network-isolate Viettel Cloud VM on critical compromise
+  - file: vn-04-vncert-ioc-sweep.yaml
+    id: pb-vn-vncert-ioc-sweep
+    region: vn
+    category: threat-hunt
+    summary: Sweep infrastructure with new VNCERT IOC feed
+  - file: vn-05-banking-nhnn-tt09.yaml
+    id: pb-vn-banking-pci-incident
+    region: vn
+    category: compliance
+    summary: PCI scope incident — NHNN TT09 4-hour reporting workflow
+  - file: vn-06-zalo-oa-alert.yaml
+    id: pb-vn-zalo-oa-soc-alert
+    region: vn
+    category: notification
+    summary: SOC oncall alert via Zalo Official Account, Slack fallback
+  - file: vn-07-govvn-cert-monitor.yaml
+    id: pb-vn-govvn-cert-monitor
+    region: vn
+    category: monitoring
+    summary: TLS cert expiry monitor for *.gov.vn / *.org.vn
+  - file: vn-08-malicious-ip-block.yaml
+    id: pb-vn-malicious-ip-block
+    region: vn
+    category: blocklist
+    summary: Sync VNCERT/BKAV/ViettelCS IP blocklists to WAF + iptables
+  - file: vn-09-secret-rotate.yaml
+    id: pb-vn-secret-rotate
+    region: vn
+    category: secrets
+    summary: Rotate leaked credential at provider, block CI, notify dev (VN)
+  - file: vn-10-soc-daily-digest.yaml
+    id: pb-vn-soc-daily-digest
+    region: vn
+    category: reporting
+    summary: Daily SOC digest (Vietnamese) — 8AM Asia/Ho_Chi_Minh
+
+  # === International (10) ===
+  - file: intl-01-slack-ir-channel.yaml
+    id: pb-intl-slack-ir-channel
+    region: intl
+    category: incident-response
+    summary: Auto-create #inc-* Slack channel + invite responders for CRITICAL
+  - file: intl-02-aws-guardduty-triage.yaml
+    id: pb-intl-aws-guardduty-triage
+    region: intl
+    category: cloud
+    summary: AWS GuardDuty finding triage with team-based routing
+  - file: intl-03-pagerduty-escalation.yaml
+    id: pb-intl-pagerduty-escalation
+    region: intl
+    category: escalation
+    summary: Tiered PD escalation, SMS to CISO if no L1 ack in 10min
+  - file: intl-04-github-secret-revoke.yaml
+    id: pb-intl-github-secret-revoke
+    region: intl
+    category: secrets
+    summary: GitHub push-protection secret leak — auto-revoke + remediate
+  - file: intl-05-crowdstrike-contain.yaml
+    id: pb-intl-crowdstrike-contain
+    region: intl
+    category: edr
+    summary: CrowdStrike Falcon network containment + IR ticket
+  - file: intl-06-soc2-evidence.yaml
+    id: pb-intl-soc2-evidence-collect
+    region: intl
+    category: compliance
+    summary: SOC2 quarterly evidence collection + audit package
+  - file: intl-07-sentinel-forward.yaml
+    id: pb-intl-sentinel-forward
+    region: intl
+    category: siem
+    summary: Forward VSP findings to Microsoft Sentinel (ASIM-compliant)
+  - file: intl-08-phish-triage.yaml
+    id: pb-intl-phish-triage
+    region: intl
+    category: email-security
+    summary: User-reported phishing — auto-quarantine M365/GSuite mailbox-wide
+  - file: intl-09-cf-waf-ratelimit.yaml
+    id: pb-intl-cf-waf-ratelimit
+    region: intl
+    category: ddos
+    summary: Cloudflare adaptive rate-limit on attack pattern
+  - file: intl-10-cisa-kev-prioritize.yaml
+    id: pb-intl-cisa-kev-prioritize
+    region: intl
+    category: vulnerability-management
+    summary: CISA KEV — find affected assets, accelerate to BOD 22-01 SLA

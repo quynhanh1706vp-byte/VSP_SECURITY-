@@ -73,6 +73,41 @@ func TestHash_ChainIntegrity(t *testing.T) {
 	}
 }
 
+// L31 2026-05-09: pin TenantID inclusion in the hash. The mutation
+// L11 13.2.A3 drops TenantID from the format string and previously
+// every test still passed — that vacuous coverage allowed forging an
+// entry that would hash-match across tenants. This pin breaks the
+// moment someone alters the hash format.
+func TestHash_TenantIDInHash(t *testing.T) {
+	base := Entry{Seq: 1, TenantID: "tenant-A", Action: "LOGIN", Resource: "/login", PrevHash: ""}
+	other := base
+	other.TenantID = "tenant-B"
+	if Hash(base) == Hash(other) {
+		t.Error("TenantID must be included in hash — different tenants must produce different hashes")
+	}
+}
+
+// L31: pin Resource + PrevHash inclusion (defense in depth). Mutations
+// dropping either should break this.
+func TestHash_AllFieldsContribute(t *testing.T) {
+	base := Entry{Seq: 1, TenantID: "t1", Action: "LOGIN", Resource: "/login", PrevHash: "abc"}
+	cases := []struct {
+		name string
+		mut  func(*Entry)
+	}{
+		{"Resource", func(e *Entry) { e.Resource = "/different" }},
+		{"PrevHash", func(e *Entry) { e.PrevHash = "different" }},
+	}
+	baseHash := Hash(base)
+	for _, c := range cases {
+		variant := base
+		c.mut(&variant)
+		if Hash(variant) == baseHash {
+			t.Errorf("changing %s must change hash — currently doesn't (vacuous coverage)", c.name)
+		}
+	}
+}
+
 func TestHash_UserIDNotInHash(t *testing.T) {
 	// UserID intentionally not in hash format — verify stability
 	e1 := Entry{Seq: 1, TenantID: "t1", Action: "LOGIN", UserID: "user-a", PrevHash: ""}

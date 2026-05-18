@@ -1,0 +1,33 @@
+title: VSP — Impossible travel for a single user
+id: 8c40bd71-5fe8-4a92-b1c3-vsp002
+status: stable
+description: |
+  Detects successful logins for the same user from two distinct /16
+  networks within 30 min — physically implausible, indicates either
+  account compromise or VPN-hopping (note in falsepositives).
+  VSP's UEBA anomaly_revoke worker auto-revokes on this; the rule
+  exposes the same signal for SIEM correlation.
+references:
+  - https://attack.mitre.org/techniques/T1078/
+  - internal/auth/anomaly_revoke.go
+author: VSP Engineering (security@vsp.vn)
+date: 2026-05-08
+tags:
+  - attack.initial_access
+  - attack.t1078
+  - attack.t1078.004
+logsource:
+  product: vsp
+  service: audit_log
+detection:
+  selection:
+    action: LOGIN_OK
+  timeframe: 30m
+  condition: |
+    selection
+      | count(distinct(network_16(ip))) by user_id > 2
+falsepositives:
+  - User on corporate VPN with rapidly rotating egress IPs
+  - User legitimately travelling and using mobile + laptop
+  - Service account shared across multiple regional deployments (anti-pattern)
+level: high

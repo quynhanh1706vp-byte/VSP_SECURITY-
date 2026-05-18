@@ -1,0 +1,52 @@
+id: pb-intl-sentinel-forward
+name: Forward incidents to Microsoft Sentinel
+description: Push VSP incidents to Sentinel via Logs Ingestion API for unified SOC view
+trigger: critical_finding
+sev_filter: HIGH
+enabled: true
+tags: [microsoft, sentinel, siem, forwarding]
+steps:
+  - type: enrich
+    name: Format ASIM-compliant payload
+    desc: Map VSP finding fields to Sentinel ASIM schema
+    config: |
+      schema: asim_security_event
+      mapping:
+        EventVendor: VSP
+        EventProduct: VSP-Scanner
+        EventSeverity: "${finding.severity}"
+        TargetHostname: "${asset.hostname}"
+        EventOriginalUid: "${finding.id}"
+        AdditionalFields:
+          rule_id: "${finding.rule_id}"
+          cvss: "${finding.cvss}"
+          epss: "${finding.epss}"
+          kev: "${finding.kev}"
+  - type: notify
+    name: POST to Sentinel Logs Ingestion API
+    desc: Authenticated push to DCE endpoint
+    config: |
+      provider: azure_logs_ingestion
+      dce_endpoint: ${AZURE_DCE_ENDPOINT}
+      dcr_immutable_id: ${AZURE_DCR_ID}
+      stream_name: Custom-VSPSecurityEvents_CL
+      tenant_id: ${AZURE_TENANT_ID}
+      client_id: ${AZURE_CLIENT_ID}
+      client_secret: ${AZURE_CLIENT_SECRET}
+  - type: condition
+    name: Verify ingestion
+    desc: Confirm 2xx response, retry on 429
+    config: |
+      retry_policy:
+        max_attempts: 3
+        backoff: exponential
+        retry_on: [429, 503]
+  - type: notify
+    name: Notify on failure only
+    desc: Slack notify if forward fails after retries
+    config: |
+      only_if: previous_step.failed=true
+      provider: slack
+      channel: "#siem-ops"
+      webhook_url: ${SLACK_OPS_WEBHOOK}
+      template: sentinel_forward_failure

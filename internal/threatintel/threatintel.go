@@ -81,10 +81,13 @@ func (c *Cache) evict() {
 // ── Client ─────────────────────────────────────────────────────────────────
 
 type Client struct {
-	http   *http.Client
-	cache  *Cache
-	kevSet map[string]bool // KEV CVE IDs
-	kevMu  sync.RWMutex
+	http        *http.Client
+	cache       *Cache
+	kevSet      map[string]bool // KEV CVE IDs
+	kevMu       sync.RWMutex
+	mu          sync.RWMutex
+	kevLoadedAt time.Time
+	kevSource   string
 }
 
 func NewClient() *Client {
@@ -308,11 +311,12 @@ func (c *Client) fetchEPSS(ctx context.Context, cveID string, enr *CVEEnrichment
 // Fix 2026-04-17: set UA (bypass Akamai 403), check HTTP status,
 // use working GitHub mirror, avoid defer-in-loop leak.
 func (c *Client) LoadKEV(ctx context.Context) error {
-	// Primary: CISA direct. Fallback: cisagov/kev-data GitHub mirror.
-	// (The old cisagov/known-exploited-vulnerabilities repo returns 404.)
+	// Primary: cisagov/kev-data GitHub mirror (reliable, no Akamai 403).
+	// Fallback: CISA direct (often returns 403 from server-side userland).
+	// Order swapped 2026-04-28 — Github mirror loads cleanly without warning spam.
 	urls := []string{
-		"https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
 		"https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json",
+		"https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
 	}
 
 	for _, url := range urls {
@@ -374,6 +378,8 @@ func (c *Client) loadKEVFromURL(ctx context.Context, url string) error {
 	for _, v := range kev.Vulnerabilities {
 		c.kevSet[v.CVEID] = true
 	}
+	c.kevLoadedAt = time.Now()
+	c.kevSource = url
 	c.kevMu.Unlock()
 	log.Info().Str("source", url).Int("count", len(kev.Vulnerabilities)).Msg("ti: KEV loaded")
 	return nil
@@ -420,15 +426,15 @@ func adjustSeverity(enr *CVEEnrichment) string {
 func computeRiskScore(enr *CVEEnrichment) float64 {
 	score := 0.0
 
-	// CVSS contributes 40%
-	score += (enr.CVSS / 10.0) * 40
+	// CVSS contributes 35% (was 40)
+	score += (enr.CVSS / 10.0) * 35
 
-	// EPSS contributes 40%
-	score += enr.EPSS * 40
+	// EPSS contributes 35% (was 40)
+	score += enr.EPSS * 35
 
-	// KEV adds 20 points
+	// KEV adds 30 points (was 20) — aligned with CISA BOD 22-01 priority
 	if enr.KEV {
-		score += 20
+		score += 30
 	}
 
 	if score > 100 {
@@ -594,3 +600,32 @@ func (f *VNThreatFeed) AddIOC(ioc *VNFeedIOC) {
 
 // GlobalVNFeed is the singleton VN threat feed
 var GlobalVNFeed = NewVNThreatFeed()
+
+// ClientStats provides observability into the threat intel client.
+type ClientStats struct {
+	KEVCount    int       `json:"kev_count"`
+	KEVLoadedAt time.Time `json:"kev_loaded_at,omitempty"`
+	KEVSource   string    `json:"kev_source,omitempty"`
+	CacheSize   int       `json:"cache_size"`
+}
+
+// Stats returns observability info about the client state.
+func (c *Client) Stats() ClientStats {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	cacheSize := 0
+	if c.cache != nil {
+		cacheSize = len(c.cache.entries)
+	}
+	return ClientStats{
+		KEVCount:    len(c.kevSet),
+		KEVLoadedAt: c.kevLoadedAt,
+		KEVSource:   c.kevSource,
+		CacheSize:   cacheSize,
+	}
+}
+
+// RefreshKEV triggers immediate KEV catalog reload (admin-triggered).
+func (c *Client) RefreshKEV(ctx context.Context) error {
+	return c.LoadKEV(ctx)
+}

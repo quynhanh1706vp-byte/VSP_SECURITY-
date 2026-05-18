@@ -1,6 +1,86 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<script>
+/* Replacement guard for sw_inventory.html — wait properly for parent token */
+(function () {
+  if (window.__VSP_SWINV_GUARD_V2__) return;
+  window.__VSP_SWINV_GUARD_V2__ = true;
+
+  var _origFetch = window.fetch;
+
+  // Get token from multiple sources, with retry
+  async function getToken(maxWaitMs) {
+    maxWaitMs = maxWaitMs || 10000; // 10s instead of 2.5s
+    var deadline = Date.now() + maxWaitMs;
+    var firstWarn = true;
+
+    while (Date.now() < deadline) {
+      // 1. Try parent window
+      try {
+        if (window.parent && window.parent !== window && window.parent.TOKEN) return window.parent.TOKEN;
+      } catch (e) {} // cross-origin
+
+      // 2. Try this window
+      if (window.TOKEN) return window.TOKEN;
+
+      // 3. Try localStorage (multiple keys)
+      try {
+        var t = localStorage.getItem('vsp_token') || localStorage.getItem('TOKEN') || localStorage.getItem('token');
+        if (t) return t;
+        // Try parent localStorage
+        if (window.parent && window.parent.localStorage) {
+          t = window.parent.localStorage.getItem('vsp_token') || window.parent.localStorage.getItem('TOKEN');
+          if (t) return t;
+        }
+      } catch (e) {}
+
+      // 4. Try sessionStorage
+      try {
+        var ts = sessionStorage.getItem('vsp_token') || sessionStorage.getItem('TOKEN');
+        if (ts) return ts;
+      } catch (e) {}
+
+      // Quiet wait — only warn once after 3s
+      if (firstWarn && (Date.now() - (deadline - maxWaitMs)) > 3000) {
+        (window.VSP_DEBUG && console.info('[VSP guard] waiting for parent token…'));
+        firstWarn = false;
+      }
+      await new Promise(r => setTimeout(r, 250));
+    }
+    return '';
+  }
+
+  window.vspAuthFetch = async function (url, opts) {
+    opts = opts || {};
+    var tk = await getToken();
+    if (tk) {
+      opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + tk });
+    } else if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) {
+      // Quiet final warning — but only for endpoints that REQUIRE a
+      // Bearer token. The /auth/* bootstrap endpoints rely on the
+      // session cookie (sent via credentials:'include') so they're
+      // not really missing a token, they don't need one.
+      console.warn('[VSP guard v2] no token after 10s — request may fail:', url);
+    }
+    return _origFetch(url, opts);
+  };
+
+  window.fetch = function (url, opts) {
+    if (typeof url === 'string' && url.indexOf('/api/') >= 0) {
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      return window.vspAuthFetch(url, opts);
+    }
+    return _origFetch(url, opts);
+  };
+
+  (window.VSP_DEBUG && console.log('[VSP-SWINV-GUARD v2] Active — 10s timeout, multi-source token lookup'));
+})();
+
+</script>
+
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
 <script>
 /* VSP auth fetch guard v2 — polling retry */
@@ -46,15 +126,37 @@
     if (tk) {
       opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
     } else {
-      console.warn("[VSP guard] no token after 2.5s:", url);
+      if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) console.warn("[VSP guard] no token after 2.5s:", url);
     }
     return _origFetch(url, opts);
   };
   
   var _origFetch = window.fetch;
+  // Endpoints that BOOTSTRAP the auth state — they're the source of
+  // the token, not consumers. Wrapping them in vspAuthFetch causes a
+  // 2.5s wait + console warn + fallback fetch *without* Bearer, even
+  // though these endpoints rely on the session cookie (sent by the
+  // browser automatically via credentials:'include' below).
+  var AUTH_BOOTSTRAP_PATHS = ["/api/v1/auth/check", "/api/v1/auth/refresh",
+                              "/api/v1/auth/login", "/api/v1/auth/logout",
+                              "/api/v1/auth/sso/"];
+  function isAuthBootstrap(u) {
+    if (typeof u !== "string") return false;
+    for (var i = 0; i < AUTH_BOOTSTRAP_PATHS.length; i++) {
+      if (u.indexOf(AUTH_BOOTSTRAP_PATHS[i]) >= 0) return true;
+    }
+    return false;
+  }
   window.fetch = function(url, opts){
     if (typeof url === "string" && url.indexOf("/api/") >= 0) {
       if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
+        return _origFetch(url, opts);
+      }
+      // Skip the guard for auth-bootstrap endpoints — they're the
+      // source of the token, not a consumer. Pass through directly so
+      // the session cookie (credentials:'include' at call site) does
+      // the auth, and no noisy "no token after 2.5s" warns fire.
+      if (isAuthBootstrap(url)) {
         return _origFetch(url, opts);
       }
       return window.vspAuthFetch(url, opts);
@@ -193,7 +295,10 @@ td{padding:7px 10px;vertical-align:middle}
 /* ── Pagination ── */
 .pager{display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--border);font-size:10px;color:var(--t3);font-family:var(--font-mono)}
 .pager-info{margin-right:auto}
+
+.swinv-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
 </style>
+<script src="/static/js/vsp_uxstates.js"></script>
 </head>
 <body>
 
@@ -255,8 +360,8 @@ td{padding:7px 10px;vertical-align:middle}
 ═══════════════════════════════════ -->
 <div class="tab-panel active" id="tab-inventory">
   <div class="toolbar">
-    <input id="inv-search" placeholder="Search package, version, host…" oninput="renderInventory()">
-    <select id="inv-filter-status" onchange="renderInventory()">
+    <input aria-label="Search package, version, host…" id="inv-search" placeholder="Search package, version, host…" oninput="renderInventory()">
+    <select aria-label="Inv Filter Status" id="inv-filter-status" onchange="renderInventory()">
       <option value="">All status</option>
       <option value="approved">Approved</option>
       <option value="unauthorized">Unauthorized</option>
@@ -264,7 +369,7 @@ td{padding:7px 10px;vertical-align:middle}
       <option value="eol">EOL</option>
       <option value="warning">Warning</option>
     </select>
-    <select id="inv-filter-os" onchange="renderInventory()">
+    <select aria-label="Inv Filter Os" id="inv-filter-os" onchange="renderInventory()">
       <option value="">All OS</option>
       <option value="linux">Linux</option>
       <option value="windows">Windows</option>
@@ -338,11 +443,11 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-head"><div class="card-title">Manual Hash Check</div><div class="card-sub">SHA-256 vs known-cracked DB</div></div>
       <div class="card-body">
         <div class="form-group">
-          <label class="form-label">File Hash (SHA-256 / MD5)</label>
+          <label class="form-label" for="hash-input">File Hash (SHA-256 / MD5)</label>
           <input class="form-ctrl" id="hash-input" placeholder="e.g. 5f4dcc3b5aa765d61d8327deb882cf99" style="font-family:var(--font-mono);font-size:11px">
         </div>
         <div class="form-group">
-          <label class="form-label">Software Name (optional)</label>
+          <label class="form-label" for="hash-name-input">Software Name (optional)</label>
           <input class="form-ctrl" id="hash-name-input" placeholder="e.g. Adobe Photoshop 2024">
         </div>
         <button class="btn btn-primary" style="width:100%" onclick="checkHash()">Check Hash →</button>
@@ -453,35 +558,35 @@ td{padding:7px 10px;vertical-align:middle}
             <div style="font-size:12px;font-weight:500">Block unauthorized installs</div>
             <div style="font-size:10px;color:var(--t3)">Alert SOC when unlisted SW detected</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-block" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Block" type="checkbox" id="pol-block" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
           <div>
             <div style="font-size:12px;font-weight:500">Crack / Pirate scan on agent report</div>
             <div style="font-size:10px;color:var(--t3)">Run hash check when agent reports packages</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-crack" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Crack" type="checkbox" id="pol-crack" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
           <div>
             <div style="font-size:12px;font-weight:500">EOL software alert</div>
             <div style="font-size:10px;color:var(--t3)">Warn when package past end-of-life date</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-eol" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Eol" type="checkbox" id="pol-eol" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
           <div>
             <div style="font-size:12px;font-weight:500">GPL copyleft enforcement</div>
             <div style="font-size:10px;color:var(--t3)">Block GPL/AGPL in proprietary products</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-gpl" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Gpl" type="checkbox" id="pol-gpl" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
           <div>
             <div style="font-size:12px;font-weight:500">VirusTotal enrichment</div>
             <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires VT API key in config</div>
           </div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-vt" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input aria-label="Pol Vt" type="checkbox" id="pol-vt" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
       </div>
     </div>
@@ -527,20 +632,20 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="g2">
         <div class="form-group">
           <label class="form-label">Package Name <span style="color:var(--red)">*</span></label>
-          <input class="form-ctrl" id="add-pkg-name" placeholder="e.g. nginx, chrome, vlc">
+          <input aria-label="e.g. nginx, chrome, vlc" class="form-ctrl" id="add-pkg-name" placeholder="e.g. nginx, chrome, vlc">
         </div>
         <div class="form-group">
           <label class="form-label">Version (optional)</label>
-          <input class="form-ctrl" id="add-pkg-ver" placeholder="e.g. 1.x, >=2.0, any">
+          <input aria-label="e.g. 1.x, >=2.0, any" class="form-ctrl" id="add-pkg-ver" placeholder="e.g. 1.x, >=2.0, any">
         </div>
       </div>
       <div class="g2">
         <div class="form-group">
-          <label class="form-label">Vendor</label>
+          <label class="form-label" for="add-pkg-vendor">Vendor</label>
           <input class="form-ctrl" id="add-pkg-vendor" placeholder="e.g. Google, Apache">
         </div>
         <div class="form-group">
-          <label class="form-label">Category</label>
+          <label class="form-label" for="add-pkg-cat">Category</label>
           <select class="form-ctrl" id="add-pkg-cat">
             <option value="browser">Browser</option>
             <option value="devtools">Dev Tools</option>
@@ -553,11 +658,11 @@ td{padding:7px 10px;vertical-align:middle}
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Reason / Notes</label>
+        <label class="form-label" for="add-pkg-reason">Reason / Notes</label>
         <input class="form-ctrl" id="add-pkg-reason" placeholder="e.g. Approved by ISSO, required for dev workflow">
       </div>
       <div class="form-group" id="add-hash-group">
-        <label class="form-label">Known-good SHA-256 hash (optional)</label>
+        <label class="form-label" for="add-pkg-hash">Known-good SHA-256 hash (optional)</label>
         <input class="form-ctrl" id="add-pkg-hash" placeholder="SHA-256 of installer / binary" style="font-family:var(--font-mono);font-size:10px">
       </div>
     </div>
@@ -597,7 +702,7 @@ async function ensureToken() {
   TOKEN = window.parent?.TOKEN || window.TOKEN || localStorage.getItem('vsp_token') || '';
   if (!TOKEN) {
     try {
-      const r = await fetch(API+'/api/v1/auth/token', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:'admin123'})});
+      const r = await fetch(API+'/api/v1/auth/check', {credentials:'include'});
       const d = await r.json(); TOKEN = d.access_token || d.token || '';
     } catch(e) { TOKEN = 'demo'; }
   }
@@ -618,7 +723,7 @@ function showToast(msg, type='info') {
 // ═══════════════════════════════════
 //  MOCK DATA (real API falls back to this)
 // ═══════════════════════════════════
-const MOCK_INVENTORY = [
+const DEF_INVENTORY = [
   {id:1,name:'nginx',version:'1.18.0',vendor:'nginx.org',host:'web-prod-01',os:'linux',status:'approved',cves:2,license:'BSD-2-Clause',eol_date:null},
   {id:2,name:'openssl',version:'1.1.1f',vendor:'OpenSSL',host:'web-prod-01',os:'linux',status:'eol',cves:14,license:'OpenSSL',eol_date:'2023-09-11'},
   {id:3,name:'vlc',version:'3.0.18',vendor:'VideoLAN',host:'ws-dev-03',os:'windows',status:'unauthorized',cves:0,license:'GPL-2.0',eol_date:null},
@@ -636,7 +741,7 @@ const MOCK_INVENTORY = [
   {id:15,name:'putty',version:'0.78',vendor:'Simon Tatham',host:'ws-it-01',os:'windows',status:'approved',cves:2,license:'MIT',eol_date:null},
 ];
 
-const MOCK_WHITELIST = [
+const DEF_WHITELIST = [
   {name:'nginx',version:'>=1.18',vendor:'nginx.org',cat:'utility',reason:'Approved web server'},
   {name:'python',version:'>=3.8',vendor:'PSF',cat:'devtools',reason:'Dev standard'},
   {name:'chrome',version:'any',vendor:'Google',cat:'browser',reason:'Corporate browser'},
@@ -645,7 +750,7 @@ const MOCK_WHITELIST = [
   {name:'libreoffice',version:'any',vendor:'TDF',cat:'productivity',reason:'Office suite'},
   {name:'putty',version:'any',vendor:'Simon Tatham',cat:'utility',reason:'SSH client'},
 ];
-const MOCK_BLACKLIST = [
+const DEF_BLACKLIST = [
   {name:'teamviewer',version:'any',vendor:'TeamViewer',cat:'utility',reason:'Remote access risk — use Citrix'},
   {name:'*_crack',version:'any',vendor:'Unknown',cat:'other',reason:'Pirated software'},
   {name:'*_keygen',version:'any',vendor:'Unknown',cat:'other',reason:'License bypass tool'},
@@ -654,13 +759,13 @@ const MOCK_BLACKLIST = [
 ];
 const MOCK_WARNING = ['log4j','oracle_jdk','flash','silverlight','java_8','python2'];
 
-const MOCK_CRACKS = [
+const DEF_CRACKS = [
   {name:'adobe_photoshop_crack',version:'2024',host:'ws-hr-07',method:'Hash match (NSRL)',risk:'CRITICAL',hash:'a3f2...9d1e'},
   {name:'7zip_keygen',version:'23.01',host:'ws-fin-04',method:'Keygen signature',risk:'HIGH',hash:'b1e4...3c7a'},
   {name:'autocad_patch',version:'2023',host:'ws-eng-02',method:'Patcher signature · high PE entropy',risk:'HIGH',hash:'9d2a...f4b6'},
 ];
 
-const MOCK_LICENSE = [
+const DEF_LICENSE = [
   {comp:'log4j',ver:'2.14.1',license:'Apache-2.0',type:'Permissive',risk:'OK',sbom:true},
   {comp:'vlc',ver:'3.0.18',license:'GPL-2.0',type:'Copyleft',risk:'WARN',sbom:false},
   {comp:'curl',ver:'7.81.0',license:'MIT',type:'Permissive',risk:'OK',sbom:true},
@@ -670,11 +775,15 @@ const MOCK_LICENSE = [
   {comp:'ffmpeg',ver:'6.0',license:'LGPL-2.1',type:'Weak Copyleft',risk:'INFO',sbom:true},
 ];
 
-const MOCK_SCAN_HISTORY = [
+const DEF_SCAN_HISTORY = [
   {rid:'SW-014',host:'All agents',total:47,unauth:2,crack:3,eol:2,date:'2026-04-15 08:12',status:'DONE'},
   {rid:'SW-013',host:'All agents',total:44,unauth:2,crack:2,eol:3,date:'2026-04-14 08:10',status:'DONE'},
   {rid:'SW-012',host:'ws-hr-07',total:18,unauth:1,crack:1,eol:1,date:'2026-04-13 14:22',status:'DONE'},
 ];
+
+// State arrays — populated by fetch
+var INVENTORY=[], WHITELIST=[], BLACKLIST=[], CRACKS=[], LICENSE_DATA=[], SCAN_HISTORY=[];
+
 
 // ═══════════════════════════════════
 //  TAB SWITCHING
@@ -698,32 +807,108 @@ function switchTab(tabId, btn) {
 let _invData = [], _invPage = 0;
 const INV_PAGE_SIZE = 8;
 
+/* FEAT-28: sw_inventory L2 UX states (loadInventory + KPI shimmer) */
+const SWINV_KPI_IDS = ['k-total', 'k-approved', 'k-unauth', 'k-crack', 'k-eol'];
+
+function _swinvKPIShimmer() {
+  SWINV_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.classList.add('swinv-shimmer'); }
+  });
+}
+function _swinvKPIClear() {
+  SWINV_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('swinv-shimmer');
+  });
+}
+function _swinvKPIDash() {
+  SWINV_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('swinv-shimmer'); el.textContent = '—'; }
+  });
+}
+
 async function loadInventory() {
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tbody = document.getElementById('inv-tbody');
+  // hasData detection: real rows already rendered (not skeleton, not empty placeholder)
+  var hasData = tbody && tbody.children.length > 0 &&
+                !tbody.querySelector('.empty') &&
+                !tbody.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#inv-tbody', { rows: 5, kind: 'table' });
+  _swinvKPIShimmer();
+
   await ensureToken();
   try {
-    const r = await fetch(API+'/api/v1/assets', {headers:hdr()});
-    if(r.ok) {
-      const d = await r.json();
-      const raw = d.assets || d.items || (Array.isArray(d)?d:[]);
-      if(raw.length) {
-        _invData = raw.map((a,i)=>({
-          id:a.id||i+1, name:a.name||'Unknown', version:a.version||'—',
-          vendor:a.vendor||a.type||'—', host:a.ip||a.name||'—',
-          os:(a.env||a.type||'').toLowerCase().includes('win')?'windows':'linux',
-          status:(a.critical||0)>0?'warning':(a.high||0)>3?'warning':'approved',
-          cves:(a.critical||0)+(a.high||0)+(a.medium||0),
-          license:a.license||'—', eol_date:a.eol_date||null,
-          risk_score:a.risk_score||0, tags:a.tags||[], last_scan:a.last_scan||'—',
-          total_findings:a.total_findings||((a.critical||0)+(a.high||0)+(a.medium||0)+(a.low||0)),
-          env:a.env||'—'
-        }));
-        console.log('[SW] Loaded', _invData.length, 'items from API');
-      } else { throw new Error('empty'); }
+    const r = await fetch(API + '/api/v1/assets', { headers: hdr() });
+    if (!r.ok) {
+      // Real HTTP error — show error state (FEAT-28 behavior change vs old silent mock fallback)
+      if (hasUX) {
+        _swinvKPIDash();
+        VSPUXState.error('#inv-tbody', 'HTTP ' + r.status, loadInventory);
+        return;
+      }
+      // Graceful degradation if VSPUXState missing
+      _invData = INVENTORY;
+      _swinvKPIClear();
+      updateKPIs();
+      renderInventory();
+      return;
     }
-    else throw new Error();
-  } catch(e) { _invData = MOCK_INVENTORY; }
-  updateKPIs();
-  renderInventory();
+    const d = await r.json();
+    const raw = d.assets || d.items || (Array.isArray(d) ? d : []);
+    if (!raw.length) {
+      // API success but empty — show empty state with retry
+      if (hasUX) {
+        _swinvKPIDash();
+        VSPUXState.empty('#inv-tbody', 'No inventory found — run a scan to discover assets', loadInventory);
+        return;
+      }
+      _invData = INVENTORY;
+      _swinvKPIClear();
+      updateKPIs();
+      renderInventory();
+      return;
+    }
+    // Success path — render real data
+    _invData = raw.map((a, i) => ({
+      id: a.id || i + 1, name: a.name || 'Unknown', version: a.version || '—',
+      vendor: a.vendor || a.type || '—', host: a.ip || a.name || '—',
+      os: (a.env || a.type || '').toLowerCase().includes('win') ? 'windows' : 'linux',
+      status: (a.critical || 0) > 0 ? 'warning' : (a.high || 0) > 3 ? 'warning' : 'approved',
+      cves: (a.critical || 0) + (a.high || 0) + (a.medium || 0),
+      license: a.license || '—', eol_date: a.eol_date || null,
+      risk_score: a.risk_score || 0, tags: a.tags || [], last_scan: a.last_scan || '—',
+      total_findings: a.total_findings || ((a.critical || 0) + (a.high || 0) + (a.medium || 0) + (a.low || 0)),
+      env: a.env || '—'
+    }));
+    // FIX 2026-05-07: vsp_fe_sync_patch_v2.js F34 overrides renderInventory
+    // and reads from window._invData (global), but the IIFE here keeps
+    // _invData private (let). Mirror to window so the hardened render
+    // sees the same 22 packages the KPIs do — without this the table
+    // shows "No matching packages found" while KPIs read 22.
+    window._invData = _invData;
+    window._invPage = _invPage;
+    window.INV_PAGE_SIZE = INV_PAGE_SIZE;
+    (window.VSP_DEBUG && console.log('[SW] Loaded', _invData.length, 'items from API'));
+    _swinvKPIClear();
+    updateKPIs();
+    renderInventory();
+  } catch(e) {
+    console.error('[FEAT-28] loadInventory failed:', e);
+    if (hasUX) {
+      _swinvKPIDash();
+      VSPUXState.error('#inv-tbody', 'Network error', loadInventory);
+      return;
+    }
+    // Graceful degradation
+    _invData = INVENTORY;
+    _swinvKPIClear();
+    updateKPIs();
+    renderInventory();
+  }
 }
 
 function updateKPIs() {
@@ -737,10 +922,10 @@ function updateKPIs() {
   document.getElementById('cs-suspicious').textContent = _invData.filter(x=>x.status==='cracked'||x.status==='warning').length;
   document.getElementById('cs-confirmed').textContent = _invData.filter(x=>x.status==='cracked').length;
   // license stats
-  document.getElementById('lic-ok').textContent = MOCK_LICENSE.filter(x=>x.risk==='OK').length;
-  document.getElementById('lic-gpl').textContent = MOCK_LICENSE.filter(x=>x.license&&x.license.includes('GPL')&&x.type==='Copyleft').length;
-  document.getElementById('lic-none').textContent = MOCK_LICENSE.filter(x=>x.license==='None'||x.type==='Unknown').length;
-  document.getElementById('lic-prop').textContent = MOCK_LICENSE.filter(x=>x.type==='Commercial').length;
+  document.getElementById('lic-ok').textContent = LICENSE_DATA.filter(x=>x.risk==='OK').length;
+  document.getElementById('lic-gpl').textContent = LICENSE_DATA.filter(x=>x.license&&x.license.includes('GPL')&&x.type==='Copyleft').length;
+  document.getElementById('lic-none').textContent = LICENSE_DATA.filter(x=>x.license==='None'||x.type==='Unknown').length;
+  document.getElementById('lic-prop').textContent = LICENSE_DATA.filter(x=>x.type==='Commercial').length;
 }
 
 function filterByStatus(status) {
@@ -807,7 +992,7 @@ function invPage(d) { _invPage += d; renderInventory(); }
 //  WHITELIST / BLACKLIST
 // ═══════════════════════════════════
 function renderWhitelist() {
-  document.getElementById('whitelist-list').innerHTML = MOCK_WHITELIST.map(x=>`
+  document.getElementById('whitelist-list').innerHTML = WHITELIST.map(x=>`
     <div class="policy-item approved">
       <div>
         <div class="policy-name">${x.name} <span style="font-size:10px;color:var(--t3);font-weight:400">${x.version}</span></div>
@@ -819,7 +1004,7 @@ function renderWhitelist() {
       </div>
     </div>`).join('');
 
-  document.getElementById('blacklist-list').innerHTML = MOCK_BLACKLIST.map(x=>`
+  document.getElementById('blacklist-list').innerHTML = BLACKLIST.map(x=>`
     <div class="policy-item blocked">
       <div>
         <div class="policy-name">${x.name} <span style="font-size:10px;color:var(--t3);font-weight:400">${x.version}</span></div>
@@ -845,9 +1030,9 @@ function loadCrackFindings() {
     MEDIUM:'<span class="sev sev-med">MEDIUM</span>',
   }[r]||r);
 
-  document.getElementById('crack-tbody').innerHTML = MOCK_CRACKS.length === 0
+  document.getElementById('crack-tbody').innerHTML = CRACKS.length === 0
     ? '<tr><td colspan="7" class="empty">No crack/pirate detections found</td></tr>'
-    : MOCK_CRACKS.map(x=>`<tr class="row-danger">
+    : CRACKS.map(x=>`<tr class="row-danger">
         <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--orange)">${x.name}</td>
         <td><span class="badge badge-neutral">${x.version}</span></td>
         <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${x.host}</td>
@@ -901,7 +1086,7 @@ function loadLicenseData() {
     INFO:'<span class="badge badge-info">INFO</span>',
   }[r]||r);
 
-  document.getElementById('license-tbody').innerHTML = MOCK_LICENSE.map(x=>`<tr>
+  document.getElementById('license-tbody').innerHTML = LICENSE_DATA.map(x=>`<tr>
     <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--t1)">${x.comp}</td>
     <td><span class="badge badge-neutral">${x.ver}</span></td>
     <td style="font-family:var(--font-mono);font-size:11px;color:${x.license==='None'?'var(--red)':x.license&&x.license.includes('GPL')?'var(--amber)':'var(--t2)'}">${x.license}</td>
@@ -928,7 +1113,7 @@ function loadLicenseData() {
 //  SCAN HISTORY
 // ═══════════════════════════════════
 function loadScanHistory() {
-  document.getElementById('scan-history-tbody').innerHTML = MOCK_SCAN_HISTORY.map(x=>`<tr>
+  document.getElementById('scan-history-tbody').innerHTML = SCAN_HISTORY.map(x=>`<tr>
     <td style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">${x.rid}</td>
     <td style="font-size:11px;color:var(--t2)">${x.host}</td>
     <td style="font-family:var(--font-mono);font-weight:600">${x.total}</td>
@@ -961,8 +1146,8 @@ function saveToList() {
   const cat = document.getElementById('add-pkg-cat').value;
   const reason = document.getElementById('add-pkg-reason').value.trim()||'No reason provided';
 
-  if(_addModalTarget==='whitelist') MOCK_WHITELIST.push({name,version:ver,vendor,cat,reason});
-  else if(_addModalTarget==='blacklist') MOCK_BLACKLIST.push({name,version:ver,vendor,cat,reason});
+  if(_addModalTarget==='whitelist') WHITELIST.push({name,version:ver,vendor,cat,reason});
+  else if(_addModalTarget==='blacklist') BLACKLIST.push({name,version:ver,vendor,cat,reason});
   else MOCK_WARNING.push(name);
 
   renderWhitelist();
@@ -977,15 +1162,15 @@ function saveToList() {
 function removeFromList(list, name) {
   if(!confirm(`Remove "${name}" from ${list}?`)) return;
   showToast(`${name} removed from ${list}`,'success');
-  if(list==='whitelist') { const i=MOCK_WHITELIST.findIndex(x=>x.name===name); if(i>=0) MOCK_WHITELIST.splice(i,1); }
-  else if(list==='blacklist') { const i=MOCK_BLACKLIST.findIndex(x=>x.name===name); if(i>=0) MOCK_BLACKLIST.splice(i,1); }
+  if(list==='whitelist') { const i=WHITELIST.findIndex(x=>x.name===name); if(i>=0) WHITELIST.splice(i,1); }
+  else if(list==='blacklist') { const i=BLACKLIST.findIndex(x=>x.name===name); if(i>=0) BLACKLIST.splice(i,1); }
   else { const i=MOCK_WARNING.indexOf(name); if(i>=0) MOCK_WARNING.splice(i,1); }
   renderWhitelist();
 }
 
 function blockSW(name) {
   if(!confirm(`Block "${name}" and add to blacklist?`)) return;
-  MOCK_BLACKLIST.push({name,version:'any',vendor:'Unknown',cat:'other',reason:'Auto-blocked: crack/pirate detection'});
+  BLACKLIST.push({name,version:'any',vendor:'Unknown',cat:'other',reason:'Auto-blocked: crack/pirate detection'});
   showToast(`${name} blocked and added to blacklist`,'error');
 }
 
@@ -996,7 +1181,7 @@ function openDetail(id) {
   const x = _detailSW;
   document.getElementById('dm-title').textContent = x.name + ' ' + (x.version||'');
   document.getElementById('dm-sub').textContent = `${x.vendor||'Unknown'} · ${x.host} · ${(x.os||'').toUpperCase()}`;
-  document.getElementById('dm-body').textContent = `
+  document.getElementById('dm-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
       <div class="stat-box"><div class="stat-lbl">Status</div><div style="margin-top:4px">${{approved:'<span class="badge badge-ok">Approved</span>',unauthorized:'<span class="badge badge-danger">Unauthorized</span>',cracked:'<span class="badge badge-danger" style="color:var(--orange)">Crack/Pirate</span>',eol:'<span class="badge badge-warn">EOL</span>',warning:'<span class="badge badge-warn">Warning</span>'}[x.status]||x.status}</div></div>
       <div class="stat-box"><div class="stat-lbl">CVEs</div><div class="stat-val ${x.cves>4?'c-red':x.cves>0?'c-amber':'c-green'}" style="font-size:20px">${x.cves||0}</div></div>
@@ -1018,7 +1203,7 @@ function blockFromDetail() {
 function approveFromDetail() {
   if(!_detailSW) return;
   const x = _detailSW;
-  MOCK_WHITELIST.push({name:x.name,version:x.version||'any',vendor:x.vendor||'Unknown',cat:'other',reason:'Manually approved'});
+  WHITELIST.push({name:x.name,version:x.version||'any',vendor:x.vendor||'Unknown',cat:'other',reason:'Manually approved'});
   x.status = 'approved';
   renderInventory(); renderWhitelist(); updateKPIs();
   document.getElementById('detail-modal').classList.remove('open');
@@ -1054,6 +1239,44 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   loadLicenseData();
   loadScanHistory();
 });
+</script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+<!-- VSP-SIEM-COMPANION -->
+
+
+<script>
+// FEAT-29: Bootstrap fetch from /api/swinv
+TOKEN='';
+async function _loadAllSwInv(){
+  if(!TOKEN) return;
+  var h={Authorization:'Bearer '+TOKEN};
+  try{
+    var [inv,wl,bl,cr,li,sh]=await Promise.all([
+      fetch(API+'/api/swinv/inventory',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/whitelist',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/blacklist',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/cracks',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/licenses',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(API+'/api/swinv/scan-history',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+    ]);
+    if(inv&&inv.items) INVENTORY=inv.items;
+    if(wl&&wl.items) WHITELIST=wl.items;
+    if(bl&&bl.items) BLACKLIST=bl.items;
+    if(cr&&cr.items) CRACKS=cr.items;
+    if(li&&li.items) LICENSE_DATA=li.items;
+    if(sh&&sh.items) SCAN_HISTORY=sh.items;
+    if(typeof loadInventory==='function') loadInventory();
+    if(typeof renderWhitelist==='function') renderWhitelist();
+    if(typeof renderBlacklist==='function') renderBlacklist();
+    if(typeof renderCracks==='function') renderCracks();
+    if(typeof renderLicense==='function') renderLicense();
+  }catch(e){console.warn('[swinv] load failed',e);}
+}
+window.addEventListener('message',function(e){
+  if(!e.data)return;
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;_loadAllSwInv();}}
+});
+if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
 </script>
 </body>
 </html>

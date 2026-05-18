@@ -1,0 +1,44 @@
+title: VSP — Supply chain signature mismatch (real tamper, not env error)
+id: ae62df93-7bc2-4d94-d3e5-vsp004
+status: stable
+description: |
+  Distinguishes a REAL signature-mismatch tampered event from
+  registry/cosign environment errors. Pre-Sprint-7 these were all
+  tagged "tampered" (false-positive cascade); post-Sprint-7 the
+  classifyVerifyFailure function emits 7 distinct states. Only the
+  literal "tampered" status is a security incident.
+references:
+  - cmd/cosign-api/main.go classifyVerifyFailure
+  - https://attack.mitre.org/techniques/T1554/
+author: VSP Engineering (security@vsp.vn)
+date: 2026-05-08
+tags:
+  - attack.persistence
+  - attack.t1554
+  - attack.supply_chain
+logsource:
+  product: vsp
+  service: supply_chain_signatures
+detection:
+  selection:
+    status: tampered
+  filter_unsigned:
+    reason|contains:
+      - 'no signatures found'
+      - 'no matching signatures'
+  filter_unavailable:
+    reason|contains:
+      - 'executable file not found'
+      - 'permission denied'
+  filter_not_found:
+    reason|contains:
+      - 'manifest unknown'
+      - 'manifest_unknown'
+      - 'connection refused'
+      - 'dial tcp'
+  condition: selection and not (filter_unsigned or filter_unavailable or filter_not_found)
+falsepositives:
+  - Key rotation in progress (verify with platform team before alerting)
+  - Cosign upstream output format change (post-Sprint-7 we still match
+    on substrings; track ongoing in cmd/cosign-api/main_test.go)
+level: critical

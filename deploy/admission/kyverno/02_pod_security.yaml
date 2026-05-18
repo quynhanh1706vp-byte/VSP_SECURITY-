@@ -1,0 +1,102 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: vsp-pod-security-baseline
+  annotations:
+    policies.kyverno.io/title: VSP Pod Security Baseline
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: |
+      Enforces the security defaults documented in deploy/helm/
+      values.yaml. Blocks any pod that doesn't set non-root, read-
+      only root filesystem, drop ALL capabilities, and use
+      RuntimeDefault seccomp. Maps to CIS K8s Benchmark 5.2.x.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-non-root
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "Pods must run as non-root (CIS K8s 5.2.5). Set securityContext.runAsNonRoot: true."
+        pattern:
+          spec:
+            =(securityContext):
+              runAsNonRoot: true
+            containers:
+              - =(securityContext):
+                  runAsNonRoot: true
+
+    - name: require-readonly-rootfs
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "Containers must use readOnlyRootFilesystem: true (CIS K8s 5.2.x)."
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  readOnlyRootFilesystem: true
+
+    - name: drop-all-capabilities
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "Containers must drop ALL capabilities (CIS K8s 5.2.7)."
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  capabilities:
+                    drop: ["ALL"]
+
+    - name: deny-privileged
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "Privileged containers are forbidden (CIS K8s 5.2.13)."
+        pattern:
+          spec:
+            containers:
+              - =(securityContext):
+                  =(privileged): "false"
+
+    - name: require-runtime-default-seccomp
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "Pods must set seccompProfile.type: RuntimeDefault (CIS K8s 5.7.2)."
+        anyPattern:
+          - spec:
+              securityContext:
+                seccompProfile:
+                  type: RuntimeDefault
+          - spec:
+              containers:
+                - securityContext:
+                    seccompProfile:
+                      type: RuntimeDefault
+
+    - name: deny-host-namespaces
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "hostNetwork / hostPID / hostIPC are forbidden (CIS K8s 5.2.3)."
+        pattern:
+          spec:
+            =(hostNetwork): "false"
+            =(hostPID): "false"
+            =(hostIPC): "false"

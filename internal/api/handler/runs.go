@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"net/http"
 	"strings"
 
@@ -20,6 +21,23 @@ import (
 type Runs struct {
 	DB    *store.DB
 	asynq *asynq.Client
+}
+
+// tenantUUID returns the caller's tenant as a canonical UUID. JWT
+// claims may carry the slug ("default") instead of the UUID; every
+// runs.* DB call expects UUID. L9 2026-05-09: this used to be open-
+// coded at every call site (and missed at half of them — Get, Latest,
+// Cancel — causing 500s). Centralising here ensures all subsequent
+// methods get the resolve for free.
+func (h *Runs) tenantUUID(r *http.Request) string {
+	c, _ := auth.FromContext(r.Context())
+	if looksLikeUUID(c.TenantID) {
+		return c.TenantID
+	}
+	if u := resolveTenantUUID(r.Context(), h.DB, c.TenantID); u != "" {
+		return u
+	}
+	return c.TenantID
 }
 
 // POST /api/v1/vsp/run
@@ -75,46 +93,63 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 		now.Format("20060102_150405"),
 		now.UnixNano()&0xFFFFFFFF)
 
-	// Tools total depends on mode
-	toolsTotal := map[string]int{
-		"SAST":     4,  // bandit + semgrep + codeql + gosec
-		"SCA":      3,  // grype + trivy + license
-		"SECRETS":  3,  // gitleaks + secretcheck + trufflehog
-		"IAC":      2,  // kics + checkov
-		"DAST":     3,  // nikto + nuclei + sslscan (nmap moved to NETWORK)
-		"NETWORK":  3,  // sslscan + nmap + netcap
-		"FULL":     17, // 16 base + nmap (+netcap when engine live = 18)
-		"FULL_SOC": 18, // FULL + netcap packet inspection
-	}[req.Mode]
+	// tools_total drives the FE progress bar and must equal the actual number
+	// of tools the worker will dispatch — which is owned by
+	// pipeline.ToolNamesForMode. Prior to 2026-05-07 we had a hand-maintained
+	// map here that drifted (e.g. FULL=17 vs real 26 → progress >100%).
+	toolsTotal := len(pipeline.ToolNamesForMode(pipeline.Mode(req.Mode)))
 	if toolsTotal == 0 {
 		toolsTotal = 3
 	}
 
+	// L9 2026-05-09: 8th occurrence of the slug→UUID pattern. CreateRun
+	// inserts into a uuid column; without resolution the dev-mint
+	// "default" slug raises "invalid input syntax for type uuid" and
+	// every Trigger call returns 500.
+	tenantUUID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
+
 	run, err := h.DB.CreateRun(r.Context(),
-		rid, claims.TenantID, req.Mode, req.Profile,
+		rid, tenantUUID, req.Mode, req.Profile,
 		req.Src, req.URL, toolsTotal)
 	if err != nil {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	go h.enqueueOrLog(run.RID, claims.TenantID, pipeline.Mode(req.Mode), pipeline.Profile(req.Profile), req.Src, req.URL)
+	go h.enqueueOrLog(run.RID, tenantUUID, pipeline.Mode(req.Mode), pipeline.Profile(req.Profile), req.Src, req.URL)
 	// Audit: log scan trigger
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) //nolint:gosec // G118: intentional
 		defer cancel()
-		prevHash, _ := h.DB.GetLastAuditHash(ctx, claims.TenantID)
+		// Same defensive resolve for the audit row — claims.UserID may
+		// be an email when dev-mint tokens carry sub=email rather than
+		// sub=UUID. nil-out if not resolvable so the row still lands.
+		uid := claims.UserID
+		if uid != "" && !looksLikeUUID(uid) {
+			if r := resolveUserUUID(ctx, h.DB, uid); r != "" {
+				uid = r
+			} else {
+				uid = ""
+			}
+		}
+		var uidPtr *string
+		if uid != "" {
+			uidPtr = &uid
+		}
+		prevHash, _ := h.DB.GetLastAuditHash(ctx, tenantUUID)
 		e := audit.Entry{
-			TenantID: claims.TenantID,
-			UserID:   claims.UserID,
+			TenantID: tenantUUID,
+			UserID:   uid,
 			Action:   "SCAN_TRIGGER",
 			Resource: run.RID,
 			IP:       r.RemoteAddr,
 			PrevHash: prevHash,
 		}
 		e.StoredHash = audit.Hash(e)
-		uid := claims.UserID
-		h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: claims.TenantID, UserID: &uid, Action: "SCAN_TRIGGER", Resource: run.RID, IP: r.RemoteAddr, PrevHash: prevHash})
+		h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: tenantUUID, UserID: uidPtr, Action: "SCAN_TRIGGER", Resource: run.RID, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 	}()
 
 	w.WriteHeader(http.StatusAccepted)
@@ -132,8 +167,7 @@ func (h *Runs) Trigger(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/vsp/run/latest
 func (h *Runs) Latest(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
-	run, err := h.DB.GetLatestRun(r.Context(), claims.TenantID)
+	run, err := h.DB.GetLatestRun(r.Context(), h.tenantUUID(r))
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
@@ -147,9 +181,8 @@ func (h *Runs) Latest(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/vsp/run/{rid}
 func (h *Runs) Get(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
-	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
+	run, err := h.DB.GetRunByRID(r.Context(), h.tenantUUID(r), rid)
 	if err != nil || run == nil {
 		jsonError(w, "run not found", http.StatusNotFound)
 		return
@@ -163,7 +196,15 @@ func (h *Runs) List(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 20)
 	offset := queryInt(r, "offset", 0)
 
-	runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, limit, offset)
+	// L4-B 2026-05-08: dev-mint tokens carry slug "default"; ListRuns
+	// queries a UUID column. Without resolution the call returns 0
+	// rows silently (no error, no leak — but UI shows empty).
+	tenantUUID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
+
+	runs, err := h.DB.ListRuns(r.Context(), tenantUUID, limit, offset)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
@@ -186,27 +227,32 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 		limit = 500
 	}
 	offset := queryInt(r, "offset", 0)
-	runs, err := h.DB.ListRuns(r.Context(), claims.TenantID, limit, offset)
+	tenantUUID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
+	runs, err := h.DB.ListRuns(r.Context(), tenantUUID, limit, offset)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
 	// Return fields needed by FE charts
 	type indexRow struct {
-		ID         string          `json:"id"`
-		RID        string          `json:"rid"`
-		Status     string          `json:"status"`
-		Mode       string          `json:"mode"`
-		Profile    string          `json:"profile"`
-		Gate       string          `json:"gate"`
-		Posture    string          `json:"posture"`
-		Total      int             `json:"total_findings"`
-		ToolsDone  int             `json:"tools_done"`
-		ToolsTotal int             `json:"tools_total"`
-		Summary    json.RawMessage `json:"summary"`
-		StartedAt  *time.Time      `json:"started_at"`
-		FinishedAt *time.Time      `json:"finished_at"`
-		CreatedAt  time.Time       `json:"created_at"`
+		ID            string          `json:"id"`
+		RID           string          `json:"rid"`
+		Status        string          `json:"status"`
+		Mode          string          `json:"mode"`
+		Profile       string          `json:"profile"`
+		Gate          string          `json:"gate"`
+		Posture       string          `json:"posture"`
+		TotalFindings int             `json:"total_findings"`
+		Total         int             `json:"total"`
+		ToolsDone     int             `json:"tools_done"`
+		ToolsTotal    int             `json:"tools_total"`
+		Summary       json.RawMessage `json:"summary"`
+		StartedAt     *time.Time      `json:"started_at"`
+		FinishedAt    *time.Time      `json:"finished_at"`
+		CreatedAt     time.Time       `json:"created_at"`
 	}
 	rows := make([]indexRow, 0, len(runs))
 	for _, run := range runs {
@@ -215,41 +261,53 @@ func (h *Runs) Index(w http.ResponseWriter, r *http.Request) {
 			summ = json.RawMessage("{}")
 		}
 		rows = append(rows, indexRow{
-			ID:         run.ID,
-			RID:        run.RID,
-			Status:     run.Status,
-			Mode:       run.Mode,
-			Profile:    run.Profile,
-			Gate:       run.Gate,
-			Posture:    run.Posture,
-			Total:      run.TotalFindings,
-			ToolsDone:  run.ToolsDone,
-			ToolsTotal: run.ToolsTotal,
-			Summary:    summ,
-			StartedAt:  run.StartedAt,
-			FinishedAt: run.FinishedAt,
-			CreatedAt:  run.CreatedAt,
+			ID:            run.ID,
+			RID:           run.RID,
+			Status:        run.Status,
+			Mode:          run.Mode,
+			Profile:       run.Profile,
+			Gate:          run.Gate,
+			Posture:       run.Posture,
+			TotalFindings: run.TotalFindings,
+			Total:         run.TotalFindings,
+			ToolsDone:     run.ToolsDone,
+			ToolsTotal:    run.ToolsTotal,
+			Summary:       summ,
+			StartedAt:     run.StartedAt,
+			FinishedAt:    run.FinishedAt,
+			CreatedAt:     run.CreatedAt,
 		})
 	}
-	jsonOK(w, map[string]any{"runs": rows, "total": len(rows)})
+	// True total — not len(rows). Pre-fix, every caller that read
+	// `total` got the page size back (50 from Dashboard fetch,
+	// 200 from Runs page fetch), so the "Total Runs" KPI flipped
+	// between 50 and 200 depending on which tab loaded the data
+	// last. Cheap COUNT(*) backed by tenant_id index.
+	totalCount, _ := h.DB.CountRuns(r.Context(), tenantUUID)
+	if totalCount == 0 {
+		totalCount = len(rows) // fallback if COUNT errored
+	}
+	jsonOK(w, map[string]any{"runs": rows, "total": totalCount, "page_size": len(rows)})
 }
 
 // POST /api/v1/vsp/run/{rid}/cancel
 func (h *Runs) Cancel(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
-	if err := h.DB.UpdateRunStatus(r.Context(), claims.TenantID, rid, "CANCELLED", 0); err != nil {
+	if err := h.DB.UpdateRunStatus(r.Context(), h.tenantUUID(r), rid, "CANCELLED", 0); err != nil {
 		jsonError(w, "cancel failed", http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: scan cancellation is an operator-initiated state change
+	// that should be auditable so a reviewer can correlate "scan
+	// terminated" with "operator action" vs "system fault".
+	logAudit(r, h.DB, "SCAN_CANCEL", "runs/"+rid)
 	jsonOK(w, map[string]string{"rid": rid, "status": "CANCELLED"})
 }
 
 // GET /api/v1/vsp/run/{rid}/log
 func (h *Runs) Log(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
 	rid := chi.URLParam(r, "rid")
-	run, err := h.DB.GetRunByRID(r.Context(), claims.TenantID, rid)
+	run, err := h.DB.GetRunByRID(r.Context(), h.tenantUUID(r), rid)
 	if err != nil || run == nil {
 		jsonError(w, "run not found", http.StatusNotFound)
 		return
@@ -270,7 +328,7 @@ func (h *Runs) Log(w http.ResponseWriter, r *http.Request) {
 		       COUNT(*) FILTER (WHERE severity='MEDIUM'),
 		       COUNT(*) FILTER (WHERE severity='LOW')
 		FROM findings WHERE run_id=$1 AND tenant_id=$2
-		GROUP BY tool ORDER BY COUNT(*) DESC`, run.ID, claims.TenantID)
+		GROUP BY tool ORDER BY COUNT(*) DESC`, run.ID, h.tenantUUID(r))
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
@@ -346,35 +404,55 @@ func (h *Runs) Log(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/vsp/findings/by-tool?rid=
 func (h *Findings) ByTool(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
+	tenantUUID := resolveTenantUUID(r.Context(), h.DB, claims.TenantID)
+	if tenantUUID == "" {
+		tenantUUID = claims.TenantID
+	}
 	rid := r.URL.Query().Get("rid")
 	runID := r.URL.Query().Get("run_id")
 	if rid != "" && runID == "" {
 		var id string
 		h.DB.Pool().QueryRow(r.Context(),
 			`SELECT id::text FROM runs WHERE rid=$1 AND tenant_id=$2 LIMIT 1`,
-			rid, claims.TenantID).Scan(&id)
+			rid, tenantUUID).Scan(&id)
 		runID = id
 	}
+
+	// Global mode: no run_id/rid → aggregate across all findings for the tenant.
+	// Dashboard widgets and SOC overviews call this endpoint without a run filter.
+	var rows pgx.Rows
+	var err error
 	if runID == "" {
-		jsonError(w, "run_id or rid required", http.StatusBadRequest)
-		return
+		rows, err = h.DB.Pool().Query(r.Context(), `
+			SELECT tool, COUNT(*),
+			       COUNT(*) FILTER (WHERE severity='CRITICAL'),
+			       COUNT(*) FILTER (WHERE severity='HIGH'),
+			       COUNT(*) FILTER (WHERE severity='MEDIUM'),
+			       COUNT(*) FILTER (WHERE severity='LOW')
+			FROM findings WHERE tenant_id=$1
+			GROUP BY tool ORDER BY COUNT(*) DESC`, tenantUUID)
+	} else {
+		rows, err = h.DB.Pool().Query(r.Context(), `
+			SELECT tool, COUNT(*),
+			       COUNT(*) FILTER (WHERE severity='CRITICAL'),
+			       COUNT(*) FILTER (WHERE severity='HIGH'),
+			       COUNT(*) FILTER (WHERE severity='MEDIUM'),
+			       COUNT(*) FILTER (WHERE severity='LOW')
+			FROM findings WHERE run_id=$1::uuid AND tenant_id=$2
+			GROUP BY tool ORDER BY COUNT(*) DESC`, runID, tenantUUID)
 	}
-	rows, err := h.DB.Pool().Query(r.Context(), `
-		SELECT tool, COUNT(*),
-		       COUNT(*) FILTER (WHERE severity='CRITICAL'),
-		       COUNT(*) FILTER (WHERE severity='HIGH'),
-		       COUNT(*) FILTER (WHERE severity='MEDIUM'),
-		       COUNT(*) FILTER (WHERE severity='LOW')
-		FROM findings WHERE run_id=$1::uuid AND tenant_id=$2
-		GROUP BY tool ORDER BY COUNT(*) DESC`, runID, claims.TenantID)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 	type T struct {
-		Tool                               string `json:"tool"`
-		Total, Critical, High, Medium, Low int
+		Tool     string `json:"tool"`
+		Total    int    `json:"total"`
+		Critical int    `json:"critical"`
+		High     int    `json:"high"`
+		Medium   int    `json:"medium"`
+		Low      int    `json:"low"`
 	}
 	var tools []T
 	for rows.Next() {

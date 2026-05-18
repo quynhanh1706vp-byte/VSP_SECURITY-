@@ -826,9 +826,9 @@ func (e *Engine) parseHTTPPayload(ts time.Time, srcIP, dstIP string, dstPort int
 		if strings.HasPrefix(strings.ToLower(l), "user-agent:") {
 			ua = strings.TrimSpace(l[11:])
 		}
-		if len(line) == 0 && body == "" {
-			// Headers ended
-		}
+		// Note: blank line marks headers-ended; body extracted below
+		// via bytes.Index search so we don't need to track state here.
+		_ = line
 	}
 
 	// Check for body (after blank line)
@@ -1115,6 +1115,17 @@ func (e *Engine) GetStats() Stats {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.stats
+}
+
+// Counts returns the ring-buffer cardinality for each subsystem. Used by
+// the /netcap/* handlers so the FE shows the true buffer depth, not the
+// page-cap. The buffer caps are typically 10k flows, 1k anomalies, etc.
+func (e *Engine) Counts() (flows, anoms, http, dns, sql, tls, grpc, eth int) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return len(e.flows), len(e.anomalies), len(e.httpReqs),
+		len(e.dnsQ), len(e.sqlEvts), len(e.tlsSess),
+		len(e.grpcEvts), len(e.ethFrames)
 }
 
 func (e *Engine) GetFlows(limit int, protoFilter, flagFilter string) []*Flow {

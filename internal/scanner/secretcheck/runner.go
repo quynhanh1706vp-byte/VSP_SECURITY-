@@ -68,6 +68,18 @@ func extractSecrets(src string) ([]rawSecret, error) {
 		if err != nil || d.IsDir() {
 			return nil
 		}
+		// FIX: skip self-scanning (scanner code contains prefix patterns), test files,
+		// backup/log files, vendored deps. These cause false positives.
+		base := filepath.Base(path)
+		if strings.Contains(path, "/internal/scanner/") ||
+			strings.Contains(path, "/vendor/") ||
+			strings.Contains(path, "/.git/") ||
+			strings.Contains(path, "/node_modules/") ||
+			strings.HasSuffix(base, "_test.go") ||
+			strings.HasSuffix(base, ".log") ||
+			strings.Contains(base, ".bak") {
+			return nil
+		}
 		ext := strings.ToLower(filepath.Ext(path))
 		skip := map[string]bool{".png": true, ".jpg": true, ".gif": true, ".bin": true, ".exe": true, ".zip": true}
 		if skip[ext] {

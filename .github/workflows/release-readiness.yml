@@ -1,0 +1,381 @@
+name: Release Readiness (L1-L34)
+
+# Runs the full release-readiness ladder against an ephemeral
+# Postgres + Redis + a freshly-built gateway. Single source of truth:
+# every PR touching scanner/gateway/handler/store/migration code
+# triggers this; merges to main are blocked unless cumulative FAIL=0.
+#
+# Levels covered (34 levels — see docs/TESTING.md):
+#   L1  smoke           L13 frontend         L25 race-toctou
+#   L2  feature         L14 perf-smoke       L26 resource-cleanup
+#   L3  comprehensive   L15 http-hygiene     L27 observability
+#   L4-A property       L16 info-disclosure  L28 secrets
+#   L4-B multi-tenant   L17 ratelimit        L29 time-correctness
+#   L5  advanced        L18 migration        L30 container-deploy
+#   L6-A db-integrity   L19 redos            L31 jwt-attacks
+#   L6-C gosec dogfood  L20 deps-license     L32 bypass
+#   L7  DSR-residue     L21 upload-safety    L33 semgrep
+#   L8  security-depth  L22 sqli             L34 fuzz
+#   L9  lifecycle       L23 trust-boundary   L35 redirect-ssrf
+#   L10 openapi         L24 input-validation L36 path-encoding
+#   L11 mutation                              L37 method-tamper
+#                                             L38 log-pii-leak
+#                                             L39 shutdown (gated)
+#                                             L40 idempotency
+#                                             L41 fe-be-contract
+#                                             L42 cookie-cors-csp
+#                                             L43 ci-self-audit
+#                                             L44 fe-runtime
+#                                             L45 api-uniformity
+#                                             L46 fe-xss
+#                                             L47 user-flow-e2e
+#                                             L48 cicd-hygiene
+#                                             L49 state-machine
+#                                             L50 tenant-deep
+#                                             L51 audit-immutable
+#                                             L52 upload-deep
+#                                             L53 prom-cardinality
+#                                             L54 sri-integrity
+#                                             L55 deserialization
+#                                             L56 dns-rebinding
+#                                             L57 backup-restore (gated)
+#                                             L58 concurrent-mod
+#                                             L59 timing-attack
+#                                             L60 fuzz-coverage
+#                                             L61 dep-confusion
+#                                             L62 secrets-rotation
+#                                             L63 gh-adv-security
+#                                             L64 hsts-preload
+#                                             L65 oidc-hardening
+#                                             L66 pii-classification
+#                                             L67 chaos-monkey (gated)
+#                                             L68 slsa-l3
+#                                             L69 audit-chain-nightly
+#
+# Why an ephemeral DB instead of staging: L4-B/L5/L7/L25 probes seed
+# canary tenants and verify residue/leak invariants without touching
+# real customer data. Each run is hermetic.
+
+on:
+  pull_request:
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'migrations/**'
+      - 'scripts/test-*.sh'
+      - 'scripts/lib/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/release-readiness.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_l7_live:
+        description: 'Run L7 live canary erasure (mutates DB, slow)'
+        required: false
+        default: 'false'
+      run_perf:
+        description: 'Run L14 perf-smoke (vegeta 15s burst)'
+        required: false
+        default: 'false'
+      run_chaos:
+        description: 'Run L12 chaos (mutates upstream services)'
+        required: false
+        default: 'false'
+      fuzztime:
+        description: 'L34 fuzz budget per target (default 8s; bump to 60s for deeper)'
+        required: false
+        default: '8s'
+
+permissions:
+  contents: read
+
+jobs:
+  release-readiness:
+    name: L1-L34 ladder
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vsp
+          POSTGRES_PASSWORD: vsp_ci_secret
+          POSTGRES_DB: vsp_go
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vsp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Synthetic JWT secret — never matches anything in production.
+      # Resolves via the resolve_jwt_secret() helper in vsp-test.sh.
+      JWT_SECRET: ci-test-secret-${{ github.run_id }}-not-for-production
+      # Both names: tests/scripts read DB_DSN, gateway reads DATABASE_URL.
+      DB_DSN: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
+      DATABASE_URL: postgres://vsp:vsp_ci_secret@localhost:5432/vsp_go?sslmode=disable
+      # Synthetic 32-byte key for SOAR secrets vault (AES-256). Real
+      # deployments inject from a sealed secret manager.
+      VSP_REPO_KEY: ci-soar-vault-key-do-not-reuse-32b
+      BASE: http://127.0.0.1:8921
+      PGHOST: localhost
+      PGUSER: vsp
+      PGPASSWORD: vsp_ci_secret
+      PGDATABASE: vsp_go
+      # Pass dispatch inputs through to test-all.sh.
+      RUN_L7: ${{ github.event.inputs.run_l7_live == 'true' && '1' || '0' }}
+      RUN_PERF: ${{ github.event.inputs.run_perf == 'true' && '1' || '0' }}
+      RUN_CHAOS: ${{ github.event.inputs.run_chaos == 'true' && '1' || '0' }}
+      FUZZTIME: ${{ github.event.inputs.fuzztime || '8s' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Install runtime tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq curl python3 \
+            python3-yaml redis-tools netcat-openbsd libpcap-dev
+          # gosec for L6-C dogfood + go-licenses for L20 dep audit.
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/google/go-licenses@latest
+          # vegeta for L14 perf (only used when RUN_PERF=1).
+          if [ "${RUN_PERF:-0}" = "1" ]; then
+            go install github.com/tsenart/vegeta/v12@latest
+          fi
+          # semgrep for L33 (pip is the supported install path).
+          pip install --user semgrep || pip3 install --user semgrep
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Build gateway + scanner
+        run: |
+          go build -o bin/vsp-gateway ./cmd/gateway
+          go build -o bin/vsp-scanner ./cmd/scanner
+
+      - name: Start gateway
+        run: |
+          # Boot order: the gateway runs its own embedded goose
+          # migrations on startup (internal/migrate/sql/*). That set
+          # creates the canonical schema (tenants, users, playbooks,
+          # iocs, …). The top-level `migrations/*.sql` set is
+          # supplemental — applied AFTER the gateway is up — and
+          # extends those base tables with newer columns/audit tables.
+          # Bind on the same port the L1-L33 tests probe.
+          ./bin/vsp-gateway > /tmp/gateway.log 2>&1 &
+          echo $! > /tmp/gateway.pid
+          # Wait until /api/v1/status responds.
+          for i in $(seq 1 30); do
+            if curl -fsS "$BASE/api/v1/status" > /dev/null 2>&1; then
+              echo "gateway up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::gateway failed to start within 30s"
+          tail -80 /tmp/gateway.log
+          exit 1
+
+      - name: Apply supplemental migrations (post-boot)
+        run: |
+          # Now that the gateway has created the base schema, apply the
+          # numbered top-level migrations that EXTEND it (audit columns,
+          # SOAR secret tables, P4 enhancements, etc.). Goose Down
+          # sections are stripped with awk so psql -f doesn't drop
+          # tables it just created. Failures stay SOFT — the level tests
+          # downstream will surface anything genuinely missing.
+          mkdir -p /tmp/migrations
+          fail_count=0
+          for f in $(ls migrations/[0-9]*.sql | sort); do
+            echo "▶ $f"
+            up_only="/tmp/migrations/$(basename "$f").up.sql"
+            awk '
+              /-- \+goose Down/ { stop=1 }
+              /-- \+goose Up/   { keep=1; next }
+              keep && !stop     { print }
+              !/-- \+goose/ && !keep && !stop { print }
+            ' "$f" > "$up_only"
+            if ! psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$up_only" \
+                 > "/tmp/migrations/$(basename "$f").out" 2>&1; then
+              echo "::warning::migration $(basename "$f") failed (soft)"
+              tail -3 "/tmp/migrations/$(basename "$f").out"
+              fail_count=$((fail_count + 1))
+            fi
+          done
+          echo "supplemental migrations: $fail_count soft-fail(s)"
+          # Verify the SOAR secret tables that L10 depends on actually
+          # exist. They're created by 20260504_011_soar_extend.sql.
+          # Wrapped in `|| true` so a diagnostic query failure can't
+          # abort the whole step.
+          echo "── current_user / schemas / search_path ──"
+          psql "$DB_DSN" -tAc \
+            "SELECT current_user, current_database(), current_setting('search_path');" \
+            || true
+          echo "── ALL playbook_* relations across schemas (relkind cast to text) ──"
+          psql "$DB_DSN" -tAc \
+            "SELECT n.nspname || '.' || c.relname || ' (' || c.relkind::text || ')'
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE c.relname LIKE 'playbook%'
+             ORDER BY n.nspname, c.relname;" \
+            || true
+          for t in playbook_secrets playbook_secret_audit; do
+            found=$(psql "$DB_DSN" -tAc "SELECT to_regclass('public.$t')" 2>/dev/null || true)
+            if [ -z "$found" ]; then
+              echo "::warning::table $t MISSING — full 011 migration log:"
+              cat "/tmp/migrations/20260504_011_soar_extend.sql.out" 2>/dev/null || true
+              echo "── re-running migration with verbose output ──"
+              psql "$DB_DSN" -v ON_ERROR_STOP=1 -f \
+                "/tmp/migrations/20260504_011_soar_extend.sql.up.sql" 2>&1 \
+                | head -60 || true
+            else
+              echo "✓ $t exists ($found)"
+            fi
+          done
+
+      - name: Seed minimal fixtures
+        run: |
+          # Many test scripts hardcode tenant_id='1bdf7f20-…' (default)
+          # and '8bb9a716-…' (acme-corp) when querying audit_log /
+          # data_subject_requests etc. The gateway's embedded
+          # internal/migrate/sql/001_init.sql seeds `default` with a
+          # *random* UUID via gen_random_uuid(), so the test queries
+          # would otherwise return 0 rows even when the audit
+          # actually fires.
+          #
+          # Canonicalise: rewrite the default tenant's UUID to the
+          # fixture value after the gateway boots. This early in the
+          # run no FK references exist yet (no users created, no
+          # audit rows for this tenant), so the UPDATE is safe.
+          psql "$DB_DSN" -v ON_ERROR_STOP=1 <<'SQL'
+            UPDATE tenants
+               SET id = '1bdf7f20-dbb3-4116-815f-26b4dc747e76'
+             WHERE slug = 'default'
+               AND id  <> '1bdf7f20-dbb3-4116-815f-26b4dc747e76';
+            INSERT INTO tenants (id, slug, name, plan)
+              VALUES ('1bdf7f20-dbb3-4116-815f-26b4dc747e76','default','Default','FREE')
+              ON CONFLICT DO NOTHING;
+            INSERT INTO tenants (id, slug, name, plan)
+              VALUES ('8bb9a716-fd14-4eba-92e8-681dc5bdb718','acme-corp','ACME','FREE')
+              ON CONFLICT DO NOTHING;
+          SQL
+          echo "── tenants after seed ──"
+          psql "$DB_DSN" -tAc "SELECT id, slug FROM tenants ORDER BY slug;"
+
+      - name: Run release-readiness ladder
+        env:
+          # L27 reads journalctl by default; in CI we run the gateway
+          # as a foreground process (no systemd unit) so the test
+          # falls back to LOG_FALLBACK when journalctl is empty.
+          LOG_FALLBACK: /tmp/gateway.log
+        run: |
+          # test-all.sh aggregates 32 levels and exits 1 only if
+          # cumulative FAIL>0, so we get a complete scoreboard
+          # regardless of which level(s) fail.
+          # Test scripts may not carry +x in the repo (Linux dev,
+          # Windows clones, etc.) — make the whole tree executable.
+          # mint_jwt_local.sh is invoked by test-all.sh to produce
+          # TOKEN_ADMIN/TOKEN_ANALYST, so it MUST be in this set.
+          chmod +x scripts/*.sh scripts/lib/*.sh 2>/dev/null || true
+          ./scripts/test-all.sh --json test-all-report.json
+
+      - name: L6-C gosec dogfood (ratchet — fail on regression)
+        if: always()
+        run: |
+          # Run gosec against our own source and ratchet against the
+          # current baseline. Increasing the count fails the build;
+          # equal or below passes. Update GOSEC_HIGH_BASELINE in the
+          # same PR that triages a new finding.
+          #
+          # Current baseline is 16 — all triaged as false-positives:
+          #   G115×3   integer overflow conversions
+          #             - autopr/pr_service.go:471  int  -> byte
+          #             - webauthn.go:99            int64 -> uint32
+          #             - quarterly_metrics.go:92   int  -> rune
+          #            All values are pre-validated to fit (counter %256,
+          #            usercount fits uint32, bounded month index).
+          #   G118×9   intentional context.Background in fire-and-forget
+          #            paths (pipeline/worker×2, soar/secrets×2, users×2,
+          #            siem_extended, runs, apikeys, vsp_batch_handler)
+          #            — these detach from request scope on purpose so
+          #            cancellation of the inbound HTTP request doesn't
+          #            cancel the audit/notification side-effect.
+          #   G404×1   weak RNG in retry jitter (soar/retry.go:49)
+          #            — non-cryptographic backoff, math/rand is correct.
+          #   G701×1   "SQL injection" in autopr/handlers — fmt.Sprintf
+          #            interpolates only $N placeholders, args[] is
+          #            parameterised.
+          #   G702×1   "command injection" in cosign-api — args come
+          #            from server-validated inputs, cosignBin is a flag.
+          GOSEC_HIGH_BASELINE=16
+          mkdir -p /tmp/l6c
+          gosec -fmt=json -severity=high -confidence=medium \
+            -exclude-dir=cmd/dev-stub \
+            -exclude-dir=internal/scanner \
+            ./... 2>/dev/null > /tmp/l6c/gosec.json || true
+          high_count=$(jq '[.Issues[] | select(.severity == "HIGH")] | length' /tmp/l6c/gosec.json 2>/dev/null || echo 0)
+          echo "gosec HIGH count: $high_count (baseline $GOSEC_HIGH_BASELINE)"
+          if [ "$high_count" -gt "$GOSEC_HIGH_BASELINE" ]; then
+            echo "::error::gosec found $high_count HIGH-severity issues — above baseline $GOSEC_HIGH_BASELINE"
+            jq -r '.Issues[] | select(.severity == "HIGH") | "\(.rule_id) \(.file):\(.line) \(.details)"' \
+              /tmp/l6c/gosec.json | head -20
+            exit 1
+          fi
+          if [ "$high_count" -lt "$GOSEC_HIGH_BASELINE" ]; then
+            echo "::warning::gosec finding count dropped ($high_count < $GOSEC_HIGH_BASELINE) — lower GOSEC_HIGH_BASELINE in this PR"
+          fi
+          echo "gosec at-or-below baseline: $high_count ≤ $GOSEC_HIGH_BASELINE"
+
+      - name: Upload scoreboard JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-readiness-report-${{ github.run_id }}
+          path: |
+            test-all-report.json
+            /tmp/l6c/gosec.json
+          retention-days: 30
+
+      - name: Upload gateway log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-log-${{ github.run_id }}
+          path: /tmp/gateway.log
+          retention-days: 7
+
+      - name: Upload fuzz crash corpus on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-${{ github.run_id }}
+          path: |
+            internal/auth/testdata/fuzz/**
+            internal/api/handler/testdata/fuzz/**
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Stop gateway
+        if: always()
+        run: |
+          if [ -f /tmp/gateway.pid ]; then
+            kill "$(cat /tmp/gateway.pid)" 2>/dev/null || true
+          fi

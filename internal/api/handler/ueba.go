@@ -55,7 +55,7 @@ func (h *UEBA) Analyze(w http.ResponseWriter, r *http.Request) {
 	engine := siem.NewUEBAEngine(h.DB, claims.TenantID)
 	anomalies, err := engine.Analyze(r.Context())
 	if err != nil {
-		jsonError(w, "analysis failed: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "analysis failed", err)
 		return
 	}
 	// Persist significant anomalies as incidents
@@ -90,14 +90,19 @@ func (h *UEBA) Analyze(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/ueba/baseline
 func (h *UEBA) Baseline(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	type Stats struct {
-		AvgScore       float64 `json:"avg_score"`
-		StdScore       float64 `json:"std_score"`
-		AvgFindings    float64 `json:"avg_findings"`
-		GatePassRate   float64 `json:"gate_pass_rate"`
-		AvgScansPerDay float64 `json:"avg_scans_per_day"`
-		Period         string  `json:"period"`
+		AvgScore       float64   `json:"avg_score"`
+		StdScore       float64   `json:"std_score"`
+		AvgFindings    float64   `json:"avg_findings"`
+		GatePassRate   float64   `json:"gate_pass_rate"`
+		AvgScansPerDay float64   `json:"avg_scans_per_day"`
+		Period         string    `json:"period"`
+		History        []float64 `json:"history"`
 	}
 	var s Stats
 	h.DB.Pool().QueryRow(r.Context(), `
@@ -113,6 +118,28 @@ func (h *UEBA) Baseline(w http.ResponseWriter, r *http.Request) {
 		  AND status='DONE'`, claims.TenantID,
 	).Scan(&s.AvgScore, &s.StdScore, &s.AvgFindings, &s.GatePassRate, &s.AvgScansPerDay) //nolint:errcheck
 	s.Period = "30d"
+	// History: per-day avg score for the last 14 days. UEBA panel renders
+	// these as the bar chart. Pre-fix the FE asked for `d.history` and
+	// got undefined → SCORE_HIST stayed [], renderScoreBars() did
+	// `undefined - BL_SCORE` and displayed "↓ NaNpts vs baseline".
+	s.History = []float64{}
+	rows, err := h.DB.Pool().Query(r.Context(), `
+		SELECT COALESCE(AVG(COALESCE((summary->>'SCORE')::float,0)), 0) AS score
+		FROM runs
+		WHERE tenant_id=$1
+		  AND created_at > NOW() - INTERVAL '14 days'
+		  AND status='DONE'
+		GROUP BY DATE_TRUNC('day', created_at)
+		ORDER BY DATE_TRUNC('day', created_at) ASC`, claims.TenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var sc float64
+			if rows.Scan(&sc) == nil {
+				s.History = append(s.History, sc)
+			}
+		}
+	}
 	jsonOK(w, s)
 }
 

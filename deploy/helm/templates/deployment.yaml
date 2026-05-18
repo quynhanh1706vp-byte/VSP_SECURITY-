@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vsp.fullname" . }}
+  labels:
+    {{- include "vsp.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "vsp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vsp.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Force pod restart when configmap changes — keeps env in sync.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "vsp.fullname" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: VSP_REGION
+              value: {{ .Values.region | quote }}
+            - name: VSP_SECRETS_PROVIDER
+              value: {{ .Values.secrets.provider | quote }}
+            {{- if eq .Values.secrets.provider "vault" }}
+            - name: VSP_VAULT_ADDR
+              value: {{ .Values.secrets.vault.addr | quote }}
+            - name: VSP_VAULT_PATH
+              value: {{ .Values.secrets.vault.path | quote }}
+            {{- if .Values.secrets.vault.namespace }}
+            - name: VSP_VAULT_NAMESPACE
+              value: {{ .Values.secrets.vault.namespace | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.database.existingSecret }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: DATABASE_URL
+            {{- else if .Values.database.url }}
+            - name: DATABASE_URL
+              value: {{ .Values.database.url | quote }}
+            {{- end }}
+            - name: REDIS_ADDR
+              value: {{ .Values.redis.addr | quote }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/vsp
+      volumes:
+        # readOnlyRootFilesystem requires writable tmpfs for these paths.
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: cache
+          emptyDir:
+            sizeLimit: 256Mi

@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -31,7 +33,11 @@ func (h *APIKeys) List(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/admin/api-keys
 func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req struct {
 		Label      string `json:"label"`
@@ -90,6 +96,10 @@ func (h *APIKeys) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// L8 fix: API key issuance is a long-lived credential creation
+	// event. NIST 800-63B + OWASP ASVS V3.4 require it logged.
+	logAudit(r, h.DB, "API_KEY_CREATED", "api_keys/"+key.ID+":role="+req.Role)
+
 	// Return full key ONCE — never stored in plain text
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]any{
@@ -115,13 +125,56 @@ func (h *APIKeys) Delete(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
+	// Pre-fix: GetLastAuditHash used the new ctx but InsertAudit fell
+	// back to r.Context() — half-fix that lost the audit row whenever
+	// the response flushed before pgx finished the INSERT. Use the
+	// bounded bg ctx for both DB calls.
+	tenantID := claims.TenantID
+	userID := claims.UserID
+	remoteIP := r.RemoteAddr
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) //nolint:gosec // G118: intentional
 		defer cancel()
-		prevHash, _ := h.DB.GetLastAuditHash(ctx, claims.TenantID)
-		e := audit.Entry{TenantID: claims.TenantID, UserID: claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}
+		prevHash, _ := h.DB.GetLastAuditHash(ctx, tenantID)
+		e := audit.Entry{TenantID: tenantID, UserID: userID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: remoteIP, PrevHash: prevHash}
 		e.StoredHash = audit.Hash(e)
-		h.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: claims.TenantID, UserID: &claims.UserID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
+		_, _, _ = h.DB.InsertAudit(ctx, store.AuditWriteParams{TenantID: tenantID, UserID: &userID, Action: "APIKEY_DELETED", Resource: "/admin/api-keys/" + id, IP: remoteIP, PrevHash: prevHash})
 	}()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/v1/admin/api-keys/{id}
+func (h *APIKeys) Update(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok { jsonError(w, "unauthorized", http.StatusUnauthorized); return }
+	id := chi.URLParam(r, "id")
+	var req struct {
+		Label      string `json:"label"`
+		Role       string `json:"role"`
+		ExpiryDays int    `json:"expiry_days"`
+	}
+	if !decodeJSON(w, r, &req) { return }
+	sets := []string{}
+	args := []any{}
+	i := 1
+	if req.Label != "" {
+		sets = append(sets, fmt.Sprintf("label=$%d", i))
+		args = append(args, req.Label); i++
+	}
+	if req.Role != "" {
+		sets = append(sets, fmt.Sprintf("role=$%d", i))
+		args = append(args, req.Role); i++
+	}
+	if req.ExpiryDays > 0 {
+		sets = append(sets, fmt.Sprintf("expires_at=NOW()+($%d::int * interval '1 day')", i))
+		args = append(args, req.ExpiryDays); i++
+	}
+	if len(sets) == 0 { jsonError(w, "nothing to update", http.StatusBadRequest); return }
+	// updated_at column does not exist in api_keys table
+	args = append(args, claims.TenantID, id)
+	q := fmt.Sprintf("UPDATE api_keys SET %s WHERE tenant_id=$%d AND id=$%d",
+		strings.Join(sets, ","), i, i+1)
+	_, err := h.DB.Pool().Exec(r.Context(), q, args...)
+	if err != nil { jsonError(w, "update failed: "+err.Error(), http.StatusInternalServerError); return }
+	jsonOK(w, map[string]string{"id": id, "status": "updated"})
 }

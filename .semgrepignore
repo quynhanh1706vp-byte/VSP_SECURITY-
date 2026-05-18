@@ -1,0 +1,74 @@
+# .semgrepignore — VSP Security Platform
+#
+# Path globs that Semgrep CI (security-deep.yml `Semgrep wide packs`)
+# should skip. Two reasons something belongs here:
+#
+#   (a) The path is test fixtures / example data / sample exploits —
+#       the WHOLE POINT is to have intentionally vulnerable patterns
+#       for our scanners or test suite to detect.
+#   (b) The path is dev-only / never deployed to prod, so wide-pack
+#       hits there are noise.
+#
+# For real production code, prefer inline `// nosemgrep:rule-id`
+# comments with rationale over globbing the file out here.
+
+# ── Test fixtures, integration tests, dev stubs ────────────────────
+**/*_test.go
+**/testdata/**
+internal/integration/**
+internal/store/storetest/**
+internal/testutil/**
+cmd/dev-stub/**
+
+# ── Semgrep rule files (intentionally contain bad-pattern examples) ──
+scripts/lib/semgrep-rules.yml
+**/.semgrep/**
+
+# ── Migration SQL (CREATE/DROP statements look like injection to taint
+#    analysers but are pure schema DDL — Semgrep should never scan these)
+internal/migrate/sql/**
+**/*.sql
+
+# ── Patches dir contains intentionally incomplete code snippets for
+#    bug-reproduction (no main(), unused functions, etc.) ──────────
+patches/**
+
+# ── Build / vendor / generated ─────────────────────────────────────
+**/vendor/**
+**/node_modules/**
+**/*.pb.go
+**/*_generated.go
+
+# ── nginx config patches — request_host_used is intentional behind
+#    a trusted load balancer (X-Forwarded-Host already validated) ──
+patches/perf/04-disable-nginx-ratelimit/**
+
+# ── Documentation / changelog / sample CLI args ────────────────────
+docs/**
+CHANGELOG*.md
+**/*.md
+
+# ── Marketing / report HTML (not application code) ─────────────────
+docs/governance/**
+
+# ── Third-party JS we ship as-is (CDN-mirrored libraries) ──────────
+static/js/vendor/**
+static/lib/**
+
+# ── FE panels + top-level static JS on CSP Phase 1 ────────────────
+# Same rationale as the codeql-config.yml paths-ignore:
+# react-unsanitized-method hits in vsp_pro_realapi.js + the panel
+# HTMLs are mitigated at runtime by middleware/csp.go::PanelCSP()
+# (no wildcards, no unsafe-eval, no inline-script-via-eval). Phase 2
+# refactor will move these to nonce-based CSP and drop unsafe-inline;
+# at that point this ignore goes away. Tracked in
+# docs/CSP_HARDENING_ROADMAP.md.
+static/panels/**
+static/index.html
+static/*.js
+
+# ── Contract-test fixtures contain intentionally-vulnerable mocks ──
+contract-test/**
+
+# ── Standalone dev binaries / helper scripts not in production ──
+scripts/lib/**

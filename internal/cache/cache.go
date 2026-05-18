@@ -12,6 +12,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
+
+	"github.com/vsp/platform/internal/auth"
 )
 
 // Client wraps redis cho API response caching.
@@ -103,15 +105,19 @@ func (c *Client) Middleware(name string, ttl time.Duration) func(next http.Handl
 				return
 			}
 
-			// Cache key = name + query string (tenant-aware qua JWT được inject context)
-			// CRITICAL: include tenant_id to prevent cross-tenant cache leak
-			tenantID := ""
-			if tid := r.Context().Value("tenant_id"); tid != nil {
-				if s, ok := tid.(string); ok {
-					tenantID = s
-				}
-			}
-			key := "vsp:api:" + name + ":" + tenantID + ":" + r.URL.RawQuery
+			// Cache key = name + tenant + query string.
+			//
+			// L4-B 2026-05-09: previous code read context.Value("tenant_id")
+			// (plain string key) but auth.injectClaims stores under the
+			// TYPED key auth.CtxTenantID (contextKey("tenant_id")). Go's
+			// context requires both type AND value equality, so the lookup
+			// always returned nil — the cache key collapsed to "::query"
+			// and every tenant saw the first one's response within TTL.
+			// L4 multi-tenant matrix probe caught this: tenants A and B
+			// both got identical /findings/summary and /runs/index until
+			// the cache expired.
+			claims, _ := auth.FromContext(r.Context())
+			key := "vsp:api:" + name + ":" + claims.TenantID + ":" + r.URL.RawQuery
 
 			// Cache hit
 			if cached := c.Get(r.Context(), key); cached != nil {

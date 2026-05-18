@@ -15,7 +15,7 @@
       m.addedNodes.forEach(function (n) {
         if (n.nodeType !== 1) return;
         if (n.matches && n.matches(sel)) {
-          console.debug('[VSP internal] suppressed internal-bug note');
+          (window.VSP_DEBUG && console.debug('[VSP internal] suppressed internal-bug note'));
           n.remove();
         }
         if (n.querySelectorAll) {
@@ -133,5 +133,5 @@
   }, true);
 })();
 
-console.log('[VSP Sprint 2] quick-wins patch loaded — items #1,#2,#3,#9,#10 fixed');
+(window.VSP_DEBUG && console.log('[VSP Sprint 2] quick-wins patch loaded — items #1,#2,#3,#9,#10 fixed'));
 })();

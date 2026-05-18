@@ -78,3 +78,32 @@ func (h *Handler) EnrichedFindings(w http.ResponseWriter, r *http.Request) {
 	// Frontend sẽ call /api/v1/vsp/findings và merge với TI data
 	http.Error(w, `{"error":"use /api/v1/ti/enrich?cve=CVE-XXX"}`, 400)
 }
+
+// GET /api/v1/ti/stats — observability for threat intel state
+func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
+	stats := h.client.Stats()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(stats)
+}
+
+// POST /api/v1/ti/kev/refresh — admin-only manual KEV catalog reload
+func (h *Handler) RefreshKEV(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+	if user.Role != "admin" {
+		http.Error(w, `{"error":"admin role required"}`, http.StatusForbidden)
+		return
+	}
+	if err := h.client.RefreshKEV(r.Context()); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	stats := h.client.Stats()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(stats)
+}

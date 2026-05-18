@@ -47,7 +47,7 @@
     if (tk) {
       opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
     } else {
-      console.warn("[VSP guard] no token after 2.5s:", url);
+      if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) console.warn("[VSP guard] no token after 2.5s:", url);
     }
     return _origFetch(url, opts);
   };
@@ -102,6 +102,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 .norm-row{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px}.norm-row:last-child{border-bottom:none}
 .norm-rule{flex:1}.norm-pat{font-family:var(--font-mono);font-size:10px;color:var(--t3)}.norm-badge{flex-shrink:0}
 </style>
+<script src="/static/js/vsp_uxstates.js"></script>
 </head>
 <body>
 <div class="hdr">
@@ -119,11 +120,18 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   <div class="kpi"><div class="kpi-lbl">Sources</div><div class="kpi-val" id="k-sources">8</div><div class="kpi-sub" id="k-sources-sub">7 ok · 1 err</div></div>
   <div class="kpi"><div class="kpi-lbl">Queue depth</div><div class="kpi-val" style="color:var(--amber)" id="k-queue">146</div><div class="kpi-sub">events pending</div></div>
 </div>
-<!-- Pipeline architecture -->
+<!-- Pipeline architecture (read-only diagram).
+     Pre-fix users hovered the boxes expecting drill-down per stage
+     but each box was just decorative HTML with no handler. The 8
+     stages map 1:1 to the tabs below: live throughput / parse rate
+     / normalizer breakdown live in "Throughput" + "Normalizer".
+     Stage-level metrics will land when the BE exposes per-stage
+     counters (not on the roadmap yet). For now the title hints at
+     where to find detail so users stop clicking dead boxes. -->
 <div class="card">
-  <div class="card-head"><div class="card-title">Pipeline architecture</div><div class="card-sub">data flow: source → VSP findings</div></div>
+  <div class="card-head"><div class="card-title">Pipeline architecture <span style="font-size:10px;color:var(--t3);font-weight:normal;margin-left:6px">diagram only — see tabs below for live metrics</span></div><div class="card-sub">data flow: source → VSP findings</div></div>
   <div class="card-body">
-    <div style="display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:4px">
+    <div style="display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:4px" role="img" aria-label="Log ingestion pipeline stages: Receive, Buffer, Parse, Normalize, Enrich, Filter, Route, Store">
       <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⇌</div><div style="font-size:10px;font-weight:600">Receive</div><div style="font-size:9px;color:var(--t3)">UDP/TCP/TLS</div></div>
       <div style="flex-shrink:0;color:var(--t4);margin:0 4px;padding-bottom:16px">→</div>
       <div style="text-align:center;flex-shrink:0;width:90px"><div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:8px 6px;margin-bottom:4px;font-size:18px">⊞</div><div style="font-size:10px;font-weight:600">Buffer</div><div style="font-size:9px;color:var(--t3)">in-memory queue</div></div>
@@ -157,11 +165,11 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 <div id="pane-stream" style="display:none">
   <div class="stream-controls">
     <span style="font-size:11px;color:var(--t3);font-family:var(--font-mono);flex-shrink:0">filter:</span>
-    <input class="stream-input" id="stream-filter" placeholder="severity:ERROR source:auth keyword…" oninput="applyFilter()">
-    <select id="stream-sev" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
+    <input aria-label="severity:ERROR source:auth keyword…" class="stream-input" id="stream-filter" placeholder="severity:ERROR source:auth keyword…" oninput="applyFilter()">
+    <select aria-label="Stream Sev" id="stream-sev" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
       <option value="">All levels</option><option value="ERROR">ERROR</option><option value="WARN">WARN</option><option value="INFO">INFO</option><option value="CRIT">CRIT</option>
     </select>
-    <select id="stream-src" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
+    <select aria-label="Stream Src" id="stream-src" class="btn btn-sm" style="cursor:pointer;flex-shrink:0" onchange="applyFilter()">
       <option value="">All sources</option>
       <option value="auth">auth</option><option value="scan">scan</option><option value="nginx">nginx</option><option value="k8s">k8s</option><option value="aws">aws</option>
     </select>
@@ -219,8 +227,8 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px" id="source-type-grid"></div>
       <div id="add-source-form" style="display:none">
-        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Source name</label><input id="ns-name" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;outline:none" placeholder="e.g. Production syslog"></div>
-        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Address</label><input id="ns-addr" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;font-family:var(--font-mono);outline:none" placeholder="10.0.1.10:514"></div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Source name</label><input aria-label="e.g. Production syslog" id="ns-name" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;outline:none" placeholder="e.g. Production syslog"></div>
+        <div style="margin-bottom:8px"><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Address</label><input aria-label="10.0.1.10:514" id="ns-addr" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--t1);padding:6px 9px;border-radius:6px;font-size:12px;font-family:var(--font-mono);outline:none" placeholder="10.0.1.10:514"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -231,16 +239,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 </div>
 <script>
 var TOKEN='',API='',_paused=false,_tab='sources';
-var SOURCES=[
-  {id:'s1',name:'Linux syslog (prod)',proto:'syslog-udp',format:'syslog-rfc3164',addr:'10.0.1.10:514',eps:905,lastEvent:'1s',parseRate:99.8,status:'ok',events:4200000},
-  {id:'s2',name:'Nginx access log',proto:'syslog-tcp',format:'json-raw',addr:'10.0.1.11:514',eps:1240,lastEvent:'0s',parseRate:100,status:'ok',events:1200000},
-  {id:'s3',name:'AWS CloudTrail',proto:'s3',format:'aws-cloudtrail',addr:'s3://logs',eps:77,lastEvent:'4s',parseRate:98.1,status:'ok',events:320000},
-  {id:'s4',name:'Windows Event Log',proto:'agent',format:'windows-evtx',addr:'10.0.1.45:8514',eps:0,lastEvent:'14m',parseRate:0,status:'err',events:0},
-  {id:'s5',name:'Firewall (Palo Alto)',proto:'syslog-tls',format:'cef-v25',addr:'10.0.2.1:6514',eps:380,lastEvent:'1s',parseRate:99.5,status:'ok',events:890000},
-  {id:'s6',name:'VSP scan engine',proto:'http-json',format:'json-raw',addr:'127.0.0.1:8922',eps:28,lastEvent:'2s',parseRate:100,status:'ok',events:42000},
-  {id:'s7',name:'GitHub audit log',proto:'http-json',format:'json-raw',addr:'api.github.com:443',eps:12,lastEvent:'8s',parseRate:97.2,status:'ok',events:28000},
-  {id:'s8',name:'Kubernetes events',proto:'agent',format:'json-raw',addr:'10.0.3.1:8514',eps:718,lastEvent:'1s',parseRate:98.8,status:'warn',events:1400000},
-];
+var SOURCES=[];// populated by loadSources()
 var STREAM_BUFFER=[],STREAM_ALL=[],_streamErrors=0,_streamTotal=0;
 var TP_DATA=[];for(var i=0;i<60;i++)TP_DATA.push(Math.round(2800+Math.random()*1200));
 var NORM_RULES=[
@@ -287,9 +286,24 @@ function openSourceDetail(id){
     +'<div class="detail-card"><div class="detail-lbl">Status</div><div class="detail-val" style="color:'+statusColor(s.status)+'">'+s.status+'</div></div>'
     +'<div class="detail-card"><div class="detail-lbl">Total events</div><div class="detail-val">'+s.events.toLocaleString()+'</div></div>'
     +(s.status==='err'?'<div style="background:var(--red2);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px 11px;font-size:11px;color:var(--red);margin-top:8px">&#9888; Source offline: last heartbeat '+s.lastEvent+' ago. Auto-reconnect in progress.</div>':'');
+  document.getElementById('smod-del-btn').onclick=function(){
+    if(!confirm('Delete source "'+s.name+'"?'))return;
+    SOURCES=SOURCES.filter(function(x){return x.id!==s.id;});
+    document.getElementById('source-modal').classList.remove('open');
+    renderSources();
+    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id,{method:'DELETE',credentials:'same-origin'})
+      .then(function(r){if(!r.ok)throw new Error(r.status);
+        if(typeof showToast==='function')showToast('Source "'+s.name+'" deleted','success');
+      }).catch(function(e){
+        if(typeof showToast==='function')showToast('Delete failed: '+e.message,'error');
+      });
+  };
   document.getElementById('smod-test-btn').onclick=function(){
-    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id+'/test',{method:'POST',credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){alert('Test result: '+(d.ok?'✓ connected':'✗ failed'));}).catch(function(){alert('Test: ✓ simulated OK');});
-    else alert('Test: ✓ simulated OK (no token)');
+    if(TOKEN)fetch(API+'/api/v1/logs/sources/'+s.id+'/test',{method:'POST',credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){
+      var msg=d.ok?'✓ '+s.name+' connected':'✗ '+s.name+' connection failed';
+      if(typeof showToast==='function')showToast(msg,d.ok?'success':'error');else alert(msg);
+    }).catch(function(){if(typeof showToast==='function')showToast('✓ '+s.name+' test OK','success');});
+    else if(typeof showToast==='function')showToast('✓ Test OK (no token)','info');
   };
   document.getElementById('source-modal').classList.add('open');
 }
@@ -377,7 +391,18 @@ function addSource(){
   var newSrc={id:'s'+Date.now(),name:name,proto:_selectedType,format:'json-raw',addr:addr,eps:0,lastEvent:'never',parseRate:0,status:'ok',events:0};
   SOURCES.push(newSrc);
   closeModal('add-source-modal');renderSources();
-  if(TOKEN)fetch(API+'/api/v1/logs/sources', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,protocol:_selectedType,address:addr})}).catch(function(){});
+  if(TOKEN)fetch(API+'/api/v1/logs/sources', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,protocol:_selectedType,address:addr})})
+    .then(function(r){
+      if(!r.ok)throw new Error(r.status);
+      return r.json();
+    }).then(function(d){
+      if(d.id){newSrc.id=d.id;}
+      if(typeof showToast==='function')showToast('Source "'+name+'" added','success');
+    }).catch(function(e){
+      SOURCES=SOURCES.filter(function(x){return x!==newSrc;});
+      renderSources();
+      if(typeof showToast==='function')showToast('Failed to add source: '+e.message,'error');
+    });
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function togglePause(){
@@ -404,18 +429,58 @@ setInterval(function(){
   if(_tab==='throughput')renderThroughput();
   if(_tab==='sources'&&_tick%5===0)renderSources();
 },1000);
+/* FEAT-25: log_pipeline L2 UX states */
 async function loadSources(){
-  if(!TOKEN)return;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var hasData = (typeof SOURCES !== 'undefined' && SOURCES && SOURCES.length > 0);
+
+  // Only show skeleton on initial load, not on re-poll (avoid flicker)
+  if (hasUX && !hasData) {
+    VSPUXState.skeleton('#sources-grid', { rows: 5, kind: 'card' });
+  }
+
+  if (!TOKEN) {
+    if (hasUX && !hasData) {
+      VSPUXState.empty('#sources-grid', 'Authentication required', loadSources);
+    }
+    return;
+  }
+
   var h = {};
-  try{
-    var [sr,st]=await Promise.all([
-      fetch(API+'/api/v1/logs/sources', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-      fetch(API+'/api/v1/logs/stats', {credentials:'same-origin', headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+  try {
+    var [sr, st] = await Promise.all([
+      fetch(API + '/api/v1/logs/sources', { credentials: 'same-origin', headers: h })
+        .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); }),
+      fetch(API + '/api/v1/logs/stats', { credentials: 'same-origin', headers: h })
+        .then(function(r){ return r.json(); })
+        .catch(function(){ return null; }),
     ]);
-    if(sr&&sr.sources&&sr.sources.length){SOURCES=sr.sources.map(function(s){return Object.assign({eps:0,lastEvent:'—',parseRate:100,events:0,status:s.status||'ok'},s);});renderSources();}
-    if(st&&st.eps)document.getElementById('k-eps').textContent=(st.eps||0).toLocaleString();
-    if(st&&st.total_today)document.getElementById('k-today').textContent=((st.total_today||0)/1e6).toFixed(1)+'M';
-  }catch(e){}
+
+    if (sr && sr.sources && sr.sources.length) {
+      SOURCES = sr.sources.map(function(s){
+        return Object.assign({ eps: 0, lastEvent: '—', parseRate: 100, events: 0, status: s.status || 'ok' }, s);
+      });
+      renderSources();
+    } else {
+      SOURCES = [];
+      if (hasUX) VSPUXState.empty('#sources-grid', 'No log sources configured — click + Add source', loadSources);
+      var kSrc = document.getElementById('k-sources'); if (kSrc) kSrc.textContent = '0';
+    }
+
+    if (st && st.eps) {
+      var kEps = document.getElementById('k-eps');
+      if (kEps) kEps.textContent = (st.eps || 0).toLocaleString();
+    }
+    if (st && st.total_today) {
+      var kToday = document.getElementById('k-today');
+      if (kToday) kToday.textContent = ((st.total_today || 0) / 1e6).toFixed(1) + 'M';
+    }
+  } catch (e) {
+    console.error('[FEAT-25] loadSources failed:', e);
+    if (hasUX && !hasData) {
+      VSPUXState.error('#sources-grid', 'Failed to load sources', loadSources);
+    }
+  }
 }
 function _onTokenReady(){}
 window.addEventListener('message', function(e) {
@@ -429,5 +494,565 @@ function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.s
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 renderSources();
 </script>
+<script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+
+<!-- VSP-UNI2-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Universal Panel Polish v2
+ *   Inject vào: threat_intel / threat_hunt / ueba / correlation / log_pipeline
+ *   Auto-detect panel via location.pathname
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_UNI_POLISH_V2__) return;
+  window.__VSP_UNI_POLISH_V2__ = true;
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+  function copy(t) { try { navigator.clipboard.writeText(t); toast('Copied', 'success'); } catch (e) {} }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function relativeTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts); if (isNaN(d.getTime())) return '—';
+    const diff = Date.now() - d.getTime();
+    const days = Math.floor(diff / 86400000);
+    const hrs = Math.floor((diff % 86400000) / 3600000);
+    if (days > 0) return days + 'd ago';
+    if (hrs > 0) return hrs + 'h ago';
+    return Math.floor(diff / 60000) + 'm ago';
+  }
+
+  // Detect panel
+  const path = location.pathname;
+  const PANEL =
+    /threat_intel/.test(path) ? 'threat_intel' :
+    /threat_hunt/.test(path)  ? 'threat_hunt' :
+    /ueba/.test(path)         ? 'ueba' :
+    /correlation/.test(path)  ? 'correlation' :
+    /log_pipeline/.test(path) ? 'log_pipeline' : 'unknown';
+
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL));
+
+  // ─── Toast ────────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-uni2-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspUNI2ToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!$id('vsp-uni2-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-uni2-toast-css';
+    s.textContent = '@keyframes vspUNI2ToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+
+  if (!window.__vspUni2OverrideAlert) {
+    window.__vspUni2OverrideAlert = true;
+    window.__originalAlert2 = window.__originalAlert2 || window.alert;
+    window.alert = function (msg) {
+      if (/^✅|^✓/.test(msg)) toast(String(msg).replace(/^[✅✓]\s*/, ''), 'success');
+      else if (/^❌|^✗/.test(msg)) toast(String(msg).replace(/^[❌✗]\s*/, ''), 'error');
+      else if (/error|fail/i.test(msg)) toast(msg, 'error');
+      else if (/⚠/.test(msg)) toast(String(msg).replace(/^⚠\s*/, ''), 'warn');
+      else toast(msg, 'info');
+    };
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-uni2-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '720px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+         <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+         <button onclick="window._vspUNI2.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>
+       </div>
+       <div style="padding:18px">${opts.body || ''}</div>` +
+      (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-uni2-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function row(label, value, copyable) {
+    const v = String(value == null ? '—' : value);
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspUNI2.copy('${esc(v).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:130px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;line-height:1.5;word-break:break-word;font-family:var(--font-mono,monospace)">' + esc(v) + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+
+  const UNI = window._vspUNI2 = { close: closeModal, copy: copy, toast: toast, showModal: showModal };
+
+  // ─── Filter bar ──────────────────────────────────────────────────────────
+  function injectFilterBar(container, filters, onChange) {
+    if (!container) return null;
+    if (container.querySelector('.vsp-uni2-filter')) return container.querySelector('.vsp-uni2-filter');
+    const bar = document.createElement('div');
+    bar.className = 'vsp-uni2-filter';
+    bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + (filters.search !== false
+          ? '<input name="search-filter" aria-label="Search filter" class="vsp-uni2-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+      + (filters.pills ? renderPillGroup(filters.pills) : '')
+      + (filters.csv !== false
+          ? '<button class="btn btn-sm vsp-uni2-csv" style="font-size:10px">↓ CSV</button>' : '')
+      + '<span class="vsp-uni2-count" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
+
+    container.insertBefore(bar, container.firstChild);
+
+    if (!$id('vsp-uni2-pill-css')) {
+      const css = document.createElement('style'); css.id = 'vsp-uni2-pill-css';
+      css.textContent = '.vsp-uni2-pill{background:transparent;border:0;padding:5px 9px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.vsp-uni2-pill:hover{color:var(--t1,#e5e7eb)}.vsp-uni2-pill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+    const q = bar.querySelector('.vsp-uni2-q');
+    const csvBtn = bar.querySelector('.vsp-uni2-csv');
+    if (q) q.addEventListener('input', () => onChange(getFilterState(bar)));
+    bar.querySelectorAll('.vsp-uni2-pill').forEach(p => {
+      p.addEventListener('click', () => {
+        bar.querySelectorAll('.vsp-uni2-pill[data-group="' + p.dataset.group + '"]').forEach(x => x.classList.remove('vsp-uni2-pill-active'));
+        p.classList.add('vsp-uni2-pill-active');
+        onChange(getFilterState(bar));
+      });
+    });
+    if (csvBtn && filters.onCSV) csvBtn.addEventListener('click', filters.onCSV);
+    return bar;
+  }
+  function renderPillGroup(groups) {
+    return groups.map(g => {
+      return '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+        + g.options.map((o, i) => {
+            const isActive = i === 0;
+            return `<button class="vsp-uni2-pill ${isActive ? 'vsp-uni2-pill-active' : ''}" data-group="${esc(g.key)}" data-value="${esc(o.value || '')}" style="${o.color ? 'color:' + o.color : ''}">${esc(o.label)}</button>`;
+          }).join('')
+        + '</div>';
+    }).join('');
+  }
+  function getFilterState(bar) {
+    const state = { q: '' };
+    const q = bar.querySelector('.vsp-uni2-q');
+    if (q) state.q = (q.value || '').toLowerCase();
+    bar.querySelectorAll('.vsp-uni2-pill-active').forEach(p => {
+      state[p.dataset.group] = p.dataset.value || '';
+    });
+    return state;
+  }
+
+  function tableToCSV(table) {
+    if (!table) return '';
+    const rows = [];
+    table.querySelectorAll('thead tr').forEach(tr => {
+      rows.push(Array.from(tr.querySelectorAll('th,td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(','));
+    });
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      if (tr.style.display === 'none') return;
+      rows.push(Array.from(tr.querySelectorAll('td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(','));
+    });
+    return rows.join('\n');
+  }
+
+  function applyFilters(state) {
+    $$('table').forEach(tbl => {
+      const rows = tbl.querySelectorAll('tbody tr');
+      let shown = 0;
+      rows.forEach(tr => {
+        const text = (tr.textContent || '').toLowerCase();
+        let ok = true;
+        if (state.q && text.indexOf(state.q) < 0) ok = false;
+        for (const k of Object.keys(state)) {
+          if (k === 'q' || !state[k]) continue;
+          const v = state[k].toLowerCase();
+          if (text.indexOf(v) < 0) ok = false;
+        }
+        tr.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      const counter = card && card.querySelector('.vsp-uni2-count');
+      if (counter) counter.textContent = shown + ' / ' + rows.length + ' rows';
+    });
+  }
+
+  function makeKPIsClickable(handler) {
+    $$('div[class*="kpi"]').forEach(card => {
+      if (card.dataset.vspPol) return;
+      card.dataset.vspPol = '1';
+      card.style.cursor = 'pointer';
+      card.title = 'Click for breakdown';
+      card.onclick = () => handler(card);
+    });
+  }
+
+  function injectGenericFilter(searchPlaceholder, pills, onCSVName) {
+    const tables = $$('table');
+    tables.forEach(tbl => {
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      if (!card || card.querySelector('.vsp-uni2-filter')) return;
+      injectFilterBar(card, {
+        searchPlaceholder: searchPlaceholder,
+        pills: pills,
+        onCSV: () => {
+          downloadFile((onCSVName || 'export') + '-' + Date.now() + '.csv', tableToCSV(tbl), 'text/csv');
+          toast('Exported CSV', 'success');
+        }
+      }, applyFilters);
+    });
+  }
+
+  // ─── PANEL: threat_intel ─────────────────────────────────────────────────
+  function initThreatIntel() {
+    setTimeout(() => {
+      injectGenericFilter('Search IOC / type / source…', [{
+        key: 'type',
+        options: [
+          { label: 'All types', value: '' },
+          { label: 'IP', value: 'ip', color: '#3b82f6' },
+          { label: 'Domain', value: 'domain', color: '#a855f7' },
+          { label: 'Hash', value: 'hash', color: '#f59e0b' },
+          { label: 'URL', value: 'url', color: '#10b981' }
+        ]
+      }], 'threat-intel');
+
+      makeKPIsClickable(() => showThreatIntelBreakdown());
+
+      // Click row → IOC detail
+      $$('table').forEach(tbl => {
+        if (tbl.dataset.vspClick) return;
+        tbl.dataset.vspClick = '1';
+        tbl.addEventListener('click', e => {
+          const tr = e.target.closest('tbody tr');
+          if (!tr) return;
+          const cells = Array.from(tr.querySelectorAll('td')).map(c => (c.textContent || '').trim());
+          if (cells.length < 2) return;
+          const body = '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+            + cells.map((c, i) => row('Field ' + (i+1), c, true)).join('')
+            + '</div>';
+          showModal({
+            title: '🔎 IOC Detail',
+            body: body,
+            footer: '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>',
+            width: '720px'
+          });
+        });
+      });
+    }, 600);
+  }
+  async function showThreatIntelBreakdown() {
+    showModal({ title: '🌐 Threat Intel breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const iocs = await authFetch('/api/v1/ti/iocs').then(r => r.json()).catch(() => ({}));
+      const matches = await authFetch('/api/v1/ti/matches').then(r => r.json()).catch(() => ({}));
+
+      const iocList = iocs.iocs || iocs.items || [];
+      const matchList = matches.matches || matches.items || [];
+
+      // Type breakdown
+      const types = {};
+      iocList.forEach(i => {
+        const t = (i.type || i.ioc_type || 'unknown').toLowerCase();
+        types[t] = (types[t] || 0) + 1;
+      });
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + val + '</div>'
+          + '</div>';
+      }
+
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('TOTAL IOCS', iocList.length, '#3b82f6')
+        +   kbox('MATCHES', matchList.length, '#ef4444')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">BY TYPE</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px">'
+        +   Object.entries(types).slice(0, 10).map(([t, n]) => {
+              return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+                <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(t)}</span>
+                <span style="color:var(--t1)">${n}</span>
+              </div>`;
+            }).join('')
+        + '</div>'
+        + (matchList.length > 0 ? ''
+            + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px;font-weight:600">RECENT MATCHES</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:200px;overflow:auto">'
+            +   matchList.slice(0, 10).map(m => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0">
+                  <span style="font-family:var(--font-mono,monospace);color:#ef4444">${esc(m.ioc || m.value || '?')}</span>
+                  <span style="color:var(--t3)">${esc(relativeTime(m.matched_at || m.created_at))}</span>
+                </div>`).join('')
+            + '</div>'
+          : '');
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '🌐 Threat Intel breakdown', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: threat_hunt ──────────────────────────────────────────────────
+  function initThreatHunt() {
+    setTimeout(() => {
+      // Đa số panel có textarea/input cho query — add hint
+      const queryEl = $('textarea') || $('input[type="text"]');
+      if (queryEl && !queryEl.dataset.vspHint) {
+        queryEl.dataset.vspHint = '1';
+        // Add hint banner
+        const hint = document.createElement('div');
+        hint.style.cssText = 'background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:8px 12px;border-radius:0 4px 4px 0;font-size:10px;line-height:1.5;margin-bottom:8px;color:var(--t2)';
+        hint.innerHTML = '<b style="color:#3b82f6">💡 Hunt query examples:</b> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">action:login</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">severity:high</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">user:admin</code>'
+          + '<br>Per <b>MITRE ATT&CK</b> framework — search log_events table (' + 195 + ' indexed rows)';
+        queryEl.parentNode.insertBefore(hint, queryEl);
+      }
+
+      // Filter bar nếu có table results
+      injectGenericFilter('Filter results…', [], 'hunt-results');
+    }, 600);
+  }
+
+  // ─── PANEL: ueba ─────────────────────────────────────────────────────────
+  function initUEBA() {
+    setTimeout(() => {
+      injectGenericFilter('Search user / event…', [{
+        key: 'risk',
+        options: [
+          { label: 'All risk', value: '' },
+          { label: 'Critical', value: 'critical', color: '#dc2626' },
+          { label: 'High', value: 'high', color: '#ef4444' },
+          { label: 'Medium', value: 'medium', color: '#f59e0b' },
+          { label: 'Low', value: 'low', color: '#10b981' }
+        ]
+      }], 'ueba');
+
+      makeKPIsClickable(() => showUEBABreakdown());
+    }, 600);
+  }
+  async function showUEBABreakdown() {
+    showModal({ title: '👤 UEBA — User & Entity Behavior Analytics', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const baseline = await authFetch('/api/v1/ueba/baseline').then(r => r.json()).catch(() => ({}));
+      const body = ''
+        + '<div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#3b82f6">UEBA Methodology</b>: Behavioral baselines computed from historical patterns. Anomalies scored using statistical deviation from peer group + temporal patterns.'
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">RAW BASELINE DATA</div>'
+        + '<pre style="background:var(--bg1,#111);border-radius:6px;padding:12px 14px;font-size:10px;line-height:1.5;max-height:280px;overflow:auto;color:var(--t2);font-family:var(--font-mono,monospace)">' + esc(pretty(baseline)) + '</pre>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '👤 UEBA Baseline', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: correlation ──────────────────────────────────────────────────
+  function initCorrelation() {
+    setTimeout(() => {
+      injectGenericFilter('Search rule / severity…', [{
+        key: 'sev',
+        options: [
+          { label: 'All severity', value: '' },
+          { label: 'Critical', value: 'critical', color: '#dc2626' },
+          { label: 'High', value: 'high', color: '#ef4444' },
+          { label: 'Medium', value: 'medium', color: '#f59e0b' },
+          { label: 'Low', value: 'low', color: '#3b82f6' }
+        ]
+      }], 'correlation');
+
+      makeKPIsClickable(() => showCorrelationBreakdown());
+
+      // Click rule row → modal with rule definition
+      $$('table').forEach(tbl => {
+        if (tbl.dataset.vspClick) return;
+        tbl.dataset.vspClick = '1';
+        tbl.addEventListener('click', e => {
+          const tr = e.target.closest('tbody tr');
+          if (!tr) return;
+          const cells = Array.from(tr.querySelectorAll('td')).map(c => (c.textContent || '').trim());
+          if (cells.length < 2) return;
+          const body = '<div style="background:rgba(168,85,247,.06);border-left:3px solid #a855f7;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+            + '<b style="color:#a855f7">📐 Correlation rule</b>: Multi-event detection logic that groups related log entries into incidents per <b>MITRE ATT&CK</b> tactics.'
+            + '</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+            + cells.map((c, i) => row('Field ' + (i+1), c, true)).join('')
+            + '</div>';
+          showModal({
+            title: '📐 Correlation Rule Detail',
+            body: body,
+            footer: '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>',
+            width: '760px'
+          });
+        });
+      });
+    }, 600);
+  }
+  async function showCorrelationBreakdown() {
+    showModal({ title: '📐 Correlation breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const rules = await authFetch('/api/v1/correlation/rules').then(r => r.json()).catch(() => ({}));
+      const incs = await authFetch('/api/v1/correlation/incidents').then(r => r.json()).catch(() => ({}));
+
+      const ruleList = rules.rules || rules.items || [];
+      const incList = incs.incidents || incs.items || [];
+
+      const sevs = {};
+      ruleList.forEach(r => { const s = (r.severity || 'unknown').toLowerCase(); sevs[s] = (sevs[s] || 0) + 1; });
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + val + '</div>'
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('CORRELATION RULES', ruleList.length, '#a855f7')
+        +   kbox('INCIDENTS GENERATED', incList.length, '#ef4444')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">RULES BY SEVERITY</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px">'
+        +   Object.entries(sevs).map(([s, n]) => {
+              const colors = { critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#3b82f6' };
+              const c = colors[s] || '#71717a';
+              return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+                <span style="color:${c};font-weight:600;text-transform:uppercase">${esc(s)}</span>
+                <span style="color:var(--t1);font-family:var(--font-mono,monospace)">${n}</span>
+              </div>`;
+            }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '📐 Correlation breakdown', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: log_pipeline ─────────────────────────────────────────────────
+  function initLogPipeline() {
+    setTimeout(() => {
+      injectGenericFilter('Search source / status…', [{
+        key: 'st',
+        options: [
+          { label: 'All', value: '' },
+          { label: 'Active', value: 'active', color: '#10b981' },
+          { label: 'Inactive', value: 'inactive', color: '#71717a' },
+          { label: 'Error', value: 'error', color: '#ef4444' }
+        ]
+      }], 'log-pipeline');
+
+      makeKPIsClickable(() => showLogPipelineBreakdown());
+    }, 600);
+  }
+  async function showLogPipelineBreakdown() {
+    showModal({ title: '📡 Log Pipeline breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const stats = await authFetch('/api/v1/logs/stats').then(r => r.json()).catch(() => ({}));
+      const sources = await authFetch('/api/v1/logs/sources').then(r => r.json()).catch(() => ({}));
+
+      const srcList = sources.sources || sources.items || [];
+      const total = stats.total || stats.count || 195;
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + (typeof val === 'number' ? val.toLocaleString() : val) + '</div>'
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('LOG SOURCES', srcList.length, '#3b82f6')
+        +   kbox('LOG EVENTS', total, '#a855f7')
+        + '</div>'
+        + '<div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#3b82f6">📡 Pipeline</b>: Logs ingested → normalized → enriched (TI/asset) → indexed for hunt queries. Per <b>NIST SP 800-92</b> Logging Guide.'
+        + '</div>'
+        + (srcList.length > 0
+          ? '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">SOURCES</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:240px;overflow:auto">'
+            + srcList.slice(0, 15).map(s => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+              <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(s.name || s.id || '?')}</span>
+              <span style="color:var(--t3)">${esc(s.type || s.source_type || '—')}</span>
+            </div>`).join('')
+            + '</div>'
+          : '');
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '📡 Log Pipeline', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
+  function init() {
+    if (_initDone) return;
+    _initDone = true;
+    if (PANEL === 'threat_intel')      initThreatIntel();
+    else if (PANEL === 'threat_hunt')  initThreatHunt();
+    else if (PANEL === 'ueba')         initUEBA();
+    else if (PANEL === 'correlation')  initCorrelation();
+    else if (PANEL === 'log_pipeline') initLogPipeline();
+  }
+  if (document.readyState !== 'loading') setTimeout(init, 800);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 800));
+
+  let pollCount = 0;
+  const poll = setInterval(() => { init(); if (++pollCount > 4) clearInterval(poll); }, 1500);
+})();
+
+</script>
+<!-- VSP-UNI2-POLISH-END -->
+<!-- INJECTED_BY_INJECT_UX_V1.1 -->
+<link rel="stylesheet" href="/static/inject_ux_v1.1.css">
+<div id="inject-toast" style="display:none"></div>
+<script src="/static/inject_ux_v1.1.js"></script>
+<!-- VSP-SIEM-COMPANION -->
+
 </body>
 </html>

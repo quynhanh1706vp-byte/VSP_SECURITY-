@@ -105,24 +105,24 @@ var fedRAMPControlsFull = []ControlDef{
 	{ID: "CM-5", Family: "Config Mgmt", Title: "Access Restriction for Change", Framework: "FedRAMP", Tools: []string{"kics", "checkov"}, NIST: "CM-5", ILRequired: []int{4, 5}},
 	{ID: "CM-6", Family: "Config Mgmt", Title: "Configuration Settings", Framework: "FedRAMP", Tools: []string{"kics", "checkov"}, NIST: "CM-6", ILRequired: []int{2, 4, 5}},
 	{ID: "CM-7", Family: "Config Mgmt", Title: "Least Functionality", Framework: "FedRAMP", Tools: []string{"kics", "checkov", "nuclei"}, NIST: "CM-7", ILRequired: []int{2, 4, 5}},
-	{ID: "CM-8", Family: "Config Mgmt", Title: "System Component Inventory", Framework: "FedRAMP", Tools: []string{"grype", "trivy"}, NIST: "CM-8", ILRequired: []int{2, 4, 5}},
+	{ID: "CM-8", Family: "Config Mgmt", Title: "System Component Inventory", Framework: "FedRAMP", Tools: []string{"grype", "trivy", "syft", "cosign", "govulncheck"}, NIST: "CM-8", ILRequired: []int{2, 4, 5}},
 	{ID: "CM-10", Family: "Config Mgmt", Title: "Software Usage Restrictions", Framework: "FedRAMP", Tools: []string{"grype", "trivy"}, NIST: "CM-10", ILRequired: []int{2, 4, 5}},
 	{ID: "CM-11", Family: "Config Mgmt", Title: "User-Installed Software", Framework: "FedRAMP", Tools: []string{"grype", "trivy"}, NIST: "CM-11", ILRequired: []int{2, 4, 5}},
 	// IDENTIFICATION & AUTHENTICATION (IA)
 	{ID: "IA-2", Family: "Ident & Auth", Title: "Identification & Auth (Users)", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep"}, NIST: "IA-2", ILRequired: []int{2, 4, 5}},
 	{ID: "IA-3", Family: "Ident & Auth", Title: "Device Identification", Framework: "FedRAMP", Tools: []string{"kics"}, NIST: "IA-3", ILRequired: []int{4, 5}},
 	{ID: "IA-4", Family: "Ident & Auth", Title: "Identifier Management", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep"}, NIST: "IA-4", ILRequired: []int{2, 4, 5}},
-	{ID: "IA-5", Family: "Ident & Auth", Title: "Authenticator Management", Framework: "FedRAMP", Tools: []string{"gitleaks", "secretcheck"}, NIST: "IA-5", ILRequired: []int{2, 4, 5}},
+	{ID: "IA-5", Family: "Ident & Auth", Title: "Authenticator Management", Framework: "FedRAMP", Tools: []string{"gitleaks", "secretcheck", "trufflehog"}, NIST: "IA-5", ILRequired: []int{2, 4, 5}},
 	{ID: "IA-6", Family: "Ident & Auth", Title: "Authentication Feedback", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep"}, NIST: "IA-6", ILRequired: []int{2, 4, 5}},
 	{ID: "IA-7", Family: "Ident & Auth", Title: "Cryptographic Module Auth", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep"}, NIST: "IA-7", ILRequired: []int{2, 4, 5}},
 	{ID: "IA-8", Family: "Ident & Auth", Title: "Non-Org User Identification", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep"}, NIST: "IA-8", ILRequired: []int{2, 4, 5}},
 	// RISK ASSESSMENT (RA)
 	{ID: "RA-2", Family: "Risk Assessment", Title: "Security Categorization", Framework: "FedRAMP", Tools: []string{"grype", "trivy"}, NIST: "RA-2", ILRequired: []int{2, 4, 5}},
 	{ID: "RA-3", Family: "Risk Assessment", Title: "Risk Assessment", Framework: "FedRAMP", Tools: []string{"grype", "trivy", "nuclei"}, NIST: "RA-3", ILRequired: []int{2, 4, 5}},
-	{ID: "RA-5", Family: "Risk Assessment", Title: "Vulnerability Monitoring", Framework: "FedRAMP", Tools: []string{"grype", "trivy", "nuclei"}, NIST: "RA-5", ILRequired: []int{2, 4, 5}},
+	{ID: "RA-5", Family: "Risk Assessment", Title: "Vulnerability Monitoring", Framework: "FedRAMP", Tools: []string{"grype", "trivy", "nuclei", "osv-scanner", "retire-js"}, NIST: "RA-5", ILRequired: []int{2, 4, 5}},
 	{ID: "RA-7", Family: "Risk Assessment", Title: "Risk Response", Framework: "FedRAMP", Tools: []string{"grype", "trivy"}, NIST: "RA-7", ILRequired: []int{4, 5}},
 	// SYSTEM & SERVICES ACQUISITION (SA)
-	{ID: "SA-3", Family: "Sys & Svc Acq", Title: "System Dev Life Cycle", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep", "codeql"}, NIST: "SA-3", ILRequired: []int{2, 4, 5}},
+	{ID: "SA-3", Family: "Sys & Svc Acq", Title: "System Dev Life Cycle", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep", "codeql", "gosec", "hadolint"}, NIST: "SA-3", ILRequired: []int{2, 4, 5}},
 	{ID: "SA-4", Family: "Sys & Svc Acq", Title: "Acquisition Process", Framework: "FedRAMP", Tools: []string{"grype", "trivy"}, NIST: "SA-4", ILRequired: []int{2, 4, 5}},
 	{ID: "SA-5", Family: "Sys & Svc Acq", Title: "System Documentation", Framework: "FedRAMP", Tools: []string{"semgrep"}, NIST: "SA-5", ILRequired: []int{2, 4, 5}},
 	{ID: "SA-8", Family: "Sys & Svc Acq", Title: "Security Engineering Principles", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep", "kics"}, NIST: "SA-8", ILRequired: []int{4, 5}},
@@ -155,7 +155,7 @@ var fedRAMPControlsFull = []ControlDef{
 	// SYSTEM & INFO INTEGRITY (SI)
 	{ID: "SI-2", Family: "Sys & Info Integ", Title: "Flaw Remediation", Framework: "FedRAMP", Tools: []string{"grype", "trivy"}, NIST: "SI-2", ILRequired: []int{2, 4, 5}},
 	{ID: "SI-3", Family: "Sys & Info Integ", Title: "Malicious Code Protection", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep", "codeql"}, NIST: "SI-3", ILRequired: []int{2, 4, 5}},
-	{ID: "SI-4", Family: "Sys & Info Integ", Title: "System Monitoring", Framework: "FedRAMP", Tools: []string{"nuclei", "sslscan"}, NIST: "SI-4", ILRequired: []int{2, 4, 5}},
+	{ID: "SI-4", Family: "Sys & Info Integ", Title: "System Monitoring", Framework: "FedRAMP", Tools: []string{"nuclei", "sslscan", "nmap", "netcap"}, NIST: "SI-4", ILRequired: []int{2, 4, 5}},
 	{ID: "SI-5", Family: "Sys & Info Integ", Title: "Security Alerts", Framework: "FedRAMP", Tools: []string{"grype", "trivy"}, NIST: "SI-5", ILRequired: []int{2, 4, 5}},
 	{ID: "SI-6", Family: "Sys & Info Integ", Title: "Security Func Verification", Framework: "FedRAMP", Tools: []string{"bandit", "semgrep"}, NIST: "SI-6", ILRequired: []int{4, 5}},
 	{ID: "SI-7", Family: "Sys & Info Integ", Title: "Software Integrity", Framework: "FedRAMP", Tools: []string{"grype", "trivy", "checkov"}, NIST: "SI-7", ILRequired: []int{2, 4, 5}},
@@ -334,16 +334,33 @@ func assessControls(ctx context.Context, db *store.DB, tenantID string, controls
 	}
 
 	// 2. Check which tools ran (even with 0 findings)
+	// Tool→mode mapping mirrors pipeline/profiles.go:ToolNamesForMode — 8 modes, 26 tools.
 	rows2, err2 := db.Pool().Query(ctx, `
 		SELECT DISTINCT unnest(
 		  CASE mode
-		    WHEN 'SAST'    THEN ARRAY['bandit','semgrep','codeql']
-		    WHEN 'SCA'     THEN ARRAY['grype','trivy']
-		    WHEN 'SECRETS' THEN ARRAY['gitleaks','secretcheck']
-		    WHEN 'IAC'     THEN ARRAY['kics','checkov']
-		    WHEN 'DAST'    THEN ARRAY['nuclei','nikto','sslscan']
-		    WHEN 'NETWORK' THEN ARRAY['sslscan','netcap']
-		    WHEN 'FULL'    THEN ARRAY['bandit','semgrep','codeql','grype','trivy','gitleaks','secretcheck','kics','checkov','nuclei','sslscan']
+		    WHEN 'SAST'     THEN ARRAY['bandit','semgrep','codeql','gosec']
+		    WHEN 'SCA'      THEN ARRAY['trivy','grype','license','syft',
+		                               'govulncheck','osv-scanner','cosign','retire-js']
+		    WHEN 'SECRETS'  THEN ARRAY['gitleaks','secretcheck','trufflehog']
+		    WHEN 'IAC'      THEN ARRAY['kics','checkov','hadolint']
+		    WHEN 'DAST'     THEN ARRAY['nikto','nuclei','sslscan']
+		    WHEN 'NETWORK'  THEN ARRAY['sslscan','nmap','netcap']
+		    WHEN 'FULL'     THEN ARRAY['kics','checkov','hadolint',
+		                               'bandit','semgrep','codeql','gosec',
+		                               'trivy','grype','license','osv-scanner',
+		                               'cosign','retire-js','syft','govulncheck',
+		                               'gitleaks','secretcheck','trufflehog',
+		                               'nikto','nuclei','sslscan',
+		                               'nmap','netcap',
+		                               'apisec','gofuzz','racedetect']
+		    WHEN 'FULL_SOC' THEN ARRAY['kics','checkov','hadolint',
+		                               'bandit','semgrep','codeql','gosec',
+		                               'trivy','grype','license','osv-scanner',
+		                               'cosign','retire-js','syft','govulncheck',
+		                               'gitleaks','secretcheck','trufflehog',
+		                               'nikto','nuclei','sslscan',
+		                               'nmap','netcap',
+		                               'apisec','gofuzz','racedetect']
 		    ELSE ARRAY[]::text[]
 		  END
 		) as tool

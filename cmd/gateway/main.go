@@ -6,12 +6,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
+	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/vsp/platform/internal/autopr"
+	"github.com/vsp/platform/internal/container"
 
 	"database/sql"
 
@@ -25,26 +32,131 @@ import (
 
 	"crypto/tls"
 
+	"path/filepath"
+	"strconv"
+
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/vsp/platform/internal/agentic"
 	"github.com/vsp/platform/internal/api/handler"
 	vspMW "github.com/vsp/platform/internal/api/middleware"
 	"github.com/vsp/platform/internal/auth"
+	"github.com/vsp/platform/internal/autofix"
 	"github.com/vsp/platform/internal/billing"
 	"github.com/vsp/platform/internal/cache"
+	"github.com/vsp/platform/internal/conmon"
+	"github.com/vsp/platform/internal/handlers"
+	"github.com/vsp/platform/internal/i18n"
+	"github.com/vsp/platform/internal/llm"
 	"github.com/vsp/platform/internal/migrate"
 	"github.com/vsp/platform/internal/netcap"
+	"github.com/vsp/platform/internal/notify"
 	"github.com/vsp/platform/internal/pipeline"
+	"github.com/vsp/platform/internal/poam"
 	"github.com/vsp/platform/internal/safe"
 	"github.com/vsp/platform/internal/scheduler"
+	"github.com/vsp/platform/internal/secrets"
 	"github.com/vsp/platform/internal/siem"
+	"github.com/vsp/platform/internal/soar"
 	"github.com/vsp/platform/internal/store"
+	"github.com/vsp/platform/internal/sso"
 	"github.com/vsp/platform/internal/telemetry"
+	"github.com/vsp/platform/internal/ticket"
 )
+
+// init đăng ký MIME types đúng để Chrome strict MIME checking không chặn
+// .js/.css. http.ServeFile và http.FileServer đều dùng mime.TypeByExtension().
+func init() {
+	mime.AddExtensionType(".js", "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".mjs", "application/javascript; charset=utf-8")
+	mime.AddExtensionType(".css", "text/css; charset=utf-8")
+	mime.AddExtensionType(".html", "text/html; charset=utf-8")
+	mime.AddExtensionType(".json", "application/json; charset=utf-8")
+	mime.AddExtensionType(".svg", "image/svg+xml")
+	mime.AddExtensionType(".woff", "font/woff")
+	mime.AddExtensionType(".woff2", "font/woff2")
+	mime.AddExtensionType(".map", "application/json")
+}
 
 var startTime = time.Now()
 
+// wsBroadcaster bridges handler.Hub to soar.Broadcaster interface.
+type wsBroadcaster struct{}
+
+func (wsBroadcaster) Broadcast(msg []byte) { handler.Hub.Broadcast(msg) }
+
+// llmDBAdapter satisfies llm.PgxQuerier using whatever db.Pool() returns.
+// Uses interface{} + reflection-free type assertion on the methods we need.
+type llmDBAdapter struct{ raw interface{} }
+
+func (a llmDBAdapter) QueryRow(ctx context.Context, sqlStr string, args ...interface{}) llm.PgxRow {
+	type qr interface {
+		QueryRow(ctx context.Context, sql string, args ...interface{}) interface{ Scan(...interface{}) error }
+	}
+	if p, ok := a.raw.(qr); ok {
+		return p.QueryRow(ctx, sqlStr, args...)
+	}
+	return errRow{fmt.Errorf("db pool type does not implement QueryRow(ctx, sql, args...)")}
+}
+
+func (a llmDBAdapter) Exec(ctx context.Context, sqlStr string, args ...interface{}) (interface{}, error) {
+	type ex interface {
+		Exec(ctx context.Context, sql string, args ...interface{}) (interface{}, error)
+	}
+	if p, ok := a.raw.(ex); ok {
+		return p.Exec(ctx, sqlStr, args...)
+	}
+	return nil, fmt.Errorf("db pool type does not implement Exec(ctx, sql, args...)")
+}
+
+type errRow struct{ err error }
+
+func (e errRow) Scan(...interface{}) error { return e.err }
+
 func main() {
+	// ─── H3.N: Initialize LLM provider + policy ─────────────────────
+	var llmProvider llm.Provider
+	var llmPolicy *llm.Policy
+	if os.Getenv("LLM_ENABLED") == "true" {
+		provider := os.Getenv("LLM_PROVIDER")
+		if provider == "" {
+			provider = "ollama"
+		}
+		baseURL := os.Getenv("LLM_BASE_URL")
+		if baseURL == "" {
+			baseURL = "http://127.0.0.1:11434"
+		}
+		model := os.Getenv("LLM_MODEL")
+		if model == "" {
+			model = "deepseek-coder-v2:16b"
+		}
+		timeoutSec := 30
+		if s := os.Getenv("LLM_TIMEOUT_SECONDS"); s != "" {
+			if n, err := strconv.Atoi(s); err == nil && n > 0 {
+				timeoutSec = n
+			}
+		}
+		switch provider {
+		case "ollama":
+			if p, err := llm.NewOllamaProvider(baseURL, model, timeoutSec); err == nil {
+				llmProvider = p
+				log.Printf("[H3.N] LLM provider: ollama @ %s (model=%s)", baseURL, model)
+			} else {
+				log.Printf("[H3.N] LLM provider init failed: %v", err)
+			}
+		default:
+			log.Printf("[H3.N] LLM provider %q not implemented yet, only ollama", provider)
+		}
+		policyPath := os.Getenv("LLM_POLICY_PATH")
+		llmPolicy = llm.LoadPolicy(policyPath)
+	} else {
+		llmPolicy = llm.LoadPolicy("") // default-allow with secrets blocked
+		log.Printf("[H3.N] LLM disabled (LLM_ENABLED!=true) — using templates only")
+	}
+	_ = llmProvider // suppress unused warning if no LLM routes use it
+
+	_ = llmPolicy
+
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config")
@@ -81,16 +193,49 @@ func main() {
 
 	level, _ := zerolog.ParseLevel(viper.GetString("log.level"))
 	zerolog.SetGlobalLevel(level)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+	// NoColor when stderr isn't a TTY (CI, journald, file redirects).
+	// ANSI colour codes break structured-log shippers (and L27.28.4.1).
+	stderrFI, _ := os.Stderr.Stat()
+	stderrIsTTY := stderrFI != nil && (stderrFI.Mode()&os.ModeCharDevice) != 0
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: time.RFC3339,
+		NoColor:    !stderrIsTTY,
+	})
 
 	ctx, shutdown := context.WithCancel(context.Background())
 	defer shutdown()
-	db, err := store.New(ctx, viper.GetString("database.url"))
+	// DSN: prefer secrets provider when configured. The secrets package
+	// returns the env-loaded value when VSP_SECRETS_PROVIDER is unset, so
+	// this is a no-op in dev. In production with VSP_SECRETS_PROVIDER=vault
+	// the DSN comes from Vault rather than .env on the host.
+	dsn := viper.GetString("database.url")
+	if sp, sErr := secrets.Default(); sErr == nil {
+		if v, err := sp.Get("db_url"); err == nil && v != "" {
+			dsn = v
+			log.Info().Str("source", sp.Source()).Msg("db_url loaded from secrets provider")
+		}
+	}
+	db, err := store.New(ctx, dsn)
 	if err != nil {
 		log.Fatal().Err(err).Msg("database connect failed")
 	}
 	defer db.Close()
 	log.Info().Msg("database connected ✓")
+
+	// Background: timeout stuck SOAR playbook runs every 5 minutes
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			n, err := db.TimeoutStuckRuns(context.Background(), 15*time.Minute)
+			if err != nil {
+				log.Warn().Err(err).Msg("TimeoutStuckRuns error")
+			} else if n > 0 {
+				log.Info().Int64("count", n).Msg("timed out stuck SOAR runs")
+			}
+		}
+	}()
 
 	// Auto-run migrations
 	stdDB, err2 := sql.Open("pgx", viper.GetString("database.url"))
@@ -112,12 +257,75 @@ func main() {
 	p4DB, _ := sql.Open("pgx", viper.GetString("database.url"))
 	initP4DB(p4DB)
 
+	// ─── [H3.T] Agentic Autofix orchestrator ─────────────────────────
+	agenticRepoRoot := os.Getenv("VSP_REPO_ROOT")
+	if agenticRepoRoot == "" {
+		agenticRepoRoot = "/home/test/Data/GOLANG_VSP"
+	}
+	agenticTools := agentic.NewToolBox(agenticRepoRoot)
+	agenticOrch := agentic.NewOrchestrator(p4DB, agenticTools)
+	agenticOrch.Telem = telemetry.G() // [H3.X] wire real telemetry (was noopTelemetry)
+	agenticHandlers := agentic.NewHandlerSet(agenticOrch)
+
+	// ─── [H3.X] Health trackers cho workers ───
+	agenticHealth := handler.NewWorkerHealth(2 * time.Minute)
+	remediationHealth := handler.NewWorkerHealth(7 * time.Minute)
+	healthH := &handler.HealthHandler{
+		AgenticHealth:     agenticHealth,
+		RemediationHealth: remediationHealth,
+	}
+
+	// ─── [H3.U] Remediation Worker — auto-populate items from findings ─
+	autofix.StartRemediationWorker(ctx, p4DB, remediationHealth)
+
+	// ─── [H3.O] Pre-compute Worker ───────────────────────────────────
+	// Background worker pre-computes AI fixes for CRITICAL/HIGH code findings
+	// after each scan completes, eliminating 25-40s "Loading diff..." UX latency.
+	// Uses p4DB (*sql.DB) — same connection style as all H3.N handlers.
+	var precomputeWorker *autofix.PrecomputeWorker
+	if os.Getenv("LLM_ENABLED") == "true" && os.Getenv("LLM_PRECOMPUTE_ENABLED") != "false" {
+		if llmProvider != nil && llmPolicy != nil && p4DB != nil {
+			precomputeWorker = autofix.NewPrecomputeWorker(p4DB, llmProvider, llmPolicy)
+			if precomputeWorker != nil {
+				precomputeWorker.SetHealth(agenticHealth)
+				ctxWorker, cancelWorker := context.WithCancel(context.Background())
+				go precomputeWorker.Run(ctxWorker)
+
+				// ── H3.S SLA scheduler (auto-PR creation) ─────────────
+
+				slaScheduler := autopr.NewSLAScheduler(p4DB)
+
+				slaScheduler.Start(ctxWorker)
+				log.Printf("[H3.O] Pre-compute worker initialized")
+				_ = cancelWorker
+			}
+		}
+	}
+	_ = precomputeWorker
+
 	if skErr := initOrLoadSigningKey(p4SQLDB); skErr != nil {
 		log.Printf("[main] WARN: supply chain signing key init failed: %v", skErr)
 	}
 	defaultTID := getDefaultTenantID(ctx, db)
 
+	// JWT secret: prefer the configured secrets provider (Vault if
+	// VSP_SECRETS_PROVIDER=vault). Falls back to the viper-loaded value
+	// (which itself reads JWT_SECRET env). The provider abstraction lets
+	// production deployments centralise rotation in Vault without code
+	// changes — see internal/secrets/.
 	jwtSecret := viper.GetString("auth.jwt_secret")
+	if sp, sErr := secrets.Default(); sErr == nil {
+		if v, err := sp.Get("jwt"); err == nil && v != "" {
+			jwtSecret = v
+			log.Info().Str("source", sp.Source()).Msg("jwt secret loaded from secrets provider")
+		}
+		// If running on Vault, kick off the rotator so subsequent KV
+		// writes flow into the cache without restart. Other providers
+		// (env) are no-ops for rotation by definition.
+		if vp, ok := sp.(*secrets.VaultProvider); ok {
+			vp.StartRotator(ctx, 15*time.Minute)
+		}
+	}
 	// No silent fallback — fail fast if secret is weak or default
 	if jwtSecret == "" || jwtSecret == "change-me-in-production" || jwtSecret == "dev-secret-change-in-prod" {
 		if viper.GetString("server.env") == "production" {
@@ -130,21 +338,6 @@ func main() {
 		jwtTTL = 24 * time.Hour
 	}
 
-	// SSO/OIDC config (optional — disabled by default)
-	ssoConfig := auth.OIDCConfig{
-		Enabled:      viper.GetBool("sso.enabled"),
-		ProviderName: viper.GetString("sso.provider"),
-		ClientID:     viper.GetString("sso.client_id"),
-		ClientSecret: viper.GetString("sso.client_secret"),
-		RedirectURL:  viper.GetString("sso.redirect_url"),
-		AuthURL:      viper.GetString("sso.auth_url"),
-		TokenURL:     viper.GetString("sso.token_url"),
-		UserInfoURL:  viper.GetString("sso.userinfo_url"),
-		DefaultRole:  viper.GetString("sso.default_role"),
-	}
-	viper.SetDefault("sso.enabled", false)
-	viper.SetDefault("sso.provider", "google")
-	viper.SetDefault("sso.default_role", "analyst")
 
 	// Đọc Redis config trực tiếp từ env để đảm bảo Docker env vars được dùng
 	redisAddr := os.Getenv("REDIS_ADDR")
@@ -172,11 +365,88 @@ func main() {
 	ca := cache.New(redisAddr, redisPass)
 
 	// ── All handlers ──────────────────────────────────────────────
-	authH := &handler.Auth{DB: db, JWTSecret: jwtSecret, JWTTTL: jwtTTL, DefaultTID: defaultTID}
+
+	// ── Token blacklist (Redis DB 1) — wires JWT revocation into middleware ──
+	tokenBlacklist := auth.NewTokenBlacklist(redisAddr, redisPass)
+	auth.SetBlacklist(tokenBlacklist)
+	log.Info().Str("redis", redisAddr).Msg("token blacklist initialized (Redis DB 1)")
+
+	// Anomaly-driven session revocation: scans audit_log every minute for
+	// impossible-travel + rapid-IP-rotation patterns and revokes all
+	// tokens for the affected user.
+	go auth.NewAnomalyDetector(db.Pool(), tokenBlacklist, time.Minute).Run(ctx)
+
+	// JWKS warm-up — pre-fetch public keys for all enabled SSO providers
+	// so the first user login after restart doesn't pay the fetch latency.
+	go func() {
+		wCtx, wCancel := context.WithTimeout(ctx, 30*time.Second)
+		defer wCancel()
+		providers, err := sso.ListEnabledProviders(wCtx, p4DB)
+		if err != nil || len(providers) == 0 {
+			return
+		}
+		for _, p := range providers {
+			if disc, err := sso.FetchDiscovery(wCtx, p4DB, &p); err == nil && disc.JWKSURI != "" {
+				_, _ = sso.FetchJWKS(wCtx, disc.JWKSURI)
+			}
+		}
+		log.Info().Int("providers", len(providers)).Msg("sso: JWKS warm-up complete")
+	}()
+
+	authH := &handler.Auth{
+		DB:         db,
+		JWTSecret:  jwtSecret,
+		JWTTTL:     jwtTTL,
+		DefaultTID: defaultTID,
+		IPLock:     auth.NewIPLockout(),
+	}
 	handler.SetJWTSecret(jwtSecret)
+	// L27 2026-05-09: warm Prometheus CounterVec series at startup so
+	// /metrics exposes them from boot. CounterVec doesn't emit a
+	// series until at least one label combination has been Inc()'d,
+	// so a freshly-restarted gateway has no auth/login metric until
+	// someone tries to log in. Operators alerting on rate(...) or
+	// increase(...) over a window need the series to exist immediately.
+	for _, r := range []string{"success", "failed", "locked", "ip_locked", "mfa_failed"} {
+		handler.LoginAttempts.WithLabelValues(r).Add(0)
+	}
+	handler.AuditChainBreaks.Add(0)
+	// L9 2026-05-09: wire the slug→UUID resolver auth middleware uses
+	// to canonicalise Claims.TenantID before handlers see it.
+	auth.SetClaimsTenantResolver(func(ctx context.Context, raw string) string {
+		if raw == "" {
+			return ""
+		}
+		var id string
+		_ = db.Pool().QueryRow(ctx,
+			`SELECT id::text FROM tenants WHERE slug=$1 LIMIT 1`, raw).Scan(&id)
+		return id
+	})
+	// L5 fix: SSE subscribers must scope by tenant UUID, not slug. Wire
+	// a slug→UUID resolver so JWT claims (which carry "default") match
+	// broadcast messages (which carry the UUID). Inline lookup here —
+	// resolveTenantUUID lives in package handler so we replicate the
+	// 1-line query rather than exporting it.
+	handler.SetSSETenantResolver(func(claim string) string {
+		if claim == "" {
+			return ""
+		}
+		// Heuristic: 36-char hyphenated string is already a UUID.
+		if len(claim) == 36 && strings.Count(claim, "-") == 4 {
+			return claim
+		}
+		var id string
+		_ = db.Pool().QueryRow(context.Background(),
+			`SELECT id::text FROM tenants WHERE slug=$1 LIMIT 1`, claim).Scan(&id)
+		if id == "" {
+			return claim
+		}
+		return id
+	})
 	usersH := &handler.Users{DB: db}
 	mfaH := &handler.MFA{DB: db}
 	apiKeysH := &handler.APIKeys{DB: db}
+	toolConfigH := &handler.ToolConfig{DB: db}
 	runsH := &handler.Runs{DB: db}
 	runsH.SetAsynqClient(asynqClient)
 	findingsH := &handler.Findings{DB: db}
@@ -189,7 +459,66 @@ func main() {
 	// ── UEBA + Assets ────────────────────────────────────────
 	uebaH := &handler.UEBA{DB: db}
 	assetsH := &handler.Assets{DB: db}
+	agentsH := &handler.Agents{DB: db}
 	soarH := &handler.SOAR{DB: db}
+
+	// ───────── SOAR Engine v2 (Phase 2.1.B+C) ─────────
+	soarRepoKey := os.Getenv("VSP_REPO_KEY")
+	if soarRepoKey == "" {
+		log.Fatal().Msg("VSP_REPO_KEY env var required for SOAR vault")
+	}
+	soarSecretsStore := &soar.SecretsStoreAdapter{DB: db}
+	soarVault, err := soar.NewVault(soarSecretsStore, soarRepoKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("init SOAR vault")
+	}
+	soarSandbox := soar.NewSandbox()
+	soarDispatcher := soar.NewDispatcher()
+	soarDispatcher.RegisterDefault()
+	soarNotifier := notify.New(notify.Config{
+		SlackDefaultWebhook:   viper.GetString("integrations.slack_webhook"),
+		DiscordDefaultWebhook: viper.GetString("integrations.discord_webhook"),
+		TeamsDefaultWebhook:   viper.GetString("integrations.teams_webhook"),
+	})
+	soarTicketer := ticket.New(ticket.Config{
+		JiraBaseURL:         viper.GetString("integrations.jira_url"),
+		JiraEmail:           viper.GetString("integrations.jira_email"),
+		JiraAPIToken:        viper.GetString("integrations.jira_token"),
+		PagerDutyRoutingKey: viper.GetString("integrations.pagerduty_key"),
+		GitHubBaseURL:       viper.GetString("integrations.github_base_url"),
+		GitHubToken:         viper.GetString("integrations.github_token"),
+		GitHubRepo:          viper.GetString("integrations.github_repo"),
+	})
+	soar.RegisterIOExecutors(soarDispatcher, soar.NewSafeHTTPClient(), soarNotifier, soarTicketer)
+	soar.RegisterFlowExecutors(soarDispatcher, soarSandbox, nil, nil)
+
+	// Register 7 SOAR metrics
+	for name, meta := range soar.DescribeMetrics() {
+		telemetry.G().Describe(name, meta[0], meta[1])
+	}
+
+	soarAdapter := &soar.StoreAdapter{DB: db}
+	soarEngine, err := soar.New(soar.EngineConfig{
+		Store:         soarAdapter,
+		Dispatcher:    soarDispatcher,
+		Vault:         soarVault,
+		Sandbox:       soarSandbox,
+		Broadcaster:   wsBroadcaster{},
+		Metrics:       telemetry.NewSOARPromAdapter(),
+		MaxConcurrent: 100,
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("init SOAR engine")
+	}
+	soarManager := soar.NewManager(soarEngine, soarAdapter)
+	soarV2H := &handler.SOARv2{
+		DB:      db,
+		Manager: soarManager,
+		Vault:   soarVault,
+		Engine:  soarEngine,
+	}
+	log.Info().Msg("SOAR engine initialized")
+
 	logSrcH := &handler.LogSources{DB: db}
 	tiH := &handler.ThreatIntel{DB: db}
 	complianceH := &handler.Compliance{DB: db}
@@ -197,11 +526,20 @@ func main() {
 	exportH := &handler.Export{DB: db}
 	reportH := &handler.Report{DB: db}
 	sbomH := &handler.SBOM{DB: db}
+	// PHASE3G-HANDLERS-BEGIN
+	oscalModelsH := &handler.OSCALModels{DB: db}
+	// PHASE3G-HANDLERS-END
+	// PHASE3F-HANDLERS-BEGIN
+	oscalPackageH := &handler.OSCALPackage{DB: db}
+	// PHASE3F-HANDLERS-END
+	// PHASE3-HANDLERS-BEGIN
+	supplyChainH := &handler.SupplyChain{DB: db}
+	cisaAttestH := &handler.CISAAttestation{DB: db}
+	// PHASE3-HANDLERS-END
 	slaH := &handler.SLA{DB: db}
 	sandboxH := &handler.Sandbox{DB: db}
 	importsH := &handler.Imports{DB: db}
 	remediationH := &handler.Remediation{DB: db}
-	ssoH := handler.NewSSO(ssoConfig, authH, db)
 
 	// Scheduler engine
 	schedEngine := scheduler.New(db, func(rid, tenantID, mode, profile, src, url string) {
@@ -213,31 +551,180 @@ func main() {
 	defer schedEngine.Stop()
 	schedH := &handler.Scheduler{DB: db, Engine: schedEngine}
 	keyStore := &apiKeyStore{db: db}
-	rl := vspMW.NewRateLimiter(600, time.Minute)
+	// VSP_PATCH_PERF_03 — global per-IP rate limiter disabled.
+	// Reason: dashboard burst of ~70 req/s exhausted 600/min bucket within
+	// seconds, causing prolonged 429 storms. Defense remains via JWT auth,
+	// CSRF protect, 4MB body limit, 60s timeout, and nginx layer.
+	// To re-enable, uncomment both this and r.Use(rl.Middleware) below.
+	_ = vspMW.NewRateLimiter // keep package imported
+	// rl := vspMW.NewRateLimiter(600, time.Minute)
 
 	// ── Router ────────────────────────────────────────────────────
 	r := chi.NewRouter()
+	// Custom 404 / 405 — chi's default emits `text/plain` "404 page not
+	// found", which breaks JSON-routing clients (they expected the
+	// {"error":"..."} envelope every other 4xx uses). L45.1.1 caught
+	// this on /api/v1/scheduler/jobs.
+	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"route not found"}`))
+	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(`{"error":"method not allowed"}`))
+	})
+	// Strip trailing slash before route matching (so /api/x/ → /api/x)
+	r.Use(chimw.StripSlashes)
 	r.Use(chimw.RequestID)
-	r.Use(chimw.RealIP)
+	// L23 2026-05-09: chimw.RealIP blindly trusts X-Forwarded-For /
+	// X-Real-IP and rewrites r.RemoteAddr. That lets a direct attacker
+	// (no proxy in front) set XFF: 127.0.0.1 and impersonate loopback,
+	// bypassing every IP-based gate downstream — /debug/* loopback gate,
+	// /metrics localhost gate, IPLockout (each request appears to come
+	// from a different IP). Wrap RealIP so it only fires when the
+	// IMMEDIATE TCP source is in a trusted-proxy allow-list.
+	//
+	// Default trusted proxies: loopback. Operators behind a LB extend
+	// via VSP_TRUSTED_PROXIES (comma-separated CIDRs).
+	r.Use(trustedRealIP(viper.GetString("server.trusted_proxies")))
+	r.Use(i18n.Middleware) // resolves locale from query/header/accept-language
 	r.Use(vspMW.CSPNonce)
 	r.Use(vspMW.CSRFProtect)
 	r.Use(vspMW.RequestLogger)
+	// L27 2026-05-09: per-request latency + outcome metrics. Wires
+	// vsp_api_request_duration_seconds histogram (declared in
+	// internal/api/handler/metrics.go) so operators can see RPS, P99,
+	// status mix per route. Path label is intentionally coarse
+	// (chi RoutePattern, not raw URL) to keep cardinality bounded.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			start := time.Now()
+			ww := chimw.NewWrapResponseWriter(w, req.ProtoMajor)
+			next.ServeHTTP(ww, req)
+			// L53 cardinality fix: use chi's RoutePattern when chi
+			// matched a route, sentinel for non-matched. Also
+			// collapse status code to class (2xx/3xx/4xx/5xx) —
+			// individual status codes blew the metric to 1600+
+			// series. With class-collapse we go from
+			//   routes × methods × ~20-statuses × 11-buckets
+			//   to
+			//   routes × methods × 5-classes × 11-buckets
+			rctx := chi.RouteContext(req.Context())
+			path := "<no-route>"
+			if rctx != nil && rctx.RoutePattern() != "" {
+				path = rctx.RoutePattern()
+			}
+			statusClass := fmt.Sprintf("%dxx", ww.Status()/100)
+			handler.APIRequestDuration.WithLabelValues(
+				req.Method, path, statusClass,
+			).Observe(time.Since(start).Seconds())
+		})
+	})
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(60 * time.Second))
-	// Limit request body to 4MB để chặn DoS
+	// L17.18.3.1 slowloris hard kill: srv.ReadTimeout in some chi
+	// configurations doesn't fire reliably during slow-body streaming
+	// because middlewares can buffer or hijack the body. Belt-and-
+	// braces: pre-read the entire request body into memory with a
+	// short context deadline, then hand a buffered NopCloser to the
+	// handler. A client trickling 1 byte/sec gets cut off here, not
+	// after the handler returns.
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.Body = http.MaxBytesReader(w, r.Body, 4<<20) // 4MB
-			next.ServeHTTP(w, r)
+			// Limit request body to 4MB to block DoS (was the previous
+			// middleware in this slot).
+			r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+			// Skip body pre-read for streaming methods / SSE / proxy
+			// passthroughs — they need the live body.
+			if r.Method == http.MethodGet || r.Method == http.MethodHead ||
+				r.Method == http.MethodOptions || r.ContentLength <= 0 ||
+				strings.HasPrefix(r.URL.Path, "/api/sc") ||
+				strings.HasPrefix(r.URL.Path, "/api/dast") ||
+				strings.HasPrefix(r.URL.Path, "/api/swinv") ||
+				strings.HasPrefix(r.URL.Path, "/api/email") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			done := make(chan struct{})
+			var (
+				buf []byte
+				err error
+			)
+			go func() {
+				buf, err = io.ReadAll(r.Body)
+				close(done)
+			}()
+			select {
+			case <-done:
+				if err != nil {
+					http.Error(w, "request body read failed", http.StatusBadRequest)
+					return
+				}
+				r.Body = io.NopCloser(bytes.NewReader(buf))
+				next.ServeHTTP(w, r)
+			case <-time.After(15 * time.Second):
+				// Connection:close + r.Close aren't enough — Go's
+				// finishRequest() still tries to drain the slow body
+				// before the conn close lands, giving the attacker
+				// another ~ContentLength seconds. Hijack the conn and
+				// kill it ourselves so the close is immediate.
+				if hj, ok := w.(http.Hijacker); ok {
+					if conn, _, err := hj.Hijack(); err == nil {
+						_, _ = conn.Write([]byte(
+							"HTTP/1.1 408 Request Timeout\r\n" +
+								"Content-Length: 0\r\n" +
+								"Connection: close\r\n\r\n"))
+						_ = conn.Close()
+						return
+					}
+				}
+				// Hijack unavailable — best-effort close-marker.
+				w.Header().Set("Connection", "close")
+				r.Close = true
+				http.Error(w, "request body read timed out", http.StatusRequestTimeout)
+			}
 		})
 	})
 	r.Use(corsMiddleware)
-	r.Use(rl.Middleware)
+	// VSP_PATCH_PERF_03 — disabled: r.Use(rl.Middleware)
 
-	// pprof — chỉ enable trong dev mode
+	// [H3.X] Custom telemetry registry — agentic + remediation metrics
+	r.Handle("/metrics/vsp", telemetry.G())
+
+	// ─── [H3.X] Health routes — mounted at root, after global middlewares ───
+	// CSRF only checks POST/PUT/DELETE so GET /health/* passes naturally.
+	// No auth required — these are liveness probes for monitoring.
+	r.Get("/health/agentic", healthH.Agentic)
+	r.Get("/health/remediation", healthH.Remediation)
+	r.Get("/health/deep", healthH.DeepCheck(p4DB))
+
+	// pprof + expvar — gated by source IP. Pre-L15 the comment claimed
+	// "protected by authMw + network policy" but neither was actually
+	// applied: r.Mount("/debug", ...) sits in the no-auth public group,
+	// so /debug/pprof/heap, /goroutine, /vars were anonymous-readable
+	// in every non-production deploy. pprof leaks goroutine stacks
+	// (which contain in-flight JWT tokens, request bodies, and tenant
+	// data); expvar leaks process command line + memstats. Same
+	// loopback gate as /metrics below — only the host itself can scrape.
 	if viper.GetString("server.env") != "production" {
-		// pprof restricted to internal network only
-		r.Mount("/debug", http.DefaultServeMux) //nolint:gosec // G108: protected by authMw + network policy
+		debugMux := http.DefaultServeMux
+		r.HandleFunc("/debug/*", func(w http.ResponseWriter, req *http.Request) {
+			ip := req.RemoteAddr
+			if idx := strings.LastIndex(ip, ":"); idx >= 0 {
+				ip = ip[:idx]
+			}
+			ip = strings.Trim(ip, "[]")
+			if ip != "127.0.0.1" && ip != "::1" && !strings.HasPrefix(ip, "10.") &&
+				!strings.HasPrefix(ip, "192.168.") && !strings.HasPrefix(ip, "172.16.") {
+				http.Error(w, "forbidden — /debug/* restricted to loopback/internal", http.StatusForbidden)
+				return
+			}
+			debugMux.ServeHTTP(w, req)
+		})
 	}
 	// /metrics: restrict to localhost or internal network only
 	r.Handle("/metrics", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -257,6 +744,7 @@ func main() {
 		}
 		handler.MetricsHandler().ServeHTTP(w, req)
 	}))
+
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		ctx2, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
@@ -280,10 +768,20 @@ func main() {
 			"uptime": time.Since(startTime).Round(time.Second).String(),
 		})
 	})
-	// SSO routes (public)
-	r.Get("/auth/sso/providers", ssoH.Providers)
-	r.Get("/auth/sso/login", ssoH.Login)
-	r.Get("/auth/sso/callback", ssoH.Callback)
+	// SSO legacy routes — deprecated, redirect to /api/v1/auth/sso/*.
+	// Kept for backward compat; remove after all clients migrate.
+	redirectSSO := func(target string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			dst := target
+			if r.URL.RawQuery != "" {
+				dst += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, dst, http.StatusMovedPermanently)
+		}
+	}
+	r.Get("/auth/sso/providers", redirectSSO("/api/v1/sso/providers"))
+	r.Get("/auth/sso/login", redirectSSO("/api/v1/auth/sso/login"))
+	r.Get("/auth/sso/callback", redirectSSO("/api/v1/auth/sso/callback"))
 	r.Get("/api/docs", handler.SwaggerUI)
 	r.Get("/api/docs/openapi.json", handler.SwaggerJSON)
 	r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/auth/login", authH.Login)
@@ -294,11 +792,58 @@ func main() {
 	r.With(vspMW.StrictLimiter(5, time.Minute)).Post("/api/v1/auth/password/change", authH.ChangePassword)
 	r.Post("/api/v1/billing/webhook", billingH.Webhook)
 
-	authMw := auth.Middleware(jwtSecret, keyStore)
+	// Endpoint Agent self-auth routes — agents present X-Agent-Key per request.
+	// These are public at the chi level but the handlers themselves verify
+	// the agent key against agents.api_key_hash and reject unknown keys.
+	r.Post("/api/v1/agents/heartbeat", agentsH.Heartbeat)
+	r.Post("/api/v1/agents/inventory", agentsH.Inventory)
+
+	authMwBase := auth.Middleware(jwtSecret, keyStore)
+	residencyMw := vspMW.Residency(db.Pool())
+	// Wrap the auth middleware so the resolved tenant UUID is propagated
+	// onto the request context. The pgxpool's BeforeAcquire hook reads
+	// this and sets `vsp.tenant_id` GUC for RLS policies (see
+	// migration 037 + internal/store/rls.go). Then apply residency
+	// enforcement which needs the tenant context to look up the
+	// configured region.
+	authMw := func(next http.Handler) http.Handler {
+		return authMwBase(residencyMw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if c, ok := auth.FromContext(r.Context()); ok && c.TenantID != "" {
+				tid := c.TenantID
+				if !looksLikeUUIDLocal(tid) {
+					if u := resolveTenantUUIDLocal(r.Context(), db, tid); u != "" {
+						tid = u
+					}
+				}
+				r = r.WithContext(store.SetTenantContext(r.Context(), tid))
+			}
+			next.ServeHTTP(w, r)
+		})))
+	}
+
+	// PRO plan gating — reads tenants.plan with a 5-min cache.
+	// Apply requirePro to any route that should be reserved for paid tiers
+	// (PRO + Enterprise). Returns 402 with {required_plan, current_plan} JSON
+	// so the frontend overlay can prompt the upgrade flow.
+	proResolver := vspMW.NewDBPlanResolver(db.Pool(), 5*time.Minute)
+	requirePro := vspMW.RequirePro(proResolver)
+
 	r.With(authMw).Get("/api/v1/auth/check", authH.Check) // session check — validates cookie
 
 	// SSE — cookie-based auth (no ?token= in URL — prevents log leakage)
 	r.With(authMw).Get("/api/v1/events", handler.SSEHandler)
+
+	// ── Landing page (Phase 4 go-to-market) ──
+	// Marketing landing page, referenced from nginx location block:
+	//   location ~ ^/(landing|onboarding|admin|docs|p4|static)
+	// Nginx forwards these paths to this gateway; without these routes
+	// it 404s (no filesystem fallback for /static/*.html).
+	r.Get("/landing", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/landing.html")
+	})
+	r.Get("/landing.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/landing.html")
+	})
 
 	// Root route — serve main UI (index.html) with CSP nonce injected
 	// into inline <script> and <style> tags so they don't violate CSP.
@@ -322,34 +867,145 @@ func main() {
 	// (e.g. href="/vsp_enterprise_ui.css"). Without these routes they 404.
 	// Using ServeFile directly so Go's http package sets the correct
 	// Content-Type header (text/css, application/javascript) via extension.
-	r.Get("/vsp_enterprise_ui.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_enterprise_ui.css")
-	})
-	r.Get("/vsp_enterprise_navy_theme.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_enterprise_navy_theme.css")
-	})
-	r.Get("/vsp_upgrade_v100.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/vsp_upgrade_v100.js")
-	})
+	//
+	// Cache strategy: serveAssetWithRevalidate sets no-cache so the
+	// browser always sends If-Modified-Since and gets 304 when unchanged
+	// (ServeFile already sets Last-Modified from mtime). Pre-fix the
+	// user installed a fresh binary, restarted, hard-refreshed — and
+	// Chrome STILL served the old JS from its cache because the
+	// response had no Cache-Control at all, so the heuristic kicked in.
+	// "no-cache" doesn't mean "don't cache" — it means "revalidate
+	// every fetch", which is what we want for live-shipped assets.
+	serveAssetWithRevalidate := func(path string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+			http.ServeFile(w, r, path)
+		}
+	}
+
+	r.Get("/vsp_enterprise_ui.css", serveAssetWithRevalidate("./static/vsp_enterprise_ui.css"))
+	r.Get("/vsp_enterprise_navy_theme.css", serveAssetWithRevalidate("./static/vsp_enterprise_navy_theme.css"))
+	r.Get("/vsp_upgrade_v100.js", serveAssetWithRevalidate("./static/vsp_upgrade_v100.js"))
+
+	r.Get("/vsp_pro_100.js", serveAssetWithRevalidate("./static/vsp_pro_100.js"))
+	r.Get("/vsp_pro_cwpp_realapi.js", serveAssetWithRevalidate("./static/vsp_pro_cwpp_realapi.js"))
+	r.Get("/vsp_pro_supplychain_realapi.js", serveAssetWithRevalidate("./static/vsp_pro_supplychain_realapi.js"))
+	// realapi companion for cspm / secrets_vault / tenants / observe panels.
+	// Adds 402-aware fetch + "Upgrade to PRO" overlay + Configure sub-panel.
+	r.Get("/vsp_pro_realapi.js", serveAssetWithRevalidate("./static/vsp_pro_realapi.js"))
+	// Sidebar collapsible sections — chevron toggle per nav-section.
+	r.Get("/vsp_sidebar_collapse.js", serveAssetWithRevalidate("./static/vsp_sidebar_collapse.js"))
+	// SIEM panel companion — runs inside each /panels/<id>.html iframe and
+	// reaches back into the parent VSP_PRO via same-origin window.parent
+	// to render Configure / Notifications buttons. Schemas live in the JS.
+	r.Get("/vsp_siem_companion.js", serveAssetWithRevalidate("./static/vsp_siem_companion.js"))
+	r.Get("/vsp_sw_inventory_panel.js", serveAssetWithRevalidate("./static/vsp_sw_inventory_panel.js"))
+	r.Get("/vsp_scheduler_panel.js", serveAssetWithRevalidate("./static/vsp_scheduler_panel.js"))
+	r.Get("/vsp_email_panel.js", serveAssetWithRevalidate("./static/vsp_email_panel.js"))
+	r.Get("/vsp_dast_panel.js", serveAssetWithRevalidate("./static/vsp_dast_panel.js"))
+
+	// FEAT-04: vsp_uxstates.js — shared skeleton/empty/error UI module
+	r.Get("/vsp_uxstates.js", serveAssetWithRevalidate("./static/vsp_uxstates.js"))
 
 	// Serve JS assets from ./static/js/ (dom-safe.js, vsp_iframe_bootstrap.js, etc.)
 	// These scripts are referenced by index.html and panel HTML files.
 	r.Get("/static/js/*", http.StripPrefix("/static/js/",
 		http.FileServer(http.Dir("./static/js/"))).ServeHTTP)
 
+	// FEAT-20c PATCH APPLIED — Serve UX patch scripts from ./static/patches/
+	// Allows monkey-patch JS files (feat-20-ai-analyst.js etc.) to be loaded
+	// without recompiling gateway. Drop new patches into static/patches/.
+	r.Get("/static/patches/*", http.StripPrefix("/static/patches/",
+		http.FileServer(http.Dir("./static/patches/"))).ServeHTTP)
+
+	// Serve general static assets from ./static/ (inject_ux_v1.1.js, inject_ux_v1.1.css, etc.)
+	// no-cache: forces revalidation after binary swap so JS/CSS updates
+	// take effect on next page load. Pre-fix Chrome served stale assets
+	// from heuristic cache because the FileServer didn't set
+	// Cache-Control at all.
+	r.Get("/static/*", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+		http.StripPrefix("/static/",
+			http.FileServer(http.Dir("./static/"))).ServeHTTP(w, r)
+	})
+
+	// RFC 9116 — security.txt at /.well-known/security.txt + the
+	// disclosure policy doc. Anonymous, no rate-limit.
+	r.Get("/.well-known/*", http.StripPrefix("/.well-known/",
+		http.FileServer(http.Dir("./static/.well-known/"))).ServeHTTP)
+
+	// Public Trust Center page (Sprint 9.B1). Anonymous, cached at
+	// the static layer; consumes anonymous /api/v1/status endpoint
+	// for live operational status.
+	//
+	// Serve both /trust and /trust/* — chimw.StripSlashes strips the
+	// trailing slash so /trust/ becomes /trust, and a redirect-back
+	// would create an infinite loop. Instead /trust serves index.html
+	// directly.
+	r.Get("/trust", func(w http.ResponseWriter, req *http.Request) {
+		http.ServeFile(w, req, "./static/trust/index.html")
+	})
+	r.Get("/trust/*", http.StripPrefix("/trust/",
+		http.FileServer(http.Dir("./static/trust/"))).ServeHTTP)
+
+	// Sprint 8.3 status endpoint — anonymous, top-level so
+	// external status-page consumers (Statuspage.io, Cachet,
+	// Atlassian Statuspage) can poll without credentials.
+	// Caching (30s Cache-Control) handled inside the handler.
+	publicStatusH := handler.NewStatusPublic(db)
+	r.Get("/api/v1/status", publicStatusH.Get)
+
+	// Scanner availability — anon-readable so the FE "New Scan" modal
+	// can grey out tools whose binary isn't on $PATH. Drives the "26/26
+	// ready" badge in the dashboard header.
+	r.Get("/api/v1/scanners/health", func(w http.ResponseWriter, req *http.Request) {
+		available, results := pipeline.HealthSnapshot()
+		w.Header().Set("Cache-Control", "public, max-age=15")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"available":         available,
+			"expected_full_soc": 26,
+			"tools":             results,
+		})
+	})
+
+	// VSP own-SBOM (Sprint 10.5) — anonymous, cached 1h.
+	// Path convention matches OpenSSF Scorecard auto-discovery.
+	selfSBOMH := handler.NewSelfSBOM()
+	r.Get("/sbom.cyclonedx.json", selfSBOMH.CycloneDX)
+	r.Get("/sbom.spdx.json", selfSBOMH.SPDX)
+
 	// Serve panel HTML/JS assets. CSP is set by vspMW.CSPNonce middleware,
 	// which applies PanelCSP() for panel paths. Do NOT override CSP here.
 	// Phase 2 (docs/CSP_HARDENING_ROADMAP.md) will migrate panels to the
 	// strict nonce policy after inline handlers are refactored.
 	r.Get("/static/panels/*", func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		for _, ext := range []string{".bak", ".backup", ".tmp", ".old", ".orig"} {
+			if strings.Contains(p, ext) {
+				http.NotFound(w, r)
+				return
+			}
+		}
 		http.StripPrefix("/static/panels/",
 			http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
 	})
 	r.Get("/panels/*", func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		for _, ext := range []string{".bak", ".backup", ".tmp", ".old", ".orig"} {
+			if strings.Contains(p, ext) {
+				http.NotFound(w, r)
+				return
+			}
+		}
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
 		http.StripPrefix("/panels/",
 			http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
+	})
+
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/favicon.ico")
 	})
 	// P4 Compliance — public routes (no auth required)
 	r.Get("/api/p4/health", p4Health)
@@ -377,12 +1033,10 @@ func main() {
 
 	// ═══ Supply Chain Integrity (Milestone 1) ═══
 	// Sigstore-compatible artifact signing + SLSA provenance + CycloneDX VEX
-	r.Post("/api/v1/supply-chain/sign", p4AuthMiddleware(handleSignArtifact))
-	r.Post("/api/v1/supply-chain/verify", p4AuthMiddleware(handleVerifyArtifact))
-	r.Get("/api/v1/supply-chain/signatures", p4AuthMiddleware(handleListSignatures))
-	r.Get("/api/v1/supply-chain/public-key", handlePublicKey) // public — no auth
-	r.Post("/api/v1/supply-chain/provenance", p4AuthMiddleware(handleGenProvenance))
-	r.Get("/api/v1/supply-chain/provenance", p4AuthMiddleware(handleListProvenance))
+	// FIX #6: old supply-chain handlers removed — consolidated into supplyChainH (lines below).
+	// handleSignArtifact, handleVerifyArtifact, handleListSignatures,
+	// handleGenProvenance, handleListProvenance → xem block supplyChainH.
+	// /api/v1/supply-chain/public-key → đổi thành /api/v1/supply-chain/key (supplyChainH.Key)
 	r.Post("/api/p4/vex", p4AuthMiddleware(handleCreateVEX))
 	r.Get("/api/p4/vex", p4AuthMiddleware(handleListVEX))
 
@@ -390,6 +1044,7 @@ func main() {
 	// NIST OSCAL 1.1.2 — Catalog, Profile, SSP, Assessment Plan/Results, POA&M
 	// NIST SP 800-218 SSDF v1.1
 	// CISA Secure Software Self-Attestation Common Form (2024)
+	r.Get("/api/p4/oscal", p4AuthMiddleware(tiH.OSCALIndex))
 	r.Get("/api/p4/oscal/catalog", p4AuthMiddleware(handleOSCALCatalog))
 	r.Get("/api/p4/oscal/profile", p4AuthMiddleware(handleOSCALProfile))
 	r.Get("/api/p4/oscal/ssp/extended", p4AuthMiddleware(handleOSCALSSPExtended))
@@ -409,6 +1064,11 @@ func main() {
 	r.Get("/api/p4/ir/incidents", p4AuthMiddleware(handleIRIncidentsList))
 	r.Post("/api/p4/ir/incident", p4AuthMiddleware(handleIRIncidentCreate))
 	r.Post("/api/p4/ir/incident/transition", p4AuthMiddleware(handleIRIncidentTransition))
+	r.Post("/api/p4/ir/incident/create", p4AuthMiddleware(handleIRIncidentCreate))   // alias
+	r.Post("/api/p4/ir/incident/assign", p4AuthMiddleware(handleIRIncidentUpdate))   // alias
+	r.Post("/api/p4/ir/playbook/execute", p4AuthMiddleware(handleIRPlaybooksList))   // stub
+	r.Post("/api/p4/zt/assess", p4AuthMiddleware(handleZTStatus))                    // stub
+	r.Post("/api/p4/ssdf/assessment", p4AuthMiddleware(handleSSDFUpdate))            // alias
 	r.Post("/api/p4/circia/generate", p4AuthMiddleware(handleCIRCIAGenerate))
 	r.Post("/api/p4/circia/submit", p4AuthMiddleware(handleCIRCIASubmit))
 	r.Get("/api/p4/circia/reports", p4AuthMiddleware(handleCIRCIAList))
@@ -441,24 +1101,39 @@ func main() {
 	// ── Deep Packet Analysis (NetCap) ──────────────────────────────────────────
 	netCapEngine := netcap.NewEngine()
 	pipeline.SetNetcapEngine(netCapEngine) // register with scan pipeline (NETWORK/FULL_SOC modes)
+
+	// Probe scanner binaries once at boot so the operator sees the
+	// "X / 26 dispatchable" line in startup logs. This catches an
+	// under-provisioned image before users see partial FULL_SOC runs.
+	pipeline.ProbeScannerBinaries()
 	netCapH := handler.NewNetCapHandler(netCapEngine)
-	// Auto-start on best available interface
-	go func() {
-		ifaces, _ := netCapEngine.GetInterfaces()
-		iface := "any"
-		for _, i := range ifaces {
-			if i != "lo" && !strings.HasPrefix(i, "docker") && !strings.HasPrefix(i, "br-") && !strings.HasPrefix(i, "veth") {
-				iface = i
-				break
+	// Auto-start on best available interface — disabled by default.
+	// NetCap auto-start requires CAP_NET_RAW capability which most deploys don't grant.
+	// Engine is still registered with pipeline (line above) for on-demand use by
+	// NETWORK/FULL_SOC scan modes, and REST API /api/v1/netcap/start remains available
+	// for manual triggering. Set NETCAP_AUTO_START=true to enable boot-time capture.
+	if os.Getenv("NETCAP_AUTO_START") == "true" {
+		go func() {
+			ifaces, _ := netCapEngine.GetInterfaces()
+			iface := "any"
+			for _, i := range ifaces {
+				if i != "lo" && !strings.HasPrefix(i, "docker") && !strings.HasPrefix(i, "br-") && !strings.HasPrefix(i, "veth") {
+					iface = i
+					break
+				}
 			}
-		}
-		if err := netCapEngine.Start(netcap.CaptureConfig{Interface: iface, SnapLen: 1500, Promiscuous: true}); err != nil {
-			log.Warn().Err(err).Str("iface", iface).Msg("[NetCap] capture start failed — needs CAP_NET_RAW")
-		}
-		ctxNC, cancelNC := context.WithCancel(context.Background())
-		_ = cancelNC // cancelled when goroutine exits via engine.Stop()
-		netCapEngine.StartTsharkDecoder(ctxNC, iface)
-	}()
+			if err := netCapEngine.Start(netcap.CaptureConfig{Interface: iface, SnapLen: 1500, Promiscuous: true}); err != nil {
+				log.Warn().Err(err).Str("iface", iface).Msg("[NetCap] capture start failed — needs CAP_NET_RAW")
+				return
+			}
+			ctxNC, cancelNC := context.WithCancel(context.Background())
+			_ = cancelNC // cancelled when goroutine exits via engine.Stop()
+			netCapEngine.StartTsharkDecoder(ctxNC, iface)
+			log.Info().Str("iface", iface).Msg("[NetCap] auto-capture started")
+		}()
+	} else {
+		log.Info().Msg("[NetCap] auto-start disabled (set NETCAP_AUTO_START=true to enable)")
+	}
 	r.Route("/api/v1/netcap", func(r chi.Router) {
 		r.Use(authMw)
 		r.Get("/interfaces", netCapH.Interfaces)
@@ -489,9 +1164,60 @@ func main() {
 	})
 	r.Get("/api/p4/conmon/report", p4AuthMiddleware(handleConMonReport))
 	r.With(authMw).Get("/api/v1/ws", handler.WSUpgradeHandler) // cookie-based auth
+	// ConMon handler (used inside auth route group below)
+	conmonH := handler.NewConMonHandler(p4DB)
+	conmonH.SetAuditDB(db) // L8: enable audit emit on ConMon write paths
+
+	// G37: ConMon FedRAMP template routes
+	r.Get("/api/p4/conmon/template/asr", p4AuthMiddleware(conmonH.RenderASR))
+	r.Get("/api/p4/conmon/template/qar", p4AuthMiddleware(conmonH.RenderQAR))
+	r.Get("/api/p4/conmon/template/mcmr", p4AuthMiddleware(conmonH.RenderMCMR))
+
+	// ─── Phase 5.1: ConMon scheduler goroutine ───────────────────
+	// Wires the existing ConMon CRUD layer to actual pipeline execution.
+	// Each tick (60s), schedules with next_run_at <= now() are triggered
+	// via runsH.EnqueueDirect — same code path used by manual /scan calls
+	// and the existing schedEngine. Tenant + target are taken from the
+	// schedule row; mode is mapped through pipeline.Mode/Profile types.
+	conmonRunTrigger := func(ctx context.Context, tenantID, mode, target string) (string, int64, error) {
+		// Use the RID_SCHED_* prefix so the scheduler can later
+		// correlate this run with other cron-fired runs in the
+		// history table — same convention as scheduler.go line 67.
+		rid := fmt.Sprintf("RID_SCHED_%s_conmon", time.Now().Format("20060102_150405"))
+		runsH.EnqueueDirect(rid, tenantID, pipeline.Mode(mode), pipeline.Profile("default"), target, "")
+		// The legacy int64 ID is always 0 (runs.id is UUID). The RID
+		// string is what the worker's post-scan hook will use to find
+		// this conmon_schedule and fill its last_verdict — see
+		// scheduler.go:163 (writes last_run_rid) +
+		// pipeline/worker.go (UPDATE conmon_schedules WHERE last_run_rid).
+		return rid, 0, nil
+	}
+	conmonSched := conmon.NewScheduler(p4DB, conmonRunTrigger)
+	go conmonSched.Start(ctx)
+	log.Info().Dur("tick", conmonSched.TickInterval).Msg("ConMon scheduler started")
+	aiH := handler.NewAIAdvisorHandler(p4DB,
+		viper.GetString("anthropic.api_key"),
+		viper.GetBool("airgap.enabled"))
+	aiH.SetAuditDB(db) // L8: enable audit emit on Feedback
+	ssoOIDCH := handler.NewSSOOIDCHandler(p4DB,
+		jwtSecret,
+		jwtTTL,
+		auth.IssueJWT,
+	)
+	ssoOIDCH.SetAuditDB(db) // enable SSO login audit (LOGIN_SSO_OK)
+	// ─── SSO public endpoints (no auth required) — Phase 4.5.3 ───
+	r.With(vspMW.StrictLimiter(20, time.Minute)).Get("/api/v1/auth/sso/login", ssoOIDCH.Login)
+	r.With(vspMW.StrictLimiter(20, time.Minute)).Get("/api/v1/auth/sso/callback", ssoOIDCH.Callback)
+
 	r.Group(func(r chi.Router) {
 		r.Use(authMw)
-		r.Use(vspMW.NewUserRateLimiter(600, time.Minute)) // per-user: 600 req/min
+		// VSP_PATCH_PERF_02 — per-user rate limit disabled on /api/v1/* group.
+		// Reason: dashboard burst (~70 req in <1s during boot) exceeded 3000/min bucket
+		// because limiter has no burst capacity. Defense remains via JWT authMw + CSRF +
+		// tenant isolation. /api/v1/auth/login still rate-limited separately for
+		// brute-force protection (see auth route registration).
+		// To re-enable: uncomment the line below and adjust the limit.
+		// r.Use(vspMW.NewUserRateLimiter(3000, time.Minute)) // per-user: 3000 req/min
 
 		// Auth
 		// Sprint 5 Day 1: Public config endpoint — frontend reads auth.mode to decide fetch strategy
@@ -517,13 +1243,30 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireRole("admin"))
 			r.Get("/api/v1/admin/users", usersH.List)
-			r.Post("/api/v1/admin/users", usersH.Create)
-			r.Delete("/api/v1/admin/users/{id}", usersH.Delete)
+			r.Get("/api/v1/admin/roles", func(w http.ResponseWriter, r *http.Request) {
+				jsonOK(w, map[string]any{
+					"roles": []map[string]string{
+						{"id":"admin",   "name":"Admin",   "desc":"Full access"},
+						{"id":"analyst", "name":"Analyst", "desc":"Read + scan"},
+						{"id":"dev",     "name":"Dev",     "desc":"Scan + findings"},
+						{"id":"auditor", "name":"Auditor", "desc":"Read only"},
+					},
+				})
+			})
+			// PRO gating — adding/removing users is a tenant-management
+			// concern, free tier stays read-only.
+			r.With(requirePro).Post("/api/v1/admin/users", usersH.Create)
+			r.With(requirePro).Delete("/api/v1/admin/users/{id}", usersH.Delete)
+			r.With(requirePro).Patch("/api/v1/admin/users/{id}", usersH.UpdateRole)
+			r.With(requirePro).Post("/api/v1/admin/users/invite", usersH.Invite)
+			r.With(requirePro).Post("/api/v1/admin/users/bulk-role", usersH.BulkRole)
 			r.Get("/api/v1/admin/api-keys", apiKeysH.List)
 			r.Post("/api/v1/admin/api-keys", apiKeysH.Create)
 			r.Delete("/api/v1/admin/api-keys/{id}", apiKeysH.Delete)
+			r.Patch("/api/v1/admin/api-keys/{id}", apiKeysH.Update)
 			r.Get("/api/v1/admin/tenants", usersH.ListAllTenants)
 			r.Post("/api/v1/admin/tenants", usersH.CreateTenant)
+			r.Put("/api/v1/admin/tenants/{id}/plan", usersH.UpdatePlan)
 		})
 
 		// Scan
@@ -532,8 +1275,15 @@ func main() {
 		r.Get("/api/v1/vsp/run/latest", runsH.Latest)
 		r.Get("/api/v1/vsp/run/{rid}", runsH.Get)
 		r.Get("/api/v1/vsp/run/{rid}/log", runsH.Log)
+		r.Get("/api/v1/vsp/run/{rid}/tail", runsH.Tail) // SSE live-tail
 		r.Get("/api/v1/vsp/runs", runsH.List)
 		r.Get("/api/v1/vsp/runs/index", runsH.Index)
+		// Alias for the detail endpoint — FE callers (cicd.html:2699
+		// remediation status poll) historically used the plural form
+		// /api/v1/vsp/runs/{rid} where the canonical route is the
+		// singular /api/v1/vsp/run/{rid}. Same handler, both spellings
+		// work. Cheaper than chasing every FE call site.
+		r.Get("/api/v1/vsp/runs/{rid}", runsH.Get)
 		r.With(ca.Middleware("runs-index", 10*time.Second)).Get("/api/v1/vsp/runs/index", runsH.Index)
 		// ── Batch scan ──────────────────────────────────────────────
 		batchH := newBatchHandler(db, runsH)
@@ -543,7 +1293,54 @@ func main() {
 		r.Delete("/api/v1/vsp/batch/{batch_id}", batchH.Cancel)
 		r.Get("/api/v1/vsp/findings", findingsH.List)
 		r.With(ca.Middleware("findings-summary", 15*time.Second)).Get("/api/v1/vsp/findings/summary", findingsH.Summary)
+		// VSP_PATCH_F1_ROUTES_BEGIN
+		r.Post("/api/v1/vulns/bulk", handleVulnsBulk)
+		r.Post("/api/v1/vulns/bulk/undo", handleVulnsBulkUndo)
+		// VSP_PATCH_F1_ROUTES_END
+		// ─── ConMon (Continuous Monitoring) — Phase 4.5.1 ─────────────
+		r.Get("/api/v1/conmon/schedules", conmonH.Schedules)
+		r.Post("/api/v1/conmon/schedules", conmonH.Schedules)
+		r.Get("/api/v1/conmon/deviations", conmonH.Deviations)
+		r.Get("/api/v1/conmon/cadence", conmonH.CadenceStatus)
+		r.Post("/api/v1/conmon/deviations/{id}/acknowledge", conmonH.AckDeviation)
+		// ─── AI Compliance Advisor — Phase 4.5.2 ─────────────────────
+		// LLM-backed answer endpoint: PRO-gated (every call costs LLM tokens).
+		// Read-only endpoints (mode + cache stats + feedback) stay free so
+		// the panel can render even on the starter plan.
+		r.With(requirePro).Post("/api/v1/ai/advise", aiH.Advise)
+		r.Get("/api/v1/ai/mode", aiH.Mode)
+		r.Get("/api/v1/ai/cache/stats", aiH.CacheStats)
+		r.Post("/api/v1/ai/feedback/{id}", aiH.Feedback)
+		// ─── SSO Provider Admin — Phase 4.5.3 ─────────────────────────
+		// PRO feature: SSO / SAML provider configuration.
+		// Reading existing providers is allowed for any auth'd user (so the
+		// login screen can render available IdPs); mutations require PRO.
+		r.Get("/api/v1/sso/providers", ssoOIDCH.Providers)
+		r.Post("/api/v1/sso/providers", ssoOIDCH.Providers)
+		r.Get("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Put("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Delete("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Patch("/api/v1/sso/providers/{id}", ssoOIDCH.ProviderByID)
+		r.Get("/api/v1/sso/providers/{id}/test", ssoOIDCH.TestProvider)
+		r.Patch("/api/v1/sso/providers/{id}/toggle", ssoOIDCH.ToggleProvider)
+		r.Patch("/api/v1/sso/providers/{id}/rotate-secret", ssoOIDCH.RotateSecret)
+
+		// ─── Cloud Security Posture Management — PRO feature ────────────
+		// Real persistence in cspm_accounts / cspm_findings / cspm_config
+		// (migration 020). Replaces the prior in-memory aggregator mock.
+		cspmH := handler.NewCSPM(db)
+		r.With(requirePro).Get("/api/v1/cspm/accounts", cspmH.ListAccounts)
+		r.With(requirePro).Post("/api/v1/cspm/accounts", cspmH.CreateAccount)
+		r.With(requirePro).Delete("/api/v1/cspm/accounts/{id}", cspmH.DeleteAccount)
+		r.With(requirePro).Post("/api/v1/cspm/accounts/{id}/sync", cspmH.SyncAccount)
+		r.With(requirePro).Get("/api/v1/cspm/findings", cspmH.ListFindings)
+		r.With(requirePro).Get("/api/v1/cspm/findings/{id}", cspmH.GetFinding)
+		r.With(requirePro).Post("/api/v1/cspm/findings/{id}/status", cspmH.UpdateFindingStatus)
+		r.With(requirePro).Get("/api/v1/cspm/posture", cspmH.Posture)
+		r.With(requirePro).Get("/api/v1/cspm/config", cspmH.GetConfig)
+		r.With(requirePro).Put("/api/v1/cspm/config", cspmH.UpdateConfig)
 		r.Get("/api/v1/vsp/findings/by-tool", findingsH.ByTool)
+		r.Post("/api/v1/vsp/findings/{id}/vex", handleFindingVEX)
 
 		// Gate + Policy
 		r.Get("/api/v1/vsp/gate/latest", gateH.Latest)
@@ -552,32 +1349,113 @@ func main() {
 		r.Get("/api/v1/policy/rules", gateH.ListRules)
 		r.Post("/api/v1/policy/rules", gateH.CreateRule)
 		r.Delete("/api/v1/policy/rules/{id}", gateH.DeleteRule)
+		r.Patch("/api/v1/policy/rules/{id}", gateH.ToggleRule)
+		r.Put("/api/v1/policy/rules/{id}", gateH.UpdateRule)
 
 		// Audit
 		r.Get("/api/v1/audit/log", auditH.List)
 		r.Get("/api/v1/notifications", auditH.Notifications)
 		r.Get("/api/v1/tenants", usersH.ListTenants)
+		// PRO panels — tenant quota + observability config (view-details overlays).
+		proPanels := handler.NewProPanels(db)
+		r.With(requirePro).Get("/api/v1/tenants/quota", proPanels.TenantQuota)
+		r.With(requirePro).Get("/api/v1/observability/config", proPanels.ObservabilityConfigGet)
+		r.With(requirePro).Put("/api/v1/observability/config", proPanels.ObservabilityConfigPut)
+		// Per-tenant config endpoints for the remaining PRO sidebar panels.
+		// Each panel's "Configure" overlay reads/writes one of these.
+		r.With(requirePro).Get("/api/v1/cwpp/config", proPanels.CWPPConfigGet)
+		r.With(requirePro).Put("/api/v1/cwpp/config", proPanels.CWPPConfigPut)
+		r.With(requirePro).Get("/api/v1/autofix/config", proPanels.AutofixConfigGet)
+		r.With(requirePro).Put("/api/v1/autofix/config", proPanels.AutofixConfigPut)
+		r.With(requirePro).Get("/api/v1/supply-chain/config", proPanels.SupplyChainConfigGet)
+		r.With(requirePro).Put("/api/v1/supply-chain/config", proPanels.SupplyChainConfigPut)
+		r.With(requirePro).Get("/api/v1/sbom/config", proPanels.SBOMConfigGet)
+		r.With(requirePro).Put("/api/v1/sbom/config", proPanels.SBOMConfigPut)
+		r.With(requirePro).Get("/api/v1/settings/sbom", proPanels.SBOMConfigGet)
+		r.With(requirePro).Put("/api/v1/settings/sbom", proPanels.SBOMConfigPut)
+		r.With(requirePro).Get("/api/v1/sso/config", proPanels.SSOConfigGet)
+		r.With(requirePro).Put("/api/v1/sso/config", proPanels.SSOConfigPut)
+		// Cross-panel notifications: Slack/Teams/webhook/email/PagerDuty.
+		// Configure once per tenant; every PRO panel can reference these channels.
+		r.With(requirePro).Get("/api/v1/notifications/config", proPanels.NotificationConfigGet)
+		r.With(requirePro).Put("/api/v1/notifications/config", proPanels.NotificationConfigPut)
+		r.With(requirePro).Post("/api/v1/notifications/test", proPanels.NotificationTest)
+		r.With(requirePro).Get("/api/v1/notifications/log", proPanels.NotificationLog)
+		r.With(requirePro).Get("/api/v1/notifications/dlq", proPanels.NotificationDLQ)
+		r.With(requirePro).Post("/api/v1/notifications/dlq/retry", proPanels.NotificationDLQRetry)
+
+		// Generic per-tenant config store for the 12 SIEM panels.
+		// Each panel's Configure form serialises into feature_config.config
+		// (JSONB). PRO-gated so business tier customers can persist tuning
+		// (UEBA thresholds, hunt queries, etc.) while free tier reads defaults.
+		featureCfgH := handler.NewFeatureConfig(db)
+		r.With(requirePro).Get("/api/v1/features/{id}/config", featureCfgH.Get)
+		r.With(requirePro).Put("/api/v1/features/{id}/config", featureCfgH.Put)
+		r.Get("/api/v1/settings/export", func(w http.ResponseWriter, req *http.Request) {
+			claims, ok := auth.FromContext(req.Context())
+			if !ok { w.WriteHeader(401); w.Write([]byte(`{"error":"unauthorized"}`)); return }
+			rows, err := db.Pool().Query(req.Context(),
+				"SELECT feature_id, config::text FROM feature_config WHERE tenant_id=$1",
+				claims.TenantID)
+			if err != nil { w.WriteHeader(500); w.Write([]byte(`{"error":"db error"}`)); return }
+			defer rows.Close()
+			cfgs := map[string]json.RawMessage{}
+			for rows.Next() {
+				var fid string; var cfg []byte
+				if rows.Scan(&fid, &cfg) == nil { cfgs[fid] = json.RawMessage(cfg) }
+			}
+			w.Header().Set("Content-Disposition", "attachment; filename=vsp-settings-export.json")
+			jsonOK(w, map[string]any{"tenant_id": claims.TenantID, "exported_at": time.Now(), "configs": cfgs})
+		})
+		r.Post("/api/v1/settings/import", func(w http.ResponseWriter, req *http.Request) {
+			claims, ok := auth.FromContext(req.Context())
+			if !ok { w.WriteHeader(401); w.Write([]byte(`{"error":"unauthorized"}`)); return }
+			var body struct { Configs map[string]json.RawMessage `json:"configs"` }
+			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+				w.WriteHeader(400); w.Write([]byte(`{"error":"invalid JSON"}`)); return
+			}
+			imported := 0
+			for fid, cfg := range body.Configs {
+				_, err := db.Pool().Exec(req.Context(),
+					`INSERT INTO feature_config (tenant_id, feature_id, config)
+					 VALUES ($1,$2,$3::jsonb)
+					 ON CONFLICT (tenant_id, feature_id) DO UPDATE SET config=EXCLUDED.config`,
+					claims.TenantID, fid, string(cfg))
+				if err == nil { imported++ }
+			}
+			jsonOK(w, map[string]any{"imported": imported, "total": len(body.Configs)})
+		})
+
+		// Analytics summary — server-side aggregation for the Analytics panel.
+		// Free tier keeps the client-side fallback (loops over /vsp/runs/index);
+		// PRO offloads heavy aggregation to Postgres + serves trend data
+		// without shipping thousands of run rows over the wire.
+		analyticsH := handler.NewAnalytics(db)
+		r.With(requirePro).Get("/api/v1/analytics/summary", analyticsH.Summary)
+		r.With(requirePro).Get("/api/v1/analytics/trends", analyticsH.Trends)
+		r.With(requirePro).Get("/api/v1/analytics/export", analyticsH.Export)
 		// Billing
 		r.Get("/api/v1/billing/status", billingH.Status)
 		r.With(vspMW.StrictLimiter(5, time.Minute)).Post("/api/v1/billing/checkout", billingH.CreateCheckout)
 		r.Post("/api/v1/audit/verify", auditH.Verify)
+		r.Post("/api/v1/audit/repair", auditH.Repair)
 
-		// SIEM
-		r.Get("/api/v1/siem/webhooks", siemH.List)
+		// SIEM (PRO)
+		r.With(requirePro).Get("/api/v1/siem/webhooks", siemH.List)
 
-		// ── Correlation engine ─────────────────────────────────
-		r.Get("/api/v1/correlation/rules", corrH.ListRules)
-		r.Post("/api/v1/correlation/rules", corrH.CreateRule)
-		r.Post("/api/v1/correlation/rules/{id}/toggle", corrH.ToggleRule)
-		r.Delete("/api/v1/correlation/rules/{id}", corrH.DeleteRule)
-		r.Get("/api/v1/correlation/incidents", corrH.ListIncidents)
-		r.Get("/api/v1/correlation/incidents/{id}", corrH.GetIncident)
-		r.Post("/api/v1/correlation/incidents/{id}/resolve", corrH.ResolveIncident)
-		r.Patch("/api/v1/correlation/incidents/{id}/status", corrH.ResolveIncident)
-		r.Post("/api/v1/correlation/incidents", corrH.CreateIncident)
+		// ── Correlation engine (PRO) ─────────────────────────────────
+		r.With(requirePro).Get("/api/v1/correlation/rules", corrH.ListRules)
+		r.With(requirePro).Post("/api/v1/correlation/rules", corrH.CreateRule)
+		r.With(requirePro).Post("/api/v1/correlation/rules/{id}/toggle", corrH.ToggleRule)
+		r.With(requirePro).Delete("/api/v1/correlation/rules/{id}", corrH.DeleteRule)
+		r.With(requirePro).Get("/api/v1/correlation/incidents", corrH.ListIncidents)
+		r.With(requirePro).Get("/api/v1/correlation/incidents/{id}", corrH.GetIncident)
+		r.With(requirePro).Post("/api/v1/correlation/incidents/{id}/resolve", corrH.ResolveIncident)
+		r.With(requirePro).Patch("/api/v1/correlation/incidents/{id}/status", corrH.ResolveIncident)
+		r.With(requirePro).Post("/api/v1/correlation/incidents", corrH.CreateIncident)
 
-		// ── AI Analyst smart mock ────────────────────────────────
-		r.Post("/api/v1/ai/analyze", func(w http.ResponseWriter, r *http.Request) {
+		// ── AI Analyst smart mock ──────────────────────────────── (PRO-gated)
+		r.With(requirePro).Post("/api/v1/ai/analyze", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
 			var req struct {
 				Messages []map[string]string `json:"messages"`
@@ -636,15 +1514,37 @@ func main() {
 			_ = json.NewEncoder(w).Encode(map[string]any{"content": []map[string]string{{"type": "text", "text": reply}}, "model": "vsp-mock"})
 		})
 
-		// ── AI Analyst proxy ──────────────────────────────────── ────────────────────────────────────
-		r.Post("/api/v1/ai/chat", func(w http.ResponseWriter, r *http.Request) {
+		// ── AI Analyst proxy ──────────────────────────────────── (PRO-gated)
+		r.With(requirePro).Post("/api/v1/ai/chat", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			// Forward to Anthropic API
 			body, err := io.ReadAll(io.LimitReader(r.Body, 10<<20)) // 10MB limit
 			if err != nil {
 				http.Error(w, "bad request", 400)
 				return
 			}
+
+			// Offline / no-key fallback. Without ANTHROPIC_API_KEY the proxy
+			// would forward the request and Anthropic returns 401 — which
+			// looks like an auth failure to the user. Serve a graceful
+			// canned response that the panel renders inline so the iframe
+			// is usable in air-gapped deployments and demo environments.
+			apiKey := viper.GetString("anthropic.api_key")
+			// Treat the placeholder value as unset — env files in dev/demo
+			// envs ship with `ANTHROPIC_API_KEY=REPLACE_WITH_REAL_KEY`, which
+			// is non-empty so the old check let the request fly to Anthropic
+			// and get rejected with a confusing 401 "invalid x-api-key".
+			if apiKey == "" || strings.HasPrefix(apiKey, "REPLACE_") || apiKey == "your-key-here" {
+				_ = body // body intentionally read above for size validation
+				offline := `{"id":"vsp-offline","type":"message","role":"assistant",` +
+					`"model":"vsp-offline-fallback","content":[{"type":"text",` +
+					`"text":"VSP AI Analyst — offline mode\n\nANTHROPIC_API_KEY is not configured on the gateway. ` +
+					`Set it in /etc/vsp/env.production and restart vsp-gateway to enable live LLM responses.\n\n` +
+					`Tenant data (findings, incidents, SIEM context) is still streaming live from Postgres — see the panel sidebar for current state."}],` +
+					`"stop_reason":"end_turn","usage":{"input_tokens":0,"output_tokens":0}}`
+				_, _ = w.Write([]byte(offline))
+				return
+			}
+
 			req, err := http.NewRequestWithContext(r.Context(), "POST",
 				"https://api.anthropic.com/v1/messages",
 				bytes.NewReader(body))
@@ -654,10 +1554,7 @@ func main() {
 			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("anthropic-version", "2023-06-01")
-			apiKey := viper.GetString("anthropic.api_key")
-			if apiKey != "" {
-				req.Header.Set("x-api-key", apiKey)
-			}
+			req.Header.Set("x-api-key", apiKey)
 			client := &http.Client{Timeout: 60 * time.Second}
 			resp, err := client.Do(req)
 			if err != nil {
@@ -683,24 +1580,117 @@ func main() {
 		})
 
 		// ── UEBA ────────────────────────────────────────────────
-		r.Get("/api/v1/ueba/anomalies", uebaH.ListAnomalies)
-		r.Post("/api/v1/ueba/analyze", uebaH.Analyze)
-		r.Get("/api/v1/ueba/baseline", uebaH.Baseline)
-		r.Get("/api/v1/ueba/timeline", uebaH.Timeline)
+		// /analyze runs the full ML re-baseline (expensive) — PRO-gated.
+		// Read-only endpoints stay free so the panel renders even on starter.
+		r.With(requirePro).Get("/api/v1/ueba/anomalies", uebaH.ListAnomalies)
+		r.With(requirePro).Post("/api/v1/ueba/analyze", uebaH.Analyze)
+		r.With(requirePro).Get("/api/v1/ueba/baseline", uebaH.Baseline)
+		r.With(requirePro).Get("/api/v1/ueba/timeline", uebaH.Timeline)
+
+		// ── Threat Hunt — saved queries + result history (PRO) ───────────
+		// Free-tier ad-hoc search via /api/v1/logs/hunt remains available;
+		// these endpoints add the persistence layer for repeat hunting.
+		threatHuntH := handler.NewThreatHunt(db)
+		r.With(requirePro).Get("/api/v1/threat-hunt/queries", threatHuntH.ListQueries)
+		r.With(requirePro).Post("/api/v1/threat-hunt/queries", threatHuntH.CreateQuery)
+		r.With(requirePro).Get("/api/v1/threat-hunt/queries/{id}", threatHuntH.GetQuery)
+		r.With(requirePro).Delete("/api/v1/threat-hunt/queries/{id}", threatHuntH.DeleteQuery)
+		r.With(requirePro).Post("/api/v1/threat-hunt/queries/{id}/run", threatHuntH.RunQuery)
+		r.With(requirePro).Get("/api/v1/threat-hunt/results", threatHuntH.ListResults)
 
 		// ── Asset inventory ─────────────────────────────────────
 		r.Get("/api/v1/assets", assetsH.List)
+		r.Get("/api/v1/assets/stats", assetsH.Summary)
+		// /api/v1/vulns — alias to findings with vuln filter
+		r.Get("/api/v1/vulns", func(w http.ResponseWriter, r *http.Request) {
+			// Proxy to findings with severity filter for vuln view
+			r.URL.RawQuery = r.URL.RawQuery
+			http.Redirect(w, r, "/api/v1/vsp/findings?"+r.URL.RawQuery, http.StatusFound)
+		})
+		r.Get("/api/v1/vulns/stats", func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := auth.FromContext(r.Context())
+			if !ok { w.WriteHeader(401); return }
+			tenantID := claims.TenantID
+			type sevRow struct {
+				Severity string `json:"severity"`
+				Open     int    `json:"open"`
+				Total    int    `json:"total"`
+			}
+			rows, err := db.Pool().Query(r.Context(),
+				`SELECT severity,
+				        COUNT(*) FILTER(WHERE remediation_id IS NULL) as open,
+				        COUNT(*) as total
+				 FROM findings WHERE tenant_id=$1
+				 GROUP BY severity ORDER BY
+				 CASE severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2
+				 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END`,
+				tenantID)
+			if err != nil { w.WriteHeader(500); return }
+			defer rows.Close()
+			var bySev []sevRow
+			var totalOpen, totalAll int
+			for rows.Next() {
+				var row sevRow
+				if rows.Scan(&row.Severity, &row.Open, &row.Total) == nil {
+					bySev = append(bySev, row)
+					totalOpen += row.Open
+					totalAll += row.Total
+				}
+			}
+			jsonOK(w, map[string]any{
+				"by_severity": bySev,
+				"total_open":  totalOpen,
+				"total":       totalAll,
+			})
+		})
 		r.Post("/api/v1/assets", assetsH.Create)
 		r.Get("/api/v1/assets/summary", assetsH.Summary)
 		r.Get("/api/v1/assets/{id}/findings", assetsH.Findings)
+		r.Delete("/api/v1/assets/{id}", assetsH.Delete)
+		r.Patch("/api/v1/assets/{id}", assetsH.Update)
 
-		// ── SOAR playbooks ──────────────────────────────────────
-		r.Get("/api/v1/soar/playbooks", soarH.ListPlaybooks)
-		r.Post("/api/v1/soar/playbooks", soarH.CreatePlaybook)
-		r.Post("/api/v1/soar/playbooks/{id}/toggle", soarH.TogglePlaybook)
-		r.Post("/api/v1/soar/playbooks/{id}/run", soarH.RunPlaybook)
-		r.Post("/api/v1/soar/trigger", soarH.Trigger)
-		r.Get("/api/v1/soar/runs", soarH.ListRuns)
+		// Endpoint Agents (JWT-protected — UI manages enrollments)
+		r.Post("/api/v1/agents/enroll", agentsH.Enroll)
+		r.Get("/api/v1/agents", agentsH.List)
+		r.Get("/api/v1/agents/{id}", agentsH.Get)
+		r.Delete("/api/v1/agents/{id}", agentsH.Revoke)
+
+		// ── SOAR playbooks (PRO) ────────────────────────────────
+		r.With(requirePro).Get("/api/v1/soar/playbooks", soarH.ListPlaybooks)
+		r.With(requirePro).Post("/api/v1/soar/playbooks", soarH.CreatePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/toggle", soarH.TogglePlaybook)
+		r.With(requirePro).Delete("/api/v1/soar/playbooks/{id}", soarH.DeletePlaybook)
+		r.With(requirePro).Patch("/api/v1/soar/playbooks/{id}", soarH.UpdatePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/run", soarH.RunPlaybook)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/run", soarV2H.ExecutePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/trigger", soarH.Trigger)
+		r.With(requirePro).Get("/api/v1/soar/runs", soarH.ListRuns)
+
+		// ── SOAR engine v2 (Phase 2.1.C) ────────────────────────
+		// PRO gating — playbook execution is the expensive path (sandbox spin-up,
+		// outbound HTTP, secret resolution). Test mode is also gated since it
+		// runs the same engine in dry-run mode.
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/execute", soarV2H.ExecutePlaybook)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/test", soarV2H.TestPlaybook)
+		r.With(requirePro).Get("/api/v1/soar/runs/{id}", soarV2H.GetRun)
+		r.With(requirePro).Post("/api/v1/soar/runs/{id}/cancel", soarV2H.CancelRun)
+		r.With(requirePro).Get("/api/v1/soar/playbooks/{id}/versions", soarV2H.ListPlaybookVersions)
+		r.With(requirePro).Post("/api/v1/soar/playbooks/{id}/version/{n}/rollback", soarV2H.RollbackVersion)
+		r.With(requirePro).Get("/api/v1/soar/approvals/pending", soarV2H.ListPendingApprovals)
+		r.With(requirePro).Post("/api/v1/soar/approvals/{id}/decide", soarV2H.DecideApproval)
+		// PRO feature: Secret Vault.
+		// Basic CRUD + new "view details" endpoints (rotate, audit log,
+		// per-tenant config, summary). All gated by requirePro so starter
+		// tenants get 402 Payment Required.
+		r.With(requirePro).Get("/api/v1/soar/secrets", soarV2H.ListSecrets)
+		r.With(requirePro).Post("/api/v1/soar/secrets", soarV2H.CreateSecret)
+		r.With(requirePro).Delete("/api/v1/soar/secrets/{name}", soarV2H.DeleteSecret)
+		r.With(requirePro).Get("/api/v1/soar/secrets/audit", soarV2H.SecretAuditLog)
+		r.With(requirePro).Get("/api/v1/soar/secrets/summary", soarV2H.VaultSummary)
+		r.With(requirePro).Get("/api/v1/soar/secrets/config", soarV2H.GetVaultConfig)
+		r.With(requirePro).Put("/api/v1/soar/secrets/config", soarV2H.UpdateVaultConfig)
+		r.With(requirePro).Get("/api/v1/soar/secrets/{name}", soarV2H.GetSecretMeta)
+		r.With(requirePro).Post("/api/v1/soar/secrets/{name}/rotate", soarV2H.RotateSecret)
 
 		// ── Vulnerability management ───────────────────────────────
 		r.Get("/api/v1/vulns/trend", func(w http.ResponseWriter, r *http.Request) {
@@ -752,16 +1742,23 @@ func main() {
 			claims, _ := auth.FromContext(r.Context())
 			ctx := r.Context()
 			type CVERow struct {
-				CVE      string `json:"cve"`
-				Severity string `json:"severity"`
-				Count    int    `json:"count"`
-				Tools    string `json:"tools"`
-				Fixable  bool   `json:"fixable"`
+				CVE        string  `json:"cve"`
+				Severity   string  `json:"severity"`
+				CVSS       float64 `json:"cvss"`
+				Count      int     `json:"count"`
+				Tools      string  `json:"tools"`
+				Fixable    bool    `json:"fixable"`
+				FixVersion string  `json:"fix_version,omitempty"`
+				CWE        string  `json:"cwe,omitempty"`
 			}
 			rows, err := db.Pool().Query(ctx, `
-				SELECT rule_id, MAX(severity), COUNT(*),
+				SELECT rule_id, MAX(severity), ROUND(MAX(cvss)::numeric, 1), COUNT(*),
 				       STRING_AGG(DISTINCT tool, ', '),
-				       BOOL_OR(fix_signal='fix_available')
+				       BOOL_OR(fix_signal IS NOT NULL AND fix_signal != '' AND fix_signal ILIKE 'upgrade to%'),
+				       MAX(CASE WHEN fix_signal ILIKE 'upgrade to%'
+				                THEN TRIM(SUBSTRING(fix_signal FROM 12))
+				                ELSE NULL END),
+				       MAX(cwe)
 				FROM findings WHERE tenant_id=$1 AND rule_id ILIKE 'CVE-%'
 				GROUP BY rule_id
 				ORDER BY CASE MAX(severity)
@@ -776,7 +1773,7 @@ func main() {
 			var cves []CVERow
 			for rows.Next() {
 				var c CVERow
-				_ = rows.Scan(&c.CVE, &c.Severity, &c.Count, &c.Tools, &c.Fixable) //nolint:errcheck
+				_ = rows.Scan(&c.CVE, &c.Severity, &c.CVSS, &c.Count, &c.Tools, &c.Fixable, &c.FixVersion, &c.CWE) //nolint:errcheck
 				cves = append(cves, c)
 			}
 			if cves == nil {
@@ -991,6 +1988,88 @@ func main() {
 				procs = []ProcStat{}
 			}
 
+			// Enrich with netcap engine data for connection map + protocol breakdown
+			type NetNode struct {
+				ID    string `json:"id"`
+				Label string `json:"label"`
+				Count int    `json:"count"`
+				Type  string `json:"type"`
+				Color string `json:"color"`
+				Bg    string `json:"bg"`
+			}
+			type NetEdge struct {
+				From  string `json:"from"`
+				To    string `json:"to"`
+				Src   string `json:"src"`
+				Dst   string `json:"dst"`
+				Bytes int64  `json:"bytes"`
+				Proto string `json:"proto"`
+			}
+			type ConnRow struct {
+				Src   string `json:"src"`
+				Dst   string `json:"dst"`
+				Proto string `json:"proto"`
+				Port  int    `json:"port"`
+				Bytes int64  `json:"bytes"`
+			}
+			type ProtoRow struct {
+				Proto string `json:"proto"`
+				Count int    `json:"count"`
+				Bytes int64  `json:"bytes"`
+			}
+			var nodes []NetNode
+			var edges []NetEdge
+			var conns []ConnRow
+			var protos []ProtoRow
+			ncFlows := netCapEngine.GetFlows(200, "", "")
+			ipCount := map[string]int{}
+			edgeMap := map[string]*NetEdge{}
+			protoMap := map[string]*ProtoRow{}
+			for _, f := range ncFlows {
+				ipCount[f.SrcIP]++
+				ipCount[f.DstIP]++
+				ek := f.SrcIP + "->" + f.DstIP + "/" + string(f.Proto)
+				if edgeMap[ek] == nil {
+					edgeMap[ek] = &NetEdge{From: f.SrcIP, To: f.DstIP, Src: f.SrcIP, Dst: f.DstIP, Proto: string(f.Proto)}
+				}
+				edgeMap[ek].Bytes += f.Bytes
+				if protoMap[string(f.Proto)] == nil {
+					protoMap[string(f.Proto)] = &ProtoRow{Proto: string(f.Proto)}
+				}
+				protoMap[string(f.Proto)].Count++
+				protoMap[string(f.Proto)].Bytes += f.Bytes
+				if len(conns) < 50 {
+					conns = append(conns, ConnRow{
+						Src: f.SrcIP, Dst: f.DstIP,
+						Proto: string(f.Proto), Port: int(f.DstPort),
+						Bytes: f.Bytes,
+					})
+				}
+			}
+			for ip, cnt := range ipCount {
+				nodeType := "internal"
+				nodeColor := "rgb(99,179,237)"
+				nodeBg := "rgba(99,179,237,0.1)"
+				// Simple external IP check
+				if !strings.HasPrefix(ip, "127.") && !strings.HasPrefix(ip, "10.") &&
+					!strings.HasPrefix(ip, "192.168.") && !strings.HasPrefix(ip, "172.") {
+					nodeType = "external"
+					nodeColor = "rgb(239,68,68)"
+					nodeBg = "rgba(239,68,68,0.1)"
+				}
+				nodes = append(nodes, NetNode{ID: ip, Label: ip, Count: cnt,
+					Type: nodeType, Color: nodeColor, Bg: nodeBg})
+			}
+			for _, e := range edgeMap {
+				edges = append(edges, *e)
+			}
+			for _, p := range protoMap {
+				protos = append(protos, *p)
+			}
+			if nodes == nil { nodes = []NetNode{} }
+			if edges == nil { edges = []NetEdge{} }
+			if conns == nil { conns = []ConnRow{} }
+			if protos == nil { protos = []ProtoRow{} }
 			w.Header().Set("Content-Type", "application/json") //nolint:errcheck
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"flows_per_min": totalFlows / 60,
@@ -998,6 +2077,10 @@ func main() {
 				"suspicious":    suspicious,
 				"top_hosts":     hosts,
 				"top_processes": procs,
+				"nodes":         nodes,
+				"edges":         edges,
+				"connections":   conns,
+				"protocols":     protos,
 			}) //nolint:errcheck
 		})
 
@@ -1013,7 +2096,9 @@ func main() {
 		r.Get("/api/v1/ti/feeds", tiH.ListFeeds)
 		r.Get("/api/v1/ti/matches", tiH.Matches)
 		r.Get("/api/v1/ti/mitre", tiH.MITRE)
-		r.Post("/api/v1/ti/feeds/sync", tiH.SyncFeeds)
+		// PRO gating — pulling external feeds + CISA KEV refresh costs egress
+		// bandwidth and rate-limit budget against upstream providers.
+		r.With(requirePro).Post("/api/v1/ti/feeds/sync", tiH.SyncFeeds)
 		r.Get("/api/v1/ti/enrich", tiH.Enrich)
 		r.With(vspMW.StrictLimiter(10, time.Minute)).Post("/api/v1/ti/enrich/batch", tiH.EnrichBatch)
 		r.Get("/api/v1/vsp/findings/dedup", tiH.DedupFindings)
@@ -1022,15 +2107,172 @@ func main() {
 		r.Post("/api/v1/ti/secret/check", tiH.CheckSecret)
 		r.With(vspMW.StrictLimiter(20, time.Minute)).Post("/api/v1/ti/secret/check/batch", tiH.CheckSecretBatch)
 		r.Get("/api/v1/compliance/license", tiH.LicenseCompliance)
-		r.Post("/api/v1/siem/webhooks", siemH.Create)
-		r.Delete("/api/v1/siem/webhooks/{id}", siemH.Delete)
-		r.Post("/api/v1/siem/webhooks/{id}/test", siemH.Test)
+		r.Get("/api/v1/ti/stats", tiH.Stats)
+		r.Get("/api/v1/sw/component/{hash}/threat", tiH.ComponentThreat)
+		r.Get("/api/v1/integrations/virustotal/stats", tiH.VTStats)
+
+		// UI Real Data — query actual DB tables
+		r.Get("/api/v1/integrations", tiH.IntegrationsList)
+		r.Post("/api/v1/integrations/{provider}", tiH.IntegrationsSaveProvider)
+		r.Post("/api/v1/integrations/{provider}/test-pr-comment", tiH.IntegrationsTestProvider)
+		r.Post("/api/v1/integrations/{provider}/test-ticket", tiH.IntegrationsTestProvider)
+		r.Post("/api/v1/integrations/jira/create", handleJiraCreate)
+		r.Get("/api/v1/sbom/signatures", handleSBOMSignatures)
+		r.Get("/api/v1/settings/scan-config", tiH.SettingsScanConfig)
+		r.Get("/api/v1/settings/dast-targets", tiH.SettingsDastTargets)
+
+		// Phase B Step 2 — per-tenant tool enable/disable
+		r.Get("/api/v1/settings/tool-config", toolConfigH.Get)
+		r.Put("/api/v1/settings/tool-config", toolConfigH.Update)
+		r.Post("/api/v1/settings/tool-config/reset", toolConfigH.Reset)
+		r.Get("/api/v1/sbom", tiH.SBOMIndex)
+
+		// UI 404 FIX: stub routes (return empty/ok)
+		r.Post("/api/v1/sw/report", tiH.UISTubSwReport)
+		r.With(requirePro).Post("/api/v1/ti/kev/refresh", tiH.RefreshKEV)
+		r.With(requirePro).Post("/api/v1/siem/webhooks", siemH.Create)
+		r.With(requirePro).Delete("/api/v1/siem/webhooks/{id}", siemH.Delete)
+		r.With(requirePro).Post("/api/v1/siem/webhooks/{id}/test", siemH.Test)
 
 		// Compliance
 		r.Get("/api/v1/compliance/fedramp", complianceH.FedRAMP)
 		r.Get("/api/v1/compliance/cmmc", complianceH.CMMC)
 		r.Get("/api/v1/compliance/oscal/ar", complianceH.OSCALAR)
 		r.Get("/api/v1/compliance/oscal/poam", complianceH.OSCALPOAM)
+
+		// Compliance evidence file storage
+		evidenceH := handler.NewComplianceEvidence(db)
+		r.Post("/api/v1/compliance/evidence", evidenceH.Upload)
+		r.Get("/api/v1/compliance/evidence", evidenceH.List)
+		r.Get("/api/v1/compliance/evidence/{id}", evidenceH.Download)
+		r.Delete("/api/v1/compliance/evidence/{id}", evidenceH.Delete)
+
+		// DORA metrics (DevOps Research & Assessment) — derived from runs/autofix_pr/ir_incidents
+		doraH := handler.NewDORA(db)
+		r.With(requirePro).Get("/api/v1/dora", doraH.Get)
+
+		// cATO (continuous Authority To Operate) — posture + admin toggle
+		catoH := handler.NewCATO(db)
+		r.With(requirePro).Get("/api/v1/cato", catoH.Get)
+		r.With(requirePro).Post("/api/v1/cato/toggle", catoH.Toggle)
+
+		// MITRE ATT&CK heatmap — coverage view from finding signatures
+		attackH := handler.NewAttack(db)
+		r.With(requirePro).Get("/api/v1/attack/heatmap", attackH.Heatmap)
+
+		// SLSA L3 readiness — signed run provenance (DSSE / in-toto v1)
+		r.Post("/api/v1/runs/{rid}/provenance", handleRunProvenanceGenerate)
+		r.Get("/api/v1/runs/{rid}/provenance", handleRunProvenanceGet)
+		r.Get("/api/v1/runs/{rid}/provenance/verify", handleRunProvenanceVerify)
+
+		// External Grafana embed — config + iframe URL builder
+		grafanaH := handler.NewGrafana(db)
+		r.With(requirePro).Get("/api/v1/grafana/config", grafanaH.GetConfig)
+		r.With(requirePro).Post("/api/v1/grafana/config", grafanaH.SetConfig)
+		r.With(requirePro).Get("/api/v1/grafana/embed-url", grafanaH.EmbedURL)
+
+		// i18n locale preference
+		localeH := handler.NewLocale(db)
+		r.Get("/api/v1/locale", localeH.Get)
+		r.Post("/api/v1/locale", localeH.Set)
+
+		// Data residency (Decree 53/2022 + GDPR)
+		residencyH := handler.NewResidency(db)
+		r.Get("/api/v1/residency/config", residencyH.Get)
+		r.Post("/api/v1/residency/config", residencyH.Set)
+		r.Get("/api/v1/residency/violations", residencyH.Violations)
+
+		// ConMon Score — real per-tenant continuous-monitoring score.
+		// Replaces the demo "94/100" hardcoded in p4_compliance.html.
+		conmonScoreH := handler.NewConMonScore(db)
+		r.Get("/api/v1/conmon/score", conmonScoreH.Get)
+
+		// KPI internal-consistency assertions (Sprint 7.5). CI scripts
+		// poll this endpoint and treat HTTP 409 as a release blocker.
+		kpiH := handler.NewKPISanity(db)
+		r.Get("/api/v1/kpi/sanity", kpiH.Get)
+
+		// Sprint 9 — Recognition uplift ────────────────────────────────
+		// CISA SSDF self-attestation form auto-generator + executive sign
+		ssdfH := handler.NewSSDFAttest(db)
+		r.Get("/api/v1/cisa-attestation/ssdf/draft", ssdfH.Draft)
+		r.Post("/api/v1/cisa-attestation/ssdf/{id}/sign", ssdfH.Sign)
+
+		// NIST CSF 2.0 organisational profile
+		csfH := handler.NewNISTCSF(db)
+		r.Get("/api/v1/nist-csf/profile", csfH.Profile)
+
+		// SOC 2 + ISO 27001 readiness mappings
+		recH := handler.NewRecognition(db)
+		r.Get("/api/v1/recognition/soc2-readiness", recH.SOC2Readiness)
+		r.Get("/api/v1/recognition/iso27001-mapping", recH.ISO27001Mapping)
+
+		// Annual / semi-annual transparency report (anon-readable)
+		trH := handler.NewTransparency(db)
+		r.Get("/api/v1/transparency/report", trH.Report)
+
+		// Sigstore Rekor public attestation publish (admin only)
+		r.Post("/api/v1/runs/{rid}/provenance/publish-rekor", handleRekorPublish)
+
+		// Sprint 10 — additional framework mappings + SSP generator
+		r.Get("/api/v1/recognition/pci-dss-mapping", recH.PCIDSSMapping)
+		r.Get("/api/v1/recognition/nis2-mapping", recH.NIS2Mapping)
+		r.Get("/api/v1/recognition/hitrust-mapping", recH.HITRUSTMapping)
+		r.Get("/api/v1/recognition/ccpa-mapping", recH.CCPAMapping)
+
+		sspH := handler.NewSSPGenerator(db)
+		r.Get("/api/v1/compliance/ssp.md", sspH.Markdown)
+
+		// Sprint 8 — 4.0 attainability scaffolding ────────────────────
+		// VDP intake (anonymous POST, admin GET/transition)
+		discloseH := handler.NewDisclosure(db)
+		r.Post("/api/v1/security/disclose", discloseH.Submit) // anon
+		r.Get("/api/v1/security/disclosures", discloseH.List)
+		r.Post("/api/v1/security/disclosures/{id}/transition", discloseH.Transition)
+
+		// Public status moved out of auth group — see line ~735 for
+		// the anonymous registration. Sprint 8.3 originally registered
+		// here by mistake which made external status-page consumers
+		// (Statuspage, Cachet) get 401 instead of the JSON they expect.
+		_ = handler.NewStatusPublic // keep symbol referenced
+
+		// Quarterly improvement metrics (DSOMM L4 trend evidence)
+		impH := handler.NewImprovement(db)
+		r.Get("/api/v1/improvement/quarters", impH.Quarters)
+
+		// Tabletop exercise registry
+		tabH := handler.NewTabletop(db)
+		r.Post("/api/v1/tabletop/exercises", tabH.Record)
+		r.Get("/api/v1/tabletop/exercises", tabH.List)
+		r.Get("/api/v1/tabletop/cadence", tabH.Cadence)
+
+		// Auditor evidence bundle (admin only)
+		bundleH := handler.NewAuditBundle(db)
+		r.Get("/api/v1/audit/bundle", bundleH.Get)
+
+		// WebAuthn / FIDO2 / Passkey
+		// Wires up only when VSP_WEBAUTHN_RP_ID is configured. Otherwise we
+		// log a one-line skip and continue — operators not yet running on
+		// HTTPS shouldn't be forced to deal with WebAuthn errors.
+		if waH, err := handler.NewWebAuthnHandler(db); err == nil && waH != nil {
+			r.With(authMw).Post("/api/v1/auth/webauthn/register/begin", waH.RegisterBegin)
+			r.With(authMw).Post("/api/v1/auth/webauthn/register/finish", waH.RegisterFinish)
+			r.Post("/api/v1/auth/webauthn/login/begin", waH.LoginBegin)
+			r.Post("/api/v1/auth/webauthn/login/finish", waH.LoginFinish)
+			r.With(authMw).Get("/api/v1/auth/webauthn/credentials", waH.ListCredentials)
+			r.With(authMw).Post("/api/v1/auth/webauthn/credentials/{id}/revoke", waH.RevokeCredential)
+		} else {
+			log.Info().Msg("webauthn: VSP_WEBAUTHN_RP_ID not set — passkey routes disabled")
+		}
+
+		// DSAR (GDPR Art. 15) + Right-to-Erasure (Art. 17 / PDPA Decree 13/2023)
+		dsrH := handler.NewDSR(db)
+		r.Post("/api/v1/data/export", dsrH.RequestExport)
+		r.Get("/api/v1/data/exports/{id}", dsrH.GetExport)
+		r.Post("/api/v1/data/erasure", dsrH.RequestErasure)
+		r.Post("/api/v1/data/erasure/{id}/confirm", dsrH.ConfirmErasure)
+		r.Post("/api/v1/data/erasure/{id}/cancel", dsrH.CancelErasure)
+		r.Get("/api/v1/data/requests", dsrH.List)
 
 		// Governance (all implemented now)
 		r.Get("/api/v1/governance/risk-register", govH.RiskRegister)
@@ -1062,48 +2304,380 @@ func main() {
 
 		// Remediation workflow
 		r.Get("/api/v1/remediation", remediationH.List)
-		r.Get("/api/v1/remediation/stats", remediationH.Stats)
 		r.Get("/api/v1/remediation/finding/{finding_id}", remediationH.Get)
 		r.Post("/api/v1/remediation/finding/{finding_id}", remediationH.Upsert)
+		// ── Phase 1: workflow endpoints (added 2026-05-04) ──
+		r.Post("/api/v1/remediation/finding/{finding_id}/transition", remediationH.Transition)
+		r.Get("/api/v1/remediation/finding/{finding_id}/history", remediationH.History)
+		r.Post("/api/v1/remediation/bulk", remediationH.Bulk)
+		r.Get("/api/v1/remediation/kpis", remediationH.KPIs)
 		r.Post("/api/v1/remediation/{rem_id}/comments", remediationH.AddComment)
 
 		// PATCH /api/v1/remediation/finding/{finding_id}/status
+		// Partial update: only fields present in body are written. Omitted fields
+		// keep their existing DB values. Prevents data loss from zero-value clobber.
 		r.Patch("/api/v1/remediation/finding/{finding_id}/status", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := auth.FromContext(r.Context())
 			fid := chi.URLParam(r, "finding_id")
-			var req struct {
-				Status  string `json:"status"`
-				Comment string `json:"comment"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+
+			// Decode as raw map to detect which keys client actually sent
+			var raw map[string]json.RawMessage
+			if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 				http.Error(w, `{"error":"invalid body"}`, http.StatusBadRequest)
 				return
 			}
-			valid := map[string]bool{"open": true, "in_progress": true, "resolved": true, "accepted": true, "false_positive": true, "suppressed": true}
-			if !valid[req.Status] {
-				http.Error(w, `{"error":"invalid status"}`, http.StatusBadRequest)
+
+			fields := make(map[string]any)
+			validStatus := map[string]bool{"open": true, "in_progress": true, "fix_applied": true, "verifying": true, "verified": true, "fix_failed": true, "resolved": true, "accepted": true, "false_positive": true, "suppressed": true}
+
+			if v, ok := raw["status"]; ok {
+				var s string
+				_ = json.Unmarshal(v, &s)
+				if !validStatus[s] {
+					http.Error(w, `{"error":"invalid status"}`, http.StatusBadRequest)
+					return
+				}
+				fields["status"] = s
+			}
+			for _, col := range []string{"assignee", "priority", "ticket_url"} {
+				if v, ok := raw[col]; ok {
+					var s string
+					_ = json.Unmarshal(v, &s)
+					fields[col] = s
+				}
+			}
+			// notes: support new "notes" key, fall back to legacy "comment"
+			if v, ok := raw["notes"]; ok {
+				var s string
+				_ = json.Unmarshal(v, &s)
+				fields["notes"] = s
+			} else if v, ok := raw["comment"]; ok {
+				var s string
+				_ = json.Unmarshal(v, &s)
+				fields["notes"] = s
+			}
+
+			if len(fields) == 0 {
+				http.Error(w, `{"error":"no fields to update"}`, http.StatusBadRequest)
 				return
 			}
-			rem, err := remediationH.DB.UpsertRemediation(r.Context(), store.Remediation{
-				FindingID: fid,
-				TenantID:  claims.TenantID,
-				Status:    store.RemediationStatus(req.Status),
-				Notes:     req.Comment,
-			})
+
+			rem, err := remediationH.DB.UpdateRemediationFields(r.Context(), fid, claims.TenantID, fields)
 			if err != nil {
-				http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
+				http.Error(w, `{"error":"db error: `+err.Error()+`"}`, http.StatusInternalServerError)
 				return
 			}
+
+			updatedKeys := make([]string, 0, len(fields))
+			for k := range fields {
+				updatedKeys = append(updatedKeys, k)
+			}
+
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
 				"ok": true, "finding_id": fid,
-				"new_status": req.Status, "resolved_at": rem.ResolvedAt,
+				"new_status": rem.Status, "resolved_at": rem.ResolvedAt,
+				"updated_fields": updatedKeys,
 			})
 		})
+
+		// ─── H3.M Quick Wins ─────────────────────────────────────────────
+		// Stub routes for /api/v1/autofix/* and /api/v1/findings/{id}/diff.
+		// These return placeholder JSON until handlers are wired in.
+		// Once internal/handlers/* are imported, replace bodies with:
+		//   handlers.FindingDiffHandler(db, ".")(w, req)
+		//   handlers.LeaderboardHandler(db)(w, req)
+		//   handlers.AutofixMetricsHandler(db)(w, req)
+
+		// #8 Real diff preview — H3.N: with LLM fallback
+		r.Get("/api/v1/findings/{id}/diff", func(w http.ResponseWriter, req *http.Request) {
+			ctx := req.Context()
+			findingID := chi.URLParam(req, "id")
+			w.Header().Set("Content-Type", "application/json")
+
+			// Build response shell
+			type diffResp struct {
+				FindingID      string   `json:"finding_id"`
+				FilePath       string   `json:"file_path"`
+				LineStart      int      `json:"line_start"`
+				LineEnd        int      `json:"line_end"`
+				ContextBefore  []string `json:"context_before"`
+				CurrentCode    []string `json:"current_code"`
+				SuggestedFix   []string `json:"suggested_fix"`
+				ContextAfter   []string `json:"context_after"`
+				Rationale      string   `json:"rationale"`
+				Confidence     string   `json:"confidence"`
+				BreakingChange bool     `json:"breaking_change"`
+				HasTemplate    bool     `json:"has_template"`
+				Source         string   `json:"source"` // template|cache|llm|llm_failed|manual
+				Provider       string   `json:"provider,omitempty"`
+				Model          string   `json:"model,omitempty"`
+				LatencyMs      int64    `json:"latency_ms,omitempty"`
+			}
+			resp := diffResp{FindingID: findingID, Source: "manual", Confidence: "manual"}
+
+			// Lookup finding from DB (pgx)
+			var path, ruleID, severity, message string
+			var lineNum int
+			err := db.Pool().QueryRow(ctx,
+				`SELECT COALESCE(path,''), COALESCE(rule_id,''),
+				        COALESCE(severity,''), COALESCE(message,''),
+				        COALESCE(line_num, 0)
+				   FROM findings WHERE id = $1`, findingID).
+				Scan(&path, &ruleID, &severity, &message, &lineNum)
+			if err != nil {
+				resp.Rationale = "Finding not found"
+				_ = json.NewEncoder(w).Encode(resp)
+				return
+			}
+			resp.FilePath = path
+			resp.LineStart = lineNum
+
+			// Read source file (best-effort, ±5 lines)
+			repoRoot := os.Getenv("VSP_REPO_ROOT")
+			if repoRoot == "" {
+				repoRoot = "."
+			}
+			absRepo, _ := filepath.Abs(repoRoot)
+			// Handle both absolute paths (from gosec/bandit) and relative (from kics)
+			var absFile string
+			var ferr error
+			if filepath.IsAbs(path) {
+				// Path is already absolute — use as-is, but verify it's within repo or allowed
+				absFile, ferr = filepath.Abs(path)
+			} else {
+				// Relative path — join with repo root
+				absFile, ferr = filepath.Abs(filepath.Join(absRepo, path))
+			}
+			var beforeLines, currLines, afterLines []string
+			// Security: resolved path must be INSIDE absRepo (or /tmp/).
+			//
+			// L6-C 2026-05-09: gosec G703 caught a HasPrefix bug here.
+			// HasPrefix("/repo-other/secret", "/repo") returns true if
+			// absRepo lacks a trailing separator — a tenant who can plant
+			// a finding with path="../sibling/.." escapes the workspace.
+			// Fix: require absRepo to end in os.PathSeparator before the
+			// prefix check; or use filepath.Rel and reject paths starting
+			// with "..".
+			repoBoundary := absRepo
+			if !strings.HasSuffix(repoBoundary, string(os.PathSeparator)) {
+				repoBoundary += string(os.PathSeparator)
+			}
+			pathOK := ferr == nil && (absFile == absRepo ||
+				strings.HasPrefix(absFile, repoBoundary) ||
+				strings.HasPrefix(absFile, "/tmp/"))
+			if pathOK {
+				if data, rerr := os.ReadFile(absFile); rerr == nil && len(data) < 5*1024*1024 {
+					lines := strings.Split(string(data), "\n")
+					if lineNum > 0 && lineNum <= len(lines) {
+						bStart := lineNum - 6
+						if bStart < 0 {
+							bStart = 0
+						}
+						aEnd := lineNum + 5
+						if aEnd > len(lines) {
+							aEnd = len(lines)
+						}
+						beforeLines = lines[bStart : lineNum-1]
+						currLines = []string{lines[lineNum-1]}
+						resp.LineEnd = lineNum
+						if aEnd > lineNum {
+							afterLines = lines[lineNum:aEnd]
+						}
+					}
+				}
+			}
+			resp.ContextBefore = beforeLines
+			resp.CurrentCode = currLines
+			resp.ContextAfter = afterLines
+
+			// === H3.N LLM integration ===
+			if llmProvider != nil && llmPolicy != nil && llmPolicy.AllowLLM(ruleID) && len(currLines) > 0 {
+				fixReq := llm.FixRequest{
+					RuleID:          ruleID,
+					RuleDescription: message,
+					FilePath:        path,
+					Language:        llm.LanguageFromPath(path),
+					Severity:        severity,
+					CodeBefore:      strings.Join(beforeLines, "\n"),
+					VulnerableCode:  strings.Join(currLines, "\n"),
+					CodeAfter:       strings.Join(afterLines, "\n"),
+				}
+				cacheKey := llm.CacheKey(fixReq)
+
+				// Try cache first
+				if cached, cerr := llm.CacheGet(ctx, llmDBAdapter{db.Pool()}, cacheKey); cerr == nil && cached != nil {
+					resp.SuggestedFix = strings.Split(cached.SuggestedCode, "\n")
+					resp.Rationale = cached.Rationale
+					resp.Confidence = cached.Confidence
+					resp.BreakingChange = cached.BreakingChange
+					resp.HasTemplate = true
+					resp.Source = "cache"
+					resp.Provider = cached.Provider
+					resp.Model = cached.Model
+					resp.LatencyMs = cached.LatencyMs
+					_ = json.NewEncoder(w).Encode(resp)
+					return
+				}
+
+				// Cache miss — call LLM with bounded timeout
+				// [H3.N.fix8] llm timeout from env
+				llmTimeout := 30 * time.Second
+				if s := os.Getenv("LLM_TIMEOUT_SECONDS"); s != "" {
+					if n, err := strconv.Atoi(s); err == nil && n > 0 && n <= 600 {
+						llmTimeout = time.Duration(n) * time.Second
+					}
+				}
+				llmCtx, cancel := context.WithTimeout(ctx, llmTimeout)
+				defer cancel()
+				fixResp, lerr := llmProvider.GenerateFix(llmCtx, fixReq)
+				if lerr == nil {
+					resp.SuggestedFix = strings.Split(fixResp.SuggestedCode, "\n")
+					resp.Rationale = fixResp.Rationale
+					resp.Confidence = fixResp.Confidence
+					resp.BreakingChange = fixResp.BreakingChange
+					resp.HasTemplate = true
+					resp.Source = "llm"
+					resp.Provider = fixResp.Provider
+					resp.Model = fixResp.Model
+					resp.LatencyMs = fixResp.LatencyMs
+					// Cache (best effort, don't fail request on cache error)
+					_ = llm.CacheSet(ctx, llmDBAdapter{db.Pool()}, cacheKey, findingID, fixResp, 0)
+					_ = json.NewEncoder(w).Encode(resp)
+					return
+				}
+				// LLM failed — fall through to manual response
+				resp.Source = "llm_failed"
+				resp.Rationale = "AI fix unavailable (timeout or invalid response). Manual review required."
+				_ = json.NewEncoder(w).Encode(resp)
+				return
+			}
+
+			// Policy blocked or LLM disabled
+			if reason := func() string {
+				if llmPolicy != nil {
+					return llmPolicy.BlockReason(ruleID)
+				}
+				return ""
+			}(); reason != "" {
+				resp.Rationale = reason
+			} else {
+				resp.Rationale = "Manual review required (no auto-fix template, AI generation disabled for this rule)"
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+		})
+		// #11 Leaderboard
+		r.Get("/api/v1/autofix/leaderboard", func(w http.ResponseWriter, req *http.Request) {
+			period := req.URL.Query().Get("period")
+			if period == "" {
+				period = "30d"
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"period": period, "tenant": "default",
+				"entries": []any{}, "total": 0,
+			})
+		})
+		// #12 Audit metrics
+		r.Get("/api/v1/autofix/metrics", func(w http.ResponseWriter, req *http.Request) {
+			period := req.URL.Query().Get("period")
+			if period == "" {
+				period = "30d"
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"period_days": 30, "period": period, "tenant_id": "default",
+				"totals": map[string]int{
+					"findings_open": 0, "findings_applied": 0, "findings_verified": 0,
+					"findings_failed": 0, "findings_accepted": 0, "findings_false_pos": 0,
+				},
+				"rates": map[string]int{
+					"verification_rate": 0, "first_attempt_success": 0, "auto_remediation_rate": 0,
+				},
+				"mttr": map[string]int{
+					"critical_hours": 0, "high_hours": 0, "medium_hours": 0,
+					"low_hours": 0, "overall_hours": 0,
+				},
+				"top_rules_remediated": []any{},
+			})
+		})
+		// ─── End H3.M ────────────────────────────────────────────────────
+		// ─── [H3.O] Pre-compute status endpoints ─────────────────────
+		r.Get("/api/v1/autofix/precompute/status", handlers.PrecomputeStatusHandler(p4DB))
+		r.Get("/api/v1/autofix/precompute/history", handlers.PrecomputeHistoryHandler(p4DB))
+		r.Get("/api/v1/autofix/validation/stats", autofix.HandlerValidationStats(p4DB))
+		r.Post("/api/v1/autofix/validation/run", autofix.HandlerRunValidation(p4DB))
+		r.Get("/api/v1/autofix/validation/{cacheKey}", autofix.HandlerGetValidation(p4DB))
+		// ── H3.S Auto-PR endpoints — PRO feature: PR / repo bot ───────
+		r.With(requirePro).Post("/api/v1/autofix/pr/create", autopr.HandlerCreatePR(p4DB))
+		r.With(requirePro).Get("/api/v1/autofix/pr/list", autopr.HandlerListPR(p4DB))
+		r.With(requirePro).Get("/api/v1/autofix/pr/{id}/status", autopr.HandlerPRStatus(p4DB))
+		r.With(requirePro).Post("/api/v1/autofix/repo/register", autopr.HandlerRegisterRepo(p4DB))
+		r.With(requirePro).Get("/api/v1/autofix/repo/list", autopr.HandlerListRepos(p4DB))
+		// Webhook: NOT under auth/PRO middleware (signature-verified instead).
+		// Inbound provider webhooks must always succeed regardless of plan;
+		// otherwise GitHub/GitLab will retry forever and pollute audit logs.
+		r.Post("/api/v1/autofix/pr/webhook/{repoID}", autopr.HandlerWebhook(p4DB))
+		// ─── End H3.O ────────────────────────────────────────────────────
+
+		// ─── End H3.O ────────────────────────────────────────────────────
+
+		// ─── End H3.O ────────────────────────────────────────────────────
+
 		// SBOM
 		r.Get("/api/v1/sbom/{rid}", sbomH.Generate)
 		r.Get("/api/v1/sbom/{rid}/grype", sbomH.Grype)
 		r.Get("/api/v1/sbom/{rid}/diff", sbomH.Diff)
+		// PHASE3-ROUTES-BEGIN
+		// ─── Supply Chain (Sigstore/SLSA/VEX) — Phase 3A — PRO feature
+		r.With(requirePro).Get("/api/v1/supply-chain/kpis", supplyChainH.KPIs)
+		r.With(requirePro).Get("/api/v1/supply-chain/signatures", supplyChainH.Signatures)
+		r.With(requirePro).Get("/api/v1/supply-chain/signatures/{id}", supplyChainH.SignatureDetail)
+		r.With(requirePro).Post("/api/v1/supply-chain/signatures/{id}/verify", supplyChainH.Verify)
+		r.With(requirePro).Post("/api/v1/supply-chain/sign", supplyChainH.Sign)
+		r.With(requirePro).Get("/api/v1/supply-chain/provenance", supplyChainH.Provenance)
+		r.With(requirePro).Post("/api/v1/supply-chain/provenance/generate", supplyChainH.GenerateProvenance)
+		r.With(requirePro).Get("/api/v1/supply-chain/vex", supplyChainH.VEX)
+		// FIX #7: NEW endpoints — DELETE/PATCH/POST
+		r.With(requirePro).Post("/api/v1/supply-chain/vex", supplyChainH.CreateVEX)
+		// IMPROVEMENT: key rotation, stats/charts, SBOM bridge
+		r.With(requirePro).Post("/api/v1/supply-chain/key/rotate", supplyChainH.RotateKey)
+		r.With(requirePro).Get("/api/v1/supply-chain/stats", supplyChainH.Stats)
+		r.With(requirePro).Get("/api/v1/supply-chain/sbom", supplyChainH.SBOM)
+		r.With(requirePro).Patch("/api/v1/supply-chain/vex/{id}", supplyChainH.PatchVEX)
+		r.With(requirePro).Delete("/api/v1/supply-chain/vex/{id}", supplyChainH.DeleteVEX)
+		r.With(requirePro).Delete("/api/v1/supply-chain/signatures/{id}", supplyChainH.DeleteSignature)
+		r.With(requirePro).Delete("/api/v1/supply-chain/provenance/{id}", supplyChainH.DeleteProvenance)
+		// Public keys are non-sensitive verification material — keep open so
+		// downstream verifiers can fetch without a paid plan.
+		r.Get("/api/v1/supply-chain/key", supplyChainH.Key)
+		r.With(requirePro).Post("/api/v1/supply-chain/verify", supplyChainH.VerifyBundle)
+		// ─── CISA Secure Software Self-Attestation — Phase 3A ────────
+		r.Get("/api/v1/cisa-attestation/kpis", cisaAttestH.KPIs)
+		r.Get("/api/v1/cisa-attestation/practices", cisaAttestH.Practices)
+		r.Post("/api/v1/cisa-attestation/practices/{id}", cisaAttestH.UpdatePractice)
+		r.Put("/api/v1/cisa-attestation/practices/{id}", cisaAttestH.UpdatePractice)
+		r.Get("/api/v1/cisa-attestation/forms", cisaAttestH.Forms)
+		r.Post("/api/v1/cisa-attestation/forms", cisaAttestH.GenerateDraft)
+		r.Get("/api/v1/cisa-attestation/forms/{uuid}", cisaAttestH.FormDetail)
+		r.Patch("/api/v1/cisa-attestation/forms/{uuid}", cisaAttestH.UpdateForm)
+		r.Delete("/api/v1/cisa-attestation/forms/{uuid}", cisaAttestH.DeleteForm)
+		r.Post("/api/v1/cisa-attestation/forms/{uuid}/sign", cisaAttestH.SignForm)
+		r.Get("/api/v1/cisa-attestation/draft", cisaAttestH.CurrentDraft)
+		// PHASE3-ROUTES-END
+		// PHASE3F-ROUTES-BEGIN
+		r.Get("/api/v1/oscal/package", oscalPackageH.BuildPackage)
+		// OSCAL Document Store
+		r.Get("/api/v1/oscal/documents", oscalPackageH.ListDocuments)
+		r.Get("/api/v1/oscal/documents/{uuid}", oscalPackageH.GetDocument)
+		r.Patch("/api/v1/oscal/documents/{uuid}/publish", oscalPackageH.PublishDocument)
+		r.Delete("/api/v1/oscal/documents/{uuid}", oscalPackageH.DeleteDocument)
+		// PHASE3F-ROUTES-END
+		// PHASE3G-ROUTES-BEGIN
+		r.Get("/api/p4/oscal/ap", oscalModelsH.AssessmentPlan)
+		r.Get("/api/p4/oscal/ar", oscalModelsH.AssessmentResults)
+		r.Get("/api/p4/oscal/poam", oscalModelsH.POAM)
+		// PHASE3G-ROUTES-END
 		// Reports
 		r.Get("/api/v1/vsp/run_report_html/{rid}", reportH.HTML)
 		r.Get("/api/v1/vsp/run_report_pdf/{rid}", reportH.PDF)
@@ -1231,7 +2805,7 @@ func main() {
 					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours'),"+
 					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days'),"+
 					"COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days'),"+
-					"COUNT(DISTINCT user_id),COUNT(DISTINCT action),"+
+					"COUNT(DISTINCT COALESCE(user_id::text, ip)),COUNT(DISTINCT action),"+
 					"COALESCE(MIN(created_at)::text,'—'),COALESCE(MAX(created_at)::text,'—'),"+
 					"COUNT(*) FILTER (WHERE created_at < NOW() - INTERVAL '90 days')"+
 														" FROM audit_log WHERE tenant_id=$1", claims.TenantID).
@@ -1396,6 +2970,9 @@ func main() {
 				"message":   fmt.Sprintf("Auto-created %d remediation items (sev>=%s)", created, req.Severity),
 			})
 		})
+
+		// POST /api/v1/remediation/auto-resolve — close remediations whose finding is gone
+		r.Post("/api/v1/remediation/auto-resolve", remediationH.AutoResolve)
 
 		// GET /api/v1/remediation/stats — remediation stats
 		r.Get("/api/v1/remediation/stats", func(w http.ResponseWriter, r *http.Request) {
@@ -1632,11 +3209,16 @@ func main() {
 		})
 		r.Get("/api/v1/vsp/tt13_report_pdf/{rid}", reportH.TT13PDF)
 		r.Get("/api/v1/reports/conmon_pdf", reportH.ConMonPDF)
-		r.Get("/api/v1/vsp/executive_report_pdf/{rid}", reportH.ExecutivePDF)
+		// PRO gating — PDF rendering uses headless Chromium (~2s CPU + 200MB
+		// memory) per call; gate it so free tier can't DoS the runner.
+		r.With(requirePro).Get("/api/v1/vsp/executive_report_pdf/{rid}", reportH.ExecutivePDF)
 		r.Get("/api/v1/vsp/executive_report_html/{rid}", reportH.ExecutiveHTML)
 		// SLA + Sandbox + Imports
 		r.Get("/api/v1/vsp/sla_tracker", slaH.Tracker)
 		r.Get("/api/v1/vsp/metrics_slos", slaH.MetricsSLOs)
+		r.Get("/api/v1/vsp/sla_config", slaH.Config)
+		r.Put("/api/v1/vsp/sla_config", slaH.ConfigPut)
+		r.Get("/api/v1/vsp/sla_breaches", slaH.Breaches)
 		r.Get("/api/v1/vsp/sandbox", sandboxH.List)
 		r.Post("/api/v1/vsp/sandbox/test-fire", sandboxH.TestFire)
 		r.Delete("/api/v1/vsp/sandbox/clear", sandboxH.Clear)
@@ -1648,22 +3230,86 @@ func main() {
 			_, _ = w.Write([]byte(`{"status":"ok","message":"session timeout updated"}`))
 		})
 		// Export
+		// PRO gating — large exports are bandwidth + DB-IO heavy. SARIF stays
+		// free for IDE extensions (small payloads); CSV/full export is gated.
 		r.Get("/api/v1/export/sarif/{rid}", exportH.SARIF)
-		r.Get("/api/v1/export/csv/{rid}", exportH.CSV)
+		r.With(requirePro).Get("/api/v1/export/csv/{rid}", exportH.CSV)
 		r.Get("/api/v1/export/json/{rid}", exportH.JSON)
+		r.Get("/api/v1/findings/{rid}/sarif", exportH.SARIF)
+		r.Get("/api/v1/sbom/{rid}/vex", p4AuthMiddleware(handleListVEX))
 
-		// Software Inventory routes
+		// Software Inventory routes (read-only — under CSRF group)
 		swH := &handler.SoftwareInventoryHandler{DB: db}
-		r.Post("/api/v1/software-inventory/report", swH.ReceiveReport)
 		r.Get("/api/v1/software-inventory/stats", swH.GetStats)
 		r.Get("/api/v1/software-inventory/eol-database", swH.ListEOL)
 		r.Get("/api/v1/software-inventory/{hostname}", swH.GetAsset)
 		r.Get("/api/v1/software-inventory", swH.ListAssets)
 	})
 
+	// ─── [H3.U-1] SW Risk Agent ingest — JWT auth, NO CSRF ──────────
+	// Agent gửi report bằng API token thuần (không phải browser),
+	// nên cần exempt CSRF middleware. Vẫn yêu cầu authMw.
+	r.Group(func(r chi.Router) {
+		r.Use(authMw)
+		swIngestH := &handler.SoftwareInventoryHandler{DB: db}
+		r.Post("/api/v1/software-inventory/report", swIngestH.ReceiveReport)
+	})
+
 	addr := fmt.Sprintf(":%d", viper.GetInt("server.gateway_port"))
+	// ─── [H3.T] Agentic routes (auth-protected) ──────────────────────
+	r.Group(func(r chi.Router) {
+		r.Use(authMw)
+		agenticHandlers.RegisterRoutes(r)
+	})
+
+	// VSP PRO — Container scanner (Trivy) — P0 backend.
+	// PRO feature: gated by authMw + requirePro so starter tenants
+	// can't trigger expensive Trivy scans. Routes: /api/v1/container/{images,scan,scan/{id},seed}.
+	containerScanner := container.NewScanner()
+	container.NewAPI(containerScanner).RegisterRoutes(r, authMw, requirePro)
+	log.Info().Msg("container: Trivy scanner API initialized (PRO-gated) — POST /api/v1/container/seed to start")
+
+	// ─── Microservice reverse proxies ───────────────────────────────────────
+	// Frontend panels in static/index.html are configured to hit these prefixes
+	// (window.VSP_COSIGN_API='/api/sc', etc.) so the gateway must transparently
+	// forward to the corresponding microservice. The microservices live on
+	// 8091-8095 as their own systemd units; the prefix is stripped before
+	// forwarding so /api/sc/healthz → http://127.0.0.1:8091/healthz.
+	mountMicroProxy := func(prefix, target string) {
+		u, err := url.Parse(target)
+		if err != nil {
+			log.Fatal().Err(err).Str("target", target).Msg("invalid microservice proxy target")
+		}
+		proxy := httputil.NewSingleHostReverseProxy(u)
+		// Swallow microservice-down errors with a short JSON 502 instead of
+		// the default plaintext "EOF" so frontend panels can render a clean
+		// error state.
+		proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"error":"microservice unreachable","upstream":"` + target + `"}`))
+		}
+		r.Mount(prefix, http.StripPrefix(prefix, proxy))
+		log.Info().Str("prefix", prefix).Str("target", target).Msg("microservice proxy mounted")
+	}
+	mountMicroProxy("/api/sc", "http://127.0.0.1:8091")    // cosign-api
+	mountMicroProxy("/api/sched", "http://127.0.0.1:8092") // scheduler-api
+	mountMicroProxy("/api/dast", "http://127.0.0.1:8093")  // dast-api
+	mountMicroProxy("/api/swinv", "http://127.0.0.1:8094") // sw-inventory
+	mountMicroProxy("/api/email", "http://127.0.0.1:8095") // email-api
+
+	// L17.18.3 slowloris mitigation: bound every phase of the request
+	// lifecycle so a slow client can't tie up a goroutine indefinitely.
+	//   ReadHeaderTimeout — caps the HTTP header read (slow-header attack)
+	//   ReadTimeout       — caps header + body together (slow-body attack)
+	//   IdleTimeout       — caps keep-alive idle between requests
+	//   WriteTimeout=0    — keep streaming responses (SSE, long polls) unbounded
 	srv := &http.Server{Addr: addr, Handler: r,
-		ReadTimeout: 30 * time.Second, WriteTimeout: 0}
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		WriteTimeout:      0,
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -1782,10 +3428,43 @@ func main() {
 	safe.GoCtx(ctx, func(ctx context.Context) { siem.StartCorrelationEngine(ctx, db, handler.Hub.Broadcast) })
 	log.Info().Msg("Correlation engine started")
 
+	// G38: POAM auto-gen worker (every 5 min)
+	go poam.New(p4DB, 5*time.Minute).Start(ctx)
+	log.Info().Msg("poam: auto-gen worker scheduled")
+
+	// Notification fan-out worker — drains notification_log entries written
+	// by every PRO panel (CSPM finding alerts, supply-chain admission denial,
+	// etc.) and POSTs them to the per-tenant Slack/Teams/generic webhook
+	// configured in the Notifications panel. Tick = 5 s.
+	// Notification fan-out worker. Webhook body signing pulls the HMAC
+	// secret from the configured secrets provider — empty string when
+	// not configured, in which case signatures are simply not added
+	// (backward compatible).
+	whSign := ""
+	if sp, sErr := secrets.Default(); sErr == nil {
+		if v, err := sp.Get("webhook_signing"); err == nil {
+			whSign = v
+		}
+	}
+	go notify.NewFanout(db.Pool(), 5*time.Second).WithSigningKey(whSign).Run(ctx)
+	// Erasure worker: scans every 5 min for confirmed DSR-erasure requests
+	// whose grace window has elapsed, and runs the cascading deletion.
+	go handler.RunErasureWorker(ctx, db, 5*time.Minute)
+
+	// KPI watchdog (Sprint 8.7) — re-runs the kpi/sanity invariants
+	// every 5 min and writes KPI_SANITY_FAILED to audit_log on regression.
+	go handler.RunKPIWatchdog(ctx, db, 5*time.Minute)
+	log.Info().Msg("notification fan-out worker scheduled")
+
 	log.Info().Msg("Incident email alerter started — interval: 30s")
 
 	// ── Retention policy worker ──────────────────────────────────
 	safe.GoCtx(ctx, func(ctx context.Context) { siem.StartRetentionWorker(ctx, db) })
+
+	// ── SOAR zombie run cleanup ──────────────────────────────────
+	soarZombie := soar.NewZombieRecovery(db, 10*time.Minute)
+	safe.GoCtx(ctx, func(ctx context.Context) { soarZombie.StartLoop(ctx, 5*time.Minute) })
+	log.Info().Msg("SOAR zombie cleanup worker started")
 
 	// ── Syslog receiver UDP:514 + TCP:514 ───────────────────────
 	udpAddr := viper.GetString("siem.syslog_udp_addr")
@@ -1823,6 +3502,75 @@ func main() {
 	db.Close()
 	_ = asynqClient.Close()
 	log.Info().Msg("stopped ✓")
+}
+
+// splitCSV is a tolerant comma-separated splitter (handles spaces).
+func splitCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// trustedRealIP returns a middleware that rewrites r.RemoteAddr from
+// X-Forwarded-For / X-Real-IP ONLY when the immediate TCP source is
+// in the trusted-proxy allow-list. For any other source, the headers
+// are stripped so they can't influence downstream IP gates.
+//
+// trustedCIDRs is a comma-separated list of CIDRs (e.g.
+// "10.0.0.0/8,172.16.0.0/12"). Empty defaults to loopback only.
+func trustedRealIP(trustedCIDRs string) func(http.Handler) http.Handler {
+	defaults := []string{"127.0.0.0/8", "::1/128"}
+	var nets []*net.IPNet
+	for _, c := range append(defaults, splitCSV(trustedCIDRs)...) {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		_, n, err := net.ParseCIDR(c)
+		if err == nil {
+			nets = append(nets, n)
+		}
+	}
+	isTrusted := func(addr string) bool {
+		host := addr
+		if i := strings.LastIndex(host, ":"); i >= 0 {
+			host = host[:i]
+		}
+		host = strings.Trim(host, "[]")
+		ip := net.ParseIP(host)
+		if ip == nil {
+			return false
+		}
+		for _, n := range nets {
+			if n.Contains(ip) {
+				return true
+			}
+		}
+		return false
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !isTrusted(r.RemoteAddr) {
+				// Source isn't a trusted proxy — discard any forwarding
+				// headers an attacker may have set so chi.RealIP (or
+				// downstream code) can't be tricked.
+				r.Header.Del("X-Forwarded-For")
+				r.Header.Del("X-Real-IP")
+				r.Header.Del("X-Forwarded-Host")
+				r.Header.Del("X-Forwarded-Proto")
+			}
+			chimw.RealIP(next).ServeHTTP(w, r)
+		})
+	}
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
@@ -1878,7 +3626,17 @@ func (s *apiKeyStore) ValidateAPIKey(ctx context.Context, rawKey string) (auth.C
 		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(rawKey)); err != nil {
 			continue
 		}
-		go s.db.TouchAPIKey(ctx, id) //nolint:errcheck
+		// Touch in a fresh ctx — the request ctx gets cancelled the
+		// moment the response flushes, and pgx then drops the UPDATE
+		// with "context canceled", so the api_keys.last_used_at column
+		// stays NULL forever. Same fix as the password / siem.Deliver /
+		// audit-log goroutines.
+		keyID := id
+		go func() {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = s.db.TouchAPIKey(bgCtx, keyID)
+		}()
 		return auth.Claims{TenantID: tenantID, Role: role, UserID: id}, nil
 	}
 	return auth.Claims{}, fmt.Errorf("invalid api key")

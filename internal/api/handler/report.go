@@ -493,7 +493,7 @@ func (h *Report) TT13PDF(w http.ResponseWriter, r *http.Request) {
 	defer os.Remove(tmpHTML.Name())
 	if err := tt13Tmpl.Execute(tmpHTML, data); err != nil {
 		tmpHTML.Close()
-		jsonError(w, "template error: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "template error", err)
 		return
 	}
 	tmpHTML.Close()
@@ -959,7 +959,7 @@ func (h *Report) ConMonPDF(w http.ResponseWriter, r *http.Request) {
 	defer os.Remove(tmpHTML.Name())
 	if err := conmonTmpl.Execute(tmpHTML, data); err != nil {
 		tmpHTML.Close()
-		jsonError(w, "template error: "+err.Error(), 500)
+		jsonInternalError(w, r, "template error", err)
 		return
 	}
 	tmpHTML.Close()

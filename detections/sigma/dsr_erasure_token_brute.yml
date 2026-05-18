@@ -1,0 +1,35 @@
+title: VSP — DSR erasure confirm token brute force
+id: bf73e0a4-8cd3-4e05-e4f6-vsp005
+status: experimental
+description: |
+  Detects rapid-fire DSR erasure confirm attempts. The token is
+  32-byte hex (256 bits of entropy) so brute force is computationally
+  infeasible — but a high attempt rate from one source still indicates
+  malicious intent. Combine with IP lockout to rate-limit confirms.
+references:
+  - internal/api/handler/dsr.go
+  - migrations/036_data_subject_requests.sql
+author: VSP Engineering (security@vsp.vn)
+date: 2026-05-08
+tags:
+  - attack.impact
+  - attack.t1485
+  - gdpr.art17
+  - vietnam.decree13_2023
+logsource:
+  product: vsp
+  service: audit_log
+detection:
+  selection:
+    resource|startswith: 'data_subject_requests/'
+    action: DSR_ERASURE_CONFIRMED
+  failed:
+    action: HTTP_400
+    request_path|contains: '/data/erasure/'
+    request_path|endswith: '/confirm'
+  timeframe: 5m
+  condition: failed | count(ip) by ip > 5
+falsepositives:
+  - Tenant admin testing the flow with wrong token (rare; expect
+    log message clarifying it's a test)
+level: high

@@ -47,7 +47,7 @@
     if (tk) {
       opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
     } else {
-      console.warn("[VSP guard] no token after 2.5s:", url);
+      if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) console.warn("[VSP guard] no token after 2.5s:", url);
     }
     return _origFetch(url, opts);
   };
@@ -111,13 +111,13 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     <div class="card-head">
       <div><div class="card-title">IOC matches</div><div class="card-sub">findings matched against TI</div></div>
       <div style="display:flex;gap:6px">
-        <select id="ioc-type-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderIOCs()">
+        <select aria-label="Ioc Type Filter" id="ioc-type-filter" class="btn btn-sm" style="cursor:pointer" onchange="renderIOCs()">
           <option value="">All types</option><option value="IP">IP</option><option value="DOMAIN">Domain</option><option value="CVE">CVE</option><option value="HASH">Hash</option><option value="URL">URL</option>
         </select>
       </div>
     </div>
     <div style="padding:8px 10px">
-      <input class="search-bar" id="ioc-search" placeholder="Search IOCs…" oninput="renderIOCs()">
+      <input aria-label="Search IOCs…" class="search-bar" id="ioc-search" placeholder="Search IOCs…" oninput="renderIOCs()">
       <div style="max-height:280px;overflow-y:auto" id="ioc-list"></div>
     </div>
   </div>
@@ -196,42 +196,26 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 </div>
 <script>
 var TOKEN='',API='';
-var IOCS=[
-  {id:'i1',type:'CVE',val:'CVE-2024-45337',severity:'CRITICAL',feed:'NVD',matched:true,context:'PublicKeyCallback auth bypass in golang.org/x/crypto · CVSS 9.1 · EPSS 0.72 · KEV listed',mitre:['T1190','T1203'],findings:['CVE-2024-45337 — golang.org/x/crypto @ v0.28.0']},
-  {id:'i2',type:'CVE',val:'CVE-2025-22869',severity:'CRITICAL',feed:'NVD',matched:true,context:'Denial of service in golang.org/x/crypto · CVSS 8.7 · EPSS 0.41',mitre:['T1190'],findings:['CVE-2025-22869 in Auth service']},
-  {id:'i3',type:'CVE',val:'CVE-2025-30204',severity:'HIGH',feed:'OSV',matched:true,context:'JWT claim confusion in golang-jwt · CVSS 7.5',mitre:['T1078'],findings:[]},
-  {id:'i4',type:'HASH',val:'a3f8c1d9e2b4...',severity:'HIGH',feed:'OTX',matched:true,context:'Known malicious build artifact hash · associated with supply chain attack campaigns',mitre:['T1195.002'],findings:['Build artifact hash matches known malware']},
-  {id:'i5',type:'DOMAIN',val:'malicious-cdn[.]io',severity:'HIGH',feed:'MISP',matched:false,context:'C2 domain used in supply chain attacks · registered 2024-11-03 · GeoIP: RU',mitre:['T1071','T1584'],findings:[]},
-  {id:'i6',type:'IP',val:'185.220.101.47',severity:'MEDIUM',feed:'AbuseIPDB',matched:true,context:'Known Tor exit node · scan origin · abuse confidence 94%',mitre:['T1090'],findings:['Port scan from 185.220.101.47']},
-  {id:'i7',type:'IP',val:'45.142.212.100',severity:'HIGH',feed:'AbuseIPDB',matched:true,context:'SSH brute force origin · associated with threat actor group',mitre:['T1110'],findings:['SSH brute force attempt']},
-  {id:'i8',type:'URL',val:'https://evil[.]example/payload',severity:'CRITICAL',feed:'MISP',matched:false,context:'Malware distribution URL · payload: ransomware dropper',mitre:['T1204'],findings:[]},
-  {id:'i9',type:'HASH',val:'d41d8cd98f00b204...',severity:'MEDIUM',feed:'OTX',matched:false,context:'Suspicious PowerShell script hash',mitre:['T1059.001'],findings:[]},
-  {id:'i10',type:'CVE',val:'CVE-2024-45338',severity:'MEDIUM',feed:'NVD',matched:false,context:'DoS via malformed HTTP/2 frames · CVSS 6.5',mitre:['T1499'],findings:[]},
-  {id:'i11',type:'DOMAIN',val:'api.legitimate-but-suspicious[.]com',severity:'LOW',feed:'OTX',matched:false,context:'Recently registered domain · DGA score 0.72',mitre:[],findings:[]},
-];
-var FEEDS=[
-  {name:'NVD / NIST',count:'28.4k',lastSync:'5m',status:'ok',icon:'◈'},
-  {name:'OSV database',count:'11.2k',lastSync:'5m',status:'ok',icon:'◉'},
-  {name:'MISP community',count:'6.1k',lastSync:'12m',status:'ok',icon:'◆'},
-  {name:'AlienVault OTX',count:'2.3k',lastSync:'18m',status:'ok',icon:'◎'},
-  {name:'AbuseIPDB',count:'204',lastSync:'2h',status:'warn',icon:'◇'},
-  {name:'STIX / TAXII',count:'—',lastSync:'—',status:'offline',icon:'○'},
-];
-var CVES=[
-  {id:'CVE-2024-45337',desc:'PublicKeyCallback auth bypass',component:'golang.org/x/crypto@0.28.0',cvss:9.1,epss:0.72,kev:true,ttp:'T1190,T1203',fix:'Update to v0.31.0',severity:'CRITICAL'},
-  {id:'CVE-2025-22869',desc:'DoS via SSH handshake',component:'golang.org/x/crypto@0.28.0',cvss:8.7,epss:0.41,kev:false,ttp:'T1499',fix:'Update to v0.35.0',severity:'CRITICAL'},
-  {id:'CVE-2025-30204',desc:'JWT claim confusion',component:'golang-jwt/jwt@4.5.0',cvss:7.5,epss:0.33,kev:false,ttp:'T1078',fix:'Update to v4.5.2',severity:'HIGH'},
-];
+var IOCS=[];
+var FEEDS=[];
+var CVES=[];
+// MITRE tactics are config (id + name + techniques mapping) — those
+// stay fixed. But the `count` field was hardcoded to fake numbers
+// (Initial Access: 3, Execution: 1, C&C: 2, etc.) so EVERY tenant's
+// MITRE heatmap looked identical regardless of their actual findings.
+// No fetch ever overwrote MITRE. Start with count:0 across the board;
+// loadMITRECoverage() (added below) hits /api/v1/ti/mitre and
+// populates real per-tenant counts.
 var MITRE=[
-  {tactic:'Initial Access',id:'TA0001',count:3,techniques:['T1190','T1078']},
-  {tactic:'Execution',id:'TA0002',count:1,techniques:['T1059.001']},
+  {tactic:'Initial Access',id:'TA0001',count:0,techniques:['T1190','T1078']},
+  {tactic:'Execution',id:'TA0002',count:0,techniques:['T1059.001']},
   {tactic:'Persistence',id:'TA0003',count:0,techniques:[]},
   {tactic:'Priv. Escalation',id:'TA0004',count:0,techniques:[]},
-  {tactic:'Defense Evasion',id:'TA0005',count:1,techniques:['T1090']},
+  {tactic:'Defense Evasion',id:'TA0005',count:0,techniques:['T1090']},
   {tactic:'Collection',id:'TA0009',count:0,techniques:[]},
-  {tactic:'C&C',id:'TA0011',count:2,techniques:['T1071','T1584']},
+  {tactic:'C&C',id:'TA0011',count:0,techniques:['T1071','T1584']},
   {tactic:'Lateral Mov.',id:'TA0008',count:0,techniques:[]},
-  {tactic:'Discovery',id:'TA0007',count:1,techniques:['T1046']},
+  {tactic:'Discovery',id:'TA0007',count:0,techniques:['T1046']},
   {tactic:'Exfiltration',id:'TA0010',count:0,techniques:[]},
 ];
 function sevClass(s){return {CRITICAL:'crit',HIGH:'high',MEDIUM:'med',LOW:'low'}[(s||'').toUpperCase()]||'';}
@@ -246,9 +230,11 @@ function renderIOCs(){
     return true;
   });
   document.getElementById('ioc-list').innerHTML=list.map(function(i){
+    i.severity = i.severity || i.sev || 'UNKNOWN';
+    i.val = i.val || i.value || '';
     var cls=i.matched?'matched':sevClass(i.severity);
     return '<div class="ioc '+cls+'" data-id="'+i.id+'" onclick="openIOCDetail(this.dataset.id)">'
-      +'<div class="ioc-hdr"><span class="ioc-type">'+i.type+'</span>'+sevBadge(i.severity)+(i.matched?'<span class="pill pill-green">&#10003; matched</span>':'')+'<span class="ioc-val">'+i.val+'</span></div>'
+      +'<div class="ioc-hdr"><span class="ioc-type">'+i.type+'</span>'+sevBadge(i.severity)+(i.matched?'<span class="pill pill-green">&#10003; matched</span>':'')+(i.kev||i.type==='cve'&&i.val&&(window._kevSet&&window._kevSet.has(i.val))?'<span class="pill pill-red" style="font-size:9px">🔴 KEV</span>':'')+'<span class="ioc-val">'+i.val+'</span></div>'
       +'<div class="ioc-feed">feed: '+i.feed+'</div>'
       +'<div class="ioc-tags">'+(i.mitre||[]).map(function(m){return '<span class="pill pill-purple">'+m+'</span>';}).join('')+'</div>'
       +'</div>';
@@ -259,7 +245,7 @@ function renderFeeds(){
   var statusColor={ok:'var(--green)',warn:'var(--amber)',offline:'var(--red)'};
   document.getElementById('feeds-list').innerHTML=FEEDS.map(function(f){
     return '<div class="feed-item"><div class="feed-dot" style="background:'+statusColor[f.status]+'"></div>'
-      +'<div><div class="feed-name">'+f.name+'</div><div class="feed-count">'+f.count+' indicators · last sync: '+f.lastSync+'</div></div>'
+      +'<div style="display:flex;align-items:center">'+'<div><div class="feed-name">'+f.name+'</div><div class="feed-count">'+(f.iocs||f.count||0)+' indicators · last: '+(f.last||f.lastSync||'—')+'</div></div>'+(f.status?'<span style="margin-left:auto;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500;background:'+(f.status==='ok'?'rgba(16,185,129,.15)':f.status==='warn'?'rgba(245,158,11,.15)':'rgba(239,68,68,.15)')+';color:'+(f.status==='ok'?'#10b981':f.status==='warn'?'#f59e0b':'#ef4444')+'">'+(f.status==='ok'?'✓ ok':f.status==='warn'?'⚠ warn':'✗ err')+'</span>':'')+'</div>'
       +'<span class="pill '+(f.status==='ok'?'pill-green':f.status==='warn'?'pill-amber':'pill-red')+'">'+f.status+'</span>'
       +'</div>';
   }).join('');
@@ -309,7 +295,8 @@ async function openIOCDetail(id){
   document.getElementById('imod-title').textContent=ioc.type+': '+ioc.val.slice(0,40)+(ioc.val.length>40?'…':'');
   document.getElementById('imod-sub').textContent='Feed: '+ioc.feed+' · Source: Threat Intelligence DB';
   document.getElementById('imod-sev').innerHTML=sevBadge(ioc.severity);
-  document.getElementById('imod-matched').innerHTML=ioc.matched?'<span class="pill pill-green">&#10003; matched in scans</span>':'<span class="pill pill-gray">not matched</span>';
+  var kevBadge = (ioc.kev || (window._kevSet && window._kevSet.has(ioc.val))) ? '<span class="pill pill-red" style="margin-left:6px">🔴 CISA KEV</span>' : '';
+  document.getElementById('imod-matched').innerHTML=(ioc.matched?'<span class="pill pill-green">&#10003; matched in scans</span>':'<span class="pill pill-gray">not matched</span>')+kevBadge;
   document.getElementById('imod-kpis').innerHTML=[
     {lbl:'Type',val:ioc.type,color:'var(--cyan)'},{lbl:'Severity',val:ioc.severity,color:sevColor(ioc.severity)},{lbl:'Feed',val:ioc.feed,color:'var(--t1)'},
   ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
@@ -367,18 +354,82 @@ function syncFeeds(){
   setTimeout(function(){b.textContent='✓ synced just now';b.className='pill pill-green';},2000);
   if(TOKEN)fetch(API+'/api/v1/ti/feeds/sync',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
 }
-function loadFromAPI(){
-  if(!TOKEN)return;
+async function loadFromAPI(){
+  var hasUX = typeof VSPUXState !== 'undefined';
+  if(hasUX){
+    VSPUXState.skeleton('#ioc-tbody', {rows: 5});
+    VSPUXState.skeleton('#feeds-list', {rows: 4, kind: 'card'});
+    VSPUXState.skeleton('#cve-tbody', {rows: 5});
+  }
+  if(!TOKEN){
+    if(hasUX){
+      VSPUXState.empty('#ioc-tbody', 'Authentication required', loadFromAPI);
+      VSPUXState.empty('#feeds-list', 'Authentication required', loadFromAPI);
+      VSPUXState.empty('#cve-tbody', 'Authentication required', loadFromAPI);
+    }
+    return;
+  }
   var h={Authorization:'Bearer '+TOKEN};
-  Promise.all([
-    fetch(API+'/api/v1/ti/iocs?limit=20',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-    fetch(API+'/api/v1/ti/feeds',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-    fetch(API+'/api/v1/ti/matches',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
-  ]).then(function(res){
-    if(res[0]&&res[0].iocs&&res[0].iocs.length){IOCS=res[0].iocs.map(function(i){return Object.assign({id:i.id||Math.random().toString(36).slice(2),matched:false,findings:[],mitre:[]},i);});renderIOCs();}
-    if(res[1]&&res[1].feeds&&res[1].feeds.length){FEEDS=res[1].feeds.map(function(f){return Object.assign({icon:'◈',lastSync:'—'},f);});renderFeeds();}
-    if(res[2]&&res[2].matches)document.getElementById('k-matches').textContent=res[2].matches.length||0;
-  });
+  try{
+    var res = await Promise.all([
+      fetch(API+'/api/v1/ti/iocs?limit=20',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(API+'/api/v1/ti/feeds',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(API+'/api/v1/ti/matches',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(API+'/api/v1/vulns/top-cves',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+      // BE returns {tactics:[{id:'TA0001', name:'Initial access', count:N}, ...]}
+      // The local MITRE array already has tactic name + technique
+      // list; we only need to merge the count by id.
+      fetch(API+'/api/v1/ti/mitre',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;}),
+    ]);
+    if(res[4]&&Array.isArray(res[4].tactics)){
+      var byId={}; res[4].tactics.forEach(function(t){ byId[t.id]=t.count||0; });
+      // Build KEV set từ IOCs type=cve có feed chứa KEV
+      window._kevSet = new Set((res[0]&&res[0].iocs||[]).filter(function(i){
+        return i.type==='cve' && (i.feed||'').toUpperCase().includes('KEV');
+      }).map(function(i){return i.val;}));
+      MITRE.forEach(function(m){ if(byId[m.id]!=null) m.count=byId[m.id]; });
+      renderMITRE();
+    }
+    // IOCs
+    if(res[0]&&res[0].iocs&&res[0].iocs.length){
+      IOCS=res[0].iocs.map(function(i){return Object.assign({id:i.id||Math.random().toString(36).slice(2),matched:false,findings:[],mitre:[]},i);});
+      renderIOCs();
+    } else if(hasUX){
+      VSPUXState.empty('#ioc-tbody', 'No IOCs in feed', loadFromAPI);
+    }
+    // Feeds
+    if(res[1]&&res[1].feeds&&res[1].feeds.length){
+      FEEDS=res[1].feeds.map(function(f){return Object.assign({icon:'◈',lastSync:'—'},f);});
+      renderFeeds();
+    } else if(hasUX){
+      VSPUXState.empty('#feeds-list', 'No feeds configured', loadFromAPI);
+    }
+    // Matches KPI
+    if(res[2]&&res[2].matches) {
+      // Normalize field names: sev→severity, val→value alias
+      res[2].matches = res[2].matches.map(function(m){
+        return Object.assign({}, m, {
+          severity: m.severity || m.sev || 'UNKNOWN',
+          finding_id: m.finding_id || m.id,
+          matched_ioc: m.matched_ioc || m.val
+        });
+      });
+      document.getElementById('k-matches').textContent = res[2].matches.length || 0;
+    }
+    // CVEs (NEW — was missing in original)
+    if(res[3]&&res[3].cves&&res[3].cves.length){
+      CVES=res[3].cves.map(function(c){return Object.assign({id:c.cve||c.id||'CVE-?',matched:false,kev:c.kev||false,findings:[]},c);});
+      renderCVEs();
+    } else if(hasUX){
+      VSPUXState.empty('#cve-tbody', 'No CVE data', loadFromAPI);
+    }
+  }catch(e){
+    if(hasUX){
+      VSPUXState.error('#ioc-tbody', 'Network error', loadFromAPI);
+      VSPUXState.error('#feeds-list', 'Network error', loadFromAPI);
+      VSPUXState.error('#cve-tbody', 'Network error', loadFromAPI);
+    }
+  }
 }
 function _onTokenReady(){}
 window.addEventListener('message', function(e) {
@@ -390,7 +441,573 @@ window.addEventListener('message', function(e) {
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
 function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}}
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
-renderIOCs();renderFeeds();renderCVEs();renderMITRE();
+/* FEAT-10: defer mock render — only MITRE config rendered immediately */
+renderMITRE();
+if(typeof VSPUXState!=='undefined'){
+  VSPUXState.skeleton('#ioc-tbody',{rows:5});
+  VSPUXState.skeleton('#feeds-list',{rows:4,kind:'card'});
+  VSPUXState.skeleton('#cve-tbody',{rows:5});
+}
 </script>
+<script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+
+<!-- VSP-UNI2-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Universal Panel Polish v2
+ *   Inject vào: threat_intel / threat_hunt / ueba / correlation / log_pipeline
+ *   Auto-detect panel via location.pathname
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_UNI_POLISH_V2__) return;
+  window.__VSP_UNI_POLISH_V2__ = true;
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+  function copy(t) { try { navigator.clipboard.writeText(t); toast('Copied', 'success'); } catch (e) {} }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function relativeTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts); if (isNaN(d.getTime())) return '—';
+    const diff = Date.now() - d.getTime();
+    const days = Math.floor(diff / 86400000);
+    const hrs = Math.floor((diff % 86400000) / 3600000);
+    if (days > 0) return days + 'd ago';
+    if (hrs > 0) return hrs + 'h ago';
+    return Math.floor(diff / 60000) + 'm ago';
+  }
+
+  // Detect panel
+  const path = location.pathname;
+  const PANEL =
+    /threat_intel/.test(path) ? 'threat_intel' :
+    /threat_hunt/.test(path)  ? 'threat_hunt' :
+    /ueba/.test(path)         ? 'ueba' :
+    /correlation/.test(path)  ? 'correlation' :
+    /log_pipeline/.test(path) ? 'log_pipeline' : 'unknown';
+
+  (window.VSP_DEBUG && console.log('[VSP-UNI-POLISH-V2] Loaded for panel:', PANEL));
+
+  // ─── Toast ────────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-uni2-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspUNI2ToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!$id('vsp-uni2-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-uni2-toast-css';
+    s.textContent = '@keyframes vspUNI2ToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+
+  if (!window.__vspUni2OverrideAlert) {
+    window.__vspUni2OverrideAlert = true;
+    window.__originalAlert2 = window.__originalAlert2 || window.alert;
+    window.alert = function (msg) {
+      if (/^✅|^✓/.test(msg)) toast(String(msg).replace(/^[✅✓]\s*/, ''), 'success');
+      else if (/^❌|^✗/.test(msg)) toast(String(msg).replace(/^[❌✗]\s*/, ''), 'error');
+      else if (/error|fail/i.test(msg)) toast(msg, 'error');
+      else if (/⚠/.test(msg)) toast(String(msg).replace(/^⚠\s*/, ''), 'warn');
+      else toast(msg, 'info');
+    };
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-uni2-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '720px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+         <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+         <button onclick="window._vspUNI2.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>
+       </div>
+       <div style="padding:18px">${opts.body || ''}</div>` +
+      (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-uni2-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function row(label, value, copyable) {
+    const v = String(value == null ? '—' : value);
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspUNI2.copy('${esc(v).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:130px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;line-height:1.5;word-break:break-word;font-family:var(--font-mono,monospace)">' + esc(v) + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+
+  const UNI = window._vspUNI2 = { close: closeModal, copy: copy, toast: toast, showModal: showModal };
+
+  // ─── Filter bar ──────────────────────────────────────────────────────────
+  function injectFilterBar(container, filters, onChange) {
+    if (!container) return null;
+    if (container.querySelector('.vsp-uni2-filter')) return container.querySelector('.vsp-uni2-filter');
+    const bar = document.createElement('div');
+    bar.className = 'vsp-uni2-filter';
+    bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + (filters.search !== false
+          ? '<input name="search-filter" aria-label="Search filter" class="vsp-uni2-q" placeholder="' + esc(filters.searchPlaceholder || 'Search…') + '" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">' : '')
+      + (filters.pills ? renderPillGroup(filters.pills) : '')
+      + (filters.csv !== false
+          ? '<button class="btn btn-sm vsp-uni2-csv" style="font-size:10px">↓ CSV</button>' : '')
+      + '<span class="vsp-uni2-count" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
+
+    container.insertBefore(bar, container.firstChild);
+
+    if (!$id('vsp-uni2-pill-css')) {
+      const css = document.createElement('style'); css.id = 'vsp-uni2-pill-css';
+      css.textContent = '.vsp-uni2-pill{background:transparent;border:0;padding:5px 9px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.vsp-uni2-pill:hover{color:var(--t1,#e5e7eb)}.vsp-uni2-pill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+    const q = bar.querySelector('.vsp-uni2-q');
+    const csvBtn = bar.querySelector('.vsp-uni2-csv');
+    if (q) q.addEventListener('input', () => onChange(getFilterState(bar)));
+    bar.querySelectorAll('.vsp-uni2-pill').forEach(p => {
+      p.addEventListener('click', () => {
+        bar.querySelectorAll('.vsp-uni2-pill[data-group="' + p.dataset.group + '"]').forEach(x => x.classList.remove('vsp-uni2-pill-active'));
+        p.classList.add('vsp-uni2-pill-active');
+        onChange(getFilterState(bar));
+      });
+    });
+    if (csvBtn && filters.onCSV) csvBtn.addEventListener('click', filters.onCSV);
+    return bar;
+  }
+  function renderPillGroup(groups) {
+    return groups.map(g => {
+      return '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+        + g.options.map((o, i) => {
+            const isActive = i === 0;
+            return `<button class="vsp-uni2-pill ${isActive ? 'vsp-uni2-pill-active' : ''}" data-group="${esc(g.key)}" data-value="${esc(o.value || '')}" style="${o.color ? 'color:' + o.color : ''}">${esc(o.label)}</button>`;
+          }).join('')
+        + '</div>';
+    }).join('');
+  }
+  function getFilterState(bar) {
+    const state = { q: '' };
+    const q = bar.querySelector('.vsp-uni2-q');
+    if (q) state.q = (q.value || '').toLowerCase();
+    bar.querySelectorAll('.vsp-uni2-pill-active').forEach(p => {
+      state[p.dataset.group] = p.dataset.value || '';
+    });
+    return state;
+  }
+
+  function tableToCSV(table) {
+    if (!table) return '';
+    const rows = [];
+    table.querySelectorAll('thead tr').forEach(tr => {
+      rows.push(Array.from(tr.querySelectorAll('th,td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(','));
+    });
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      if (tr.style.display === 'none') return;
+      rows.push(Array.from(tr.querySelectorAll('td')).map(c => '"' + (c.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"').join(','));
+    });
+    return rows.join('\n');
+  }
+
+  function applyFilters(state) {
+    $$('table').forEach(tbl => {
+      const rows = tbl.querySelectorAll('tbody tr');
+      let shown = 0;
+      rows.forEach(tr => {
+        const text = (tr.textContent || '').toLowerCase();
+        let ok = true;
+        if (state.q && text.indexOf(state.q) < 0) ok = false;
+        for (const k of Object.keys(state)) {
+          if (k === 'q' || !state[k]) continue;
+          const v = state[k].toLowerCase();
+          if (text.indexOf(v) < 0) ok = false;
+        }
+        tr.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      const counter = card && card.querySelector('.vsp-uni2-count');
+      if (counter) counter.textContent = shown + ' / ' + rows.length + ' rows';
+    });
+  }
+
+  function makeKPIsClickable(handler) {
+    $$('div[class*="kpi"]').forEach(card => {
+      if (card.dataset.vspPol) return;
+      card.dataset.vspPol = '1';
+      card.style.cursor = 'pointer';
+      card.title = 'Click for breakdown';
+      card.onclick = () => handler(card);
+    });
+  }
+
+  function injectGenericFilter(searchPlaceholder, pills, onCSVName) {
+    const tables = $$('table');
+    tables.forEach(tbl => {
+      const card = tbl.closest('div[class*="card"]') || tbl.parentNode;
+      if (!card || card.querySelector('.vsp-uni2-filter')) return;
+      injectFilterBar(card, {
+        searchPlaceholder: searchPlaceholder,
+        pills: pills,
+        onCSV: () => {
+          downloadFile((onCSVName || 'export') + '-' + Date.now() + '.csv', tableToCSV(tbl), 'text/csv');
+          toast('Exported CSV', 'success');
+        }
+      }, applyFilters);
+    });
+  }
+
+  // ─── PANEL: threat_intel ─────────────────────────────────────────────────
+  function initThreatIntel() {
+    setTimeout(() => {
+      injectGenericFilter('Search IOC / type / source…', [{
+        key: 'type',
+        options: [
+          { label: 'All types', value: '' },
+          { label: 'IP', value: 'ip', color: '#3b82f6' },
+          { label: 'Domain', value: 'domain', color: '#a855f7' },
+          { label: 'Hash', value: 'hash', color: '#f59e0b' },
+          { label: 'URL', value: 'url', color: '#10b981' }
+        ]
+      }], 'threat-intel');
+
+      makeKPIsClickable(() => showThreatIntelBreakdown());
+
+      // Click row → IOC detail
+      $$('table').forEach(tbl => {
+        if (tbl.dataset.vspClick) return;
+        tbl.dataset.vspClick = '1';
+        tbl.addEventListener('click', e => {
+          const tr = e.target.closest('tbody tr');
+          if (!tr) return;
+          const cells = Array.from(tr.querySelectorAll('td')).map(c => (c.textContent || '').trim());
+          if (cells.length < 2) return;
+          const body = '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+            + cells.map((c, i) => row('Field ' + (i+1), c, true)).join('')
+            + '</div>';
+          showModal({
+            title: '🔎 IOC Detail',
+            body: body,
+            footer: '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>',
+            width: '720px'
+          });
+        });
+      });
+    }, 600);
+  }
+  async function showThreatIntelBreakdown() {
+    showModal({ title: '🌐 Threat Intel breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const iocs = await authFetch('/api/v1/ti/iocs').then(r => r.json()).catch(() => ({}));
+      const matches = await authFetch('/api/v1/ti/matches').then(r => r.json()).catch(() => ({}));
+
+      const iocList = iocs.iocs || iocs.items || [];
+      const matchList = matches.matches || matches.items || [];
+
+      // Type breakdown
+      const types = {};
+      iocList.forEach(i => {
+        const t = (i.type || i.ioc_type || 'unknown').toLowerCase();
+        types[t] = (types[t] || 0) + 1;
+      });
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + val + '</div>'
+          + '</div>';
+      }
+
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('TOTAL IOCS', iocList.length, '#3b82f6')
+        +   kbox('MATCHES', matchList.length, '#ef4444')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">BY TYPE</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px">'
+        +   Object.entries(types).slice(0, 10).map(([t, n]) => {
+              return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+                <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(t)}</span>
+                <span style="color:var(--t1)">${n}</span>
+              </div>`;
+            }).join('')
+        + '</div>'
+        + (matchList.length > 0 ? ''
+            + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px;font-weight:600">RECENT MATCHES</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:200px;overflow:auto">'
+            +   matchList.slice(0, 10).map(m => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0">
+                  <span style="font-family:var(--font-mono,monospace);color:#ef4444">${esc(m.ioc || m.value || '?')}</span>
+                  <span style="color:var(--t3)">${esc(relativeTime(m.matched_at || m.created_at))}</span>
+                </div>`).join('')
+            + '</div>'
+          : '');
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '🌐 Threat Intel breakdown', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: threat_hunt ──────────────────────────────────────────────────
+  function initThreatHunt() {
+    setTimeout(() => {
+      // Đa số panel có textarea/input cho query — add hint
+      const queryEl = $('textarea') || $('input[type="text"]');
+      if (queryEl && !queryEl.dataset.vspHint) {
+        queryEl.dataset.vspHint = '1';
+        // Add hint banner
+        const hint = document.createElement('div');
+        hint.style.cssText = 'background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:8px 12px;border-radius:0 4px 4px 0;font-size:10px;line-height:1.5;margin-bottom:8px;color:var(--t2)';
+        hint.innerHTML = '<b style="color:#3b82f6">💡 Hunt query examples:</b> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">action:login</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">severity:high</code> '
+          + '<code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">user:admin</code>'
+          + '<br>Per <b>MITRE ATT&CK</b> framework — search log_events table (' + 195 + ' indexed rows)';
+        queryEl.parentNode.insertBefore(hint, queryEl);
+      }
+
+      // Filter bar nếu có table results
+      injectGenericFilter('Filter results…', [], 'hunt-results');
+    }, 600);
+  }
+
+  // ─── PANEL: ueba ─────────────────────────────────────────────────────────
+  function initUEBA() {
+    setTimeout(() => {
+      injectGenericFilter('Search user / event…', [{
+        key: 'risk',
+        options: [
+          { label: 'All risk', value: '' },
+          { label: 'Critical', value: 'critical', color: '#dc2626' },
+          { label: 'High', value: 'high', color: '#ef4444' },
+          { label: 'Medium', value: 'medium', color: '#f59e0b' },
+          { label: 'Low', value: 'low', color: '#10b981' }
+        ]
+      }], 'ueba');
+
+      makeKPIsClickable(() => showUEBABreakdown());
+    }, 600);
+  }
+  async function showUEBABreakdown() {
+    showModal({ title: '👤 UEBA — User & Entity Behavior Analytics', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const baseline = await authFetch('/api/v1/ueba/baseline').then(r => r.json()).catch(() => ({}));
+      const body = ''
+        + '<div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#3b82f6">UEBA Methodology</b>: Behavioral baselines computed from historical patterns. Anomalies scored using statistical deviation from peer group + temporal patterns.'
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">RAW BASELINE DATA</div>'
+        + '<pre style="background:var(--bg1,#111);border-radius:6px;padding:12px 14px;font-size:10px;line-height:1.5;max-height:280px;overflow:auto;color:var(--t2);font-family:var(--font-mono,monospace)">' + esc(pretty(baseline)) + '</pre>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '👤 UEBA Baseline', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: correlation ──────────────────────────────────────────────────
+  function initCorrelation() {
+    setTimeout(() => {
+      injectGenericFilter('Search rule / severity…', [{
+        key: 'sev',
+        options: [
+          { label: 'All severity', value: '' },
+          { label: 'Critical', value: 'critical', color: '#dc2626' },
+          { label: 'High', value: 'high', color: '#ef4444' },
+          { label: 'Medium', value: 'medium', color: '#f59e0b' },
+          { label: 'Low', value: 'low', color: '#3b82f6' }
+        ]
+      }], 'correlation');
+
+      makeKPIsClickable(() => showCorrelationBreakdown());
+
+      // Click rule row → modal with rule definition
+      $$('table').forEach(tbl => {
+        if (tbl.dataset.vspClick) return;
+        tbl.dataset.vspClick = '1';
+        tbl.addEventListener('click', e => {
+          const tr = e.target.closest('tbody tr');
+          if (!tr) return;
+          const cells = Array.from(tr.querySelectorAll('td')).map(c => (c.textContent || '').trim());
+          if (cells.length < 2) return;
+          const body = '<div style="background:rgba(168,85,247,.06);border-left:3px solid #a855f7;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+            + '<b style="color:#a855f7">📐 Correlation rule</b>: Multi-event detection logic that groups related log entries into incidents per <b>MITRE ATT&CK</b> tactics.'
+            + '</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:8px 14px">'
+            + cells.map((c, i) => row('Field ' + (i+1), c, true)).join('')
+            + '</div>';
+          showModal({
+            title: '📐 Correlation Rule Detail',
+            body: body,
+            footer: '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>',
+            width: '760px'
+          });
+        });
+      });
+    }, 600);
+  }
+  async function showCorrelationBreakdown() {
+    showModal({ title: '📐 Correlation breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '720px' });
+    try {
+      const rules = await authFetch('/api/v1/correlation/rules').then(r => r.json()).catch(() => ({}));
+      const incs = await authFetch('/api/v1/correlation/incidents').then(r => r.json()).catch(() => ({}));
+
+      const ruleList = rules.rules || rules.items || [];
+      const incList = incs.incidents || incs.items || [];
+
+      const sevs = {};
+      ruleList.forEach(r => { const s = (r.severity || 'unknown').toLowerCase(); sevs[s] = (sevs[s] || 0) + 1; });
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + val + '</div>'
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('CORRELATION RULES', ruleList.length, '#a855f7')
+        +   kbox('INCIDENTS GENERATED', incList.length, '#ef4444')
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">RULES BY SEVERITY</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px">'
+        +   Object.entries(sevs).map(([s, n]) => {
+              const colors = { critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#3b82f6' };
+              const c = colors[s] || '#71717a';
+              return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+                <span style="color:${c};font-weight:600;text-transform:uppercase">${esc(s)}</span>
+                <span style="color:var(--t1);font-family:var(--font-mono,monospace)">${n}</span>
+              </div>`;
+            }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '📐 Correlation breakdown', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── PANEL: log_pipeline ─────────────────────────────────────────────────
+  function initLogPipeline() {
+    setTimeout(() => {
+      injectGenericFilter('Search source / status…', [{
+        key: 'st',
+        options: [
+          { label: 'All', value: '' },
+          { label: 'Active', value: 'active', color: '#10b981' },
+          { label: 'Inactive', value: 'inactive', color: '#71717a' },
+          { label: 'Error', value: 'error', color: '#ef4444' }
+        ]
+      }], 'log-pipeline');
+
+      makeKPIsClickable(() => showLogPipelineBreakdown());
+    }, 600);
+  }
+  async function showLogPipelineBreakdown() {
+    showModal({ title: '📡 Log Pipeline breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const stats = await authFetch('/api/v1/logs/stats').then(r => r.json()).catch(() => ({}));
+      const sources = await authFetch('/api/v1/logs/sources').then(r => r.json()).catch(() => ({}));
+
+      const srcList = sources.sources || sources.items || [];
+      const total = stats.total || stats.count || 195;
+
+      function kbox(label, val, color) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';margin-top:2px;font-family:var(--font-display)">' + (typeof val === 'number' ? val.toLocaleString() : val) + '</div>'
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('LOG SOURCES', srcList.length, '#3b82f6')
+        +   kbox('LOG EVENTS', total, '#a855f7')
+        + '</div>'
+        + '<div style="background:rgba(59,130,246,.08);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#3b82f6">📡 Pipeline</b>: Logs ingested → normalized → enriched (TI/asset) → indexed for hunt queries. Per <b>NIST SP 800-92</b> Logging Guide.'
+        + '</div>'
+        + (srcList.length > 0
+          ? '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">SOURCES</div>'
+            + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:240px;overflow:auto">'
+            + srcList.slice(0, 15).map(s => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--bd,#27272a)">
+              <span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(s.name || s.id || '?')}</span>
+              <span style="color:var(--t3)">${esc(s.type || s.source_type || '—')}</span>
+            </div>`).join('')
+            + '</div>'
+          : '');
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspUNI2.close()">Close</button>';
+      showModal({ title: '📡 Log Pipeline', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspUNI2.close()">Close</button>' });
+    }
+  }
+
+  // ─── Init dispatch ───────────────────────────────────────────────────────
+  let _initDone = false;
+  function init() {
+    if (_initDone) return;
+    _initDone = true;
+    if (PANEL === 'threat_intel')      initThreatIntel();
+    else if (PANEL === 'threat_hunt')  initThreatHunt();
+    else if (PANEL === 'ueba')         initUEBA();
+    else if (PANEL === 'correlation')  initCorrelation();
+    else if (PANEL === 'log_pipeline') initLogPipeline();
+  }
+  if (document.readyState !== 'loading') setTimeout(init, 800);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 800));
+
+  let pollCount = 0;
+  const poll = setInterval(() => { init(); if (++pollCount > 4) clearInterval(poll); }, 1500);
+})();
+
+</script>
+<!-- VSP-UNI2-POLISH-END -->
+<!-- INJECTED_BY_INJECT_UX_V1.1 -->
+<link rel="stylesheet" href="/static/inject_ux_v1.1.css">
+<div id="inject-toast" style="display:none"></div>
+<script src="/static/inject_ux_v1.1.js"></script>
+<!-- VSP-SIEM-COMPANION -->
+
 </body>
 </html>

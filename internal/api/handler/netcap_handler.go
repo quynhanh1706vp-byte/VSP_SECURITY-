@@ -31,7 +31,7 @@ func NewNetCapHandler(e *netcap.Engine) *NetCapHandler {
 func (h *NetCapHandler) Interfaces(w http.ResponseWriter, r *http.Request) {
 	ifaces, err := h.Engine.GetInterfaces()
 	if err != nil {
-		jsonError(w, "failed to list interfaces: "+err.Error(), http.StatusInternalServerError)
+		jsonInternalError(w, r, "failed to list interfaces", err)
 		return
 	}
 	jsonOK(w, map[string]interface{}{
@@ -55,7 +55,7 @@ func (h *NetCapHandler) Start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Engine.Start(cfg); err != nil {
-		jsonError(w, err.Error(), http.StatusBadRequest)
+		jsonError(w, err.Error(), http.StatusBadRequest) // safe-err-leak: user gets validation feedback
 		return
 	}
 
@@ -102,9 +102,12 @@ func (h *NetCapHandler) Flows(w http.ResponseWriter, r *http.Request) {
 	flags := r.URL.Query().Get("flags")
 
 	flows := h.Engine.GetFlows(limit, proto, flags)
+	totalFlows, _, _, _, _, _, _, _ := h.Engine.Counts()
 	jsonOK(w, map[string]interface{}{
-		"flows": flows,
-		"count": len(flows),
+		"flows":     flows,
+		"count":     len(flows), // safe-len: legacy page count; total is honest
+		"total":     totalFlows,
+		"page_size": len(flows),
 	})
 }
 
@@ -117,9 +120,12 @@ func (h *NetCapHandler) Flows(w http.ResponseWriter, r *http.Request) {
 func (h *NetCapHandler) Anomalies(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 50)
 	anoms := h.Engine.GetAnomalies(limit)
+	_, totalAnoms, _, _, _, _, _, _ := h.Engine.Counts()
 	jsonOK(w, map[string]interface{}{
 		"anomalies": anoms,
-		"count":     len(anoms),
+		"count":     len(anoms), // safe-len: legacy page count; total is honest
+		"total":     totalAnoms,
+		"page_size": len(anoms),
 	})
 }
 
@@ -151,9 +157,12 @@ func (h *NetCapHandler) ProtoBreakdown(w http.ResponseWriter, r *http.Request) {
 func (h *NetCapHandler) L7HTTP(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 100)
 	reqs := h.Engine.GetHTTPRequests(limit)
+	_, _, totalHTTP, _, _, _, _, _ := h.Engine.Counts()
 	jsonOK(w, map[string]interface{}{
-		"requests": reqs,
-		"count":    len(reqs),
+		"requests":  reqs,
+		"count":     len(reqs), // safe-len: legacy page count; total is honest
+		"total":     totalHTTP,
+		"page_size": len(reqs),
 	})
 }
 
@@ -165,9 +174,12 @@ func (h *NetCapHandler) L7HTTP(w http.ResponseWriter, r *http.Request) {
 func (h *NetCapHandler) L7DNS(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 100)
 	queries := h.Engine.GetDNSQueries(limit)
+	_, _, _, totalDNS, _, _, _, _ := h.Engine.Counts()
 	jsonOK(w, map[string]interface{}{
-		"queries": queries,
-		"count":   len(queries),
+		"queries":   queries,
+		"count":     len(queries), // safe-len: legacy page count; total is honest
+		"total":     totalDNS,
+		"page_size": len(queries),
 	})
 }
 
@@ -179,9 +191,12 @@ func (h *NetCapHandler) L7DNS(w http.ResponseWriter, r *http.Request) {
 func (h *NetCapHandler) L7SQL(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 100)
 	evts := h.Engine.GetSQLEvents(limit)
+	_, _, _, _, totalSQL, _, _, _ := h.Engine.Counts()
 	jsonOK(w, map[string]interface{}{
-		"events": evts,
-		"count":  len(evts),
+		"events":    evts,
+		"count":     len(evts), // safe-len: legacy page count; total is honest
+		"total":     totalSQL,
+		"page_size": len(evts),
 	})
 }
 
@@ -193,9 +208,12 @@ func (h *NetCapHandler) L7SQL(w http.ResponseWriter, r *http.Request) {
 func (h *NetCapHandler) L7TLS(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 100)
 	sessions := h.Engine.GetTLSSessions(limit)
+	_, _, _, _, _, totalTLS, _, _ := h.Engine.Counts()
 	jsonOK(w, map[string]interface{}{
-		"sessions": sessions,
-		"count":    len(sessions),
+		"sessions":  sessions,
+		"count":     len(sessions), // safe-len: legacy page count; total is honest
+		"total":     totalTLS,
+		"page_size": len(sessions),
 	})
 }
 
@@ -207,9 +225,12 @@ func (h *NetCapHandler) L7TLS(w http.ResponseWriter, r *http.Request) {
 func (h *NetCapHandler) L7GRPC(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 100)
 	evts := h.Engine.GetGRPCEvents(limit)
+	_, _, _, _, _, _, totalGRPC, _ := h.Engine.Counts()
 	jsonOK(w, map[string]interface{}{
-		"events": evts,
-		"count":  len(evts),
+		"events":    evts,
+		"count":     len(evts), // safe-len: legacy page count; total is honest
+		"total":     totalGRPC,
+		"page_size": len(evts),
 	})
 }
 

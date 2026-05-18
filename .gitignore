@@ -30,6 +30,17 @@ vsp_*.js
 !static/vsp_upgrade_v100.js
 !static/vsp_poam.js
 !static/panels/vsp_siem_patch.js
+!static/vsp_siem_companion.js
+# Bundles referenced by static/index.html — L13 frontend test (15.5)
+# probes them and fails the ladder if any 404.
+!static/vsp_pro_realapi.js
+!static/vsp_sidebar_collapse.js
+!static/vsp_sw_inventory_panel.js
+!static/vsp_scheduler_panel.js
+!static/vsp_email_panel.js
+!static/vsp_dast_panel.js
+!static/panels/vsp_pro_paginate.js
+!static/patches/vsp_advanced_features_v7.js
 vsp_features_patch.js
 static/vsp_features_patch.js
 
@@ -114,7 +125,7 @@ vsp-agent
 *.exe
 
 # Claude/AI work artifacts — not part of production repo
-patches/
+patches/*
 *.bak_hotfix
 
 # Sprint 4 — local backups before codemod (DO NOT COMMIT)
@@ -140,3 +151,125 @@ report_*.pdf
 VSP-Billing.html
 VSP-P4-Report-*.html
 VSP-P4-Sales-*.html
+.phase*_backup_*/
+phase*_before.log
+phase*_after.log
+phase*_apply.log
+phase*_smoketest.log
+PHASE*_DEPLOY.md
+static/*.backup-*.html
+static/*.bak.html
+static/*-v[0-9].html
+gateway.log
+*.log
+gateway.log
+*.log
+.admin_password.txt
+.env.production.rotated-*
+go.mod.bak
+go.sum.bak
+phase4_3_pitch.tar.gz
+*.tar.gz
+
+# VSP build artifacts
+*.bak.*
+*backup.*
+*.before_revert.*
+NOTES_FIX_*.md
+triggered_via
+internal/threatintel/conflicting_*/
+
+# Editor / script backup files
+*.bak
+*.bak.*
+*.orig
+*.swp
+*~
+
+# Build artifacts
+cmd/gateway/gateway
+vsp-migrate
+vsp-scanner
+cover.out
+_codeql_detected_source_root
+
+# Large external/derived
+llama.cpp/
+.archive/
+reports/
+
+# Local backup files
+*.bak.*
+*.broken*
+*.before_*
+*.working_*
+
+# === Build artifacts (added 2026-05-05) ===
+/vsp-gateway
+/vsp-scanner
+/vsp-cosign-api
+/vsp-dast-api
+/vsp-email-api
+/vsp-scheduler
+/vsp-sw-agent
+/vsp-sw-inventory
+/vsp-trivy-api
+/vsp-gateway-debug
+
+# === Secrets (NEVER commit) ===
+/cosign.key
+/cosign.pass
+*.pem
+*.p12
+
+# === Build dirs ===
+/bin/
+
+# === Test/temp HTML ===
+/static/panels_test.html
+/static/index.html.bak*
+/static/index.html.before_*
+
+# === Standalone/dev artifacts ===
+/standalone_main.go
+/api.go
+/scanner.go
+
+# === Sprint 1 Findings Pro — F1-F8 whitelist (added by patch) ===
+# Override the broad ignores for production-tracked Sprint 1 deliverables.
+# Note: the original `patches/` rule above was changed to `patches/*` so
+# that re-include rules below can take effect.
+
+# Un-ignore the entire patches/findings/ subtree
+!patches/findings/
+!patches/findings/**
+!patches/perf/
+!patches/perf/**
+!patches/feat/
+!patches/feat/**
+
+# Each Sprint 1 F* feature script — explicit per-file allow
+!static/js/vsp_bulk_f1.js
+!static/vsp_uxstates.js
+!static/js/vsp_uxstates.js
+# (future entries: !static/js/vsp_filter_f2.js, vsp_cvss_sort_f3.js, ...)
+
+# Defensive: keep .bak / generated artifacts ignored inside patches/
+patches/findings/**/*.bak
+patches/findings/**/*.bak.*
+patches/findings/**/*.tmp
+
+# L28 2026-05-09: defense-in-depth — block any future secrets/ dir
+secrets/
+secrets.yaml
+secrets.yml
+*.key
+cosign-api
+vsp-dev-stub
+vsp-gateway-new
+re
+static/panels/csv
+scripts/mint_jwt.sh
+scripts/start-devstub.sh
+scripts/stop-devstub.sh
+gateway_bin
