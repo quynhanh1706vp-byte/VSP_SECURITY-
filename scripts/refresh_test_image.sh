@@ -13,3 +13,9 @@ echo "Pushed: ttl.sh/vsp-alpine@$DIGEST"
 COSIGN_PASSWORD="" cosign sign --key /etc/vsp/cosign.key \
   --tlog-upload=false --yes "ttl.sh/vsp-alpine@$DIGEST"
 echo "Signed OK: ttl.sh/vsp-alpine@$DIGEST"
+
+# Re-apply CAP_NET_RAW sau khi build gateway
+if [ -f /home/test/Data/GOLANG_VSP/gateway ]; then
+  sudo setcap cap_net_raw+eip /home/test/Data/GOLANG_VSP/gateway 2>/dev/null && \
+    echo "CAP_NET_RAW set on gateway binary"
+fi
