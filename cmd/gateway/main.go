@@ -3114,6 +3114,9 @@ func main() {
 		// SLA + Sandbox + Imports
 		r.Get("/api/v1/vsp/sla_tracker", slaH.Tracker)
 		r.Get("/api/v1/vsp/metrics_slos", slaH.MetricsSLOs)
+		r.Get("/api/v1/vsp/sla_config", slaH.Config)
+		r.Put("/api/v1/vsp/sla_config", slaH.ConfigPut)
+		r.Get("/api/v1/vsp/sla_breaches", slaH.Breaches)
 		r.Get("/api/v1/vsp/sandbox", sandboxH.List)
 		r.Post("/api/v1/vsp/sandbox/test-fire", sandboxH.TestFire)
 		r.Delete("/api/v1/vsp/sandbox/clear", sandboxH.Clear)
