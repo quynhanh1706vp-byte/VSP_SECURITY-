@@ -55,8 +55,7 @@ func (h *Correlation) CreateRule(w http.ResponseWriter, r *http.Request) {
 		Enabled   bool     `json:"enabled"`
 	}
 	if !decodeJSON(w, r, &req) {
-		jsonError(w, "invalid body", http.StatusBadRequest)
-		return
+		return // decodeJSON already wrote the error response
 	}
 	if req.Name == "" {
 		jsonError(w, "name required", http.StatusBadRequest)

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS sla_config (
   updated_at       timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_sla_config_tenant ON sla_config(tenant_id);
+ALTER TABLE sla_config OWNER TO vsp;
 
 -- +goose Down
 DROP TABLE IF EXISTS sla_config;
