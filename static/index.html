@@ -1734,20 +1734,71 @@ window.addEventListener('DOMContentLoaded', function(){
       <div class="card mb14">
         <div class="card-head">
           <div><div class="card-title">Export run</div><div class="card-sub" id="export-rid-label">Loading…</div></div>
-          <button class="btn btn-ghost" onclick="loadExportRuns()">↻ Refresh</button>
+          <button class="btn btn-ghost" onclick="var s=document.getElementById('export-run-search');if(s)s.value='';loadExportRuns();showToast('Refreshed','success')">↻ Refresh</button>
         </div>
         <div class="card-body">
-          <select aria-label="Select run for export" class="filter-select" id="export-run-select" style="width:100%;max-width:600px;margin-bottom:14px" onchange="updateExportRID()">
+          <!-- Hidden select for compatibility -->
+          <select id="export-run-select" style="display:none" onchange="updateExportRID()">
             <option value="">— select run —</option>
           </select>
-          <div class="flex gap8 mb12">
-            <button class="btn btn-primary" onclick="exportDownload('sarif')">↓ SARIF 2.1.0</button>
-            <button class="btn btn-primary" onclick="exportDownload('csv')">↓ CSV</button>
-            <button class="btn btn-primary" onclick="exportDownload('json')">↓ JSON</button>
+          <!-- Run cards list -->
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+            <input id="export-run-search" placeholder="🔍 Filter runs…"
+              style="flex:1;min-width:200px;padding:6px 10px;border-radius:6px;
+                     border:1px solid var(--border);background:var(--bg2);
+                     color:var(--t1);font-size:12px"
+              oninput="filterExportRuns(this.value)">
+            <select id="export-filter-gate" onchange="filterExportRuns()"
+              style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);
+                     background:var(--bg2);color:var(--t2);font-size:11px">
+              <option value="">All gates</option>
+              <option value="PASS">✓ PASS</option>
+              <option value="FAIL">✗ FAIL</option>
+              <option value="WARN">⚠ WARN</option>
+            </select>
+            <select id="export-filter-mode" onchange="filterExportRuns()"
+              style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);
+                     background:var(--bg2);color:var(--t2);font-size:11px">
+              <option value="">All modes</option>
+              <option value="IAC">IAC</option>
+              <option value="SAST">SAST</option>
+              <option value="FULL_SOC">FULL_SOC</option>
+              <option value="DAST">DAST</option>
+            </select>
           </div>
-          <div class="flex gap8">
-            <button class="btn btn-ghost" onclick="exportOSCAL('ar')">↓ OSCAL AR</button>
-            <button class="btn btn-ghost" onclick="exportOSCAL('poam')">↓ OSCAL POA&amp;M</button>
+          <div id="export-run-cards" style="display:grid;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:14px"></div>
+          <!-- Export buttons -->
+          <div style="background:var(--surface);border-radius:8px;padding:12px;border:1px solid var(--border)">
+            <div style="font-size:10px;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Export format</div>
+            <div class="flex gap8 mb8">
+              <button class="btn btn-primary" onclick="exportDownload('sarif')">↓ SARIF 2.1.0</button>
+              <button class="btn btn-primary" onclick="exportDownload('csv')">↓ CSV</button>
+              <button class="btn btn-primary" onclick="exportDownload('json')">↓ JSON</button>
+            </div>
+            <div style="font-size:10px;color:var(--t3);margin-bottom:8px;margin-top:10px;text-transform:uppercase;letter-spacing:.05em">Filter export</div>
+            <div class="flex gap8">
+              <select id="export-sev-filter"
+                style="padding:5px 8px;border-radius:5px;border:1px solid var(--border);
+                       background:var(--bg2);color:var(--t2);font-size:11px">
+                <option value="">All severities</option>
+                <option value="CRITICAL">CRITICAL</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="LOW">LOW</option>
+              </select>
+              <select id="export-tool-filter"
+                style="padding:5px 8px;border-radius:5px;border:1px solid var(--border);
+                       background:var(--bg2);color:var(--t2);font-size:11px">
+                <option value="">All tools</option>
+              </select>
+              <input id="export-limit-filter" type="number" placeholder="limit (all)"
+                style="width:100px;padding:5px 8px;border-radius:5px;border:1px solid var(--border);
+                       background:var(--bg2);color:var(--t2);font-size:11px">
+            </div>
+            <div style="margin-top:10px" class="flex gap8">
+              <button class="btn btn-ghost" onclick="exportOSCAL('ar')">↓ OSCAL AR</button>
+              <button class="btn btn-ghost" onclick="exportOSCAL('poam')">↓ OSCAL POA&amp;M</button>
+            </div>
           </div>
         </div>
       </div>
@@ -7674,14 +7725,76 @@ async function loadExportRuns() {
           return '<option value="'+r.rid+'">'+r.rid+' · '+r.mode+' · '+r.gate+' · '+(r.total||0)+' findings</option>';
         }).join('');
     // Auto-select latest
+    _exportRunsCache = runs;
     var lbl = document.getElementById('export-rid-label');
     if (lbl) lbl.textContent = runs.length + ' runs available';
+    renderExportRunCards(runs);
     if (runs.length) {
       sel.value = runs[0].rid;
+      _exportRID = runs[0].rid;
       updateExportRID();
     }
   } catch(e) { console.error('loadExportRuns', e); }
 }
+
+// Cache for filter
+var _exportRunsCache = [];
+
+function renderExportRunCards(runs) {
+  var cards = document.getElementById('export-run-cards');
+  if (!cards) return;
+  if (!runs.length) {
+    cards.innerHTML = '<div style="padding:12px;color:var(--t3);font-size:12px;text-align:center">No runs found</div>';
+    return;
+  }
+  cards.innerHTML = runs.map(function(r) {
+    var gateColor = r.gate==='PASS'?'var(--green)':r.gate==='FAIL'?'var(--red)':'var(--amber)';
+    var isActive = r.rid === _exportRID;
+    return '<div onclick="selectExportRun(\''+r.rid+'\')" style="'
+      +'display:flex;align-items:center;gap:10px;padding:8px 12px;'
+      +'border-radius:6px;cursor:pointer;border:1px solid '+(isActive?'var(--blue)':'var(--border)')+';'
+      +'background:'+(isActive?'rgba(59,130,246,.08)':'var(--bg2)')+';'
+      +'transition:all .15s">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-family:var(--font-mono);font-size:11px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.rid+'</div>'
+      +'<div style="font-size:10px;color:var(--t3);margin-top:2px">'+r.mode+' · '+(r.created_at||'').slice(0,16).replace('T',' ')+'</div>'
+      +'</div>'
+      +'<span style="font-size:10px;font-weight:700;color:'+gateColor+'">'+r.gate+'</span>'
+      +'<span style="font-size:11px;color:var(--t2)">'+r.total+'</span>'
+      +'<span style="font-size:9px;color:var(--t3)">findings</span>'
+      +'</div>';
+  }).join('');
+  // Populate tool filter
+  var toolSel = document.getElementById('export-tool-filter');
+  if (toolSel && toolSel.options.length <= 1) {
+    var modes = [...new Set(runs.map(function(r){return r.mode;}))];
+  }
+}
+
+window.selectExportRun = function(rid) {
+  var sel = document.getElementById('export-run-select');
+  if (sel) { sel.value = rid; }
+  _exportRID = rid;
+  renderExportRunCards(_exportRunsCache.filter(function(r){
+    return applyExportFilter(r);
+  }));
+  updateExportRID();
+};
+
+function applyExportFilter(r) {
+  var search = (document.getElementById('export-run-search')||{}).value||'';
+  var gate   = (document.getElementById('export-filter-gate')||{}).value||'';
+  var mode   = (document.getElementById('export-filter-mode')||{}).value||'';
+  if (search && r.rid.indexOf(search.toUpperCase()) < 0) return false;
+  if (gate && r.gate !== gate) return false;
+  if (mode && r.mode !== mode) return false;
+  return true;
+}
+
+window.filterExportRuns = function(val) {
+  var filtered = _exportRunsCache.filter(applyExportFilter);
+  renderExportRunCards(filtered);
+};
 
 async function updateExportRID() {
   var sel = document.getElementById('export-run-select');
@@ -7740,9 +7853,16 @@ async function updateExportRID() {
 async function exportDownload(fmt) {
   if (!_exportRID) { showToast('Select a run first','error'); return; }
   await ensureToken();
+  var sev   = (document.getElementById('export-sev-filter')||{}).value||'';
+  var tool  = (document.getElementById('export-tool-filter')||{}).value||'';
+  var limit = (document.getElementById('export-limit-filter')||{}).value||'';
   showToast('Generating '+fmt.toUpperCase()+'…','info');
   try {
-    var url = '/api/v1/export/'+fmt+'/'+_exportRID;
+    var params = [];
+    if (sev)   params.push('severity='+encodeURIComponent(sev));
+    if (tool)  params.push('tool='+encodeURIComponent(tool));
+    if (limit) params.push('limit='+encodeURIComponent(limit));
+    var url = '/api/v1/export/'+fmt+'/'+_exportRID+(params.length?'?'+params.join('&'):'');
     var resp = await fetch(url, {headers:{'Authorization':'Bearer '+window.TOKEN}});
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     var blob = await resp.blob();
