@@ -7674,6 +7674,8 @@ async function loadExportRuns() {
           return '<option value="'+r.rid+'">'+r.rid+' · '+r.mode+' · '+r.gate+' · '+(r.total||0)+' findings</option>';
         }).join('');
     // Auto-select latest
+    var lbl = document.getElementById('export-rid-label');
+    if (lbl) lbl.textContent = runs.length + ' runs available';
     if (runs.length) {
       sel.value = runs[0].rid;
       updateExportRID();
