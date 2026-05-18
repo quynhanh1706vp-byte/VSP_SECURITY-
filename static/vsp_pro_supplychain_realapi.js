@@ -100,7 +100,7 @@
     if (panel.dataset.realApi === '1') return; // idempotent
     panel.dataset.realApi = '1';
 
-    const lastImg = localStorage.getItem(STORE_KEY) || 'ghcr.io/sigstore/cosign:v2.2.3';
+    const lastImg = localStorage.getItem(STORE_KEY) || 'ttl.sh/vsp-alpine@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1';
 
     panel.insertAdjacentHTML('afterbegin', `
       <div class="card mb14" id="sc-controls">
