@@ -333,21 +333,18 @@
     try {
       const j = await api('/signatures');
       const arr = j.signatures || []; _ledgerCache = arr;
-      if (sub) sub.textContent = arr.length + ' record' + (arr.length === 1 ? '' : 's');
+      const total = arr.length;
+      const verified = arr.filter(s => s.status === 'verified' || s.status === 'signed').length;
+      const failed = arr.filter(s => s.status === 'failed' || s.status === 'tampered').length;
+      const unreachable = arr.filter(s => s.status === 'not_found' || s.status === 'unavailable').length;
+      if (sub) sub.textContent = `${total} records · ${verified} ok · ${failed} failed · ${unreachable} unreachable`;
       if (!arr.length) {
         rows.innerHTML = `<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3)">
           no signatures yet — sign an image above to populate the ledger</td></tr>`;
         return;
       }
-      rows.innerHTML = arr.slice(0, 100).map(s => `
-        <tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:8px 12px;font-family:var(--font-mono);font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.image)}">${esc(s.image)}</td>
-          <td style="padding:8px 12px">${statusPill(s.status)}</td>
-          <td style="padding:8px 12px;font-family:var(--font-mono);font-size:10px;color:var(--t3)">
-              ${esc(s.digest || '—').slice(0, 24)}${s.digest && s.digest.length > 24 ? '…' : ''}</td>
-          <td style="padding:8px 12px;font-size:11px;color:var(--t3)">${fmtTime(s.created_at)}</td>
-          <td style="padding:8px 12px;font-family:var(--font-mono);font-size:10px;color:var(--t3)">${esc(s.id)}</td>
-        </tr>`).join('');
+      // Render via filterLedger to respect current filter
+      filterLedger();
     } catch (e) {
       if (sub) sub.textContent = 'error';
       rows.innerHTML = `<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--red)">
