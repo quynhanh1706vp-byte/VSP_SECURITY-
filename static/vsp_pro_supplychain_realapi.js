@@ -358,6 +358,7 @@
   // Cache for filter
   let _ledgerCache = [];
 
+  window.filterLedger = filterLedger;
   function filterLedger() {
     const filter = document.getElementById('sc-ledger-filter');
     const rows = $('sc-ledger-rows');
