@@ -1107,7 +1107,7 @@ function loadRunHistory(){
           if(!RUN_HISTORY.find(function(x){return x.id===r.id;})){
             RUN_HISTORY.push({id:r.id,shortId:r.id.slice(0,8).toUpperCase(),pb:r.pb||r.PlaybookName||r.playbook_name||'—',
               pbId:r.playbook_id||'',status:r.status,ts:(r.ts||r.triggered_at||r.StartedAt||'').slice(11,19),
-              dur:r.finished_at?'done':'—',trigger:r.trigger||'manual',steps:[],log:[]});
+              dur:r.finished_at?'done':'—',trigger:r.trigger||r.trigger_event||'manual',steps:[],log:[]});
           }
         });
         // Fix 3: Run stats counter
