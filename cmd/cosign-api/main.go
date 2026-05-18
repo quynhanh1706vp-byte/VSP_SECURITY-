@@ -325,8 +325,10 @@ func handleSign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sig.Status = "signed"
-	// best-effort digest pull
-	if d := extractDigest(stderr); d != "" {
+	// best-effort digest: image name first (e.g. img@sha256:...), fallback stderr parse
+	if d := extractDigestFromImage(sig.Image); d != "" {
+		sig.Digest = d
+	} else if d := extractDigest(stderr); d != "" {
 		sig.Digest = d
 	}
 	saveSig(sig)
@@ -410,6 +412,10 @@ func handleAttest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sig.Status = "signed"
+	// extract digest from image name (attest uses @sha256: digest ref)
+	if d := extractDigestFromImage(sig.Image); d != "" {
+		sig.Digest = d
+	}
 	saveSig(sig)
 	writeJSON(w, 200, sig)
 }
@@ -530,6 +536,14 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // ─── parsing helpers ──────────────────────────────────────────────────────
+
+// extractDigestFromImage lấy digest từ image name nếu có dạng image@sha256:...
+func extractDigestFromImage(image string) string {
+	if i := strings.Index(image, "@sha256:"); i >= 0 {
+		return image[i+1:] // trả về "sha256:abcd..."
+	}
+	return ""
+}
 
 // extractDigest scrapes the sha256:abcd… reference cosign prints to stderr.
 func extractDigest(s string) string {
