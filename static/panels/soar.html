@@ -1152,7 +1152,13 @@ function openRunDetail(id){
         if(d.log)   run.log=d.log||[];
         if(d.status) run.status=d.status;
         if(d.error)  run.error=d.error;
-        if(d.duration_ms) run.dur=d.duration_ms>0?(d.duration_ms/1000).toFixed(1)+'s':'—';
+        // Duration: dùng duration_ms hoặc tính từ started/finished
+        if(d.duration_ms && d.duration_ms>0) {
+          run.dur=(d.duration_ms/1000).toFixed(1)+'s';
+        } else if(d.started_at && d.finished_at) {
+          var ms=new Date(d.finished_at)-new Date(d.started_at);
+          run.dur=ms>0?(ms/1000).toFixed(1)+'s':'<1s';
+        }
         if(d.finished_at) run.finished_at=d.finished_at;
         // Show error in log if no steps
         if(run.error && (!run.steps||!run.steps.length)) {
