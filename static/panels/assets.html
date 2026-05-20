@@ -423,7 +423,7 @@ async function openAssetModal(id){
     // Đảm bảo _api_findings đã load
     if(a._api_findings&&a._api_findings.length){
       renderFindings();
-    } else if(TOKEN){
+} else if(TOKEN && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a.id)){
       fetch(API+'/api/v1/assets/'+a.id+'/findings',{headers:hdr()})
         .then(function(r){return r.ok?r.json():{findings:[]};})
         .then(function(d){
@@ -434,7 +434,15 @@ async function openAssetModal(id){
           _activeAsset=a;
           renderFindings();
         }).catch(function(){renderFindings();});
-    } else { renderFindings(); }
+} else {
+  // Slug ID — dùng tool filter
+  var _tn=a.id.replace(/^scanner-/,'').toLowerCase();
+  a._api_findings=ALL_FINDINGS.filter(function(f){
+    var ft=(f.tool||'').toLowerCase();
+    return ft===_tn||ft.replace(/[^a-z0-9]/g,'')===_tn.replace(/[^a-z0-9]/g,'');
+  });
+  renderFindings();
+}
   };
   // Store as active asset cho "View all findings"
   window._lastOpenedAsset = a;
