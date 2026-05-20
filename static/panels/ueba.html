@@ -382,6 +382,8 @@ async function runAnalysis(){
 async function loadBaseline(){
   var hasUX = typeof VSPUXState !== 'undefined';
   if(hasUX) VSPUXState.skeleton('#score-bars', {rows: 1, height: 80});
+  // Ensure API set
+  if(!API) API = window.location.origin === 'null' ? '' : window.location.origin;
   if(!TOKEN){
     if(hasUX) VSPUXState.empty('#score-bars', 'Authentication required', loadBaseline);
     return;
@@ -436,6 +438,8 @@ async function loadTimelineData(){
 
 async function loadAnomalies(){
   var hasUX = typeof VSPUXState !== 'undefined';
+  if(!API) API = window.location.origin === 'null' ? '' : window.location.origin;
+  if(!TOKEN){ try{ var _t=localStorage.getItem('vsp_token')||''; if(_t&&_t.length>20) TOKEN=_t; }catch(_){} }
   var target = '#anomalies-list';
   if(hasUX) VSPUXState.skeleton(target, {rows: 3});
   if(!TOKEN){
@@ -501,6 +505,7 @@ API = window.location.origin === "null" ? "" : window.location.origin;
 try{ var _initT=localStorage.getItem("vsp_token")||""; if(_initT&&_initT.length>20){TOKEN=_initT;window.TOKEN=TOKEN;} }catch(_){}
 // [FIX] Set API + lấy token localStorage trước khi loadBaseline
 API = (window.location.origin === "null" ? "" : window.location.origin);
+window._uebaAPI = API;
 try{
   var _t2 = localStorage.getItem("vsp_token") || "";
   if(_t2 && _t2.length > 20 && !TOKEN){ TOKEN = _t2; window.TOKEN = TOKEN; }
