@@ -283,7 +283,7 @@ function renderAssets(){
     var sc=a.risk_score||0,rc=riskColor(sc);
     return '<tr data-id="'+a.id+'">'
       +'<td style="width:32px;padding:8px 6px"><input type="checkbox" class="asset-chk" data-id="'+a.id+'" onclick="event.stopPropagation()" style="cursor:pointer"></td>'
-      +'<td onclick="openAssetModal(''+a.id+'')" style="cursor:pointer"><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+(a.ip?' · '+a.ip:'')+(a.env?' · '+a.env:'')+'</div></td>'
+      +'<td onclick="openAssetModal(\'' +a.id+ '\'')" style="cursor:pointer"><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+(a.ip?' · '+a.ip:'')+(a.env?' · '+a.env:'')+'</div></td>'
       +'<td>'+envBadge(a.env)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--red);font-weight:700">'+(a.critical||0)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--amber);font-weight:700">'+(a.high||0)+'</td>'
