@@ -1174,13 +1174,20 @@ function saveToList() {
   document.getElementById('add-pkg-reason').value='';
 }
 
-function removeFromList(list, name) {
-  if(!confirm(`Remove "${name}" from ${list}?`)) return;
-  showToast(`${name} removed from ${list}`,'success');
-  if(list==='whitelist') { const i=WHITELIST.findIndex(x=>x.name===name); if(i>=0) WHITELIST.splice(i,1); }
-  else if(list==='blacklist') { const i=BLACKLIST.findIndex(x=>x.name===name); if(i>=0) BLACKLIST.splice(i,1); }
-  else { const i=MOCK_WARNING.indexOf(name); if(i>=0) MOCK_WARNING.splice(i,1); }
-  renderWhitelist();
+async function removeFromList(listType, id, name) {
+  if(!confirm(`Remove "${name}" from ${listType}?`)) return;
+  try {
+    const r = await fetch(API+'/api/v1/software-inventory/'+listType+'/'+id,
+      {method:'DELETE', headers:hdr()});
+    if(r.ok) {
+      showToast(`${name} removed from ${listType}`,'success');
+      loadWhiteBlacklist();
+    } else {
+      showToast('Delete failed: '+r.status,'error');
+    }
+  } catch(e) {
+    showToast('Network error','error');
+  }
 }
 
 function blockSW(name) {
