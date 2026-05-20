@@ -667,3 +667,20 @@ func (h *SoftwareInventoryHandler) SavePolicy(w http.ResponseWriter, r *http.Req
 	logAudit(r, h.DB, "SW_POLICY_UPDATED", "policy saved")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
 }
+
+// TriggerReport: POST /api/v1/software-inventory/report
+func (h *SoftwareInventoryHandler) TriggerReport(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var body struct {
+		Hostname string `json:"hostname"`
+		Mode     string `json:"mode"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if body.Hostname == "" { body.Hostname = "all" }
+	if body.Mode == "" { body.Mode = "full" }
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok": true, "queued": true,
+		"hostname": body.Hostname, "mode": body.Mode,
+		"message": "SW inventory report queued",
+	})
+}

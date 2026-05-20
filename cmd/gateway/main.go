@@ -3351,6 +3351,7 @@ func main() {
 		r.Post("/api/v1/software-inventory/policy",             swH.SavePolicy)
 		r.Post("/api/v1/software-inventory/{list_type}",        swH.AddToList)
 		r.Delete("/api/v1/software-inventory/{list_type}/{id}", swH.RemoveFromList)
+		r.Post("/api/v1/software-inventory/report", swH.TriggerReport)
 	})
 	// ─── [H3.U-1] SW Risk Agent ingest — JWT auth, NO CSRF ──────────
 	// Agent gửi report bằng API token thuần (không phải browser),
