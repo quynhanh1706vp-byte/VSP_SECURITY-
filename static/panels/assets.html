@@ -104,7 +104,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   <div><h2>Asset inventory</h2><p>CMDB · risk scoring · vulnerability heatmap · findings per asset</p></div>
   <div style="display:flex;gap:8px;align-items:center">
     <input aria-label="Search assets…" id="search-box" placeholder="Search assets…" class="btn" style="width:150px;text-align:left" oninput="renderAssets()">
-    <button class="btn btn-sm" onclick="loadEOLBanner()">&#8635;</button>
+    <button class="btn btn-sm" onclick="loadAssets()">&#8635;</button>
   </div>
 </div>
 <div class="kpi-row">
@@ -178,14 +178,14 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   <div class="modal">
     <div class="modal-head">
       <div><div class="modal-title" id="fmod-title">Finding</div><div class="modal-sub" id="fmod-sub"></div></div>
-      <div style="display:flex;gap:8px;align-items:center"><span id="fmod-sev"></span><button class="modal-close" onclick="closeModal('asset-modal')">&#10005;</button></div>
+      <div style="display:flex;gap:8px;align-items:center"><span id="fmod-sev"></span><button class="modal-close" onclick="closeModal('finding-modal')">&#10005;</button></div>
     </div>
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="fmod-kpis"></div>
       <div class="slbl" style="margin-top:0">&#9656; Description</div>
       <div id="fmod-desc" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:12px"></div>
       <div class="slbl">&#9656; Location</div>
-      <div id="fmod-location" style="font-size:10px;font-family:var(--font-mono);color:var(--t3);padding:6px 8px;background:var(--bg);border-radius:4px;white-space:pre;margin-bottom:12px"></div>
+  document.getElementById('fmod-location').textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
       <div class="slbl">&#9656; Remediation</div>
       <div id="fmod-rem" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:8px"></div>
       <div class="slbl">&#9656; References</div>
@@ -199,13 +199,13 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 </div>
 <script>
 var TOKEN='',API='',_assetFilter='',_activeAsset=null;
-function hdr(){ return {Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}; }
+function hdr(){return {Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'};}
 function assetToast(msg,type){
   var t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;background:var(--bg2);border:1px solid var(--border2);color:var(--t1);max-width:320px';
-  if(type==='success') t.style.borderColor='rgba(34,197,94,.4)';
-  if(type==='error')   t.style.borderColor='rgba(239,68,68,.4)';
-  t.textContent=msg; document.body.appendChild(t);
+  if(type==='success')t.style.borderColor='rgba(34,197,94,.4)';
+  if(type==='error')t.style.borderColor='rgba(239,68,68,.4)';
+  t.textContent=msg;document.body.appendChild(t);
   setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},300);},3000);
 }
 var ASSETS=[];
@@ -292,7 +292,7 @@ function renderAssets(){
     var sc=a.risk_score||0,rc=riskColor(sc);
     return '<tr data-id="'+a.id+'">'
       +'<td style="width:32px;padding:8px 6px"><input type="checkbox" class="asset-chk" data-id="'+a.id+'" onclick="event.stopPropagation()" style="cursor:pointer"></td>'
-      +'<td onclick="openAssetModal(\"'+a.id+'\")" style="cursor:pointer"><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+(a.ip?' · '+a.ip:'')+(a.env?' · '+a.env:'')+'</div></td>'
+      +'<td onclick="openAssetModal(''+a.id+'')" style="cursor:pointer"><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+(a.ip?' · '+a.ip:'')+(a.env?' · '+a.env:'')+'</div></td>'
       +'<td>'+envBadge(a.env)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--red);font-weight:700">'+(a.critical||0)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--amber);font-weight:700">'+(a.high||0)+'</td>'
@@ -309,7 +309,7 @@ function renderFindings(){
   var list=src.filter(function(f){
     if(sf&&(f.severity||'').toUpperCase()!==sf)return false;
     if(stf&&(f.status||'open')!==stf)return false;
-    if(q&&!((f.rule_id||f.title||f.message||'').toLowerCase().includes(q)||(f.asset||'').toLowerCase().includes(q)))return false;
+    if(q&&!(f.title.toLowerCase().includes(q)||(f.asset||'').toLowerCase().includes(q)))return false;
     return true;
   });
   document.getElementById('findings-title').textContent=_activeAsset?_activeAsset.name+' findings':'All findings';
@@ -328,9 +328,9 @@ function renderFindings(){
   document.getElementById('findings-list').innerHTML=list.map(function(f){
     var sc=sevClass((f.severity||'').toUpperCase());
     return '<div class="finding '+sc+'" data-id="'+f.id+'" onclick="openFindingModal(this.dataset.id)">'
-      +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity||'INFO')+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+(f.rule_id||f.title||f.message||'—')+'</span><span class="f-ts">'+f.asset+'</span></div>'
+      +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+f.title+'</span><span class="f-ts">'+f.asset+'</span></div>'
       +'<div class="f-file">'+(f.tool||'?')+' · '+(f.path||f.file||'?')+':'+(f.line||0)+'</div>'
-      +'<div class="f-tags"><span class="pill pill-gray">'+(f.rule_id||f.rule||'?')+'</span>'+(f.cwe?'<span class="pill pill-gray">'+f.cwe+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+f.cvss+'</span>':'')+'</div>'
+      +'<div class="f-tags"><span class="pill pill-gray">'+f.rule+'</span>'+(f.cwe?'<span class="pill pill-gray">'+f.cwe+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+f.cvss+'</span>':'')+'</div>'
       +'</div>';
   }).join('');
 }
@@ -379,8 +379,8 @@ async function openAssetModal(id){
   var af=(a._api_findings||ALL_FINDINGS.filter(function(f){return f.asset_id===a.id;})).slice(0,4);
   document.getElementById('amod-findings').innerHTML=af.length?af.map(function(f){
     return '<div class="finding '+sevClass((f.severity||'').toUpperCase())+'" data-fid="'+f.id+'" onclick="openFindingModal(this.dataset.fid)">'
-      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+(f.rule_id||f.title||f.rule||'—')+'</span></div>'
-      +'<div class="f-file">'+f.path||f.file||'?'+':'+f.line+' · '+f.rule_id||f.rule+'</div></div>';
+      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+f.title+'</span></div>'
+      +'<div class="f-file">'+f.file+':'+f.line+' · '+f.rule+'</div></div>';
   }).join(''):(typeof VSPUXState!=='undefined'?(_assetEmpty('#amod-findings','No findings for this asset',null),''):'<div style=\"color:var(--t3);font-size:11px\">No findings for this asset</div>');
   document.getElementById('amod-all-btn').onclick=function(){closeModal('asset-modal');_activeAsset=a;renderFindings();};
   document.getElementById('asset-modal').classList.add('open');
@@ -392,14 +392,11 @@ function openFindingModal(id){
   document.getElementById('fmod-sub').textContent=f.id.slice(0,8)+' · '+(f.tool||'?')+' · '+(f.rule_id||f.rule||'—');
   document.getElementById('fmod-sev').innerHTML=sevBadge(sev);
   document.getElementById('fmod-kpis').innerHTML=[
-    {lbl:'Severity',val:sev,color:sevColor(sev)},{lbl:'CVSS',val:f.cvss>0?f.cvss:'—',color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
+    {lbl:'Severity',val:sev,color:sevColor(sev)},{lbl:'CVSS',val:f.cvss||'—',color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
     {lbl:'EPSS',val:f.epss||'—',color:'var(--t1)'},{lbl:'Status',val:f.status||'open',color:f.status==='resolved'?'var(--green)':'var(--amber)'},
   ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
   document.getElementById('fmod-desc').textContent=f.desc||'';
-  var _file=f.path||f.file||'?', _asset=f.asset_name||f.asset||f.host||'—', _rule=f.rule_id||f.rule||'—', _rem=f.fix_signal||f.remediation||'';
-  document.getElementById('fmod-desc').textContent=f.message||f.desc||'';
-  document.getElementById('fmod-location').textContent='File: '+_file+(f.line?':'+f.line:'')+'\nAsset: '+_asset+'\nTool:  '+(f.tool||'?')+'\nRule:  '+_rule+(f.cwe?'\nCWE:   '+f.cwe:'');
-  document.getElementById('fmod-rem').textContent=_rem;
+  document.getElementById('fmod-location').textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
 
 
 
@@ -408,65 +405,43 @@ function openFindingModal(id){
   document.getElementById('fmod-refs').innerHTML=(f.refs||[]).map(function(r){return '<div>· '+r+'</div>';}).join('');
   document.getElementById('finding-modal').classList.add('open');
 }
-async function createFindingTicket(){
-  var f = window._currentFinding;
-  if(!f){ assetToast('No finding selected','error'); return; }
-  // Thử POST to SOAR nếu có
-  if(TOKEN){
-    try{
-      var r = await fetch(API+'/api/v1/soar/tickets', {
-        method:'POST', headers:hdr(),
-        body: JSON.stringify({
-          title: (f.rule_id||f.rule||f.title||'Finding')+' — '+f.severity,
-          description: f.message||f.desc||'',
-          severity: f.severity,
-          finding_id: f.id,
-          tool: f.tool,
-          cwe: f.cwe,
-          path: f.path||f.file,
-          source: 'assets_panel'
-        })
-      });
-      if(r.ok){
-        var d = await r.json();
-        assetToast('Ticket created: '+(d.ticket_id||d.id||'OK'),'success');
-        return;
-      }
-    }catch(e){}
-  }
-  // Fallback: copy finding details to clipboard
-  var text = 'Finding: '+(f.rule_id||f.rule||'?')+'\nSeverity: '+f.severity+'\nTool: '+f.tool+'\nPath: '+(f.path||'?')+'\nMessage: '+(f.message||'')+'\nCWE: '+(f.cwe||'N/A');
-  try{
-    await navigator.clipboard.writeText(text);
-    assetToast('Finding details copied to clipboard (no SOAR ticket endpoint)','info');
-  }catch(e){
-    assetToast('Ticket: '+( f.rule_id||'finding')+' — copy details manually','warn');
-  }
-}
-
-async function saveAsset(payload, id){
-  if(!TOKEN){ assetToast('Not authenticated','error'); return; }
-  try{
-    var method = id ? 'PATCH' : 'POST';
-    var url = id ? API+'/api/v1/assets/'+id : API+'/api/v1/assets';
-    var r = await fetch(url, {method:method, headers:hdr(), body:JSON.stringify(payload)});
-    var d = r.ok ? await r.json() : null;
-    assetToast(r.ok ? (id?'Asset updated':'Asset created') : 'Save failed: HTTP '+r.status, r.ok?'success':'error');
-    if(r.ok) loadAssets();
-  }catch(e){ assetToast('Error: '+e.message,'error'); }
-}
-
-async function deleteAsset(id, name){
-  if(!confirm('Delete asset "'+name+'"?')) return;
-  if(!TOKEN){ assetToast('Not authenticated','error'); return; }
-  try{
-    var r = await fetch(API+'/api/v1/assets/'+id, {method:'DELETE', headers:hdr()});
-    assetToast(r.ok||r.status===204 ? '"'+name+'" deleted' : 'Delete failed: HTTP '+r.status, r.ok||r.status===204?'success':'error');
-    if(r.ok||r.status===204) loadAssets();
-  }catch(e){ assetToast('Error: '+e.message,'error'); }
-}
-
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+async function saveAsset(payload,id){
+  if(!TOKEN){assetToast('Not authenticated','error');return;}
+  try{
+    var r=await fetch(id?API+'/api/v1/assets/'+id:API+'/api/v1/assets',
+      {method:id?'PATCH':'POST',headers:hdr(),body:JSON.stringify(payload)});
+    var d=r.ok?await r.json():null;
+    assetToast(r.ok?(id?'Asset updated':'Asset created'):'Save failed: HTTP '+r.status,r.ok?'success':'error');
+    if(r.ok)loadAssets();
+  }catch(e){assetToast('Error: '+e.message,'error');}
+}
+async function deleteAsset(id,name){
+  if(!confirm('Delete "'+name+'"?'))return;
+  if(!TOKEN){assetToast('Not authenticated','error');return;}
+  try{
+    var r=await fetch(API+'/api/v1/assets/'+id,{method:'DELETE',headers:hdr()});
+    assetToast(r.ok||r.status===204?'"'+name+'" deleted':'Delete failed: HTTP '+r.status,r.ok||r.status===204?'success':'error');
+    if(r.ok||r.status===204)loadAssets();
+  }catch(e){assetToast('Error: '+e.message,'error');}
+}
+async function createFindingTicket(){
+  var f=window._currentFinding;
+  if(!f){assetToast('No finding selected','error');return;}
+  if(!TOKEN){assetToast('Not authenticated','error');return;}
+  try{
+    var r=await fetch(API+'/api/v1/soar/tickets',{method:'POST',headers:hdr(),
+      body:JSON.stringify({title:(f.rule_id||f.rule||'Finding')+' — '+f.severity,
+        description:f.message||f.desc||'',severity:f.severity,finding_id:f.id,
+        tool:f.tool,cwe:f.cwe,path:f.path||f.file,source:'assets_panel'})});
+    if(r.ok){var d=await r.json();assetToast('Ticket: '+(d.ticket_id||d.id||'created'),'success');return;}
+  }catch(e){}
+  try{
+    var txt='Finding: '+(f.rule_id||'?')+'\nSeverity: '+f.severity+'\nTool: '+f.tool+'\nPath: '+(f.path||'?')+'\nMessage: '+(f.message||'');
+    await navigator.clipboard.writeText(txt);
+    assetToast('Copied to clipboard (no ticket endpoint)','info');
+  }catch(e){assetToast('Ticket: '+(f.rule_id||'finding')+' — manual action needed','warn');}
+}
 async function loadEOLBanner(){
   try {
     var r = await authFetch('/api/v1/software-inventory/stats');
@@ -475,7 +450,7 @@ async function loadEOLBanner(){
     if (!banner) return;
     if (d && d.eol_total > 0) {
       banner.style.display = '';
-      banner.innerHTML = '<span style="color:var(--amber)">⚠ ' + d.eol_total + ' EOL packages detected across ' + d.total_assets + ' assets</span> — <a href="#" style="color:var(--cyan)" onclick="window.parent.showPanel&&window.parent.showPanel(\"software_inventory\")">View software inventory →</a>';
+      banner.innerHTML = '<span style="color:var(--amber)">⚠ ' + d.eol_total + ' EOL packages detected across ' + d.total_assets + ' assets</span> — <a href="#" style="color:var(--cyan)" onclick="window.parent.showPanel&&window.parent.showPanel('software_inventory')">View software inventory →</a>';
     } else if (banner) {
       banner.style.display = 'none';
     }
@@ -509,8 +484,11 @@ document.addEventListener('change', function(e){
 });
 async function loadAssets(){
   var hasUX = typeof VSPUXState !== 'undefined';
+  if(!API) API=window.location.origin==='null'?'':window.location.origin;
+  if(!TOKEN){try{var _lt=localStorage.getItem('vsp_token')||'';if(_lt&&_lt.length>20)TOKEN=_lt;}catch(_){}}
   if(!TOKEN){
-    if (hasUX) _assetEmpty('#asset-tbody', 'Authentication required', null);
+    if(hasUX) _assetEmpty('#asset-tbody','Authentication required',null);
+    setTimeout(loadAssets,1500);
     return;
   }
   if (hasUX && !_assetHasData('#asset-tbody')) {
@@ -519,10 +497,7 @@ async function loadAssets(){
   }
   var h={Authorization:'Bearer '+TOKEN};
   try{
-    if(!API) API = window.location.origin === 'null' ? '' : window.location.origin;
-  if(!TOKEN){ try{ var _lt=localStorage.getItem('vsp_token')||''; if(_lt&&_lt.length>20) TOKEN=_lt; }catch(_){} }
-  var h={Authorization:'Bearer '+TOKEN};
-  var r=await fetch(API+'/api/v1/assets',{headers:h});
+    var r=await fetch(API+'/api/v1/assets',{headers:h});
     if(!r.ok) throw new Error('HTTP '+r.status);
     var d=await r.json();
     if(!d.assets||!d.assets.length){
@@ -572,11 +547,7 @@ if(window.parent!==window){
   window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
   try{
     var _t=localStorage.getItem('vsp_token')||window.parent.TOKEN||'';
-    if(_t&&_t.length>20&&!TOKEN){
-      TOKEN=_t; window.TOKEN=TOKEN;
-      API=window.location.origin;
-      setTimeout(loadAssets,300);
-    }
+    if(_t&&_t.length>20&&!TOKEN){TOKEN=_t;window.TOKEN=TOKEN;API=window.location.origin;setTimeout(loadAssets,300);}
   }catch(_){}
 }
 function _applyTheme(t){var r=document.documentElement;if(t==='light'){r.style.setProperty('--bg','#f4f5f7');r.style.setProperty('--bg2','#ffffff');r.style.setProperty('--surface','#f0f1f4');r.style.setProperty('--border','rgba(0,0,0,.08)');r.style.setProperty('--t1','#1a1d24');r.style.setProperty('--t2','#4a5068');r.style.setProperty('--t3','#8a90a8');document.body.style.background='#f4f5f7';}else{r.style.setProperty('--bg','#0a0c10');r.style.setProperty('--bg2','#111318');r.style.setProperty('--surface','#1e2128');r.style.setProperty('--border','rgba(255,255,255,.07)');r.style.setProperty('--t1','#e8eaf0');r.style.setProperty('--t2','#9aa3b8');r.style.setProperty('--t3','#5a6278');document.body.style.background='#0a0c10';}}
@@ -714,7 +685,7 @@ updateKPIs();renderHeatmap();renderAssets();
   }
   function row(label, value, copyable) {
     const v = String(value == null ? '—' : value);
-    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="this.previousSibling&&navigator.clipboard.writeText(this.dataset.v)" data-v="${esc(v)}">📋</button>` : '';
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspUNI.copy('${esc(v).replace(/'/g, '&#39;')}')">📋</button>` : '';
     return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
       + '<div style="min-width:130px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
       + '<div style="flex:1;font-size:11px;line-height:1.5;word-break:break-word">' + esc(v) + '</div>'
