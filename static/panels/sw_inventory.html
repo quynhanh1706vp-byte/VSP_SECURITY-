@@ -1270,6 +1270,45 @@ function savePolicy() { showToast('Policy saved','success'); }
 // ═══════════════════════════════════
 //  INIT
 // ═══════════════════════════════════
+async function loadPolicy() {
+  await ensureToken(3000);
+  if(!TOKEN||TOKEN.length<20){setTimeout(loadPolicy,1500);return;}
+  try {
+    const r = await fetch(API+'/api/v1/software-inventory/policy',{headers:hdr()});
+    if(r.ok){
+      const p = await r.json();
+      const ids = {
+        block_unauthorized:'pol-block-unauth',
+        crack_scan_on_ingest:'pol-crack-scan',
+        eol_alert:'pol-eol-alert',
+        gpl_enforcement:'pol-gpl',
+        vt_enrichment:'pol-vt'
+      };
+      Object.entries(ids).forEach(([k,id])=>{
+        const el=document.getElementById(id);
+        if(el) el.checked=!!p[k];
+      });
+    }
+  } catch(e){ console.warn('[SWINV] loadPolicy:',e); }
+}
+
+async function savePolicy() {
+  await ensureToken();
+  const policy = {
+    block_unauthorized: document.getElementById('pol-block-unauth')?.checked||false,
+    crack_scan_on_ingest: document.getElementById('pol-crack-scan')?.checked||false,
+    eol_alert: document.getElementById('pol-eol-alert')?.checked||false,
+    gpl_enforcement: document.getElementById('pol-gpl')?.checked||false,
+    vt_enrichment: document.getElementById('pol-vt')?.checked||false,
+  };
+  try {
+    const r = await fetch(API+'/api/v1/software-inventory/policy',
+      {method:'POST',headers:hdr(),body:JSON.stringify(policy)});
+    if(r.ok) showToast('Policy saved','success');
+    else showToast('Save failed','error');
+  } catch(e){ showToast('Network error','error'); }
+}
+
 document.addEventListener('DOMContentLoaded', async ()=>{
   await ensureToken(3000);
   await loadInventory();
