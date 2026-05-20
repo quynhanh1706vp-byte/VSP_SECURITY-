@@ -1000,6 +1000,27 @@ function invPage(d) { _invPage += d; renderInventory(); }
 // ═══════════════════════════════════
 //  WHITELIST / BLACKLIST
 // ═══════════════════════════════════
+async function loadWhiteBlacklist() {
+  await ensureToken(3000);
+  if(!TOKEN||TOKEN.length<20){setTimeout(loadWhiteBlacklist,1500);return;}
+  try {
+    const [wlR,blR] = await Promise.all([
+      fetch(API+'/api/v1/software-inventory/whitelist',{headers:hdr()}),
+      fetch(API+'/api/v1/software-inventory/blacklist',{headers:hdr()}),
+    ]);
+    const wl = wlR.ok ? await wlR.json() : null;
+    const bl = blR.ok ? await blR.json() : null;
+    WHITELIST = (wl&&wl.items) ? wl.items : [];
+    BLACKLIST = (bl&&bl.items) ? bl.items : [];
+    WARNING_ITEMS = MOCK_WARNING.map(n=>({id:0,name:n}));
+  } catch(e) {
+    console.warn('[SWINV] loadWhiteBlacklist:', e);
+    WHITELIST=WHITELIST||[]; BLACKLIST=BLACKLIST||[];
+    WARNING_ITEMS = MOCK_WARNING.map(n=>({id:0,name:n}));
+  }
+  renderWhitelist();
+}
+
 function renderWhitelist() {
   document.getElementById('whitelist-list').innerHTML = WHITELIST.map(x=>`
     <div class="policy-item approved">
@@ -1250,11 +1271,14 @@ function savePolicy() { showToast('Policy saved','success'); }
 //  INIT
 // ═══════════════════════════════════
 document.addEventListener('DOMContentLoaded', async ()=>{
+  if(!API) API=window.location.origin==='null'?'':window.location.origin;
+  await ensureToken(3000);
   await loadInventory();
-  renderWhitelist();
+  loadWhiteBlacklist();
   loadCrackFindings();
   loadLicenseData();
   loadScanHistory();
+  loadPolicy();
 });
 </script>
 <script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
