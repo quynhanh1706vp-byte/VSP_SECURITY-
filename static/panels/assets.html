@@ -305,11 +305,20 @@ function renderFindings(){
   var sf=document.getElementById('sev-filter').value;
   var stf=document.getElementById('status-filter').value;
   var q=(document.getElementById('search-box').value||'').toLowerCase();
-  var src=_activeAsset
-    ?(_activeAsset._api_findings||ALL_FINDINGS.filter(function(f){
-        return f.asset_id===_activeAsset.id||f.run_id===_activeAsset.id;
-      }))
-    :ALL_FINDINGS;
+  var src;
+  if(!_activeAsset){
+    src=ALL_FINDINGS;
+  } else if(_activeAsset._api_findings&&_activeAsset._api_findings.length){
+    src=_activeAsset._api_findings;
+  } else {
+    // Fallback: filter by tool name for scanner assets
+    var _tname=(_activeAsset.name||'').replace(/ scanner$/i,'').toLowerCase();
+    src=ALL_FINDINGS.filter(function(f){
+      return f.asset_id===_activeAsset.id ||
+             (f.tool||'').toLowerCase()===_tname ||
+             (f.tool||'').toLowerCase().includes(_tname);
+    });
+  }
   var list=src.filter(function(f){
     if(sf&&(f.severity||'').toUpperCase()!==sf)return false;
     if(stf&&(f.status||'open')!==stf)return false;
@@ -351,7 +360,13 @@ async function openAssetModal(id){
         if(resp.ok){
           var d=await resp.json();
           if(d.findings&&d.findings.length){
-            a._api_findings=d.findings;
+            a._api_findings=d.findings.map(function(f){
+              return Object.assign({asset_id:id,asset:a.name,
+                title:f.rule_id||f.title||f.message||'—',
+                file:f.path||f.file||'?',
+                rule:f.rule_id||f.rule||'—',
+                remediation:f.fix_signal||f.remediation||''},f);
+            });
             a.critical=(d.findings.filter(function(f){return f.severity==='CRITICAL';}).length)||a.critical||0;
             a.high=(d.findings.filter(function(f){return f.severity==='HIGH';}).length)||a.high||0;
             a.medium=(d.findings.filter(function(f){return f.severity==='MEDIUM';}).length)||a.medium||0;
@@ -362,6 +377,14 @@ async function openAssetModal(id){
       }catch(e){
         console.warn('[FEAT-34] modal fetch failed, using seed:', e.message);
       }
+    } else {
+      // Slug ID (scanner-xxx) — filter ALL_FINDINGS by tool name
+      var toolName = a.name.replace(' scanner','').replace(' Scanner','').toLowerCase();
+      var slugFindings = ALL_FINDINGS.filter(function(f){
+        return (f.tool||'').toLowerCase()===toolName ||
+               (f.tool||'').toLowerCase().includes(toolName);
+      });
+      if(slugFindings.length) a._api_findings=slugFindings;
     }
   }
   document.getElementById('amod-name').textContent=a.name;
