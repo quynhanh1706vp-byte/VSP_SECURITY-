@@ -84,11 +84,7 @@ body {
   background-size: 80px 80px;
 }
 
-/* Sidebar */
-.sidenav {
-  background: var(--bg2);
-  border-right: 1px solid var(--border);
-}
+/* Sidebar — see merged definition below */
 .sidenav-logo { padding: 20px 16px 14px; }
 .logo-badge {
   font-family: var(--display) !important;
@@ -147,24 +143,10 @@ body {
 }
 
 /* Pillar cards */
-.zt-pillar {
-  background: var(--bg2) !important;
-  border-radius: 12px !important;
-  transition: all .2s !important;
-}
-.zt-pillar:hover { transform: translateY(-2px) !important; }
-.zt-pillar-score {
-  font-family: var(--display) !important;
-  font-size: 28px !important;
-  font-weight: 800 !important;
-  letter-spacing: -.03em !important;
-}
-.zt-pillar-name {
-  font-family: var(--mono) !important;
-  font-size: 9px !important;
-  letter-spacing: .04em !important;
-  color: var(--t3) !important;
-}
+.zt-pillar { border-radius:12px !important; transition:all .2s !important; overflow:visible !important; }
+.zt-pillar:hover { transform:translateY(-2px) !important; }
+.zt-pillar-score { font-family:var(--display) !important; font-size:28px !important; font-weight:800 !important; letter-spacing:-.03em !important; }
+.zt-pillar-name { font-family:var(--mono) !important; font-size:9px !important; letter-spacing:.04em !important; color:var(--t3) !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; display:block !important; max-width:100% !important; }
 
 /* Pipeline table */
 .pipeline-row {
@@ -260,6 +242,48 @@ body {
 .dropdown-item { padding:6px 10px; border-radius:4px; font-size:11px; cursor:pointer; color:var(--t2); }
 .dropdown-item:hover { background:rgba(255,255,255,.06); color:var(--t1); }
 .tab-badge { display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px; border-radius:8px; font-size:9px; font-weight:700; padding:0 4px; margin-left:4px; }
+#zt-tooltip-portal { display:none; position:fixed; background:var(--bg3,#181b22); border:1px solid var(--border2,rgba(255,255,255,.12)); border-radius:8px; padding:10px 12px; min-width:200px; max-width:260px; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,.6); pointer-events:none; font-size:11px; }
+#zt-tooltip-portal .zt-tooltip-title { font-size:11px; font-weight:700; color:var(--t1,#f0f2f8); margin-bottom:6px; }
+#zt-tooltip-portal .zt-tooltip-row { display:flex; justify-content:space-between; font-size:10px; color:var(--t2,#8a90a2); padding:2px 0; border-bottom:1px solid var(--border,rgba(255,255,255,.06)); }
+#zt-tooltip-portal .zt-tooltip-row:last-child { border-bottom:none; }
+
+/* ── ZT Pillar tooltip ── */
+.zt-pillar { position:relative; cursor:pointer; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:12px; overflow:visible; min-width:0; }
+.zt-tooltip { display:none; position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%); background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:10px 12px; min-width:200px; z-index:100; box-shadow:0 8px 24px rgba(0,0,0,.5); pointer-events:none; }
+.zt-tooltip::before { content:''; position:absolute; top:-5px; left:50%; transform:translateX(-50%); width:8px; height:8px; background:var(--bg3); border-left:1px solid var(--border2); border-top:1px solid var(--border2); rotate:45deg; }
+/* tooltip shown via JS */.zt-pillar:hover .zt-tooltip { display:none; }
+.zt-tooltip-title { font-size:11px; font-weight:700; color:var(--t1); margin-bottom:6px; }
+.zt-tooltip-row { display:flex; justify-content:space-between; font-size:10px; color:var(--t2); padding:2px 0; border-bottom:1px solid var(--border); }
+.zt-tooltip-row:last-child { border-bottom:none; }
+
+/* ── POAM filter ── */
+.poam-filter-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+.poam-filter-pill { padding:3px 10px; border-radius:10px; font-size:10px; font-family:var(--mono); border:1px solid var(--border); background:var(--bg3); color:var(--t2); cursor:pointer; transition:all .15s; }
+.poam-filter-pill:hover { border-color:var(--border2); color:var(--t1); }
+.poam-filter-pill.active { background:rgba(0,229,255,.1); border-color:rgba(0,229,255,.4); color:var(--cyan); }
+
+/* ── Auto-refresh indicator ── */
+#refresh-indicator { display:none; align-items:center; gap:6px; font-size:10px; color:var(--t3); font-family:var(--mono); }
+#refresh-indicator.visible { display:flex; }
+.refresh-ring { width:14px; height:14px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--cyan); animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── Sidebar collapse ── */
+/* sidenav transition — merged */
+.sidenav.collapsed { width:44px !important; min-width:44px !important; }
+.sidenav.collapsed .nav-label { display:none; }
+.sidenav.collapsed .sidenav-logo { padding:14px 8px; }
+.sidenav.collapsed .logo-badge { display:none; }
+.sidenav.collapsed .logo-sub { display:none; }
+.sidenav.collapsed .nav-section { display:none; }
+.sidenav.collapsed .nav-btn { padding:8px; justify-content:center; }
+.sidenav.collapsed .nav-dot { margin:0; }
+.sidenav.collapsed #sidebar-p4-section { display:none; }
+.collapse-btn { position:absolute; top:14px; right:-12px; width:24px; height:24px; border-radius:50%; background:var(--bg2); border:1px solid var(--border2); color:var(--t2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:10px; z-index:20; transition:transform .2s; }
+.collapse-btn:hover { color:var(--t1); border-color:var(--cyan); }
+/* sidenav position — merged */
+/* shell transition — merged */
+.shell.nav-collapsed { grid-template-columns:44px 1fr; }
 
 /* AI advisor modal */
 #ai-advisor-modal .modal {
@@ -352,15 +376,15 @@ body::after {
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size:13px; line-height:1.5; }
-.shell { display:grid; grid-template-columns:180px 1fr; height:100vh; overflow:hidden; }
+.shell { display:grid; grid-template-columns:180px 1fr; height:100vh; overflow:hidden; min-width:0; transition:grid-template-columns .2s ease; }
 
 /* Sidebar nav */
-.sidenav { background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+.sidenav { background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; width:180px; min-width:180px; max-width:180px; overflow:hidden; overflow-y:auto; position:relative; transition:width .2s ease, min-width .2s ease; flex-shrink:0; }
 .sidenav-logo { padding:18px 14px 12px; border-bottom:1px solid var(--border); }
 .logo-badge { font-size:10px; font-weight:700; letter-spacing:.14em; color:var(--cyan); }
 .logo-sub { font-size:9px; color:var(--t3); margin-top:2px; }
 .nav-section { padding:12px 10px 6px; font-size:9px; color:var(--t3); letter-spacing:.1em; }
-.nav-btn { display:flex; align-items:center; gap:8px; padding:7px 14px; cursor:pointer; border:none; background:none; color:var(--t2); font-family:var(--mono); font-size:12px; width:100%; text-align:left; border-left:2px solid transparent; transition:all .15s; }
+.nav-btn { display:flex; align-items:center; gap:8px; padding:7px 14px; cursor:pointer; border:none; background:none; color:var(--t2); font-family:var(--mono); font-size:12px; width:100%; text-align:left; border-left:2px solid transparent; transition:all .15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .nav-btn:hover { color:var(--t1); background:var(--border); }
 .nav-btn.active { color:var(--cyan); border-left-color:var(--cyan); background:var(--cyan-d); }
 .nav-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
@@ -414,8 +438,9 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
 .task-artifact { font-size:10px; color:var(--t3); }
 
 /* Zero Trust pillars */
-.zt-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
-.zt-pillar { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:12px; }
+.zt-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-bottom:16px; position:relative; }
+.zt-grid-wrap { overflow:visible; position:relative; }
+/* zt-pillar merged below */
 .zt-pillar-name { font-size:10px; color:var(--t3); margin-bottom:6px; }
 .zt-pillar-score { font-size:22px; font-weight:700; }
 .zt-bar { height:3px; background:var(--border); border-radius:2px; margin-top:6px; }
@@ -556,6 +581,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
 <div class="shell">
   <!-- Sidebar -->
   <nav class="sidenav">
+    <button class="collapse-btn" id="collapse-btn" onclick="toggleSidebar()" title="Toggle sidebar">‹</button>
     <div class="sidenav-logo">
       <div class="logo-badge">VSP // P4</div>
       <div class="logo-sub">DoD Zero Trust Compliance</div>
@@ -591,7 +617,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
     <button class="nav-btn" onclick="switchTab('vn-standards',this)">
       <div class="nav-dot" style="background:var(--red)"></div> VN Standards
     </button>
-    <div class="nav-section" style="margin-top:auto">STATUS</div>
+    <div class="nav-section" id="sidebar-p4-section" style="margin-top:auto">STATUS</div>
     <div style="padding:10px 14px">
       <div style="font-size:10px;color:var(--t3);margin-bottom:4px">P4 Readiness</div>
       <div id="sidebar-p4" style="font-size:20px;font-weight:700;color:var(--amber)">—</div>
@@ -616,7 +642,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
     <div style="font-size:10px;color:var(--t3);padding:4px 8px;margin-bottom:4px">SWITCH TENANT</div>
     <div id="tenant-list"><div style="padding:8px 10px;color:var(--t3);font-size:11px">Loading…</div></div>
     <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px">
-      <div onclick="window.location.href='/onboarding'" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--cyan)" onmouseover="this.style.background='rgba(6,182,212,.08)'" onmouseout="this.style.background='transparent'">
+      <div onclick="toast('Tenant management requires admin access — contact your system administrator','info')" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--cyan)" onmouseover="this.style.background='rgba(6,182,212,.08)'" onmouseout="this.style.background='transparent'">
         + Add new tenant
       </div>
     </div>
@@ -625,6 +651,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
         <button class="btn btn-ghost btn-sm" onclick="openP4Configure()" title="Panel display + alert thresholds">⚙ Configure</button>
         <button class="btn btn-ghost btn-sm" onclick="openP4Notifications()" title="Compliance event notifications">🔔 Notifications</button>
         <button class="btn btn-ghost btn-sm" onclick="openAIAdvisor(null)" style="color:#8b5cf6;border-color:rgba(139,92,246,.4)">🤖 AI</button>
+        <button class="btn btn-ghost btn-sm" onclick="refreshAll()" title="Refresh current tab">↺ Refresh</button>
         <button class="btn btn-ghost btn-sm" onclick="exportPDF()">⬇ PDF</button>
       </div>
     </div>
@@ -644,8 +671,8 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
             <div class="score-label">FEDRAMP MODERATE</div>
             <div class="score-val" id="ov-fedramp" style="color:var(--cyan)">—</div>
             <div class="score-sub" id="ov-fedramp-sub">loading...</div>
-            <div class="score-bar"><div class="score-bar-fill" id="fedramp-families" style="margin-top:10px;font-size:11px"></div>
-<div id="ov-fedramp-bar" style="width:0%;background:var(--cyan)"></div></div>
+            <div class="score-bar"><div class="score-bar-fill" id="ov-fedramp-bar" style="width:0%;background:var(--cyan)"></div></div>
+            <div id="fedramp-families" style="font-size:10px;color:var(--t3);margin-top:6px;display:none;max-height:140px;overflow-y:auto"></div>
           </div>
           <div class="score-card" onclick="switchTab('rmf',null)" style="cursor:pointer" title="View CMMC / RMF detail">
             <div class="score-label">CMMC LEVEL 2</div>
@@ -729,8 +756,8 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
       <!-- PIPELINE TAB -->
       <div id="tab-pipeline" class="tab-panel">
         <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button class="btn btn-primary btn-sm" onclick="triggerPipeline()">▶ Trigger Scan</button>
-          <button class="btn btn-ghost btn-sm" onclick="loadPipeline()">History</button>
+          <button class="btn btn-primary btn-sm" id="trigger-scan-btn" onclick="triggerPipeline()">▶ Trigger Scan</button>
+          <button class="btn btn-ghost btn-sm" onclick="openPipelineHistory()">📋 History</button>
         </div>
 
         <div id="pipeline-run-header"></div>
@@ -769,7 +796,7 @@ body { background:var(--bg); color:var(--t1); font-family:var(--mono); font-size
         </div>
         <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:auto">
           <table class="rule-table">
-            <thead><tr><th>ID</th><th>Name</th><th>Source</th><th>Destination</th><th>Port</th><th>Action</th><th>mTLS</th><th>Hits</th></tr></thead>
+            <thead><tr><th>ID</th><th>Name</th><th>Source</th><th>Destination</th><th>Port</th><th>Action</th><th>mTLS</th><th>Hits</th><th>Actions</th></tr></thead>
             <tbody id="seg-tbody"></tbody>
           </table>
         </div>
@@ -1166,14 +1193,12 @@ function loadTab(name) {
     case 'pipeline':   loadPipeline(); loadConMonTimeline(); break;
     case 'microseg':   loadMicroSeg(); break;
     case 'rasp':       pollRASP(); break;
-    case 'sbom-viewer': loadSBOMView(); break;
-    case 'sbom':        loadSBOMView(); break;
+    case 'sbom-viewer':
+    case 'sbom':
+    case 'sbom-view':   loadSBOMView(); break;
     case 'poam':        loadPOAM(); break;
-    case 'vn-standards': if(typeof loadVNStandards==='function') loadVNStandards(); break;
-    case 'ato-expiry':   if(typeof loadATOExpiry==='function') loadATOExpiry(); break;
-    case 'ato-expiry': loadATOExpiry(); break;
-    case 'sbom-view':  loadSBOMView(); break;
     case 'vn-standards': loadVNStandards(); break;
+    case 'ato-expiry':  loadATOExpiry(); break;
   }
 }
 
@@ -1347,9 +1372,11 @@ async function loadOverview() {
       });
       var famEl = document.getElementById('fedramp-families');
       if (famEl) {
+        famEl.style.display = 'block';
+        famEl.style.maxHeight = 'none';
         famEl.innerHTML = Object.entries(families).sort(function(a,b){
           return (b[1].fail||0)-(a[1].fail||0);
-        }).slice(0,6).map(function(e){
+        }).slice(0,3).map(function(e){
           var f=e[1], tot=(f.pass||0)+(f.warn||0)+(f.fail||0);
           var pct = tot>0?Math.round((f.pass||0)/tot*100):0;
           var col = pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
@@ -1392,11 +1419,14 @@ async function loadOverview() {
       } else {
         grid.innerHTML = Object.entries(zt.pillars).map(function(e) {
           var k = e[0], p = e[1];
-          return '<div class="zt-pillar" style="border-color:' + (p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)') + '">'
-            + '<div class="zt-pillar-name">' + p.name + '</div>'
-            + '<div class="zt-pillar-score" style="color:' + (p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)') + '">' + p.score + '</div>'
+          var col = p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)';
+          var bdr = p.score>=85?'rgba(16,185,129,.3)':p.score>=60?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)';
+          var pillarId = 'zt-p-'+k;
+          return '<div class="zt-pillar" id="'+pillarId+'" style="border-color:'+bdr+'">'
+            + '<div class="zt-pillar-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+p.name+'">' + p.name + '</div>'
+            + '<div class="zt-pillar-score" style="color:'+col+'">' + p.score + '</div>'
             + '<div class="p4-target" style="color:var(--t3)">target ' + p.target + '</div>'
-            + '<div class="zt-bar"><div class="zt-bar-fill" style="width:' + p.score + '%;background:' + (p.score>=85?'var(--green)':p.score>=60?'var(--amber)':'var(--red)') + '"></div></div>'
+            + '<div class="zt-bar"><div class="zt-bar-fill" style="width:'+p.score+'%;background:'+col+'"></div></div>'
             + '</div>';
         }).join('');
       }
@@ -1579,8 +1609,6 @@ async function _loadATOOverrides(){
 }
 
 async function toggleATOTask(id, newDone){
-  // Optimistic UI: flip the row immediately so user sees feedback even on slow
-  // network. Roll back on save failure.
   var row = document.querySelector('[data-rc-id="'+id+'"]');
   var prevHtml = row ? row.innerHTML : null;
   if (row) {
@@ -1594,8 +1622,10 @@ async function toggleATOTask(id, newDone){
     var existing = await fetch('/api/v1/features/settings_general/config', {
       headers:{Authorization:'Bearer '+(window.TOKEN||'')}, credentials:'same-origin'
     });
+    if (!existing.ok) throw new Error('Failed to load config: HTTP '+existing.status);
     var cfg = {};
-    if (existing.ok) { var j = await existing.json(); cfg = (j && j.config) || {}; }
+    var j = await existing.json();
+    cfg = (j && j.config) || {};
     cfg.p4_ato_checklist_overrides = cfg.p4_ato_checklist_overrides || {};
     cfg.p4_ato_checklist_overrides[id] = !!newDone;
     var r = await fetch('/api/v1/features/settings_general/config', {
@@ -1605,16 +1635,16 @@ async function toggleATOTask(id, newDone){
       body: JSON.stringify({ config: cfg })
     });
     if (!r.ok) throw new Error('HTTP '+r.status);
-    // Update the "done/total" counter card without full reload
     _refreshATOCounter();
-    toast('Task '+id+' marked '+(newDone?'done ✓':'pending'));
+    toast('Task '+id+' '+(newDone?'done ✓':'pending'), newDone?'success':'info');
   } catch(e) {
+    // Rollback UI
     if (row && prevHtml != null) {
       row.innerHTML = prevHtml;
       row.dataset.rcDone = newDone ? '0' : '1';
       row.setAttribute('onclick', "toggleATOTask('"+id+"',"+newDone+")");
     }
-    toast('Save failed: '+(e.message||e));
+    toast('Save failed: '+(e.message||e), 'error');
   }
 }
 
@@ -1694,6 +1724,7 @@ async function toggleTask(stepId, taskId, currentStatus) {
 }
 
 async function generateATOLetter() {
+  toast('Generating ATO letter…', 'info');
   const data = await api('/api/p4/rmf/ato-letter');
   if (!data) return;
   const box = document.getElementById('ato-letter-box');
@@ -1798,8 +1829,10 @@ async function loadZeroTrust() {
     if (!appPillar || !appPillar.capabilities || appPillar.capabilities.length === 0) {
       if (hasUX) _p4Empty('#cap-tbody', 'No application capabilities defined', loadZeroTrust);
     } else {
+      window._capMap = window._capMap || {};
+      appPillar.capabilities.forEach(function(c){ window._capMap[c.id]=c; });
       capTbody.innerHTML = appPillar.capabilities.map(function(c) {
-        return '<tr>'
+        return '<tr style="cursor:pointer" onclick="openCapDetail(this.dataset.cid)" data-cid="'+c.id+'">'
           + '<td style="color:var(--purple)">' + c.id + '</td>'
           + '<td>' + c.name + '<br><span style="font-size:10px;color:var(--t3)">' + (c.description||'') + '</span></td>'
           + '<td class="level-' + (c.level==='Optimal'?'opt':c.level==='Advanced'?'adv':'trad') + '">' + c.level + '</td>'
@@ -1842,8 +1875,8 @@ async function loadPipeline() {
   try {
     var res = await Promise.all([
       safe(api('/api/p4/pipeline/latest')),
-      safe(api('/api/p4/pipeline/drift')),
-      safe(api('/api/p4/pipeline/schedules'))
+      safe(api('/api/v1/drift')),
+      safe(api('/api/v1/schedules'))
     ]);
     latest = res[0]; drift = res[1]; schedules = res[2];
   } catch(e) {
@@ -1941,49 +1974,149 @@ function filterTests(status) {
   renderTests(status === 'all' ? allTests : allTests.filter(t => t.status === status));
 }
 
-function renderDrift(events) {
+function renderDrift(data) {
+  var events = Array.isArray(data) ? data : (data && data.events ? data.events : []);
   const colors = { CRITICAL:'var(--red)', HIGH:'var(--amber)', MEDIUM:'var(--blue)', LOW:'var(--t3)' };
-  document.getElementById('drift-list').innerHTML = events.map(d => `
-    <div class="drift-row">
-      <div class="drift-icon" style="background:${d.severity==='CRITICAL'?'var(--red-d)':d.severity==='HIGH'?'var(--amber-d)':'var(--blue-d)'}">
-        <span style="color:${colors[d.severity]}">⚠</span>
-      </div>
-      <div class="drift-info">
-        <div class="drift-resource">${d.resource} <span style="font-size:10px;color:var(--t3)">[${d.resource_type}]</span></div>
-        <div class="drift-change">${d.change}</div>
-        <div style="display:flex;gap:10px;margin-top:3px">
-          <span class="drift-ctrl">${d.control_id}</span>
-          ${d.auto_reverted ? '<span class="drift-reverted">✓ auto-reverted</span>' : '<span style="font-size:10px;color:var(--red)">manual review required</span>'}
-        </div>
-      </div>
-      <div style="font-size:10px;color:var(--t3)">${new Date(d.detected_at).toLocaleDateString()}</div>
-    </div>
-  `).join('');
+  window._driftMap = {};
+  events.forEach(function(d){ window._driftMap[d.id] = d; });
+  document.getElementById('drift-list').innerHTML = events.map(function(d) {
+    var col = colors[d.severity] || 'var(--t3)';
+    var bg = d.severity==='CRITICAL'?'var(--red-d)':d.severity==='HIGH'?'var(--amber-d)':'var(--blue-d)';
+    return '<div class="drift-row" style="cursor:pointer" onclick="openDriftDetail(this.dataset.did)" data-did="'+d.id+'">'
+      + '<div class="drift-icon" style="background:'+bg+'"><span style="color:'+col+'">!</span></div>'
+      + '<div class="drift-info">'
+      + '<div class="drift-resource">'+d.resource+' <span style="font-size:10px;color:var(--t3)">['+d.resource_type+']</span></div>'
+      + '<div class="drift-change">'+d.change+'</div>'
+      + '<div style="display:flex;gap:10px;margin-top:3px">'
+      + '<span class="drift-ctrl">'+d.control_id+'</span>'
+      + (d.auto_reverted ? '<span class="drift-reverted">auto-reverted</span>' : '<span style="font-size:10px;color:var(--red)">manual review required</span>')
+      + '</div></div>'
+      + '<div style="font-size:10px;color:var(--t3)">'+new Date(d.detected_at).toLocaleDateString('vi-VN')+'</div>'
+      + '</div>';
+  }).join('');
 }
 
-function renderSchedules(schedules) {
-  document.getElementById('schedules-list').innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-      <table class="rule-table">
-        <thead><tr><th>Name</th><th>Cron</th><th>Framework</th><th>Next Run</th><th>Status</th></tr></thead>
-        <tbody>${schedules.map(s => `
-          <tr>
-            <td style="font-weight:600">${s.name}</td>
-            <td style="color:var(--cyan)">${s.cron}</td>
-            <td style="color:var(--purple)">${s.framework}</td>
-            <td style="color:var(--t3)">${new Date(s.next_run).toLocaleString()}</td>
-            <td><span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${s.enabled?'var(--green-d)':'var(--border)'};color:${s.enabled?'var(--green)':'var(--t3)'}">${s.enabled?'enabled':'disabled'}</span></td>
-          </tr>
-        `).join('')}</tbody>
-      </table>
-    </div>`;
+function openDriftDetail(id) {
+  var d = window._driftMap && window._driftMap[id];
+  if (!d) return;
+  var col = {CRITICAL:'var(--red)',HIGH:'var(--amber)',MEDIUM:'var(--blue)',LOW:'var(--t3)'}[d.severity]||'var(--t3)';
+  var detected = d.detected_at ? new Date(d.detected_at).toLocaleString('vi-VN') : '-';
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)';
+  ov.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;min-width:400px;max-width:560px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    + '<span style="font-size:14px;font-weight:700;color:var(--t1)">Drift Event Detail</span>'
+    + '<button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px">X</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:16px">'
+    + '<span style="padding:2px 10px;border-radius:4px;background:'+col+'22;color:'+col+';font-size:11px;font-weight:700">'+(d.severity||'-')+'</span>'
+    + '<span style="padding:2px 10px;border-radius:4px;background:var(--bg3);color:var(--t2);font-size:11px">'+(d.resource_type||'-')+'</span>'
+    + (d.auto_reverted ? '<span style="padding:2px 10px;border-radius:4px;background:rgba(34,197,94,.1);color:var(--green);font-size:11px">auto-reverted</span>' : '<span style="padding:2px 10px;border-radius:4px;background:rgba(239,68,68,.1);color:var(--red);font-size:11px">manual review</span>')
+    + '</div>'
+    + _driftRow('ID', d.id||'-')
+    + _driftRow('Resource', d.resource||'-')
+    + _driftRow('Change', d.change||'-')
+    + _driftRow('Control', d.control_id||'-')
+    + _driftRow('Detected', detected)
+    + '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+}
+
+function _driftRow(k,v){
+  return '<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px">'
+    +'<div style="width:100px;flex-shrink:0;color:var(--t3);font-family:var(--mono);font-size:10px;text-transform:uppercase">'+k+'</div>'
+    +'<div style="flex:1;color:var(--t1)">'+v+'</div></div>';
+}
+
+function renderSchedules(data) {
+  // /api/v1/schedules trả về {schedules:[...], total:N}
+  var schedules = Array.isArray(data) ? data : (data && data.schedules ? data.schedules : []);
+  if (!schedules.length) {
+    document.getElementById('schedules-list').innerHTML =
+      '<div style="padding:24px;text-align:center;color:var(--t3);font-size:12px">No schedules configured</div>';
+    return;
+  }
+  document.getElementById('schedules-list').innerHTML =
+    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">'
+    + '<table class="rule-table"><thead><tr>'
+    + '<th>Name</th><th>Cron</th><th>Mode</th><th>Next Run</th><th>Status</th><th>Actions</th>'
+    + '</tr></thead><tbody>'
+    + schedules.map(function(s) {
+        var nextRun = s.next_run_at ? new Date(s.next_run_at).toLocaleString('vi-VN') : '—';
+        return '<tr>'
+          + '<td style="font-weight:600">'+s.name+'</td>'
+          + '<td style="color:var(--cyan);font-family:var(--mono)">'+s.cron+'</td>'
+          + '<td style="color:var(--purple)">'+(s.mode||'—')+'</td>'
+          + '<td style="color:var(--t3);font-size:10px">'+nextRun+'</td>'
+          + '<td><span style="font-size:10px;padding:2px 8px;border-radius:3px;background:'+(s.enabled?'var(--green-d)':'var(--border)')+';color:'+(s.enabled?'var(--green)':'var(--t3)')+'">'+( s.enabled?'enabled':'disabled')+'</span></td>'
+          + '<td style="display:flex;gap:4px;align-items:center">'
+          + '<button onclick="toggleSchedule(this.dataset.sid,'+(!s.enabled)+')" data-sid="'+s.id+'" style="padding:2px 8px;border-radius:4px;border:1px solid '+(s.enabled?'rgba(239,68,68,.3)':'rgba(34,197,94,.3)')+';background:'+(s.enabled?'rgba(239,68,68,.08)':'rgba(34,197,94,.08)')+';color:'+(s.enabled?'var(--red)':'var(--green)')+';font-size:10px;cursor:pointer">'+(s.enabled?'Disable':'Enable')+'</button>'
+          + '<button onclick="runScheduleNow(this.dataset.sid,this.dataset.sname)" data-sid="'+s.id+'" data-sname="'+s.name+'" style="padding:2px 8px;border-radius:4px;border:1px solid rgba(0,229,255,.3);background:rgba(0,229,255,.08);color:var(--cyan);font-size:10px;cursor:pointer">▶ Run</button>'
+          + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+async function toggleSchedule(id, enable) {
+  if (!id) return;
+  try {
+    var tk = window.TOKEN || '';
+    var r = await fetch('/api/v1/schedules/'+id+'/toggle', {
+      method: 'PATCH',
+      headers: {'Authorization':'Bearer '+tk, 'Content-Type':'application/json'},
+      body: JSON.stringify({enabled: enable})
+    });
+    var data = await r.json();
+    if (r.ok) {
+      toast('Schedule '+(enable?'enabled':'disabled')+' ✓', 'success');
+      loadPipeline();
+    } else {
+      toast('Toggle failed: '+(data.error||'HTTP '+r.status), 'error');
+    }
+  } catch(e) { toast('Network error: '+e.message, 'error'); }
+}
+
+async function runScheduleNow(id, name) {
+  if (!id) return;
+  toast('Running schedule: '+name+'…', 'info');
+  try {
+    var tk = window.TOKEN || '';
+    var r = await fetch('/api/v1/schedules/'+id+'/run', {
+      method: 'POST',
+      headers: {'Authorization':'Bearer '+tk}
+    });
+    var data = await r.json();
+    if (r.ok) {
+      toast(name+' triggered ✓', 'success');
+      setTimeout(loadPipeline, 2000);
+    } else {
+      toast('Run failed: '+(data.error||'HTTP '+r.status), 'error');
+    }
+  } catch(e) { toast('Network error: '+e.message, 'error'); }
 }
 
 async function triggerPipeline() {
-  const res = await post('/api/p4/pipeline/trigger', {});
-  if (res) {
-    toast('Pipeline queued: ' + res.run_id + '. Results in ~3s...');
-    setTimeout(loadPipeline, 3500);
+  var btn = document.getElementById('trigger-scan-btn');
+  if (btn) { btn.textContent = '⟳ Running...'; btn.disabled = true; }
+  toast('Triggering pipeline scan…', 'info');
+  try {
+    const res = await post('/api/p4/pipeline/trigger', {});
+    if (res && (res.run_id || res.status === 'ok')) {
+      toast('Pipeline queued: ' + (res.run_id||'') + ' — results in ~3s', 'success');
+      setTimeout(function(){
+        loadPipeline();
+        if (btn) { btn.textContent = '▶ Trigger Scan'; btn.disabled = false; }
+      }, 3500);
+    } else {
+      var err = (res && res.error) || 'Failed to trigger pipeline';
+      toast('Error: ' + err, 'error');
+      if (btn) { btn.textContent = '▶ Trigger Scan'; btn.disabled = false; }
+    }
+  } catch(e) {
+    toast('Network error: ' + e.message, 'error');
+    if (btn) { btn.textContent = '▶ Trigger Scan'; btn.disabled = false; }
   }
 }
 
@@ -2062,7 +2195,10 @@ async function loadMicroSeg() {
   var tbody = document.getElementById('seg-tbody');
   if (tbody) {
     tbody.innerHTML = rules.map(function(r) {
-      return '<tr>'
+      var isSystem = parseInt(r.id.replace('SEG-','')) <= 13;
+      window._segRuleMap = window._segRuleMap || {};
+      window._segRuleMap[r.id] = r;
+      return '<tr style="cursor:pointer" onclick="_openSegDetailById(event,this.dataset.rid)" data-rid="'+r.id+'">'
         + '<td style="color:var(--cyan)">' + r.id + '</td>'
         + '<td style="font-weight:600">' + r.name + '</td>'
         + '<td>' + r.source + '</td>'
@@ -2071,6 +2207,11 @@ async function loadMicroSeg() {
         + '<td class="action-' + r.action + '">' + r.action.toUpperCase() + '</td>'
         + '<td class="' + (r.mtls?'mtls-yes':'mtls-no') + '">' + (r.mtls?'mTLS':'none') + '</td>'
         + '<td style="color:var(--t3)">' + r.hit_count.toLocaleString() + '</td>'
+        + '<td>'
+          + (isSystem
+            ? '<span style="font-size:9px;color:var(--t3);font-family:var(--mono)">system</span>'
+            : '<button onclick="deleteSegRule(this.dataset.id)" data-id="'+r.id+'" style="padding:2px 8px;border-radius:4px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:var(--red);font-size:10px;cursor:pointer" title="Delete rule">✕ Delete</button>')
+          + '</td>'
         + '</tr>';
     }).join('');
   }
@@ -2079,21 +2220,183 @@ async function loadMicroSeg() {
 function openSegModal() { document.getElementById('seg-modal').classList.add('open'); }
 function closeSegModal() { document.getElementById('seg-modal').classList.remove('open'); }
 
+function openCapDetail(id) {
+  var c = window._capMap && window._capMap[id];
+  if (!c) return;
+  var col = c.score>=c.max_score?'var(--green)':c.score>=(c.max_score*0.8)?'var(--amber)':'var(--red)';
+  var pct = c.max_score>0 ? Math.round(c.score/c.max_score*100) : 0;
+  var ctrls = (c.controls||[]).join(', ') || '—';
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)';
+  ov.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;min-width:380px;max-width:500px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    + '<span style="font-size:14px;font-weight:700;color:var(--cyan);font-family:var(--mono)">'+c.id+' — '+c.name+'</span>'
+    + '<button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px">✕</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:16px">'
+    + '<span style="padding:2px 10px;border-radius:4px;background:'+col+'22;color:'+col+';font-size:11px;font-weight:700">'+c.level+'</span>'
+    + '<span style="padding:2px 10px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--t2);font-size:11px">'+c.status+'</span>'
+    + '</div>'
+    + '<div style="margin-bottom:12px">'
+    + '<div style="font-size:10px;color:var(--t3);margin-bottom:4px">SCORE</div>'
+    + '<div style="display:flex;align-items:center;gap:10px">'
+    + '<span style="font-size:24px;font-weight:700;color:'+col+'">'+c.score+'<span style="font-size:12px;color:var(--t3)">/'+c.max_score+'</span></span>'
+    + '<div style="flex:1;height:6px;background:var(--border);border-radius:3px"><div style="width:'+pct+'%;height:6px;border-radius:3px;background:'+col+'"></div></div>'
+    + '<span style="font-size:11px;color:'+col+'">'+pct+'%</span>'
+    + '</div></div>'
+    + (c.description ? '<div style="font-size:11px;color:var(--t2);margin-bottom:12px">'+c.description+'</div>' : '')
+    + '<div style="font-size:10px;color:var(--t3);margin-bottom:4px">CONTROLS</div>'
+    + '<div style="font-size:11px;color:var(--cyan);font-family:var(--mono);margin-bottom:12px">'+ctrls+'</div>'
+    + (c.evidence ? '<div style="font-size:10px;color:var(--t3);margin-bottom:4px">EVIDENCE</div><div style="font-size:11px;color:var(--t2)">'+c.evidence+'</div>' : '')
+    + '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+}
+
+function _loadHistRun(id) {
+  document.getElementById('pipeline-history-modal').classList.remove('open');
+  var r = window._histRuns && window._histRuns[id];
+  if (r) renderPipelineRun(r);
+}
+
+
+
+async function openPipelineHistory() {
+  var modal = document.getElementById('pipeline-history-modal');
+  var body = document.getElementById('pipeline-history-body');
+  if (!modal || !body) return;
+  modal.classList.add('open');
+  body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t3)"><span class="spinner"></span> Loading...</div>';
+  try {
+    var runs = await api('/api/p4/pipeline/history');
+    if (!runs || !runs.length) {
+      body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t3)">No pipeline runs found</div>';
+      return;
+    }
+    body.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      + '<thead><tr style="background:var(--bg3)">'
+      + '<th style="padding:8px 12px;text-align:left;color:var(--t3);font-weight:600">RUN ID</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:var(--t3);font-weight:600">TRIGGER</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:var(--t3);font-weight:600">BRANCH</th>'
+      + '<th style="padding:8px 12px;text-align:center;color:var(--t3);font-weight:600">STATUS</th>'
+      + '<th style="padding:8px 12px;text-align:center;color:var(--t3);font-weight:600">SCORE</th>'
+      + '<th style="padding:8px 12px;text-align:center;color:var(--t3);font-weight:600">DURATION</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:var(--t3);font-weight:600">STARTED</th>'
+      + '</tr></thead><tbody>'
+      + runs.map(function(r) {
+          var s = r.summary || {};
+          var score = s.score != null ? Math.round(s.score) : '—';
+          var col = s.score>=80?'var(--green)':s.score>=60?'var(--amber)':'var(--red)';
+          var stCol = r.status==='pass'?'var(--green)':r.status==='fail'?'var(--red)':'var(--amber)';
+          var started = r.started_at ? new Date(r.started_at).toLocaleString('vi-VN') : '—';
+          var pass = s.pass||0, warn = s.warn||0, fail = s.fail||0;
+          return '<tr style="border-bottom:1px solid var(--border);cursor:pointer" '
+            + 'onclick="_loadHistRun(this.dataset.rid)" data-rid="'+r.id+'" '
+            + 'style="border-bottom:1px solid var(--border);cursor:pointer">'  
+            + '<td style="padding:8px 12px;font-family:var(--mono);color:var(--cyan)">' + r.id + '</td>'
+            + '<td style="padding:8px 12px;color:var(--t2)">' + (r.trigger_type||'—') + '</td>'
+            + '<td style="padding:8px 12px;color:var(--t2)">' + (r.branch||'main') + '</td>'
+            + '<td style="padding:8px 12px;text-align:center"><span style="color:'+stCol+';font-weight:600">'+(r.status||'—').toUpperCase()+'</span></td>'
+            + '<td style="padding:8px 12px;text-align:center;color:'+col+';font-weight:700">' + score + '%</td>'
+            + '<td style="padding:8px 12px;text-align:center;color:var(--t3)">' + (r.duration_sec||0) + 's</td>'
+            + '<td style="padding:8px 12px;color:var(--t3);font-size:10px">' + started + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table>'
+      + '<div style="padding:10px 12px;font-size:10px;color:var(--t3);border-top:1px solid var(--border)">'+runs.length+' runs — click row to load run details</div>';
+    // Store runs for click handler
+    window._histRuns = {};
+    runs.forEach(function(r){ window._histRuns[r.id] = r; });
+  } catch(e) {
+    body.innerHTML = '<div style="padding:20px;color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+function _openSegDetailById(e, id) {
+  if (e.target.tagName === 'BUTTON') return;
+  var r = window._segRuleMap && window._segRuleMap[id];
+  if (r) openSegDetail(r);
+}
+function openSegDetail(r) {
+  var sevColor = {ALLOW:'var(--green)',DENY:'var(--red)',INSPECT:'var(--amber)'};
+  var col = sevColor[r.action] || 'var(--t2)';
+  var lastHit = r.last_hit ? new Date(r.last_hit).toLocaleString('vi-VN') : 'Never';
+  var created = r.created_at ? new Date(r.created_at).toLocaleString('vi-VN') : '—';
+  var isSystem = parseInt((r.id||'').replace('SEG-','')) <= 13;
+  var d = document.getElementById('seg-detail-body');
+  if (!d) return;
+  d.innerHTML =
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    + '<span style="font-size:18px;font-weight:700;color:var(--cyan);font-family:var(--mono)">'+r.id+'</span>'
+    + '<span style="padding:2px 10px;border-radius:4px;background:'+col+'22;color:'+col+';font-size:11px;font-weight:700">'+r.action+'</span>'
+    + (r.mtls ? '<span style="padding:2px 8px;border-radius:4px;background:rgba(0,229,255,.1);color:var(--cyan);font-size:10px">mTLS</span>' : '')
+    + (isSystem ? '<span style="padding:2px 8px;border-radius:4px;background:var(--bg3);color:var(--t3);font-size:10px">system rule</span>' : '')
+    + '</div>'
+    + _segRow('Name', r.name)
+    + _segRow('Source', r.source || '*')
+    + _segRow('Destination', r.destination || '*')
+    + _segRow('Port', r.port ? r.port+' / '+(r.protocol||'tcp') : 'any')
+    + _segRow('Hit count', (r.hit_count||0).toLocaleString())
+    + _segRow('Last hit', lastHit)
+    + _segRow('Created', created)
+    + (!isSystem ? '<div style="margin-top:16px"><button onclick="deleteSegRule(this.dataset.rid);closeSegDetailModal()" data-rid="'+r.id+'" style="padding:6px 14px;border-radius:6px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:var(--red);font-size:11px;cursor:pointer">✕ Delete rule</button></div>' : '');
+  document.getElementById('seg-detail-title').textContent = r.id + ' — ' + r.name;
+  document.getElementById('seg-detail-modal').classList.add('open');
+}
+function _segRow(k, v) {
+  return '<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px">'
+    + '<div style="width:120px;flex-shrink:0;color:var(--t3);font-family:var(--mono);font-size:10px;text-transform:uppercase">'+k+'</div>'
+    + '<div style="flex:1;color:var(--t1)">'+v+'</div></div>';
+}
+function closeSegDetailModal() { document.getElementById('seg-detail-modal').classList.remove('open'); }
+
+async function deleteSegRule(id) {
+  if (!confirm('Delete rule ' + id + '? This cannot be undone.')) return;
+  try {
+    var tk = window.TOKEN || '';
+    var r = await fetch('/api/p4/zt/microseg/' + id, {
+      method: 'DELETE',
+      headers: {'Authorization': 'Bearer ' + tk}
+    });
+    var data = await r.json();
+    if (r.ok && data.status === 'ok') {
+      toast('Rule ' + id + ' deleted ✓', 'success');
+      await loadMicroSeg();
+    } else {
+      toast('Delete failed: ' + (data.error || 'HTTP ' + r.status), 'error');
+    }
+  } catch(e) {
+    toast('Network error: ' + e.message, 'error');
+  }
+}
+
 async function submitSegRule() {
+  var name = document.getElementById('seg-name').value.trim();
+  var src  = document.getElementById('seg-src').value.trim();
+  var dst  = document.getElementById('seg-dst').value.trim();
+  var port = parseInt(document.getElementById('seg-port').value)||0;
+  if (!name) { toast('Rule name is required', 'error'); return; }
+  if (!src)  { toast('Source service is required', 'error'); return; }
+  if (!dst)  { toast('Destination service is required', 'error'); return; }
+  if (src === dst) { toast('Source and destination must be different', 'error'); return; }
   const rule = {
-    name: document.getElementById('seg-name').value,
-    source: document.getElementById('seg-src').value,
-    destination: document.getElementById('seg-dst').value,
-    port: parseInt(document.getElementById('seg-port').value)||0,
+    name: name, source: src, destination: dst, port: port,
     protocol: document.getElementById('seg-proto').value,
     action: document.getElementById('seg-action').value,
     mtls: document.getElementById('seg-mtls').checked,
   };
-  const res = await post('/api/p4/zt/microseg', rule);
-  if (res && res.status === 'ok') {
-    closeSegModal();
-    await loadMicroSeg();
-    toast('Rule ' + res.id + ' added — Application pillar score updated');
+  try {
+    const res = await post('/api/p4/zt/microseg', rule);
+    if (res && res.status === 'ok') {
+      closeSegModal();
+      await loadMicroSeg();
+      toast('Rule ' + (res.id||'') + ' added ✓', 'success');
+    } else {
+      var err = (res && res.error) || 'Failed to add rule';
+      toast('Error: ' + err, 'error');
+    }
+  } catch(e) {
+    toast('Network error: ' + e.message, 'error');
   }
 }
 
@@ -2205,10 +2508,44 @@ async function loadPOAM() {
     if (hasUX) _p4Empty('#poam-list', 'No POAM items — all controls compliant', loadPOAM);
     return;
   }
+  // Store for filter
+  window._poamItems = data.poam_items;
+  renderPOAMFiltered();
+}
+
+function renderPOAMFiltered() {
+  var items = window._poamItems || [];
+  var sevF = window._poamSevFilter || 'ALL';
+  var stF  = window._poamStFilter  || 'ALL';
+  var filtered = items.filter(function(p){
+    var sevOk = sevF==='ALL' || p.severity===sevF;
+    var stOk  = stF==='ALL'  || p.status===stF;
+    return sevOk && stOk;
+  });
   var list = document.getElementById('poam-list');
-  if (list) {
-    list.innerHTML = data.poam_items.map(function(p) { return renderPOAMRow(p); }).join('');
+  if (!list) return;
+  // Update filter counts
+  ['CRITICAL','HIGH','MEDIUM','LOW'].forEach(function(s){
+    var el = document.getElementById('pf-sev-'+s);
+    if (el) { var n=items.filter(function(p){return p.severity===s;}).length; el.textContent=s+' ('+n+')'; }
+  });
+  ['open','in_remediation','closed'].forEach(function(s){
+    var el = document.getElementById('pf-st-'+s);
+    if (el) { var n=items.filter(function(p){return p.status===s;}).length; el.textContent=s.replace('_',' ')+' ('+n+')'; }
+  });
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t3);font-size:12px">No POAM items match filter</div>';
+    return;
   }
+  list.innerHTML = filtered.map(function(p) { return renderPOAMRow(p); }).join('');
+}
+
+function setPOAMFilter(type, val, el) {
+  if (type==='sev') window._poamSevFilter=val;
+  else window._poamStFilter=val;
+  document.querySelectorAll('.poam-filter-pill[data-ftype="'+type+'"]').forEach(function(b){ b.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  renderPOAMFiltered();
 }
 
 function renderPOAMRow(p) {
@@ -2265,8 +2602,20 @@ function openPOAMDetail(p) {
 }
 
 async function updatePOAMStatus(id, status) {
-  const res = await post('/api/p4/rmf/task', {step_id:'poam', task_id:id, status});
-  if (res) { toast('POA&M '+id+' → '+status); document.getElementById('poam-detail-modal').classList.remove('open'); loadPOAM(); }
+  if (!id || !status) { toast('Invalid POAM update request', 'error'); return; }
+  try {
+    const res = await post('/api/p4/rmf/task', {step_id:'poam', task_id:id, status});
+    if (res && (res.status === 'ok' || res.id || res.task_id)) {
+      toast('POA&M '+id+' → '+status+' ✓', 'success');
+      document.getElementById('poam-detail-modal').classList.remove('open');
+      loadPOAM();
+    } else {
+      var errMsg = (res && res.error) || 'Update failed';
+      toast('POA&M update failed: '+errMsg, 'error');
+    }
+  } catch(e) {
+    toast('POA&M update error: '+e.message, 'error');
+  }
 }
 
 // ---- Utils ----
@@ -2274,11 +2623,26 @@ function fmtStatus(s) {
   return { complete:'✓ Complete', in_progress:'⟳ In Progress', pending:'○ Pending' }[s] || s;
 }
 
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, 2500);
+function toast(msg, type) {
+  // Delegate to VSP-UNI-POLISH-V4 toast if available
+  if (window.__VSP_UNI_POLISH_V4__) {
+    var _t=document.createElement('div');
+    _t.id='vsp-p4-toast-relay';
+    document.body.appendChild(_t);
+    // Use the richer toast from polish layer
+    var colors={success:{bg:'rgba(16,185,129,.15)',border:'#10b981',icon:'✓'},error:{bg:'rgba(239,68,68,.15)',border:'#ef4444',icon:'✗'},warn:{bg:'rgba(245,158,11,.15)',border:'#f59e0b',icon:'⚠'},info:{bg:'rgba(59,130,246,.15)',border:'#3b82f6',icon:'ℹ'}};
+    type=type||'info';
+    var c=colors[type]||colors.info;
+    var tc=document.createElement('div');
+    tc.style.cssText='position:fixed;bottom:20px;right:20px;z-index:99999;pointer-events:auto;background:'+c.bg+';border-left:3px solid '+c.border+';padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);display:flex;gap:10px;align-items:flex-start';
+    tc.innerHTML='<span style="font-size:14px;color:'+c.border+';flex-shrink:0">'+c.icon+'</span><span style="flex:1;line-height:1.4">'+String(msg).replace(/[&<>"']/g,function(x){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x];})+'</span>';
+    document.body.appendChild(tc);
+    setTimeout(function(){tc.style.transition='opacity .2s';tc.style.opacity='0';setTimeout(function(){tc.remove();},250);},3000);
+    return;
+  }
+  // Fallback simple toast
+  var t=document.getElementById('toast');
+  if(t){t.textContent=msg;t.style.display='block';setTimeout(function(){t.style.display='none';},2500);}
 }
 
 // ---- VN Standards ----
@@ -2536,12 +2900,19 @@ function openVNDetail(id) {
 async function updateVNStatus(id, status) {
   document.querySelectorAll('.dropdown-menu').forEach(function(d){ d.style.display='none'; });
   const s = _vnStandards.find(function(x){return x.id===id;});
-  if (!s) return;
-  const res = await post('/api/p4/vn-standards/update', {id, score: s.score, status, notes: s.notes||''});
-  if (res && res.status === 'ok') {
-    toast(id + ' → ' + status);
-    document.getElementById('vn-detail-modal') && document.getElementById('vn-detail-modal').classList.remove('open');
-    loadVNStandards();
+  if (!s) { toast('Standard not found: '+id, 'error'); return; }
+  try {
+    const res = await post('/api/p4/vn-standards/update', {id, score: s.score, status, notes: s.notes||''});
+    if (res && res.status === 'ok') {
+      toast(id+' → '+status+' ✓', 'success');
+      document.getElementById('vn-detail-modal') && document.getElementById('vn-detail-modal').classList.remove('open');
+      loadVNStandards();
+    } else {
+      var errMsg = (res && res.error) || 'Update failed';
+      toast('VN Standards update failed: '+errMsg, 'error');
+    }
+  } catch(e) {
+    toast('VN Standards update error: '+e.message, 'error');
   }
 }
 
@@ -2582,6 +2953,45 @@ setInterval(() => {
   if (currentTab() === 'rasp') pollRASP();
 }, 30000);
 
+// ── Auto-refresh indicator ──
+var _refreshTimer = null;
+var _refreshCountdown = 0;
+function startAutoRefresh(secs) {
+  if (_refreshTimer) { clearInterval(_refreshTimer); _refreshTimer = null; }
+  if (!secs || secs <= 0) {
+    document.getElementById('refresh-indicator').classList.remove('visible');
+    return;
+  }
+  _refreshCountdown = secs;
+  document.getElementById('refresh-indicator').classList.add('visible');
+  document.getElementById('refresh-countdown').textContent = secs + 's';
+  _refreshTimer = setInterval(function(){
+    _refreshCountdown--;
+    var el = document.getElementById('refresh-countdown');
+    if (el) el.textContent = _refreshCountdown + 's';
+    if (_refreshCountdown <= 0) {
+      _refreshCountdown = secs;
+      if (el) el.textContent = secs + 's';
+      var tab = currentTab();
+      if (tab==='overview') loadOverview();
+      else if (tab==='zerotrust') loadZeroTrust();
+      else if (tab==='pipeline') loadPipeline();
+      else if (tab==='poam') loadPOAM();
+    }
+  }, 1000);
+}
+// Init auto-refresh from saved config
+(async function(){
+  try {
+    var r = await fetch('/api/v1/features/settings_general/config',{headers:{Authorization:'Bearer '+(window.TOKEN||'')}});
+    if (r.ok) {
+      var j = await r.json();
+      var secs = ((j&&j.config&&j.config.panel_p4)||{}).auto_refresh_secs || 0;
+      if (secs > 0) startAutoRefresh(secs);
+    }
+  } catch(e) {}
+})();
+
 const DEMO_STEPS=[
   {title:"01 — P4 Readiness: 100% Achieved",color:"var(--green)",points:["DoD Zero Trust Architecture v2.0 — mức cao nhất (P4)","Tất cả 7 pillars đạt ≥85/100 — threshold P4","ATO (Authority to Operate) đã được cấp — 3 năm","NIST SP 800-37 Rev 2 | DoD Instruction 8510.01"],action:"→ Show: Overview tab, P4 ACHIEVED badge"},
   {title:"02 — Zero Trust: 7 Pillars All Green",color:"var(--cyan)",points:["Network 100, Data 100 — Optimal maturity","User 96 — MFA 100%, PAM, UEBA","Application 91 — RASP 5/5, 13 micro-seg rules","Automation 93 — 12 SOAR playbooks, OPA/Rego"],action:"→ Show: Zero Trust tab"},
@@ -2592,6 +3002,51 @@ const DEMO_STEPS=[
   {title:"07 — POA&M: Only 1 LOW Remaining",color:"var(--green)",points:["6/7 POA&M items CLOSED — all CRIT/HIGH resolved","Remaining: POAM-007 — annual assessment (LOW)","System under full ATO — no conditions","Export PDF report cho stakeholders"],action:"→ Show: POA&M → Generate ATO Letter → Export PDF"}
 ];
 let demoIdx=0;
+// ── ZT Pillar tooltip portal ──
+var _ztTipEl = null;
+function _ztShowTip(e, id) {
+  var tp = document.getElementById('zt-tooltip-portal');
+  if (!tp) return;
+  var html = (window._ztTips && window._ztTips[id]) || '';
+  if (!html) return;
+  tp.innerHTML = html;
+  tp.style.display = 'block';
+  _ztPositionTip(e, tp);
+}
+function _ztPositionTip(e, tp) {
+  var rect = e.currentTarget.getBoundingClientRect();
+  var tw = tp.offsetWidth || 220;
+  var left = rect.left + rect.width/2 - tw/2;
+  var top = rect.bottom + 8;
+  // Clamp to viewport
+  if (left < 8) left = 8;
+  if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
+  if (top + 200 > window.innerHeight) top = rect.top - 200;
+  tp.style.left = left + 'px';
+  tp.style.top = top + 'px';
+}
+function _ztHideTip() {
+  var tp = document.getElementById('zt-tooltip-portal');
+  if (tp) tp.style.display = 'none';
+}
+
+function toggleSidebar(){
+  var nav = document.querySelector('.sidenav');
+  var shell = document.querySelector('.shell');
+  var btn = document.getElementById('collapse-btn');
+  var collapsed = nav.classList.toggle('collapsed');
+  shell.classList.toggle('nav-collapsed', collapsed);
+  btn.textContent = collapsed ? '›' : '‹';
+  btn.style.transform = collapsed ? 'translateX(0)' : '';
+  localStorage.setItem('p4_sidebar_collapsed', collapsed?'1':'0');
+}
+// Restore sidebar state
+(function(){
+  if (localStorage.getItem('p4_sidebar_collapsed')==='1') {
+    setTimeout(function(){ toggleSidebar(); }, 100);
+  }
+})();
+
 function startDemoMode(){demoIdx=0;renderDemoStep();document.getElementById('demo-modal').classList.add('open');}
 function closeDemoMode(){document.getElementById('demo-modal').classList.remove('open');}
 function demoNav(d){demoIdx=Math.max(0,Math.min(DEMO_STEPS.length-1,demoIdx+d));renderDemoStep();}
@@ -2935,7 +3390,7 @@ async function sendAIMessage(userMsg, isAuto) {
 
 function aiKeydown(e) { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAIMessage(null,false);} }
 
-const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Application pillar to 100?','Generate evidence for SC-7(5) micro-seg','CMMC L2 vs FedRAMP Moderate differences'];
+var AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Application pillar to 100?','Generate evidence for SC-7(5) micro-seg','CMMC L2 vs FedRAMP Moderate differences'];
 
 </script>
 
@@ -2969,6 +3424,7 @@ const AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Appli
   </div>
 </div>
 <script>
+var AI_QUICK = ['What are top risks to our ATO renewal?','How to improve Application pillar to 100?','Generate evidence for SC-7(5) micro-seg','CMMC L2 vs FedRAMP Moderate differences'];
 document.addEventListener('DOMContentLoaded',function(){
   const qb=document.getElementById('ai-quick-btns');
   if(!qb)return;
@@ -3729,31 +4185,93 @@ function switchTenant(id) {
 <script>
 // Fix 4: Evidence quick upload
 async function uploadEvidence() {
-  var input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.pdf,.docx,.xlsx,.png,.jpg,.txt';
-  input.onchange = async function() {
-    if (!input.files[0]) return;
-    var file = input.files[0];
-    var ctrl = prompt('Control ID (e.g. AC-2, CM-6):', '');
-    if (!ctrl) return;
-    var fd = new FormData();
-    fd.append('file', file);
-    fd.append('control_id', ctrl);
-    fd.append('label', file.name);
-    try {
-      var tok = window.TOKEN || await (typeof getToken==='function'?getToken():Promise.resolve(''));
-      var r = await fetch('/api/v1/compliance/evidence', {
-        method: 'POST',
-        headers: {'Authorization': 'Bearer '+tok},
-        body: fd
-      });
-      if (r.ok) { alert('Evidence uploaded for '+ctrl+' ✓'); }
-      else { var e=await r.json(); alert('Upload failed: '+(e.error||r.status)); }
-    } catch(e2) { alert('Error: '+e2.message); }
+  // Show control ID input modal before file picker
+  var ctrlInput = document.createElement('div');
+  ctrlInput.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)';
+  ctrlInput.innerHTML = `
+    <div style="background:var(--bg2,#141820);border:1px solid var(--border2,rgba(255,255,255,.12));border-radius:12px;padding:24px;min-width:320px;max-width:400px">
+      <div style="font-size:14px;font-weight:700;color:var(--t1,#f0f2f8);margin-bottom:4px">Upload Evidence</div>
+      <div style="font-size:11px;color:var(--t3,#484e61);margin-bottom:16px">Accepted: PDF, DOCX, XLSX, PNG, JPG, TXT</div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:10px;color:var(--t3,#484e61);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">Control ID *</label>
+        <input id="ev-ctrl-input" type="text" placeholder="e.g. AC-2, CM-6, SC-7" style="width:100%;background:var(--bg3,#181b22);border:1px solid var(--border,rgba(255,255,255,.06));border-radius:6px;padding:7px 10px;font-size:12px;color:var(--t1,#f0f2f8);outline:none;font-family:var(--mono,'DM Mono',monospace)">
+        <div id="ev-ctrl-err" style="font-size:10px;color:#ef4444;margin-top:3px;display:none">Control ID is required (e.g. AC-2)</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="ev-cancel-btn" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border2,rgba(255,255,255,.12));background:transparent;color:var(--t2,#8a90a2);font-size:12px;cursor:pointer">Cancel</button>
+        <button id="ev-confirm-btn" style="padding:6px 14px;border-radius:6px;border:none;background:var(--cyan,#00e5ff);color:#0b0c0f;font-size:12px;font-weight:600;cursor:pointer">Choose File</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ctrlInput);
+  document.getElementById('ev-cancel-btn').onclick = function(){ ctrlInput.remove(); };
+  document.getElementById('ev-confirm-btn').onclick = function(){
+    var ctrl = document.getElementById('ev-ctrl-input').value.trim().toUpperCase();
+    var ctrlPattern = /^[A-Z]{1,3}-\d+(\(\d+\))?$/;
+    if (!ctrl) {
+      document.getElementById('ev-ctrl-err').textContent = 'Control ID is required (e.g. AC-2)';
+      document.getElementById('ev-ctrl-err').style.display = 'block';
+      return;
+    }
+    if (!ctrlPattern.test(ctrl)) {
+      document.getElementById('ev-ctrl-err').textContent = 'Invalid format — use e.g. AC-2, CM-6, SC-7(5)';
+      document.getElementById('ev-ctrl-err').style.display = 'block';
+      return;
+    }
+    ctrlInput.remove();
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.docx,.xlsx,.png,.jpg,.txt';
+    input.onchange = async function() {
+      if (!input.files[0]) return;
+      var file = input.files[0];
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) { toast('File too large — max 10MB', 'error'); return; }
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('control_id', ctrl);
+      fd.append('label', file.name);
+      toast('Uploading evidence for '+ctrl+'…', 'info');
+      try {
+        var tok = window.TOKEN || await (typeof getToken==='function'?getToken():Promise.resolve(''));
+        var r = await fetch('/api/v1/compliance/evidence', {
+          method: 'POST',
+          headers: {'Authorization': 'Bearer '+tok},
+          body: fd
+        });
+        if (r.ok) {
+          toast('Evidence uploaded for '+ctrl+' ✓', 'success');
+        } else {
+          var e=await r.json();
+          toast('Upload failed: '+(e.error||'HTTP '+r.status), 'error');
+        }
+      } catch(e2) { toast('Upload error: '+e2.message, 'error'); }
+    };
+    input.click();
   };
-  input.click();
+  // Focus input
+  setTimeout(function(){ var i=document.getElementById('ev-ctrl-input'); if(i) i.focus(); }, 50);
 }
 </script>
+<div id="zt-tooltip-portal"></div>
+<div class="modal-overlay" id="pipeline-history-modal">
+  <div class="modal detail-modal" style="min-width:700px;max-width:900px">
+    <div class="modal-header">
+      <div class="modal-title">Pipeline Run History</div>
+      <button class="modal-close" onclick="document.getElementById('pipeline-history-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="pipeline-history-body" style="padding:0">
+      <div style="padding:20px;text-align:center;color:var(--t3)"><span class="spinner"></span> Loading...</div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="seg-detail-modal">
+  <div class="modal detail-modal">
+    <div class="modal-header">
+      <div class="modal-title" id="seg-detail-title">Rule Detail</div>
+      <button class="modal-close" onclick="closeSegDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="seg-detail-body"></div>
+  </div>
+</div>
 </body>
 </html>

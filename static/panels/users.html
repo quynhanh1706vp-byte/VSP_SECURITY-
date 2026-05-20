@@ -180,7 +180,7 @@ var API_KEYS=[];
 var _selectedRole='analyst',_editId=null;
 
 function roleColor(r){return {admin:'var(--red)',analyst:'var(--amber)',viewer:'var(--blue)',api:'var(--purple)'}[r]||'var(--t3)';}
-function roleBadge(r){var m={admin:'pill-red',analyst:'pill-amber',viewer:'pill-blue',api:'pill-purple'};return '<span class="pill '+(m[r]||'pill-gray')+'">'+r+'</span>';}
+function roleBadge(r){var m={admin:'pill-red',analyst:'pill-amber',dev:'pill-blue',auditor:'pill-blue',api:'pill-purple'};return '<span class="pill '+(m[r]||'pill-gray')+'">'+r+'</span>';}
 function statusBadge(s){return '<span class="pill '+(s==='active'?'pill-green':'pill-gray')+'">'+s+'</span>';}
 function avatarColor(n){var colors=['#ef4444','#f59e0b','#22c55e','#3b82f6','#8b5cf6','#06b6d4'];return colors[n.charCodeAt(0)%colors.length];}
 
@@ -317,29 +317,55 @@ function editUser(idx){
 }
 
 function saveUser(){
-  var name=document.getElementById('u-name').value.trim();
   var email=document.getElementById('u-email').value.trim();
-  if(!name||!email)return;
-  var payload={name:name,email:email,role:_selectedRole,clearance:document.getElementById('u-clearance').value};
+  var pass=document.getElementById('u-pass').value;
+  if(!email)return;
+  var tk=window.TOKEN||'';
   if(_editId!==null){
-    Object.assign(USERS[_editId],payload);
-    AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Updated user '+email+' role to '+_selectedRole,ts:'just now',level:'warn'});
+    // PATCH — update role only
+    var u=USERS[_editId]; if(!u)return;
+    fetch(API+'/api/v1/admin/users/'+u.id,{
+      method:'PATCH',
+      headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},
+      body:JSON.stringify({role:_selectedRole})
+    }).then(function(r){return r.json();}).then(function(d){
+      if(d.error){alert('Update failed: '+d.error);return;}
+      USERS[_editId].role=_selectedRole;
+      AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Updated '+email+' role to '+_selectedRole,ts:'just now',level:'warn'});
+      closeModal('user-modal');updateKPIs();renderUsers();
+    }).catch(function(e){alert('Network error: '+e.message);});
   } else {
-    USERS.push(Object.assign({id:'u'+Date.now(),last_login:'never',status:'active',mfa:false},payload));
-    AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Created user '+email+' with role '+_selectedRole,ts:'just now',level:'warn'});
-    if(TOKEN)fetch(API+'/api/v1/admin/users',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(){});
+    // POST — create new user
+    if(!pass||pass.length<12){alert('Password must be at least 12 characters');return;}
+    fetch(API+'/api/v1/admin/users',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},
+      body:JSON.stringify({email:email,password:pass,role:_selectedRole})
+    }).then(function(r){return r.json();}).then(function(d){
+      if(d.error){alert('Create failed: '+d.error);return;}
+      USERS.push(Object.assign({last_login:'never',status:'active',mfa:false},d));
+      AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Created user '+email+' with role '+_selectedRole,ts:'just now',level:'warn'});
+      closeModal('user-modal');updateKPIs();renderUsers();
+    }).catch(function(e){alert('Network error: '+e.message);});
   }
-  closeModal('user-modal');
-  updateKPIs();renderUsers();
 }
 
 function deleteUser(idx){
   var u=USERS[idx];if(!u)return;
   if(!confirm('Delete user '+u.email+'?'))return;
-  AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Deleted user '+u.email,ts:'just now',level:'warn'});
-  USERS.splice(idx,1);
-  if(TOKEN)fetch(API+'/api/v1/admin/users/'+u.id,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
-  updateKPIs();renderUsers();
+  var tk=window.TOKEN||'';
+  fetch(API+'/api/v1/admin/users/'+u.id,{
+    method:'DELETE',
+    headers:{Authorization:'Bearer '+tk}
+  }).then(function(r){
+    if(r.status===204||r.ok){
+      USERS.splice(idx,1);
+      AUDIT.unshift({action:'admin',user:'admin@vsp.local',detail:'Deleted user '+u.email,ts:'just now',level:'warn'});
+      updateKPIs();renderUsers();
+    } else {
+      r.json().then(function(d){alert('Delete failed: '+(d.error||'HTTP '+r.status));});
+    }
+  }).catch(function(e){alert('Network error: '+e.message);});
 }
 
 function openNewKey(){
@@ -350,13 +376,27 @@ function openNewKey(){
 
 function createKey(){
   var name=document.getElementById('k-name').value.trim();
+  var expires=parseInt(document.getElementById('k-expires').value)||30;
+  var role=document.getElementById('k-role')?document.getElementById('k-role').value:'analyst';
   if(!name)return;
-  var newKey={id:'k'+Date.now(),name:name,prefix:'vsp_'+name.slice(0,3).toLowerCase()+'_',perms:'scans,read',created:'just now',expires:document.getElementById('k-expires').value+'d',status:'active'};
-  API_KEYS.unshift(newKey);
-  AUDIT.unshift({action:'api',user:'admin@vsp.local',detail:'Created API key: '+name,ts:'just now',level:'info'});
-  closeModal('key-modal');
-  updateKPIs();renderKeys();
-  document.getElementById('kmod-body').innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:11px;color:var(--t3);margin-bottom:8px">Your API key (shown once):</div><div style="font-family:var(--font-mono);font-size:12px;background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border2);color:var(--cyan)">vsp_'+name.slice(0,3).toLowerCase()+'_'+Math.random().toString(36).slice(2,18)+'</div><div style="font-size:10px;color:var(--amber);margin-top:8px">Copy this key — it will not be shown again</div></div>';
+  var tk=window.TOKEN||'';
+  fetch(API+'/api/v1/admin/api-keys',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},
+    body:JSON.stringify({label:name,role:role,expiry_days:expires})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.error){alert('Create key failed: '+d.error);return;}
+    API_KEYS.unshift(d);
+    AUDIT.unshift({action:'api',user:'admin@vsp.local',detail:'Created API key: '+name,ts:'just now',level:'info'});
+    updateKPIs();renderKeys();
+    var rawKey=d.key||d.token||d.raw_key||'(not returned)';
+    document.getElementById('kmod-body').innerHTML='<div style="text-align:center;padding:20px">'
+      +'<div style="font-size:11px;color:var(--t3);margin-bottom:8px">Your API key (shown once):</div>'
+      +'<div style="font-family:var(--font-mono);font-size:12px;background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border2);color:var(--cyan)">'+rawKey+'</div>'
+      +'<div style="font-size:10px;color:var(--amber);margin-top:8px">Copy this key — it will not be shown again</div>'
+      +'<button onclick="closeModal(\'key-modal\')" style="margin-top:12px;padding:6px 16px;background:var(--cyan);color:#000;border:none;border-radius:6px;cursor:pointer;font-size:11px">Done</button>'
+      +'</div>';
+  }).catch(function(e){alert('Network error: '+e.message);});
 }
 
 function revokeKey(idx){

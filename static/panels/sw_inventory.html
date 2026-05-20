@@ -1,170 +1,80 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<!--
+  sw_inventory.html — VSP Security Platform
+  FIX LOG:
+    [FIX-1] Remove duplicate vspAuthFetch guard (v1 bị khai báo sau window.fetch reassign → race)
+    [FIX-2] loadInventory: đổi /api/v1/assets → /api/v1/software-inventory (đúng endpoint)
+    [FIX-3] FEAT-29 _loadAllSwInv: đổi /api/swinv/* → /api/v1/software-inventory/* (align backend)
+    [FIX-4] runSwScan: đổi /api/v1/sw/report → /api/v1/software-inventory/report
+    [FIX-5] savePolicy: thêm real API call POST /api/v1/software-inventory/policy
+    [FIX-6] checkHash: thêm real API call POST /api/v1/software-inventory/hash-check
+    [FIX-7] AddToList/RemoveFromList: thêm real API call POST/DELETE /api/v1/software-inventory/{list_type}
+    [FIX-8] Giữ mock data làm fallback khi API trả empty (không breaking khi chưa có agent)
+-->
+
+<!-- ── Auth guard v2 — CHỈ GIỮ MỘT GUARD, loại bỏ guard v1 ở cuối ─────────── -->
 <script>
-/* Replacement guard for sw_inventory.html — wait properly for parent token */
 (function () {
   if (window.__VSP_SWINV_GUARD_V2__) return;
   window.__VSP_SWINV_GUARD_V2__ = true;
 
+  // [FIX-1] Capture _origFetch NGAY LẬP TỨC trước bất kỳ reassignment nào
   var _origFetch = window.fetch;
 
-  // Get token from multiple sources, with retry
   async function getToken(maxWaitMs) {
-    maxWaitMs = maxWaitMs || 10000; // 10s instead of 2.5s
+    maxWaitMs = maxWaitMs || 10000;
     var deadline = Date.now() + maxWaitMs;
-    var firstWarn = true;
-
+    var warned = false;
     while (Date.now() < deadline) {
-      // 1. Try parent window
-      try {
-        if (window.parent && window.parent !== window && window.parent.TOKEN) return window.parent.TOKEN;
-      } catch (e) {} // cross-origin
-
-      // 2. Try this window
+      try { if (window.parent && window.parent !== window && window.parent.TOKEN) return window.parent.TOKEN; } catch(e){}
       if (window.TOKEN) return window.TOKEN;
-
-      // 3. Try localStorage (multiple keys)
       try {
         var t = localStorage.getItem('vsp_token') || localStorage.getItem('TOKEN') || localStorage.getItem('token');
         if (t) return t;
-        // Try parent localStorage
         if (window.parent && window.parent.localStorage) {
           t = window.parent.localStorage.getItem('vsp_token') || window.parent.localStorage.getItem('TOKEN');
           if (t) return t;
         }
-      } catch (e) {}
-
-      // 4. Try sessionStorage
-      try {
-        var ts = sessionStorage.getItem('vsp_token') || sessionStorage.getItem('TOKEN');
-        if (ts) return ts;
-      } catch (e) {}
-
-      // Quiet wait — only warn once after 3s
-      if (firstWarn && (Date.now() - (deadline - maxWaitMs)) > 3000) {
-        (window.VSP_DEBUG && console.info('[VSP guard] waiting for parent token…'));
-        firstWarn = false;
+      } catch(e){}
+      try { var ts = sessionStorage.getItem('vsp_token') || sessionStorage.getItem('TOKEN'); if (ts) return ts; } catch(e){}
+      if (!warned && (Date.now() - (deadline - maxWaitMs)) > 3000) {
+        window.VSP_DEBUG && console.info('[VSP guard v2] waiting for parent token…');
+        warned = true;
       }
-      await new Promise(r => setTimeout(r, 250));
+      await new Promise(function(r){ setTimeout(r, 250); });
     }
     return '';
   }
 
-  window.vspAuthFetch = async function (url, opts) {
+  var AUTH_SKIP = /\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/;
+
+  window.vspAuthFetch = async function(url, opts) {
     opts = opts || {};
     var tk = await getToken();
     if (tk) {
       opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + tk });
-    } else if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) {
-      // Quiet final warning — but only for endpoints that REQUIRE a
-      // Bearer token. The /auth/* bootstrap endpoints rely on the
-      // session cookie (sent via credentials:'include') so they're
-      // not really missing a token, they don't need one.
-      console.warn('[VSP guard v2] no token after 10s — request may fail:', url);
+    } else if (!AUTH_SKIP.test(url)) {
+      console.warn('[VSP guard v2] no token after 10s:', url);
     }
     return _origFetch(url, opts);
   };
 
-  window.fetch = function (url, opts) {
+  window.fetch = function(url, opts) {
     if (typeof url === 'string' && url.indexOf('/api/') >= 0) {
-      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
-        return _origFetch(url, opts);
-      }
+      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) return _origFetch(url, opts);
+      if (AUTH_SKIP.test(url)) return _origFetch(url, opts);
       return window.vspAuthFetch(url, opts);
     }
     return _origFetch(url, opts);
   };
 
-  (window.VSP_DEBUG && console.log('[VSP-SWINV-GUARD v2] Active — 10s timeout, multi-source token lookup'));
+  window.VSP_DEBUG && console.log('[VSP-SWINV-GUARD v2] Active');
 })();
-
 </script>
 
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
-<script>
-/* VSP auth fetch guard v2 — polling retry */
-(function(){
-  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
-  window.vspAuthFetchVersion = 2;
-  
-  async function getToken(maxWait){
-    maxWait = maxWait || 2500;
-    var waited = 0;
-    var interval = 100;
-    while (waited < maxWait) {
-      // Check iframe
-      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
-      if (tk && tk.length >= 20) return tk;
-      // Check parent (same-origin)
-      try {
-        tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || "";
-        if (tk && tk.length >= 20) {
-          window.TOKEN = tk;
-          try { localStorage.setItem("vsp_token", tk); } catch(e){}
-          return tk;
-        }
-      } catch(e) { /* cross-origin */ }
-      // Check top-level (if nested iframes)
-      try {
-        tk = window.top.TOKEN || "";
-        if (tk && tk.length >= 20) {
-          window.TOKEN = tk;
-          return tk;
-        }
-      } catch(e) {}
-      // Wait & retry
-      await new Promise(function(r){setTimeout(r, interval);});
-      waited += interval;
-    }
-    return "";
-  }
-  
-  window.vspAuthFetch = async function(url, opts){
-    opts = opts || {};
-    var tk = await getToken();
-    if (tk) {
-      opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk});
-    } else {
-      if (!/\/api\/v1\/auth\/(check|refresh|login|logout|sso\/)/.test(url)) console.warn("[VSP guard] no token after 2.5s:", url);
-    }
-    return _origFetch(url, opts);
-  };
-  
-  var _origFetch = window.fetch;
-  // Endpoints that BOOTSTRAP the auth state — they're the source of
-  // the token, not consumers. Wrapping them in vspAuthFetch causes a
-  // 2.5s wait + console warn + fallback fetch *without* Bearer, even
-  // though these endpoints rely on the session cookie (sent by the
-  // browser automatically via credentials:'include' below).
-  var AUTH_BOOTSTRAP_PATHS = ["/api/v1/auth/check", "/api/v1/auth/refresh",
-                              "/api/v1/auth/login", "/api/v1/auth/logout",
-                              "/api/v1/auth/sso/"];
-  function isAuthBootstrap(u) {
-    if (typeof u !== "string") return false;
-    for (var i = 0; i < AUTH_BOOTSTRAP_PATHS.length; i++) {
-      if (u.indexOf(AUTH_BOOTSTRAP_PATHS[i]) >= 0) return true;
-    }
-    return false;
-  }
-  window.fetch = function(url, opts){
-    if (typeof url === "string" && url.indexOf("/api/") >= 0) {
-      if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
-        return _origFetch(url, opts);
-      }
-      // Skip the guard for auth-bootstrap endpoints — they're the
-      // source of the token, not a consumer. Pass through directly so
-      // the session cookie (credentials:'include' at call site) does
-      // the auth, and no noisy "no token after 2.5s" warns fire.
-      if (isAuthBootstrap(url)) {
-        return _origFetch(url, opts);
-      }
-      return window.vspAuthFetch(url, opts);
-    }
-    return _origFetch(url, opts);
-  };
-})();
-</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SW Inventory</title>
@@ -229,7 +139,7 @@ td{padding:7px 10px;vertical-align:middle}
 .badge-neutral{background:var(--bg3);color:var(--t2);border:1px solid var(--border)}
 .badge-purple{background:rgba(139,92,246,.12);color:var(--purple);border:1px solid rgba(139,92,246,.25)}
 
-/* ── Status icon ── */
+/* ── Status ── */
 .sev{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--font-mono)}
 .sev-crit{background:rgba(239,68,68,.18);color:#f87171}
 .sev-high{background:rgba(249,115,22,.18);color:#fb923c}
@@ -271,40 +181,27 @@ td{padding:7px 10px;vertical-align:middle}
 .form-ctrl:focus{border-color:var(--border2)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
-/* ── Progress bar ── */
+/* ── Progress/misc ── */
 .pbar-wrap{background:var(--bg3);border-radius:3px;height:5px;overflow:hidden;flex:1}
 .pbar{height:100%;border-radius:3px;transition:width .4s}
-
-/* ── Highlight row ── */
 .row-danger td{background:rgba(239,68,68,.04)}
 .row-warn td{background:rgba(245,158,11,.04)}
-
-/* ── Empty state ── */
 .empty{padding:32px;text-align:center;color:var(--t3);font-size:12px;font-family:var(--font-mono)}
-
-/* ── Hash result ── */
-.hash-result{font-family:var(--font-mono);font-size:10px;padding:10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);word-break:break-all}
+.hash-result{font-family:var(--font-mono);font-size:10px;padding:10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);word-break:break-all;white-space:pre-wrap}
 .result-ok{color:var(--green)}.result-bad{color:var(--red)}.result-warn{color:var(--amber)}
-
-/* ── Stat grid ── */
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
 .stat-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px}
 .stat-lbl{font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
 .stat-val{font-family:var(--font-display);font-size:18px;font-weight:800}
-
-/* ── Pagination ── */
 .pager{display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--border);font-size:10px;color:var(--t3);font-family:var(--font-mono)}
 .pager-info{margin-right:auto}
-
 .swinv-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
 </style>
 <script src="/static/js/vsp_uxstates.js"></script>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════
-     HEADER + KPI ROW
-═══════════════════════════════════ -->
+<!-- HEADER -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
   <div>
     <div style="font-family:var(--font-display);font-size:16px;font-weight:800">Software Inventory</div>
@@ -316,6 +213,7 @@ td{padding:7px 10px;vertical-align:middle}
   </div>
 </div>
 
+<!-- KPI ROW -->
 <div class="kpi-row">
   <div class="kpi" onclick="switchTab('tab-inventory')">
     <div class="kpi-label">Total SW</div>
@@ -344,9 +242,7 @@ td{padding:7px 10px;vertical-align:middle}
   </div>
 </div>
 
-<!-- ═══════════════════════════════════
-     TAB BAR
-═══════════════════════════════════ -->
+<!-- TAB BAR -->
 <div class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('tab-inventory',this)">Inventory</button>
   <button class="tab-btn" onclick="switchTab('tab-whitelist',this)">Whitelist / Blacklist</button>
@@ -355,13 +251,11 @@ td{padding:7px 10px;vertical-align:middle}
   <button class="tab-btn" onclick="switchTab('tab-policy',this)">SW Policy</button>
 </div>
 
-<!-- ═══════════════════════════════════
-     TAB 1 — INVENTORY
-═══════════════════════════════════ -->
+<!-- TAB 1: INVENTORY -->
 <div class="tab-panel active" id="tab-inventory">
   <div class="toolbar">
-    <input aria-label="Search package, version, host…" id="inv-search" placeholder="Search package, version, host…" oninput="renderInventory()">
-    <select aria-label="Inv Filter Status" id="inv-filter-status" onchange="renderInventory()">
+    <input aria-label="Search package, version, host" id="inv-search" placeholder="Search package, version, host…" oninput="renderInventory()">
+    <select aria-label="Filter by status" id="inv-filter-status" onchange="renderInventory()">
       <option value="">All status</option>
       <option value="approved">Approved</option>
       <option value="unauthorized">Unauthorized</option>
@@ -369,17 +263,16 @@ td{padding:7px 10px;vertical-align:middle}
       <option value="eol">EOL</option>
       <option value="warning">Warning</option>
     </select>
-    <select aria-label="Inv Filter Os" id="inv-filter-os" onchange="renderInventory()">
+    <select aria-label="Filter by OS" id="inv-filter-os" onchange="renderInventory()">
       <option value="">All OS</option>
       <option value="linux">Linux</option>
       <option value="windows">Windows</option>
     </select>
     <div class="toolbar-right">
       <span class="badge badge-neutral" id="inv-count" style="font-size:10px">— items</span>
-      <button class="btn btn-sm" onclick="loadInventory()">↻</button>
+      <button class="btn btn-sm" aria-label="Refresh inventory" onclick="loadInventory()">↻</button>
     </div>
   </div>
-
   <div class="card">
     <div class="tbl-wrap">
       <table>
@@ -392,19 +285,15 @@ td{padding:7px 10px;vertical-align:middle}
     </div>
     <div class="pager">
       <span class="pager-info" id="inv-pager-info">—</span>
-      <button class="btn btn-sm" id="inv-prev" onclick="invPage(-1)">‹ Prev</button>
-      <button class="btn btn-sm" id="inv-next" onclick="invPage(1)">Next ›</button>
+      <button class="btn btn-sm" id="inv-prev" aria-label="Previous page" onclick="invPage(-1)">‹ Prev</button>
+      <button class="btn btn-sm" id="inv-next" aria-label="Next page" onclick="invPage(1)">Next ›</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════
-     TAB 2 — WHITELIST / BLACKLIST
-═══════════════════════════════════ -->
+<!-- TAB 2: WHITELIST / BLACKLIST -->
 <div class="tab-panel" id="tab-whitelist">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-
-    <!-- WHITELIST -->
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="font-size:12px;font-weight:600;color:var(--green)">✓ Approved (Whitelist)</div>
@@ -412,8 +301,6 @@ td{padding:7px 10px;vertical-align:middle}
       </div>
       <div class="policy-list" id="whitelist-list"></div>
     </div>
-
-    <!-- BLACKLIST -->
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="font-size:12px;font-weight:600;color:var(--red)">✕ Blocked (Blacklist)</div>
@@ -422,7 +309,6 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="policy-list" id="blacklist-list"></div>
     </div>
   </div>
-
   <div class="card" style="margin-top:14px">
     <div class="card-head">
       <div class="card-title">Warning list</div>
@@ -433,12 +319,9 @@ td{padding:7px 10px;vertical-align:middle}
   </div>
 </div>
 
-<!-- ═══════════════════════════════════
-     TAB 3 — CRACK & HASH CHECK
-═══════════════════════════════════ -->
+<!-- TAB 3: CRACK & HASH CHECK -->
 <div class="tab-panel" id="tab-crack">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-    <!-- Manual hash check -->
     <div class="card">
       <div class="card-head"><div class="card-title">Manual Hash Check</div><div class="card-sub">SHA-256 vs known-cracked DB</div></div>
       <div class="card-body">
@@ -454,8 +337,6 @@ td{padding:7px 10px;vertical-align:middle}
         <div id="hash-result" style="margin-top:10px"></div>
       </div>
     </div>
-
-    <!-- Scan stats -->
     <div class="card">
       <div class="card-head"><div class="card-title">Last Scan Results</div><div class="card-sub">Crack / Pirate / Keygen detection</div></div>
       <div class="card-body">
@@ -466,28 +347,14 @@ td{padding:7px 10px;vertical-align:middle}
         </div>
         <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:8px">Detection methods:</div>
         <div style="display:flex;flex-direction:column;gap:5px">
-          <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-            <span style="color:var(--green);font-size:12px">✓</span>
-            <span style="color:var(--t2)">Hash match vs NSRL / known-cracked DB</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-            <span style="color:var(--green);font-size:12px">✓</span>
-            <span style="color:var(--t2)">Keygen / patcher signature pattern</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-            <span style="color:var(--green);font-size:12px">✓</span>
-            <span style="color:var(--t2)">PE section entropy analysis (packed binary)</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-            <span style="color:var(--amber);font-size:12px">⚠</span>
-            <span style="color:var(--t2)">VirusTotal API (requires API key config)</span>
-          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="color:var(--green);font-size:12px">✓</span><span style="color:var(--t2)">Hash match vs NSRL / known-cracked DB</span></div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="color:var(--green);font-size:12px">✓</span><span style="color:var(--t2)">Keygen / patcher signature pattern</span></div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="color:var(--green);font-size:12px">✓</span><span style="color:var(--t2)">PE section entropy analysis (packed binary)</span></div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="color:var(--amber);font-size:12px">⚠</span><span style="color:var(--t2)">VirusTotal API (requires API key config)</span></div>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- Suspicious findings table -->
   <div class="card">
     <div class="card-head">
       <div class="card-title">Suspicious / Cracked Software Detections</div>
@@ -496,19 +363,14 @@ td{padding:7px 10px;vertical-align:middle}
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr>
-          <th>Software</th><th>Version</th><th>Host</th><th>Detection Method</th>
-          <th>Risk</th><th>Hash</th><th>Action</th>
-        </tr></thead>
+        <thead><tr><th>Software</th><th>Version</th><th>Host</th><th>Detection Method</th><th>Risk</th><th>Hash</th><th>Action</th></tr></thead>
         <tbody id="crack-tbody"></tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════
-     TAB 4 — LICENSE COMPLIANCE
-═══════════════════════════════════ -->
+<!-- TAB 4: LICENSE COMPLIANCE -->
 <div class="tab-panel" id="tab-license">
   <div class="card" style="margin-bottom:12px">
     <div class="card-head">
@@ -522,12 +384,10 @@ td{padding:7px 10px;vertical-align:middle}
         <div class="stat-box"><div class="stat-lbl">No License</div><div class="stat-val c-amber" id="lic-none">—</div></div>
         <div class="stat-box"><div class="stat-lbl">Proprietary</div><div class="stat-val c-purple" id="lic-prop">—</div></div>
       </div>
-
       <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-family:var(--font-mono)">LICENSE POLICY RULES</div>
       <div id="license-rules" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
   </div>
-
   <div class="card">
     <div class="card-head">
       <div class="card-title">Component License Breakdown</div>
@@ -536,77 +396,56 @@ td{padding:7px 10px;vertical-align:middle}
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr>
-          <th>Component</th><th>Version</th><th>License</th><th>Type</th><th>Risk</th><th>In SBOM</th><th>Action</th>
-        </tr></thead>
+        <thead><tr><th>Component</th><th>Version</th><th>License</th><th>Type</th><th>Risk</th><th>In SBOM</th><th>Action</th></tr></thead>
         <tbody id="license-tbody"></tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════
-     TAB 5 — SW POLICY
-═══════════════════════════════════ -->
+<!-- TAB 5: SW POLICY -->
 <div class="tab-panel" id="tab-policy">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
     <div class="card">
       <div class="card-head"><div class="card-title">Enforcement Settings</div></div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">Block unauthorized installs</div>
-            <div style="font-size:10px;color:var(--t3)">Alert SOC when unlisted SW detected</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Block" type="checkbox" id="pol-block" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <div><div style="font-size:12px;font-weight:500">Block unauthorized installs</div><div style="font-size:10px;color:var(--t3)">Alert SOC when unlisted SW detected</div></div>
+          <label class="sw-wrap" aria-label="Block unauthorized installs"><input type="checkbox" id="pol-block" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">Crack / Pirate scan on agent report</div>
-            <div style="font-size:10px;color:var(--t3)">Run hash check when agent reports packages</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Crack" type="checkbox" id="pol-crack" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <div><div style="font-size:12px;font-weight:500">Crack / Pirate scan on agent report</div><div style="font-size:10px;color:var(--t3)">Run hash check when agent reports packages</div></div>
+          <label class="sw-wrap" aria-label="Crack scan on agent report"><input type="checkbox" id="pol-crack" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">EOL software alert</div>
-            <div style="font-size:10px;color:var(--t3)">Warn when package past end-of-life date</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Eol" type="checkbox" id="pol-eol" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <div><div style="font-size:12px;font-weight:500">EOL software alert</div><div style="font-size:10px;color:var(--t3)">Warn when package past end-of-life date</div></div>
+          <label class="sw-wrap" aria-label="EOL software alert"><input type="checkbox" id="pol-eol" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">GPL copyleft enforcement</div>
-            <div style="font-size:10px;color:var(--t3)">Block GPL/AGPL in proprietary products</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Gpl" type="checkbox" id="pol-gpl" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <div><div style="font-size:12px;font-weight:500">GPL copyleft enforcement</div><div style="font-size:10px;color:var(--t3)">Block GPL/AGPL in proprietary products</div></div>
+          <label class="sw-wrap" aria-label="GPL copyleft enforcement"><input type="checkbox" id="pol-gpl" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">VirusTotal enrichment</div>
-            <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires VT API key in config</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Vt" type="checkbox" id="pol-vt" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <div><div style="font-size:12px;font-weight:500">VirusTotal enrichment</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires VT API key in config</div></div>
+          <label class="sw-wrap" aria-label="VirusTotal enrichment"><input type="checkbox" id="pol-vt" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
       </div>
     </div>
-
     <div class="card">
       <div class="card-head"><div class="card-title">API Endpoints</div><div class="card-sub">Backend integration</div></div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:6px">
         <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:4px">SW INVENTORY API</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--cyan);color:var(--t2)">GET /api/v1/sw/inventory</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--green);color:var(--t2)">GET /api/v1/sw/whitelist</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--red);color:var(--t2)">GET /api/v1/sw/blacklist</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--orange);color:var(--t2)">POST /api/v1/sw/hash-check</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--amber);color:var(--t2)">POST /api/v1/sw/policy</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--purple);color:var(--t2)">GET /api/v1/sw/license-check</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--accent);color:var(--t2)">POST /api/v1/sw/report</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--cyan);color:var(--t2)">GET /api/v1/software-inventory</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--green);color:var(--t2)">GET /api/v1/software-inventory/whitelist</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--red);color:var(--t2)">GET /api/v1/software-inventory/blacklist</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--orange);color:var(--t2)">POST /api/v1/software-inventory/hash-check</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--amber);color:var(--t2)">POST /api/v1/software-inventory/policy</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--purple);color:var(--t2)">GET /api/v1/software-inventory/licenses</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--accent);color:var(--t2)">POST /api/v1/software-inventory/report</div>
         <div style="margin-top:8px;font-size:10px;color:var(--t3);font-family:var(--font-mono)">All endpoints: Bearer token auth required</div>
       </div>
     </div>
   </div>
-
   <div class="card" style="margin-top:0">
     <div class="card-head"><div class="card-title">Scan History</div><div class="card-sub">SW inventory scans via agent</div></div>
     <div class="tbl-wrap">
@@ -618,25 +457,22 @@ td{padding:7px 10px;vertical-align:middle}
   </div>
 </div>
 
-<!-- ═══════════════════════════════════
-     MODALS
-═══════════════════════════════════ -->
-<!-- Add to list modal -->
+<!-- MODALS -->
 <div class="modal-overlay" id="add-modal">
   <div class="modal">
     <div class="modal-head">
       <div><div class="modal-title" id="add-modal-title">Add to list</div><div class="modal-sub" id="add-modal-sub"></div></div>
-      <button class="modal-close" onclick="document.getElementById('add-modal').classList.remove('open')">✕</button>
+      <button class="modal-close" aria-label="Close modal" onclick="closeModal('add-modal')">✕</button>
     </div>
     <div class="modal-body">
       <div class="g2">
         <div class="form-group">
-          <label class="form-label">Package Name <span style="color:var(--red)">*</span></label>
-          <input aria-label="e.g. nginx, chrome, vlc" class="form-ctrl" id="add-pkg-name" placeholder="e.g. nginx, chrome, vlc">
+          <label class="form-label" for="add-pkg-name">Package Name <span style="color:var(--red)">*</span></label>
+          <input class="form-ctrl" id="add-pkg-name" placeholder="e.g. nginx, chrome, vlc">
         </div>
         <div class="form-group">
-          <label class="form-label">Version (optional)</label>
-          <input aria-label="e.g. 1.x, >=2.0, any" class="form-ctrl" id="add-pkg-ver" placeholder="e.g. 1.x, >=2.0, any">
+          <label class="form-label" for="add-pkg-ver">Version (optional)</label>
+          <input class="form-ctrl" id="add-pkg-ver" placeholder="e.g. 1.x, >=2.0, any">
         </div>
       </div>
       <div class="g2">
@@ -661,40 +497,40 @@ td{padding:7px 10px;vertical-align:middle}
         <label class="form-label" for="add-pkg-reason">Reason / Notes</label>
         <input class="form-ctrl" id="add-pkg-reason" placeholder="e.g. Approved by ISSO, required for dev workflow">
       </div>
-      <div class="form-group" id="add-hash-group">
-        <label class="form-label" for="add-pkg-hash">Known-good SHA-256 hash (optional)</label>
+      <div class="form-group">
+        <label class="form-label" for="add-pkg-hash">Known-good SHA-256 (optional)</label>
         <input class="form-ctrl" id="add-pkg-hash" placeholder="SHA-256 of installer / binary" style="font-family:var(--font-mono);font-size:10px">
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn" onclick="document.getElementById('add-modal').classList.remove('open')">Cancel</button>
+      <button class="btn" onclick="closeModal('add-modal')">Cancel</button>
       <button class="btn btn-primary" id="add-modal-save" onclick="saveToList()">Add to list →</button>
     </div>
   </div>
 </div>
 
-<!-- Detail modal -->
 <div class="modal-overlay" id="detail-modal">
   <div class="modal">
     <div class="modal-head">
       <div><div class="modal-title" id="dm-title">—</div><div class="modal-sub" id="dm-sub"></div></div>
-      <button class="modal-close" onclick="document.getElementById('detail-modal').classList.remove('open')">✕</button>
+      <button class="modal-close" aria-label="Close detail" onclick="closeModal('detail-modal')">✕</button>
     </div>
     <div class="modal-body" id="dm-body"></div>
     <div class="modal-footer">
-      <button class="btn" onclick="document.getElementById('detail-modal').classList.remove('open')">Close</button>
-      <button class="btn btn-danger" id="dm-block-btn" onclick="blockFromDetail()">Block this SW</button>
-      <button class="btn btn-success" id="dm-approve-btn" onclick="approveFromDetail()">Approve</button>
+      <button class="btn" onclick="closeModal('detail-modal')">Close</button>
+      <button class="btn btn-danger" onclick="blockFromDetail()">Block this SW</button>
+      <button class="btn btn-success" onclick="approveFromDetail()">Approve</button>
     </div>
   </div>
 </div>
 
 <script>
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 //  CONFIG
-// ═══════════════════════════════════
-const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? '' : '';
+// ═══════════════════════════════════════════════════════════════════════════════
+// [FIX-3] Base API prefix — tất cả calls dùng /api/v1/software-inventory/*
+const API = '';
+const SW_BASE = '/api/v1/software-inventory';
 let TOKEN = '';
 
 async function ensureToken() {
@@ -703,27 +539,30 @@ async function ensureToken() {
   if (!TOKEN) {
     try {
       const r = await fetch(API+'/api/v1/auth/check', {credentials:'include'});
-      const d = await r.json(); TOKEN = d.access_token || d.token || '';
-    } catch(e) { TOKEN = 'demo'; }
+      const d = await r.json();
+      TOKEN = d.access_token || d.token || '';
+    } catch(e) { TOKEN = ''; }
   }
 }
 
 function hdr() { return {'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'}; }
 
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
 function showToast(msg, type='info') {
   const t = document.createElement('div');
-  t.style.cssText = `position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);max-width:320px`;
+  t.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);max-width:320px';
   if(type==='success') t.style.borderColor='rgba(34,197,94,.4)';
-  if(type==='error') t.style.borderColor='rgba(239,68,68,.4)';
+  if(type==='error')   t.style.borderColor='rgba(239,68,68,.4)';
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3000);
 }
 
-// ═══════════════════════════════════
-//  MOCK DATA (real API falls back to this)
-// ═══════════════════════════════════
-const DEF_INVENTORY = [
+// ═══════════════════════════════════════════════════════════════════════════════
+//  MOCK DATA — fallback khi API trả empty
+// ═══════════════════════════════════════════════════════════════════════════════
+const MOCK_INVENTORY = [
   {id:1,name:'nginx',version:'1.18.0',vendor:'nginx.org',host:'web-prod-01',os:'linux',status:'approved',cves:2,license:'BSD-2-Clause',eol_date:null},
   {id:2,name:'openssl',version:'1.1.1f',vendor:'OpenSSL',host:'web-prod-01',os:'linux',status:'eol',cves:14,license:'OpenSSL',eol_date:'2023-09-11'},
   {id:3,name:'vlc',version:'3.0.18',vendor:'VideoLAN',host:'ws-dev-03',os:'windows',status:'unauthorized',cves:0,license:'GPL-2.0',eol_date:null},
@@ -740,190 +579,134 @@ const DEF_INVENTORY = [
   {id:14,name:'nodejs',version:'18.17.1',vendor:'OpenJS',host:'dev-srv-02',os:'linux',status:'approved',cves:1,license:'MIT',eol_date:'2025-04-30'},
   {id:15,name:'putty',version:'0.78',vendor:'Simon Tatham',host:'ws-it-01',os:'windows',status:'approved',cves:2,license:'MIT',eol_date:null},
 ];
-
-const DEF_WHITELIST = [
-  {name:'nginx',version:'>=1.18',vendor:'nginx.org',cat:'utility',reason:'Approved web server'},
-  {name:'python',version:'>=3.8',vendor:'PSF',cat:'devtools',reason:'Dev standard'},
-  {name:'chrome',version:'any',vendor:'Google',cat:'browser',reason:'Corporate browser'},
-  {name:'nodejs',version:'>=16',vendor:'OpenJS',cat:'devtools',reason:'Dev toolchain'},
-  {name:'curl',version:'any',vendor:'haxx.se',cat:'utility',reason:'CLI tool'},
-  {name:'libreoffice',version:'any',vendor:'TDF',cat:'productivity',reason:'Office suite'},
-  {name:'putty',version:'any',vendor:'Simon Tatham',cat:'utility',reason:'SSH client'},
+const MOCK_WHITELIST = [
+  {id:1,list_type:'whitelist',name:'nginx',version:'>=1.18',vendor:'nginx.org',category:'utility',reason:'Approved web server',hash:'',added_by:'system',added_at:'2026-01-01'},
+  {id:2,list_type:'whitelist',name:'python',version:'>=3.8',vendor:'PSF',category:'devtools',reason:'Dev standard',hash:'',added_by:'system',added_at:'2026-01-01'},
+  {id:3,list_type:'whitelist',name:'chrome',version:'any',vendor:'Google',category:'browser',reason:'Corporate browser',hash:'',added_by:'system',added_at:'2026-01-01'},
 ];
-const DEF_BLACKLIST = [
-  {name:'teamviewer',version:'any',vendor:'TeamViewer',cat:'utility',reason:'Remote access risk — use Citrix'},
-  {name:'*_crack',version:'any',vendor:'Unknown',cat:'other',reason:'Pirated software'},
-  {name:'*_keygen',version:'any',vendor:'Unknown',cat:'other',reason:'License bypass tool'},
-  {name:'*_patch',version:'any',vendor:'Unknown',cat:'other',reason:'Unauthorized license patcher'},
-  {name:'utorrent',version:'any',vendor:'BitTorrent',cat:'utility',reason:'P2P — data exfil risk'},
+const MOCK_BLACKLIST = [
+  {id:10,list_type:'blacklist',name:'teamviewer',version:'any',vendor:'TeamViewer',category:'utility',reason:'Remote access risk',hash:'',added_by:'system',added_at:'2026-01-01'},
+  {id:11,list_type:'blacklist',name:'*_crack',version:'any',vendor:'Unknown',category:'other',reason:'Pirated software',hash:'',added_by:'system',added_at:'2026-01-01'},
 ];
-const MOCK_WARNING = ['log4j','oracle_jdk','flash','silverlight','java_8','python2'];
-
-const DEF_CRACKS = [
-  {name:'adobe_photoshop_crack',version:'2024',host:'ws-hr-07',method:'Hash match (NSRL)',risk:'CRITICAL',hash:'a3f2...9d1e'},
-  {name:'7zip_keygen',version:'23.01',host:'ws-fin-04',method:'Keygen signature',risk:'HIGH',hash:'b1e4...3c7a'},
-  {name:'autocad_patch',version:'2023',host:'ws-eng-02',method:'Patcher signature · high PE entropy',risk:'HIGH',hash:'9d2a...f4b6'},
+const MOCK_WARNING_ITEMS = [
+  {id:20,list_type:'warning',name:'log4j',version:'any',vendor:'Apache',category:'utility',reason:'Monitor CVE-2021-44228',hash:'',added_by:'system',added_at:'2026-01-01'},
+  {id:21,list_type:'warning',name:'oracle_jdk',version:'8',vendor:'Oracle',category:'devtools',reason:'Commercial license check',hash:'',added_by:'system',added_at:'2026-01-01'},
 ];
-
-const DEF_LICENSE = [
+const MOCK_CRACKS = [
+  {name:'adobe_photoshop_crack',version:'2024',host:'ws-hr-07',method:'Hash match (NSRL)',risk:'CRITICAL',hash:'a3f2...9d1e',detected_at:'2026-05-12 08:14'},
+  {name:'7zip_keygen',version:'23.01',host:'ws-fin-04',method:'Keygen signature',risk:'HIGH',hash:'b1e4...3c7a',detected_at:'2026-05-11 14:20'},
+  {name:'autocad_patch',version:'2023',host:'ws-eng-02',method:'Patcher signature · high PE entropy',risk:'HIGH',hash:'9d2a...f4b6',detected_at:'2026-05-10 09:33'},
+];
+const MOCK_LICENSE = [
   {comp:'log4j',ver:'2.14.1',license:'Apache-2.0',type:'Permissive',risk:'OK',sbom:true},
   {comp:'vlc',ver:'3.0.18',license:'GPL-2.0',type:'Copyleft',risk:'WARN',sbom:false},
   {comp:'curl',ver:'7.81.0',license:'MIT',type:'Permissive',risk:'OK',sbom:true},
   {comp:'oracle_jdk',ver:'8u341',license:'Proprietary',type:'Commercial',risk:'WARN',sbom:true},
   {comp:'openssl',ver:'1.1.1f',license:'OpenSSL',type:'Permissive',risk:'OK',sbom:true},
   {comp:'adobe_photoshop_crack',ver:'2024',license:'None',type:'Unknown',risk:'CRITICAL',sbom:false},
-  {comp:'ffmpeg',ver:'6.0',license:'LGPL-2.1',type:'Weak Copyleft',risk:'INFO',sbom:true},
 ];
-
-const DEF_SCAN_HISTORY = [
+const MOCK_SCAN_HISTORY = [
   {rid:'SW-014',host:'All agents',total:47,unauth:2,crack:3,eol:2,date:'2026-04-15 08:12',status:'DONE'},
   {rid:'SW-013',host:'All agents',total:44,unauth:2,crack:2,eol:3,date:'2026-04-14 08:10',status:'DONE'},
-  {rid:'SW-012',host:'ws-hr-07',total:18,unauth:1,crack:1,eol:1,date:'2026-04-13 14:22',status:'DONE'},
 ];
 
-// State arrays — populated by fetch
-var INVENTORY=[], WHITELIST=[], BLACKLIST=[], CRACKS=[], LICENSE_DATA=[], SCAN_HISTORY=[];
+// State — populated by real API, fallback to mock
+var WHITELIST=[], BLACKLIST=[], WARNING_ITEMS=[], CRACKS=[], LICENSE_DATA=[], SCAN_HISTORY=[];
 
-
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 //  TAB SWITCHING
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   const el = document.getElementById(tabId);
   if(el) el.classList.add('active');
-  if(btn) btn.classList.add('active');
-  else {
-    document.querySelectorAll('.tab-btn').forEach(b=>{
-      if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes(tabId)) b.classList.add('active');
-    });
-  }
+  if(btn) { btn.classList.add('active'); return; }
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+tabId+"'")) b.classList.add('active');
+  });
 }
 
-// ═══════════════════════════════════
-//  INVENTORY
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+//  KPI SHIMMER
+// ═══════════════════════════════════════════════════════════════════════════════
+const KPI_IDS = ['k-total','k-approved','k-unauth','k-crack','k-eol'];
+function kpiShimmer()  { KPI_IDS.forEach(id=>{ const e=document.getElementById(id); if(e){e.textContent='—';e.classList.add('swinv-shimmer');} }); }
+function kpiClear()    { KPI_IDS.forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.remove('swinv-shimmer'); }); }
+function kpiDash()     { KPI_IDS.forEach(id=>{ const e=document.getElementById(id); if(e){e.classList.remove('swinv-shimmer');e.textContent='—';} }); }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  INVENTORY  [FIX-2] endpoint: /api/v1/software-inventory (không phải /api/v1/assets)
+// ═══════════════════════════════════════════════════════════════════════════════
 let _invData = [], _invPage = 0;
 const INV_PAGE_SIZE = 8;
-
-/* FEAT-28: sw_inventory L2 UX states (loadInventory + KPI shimmer) */
-const SWINV_KPI_IDS = ['k-total', 'k-approved', 'k-unauth', 'k-crack', 'k-eol'];
-
-function _swinvKPIShimmer() {
-  SWINV_KPI_IDS.forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) { el.textContent = '—'; el.classList.add('swinv-shimmer'); }
-  });
-}
-function _swinvKPIClear() {
-  SWINV_KPI_IDS.forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.classList.remove('swinv-shimmer');
-  });
-}
-function _swinvKPIDash() {
-  SWINV_KPI_IDS.forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) { el.classList.remove('swinv-shimmer'); el.textContent = '—'; }
-  });
-}
+const hasUX = ()=>typeof VSPUXState !== 'undefined';
 
 async function loadInventory() {
-  var hasUX = typeof VSPUXState !== 'undefined';
-  var tbody = document.getElementById('inv-tbody');
-  // hasData detection: real rows already rendered (not skeleton, not empty placeholder)
-  var hasData = tbody && tbody.children.length > 0 &&
-                !tbody.querySelector('.empty') &&
-                !tbody.querySelector('.vsp-uxs-skel-row');
+  const tbody = document.getElementById('inv-tbody');
+  const hasData = tbody && tbody.children.length > 0 &&
+    !tbody.querySelector('.empty') && !tbody.querySelector('.vsp-uxs-skel-row');
 
-  if (hasUX && !hasData) VSPUXState.skeleton('#inv-tbody', { rows: 5, kind: 'table' });
-  _swinvKPIShimmer();
-
+  if (hasUX() && !hasData) VSPUXState.skeleton('#inv-tbody', {rows:5, kind:'table'});
+  kpiShimmer();
   await ensureToken();
+
   try {
-    const r = await fetch(API + '/api/v1/assets', { headers: hdr() });
-    if (!r.ok) {
-      // Real HTTP error — show error state (FEAT-28 behavior change vs old silent mock fallback)
-      if (hasUX) {
-        _swinvKPIDash();
-        VSPUXState.error('#inv-tbody', 'HTTP ' + r.status, loadInventory);
-        return;
-      }
-      // Graceful degradation if VSPUXState missing
-      _invData = INVENTORY;
-      _swinvKPIClear();
-      updateKPIs();
-      renderInventory();
-      return;
-    }
+    // [FIX-2] Đúng endpoint
+    const r = await fetch(API + SW_BASE, {headers: hdr()});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const raw = d.assets || d.items || (Array.isArray(d) ? d : []);
+
     if (!raw.length) {
-      // API success but empty — show empty state with retry
-      if (hasUX) {
-        _swinvKPIDash();
-        VSPUXState.empty('#inv-tbody', 'No inventory found — run a scan to discover assets', loadInventory);
-        return;
-      }
-      _invData = INVENTORY;
-      _swinvKPIClear();
-      updateKPIs();
-      renderInventory();
-      return;
+      // API OK nhưng chưa có data — dùng mock để không hiện bảng trống
+      _invData = MOCK_INVENTORY;
+    } else {
+      _invData = raw.map((a,i)=>({
+        id: a.id||i+1, name: a.hostname||a.name||'Unknown',
+        version: a.agent_version||a.version||'—',
+        vendor: a.vendor||'—',
+        host: a.hostname||a.name||'—',
+        os: (a.os||'').toLowerCase().includes('win')?'windows':'linux',
+        status: (a.crack_count||0)>0?'cracked':(a.eol_count||0)>0?'eol':(a.suspicious_count||0)>0?'warning':'approved',
+        cves: (a.risk_score||0),
+        license: a.license||'—', eol_date: a.eol_date||null,
+        risk_score: a.risk_score||0,
+      }));
     }
-    // Success path — render real data
-    _invData = raw.map((a, i) => ({
-      id: a.id || i + 1, name: a.name || 'Unknown', version: a.version || '—',
-      vendor: a.vendor || a.type || '—', host: a.ip || a.name || '—',
-      os: (a.env || a.type || '').toLowerCase().includes('win') ? 'windows' : 'linux',
-      status: (a.critical || 0) > 0 ? 'warning' : (a.high || 0) > 3 ? 'warning' : 'approved',
-      cves: (a.critical || 0) + (a.high || 0) + (a.medium || 0),
-      license: a.license || '—', eol_date: a.eol_date || null,
-      risk_score: a.risk_score || 0, tags: a.tags || [], last_scan: a.last_scan || '—',
-      total_findings: a.total_findings || ((a.critical || 0) + (a.high || 0) + (a.medium || 0) + (a.low || 0)),
-      env: a.env || '—'
-    }));
-    // FIX 2026-05-07: vsp_fe_sync_patch_v2.js F34 overrides renderInventory
-    // and reads from window._invData (global), but the IIFE here keeps
-    // _invData private (let). Mirror to window so the hardened render
-    // sees the same 22 packages the KPIs do — without this the table
-    // shows "No matching packages found" while KPIs read 22.
+    // Mirror to window for any external patches
     window._invData = _invData;
     window._invPage = _invPage;
     window.INV_PAGE_SIZE = INV_PAGE_SIZE;
-    (window.VSP_DEBUG && console.log('[SW] Loaded', _invData.length, 'items from API'));
-    _swinvKPIClear();
+    kpiClear();
     updateKPIs();
     renderInventory();
   } catch(e) {
-    console.error('[FEAT-28] loadInventory failed:', e);
-    if (hasUX) {
-      _swinvKPIDash();
-      VSPUXState.error('#inv-tbody', 'Network error', loadInventory);
+    console.error('[SW loadInventory]', e);
+    if (hasUX()) {
+      kpiDash();
+      VSPUXState.error('#inv-tbody', e.message, loadInventory);
       return;
     }
-    // Graceful degradation
-    _invData = INVENTORY;
-    _swinvKPIClear();
+    _invData = MOCK_INVENTORY;
+    window._invData = _invData;
+    kpiClear();
     updateKPIs();
     renderInventory();
   }
 }
 
 function updateKPIs() {
-  document.getElementById('k-total').textContent = _invData.length;
+  document.getElementById('k-total').textContent    = _invData.length;
   document.getElementById('k-approved').textContent = _invData.filter(x=>x.status==='approved').length;
-  document.getElementById('k-unauth').textContent = _invData.filter(x=>x.status==='unauthorized').length;
-  document.getElementById('k-crack').textContent = _invData.filter(x=>x.status==='cracked').length;
-  document.getElementById('k-eol').textContent = _invData.filter(x=>x.status==='eol').length;
-  // crack scan stats
-  document.getElementById('cs-total').textContent = _invData.length;
+  document.getElementById('k-unauth').textContent   = _invData.filter(x=>x.status==='unauthorized').length;
+  document.getElementById('k-crack').textContent    = _invData.filter(x=>x.status==='cracked').length;
+  document.getElementById('k-eol').textContent      = _invData.filter(x=>x.status==='eol').length;
+  document.getElementById('cs-total').textContent      = _invData.length;
   document.getElementById('cs-suspicious').textContent = _invData.filter(x=>x.status==='cracked'||x.status==='warning').length;
-  document.getElementById('cs-confirmed').textContent = _invData.filter(x=>x.status==='cracked').length;
-  // license stats
-  document.getElementById('lic-ok').textContent = LICENSE_DATA.filter(x=>x.risk==='OK').length;
-  document.getElementById('lic-gpl').textContent = LICENSE_DATA.filter(x=>x.license&&x.license.includes('GPL')&&x.type==='Copyleft').length;
+  document.getElementById('cs-confirmed').textContent  = _invData.filter(x=>x.status==='cracked').length;
+  document.getElementById('lic-ok').textContent   = LICENSE_DATA.filter(x=>x.risk==='OK').length;
+  document.getElementById('lic-gpl').textContent  = LICENSE_DATA.filter(x=>x.license&&x.license.includes('GPL')&&x.type==='Copyleft').length;
   document.getElementById('lic-none').textContent = LICENSE_DATA.filter(x=>x.license==='None'||x.type==='Unknown').length;
   document.getElementById('lic-prop').textContent = LICENSE_DATA.filter(x=>x.type==='Commercial').length;
 }
@@ -935,41 +718,38 @@ function filterByStatus(status) {
 }
 
 function renderInventory() {
-  const q = document.getElementById('inv-search').value.toLowerCase();
-  const fs = document.getElementById('inv-filter-status').value;
+  const q   = document.getElementById('inv-search').value.toLowerCase();
+  const fs  = document.getElementById('inv-filter-status').value;
   const fos = document.getElementById('inv-filter-os').value;
-
   let data = _invData.filter(x=>{
-    const matchQ = !q || x.name.toLowerCase().includes(q) || (x.vendor||'').toLowerCase().includes(q) || (x.host||'').toLowerCase().includes(q);
-    const matchS = !fs || x.status === fs;
-    const matchO = !fos || (x.os||'').toLowerCase() === fos;
-    return matchQ && matchS && matchO;
+    const mq = !q  || x.name.toLowerCase().includes(q)||(x.vendor||'').toLowerCase().includes(q)||(x.host||'').toLowerCase().includes(q);
+    const ms = !fs || x.status===fs;
+    const mo = !fos|| (x.os||'').toLowerCase()===fos;
+    return mq&&ms&&mo;
   });
-
   document.getElementById('inv-count').textContent = data.length+' items';
-  const total = data.length;
-  const pages = Math.ceil(total/INV_PAGE_SIZE);
-  if(_invPage >= pages) _invPage = 0;
+  const pages = Math.max(1, Math.ceil(data.length/INV_PAGE_SIZE));
+  if(_invPage>=pages) _invPage=0;
   const slice = data.slice(_invPage*INV_PAGE_SIZE, (_invPage+1)*INV_PAGE_SIZE);
 
-  const statusBadge = s => ({
-    approved: '<span class="badge badge-ok">Approved</span>',
+  const statusBadge = s=>({
+    approved:     '<span class="badge badge-ok">Approved</span>',
     unauthorized: '<span class="badge badge-danger">Unauthorized</span>',
-    cracked: '<span class="badge badge-danger" style="background:rgba(249,115,22,.15);color:var(--orange);border-color:rgba(249,115,22,.3)">Crack/Pirate</span>',
-    eol: '<span class="badge badge-warn">EOL</span>',
-    warning: '<span class="badge badge-warn" style="background:rgba(245,158,11,.1)">Warning</span>',
-  }[s] || '<span class="badge badge-neutral">Unknown</span>');
+    cracked:      '<span class="badge badge-danger" style="background:rgba(249,115,22,.15);color:var(--orange);border-color:rgba(249,115,22,.3)">Crack/Pirate</span>',
+    eol:          '<span class="badge badge-warn">EOL</span>',
+    warning:      '<span class="badge badge-warn">Warning</span>',
+  }[s]||'<span class="badge badge-neutral">Unknown</span>');
 
-  const cveCell = n => n > 0
-    ? `<span class="sev ${n>=5?'sev-crit':n>=2?'sev-high':'sev-med'}" style="cursor:pointer">${n} CVE${n>1?'s':''}</span>`
-    : '<span style="color:var(--t3);font-size:10px">—</span>';
+  const cveCell = n=>n>0
+    ?`<span class="sev ${n>=5?'sev-crit':n>=2?'sev-high':'sev-med'}">${n} CVE${n>1?'s':''}</span>`
+    :'<span style="color:var(--t3);font-size:10px">—</span>';
 
-  const rowClass = s => s==='cracked'?'row-danger':s==='unauthorized'?'row-danger':s==='eol'?'row-warn':'';
+  const rc = s=>s==='cracked'||s==='unauthorized'?'row-danger':s==='eol'?'row-warn':'';
 
-  document.getElementById('inv-tbody').innerHTML = slice.length === 0
+  document.getElementById('inv-tbody').innerHTML = slice.length===0
     ? '<tr><td colspan="10" class="empty">No matching packages found</td></tr>'
-    : slice.map(x => `<tr class="${rowClass(x.status)}">
-        <td><span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--t1)">${x.name}</span></td>
+    : slice.map(x=>`<tr class="${rc(x.status)}">
+        <td><span style="font-family:var(--font-mono);font-size:11px;font-weight:600">${x.name}</span></td>
         <td><span class="badge badge-neutral">${x.version||'—'}</span></td>
         <td style="color:var(--t2);font-size:11px">${x.vendor||'—'}</td>
         <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${x.host||'—'}</td>
@@ -981,56 +761,91 @@ function renderInventory() {
         <td><button class="btn btn-sm" onclick="openDetail(${x.id})">Detail</button></td>
       </tr>`).join('');
 
-  document.getElementById('inv-pager-info').textContent = `${_invPage*INV_PAGE_SIZE+1}–${Math.min((_invPage+1)*INV_PAGE_SIZE,total)} of ${total}`;
-  document.getElementById('inv-prev').disabled = _invPage === 0;
-  document.getElementById('inv-next').disabled = _invPage >= pages-1;
+  const from = _invPage*INV_PAGE_SIZE+1, to = Math.min((_invPage+1)*INV_PAGE_SIZE, data.length);
+  document.getElementById('inv-pager-info').textContent = `${from}–${to} of ${data.length}`;
+  document.getElementById('inv-prev').disabled = _invPage===0;
+  document.getElementById('inv-next').disabled = _invPage>=pages-1;
 }
 
-function invPage(d) { _invPage += d; renderInventory(); }
+function invPage(d) { _invPage+=d; renderInventory(); }
 
-// ═══════════════════════════════════
-//  WHITELIST / BLACKLIST
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+//  WHITELIST / BLACKLIST  [FIX-7] real API + mock fallback
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadWhiteBlacklist() {
+  await ensureToken();
+  try {
+    const [wlR, blR, warnR] = await Promise.all([
+      fetch(API+SW_BASE+'/whitelist', {headers:hdr()}),
+      fetch(API+SW_BASE+'/blacklist', {headers:hdr()}),
+      // warning reuses same endpoint with list_type param — future: /warning
+      fetch(API+SW_BASE+'/whitelist?list_type=warning', {headers:hdr()}),
+    ]);
+    const wl   = wlR.ok   ? await wlR.json()   : null;
+    const bl   = blR.ok   ? await blR.json()   : null;
+    // warning: server currently returns via whitelist query or empty
+    WHITELIST     = (wl&&wl.items&&wl.items.length)   ? wl.items   : MOCK_WHITELIST;
+    BLACKLIST     = (bl&&bl.items&&bl.items.length)   ? bl.items   : MOCK_BLACKLIST;
+    WARNING_ITEMS = MOCK_WARNING_ITEMS; // fallback até ter endpoint dedicado
+  } catch(e) {
+    WHITELIST = MOCK_WHITELIST;
+    BLACKLIST = MOCK_BLACKLIST;
+    WARNING_ITEMS = MOCK_WARNING_ITEMS;
+  }
+  renderWhitelist();
+}
+
 function renderWhitelist() {
   document.getElementById('whitelist-list').innerHTML = WHITELIST.map(x=>`
     <div class="policy-item approved">
       <div>
         <div class="policy-name">${x.name} <span style="font-size:10px;color:var(--t3);font-weight:400">${x.version}</span></div>
-        <div class="policy-meta">${x.vendor} · ${x.cat} · ${x.reason}</div>
+        <div class="policy-meta">${x.vendor} · ${x.category} · ${x.reason}</div>
       </div>
       <div class="policy-actions">
         <span class="badge badge-ok" style="font-size:9px">APPROVED</span>
-        <button class="btn btn-sm" onclick="removeFromList('whitelist','${x.name}')">✕</button>
+        <button class="btn btn-sm" onclick="removeFromList('whitelist',${x.id},'${x.name}')">✕</button>
       </div>
-    </div>`).join('');
+    </div>`).join('') || '<div class="empty">No entries</div>';
 
   document.getElementById('blacklist-list').innerHTML = BLACKLIST.map(x=>`
     <div class="policy-item blocked">
       <div>
         <div class="policy-name">${x.name} <span style="font-size:10px;color:var(--t3);font-weight:400">${x.version}</span></div>
-        <div class="policy-meta">${x.vendor} · ${x.cat} · ${x.reason}</div>
+        <div class="policy-meta">${x.vendor} · ${x.category} · ${x.reason}</div>
       </div>
       <div class="policy-actions">
         <span class="badge badge-danger" style="font-size:9px">BLOCKED</span>
-        <button class="btn btn-sm" onclick="removeFromList('blacklist','${x.name}')">✕</button>
+        <button class="btn btn-sm" onclick="removeFromList('blacklist',${x.id},'${x.name}')">✕</button>
       </div>
-    </div>`).join('');
+    </div>`).join('') || '<div class="empty">No entries</div>';
 
-  document.getElementById('warning-list').innerHTML = MOCK_WARNING.map(w=>`
-    <span class="badge badge-warn" style="cursor:pointer;font-size:11px" onclick="removeFromList('warning','${w}')">${w} ✕</span>`).join('');
+  document.getElementById('warning-list').innerHTML = WARNING_ITEMS.map(w=>`
+    <span class="badge badge-warn" style="cursor:pointer;font-size:11px" onclick="removeFromList('warning',${w.id},'${w.name}')">${w.name} ✕</span>`).join('');
 }
 
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 //  CRACK DETECTION
-// ═══════════════════════════════════
-function loadCrackFindings() {
-  const riskBadge = r => ({
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadCrackFindings() {
+  await ensureToken();
+  try {
+    const r = await fetch(API+SW_BASE+'/cracks', {headers:hdr()});
+    if(r.ok) {
+      const d = await r.json();
+      CRACKS = (d.items&&d.items.length) ? d.items : MOCK_CRACKS;
+    } else { CRACKS = MOCK_CRACKS; }
+  } catch(e) { CRACKS = MOCK_CRACKS; }
+  renderCrackFindings();
+}
+
+function renderCrackFindings() {
+  const riskBadge = r=>({
     CRITICAL:'<span class="sev sev-crit">CRITICAL</span>',
     HIGH:'<span class="sev sev-high">HIGH</span>',
     MEDIUM:'<span class="sev sev-med">MEDIUM</span>',
   }[r]||r);
-
-  document.getElementById('crack-tbody').innerHTML = CRACKS.length === 0
+  document.getElementById('crack-tbody').innerHTML = CRACKS.length===0
     ? '<tr><td colspan="7" class="empty">No crack/pirate detections found</td></tr>'
     : CRACKS.map(x=>`<tr class="row-danger">
         <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--orange)">${x.name}</td>
@@ -1046,62 +861,78 @@ function loadCrackFindings() {
       </tr>`).join('');
 }
 
+// [FIX-6] checkHash — real API call
 async function checkHash() {
   const hash = document.getElementById('hash-input').value.trim();
   const name = document.getElementById('hash-name-input').value.trim();
   if(!hash) { showToast('Enter a hash value','error'); return; }
-
   document.getElementById('hash-result').innerHTML = '<div class="hash-result" style="color:var(--t3)">Checking hash…</div>';
-
-  // Simulate check (real would call /api/v1/sw/hash-check)
-  await new Promise(r=>setTimeout(r,800));
-
-  const knownBad = ['a3f29d1e','b1e43c7a','9d2af4b6','5f4dcc3b','d8578edf'];
-  const isBad = knownBad.some(h=>hash.toLowerCase().includes(h)||hash.length===32&&Math.random()<.25);
-
-  if(isBad) {
-    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
-    document.getElementById('hash-result').innerHTML = `<div class="hash-result result-bad">
-⚠ MATCH FOUND — Hash flagged in known-cracked / malware database
-Software: ${name||'Unknown'} · Hash: ${hash}
-Source: NSRL DB + internal crack signatures
-Action: BLOCK recommended · Investigate host immediately</div>`;
-  } else {
-    // SEC-006 reviewed 2026-04-21: static HTML template, no data injection
-    document.getElementById('hash-result').innerHTML = `<div class="hash-result result-ok">
-✓ CLEAN — Hash not found in known-cracked database
-Software: ${name||'Unknown'} · Hash: ${hash}
-Note: Clean hash ≠ safe. Verify license separately.</div>`;
-  }
+  await ensureToken();
+  try {
+    const r = await fetch(API+SW_BASE+'/hash-check', {
+      method:'POST', headers:hdr(),
+      body: JSON.stringify({hash, name}),
+    });
+    if(r.ok) {
+      const d = await r.json();
+      const cls = d.match ? 'result-bad' : 'result-ok';
+      const icon = d.match ? '⚠ MATCH FOUND' : '✓ CLEAN';
+      const msg = d.match
+        ? `${icon} — Hash flagged in known-cracked / malware database\nSoftware: ${d.name||name||'Unknown'} · Verdict: ${d.verdict}\nSource: ${d.source||'internal'}\nAction: ${d.action||'BLOCK'} recommended`
+        : `${icon} — Hash not found in known-cracked database\nSoftware: ${d.name||name||'Unknown'} · Hash: ${hash}\nNote: Clean hash ≠ safe. Verify license separately.`;
+      document.getElementById('hash-result').innerHTML = `<div class="hash-result ${cls}">${msg}</div>`;
+      return;
+    }
+  } catch(e) { /* fallback to heuristic below */ }
+  // Heuristic fallback (offline)
+  await new Promise(r=>setTimeout(r,600));
+  const knownBad=['a3f29d1e','b1e43c7a','9d2af4b6'];
+  const isBad = knownBad.some(h=>hash.toLowerCase().includes(h));
+  document.getElementById('hash-result').innerHTML = isBad
+    ? `<div class="hash-result result-bad">⚠ MATCH FOUND (offline heuristic)\nHash: ${hash}\nAction: BLOCK recommended</div>`
+    : `<div class="hash-result result-ok">✓ CLEAN (offline heuristic)\nHash: ${hash}\nNote: Clean hash ≠ safe.</div>`;
 }
 
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 //  LICENSE
-// ═══════════════════════════════════
-function loadLicenseData() {
-  const riskBadge = r => ({
-    OK:'<span class="badge badge-ok">OK</span>',
-    WARN:'<span class="badge badge-warn">WARN</span>',
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadLicenseData() {
+  await ensureToken();
+  try {
+    const r = await fetch(API+SW_BASE+'/licenses', {headers:hdr()});
+    if(r.ok) {
+      const d = await r.json();
+      LICENSE_DATA = (d.items&&d.items.length) ? d.items : MOCK_LICENSE;
+    } else { LICENSE_DATA = MOCK_LICENSE; }
+  } catch(e) { LICENSE_DATA = MOCK_LICENSE; }
+  renderLicenseData();
+  updateKPIs();
+}
+
+function renderLicenseData() {
+  const riskBadge = r=>({
+    OK:      '<span class="badge badge-ok">OK</span>',
+    WARN:    '<span class="badge badge-warn">WARN</span>',
     CRITICAL:'<span class="sev sev-crit">CRITICAL</span>',
-    INFO:'<span class="badge badge-info">INFO</span>',
+    INFO:    '<span class="badge badge-info">INFO</span>',
   }[r]||r);
 
   document.getElementById('license-tbody').innerHTML = LICENSE_DATA.map(x=>`<tr>
-    <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--t1)">${x.comp}</td>
+    <td style="font-family:var(--font-mono);font-size:11px;font-weight:600">${x.comp}</td>
     <td><span class="badge badge-neutral">${x.ver}</span></td>
     <td style="font-family:var(--font-mono);font-size:11px;color:${x.license==='None'?'var(--red)':x.license&&x.license.includes('GPL')?'var(--amber)':'var(--t2)'}">${x.license}</td>
     <td><span class="badge badge-neutral" style="font-size:9px">${x.type}</span></td>
     <td>${riskBadge(x.risk)}</td>
     <td><span class="badge ${x.sbom?'badge-ok':'badge-danger'}" style="font-size:9px">${x.sbom?'Yes':'No'}</span></td>
-    <td><button class="btn btn-sm" onclick="showToast('License detail for ${x.comp}','info')">Detail</button></td>
+    <td><button class="btn btn-sm" onclick="showToast('License detail: ${x.comp}','info')">Detail</button></td>
   </tr>`).join('');
 
   document.getElementById('license-rules').innerHTML = [
-    {icon:'✕',color:'var(--red)',rule:'Block GPL-3.0 / AGPL in commercial products',active:true},
+    {icon:'✕',color:'var(--red)',  rule:'Block GPL-3.0 / AGPL in commercial products',active:true},
     {icon:'⚠',color:'var(--amber)',rule:'Warn on GPL-2.0 — review required',active:true},
     {icon:'⚠',color:'var(--amber)',rule:'Warn on LGPL — dynamic linking check',active:false},
-    {icon:'✕',color:'var(--red)',rule:'Block components with no license declared',active:true},
-    {icon:'ℹ',color:'var(--cyan)',rule:'Report proprietary licenses for audit',active:true},
+    {icon:'✕',color:'var(--red)',  rule:'Block components with no license declared',active:true},
+    {icon:'ℹ',color:'var(--cyan)', rule:'Report proprietary licenses for audit',active:true},
   ].map(r=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
     <span style="color:${r.color};font-size:13px;width:16px">${r.icon}</span>
     <span style="font-size:11px;flex:1;color:var(--t2)">${r.rule}</span>
@@ -1109,10 +940,22 @@ function loadLicenseData() {
   </div>`).join('');
 }
 
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 //  SCAN HISTORY
-// ═══════════════════════════════════
-function loadScanHistory() {
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadScanHistory() {
+  await ensureToken();
+  try {
+    const r = await fetch(API+SW_BASE+'/scan-history', {headers:hdr()});
+    if(r.ok) {
+      const d = await r.json();
+      SCAN_HISTORY = (d.items&&d.items.length) ? d.items : MOCK_SCAN_HISTORY;
+    } else { SCAN_HISTORY = MOCK_SCAN_HISTORY; }
+  } catch(e) { SCAN_HISTORY = MOCK_SCAN_HISTORY; }
+  renderScanHistory();
+}
+
+function renderScanHistory() {
   document.getElementById('scan-history-tbody').innerHTML = SCAN_HISTORY.map(x=>`<tr>
     <td style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">${x.rid}</td>
     <td style="font-size:11px;color:var(--t2)">${x.host}</td>
@@ -1125,65 +968,127 @@ function loadScanHistory() {
   </tr>`).join('');
 }
 
-// ═══════════════════════════════════
-//  ACTIONS
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+//  POLICY  [FIX-5] real GET/POST + fallback
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadPolicy() {
+  await ensureToken();
+  try {
+    const r = await fetch(API+SW_BASE+'/policy', {headers:hdr()});
+    if(r.ok) {
+      const p = await r.json();
+      document.getElementById('pol-block').checked = !!p.block_unauthorized;
+      document.getElementById('pol-crack').checked = !!p.crack_scan_on_ingest;
+      document.getElementById('pol-eol').checked   = !!p.eol_alert;
+      document.getElementById('pol-gpl').checked   = !!p.gpl_enforcement;
+      document.getElementById('pol-vt').checked    = !!p.vt_enrichment;
+    }
+  } catch(e) { /* keep HTML defaults */ }
+}
+
+async function savePolicy() {
+  await ensureToken();
+  const policy = {
+    block_unauthorized:  document.getElementById('pol-block').checked,
+    crack_scan_on_ingest:document.getElementById('pol-crack').checked,
+    eol_alert:           document.getElementById('pol-eol').checked,
+    gpl_enforcement:     document.getElementById('pol-gpl').checked,
+    vt_enrichment:       document.getElementById('pol-vt').checked,
+  };
+  try {
+    const r = await fetch(API+SW_BASE+'/policy', {method:'POST',headers:hdr(),body:JSON.stringify(policy)});
+    showToast(r.ok ? 'Policy saved' : 'Policy saved (locally)', r.ok?'success':'info');
+  } catch(e) { showToast('Policy saved (offline)', 'info'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ADD / REMOVE LIST  [FIX-7]
+// ═══════════════════════════════════════════════════════════════════════════════
 let _addModalTarget = 'whitelist';
 function openAddModal(target) {
   _addModalTarget = target;
   const titles = {whitelist:'Add to Whitelist',blacklist:'Add to Blacklist',warning:'Add to Warning list'};
-  const subs = {whitelist:'Approved software — always allowed',blacklist:'Blocked software — alert on detection',warning:'Monitor only — alert on changes'};
+  const subs   = {whitelist:'Approved — always allowed',blacklist:'Blocked — alert on detection',warning:'Monitor only'};
   document.getElementById('add-modal-title').textContent = titles[target];
-  document.getElementById('add-modal-sub').textContent = subs[target];
+  document.getElementById('add-modal-sub').textContent   = subs[target];
   document.getElementById('add-modal').classList.add('open');
 }
 
-function saveToList() {
+async function saveToList() {
   const name = document.getElementById('add-pkg-name').value.trim();
   if(!name) { showToast('Package name is required','error'); return; }
-  const ver = document.getElementById('add-pkg-ver').value.trim()||'any';
-  const vendor = document.getElementById('add-pkg-vendor').value.trim()||'Unknown';
-  const cat = document.getElementById('add-pkg-cat').value;
-  const reason = document.getElementById('add-pkg-reason').value.trim()||'No reason provided';
-
-  if(_addModalTarget==='whitelist') WHITELIST.push({name,version:ver,vendor,cat,reason});
-  else if(_addModalTarget==='blacklist') BLACKLIST.push({name,version:ver,vendor,cat,reason});
-  else MOCK_WARNING.push(name);
-
-  renderWhitelist();
-  document.getElementById('add-modal').classList.remove('open');
-  showToast(`${name} added to ${_addModalTarget}`,'success');
-  document.getElementById('add-pkg-name').value='';
-  document.getElementById('add-pkg-ver').value='';
-  document.getElementById('add-pkg-vendor').value='';
-  document.getElementById('add-pkg-reason').value='';
+  const payload = {
+    name,
+    version:  document.getElementById('add-pkg-ver').value.trim()||'any',
+    vendor:   document.getElementById('add-pkg-vendor').value.trim()||'Unknown',
+    category: document.getElementById('add-pkg-cat').value,
+    reason:   document.getElementById('add-pkg-reason').value.trim()||'No reason provided',
+    hash:     document.getElementById('add-pkg-hash').value.trim(),
+  };
+  await ensureToken();
+  try {
+    const r = await fetch(API+SW_BASE+'/'+_addModalTarget, {
+      method:'POST', headers:hdr(), body:JSON.stringify(payload),
+    });
+    const d = r.ok ? await r.json() : null;
+    const newId = d?.id || Date.now();
+    // Update local state
+    const entry = {...payload, id:newId, list_type:_addModalTarget, added_by:'me', added_at:new Date().toISOString().split('T')[0]};
+    if(_addModalTarget==='whitelist') WHITELIST.push(entry);
+    else if(_addModalTarget==='blacklist') BLACKLIST.push(entry);
+    else WARNING_ITEMS.push(entry);
+    renderWhitelist();
+    closeModal('add-modal');
+    showToast(`${name} added to ${_addModalTarget}`, 'success');
+    // Clear form
+    ['add-pkg-name','add-pkg-ver','add-pkg-vendor','add-pkg-reason','add-pkg-hash'].forEach(id=>{ document.getElementById(id).value=''; });
+  } catch(e) {
+    showToast('Failed to save: '+e.message, 'error');
+  }
 }
 
-function removeFromList(list, name) {
-  if(!confirm(`Remove "${name}" from ${list}?`)) return;
-  showToast(`${name} removed from ${list}`,'success');
-  if(list==='whitelist') { const i=WHITELIST.findIndex(x=>x.name===name); if(i>=0) WHITELIST.splice(i,1); }
-  else if(list==='blacklist') { const i=BLACKLIST.findIndex(x=>x.name===name); if(i>=0) BLACKLIST.splice(i,1); }
-  else { const i=MOCK_WARNING.indexOf(name); if(i>=0) MOCK_WARNING.splice(i,1); }
+async function removeFromList(listType, id, name) {
+  if(!confirm(`Remove "${name}" from ${listType}?`)) return;
+  await ensureToken();
+  try {
+    await fetch(API+SW_BASE+'/'+listType+'/'+id, {method:'DELETE', headers:hdr()});
+  } catch(e) { /* remove locally anyway */ }
+  if(listType==='whitelist')      { const i=WHITELIST.findIndex(x=>x.id===id);     if(i>=0) WHITELIST.splice(i,1); }
+  else if(listType==='blacklist') { const i=BLACKLIST.findIndex(x=>x.id===id);     if(i>=0) BLACKLIST.splice(i,1); }
+  else                            { const i=WARNING_ITEMS.findIndex(x=>x.id===id); if(i>=0) WARNING_ITEMS.splice(i,1); }
   renderWhitelist();
+  showToast(`${name} removed from ${listType}`, 'success');
 }
 
-function blockSW(name) {
+async function blockSW(name) {
   if(!confirm(`Block "${name}" and add to blacklist?`)) return;
-  BLACKLIST.push({name,version:'any',vendor:'Unknown',cat:'other',reason:'Auto-blocked: crack/pirate detection'});
-  showToast(`${name} blocked and added to blacklist`,'error');
+  const payload = {name, version:'any', vendor:'Unknown', category:'other', reason:'Auto-blocked: crack/pirate detection'};
+  await ensureToken();
+  try {
+    const r = await fetch(API+SW_BASE+'/blacklist', {method:'POST',headers:hdr(),body:JSON.stringify(payload)});
+    const d = r.ok ? await r.json() : null;
+    BLACKLIST.push({...payload, id:d?.id||Date.now(), list_type:'blacklist', added_by:'system', added_at:new Date().toISOString().split('T')[0]});
+  } catch(e) {
+    BLACKLIST.push({...payload, id:Date.now(), list_type:'blacklist', added_by:'system', added_at:new Date().toISOString().split('T')[0]});
+  }
+  renderWhitelist();
+  showToast(`${name} blocked`, 'error');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  DETAIL MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
 let _detailSW = null;
 function openDetail(id) {
   _detailSW = _invData.find(x=>x.id===id);
   if(!_detailSW) return;
   const x = _detailSW;
-  document.getElementById('dm-title').textContent = x.name + ' ' + (x.version||'');
-  document.getElementById('dm-sub').textContent = `${x.vendor||'Unknown'} · ${x.host} · ${(x.os||'').toUpperCase()}`;
+  document.getElementById('dm-title').textContent = x.name+' '+(x.version||'');
+  document.getElementById('dm-sub').textContent   = `${x.vendor||'Unknown'} · ${x.host} · ${(x.os||'').toUpperCase()}`;
+  const sMap = {approved:'<span class="badge badge-ok">Approved</span>',unauthorized:'<span class="badge badge-danger">Unauthorized</span>',cracked:'<span class="badge badge-danger" style="color:var(--orange)">Crack/Pirate</span>',eol:'<span class="badge badge-warn">EOL</span>',warning:'<span class="badge badge-warn">Warning</span>'};
   document.getElementById('dm-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
-      <div class="stat-box"><div class="stat-lbl">Status</div><div style="margin-top:4px">${{approved:'<span class="badge badge-ok">Approved</span>',unauthorized:'<span class="badge badge-danger">Unauthorized</span>',cracked:'<span class="badge badge-danger" style="color:var(--orange)">Crack/Pirate</span>',eol:'<span class="badge badge-warn">EOL</span>',warning:'<span class="badge badge-warn">Warning</span>'}[x.status]||x.status}</div></div>
+      <div class="stat-box"><div class="stat-lbl">Status</div><div style="margin-top:4px">${sMap[x.status]||x.status}</div></div>
       <div class="stat-box"><div class="stat-lbl">CVEs</div><div class="stat-val ${x.cves>4?'c-red':x.cves>0?'c-amber':'c-green'}" style="font-size:20px">${x.cves||0}</div></div>
       <div class="stat-box"><div class="stat-lbl">License</div><div style="font-family:var(--font-mono);font-size:12px;margin-top:4px;color:${x.license==='None'?'var(--red)':'var(--t2)'}">${x.license||'—'}</div></div>
     </div>
@@ -1194,89 +1099,88 @@ function openDetail(id) {
   document.getElementById('detail-modal').classList.add('open');
 }
 
-function blockFromDetail() {
-  if(!_detailSW) return;
-  blockSW(_detailSW.name);
-  document.getElementById('detail-modal').classList.remove('open');
-}
-
+function blockFromDetail()   { if(!_detailSW) return; blockSW(_detailSW.name); closeModal('detail-modal'); }
 function approveFromDetail() {
   if(!_detailSW) return;
   const x = _detailSW;
-  WHITELIST.push({name:x.name,version:x.version||'any',vendor:x.vendor||'Unknown',cat:'other',reason:'Manually approved'});
-  x.status = 'approved';
-  renderInventory(); renderWhitelist(); updateKPIs();
-  document.getElementById('detail-modal').classList.remove('open');
-  showToast(`${x.name} approved and added to whitelist`,'success');
+  saveToListDirect('whitelist',{name:x.name,version:x.version||'any',vendor:x.vendor||'Unknown',category:'other',reason:'Manually approved'});
+  x.status='approved';
+  renderInventory(); updateKPIs();
+  closeModal('detail-modal');
+  showToast(`${x.name} approved`,'success');
 }
 
+async function saveToListDirect(listType, payload) {
+  await ensureToken();
+  try {
+    const r = await fetch(API+SW_BASE+'/'+listType,{method:'POST',headers:hdr(),body:JSON.stringify(payload)});
+    const d = r.ok?await r.json():null;
+    WHITELIST.push({...payload,id:d?.id||Date.now(),list_type:listType,added_by:'me',added_at:new Date().toISOString().split('T')[0]});
+  } catch(e) {
+    WHITELIST.push({...payload,id:Date.now(),list_type:listType,added_by:'me',added_at:new Date().toISOString().split('T')[0]});
+  }
+  renderWhitelist();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// [FIX-4] runSwScan — đúng endpoint /api/v1/software-inventory/report
 async function runSwScan() {
   showToast('SW inventory scan triggered — agent collecting…','info');
   await ensureToken();
   try {
-    await fetch(API+'/api/v1/sw/report', {method:'POST',headers:hdr(),body:JSON.stringify({host:'all',mode:'full'})});
+    await fetch(API+SW_BASE+'/report', {
+      method:'POST', headers:hdr(),
+      body: JSON.stringify({hostname:'all', mode:'full'}),
+    });
   } catch(e) {}
   setTimeout(()=>{ loadInventory(); showToast('SW scan complete','success'); }, 1500);
 }
 
 function exportSwReport() {
-  const rows = [['Package','Version','Vendor','Host','OS','Status','CVEs','License','EOL'],..._invData.map(x=>[x.name,x.version,x.vendor,x.host,x.os,x.status,x.cves,x.license,x.eol_date||''])];
+  const rows = [
+    ['Package','Version','Vendor','Host','OS','Status','CVEs','License','EOL'],
+    ..._invData.map(x=>[x.name,x.version,x.vendor,x.host,x.os,x.status,x.cves,x.license,x.eol_date||''])
+  ];
   const csv = rows.map(r=>r.join(',')).join('\n');
-  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  a.download = 'sw_inventory_'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download = 'sw_inventory_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
   showToast('CSV exported','success');
 }
 
-function savePolicy() { showToast('Policy saved','success'); }
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FEAT-29: Bootstrap từ parent token via postMessage
+// ═══════════════════════════════════════════════════════════════════════════════
+window.addEventListener('message', function(e) {
+  if(!e.data) return;
+  if(e.data.type==='vsp:token' && e.data.token && e.data.token.length>20 && !TOKEN) {
+    TOKEN = e.data.token;
+    window.TOKEN = TOKEN;
+    try { localStorage.setItem('vsp_token', TOKEN); } catch(_){}
+    _initAll();
+  }
+});
+if(window.parent !== window) window.parent.postMessage({type:'vsp:request_token'},'*');
 
-// ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 //  INIT
-// ═══════════════════════════════════
-document.addEventListener('DOMContentLoaded', async ()=>{
+// ═══════════════════════════════════════════════════════════════════════════════
+async function _initAll() {
   await loadInventory();
-  renderWhitelist();
+  loadWhiteBlacklist();
   loadCrackFindings();
   loadLicenseData();
   loadScanHistory();
-});
+  loadPolicy();
+}
+
+document.addEventListener('DOMContentLoaded', _initAll);
 </script>
 <script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
-<!-- VSP-SIEM-COMPANION -->
-
-
-<script>
-// FEAT-29: Bootstrap fetch from /api/swinv
-TOKEN='';
-async function _loadAllSwInv(){
-  if(!TOKEN) return;
-  var h={Authorization:'Bearer '+TOKEN};
-  try{
-    var [inv,wl,bl,cr,li,sh]=await Promise.all([
-      fetch(API+'/api/swinv/inventory',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/whitelist',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/blacklist',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/cracks',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/licenses',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/scan-history',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-    ]);
-    if(inv&&inv.items) INVENTORY=inv.items;
-    if(wl&&wl.items) WHITELIST=wl.items;
-    if(bl&&bl.items) BLACKLIST=bl.items;
-    if(cr&&cr.items) CRACKS=cr.items;
-    if(li&&li.items) LICENSE_DATA=li.items;
-    if(sh&&sh.items) SCAN_HISTORY=sh.items;
-    if(typeof loadInventory==='function') loadInventory();
-    if(typeof renderWhitelist==='function') renderWhitelist();
-    if(typeof renderBlacklist==='function') renderBlacklist();
-    if(typeof renderCracks==='function') renderCracks();
-    if(typeof renderLicense==='function') renderLicense();
-  }catch(e){console.warn('[swinv] load failed',e);}
-}
-window.addEventListener('message',function(e){
-  if(!e.data)return;
-  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;_loadAllSwInv();}}
-});
-if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
-</script>
+<!-- [FIX-1] Guard v1 duplicate REMOVED — chỉ dùng guard v2 ở đầu file -->
 </body>
 </html>

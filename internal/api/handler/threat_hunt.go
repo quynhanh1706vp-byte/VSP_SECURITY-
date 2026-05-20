@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -427,3 +428,126 @@ func (h *ThreatHunt) GetQuery(w http.ResponseWriter, r *http.Request) {
 	q.MITRETechniques = splitCSV(techs)
 	jsonOK(w, q)
 }
+
+// PATCH /api/v1/threat-hunt/queries/{id}
+func (h *ThreatHunt) UpdateQuery(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	tenantID := h.resolveTenantUUID(r, claims.TenantID)
+	if tenantID == "" {
+		jsonError(w, "tenant not found", http.StatusForbidden)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !validateUUID(id) {
+		jsonError(w, "invalid query id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Name             *string  `json:"name"`
+		Description      *string  `json:"description"`
+		Query            *string  `json:"query"`
+		LookbackHours    *int     `json:"lookback_hours"`
+		ScheduleCron     *string  `json:"schedule_cron"`
+		MITRETechniques  []string `json:"mitre_techniques"`
+		MinMatchSeverity *string  `json:"min_match_severity"`
+		Enabled          *bool    `json:"enabled"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	// Validate fields if provided
+	if req.Name != nil {
+		*req.Name = strings.TrimSpace(*req.Name)
+		if len(*req.Name) == 0 || len(*req.Name) > 200 {
+			jsonError(w, "name 1-200 chars", http.StatusBadRequest)
+			return
+		}
+	}
+	if req.Query != nil {
+		*req.Query = strings.TrimSpace(*req.Query)
+		if len(*req.Query) == 0 || len(*req.Query) > 4000 {
+			jsonError(w, "query 1-4000 chars", http.StatusBadRequest)
+			return
+		}
+	}
+	if req.MinMatchSeverity != nil {
+		sev := strings.ToLower(strings.TrimSpace(*req.MinMatchSeverity))
+		if !validHuntSeverity[sev] {
+			jsonError(w, "min_match_severity must be critical|high|medium|low", http.StatusBadRequest)
+			return
+		}
+		*req.MinMatchSeverity = sev
+	}
+	if req.ScheduleCron != nil && *req.ScheduleCron != "" {
+		if len(strings.Fields(*req.ScheduleCron)) != 5 {
+			jsonError(w, "schedule_cron must be 5 fields or empty", http.StatusBadRequest)
+			return
+		}
+	}
+	techCSV := ""
+	if req.MITRETechniques != nil {
+		techCSV = strings.ToUpper(strings.Join(req.MITRETechniques, ","))
+		if len(techCSV) > 500 {
+			jsonError(w, "too many MITRE techniques", http.StatusBadRequest)
+			return
+		}
+	}
+	// Build dynamic UPDATE — only patch provided fields
+	setClauses := []string{"updated_at = NOW()"}
+	args := []any{id, tenantID}
+	argIdx := 3
+	if req.Name != nil {
+		setClauses = append(setClauses, "name = $"+strings.TrimSpace(fmt.Sprintf("%d", argIdx)))
+		args = append(args, *req.Name); argIdx++
+	}
+	if req.Description != nil {
+		setClauses = append(setClauses, "description = $"+fmt.Sprintf("%d", argIdx))
+		args = append(args, *req.Description); argIdx++
+	}
+	if req.Query != nil {
+		setClauses = append(setClauses, "query = $"+fmt.Sprintf("%d", argIdx))
+		args = append(args, *req.Query); argIdx++
+	}
+	if req.LookbackHours != nil {
+		setClauses = append(setClauses, "lookback_hours = $"+fmt.Sprintf("%d", argIdx))
+		args = append(args, *req.LookbackHours); argIdx++
+	}
+	if req.ScheduleCron != nil {
+		setClauses = append(setClauses, "schedule_cron = NULLIF($"+fmt.Sprintf("%d", argIdx)+",''')")
+		args = append(args, *req.ScheduleCron); argIdx++
+	}
+	if req.MITRETechniques != nil {
+		setClauses = append(setClauses, "mitre_techniques = $"+fmt.Sprintf("%d", argIdx))
+		args = append(args, techCSV); argIdx++
+	}
+	if req.MinMatchSeverity != nil {
+		setClauses = append(setClauses, "min_match_severity = $"+fmt.Sprintf("%d", argIdx))
+		args = append(args, *req.MinMatchSeverity); argIdx++
+	}
+	if req.Enabled != nil {
+		setClauses = append(setClauses, "enabled = $"+fmt.Sprintf("%d", argIdx))
+		args = append(args, *req.Enabled); argIdx++
+	}
+	if len(setClauses) == 1 {
+		jsonError(w, "no fields to update", http.StatusBadRequest)
+		return
+	}
+	sql := "UPDATE hunt_queries SET " + strings.Join(setClauses, ", ") +
+		" WHERE id=$1 AND tenant_id=$2"
+	tag, err := h.DB.Pool().Exec(r.Context(), sql, args...)
+	if err != nil {
+		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	logAudit(r, h.DB, "HUNT_QUERY_UPDATED", "query:"+id)
+	jsonOK(w, map[string]any{"ok": true, "id": id})
+}
+

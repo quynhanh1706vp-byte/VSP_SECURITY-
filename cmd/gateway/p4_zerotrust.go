@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -406,4 +407,37 @@ func handleZTSBOM(w http.ResponseWriter, r *http.Request) {
 	ztState.mu.RLock()
 	defer ztState.mu.RUnlock()
 	_ = json.NewEncoder(w).Encode(ztState.SBOM)
+}
+
+// handleZTMicroSegDelete — DELETE /api/p4/zt/microseg/{id}
+func handleZTMicroSegDelete(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	// Extract {id} from path: /api/p4/zt/microseg/{id}
+	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
+	id := parts[len(parts)-1]
+	if id == "" {
+		http.Error(w, `{"error":"missing rule id"}`, 400)
+		return
+	}
+	ztState.mu.Lock()
+	found := false
+	newRules := ztState.SegRules[:0]
+	for _, rule := range ztState.SegRules {
+		if rule.ID == id {
+			found = true
+		} else {
+			newRules = append(newRules, rule)
+		}
+	}
+	if found {
+		ztState.SegRules = newRules
+		recalcScoresLocked()
+	}
+	ztState.mu.Unlock()
+	if !found {
+		http.Error(w, `{"error":"rule not found"}`, 404)
+		return
+	}
+	go saveZTStateToDB()
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "deleted": id})
 }

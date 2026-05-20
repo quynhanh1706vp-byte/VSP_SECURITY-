@@ -263,7 +263,7 @@ func (h *Assets) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logAudit(r, h.DB, "ASSET_DELETED", "log_sources/"+id)
-	jsonOK(w, map[string]string{"id": id, "status": "deleted"})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // PATCH /api/v1/assets/{id}

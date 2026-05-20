@@ -670,13 +670,20 @@ td{padding:7px 10px;vertical-align:middle}
 <script>
 async function loadHealthWidget() {
   try {
-    var r = await fetch('/health/deep', {headers:{Authorization:'Bearer '+TOKEN}});
+    var r = await fetch('/health/deep', {headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){ return {ok:false, status:0}; });
     if (!r.ok) {
-      var r2 = await fetch('/health');
-      if (!r2.ok) return;
-      var d2 = await r2.json();
+      // 503 = some subsystem unhealthy — try basic health
+      var r2 = await fetch('/health').catch(function(){ return {ok:false}; });
       var el = document.getElementById('health-details');
-      if (el) el.innerHTML = '<div style="color:var(--green)">✓ '+d2.status+' · v'+d2.version+' · up '+d2.uptime+'</div>';
+      if (r2.ok) {
+        var d2 = await r2.json();
+        if (el) el.innerHTML =
+          '<div style="color:var(--amber)">⚠ Partial health · '+d2.status+
+          ' · v'+(d2.version||'?')+' · up '+(d2.uptime||'?')+'</div>'+
+          '<div style="font-size:10px;color:var(--t3);margin-top:4px">Some subsystems degraded — check agentic process</div>';
+      } else {
+        if (el) el.innerHTML = '<div style="color:var(--red)">✗ Health check unavailable</div>';
+      }
       return;
     }
     var d = await r.json();
@@ -945,9 +952,7 @@ async function saveAllSettings(){
 }
 
 // ── DAST targets — persisted as settings_scan.dast_targets sub-key ──
-var _dastTargets=[
-  {url:'http://127.0.0.1:8921',env:'dev',status:'active'},
-];
+var _dastTargets=[];
 async function loadDastTargets(){
   var cfg = await loadSection('scan');
   if (Array.isArray(cfg.dast_targets)) {
@@ -1099,11 +1104,7 @@ async function saveAlertRules(){
 }
 
 // ── API Keys ──
-var _apiKeys=[
-  {id:'k1',name:'CI/CD pipeline',prefix:'vsp_ci_',perms:'scans,read',created:'30d ago',expires:'60d',status:'active'},
-  {id:'k2',name:'SIEM integration',prefix:'vsp_si_',perms:'read,reports',created:'90d ago',expires:'never',status:'active'},
-  {id:'k3',name:'Old deployment key',prefix:'vsp_od_',perms:'scans',created:'180d ago',expires:'expired',status:'expired'},
-];
+var _apiKeys=[];
 function renderAPIKeys(){
   document.getElementById('apikeys-tbody').innerHTML=_apiKeys.map(k=>`<tr>
     <td style="font-weight:500">${k.name}</td>
@@ -1251,8 +1252,9 @@ function copyAPIKey(){
 
 async function loadAPIKeysFromBackend(){
   try {
-    var token = (typeof window.vspToken === 'string' && window.vspToken)
-      ? window.vspToken
+    await ensureToken();
+    var token = TOKEN || (typeof window.vspToken === 'string' && window.vspToken)
+      ? (TOKEN || window.vspToken)
       : (localStorage.getItem('vsp_token') || '');
     var r = await fetch('/api/v1/admin/api-keys', {
       headers: {'Authorization': 'Bearer ' + token}
@@ -1298,8 +1300,8 @@ function rotateKey(id){
 async function confirmRotateKey(id){
   var k = _apiKeys.find(function(x){return x.id===id;});
   if (!k) { window._vspUNI4.close(); return; }
-  var token = (typeof window.vspToken === 'string' && window.vspToken)
-    ? window.vspToken : (localStorage.getItem('vsp_token') || '');
+  await ensureToken();
+  var token = TOKEN || (typeof window.vspToken === 'string' ? window.vspToken : '') || localStorage.getItem('vsp_token') || '';
   try {
     await fetch('/api/v1/admin/api-keys/'+encodeURIComponent(id), {
       method:'DELETE', headers:{'Authorization':'Bearer '+token}
@@ -2185,7 +2187,7 @@ async function loadHealthEnhanced() {
   if (badge) { badge.className = 'status-badge status-warn pulse'; badge.textContent = '● checking…'; }
   try {
     await ensureToken();
-    var r = await fetch('/health/deep', {headers:{Authorization:'Bearer '+TOKEN}});
+    var r = await fetch('/health/deep', {headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){ return {ok:false, status:0}; });
     var d = r.ok ? await r.json() : null;
     if (!d) { var r2 = await fetch('/health'); d = r2.ok ? await r2.json() : null; }
     if (d) {

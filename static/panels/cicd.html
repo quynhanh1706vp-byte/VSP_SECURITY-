@@ -230,7 +230,7 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="int-grid">
         <div class="int-card" onclick="setupIntegration('github')" style="cursor:pointer" title="Click to view setup guide">
           <div class="int-icon" style="background:rgba(34,197,94,.12);color:var(--green)">⑆</div>
-          <div><div class="int-name">GitHub Actions</div><div class="int-status" style="color:var(--green)">● Connected · cicd@vsp.local</div></div>
+          <div><div class="int-name">GitHub Actions</div><div class="int-status" id="github-int-status" style="color:var(--green)">● Connected</div></div>
           <div class="int-actions"><span class="badge badge-ok">Active</span></div>
         </div>
         <div class="int-card" onclick="setupIntegration('gitlab')" style="cursor:pointer" title="Click to view setup guide">
@@ -293,6 +293,7 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card tpl-card active" id="tpl-card-github" data-tpl="github">
     <div class="card-head">
       <div><div class="card-title">GitHub Actions — vsp-scan.yml</div><div class="card-sub">Copy vào .github/workflows/ trong repo của bạn</div></div>
+      <button class="btn btn-sm" onclick="setupIntegration('github')" title="View setup guide">📋 Setup</button>
       <button class="btn btn-sm" onclick="copyTemplate('github')">⊕ Copy</button>
     </div>
     <div class="card-body">
@@ -324,7 +325,7 @@ td{padding:7px 10px;vertical-align:middle}
           for i in $(seq 1 30); do
             <span class="var">STATUS</span>=$(curl -sf \
               -H <span class="str">"Authorization: Bearer ${{ secrets.VSP_TOKEN }}"</span> \
-              <span class="str">${{ secrets.VSP_URL }}/api/v1/vsp/run/$RID</span> | jq -r <span class="str">'.status'</span>)
+              <span class="str">${{ secrets.VSP_URL }}/api/v1/vsp/runs/$RID</span> | jq -r <span class="str">'.status'</span>)
             [ "$STATUS" = "DONE" ] && break
             sleep 10
           done
@@ -333,7 +334,7 @@ td{padding:7px 10px;vertical-align:middle}
         <span class="kw">run:</span> |
           <span class="var">GATE</span>=$(curl -sf \
             -H <span class="str">"Authorization: Bearer ${{ secrets.VSP_TOKEN }}"</span> \
-            <span class="str">${{ secrets.VSP_URL }}/api/v1/vsp/run/${{ steps.vsp.outputs.rid }}</span> \
+            <span class="str">${{ secrets.VSP_URL }}/api/v1/vsp/runs/${{ steps.vsp.outputs.rid }}</span> \
             | jq -r <span class="str">'.gate'</span>)
           echo <span class="str">"Gate: $GATE"</span>
           [ "$GATE" = "FAIL" ] && exit 1 || exit 0
@@ -350,6 +351,7 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card tpl-card" id="tpl-card-gitlab" data-tpl="gitlab">
     <div class="card-head">
       <div><div class="card-title">GitLab CI — .gitlab-ci.yml</div><div class="card-sub">Thêm stage vsp vào pipeline GitLab</div></div>
+      <button class="btn btn-sm" onclick="setupIntegration('gitlab')" title="View setup guide">📋 Setup</button>
       <button class="btn btn-sm" onclick="copyTemplate('gitlab')">⊕ Copy</button>
     </div>
     <div class="card-body">
@@ -374,11 +376,11 @@ td{padding:7px 10px;vertical-align:middle}
       <span class="cm"># Wait for scan to complete</span>
       for i in $(seq 1 30); do
         <span class="var">S</span>=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
-          $VSP_URL/api/v1/vsp/run/$RID | jq -r '.status')
+          $VSP_URL/api/v1/vsp/runs/$RID | jq -r '.status')
         [ "$S" = "DONE" ] && break; sleep 10
       done
       <span class="var">GATE</span>=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
-        $VSP_URL/api/v1/vsp/run/$RID | jq -r '.gate')
+        $VSP_URL/api/v1/vsp/runs/$RID | jq -r '.gate')
       [ "$GATE" = "FAIL" ] && exit 1 || exit 0
   <span class="kw">allow_failure:</span> <span class="str">false</span>
   <span class="kw">only:</span>
@@ -391,6 +393,7 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card tpl-card" id="tpl-card-jenkins" data-tpl="jenkins">
     <div class="card-head">
       <div><div class="card-title">Jenkins — Jenkinsfile</div><div class="card-sub">Add to repo root · works with declarative + scripted pipeline</div></div>
+      <button class="btn btn-sm" onclick="setupIntegration('jenkins')" title="View setup guide">📋 Setup</button>
       <button class="btn btn-sm" onclick="copyTemplate('jenkins')">⊕ Copy</button>
     </div>
     <div class="card-body">
@@ -413,12 +416,12 @@ td{padding:7px 10px;vertical-align:middle}
           echo "VSP run: $RID"
           for i in $(seq 1 30); do
             S=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
-              $VSP_URL/api/v1/vsp/run/$RID | jq -r '.status')
+              $VSP_URL/api/v1/vsp/runs/$RID | jq -r '.status')
             [ "$S" = "DONE" ] &amp;&amp; break
             sleep 10
           done
           GATE=$(curl -sf -H "Authorization: Bearer $VSP_TOKEN" \
-            $VSP_URL/api/v1/vsp/run/$RID | jq -r '.gate')
+            $VSP_URL/api/v1/vsp/runs/$RID | jq -r '.gate')
           echo "Gate: $GATE"
           [ "$GATE" = "FAIL" ] &amp;&amp; exit 1 || exit 0
         '''</span>
@@ -439,6 +442,7 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card tpl-card" id="tpl-card-azure" data-tpl="azure">
     <div class="card-head">
       <div><div class="card-title">Azure DevOps — azure-pipelines.yml</div><div class="card-sub">Place at repo root · YAML-based pipeline</div></div>
+      <button class="btn btn-sm" onclick="setupIntegration('azure')" title="View setup guide">📋 Setup</button>
       <button class="btn btn-sm" onclick="copyTemplate('azure')">⊕ Copy</button>
     </div>
     <div class="card-body">
@@ -473,12 +477,12 @@ td{padding:7px 10px;vertical-align:middle}
           - <span class="kw">script:</span> |
               for i in $(seq 1 30); do
                 <span class="var">S</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $(VSP_TOKEN)"</span> \
-                  $(VSP_URL)/api/v1/vsp/run/$(RID) | jq -r <span class="str">'.status'</span>)
+                  $(VSP_URL)/api/v1/vsp/runs/$(RID) | jq -r <span class="str">'.status'</span>)
                 [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; break
                 sleep 10
               done
               <span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $(VSP_TOKEN)"</span> \
-                $(VSP_URL)/api/v1/vsp/run/$(RID) | jq -r <span class="str">'.gate'</span>)
+                $(VSP_URL)/api/v1/vsp/runs/$(RID) | jq -r <span class="str">'.gate'</span>)
               [ <span class="str">"$GATE"</span> = <span class="str">"FAIL"</span> ] &amp;&amp; exit 1 || exit 0
             <span class="kw">displayName:</span> <span class="str">'Wait + check gate'</span>
 </div>
@@ -489,6 +493,7 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card tpl-card" id="tpl-card-bitbucket" data-tpl="bitbucket">
     <div class="card-head">
       <div><div class="card-title">Bitbucket Pipelines — bitbucket-pipelines.yml</div><div class="card-sub">Place at repo root · default + branch + PR pipelines</div></div>
+      <button class="btn btn-sm" onclick="setupIntegration('bitbucket')" title="View setup guide">📋 Setup</button>
       <button class="btn btn-sm" onclick="copyTemplate('bitbucket')">⊕ Copy</button>
     </div>
     <div class="card-body">
@@ -505,11 +510,11 @@ td{padding:7px 10px;vertical-align:middle}
           - <span class="kw">echo</span> <span class="str">"VSP run: $RID"</span>
           - |
             for i in $(seq 1 30); do
-              S=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> $VSP_URL/api/v1/vsp/run/$RID | jq -r <span class="str">'.status'</span>)
+              S=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> $VSP_URL/api/v1/vsp/runs/$RID | jq -r <span class="str">'.status'</span>)
               [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; break
               sleep 10
             done
-          - <span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> $VSP_URL/api/v1/vsp/run/$RID | jq -r <span class="str">'.gate'</span>)
+          - <span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> $VSP_URL/api/v1/vsp/runs/$RID | jq -r <span class="str">'.gate'</span>)
           - <span class="str">[ "$GATE" = "FAIL" ] &amp;&amp; exit 1 || exit 0</span>
 
 <span class="kw">pipelines:</span>
@@ -529,6 +534,7 @@ td{padding:7px 10px;vertical-align:middle}
   <div class="card tpl-card" id="tpl-card-vspcli" data-tpl="vspcli">
     <div class="card-head">
       <div><div class="card-title">vspcli — Local / shell pre-commit hook</div><div class="card-sub">For developer workstations or any custom CI runner</div></div>
+      <button class="btn btn-sm" onclick="setupIntegration('vspcli')" title="View setup guide">📋 Setup</button>
       <button class="btn btn-sm" onclick="copyTemplate('vspcli')">⊕ Copy</button>
     </div>
     <div class="card-body">
@@ -556,14 +562,14 @@ td{padding:7px 10px;vertical-align:middle}
 <span class="cm"># Wait</span>
 <span class="kw">for</span> i <span class="kw">in</span> $(seq 1 60); <span class="kw">do</span>
   <span class="var">S</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> \
-    <span class="str">"$VSP_URL/api/v1/vsp/run/$RID"</span> | jq -r <span class="str">'.status'</span>)
+    <span class="str">"$VSP_URL/api/v1/vsp/runs/$RID"</span> | jq -r <span class="str">'.status'</span>)
   [ <span class="str">"$S"</span> = <span class="str">"DONE"</span> ] &amp;&amp; <span class="kw">break</span>
   sleep 5
 <span class="kw">done</span>
 
 <span class="cm"># Gate verdict</span>
 <span class="var">GATE</span>=$(curl -sf -H <span class="str">"Authorization: Bearer $VSP_TOKEN"</span> \
-  <span class="str">"$VSP_URL/api/v1/vsp/run/$RID"</span> | jq -r <span class="str">'.gate'</span>)
+  <span class="str">"$VSP_URL/api/v1/vsp/runs/$RID"</span> | jq -r <span class="str">'.gate'</span>)
 <span class="kw">echo</span> <span class="str">"Gate: $GATE"</span>
 [ <span class="str">"$GATE"</span> = <span class="str">"FAIL"</span> ] &amp;&amp; <span class="kw">exit</span> 1 || <span class="kw">exit</span> 0
 </div>
@@ -571,35 +577,6 @@ td{padding:7px 10px;vertical-align:middle}
   </div>
 
 
-  <div class="card">
-    <div class="card-head">
-      <div><div class="card-title">vspcli — local pre-commit scan</div><div class="card-sub">Scan trước khi commit, không cần push</div></div>
-      <button class="btn btn-sm" onclick="copyTemplate('precommit')">⊕ Copy</button>
-    </div>
-    <div class="card-body">
-      <div class="code-block"><span class="cm"># Install vspcli</span>
-<span class="kw">curl</span> -sSL https://vsp.agency.gov/install.sh | bash
-
-<span class="cm"># Configure</span>
-<span class="kw">vspcli config</span> set url https://vsp.agency.gov
-<span class="kw">vspcli config</span> set token $VSP_TOKEN
-
-<span class="cm"># .pre-commit-config.yaml</span>
-<span class="kw">repos:</span>
-  - <span class="kw">repo:</span> <span class="str">local</span>
-    <span class="kw">hooks:</span>
-      - <span class="kw">id:</span> <span class="str">vsp-scan</span>
-        <span class="kw">name:</span> <span class="str">VSP Security Scan</span>
-        <span class="kw">entry:</span> <span class="str">vspcli scan --mode SECRETS,SAST --fail-on CRITICAL</span>
-        <span class="kw">language:</span> <span class="str">system</span>
-        <span class="kw">pass_filenames:</span> <span class="str">false</span>
-
-<span class="cm"># Run manually</span>
-<span class="kw">vspcli scan</span> --mode FULL --src . --output sarif > results.sarif
-<span class="kw">vspcli gate</span> check --rid $RID --threshold 70
-</div>
-    </div>
-  </div>
 </div>
 
 <!-- ══ TAB 3 — SCHEDULER ══ -->
@@ -750,15 +727,15 @@ td{padding:7px 10px;vertical-align:middle}
       .af-sev-pill:hover { opacity:.9 }
       .af-sev-pill.active { opacity:1; background:var(--accent,#0ea5e9); color:#fff!important; border-color:var(--accent,#0ea5e9) }
     </style>
+    <div id="llm-status-banner" style="font-size:12px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);margin-bottom:14px;color:var(--t2)">Checking AI AutoFix status...</div>
+    <div id="dora-deploy-hint" style="display:none;font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#818cf8;margin-bottom:14px">
+      ℹ️ <b>Deploy Frequency = 0</b> — Integrate CI/CD to track deploys.
+      <a href="#" style="color:var(--cyan)" onclick="showDoraSetup(event)">Setup guide →</a>
+    </div>
     <div style="overflow-x:auto">
       <table>
         <thead><tr><th>Severity</th><th>Tool</th><th>Rule</th><th>Description</th><th>Fix type</th><th>Status</th><th></th></tr></thead>
-        <div id="llm-status-banner" style="font-size:12px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);margin-bottom:14px;color:var(--t2)">Checking AI AutoFix status...</div>
-<div id="dora-deploy-hint" style="display:none;font-size:12px;padding:8px 14px;border-radius:8px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#818cf8;margin-bottom:14px">
-  ℹ️ <b>Deploy Frequency = 0</b> — Integrate CI/CD to track deploys. 
-  <a href="#" style="color:var(--cyan)" onclick="showDoraSetup(event)">Setup guide →</a>
-</div>
-<tbody id="autofix-tbody"></tbody>
+        <tbody id="autofix-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -858,6 +835,18 @@ function _cicdDashCells(ids) {
   });
 }
 
+async function loadIntegrationStatus(){
+  try {
+    var r = await fetch('/api/v1/admin/api-keys', {headers: hdr()});
+    var d = await r.json();
+    var keys = Array.isArray(d) ? d : (d.keys || d.api_keys || []);
+    var cicdKey = keys.find(function(k){ return k.status==='active'; });
+    var el = document.getElementById('github-int-status');
+    if (el && cicdKey) {
+      el.textContent = '● Connected · ' + (cicdKey.label || cicdKey.name || 'API key active');
+    }
+  } catch(e) {}
+}
 async function loadKPIs(){
   var hasUX = typeof VSPUXState !== 'undefined';
   _cicdShimmerCells(CICD_KPI_IDS);
@@ -879,7 +868,12 @@ async function loadKPIs(){
     document.getElementById('k-ci-today').textContent = todayRuns.length;
     document.getElementById('k-pass-rate').textContent = total7>0 ? Math.round(pass7/total7*100) + '%' : '—';
     document.getElementById('k-blocked').textContent = todayRuns.filter(x => x.gate==='FAIL').length;
-    document.getElementById('k-autofixed').textContent = '0';
+    // Load auto-resolved count from remediation stats
+    fetch('/api/v1/remediation/stats', {headers: hdr()})
+      .then(function(rs){return rs.json();})
+      .then(function(sd){
+        document.getElementById('k-autofixed').textContent = sd.auto_resolved || sd.resolved || '0';
+      }).catch(function(){ document.getElementById('k-autofixed').textContent = '0'; });
   }catch(e){
     console.error('[FEAT-31] loadKPIs failed:', e);
     if (hasUX) {
@@ -969,10 +963,23 @@ async function loadSchedules(){
         <div class="sched-meta">${s.mode} · ${s.cron} · ${s.src}</div>
       </div>
       <span style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-right:8px">${fmtSchedTime(s.next_run||s.next_run_at)}</span>
+      <button class="sched-edit-btn" data-id="${s.id}" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--t2);padding:2px 7px;font-size:10px;cursor:pointer;margin-right:4px" title="Edit">✎</button>
+      <button class="sched-del-btn" data-id="${s.id}" data-name="${s.name.replace(/"/g,'&quot;')}" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:4px;color:var(--red);padding:2px 7px;font-size:10px;cursor:pointer" title="Delete">✕</button>
       <span class="badge badge-${s.last_gate==='PASS'?'ok':s.last_gate==='FAIL'?'danger':'warn'}">${s.last_gate||'—'}</span>
       <button class="btn btn-sm" style="margin-left:8px" onclick="runScheduleNow('${s.id}','${s.name}')">▶ Now</button>
     </div>`).join('');
 
+  // Event delegation cho edit/delete buttons
+  var sl = document.getElementById('schedules-list');
+  if(sl && !sl._delegated){
+    sl._delegated = true;
+    sl.addEventListener('click', function(e){
+      var editBtn = e.target.closest('.sched-edit-btn');
+      var delBtn = e.target.closest('.sched-del-btn');
+      if(editBtn){ e.stopPropagation(); editSchedule(editBtn.dataset.id); }
+      if(delBtn){ e.stopPropagation(); deleteSchedule(delBtn.dataset.id, delBtn.dataset.name, delBtn); }
+    });
+  }
   var upcoming = list.filter(x => x.enabled).slice(0,5);
   if (upcoming.length === 0) {
     if (hasUX) VSPUXState.empty('#upcoming-tbody', 'No upcoming runs (no enabled schedules)', loadSchedules);
@@ -988,21 +995,45 @@ async function loadSchedules(){
 }
 async function toggleSchedule(id,enabled){
   await ensureToken();
-  try{await fetch('/api/v1/schedules/'+id+'/toggle',{method:'PATCH',headers:hdr(),body:JSON.stringify({enabled})});}catch(e){}
-  showToast('Schedule '+(enabled?'enabled':'disabled'),'success');
+  try{
+    var r=await fetch('/api/v1/schedules/'+id+'/toggle',{method:'PATCH',headers:hdr(),body:JSON.stringify({enabled})});
+    if(r.ok){
+      showToast('Schedule '+(enabled?'enabled':'disabled')+' ✓','success');
+      await loadSchedules(); // await để đảm bảo UI sync sau khi server confirm
+    } else {
+      var d=await r.json();
+      showToast('Toggle failed: '+(d.error||'HTTP '+r.status),'error');
+      await loadSchedules(); // reload để reset UI về state thật
+    }
+  }catch(e){
+    showToast('Network error: '+e.message,'error');
+    await loadSchedules();
+  }
 }
 async function runScheduleNow(id,name){
   await ensureToken();
-  try{await fetch('/api/v1/schedules/'+id+'/run',{method:'POST',headers:hdr()});}catch(e){}
-  showToast('Scan triggered: '+name,'success');
+  try{
+    var r=await fetch('/api/v1/schedules/'+id+'/run',{method:'POST',headers:hdr()});
+    if(r.ok) showToast('▶ Triggered: '+name+' ✓','success');
+    else { var d=await r.json(); showToast('Run failed: '+(d.error||'HTTP '+r.status),'error'); }
+  }catch(e){ showToast('Network error: '+e.message,'error'); }
 }
 function openAddSchedule(){
-  // VSP-CICD-H2.F: inline modal create schedule
-  if(typeof window.showCreateScheduleModal === 'function'){
+  // Gọi trực tiếp — modal luôn có sẵn trong DOM
+  var modal = document.getElementById('modal-create-schedule');
+  if(modal){
+    document.getElementById('cs-name').value = '';
+    document.getElementById('cs-src').value = '';
+    document.getElementById('cs-cron').value = '0 2 * * *';
+    document.getElementById('cs-mode').value = 'FULL';
+    document.getElementById('cs-enabled').checked = true;
+    modal.style.display = 'flex';
+    setTimeout(function(){ var n=document.getElementById('cs-name'); if(n) n.focus(); }, 50);
+  } else if(typeof window.showCreateScheduleModal === 'function'){
     window.showCreateScheduleModal();
-    return;
+  } else {
+    showToast('Schedule modal not found — refresh page','warning');
   }
-  showToast('Schedule modal not loaded — refresh page','warning');
 }
 
 // ── GATE HISTORY ──
@@ -1613,24 +1644,109 @@ function renderHistory(){
 async function triggerManualScan(){
   await ensureToken();
   try{
-    var r=await fetch('/api/v1/vsp/run',{method:'POST',headers:hdr(),body:JSON.stringify({mode:'FULL',profile:'FAST',src:'/home/test/Data/GOLANG_VSP'})});
+    var r=await fetch('/api/v1/vsp/run',{method:'POST',headers:hdr(),body:JSON.stringify({mode:'FULL',profile:'FAST',src:'.'})});
     var d=await r.json();
     showToast('Scan triggered: '+(d.rid||d.id||'queued'),'success');
-  }catch(e){showToast('Scan triggered (mock)','success');}
+  }catch(e){showToast('Scan trigger failed: '+e.message,'error');}
 }
 async function copyApiKey(){
   await ensureToken();
-  navigator.clipboard?.writeText('vsp_ci_'+TOKEN.slice(0,12)+'...');
-  showToast('API key copied to clipboard','success');
+  try {
+    var r = await fetch('/api/v1/admin/api-keys', {headers: hdr()});
+    var d = await r.json();
+    var keys = Array.isArray(d) ? d : (d.keys || d.api_keys || []);
+    var active = keys.find(function(k){ return k.status === 'active'; });
+    if (active) {
+      var keyVal = active.key || active.token || active.prefix || active.id;
+      navigator.clipboard?.writeText(keyVal);
+      showToast('API key copied: '+(active.label||active.name||active.id),'success');
+    } else {
+      showToast('No active API keys found — create one in Users → API keys','info');
+    }
+  } catch(e) {
+    showToast('Failed to fetch API keys: '+e.message,'error');
+  }
 }
 function copyTemplate(name){
   var el=document.getElementById('tpl-'+name);
-  var text=el?el.innerText.replace(/^Copy\n/,''):'';
-  navigator.clipboard?.writeText(text);
-  showToast('Template copied','success');
+  if(!el){ showToast('Template not found','error'); return; }
+  // Lấy text sạch: bỏ button "Copy" đầu, trim whitespace
+  var text=el.innerText.replace(/^Copy\n/,'').replace(/^\s+|\s+$/g,'');
+  if(!text){ showToast('Nothing to copy','warning'); return; }
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text)
+      .then(function(){ showToast('✓ Template copied to clipboard','success'); })
+      .catch(function(){
+        // Fallback nếu clipboard bị block
+        _fallbackCopy(text);
+      });
+  } else {
+    _fallbackCopy(text);
+  }
 }
-function testPRComment(){showToast('PR comment test sent (requires GitHub token)','info');}
-function saveGatePolicy(){showToast('Gate policy saved','success');}
+function _fallbackCopy(text){
+  var ta=document.createElement('textarea');
+  ta.value=text;
+  ta.style.cssText='position:fixed;top:-9999px;left:-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); showToast('✓ Template copied','success'); }
+  catch(e){ showToast('Copy failed — select text manually','error'); }
+  document.body.removeChild(ta);
+}
+async function testPRComment(){
+  try {
+    // Lấy run mới nhất để evaluate
+    var runsR = await fetch('/api/v1/vsp/runs/index?limit=1', {headers: hdr()});
+    var runsD = await runsR.json();
+    var runs = runsD.runs || [];
+    if (!runs.length) { showToast('No runs found — trigger a scan first', 'warning'); return; }
+    var rid = runs[0].rid || runs[0].id;
+    var r = await fetch('/api/v1/policy/evaluate', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, hdr()),
+      body: JSON.stringify({rid: rid})
+    });
+    var d = await r.json();
+    if (r.ok) showToast('Gate: ' + (d.gate||d.result||d.status||'evaluated') + ' · Score: ' + (d.score||'—'), 'success');
+    else showToast('Evaluate failed: ' + (d.error || 'HTTP ' + r.status), 'error');
+  } catch(e) { showToast('Test failed: ' + e.message, 'error'); }
+}
+window.loadGatePolicy = async function loadGatePolicy(){
+  try {
+    var r = await fetch('/api/v1/features/settings_general/config', {headers: hdr()});
+    if (!r.ok) return;
+    var d = await r.json();
+    var p = (d.config || {}).gate_policy || {};
+    if (p.fail_on_critical  !== undefined) document.querySelector('[name="policy-gate-toggle"]').checked  = p.fail_on_critical;
+    if (p.fail_on_secrets   !== undefined) document.querySelector('[name="policy-gate-toggle-2"]').checked = p.fail_on_secrets;
+    if (p.min_score_70      !== undefined) document.querySelector('[name="policy-gate-toggle-3"]').checked = p.min_score_70;
+    if (p.post_pr_comment   !== undefined) { var el=document.getElementById('pol-pr-comment'); if(el) el.checked=p.post_pr_comment; }
+    if (p.auto_jira         !== undefined) { var el2=document.getElementById('pol-jira'); if(el2) el2.checked=p.auto_jira; }
+  } catch(e) {}
+}
+window.saveGatePolicy = async function saveGatePolicy(){
+  var policy = {
+    fail_on_critical: document.querySelector('[name="policy-gate-toggle"]')?.checked ?? true,
+    fail_on_secrets:  document.querySelector('[name="policy-gate-toggle-2"]')?.checked ?? true,
+    min_score_70:     document.querySelector('[name="policy-gate-toggle-3"]')?.checked ?? true,
+    post_pr_comment:  document.getElementById('pol-pr-comment')?.checked ?? false,
+    auto_jira:        document.getElementById('pol-jira')?.checked ?? false,
+  };
+  try {
+    // Lưu vào features/settings_general/config
+    var cfgR = await fetch('/api/v1/features/settings_general/config', {headers: hdr()});
+    var cfg = cfgR.ok ? (await cfgR.json()).config || {} : {};
+    cfg.gate_policy = policy;
+    var r = await fetch('/api/v1/features/settings_general/config', {
+      method: 'PUT',
+      headers: Object.assign({'Content-Type':'application/json'}, hdr()),
+      body: JSON.stringify({config: cfg})
+    });
+    if (r.ok) showToast('Gate policy saved ✓', 'success');
+    else showToast('Save failed: HTTP ' + r.status, 'error');
+  } catch(e) { showToast('Save failed: ' + e.message, 'error'); }
+}
 
 // ── INIT ──
 window.addEventListener('message', e => {
@@ -1639,8 +1755,10 @@ window.addEventListener('message', e => {
 });
 document.addEventListener('DOMContentLoaded',async()=>{
   await loadKPIs();
+  loadIntegrationStatus();
   loadSchedules();
   loadGateHistory();
+  loadGatePolicy();
   loadPRComment();
   loadAutofixStats();
   loadHistory();
@@ -2261,7 +2379,7 @@ window.setupIntegration = function(platform){
   var guides = {
     github: {name:'GitHub Actions', status:'connected', tplId:'tpl-card-github', steps:[
       '<b>Create repository secrets</b> in Settings → Secrets and variables → Actions:',
-      '&nbsp;&nbsp;• <code>VSP_URL</code> = '+(location.origin||'https://vsp.example.com'),
+      '&nbsp;&nbsp;• <code>VSP_URL</code> = <code style="color:var(--cyan)">'+(location.origin)+'</code>',
       '&nbsp;&nbsp;• <code>VSP_TOKEN</code> = your VSP API key',
       '<b>Copy</b> the workflow YAML to <code>.github/workflows/vsp-scan.yml</code>',
       '<b>Push</b> the file — first run triggers automatically',
@@ -2325,13 +2443,36 @@ window.setupIntegration = function(platform){
   document.getElementById('msw-body').innerHTML =
     '<div style="margin-bottom:14px;font-size:11px;color:var(--t2)">Follow these steps to integrate <b>'+g.name+'</b> with VSP:</div>'+
     '<div style="margin-bottom:16px">'+stepsHtml+'</div>'+
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'+
+    '<div style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
+      '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Quick copy</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button class="btn btn-sm" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.origin).then(function(){showToast(\"VSP URL copied\",\"success\")})">⊕ VSP URL</button>'+
+      '<button class="btn btn-sm" onclick="_copyActiveApiKey()">⊕ API Key</button>'+
+      '</div>'+
+      '<div style="font-size:10px;color:var(--t3);margin-top:6px;font-family:var(--font-mono)">'+location.origin+'</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)">'+
       '<button class="btn" onclick="closeSetupWizard()">Close</button>'+
       '<button class="btn btn-primary" onclick="closeSetupWizard();gotoTemplate(\''+g.tplId+'\')">Open Template ↗</button>'+
     '</div>';
   document.getElementById('modal-setup-wizard').style.display = 'flex';
 };
 
+window._copyActiveApiKey = async function(){
+  await ensureToken();
+  try {
+    var r = await fetch('/api/v1/admin/api-keys', {headers: hdr()});
+    var d = await r.json();
+    var keys = Array.isArray(d) ? d : (d.keys || d.api_keys || []);
+    var k = keys.find(function(x){ return x.status === 'active'; });
+    if(k){
+      navigator.clipboard?.writeText(k.key || k.token || k.id);
+      showToast('API key copied ✓', 'success');
+    } else {
+      showToast('No active API key — create one in Users → API keys', 'warning');
+    }
+  } catch(e){ showToast('Failed: '+e.message, 'error'); }
+};
 window.closeSetupWizard = function(){
   document.getElementById('modal-setup-wizard').style.display = 'none';
 };
@@ -2387,11 +2528,11 @@ document.addEventListener('keydown', function(e){
           </select></div>
       </div>
       <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-src">Source path *</label>
+        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-src">Source path <span style="color:var(--t3);font-size:9px">(optional)</span></label>
         <input id="cs-src" placeholder="/home/user/repo  or  https://example.com" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;font-family:var(--font-mono)">
       </div>
       <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-cron">Cron expression *</label>
+        <label style="display:block;font-size:10px;color:var(--t3);margin-bottom:4px" for="cs-cron">Cron expression</label>
         <input id="cs-cron" placeholder="0 2 * * *" value="0 2 * * *" style="width:100%;padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:11px;font-family:var(--font-mono)">
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
           <button class="btn btn-sm" onclick="document.getElementById('cs-cron').value='0 2 * * *'" style="font-size:9px;padding:3px 8px">Daily 02:00</button>
@@ -2435,33 +2576,107 @@ window.showCreateScheduleModal = function(){
   setTimeout(function(){ var n=document.getElementById('cs-name'); if(n) n.focus(); }, 50);
 };
 window.closeCreateSchedule = function(){
-  document.getElementById('modal-create-schedule').style.display = 'none';
+  var modal = document.getElementById('modal-create-schedule');
+  modal.style.display = 'none';
+  delete modal.dataset.editId;
+  var btn = modal.querySelector('.btn-primary');
+  if(btn) btn.textContent = 'Create Schedule';
+  var h3 = modal.querySelector('h3');
+  if(h3) h3.textContent = '+ New Schedule';
 };
+// Delete schedule với confirm
+window.deleteSchedule = async function(id, name, btn){
+  if(!confirm('Xóa schedule "' + name + '"?')) return;
+  btn.disabled = true;
+  btn.textContent = '...';
+  var tk = window.TOKEN || (window.parent && window.parent.TOKEN) || localStorage.getItem('vsp_token') || '';
+  try {
+    var r = await fetch('/api/v1/schedules/' + id, {
+      method: 'DELETE',
+      headers: {'Authorization': 'Bearer ' + tk}
+    });
+    if(r.ok || r.status === 204){
+      _schedToast('✓ Deleted: ' + name, true);
+      if(typeof loadSchedules==='function') await loadSchedules();
+    } else {
+      _schedToast('Delete failed: HTTP ' + r.status, false);
+      btn.disabled = false; btn.textContent = '✕';
+    }
+  } catch(e) {
+    _schedToast('Error: ' + e.message, false);
+    btn.disabled = false; btn.textContent = '✕';
+  }
+};
+
+// Edit schedule — mở modal với data hiện tại
+window.editSchedule = async function(id){
+  var tk = window.TOKEN || (window.parent && window.parent.TOKEN) || localStorage.getItem('vsp_token') || '';
+  try {
+    var r = await fetch('/api/v1/schedules', {headers: {'Authorization': 'Bearer ' + tk}});
+    var d = await r.json();
+    var s = (d.schedules||[]).find(x => x.id === id);
+    if(!s) { _schedToast('Schedule not found', false); return; }
+    // Fill modal
+    document.getElementById('cs-name').value = s.name || '';
+    document.getElementById('cs-mode').value = s.mode || 'SAST';
+    document.getElementById('cs-src').value = s.src || s.url || '';
+    document.getElementById('cs-cron').value = s.cron || '0 2 * * *';
+    document.getElementById('cs-enabled').checked = !!s.enabled;
+    // Mark as edit mode
+    var modal = document.getElementById('modal-create-schedule');
+    modal.dataset.editId = id;
+    modal.querySelector('h3') && (modal.querySelector('h3').textContent = '✎ Edit Schedule');
+    var btn = modal.querySelector('.btn-primary');
+    if(btn) btn.textContent = 'Save Changes';
+    modal.style.display = 'flex';
+  } catch(e) { _schedToast('Error: ' + e.message, false); }
+};
+
+// Local toast — hoạt động độc lập không phụ thuộc showToast
+function _schedToast(msg, ok){
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:13px;font-family:monospace;z-index:999999;color:#fff;background:'+(ok?'#16a34a':'#dc2626')+';box-shadow:0 4px 16px rgba(0,0,0,.5)';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 3500);
+}
+
 window.submitCreateSchedule = async function(){
+  var modal = document.getElementById('modal-create-schedule');
+  var editId = modal && modal.dataset.editId;
   var name = document.getElementById('cs-name').value.trim();
   var mode = document.getElementById('cs-mode').value;
   var src  = document.getElementById('cs-src').value.trim();
   var cron = document.getElementById('cs-cron').value.trim();
   var enabled = document.getElementById('cs-enabled').checked;
-  if(!name || !src || !cron){
-    if(typeof showToast==='function') showToast('Name, source, and cron are required','warning');
+  if(!name || !cron){
+    if(typeof showToast==='function') showToast('Name and cron expression are required','warning');
+    else alert('Name and cron expression are required');
     return;
   }
   try {
-    var r = await fetch('/api/v1/schedules',{
-      method:'POST',
-      headers: Object.assign({'Content-Type':'application/json'}, hdr ? hdr() : {}),
-      body: JSON.stringify({name:name, mode:mode, src:src, cron:cron, enabled:enabled})
+    var tk = window.TOKEN || (window.parent && window.parent.TOKEN) || localStorage.getItem('vsp_token') || '';
+    var url = editId ? '/api/v1/schedules/' + editId : '/api/v1/schedules';
+    var method = editId ? 'PATCH' : 'POST';
+    var payload = editId
+      ? {name:name, mode:mode, profile:'FAST', cron:cron, src:src||''}
+      : {name:name, mode:mode, profile:'FAST', cron:cron, enabled:enabled, src:src||''};
+    var r = await fetch(url,{
+      method: method,
+      headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + tk},
+      body: JSON.stringify(payload)
     });
-    if(!r.ok){
-      var t = await r.text();
-      throw new Error(t || 'HTTP ' + r.status);
-    }
-    if(typeof showToast==='function') showToast('Schedule created: ' + name,'success');
+    var respText = await r.text();
+    if(!r.ok) throw new Error(respText || 'HTTP ' + r.status);
+    _schedToast((editId ? '✓ Updated: ' : '✓ Created: ') + name, true);
     closeCreateSchedule();
     if(typeof loadSchedules==='function') loadSchedules();
   } catch(e) {
-    if(typeof showToast==='function') showToast('Error: ' + e.message,'error');
+    var msg = 'Error: ' + e.message;
+    if(typeof showToast==='function') showToast(msg,'error');
+    else { var t=document.createElement('div'); t.style.cssText='position:fixed;bottom:20px;right:20px;background:#dc2626;color:#fff;padding:10px 18px;border-radius:8px;font-size:12px;z-index:99999'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),5000); }
+    console.error('[schedule]', e);
+
   }
 };
 
@@ -2491,27 +2706,86 @@ document.addEventListener('keydown', function(e){
 
 <script>
 // K1: bridge to parent's viewRunLog (which lives in index.html)
-window.openRunDetail = function(rid){
+window.openRunDetail = async function(rid){
   if(!rid){ if(typeof showToast==='function') showToast('Run ID missing','warning'); return; }
+  // Try parent first
   try {
     if(window.parent && typeof window.parent.viewRunLog === 'function'){
-      window.parent.viewRunLog(rid);
-      return;
+      window.parent.viewRunLog(rid); return;
     }
-  } catch(e) { console.warn('parent.viewRunLog unavailable', e); }
-  // Fallback: navigate parent to scanlog with this run
+  } catch(e) {}
   try {
     if(window.parent && typeof window.parent.showPanel === 'function'){
       window.parent.showPanel('scanlog', null);
       setTimeout(function(){
-        try {
-          if(typeof window.parent.loadRunLog === 'function') window.parent.loadRunLog(rid);
-        } catch(e) {}
+        try { if(typeof window.parent.loadRunLog === 'function') window.parent.loadRunLog(rid); } catch(e) {}
       }, 300);
       return;
     }
   } catch(e) {}
-  if(typeof showToast==='function') showToast('Cannot open run detail (rid: '+rid.slice(-12)+')','error');
+  // Fallback: inline modal
+  await ensureToken();
+  try {
+    var r = await fetch('/api/v1/vsp/runs/'+rid, {headers: hdr()});
+    var run = await r.json();
+    var score = run.summary?.SCORE ?? run.score ?? '—';
+    var scoreColor = score >= 70 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
+    var gateColor = run.gate==='PASS'?'var(--green)':run.gate==='FAIL'?'var(--red)':'var(--amber)';
+    var findings = run.total_findings ?? '—';
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)';
+    ov.innerHTML = `
+      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;min-width:480px;max-width:640px;max-height:85vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <span style="font-size:14px;font-weight:700;color:var(--t1)">Run Detail</span>
+          <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div style="background:var(--bg3);border-radius:8px;padding:10px">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Run ID</div>
+            <div style="font-size:10px;font-family:var(--font-mono);color:var(--cyan)">${(run.rid||rid).slice(-20)}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:10px">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Gate</div>
+            <div style="font-size:14px;font-weight:700;color:${gateColor}">${run.gate||'—'}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:10px">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Score</div>
+            <div style="font-size:14px;font-weight:700;color:${scoreColor}">${score}/100</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:10px">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Findings</div>
+            <div style="font-size:14px;font-weight:700;color:var(--t1)">${findings}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:10px">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Mode</div>
+            <div style="font-size:12px;color:var(--t1)">${run.mode||'—'} · ${run.profile||'—'}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:10px">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Status</div>
+            <div style="font-size:12px;color:var(--t1)">${run.status||'—'}</div>
+          </div>
+        </div>
+        <div style="background:var(--bg3);border-radius:8px;padding:10px;margin-bottom:16px">
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Summary</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            ${Object.entries(run.summary||{}).filter(([k])=>['CRITICAL','HIGH','MEDIUM','LOW','INFO'].includes(k)).map(([k,v])=>`
+              <div style="text-align:center">
+                <div style="font-size:12px;font-weight:700;color:${k==='CRITICAL'?'var(--red)':k==='HIGH'?'var(--amber)':k==='MEDIUM'?'var(--blue)':'var(--t3)'}">${v}</div>
+                <div style="font-size:9px;color:var(--t3)">${k}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="this.closest('[style*=fixed]').remove()" class="btn">Close</button>
+          <button onclick="navigator.clipboard?.writeText('${run.rid||rid}');showToast('RID copied','success')" class="btn">⊕ Copy RID</button>
+        </div>
+      </div>`;
+    ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+    document.body.appendChild(ov);
+  } catch(e) {
+    showToast('Failed to load run detail: '+e.message, 'error');
+  }
 };
 
 // K2: Fix preview modal
@@ -2545,7 +2819,7 @@ window.showFixPreview = function(finding){
     '<div style="background:var(--bg0);padding:12px 14px;border-radius:6px;border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;color:var(--green);white-space:pre-wrap;line-height:1.6;margin-bottom:14px">'+(fixSnippet||'(no automatic fix snippet)').replace(/</g,'&lt;')+'</div>' +
     '<div style="background:rgba(245,158,11,.08);border-left:3px solid #f59e0b;padding:10px 12px;border-radius:4px;font-size:11px;color:var(--t2);line-height:1.5;margin-bottom:14px">' +
       '<b>⚠️ Manual review required</b><br>' +
-      'Auto-apply is not yet enabled. Copy the snippet, apply it manually in your codebase, then re-scan to verify.' +
+      'Copy the snippet and apply it manually in your codebase, then click Verify to re-scan and confirm the fix.' +
     '</div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)">' +
       '<button class="btn" onclick="closeFixPreview()">Close</button>' +
@@ -2591,8 +2865,7 @@ window.closeFixPreview = function(){
 
 window.markFixApplied = async function(findingId){
   if(!findingId){ closeFixPreview(); if(typeof showToast==='function') showToast('Marked locally only — no finding ID','warning'); return; }
-  // VSP-CICD-H3.J: Backend endpoint /findings/{id}/status not yet implemented
-  // Suppress 404 console error by checking existence first OR catching silently
+  // PATCH /api/v1/remediation/finding/{id}/status — implemented
   var marked = false;
   try {
     var r = await fetch('/api/v1/remediation/finding/' + findingId + '/status', {
@@ -2606,12 +2879,12 @@ window.markFixApplied = async function(findingId){
       if(typeof showToast==='function') showToast('Fix recorded — click Verify to re-scan','success');
     } else if(r && r.status === 404){
       // Backend endpoint not yet implemented — totally expected
-      if(typeof showToast==='function') showToast('Marked locally · backend wire pending','info');
+      if(typeof showToast==='function') showToast('Status update failed — please retry','warning');
     } else {
-      if(typeof showToast==='function') showToast('Marked locally (backend offline)','info');
+      if(typeof showToast==='function') showToast('Network error — marked locally only','warning');
     }
   } catch(e) {
-    if(typeof showToast==='function') showToast('Marked locally (offline)','info');
+    if(typeof showToast==='function') showToast('Network error — marked locally only','warning');
   }
   closeFixPreview();
   if(marked && typeof loadAutofixStats === 'function') setTimeout(loadAutofixStats, 600);
@@ -3963,6 +4236,109 @@ function showSetupGuide() {
     '6. sudo systemctl restart vsp-gateway',
   ].join('\n');
   alert('LLM AutoFix Setup Guide:\n\n' + guide);
+}
+
+
+// setupIntegration — show setup guide modal for CI/CD integrations
+function setupIntegration(provider) {
+  const guides = {
+    github: {
+      title: 'GitHub Actions',
+      status: 'Connected',
+      steps: [
+        'Create repository secrets in Settings → Secrets and variables → Actions:',
+        '  • VSP_URL = http://127.0.0.1:8921',
+        '  • VSP_TOKEN = your VSP API key',
+        'Copy the workflow YAML to .github/workflows/vsp-scan.yml',
+        'Push the file — first run triggers automatically',
+        'Verify: GitHub Actions tab shows VSP Security Scan job',
+      ]
+    },
+    gitlab: {
+      title: 'GitLab CI',
+      status: 'Template available',
+      steps: [
+        'Add CI/CD variables in Settings → CI/CD → Variables:',
+        '  • VSP_URL = http://127.0.0.1:8921',
+        '  • VSP_TOKEN = your VSP API key',
+        'Copy the .gitlab-ci.yml template',
+        'Commit and push to trigger the pipeline',
+      ]
+    },
+    jenkins: {
+      title: 'Jenkins',
+      status: 'Template available',
+      steps: [
+        'Install VSP Jenkins plugin or use shell step',
+        'Add credentials: VSP_URL and VSP_TOKEN',
+        'Add VSP scan stage to your Jenkinsfile',
+        'Trigger a build to verify',
+      ]
+    },
+    azure: {
+      title: 'Azure DevOps',
+      status: 'Template available',
+      steps: [
+        'Add pipeline variables: VSP_URL and VSP_TOKEN',
+        'Copy azure-pipelines.yml template',
+        'Add VSP scan task to your pipeline',
+        'Run the pipeline to verify',
+      ]
+    },
+    bitbucket: {
+      title: 'Bitbucket Pipelines',
+      status: 'Template available',
+      steps: [
+        'Add repository variables: VSP_URL and VSP_TOKEN',
+        'Copy bitbucket-pipelines.yml template',
+        'Push to trigger the pipeline',
+      ]
+    },
+    vspcli: {
+      title: 'VSP CLI',
+      status: 'Template available',
+      steps: [
+        'Install: curl -sSL http://127.0.0.1:8921/install.sh | bash',
+        'Authenticate: vsp-cli login --url http://127.0.0.1:8921',
+        'Run scan: vsp-cli scan --mode SAST --source .',
+        'View results: vsp-cli findings list',
+      ]
+    }
+  };
+  const g = guides[provider] || { title: provider, status: '', steps: ['No guide available'] };
+  
+  // Remove existing modal if any
+  const existing = document.getElementById('vsp-integration-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'vsp-integration-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:600;color:var(--t1)">${g.title}</div>
+        <span style="font-size:11px;color:var(--green);background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);padding:2px 8px;border-radius:10px">● ${g.status}</span>
+      </div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:14px">Follow these steps to integrate <strong>${g.title}</strong> with VSP:</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+        ${g.steps.map((s,i) => `<div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="width:20px;height:20px;border-radius:50%;background:rgba(14,165,233,.2);border:1px solid rgba(14,165,233,.4);color:var(--accent);font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${i+1}</div>
+          <div style="font-size:11px;color:var(--t1);font-family:var(--font-mono);white-space:pre-wrap">${s}</div>
+        </div>`).join('')}
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:16px;font-size:10px;color:var(--t3)">
+        <div style="margin-bottom:4px;color:var(--t2);font-weight:600">Quick ref</div>
+        <div>● VSP URL &nbsp;&nbsp;● API Key</div>
+        <div style="color:var(--t2);margin-top:4px">http://127.0.0.1:8921</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn" onclick="document.getElementById('vsp-integration-modal').remove()">Close</button>
+        <button class="btn btn-primary" onclick="selectTemplate('${provider}');document.getElementById('vsp-integration-modal').remove()">Open Template ↗</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
 }
 
 // Fix 4: DORA deploy setup guide

@@ -40,6 +40,8 @@
     return "";
   }
   
+  var _origFetch = window.fetch;
+
   window.vspAuthFetch = async function(url, opts){
     opts = opts || {};
     var tk = await getToken();
@@ -50,8 +52,7 @@
     }
     return _origFetch(url, opts);
   };
-  
-  var _origFetch = window.fetch;
+
   window.fetch = function(url, opts){
     if (typeof url === "string" && url.indexOf("/api/") >= 0) {
       if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
@@ -111,6 +112,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   <div><h2>&#128269; Threat Hunting</h2><p>Query log_events · filter · timeline · pivot</p></div>
   <div style="display:flex;gap:8px;align-items:center">
     <span class="pill pill-blue" id="hunt-status">Ready</span>
+    <button class="btn btn-sm" onclick="showHuntHistory()">&#128337; History</button>
     <button class="btn btn-sm" onclick="clearResults()">&#10005; Clear</button>
   </div>
 </div>
@@ -147,6 +149,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     <option value="200">200 rows</option>
     <option value="500">500 rows</option>
   </select>
+  <input aria-label="host filter" class="filter-select" id="hunt-host" type="text" placeholder="host (e.g. 10.0.1.10)" style="width:130px">
 </div>
 
 <!-- Saved queries -->
@@ -223,6 +226,20 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 <script>
 var TOKEN='',API='',_results=[],_currentEv=null;
 
+function hdr(extra){
+  var h = {'Content-Type':'application/json'};
+  if(TOKEN) h['Authorization'] = 'Bearer '+TOKEN;
+  return Object.assign(h, extra||{});
+}
+function showToast(msg,type){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);background:var(--bg2);border:1px solid var(--border2);color:var(--t1);max-width:320px';
+  if(type==='success') t.style.borderColor='rgba(34,197,94,.4)';
+  if(type==='error')   t.style.borderColor='rgba(239,68,68,.4)';
+  t.textContent=msg; document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},300);},3000);
+}
+
 var SAVED_QUERIES=[
   {label:'SSH brute force', q:'Failed password', sev:'', proc:'sshd'},
   {label:'Sudo commands',   q:'COMMAND',         sev:'', proc:'sudo'},
@@ -262,7 +279,7 @@ function renderSavedQueries(){
 
 async function loadProSavedQueries(){
   try{
-    var r=await fetch('/api/v1/threat-hunt/queries',{credentials:'same-origin'});
+    var r=await fetch('/api/v1/threat-hunt/queries',{headers:hdr()});
     if(!r.ok) return;
     var d=await r.json();
     if(!d.queries || d.queries.length===0) return;
@@ -275,9 +292,13 @@ async function loadProSavedQueries(){
     d.queries.forEach(function(q){
       var btn=document.createElement('button');
       btn.className='sq-btn';
-      btn.style.cssText='border-color:rgba(34,211,238,.3)';
+      btn.style.cssText='border-color:rgba(34,211,238,.3)'+(q.enabled===false?';opacity:.45;text-decoration:line-through':'');
+      if(q.enabled===false) btn.title='[DISABLED] '+btn.title;
       var lastRunStr = q.last_run ? new Date(q.last_run).toLocaleDateString() : 'never run';
-      btn.title=(q.description||'')+' · query: '+q.query+' · last run: '+lastRunStr;
+      var mitre = (q.mitre_techniques||[]).length ? ' · MITRE: '+q.mitre_techniques.slice(0,3).join(',') : '';
+      var sched = q.schedule_cron ? ' · cron: '+q.schedule_cron : '';
+      var lookback = q.lookback_hours ? ' · lookback: '+q.lookback_hours+'h' : '';
+      btn.title=(q.description||'')+' · query: '+q.query+' · last run: '+lastRunStr+mitre+sched+lookback;
       btn.textContent=q.name;
       // Add last_run indicator
       var lbl = document.createElement('span');
@@ -286,6 +307,16 @@ async function loadProSavedQueries(){
       btn.appendChild(lbl);
       btn.onclick=function(){
         document.getElementById('hunt-q').value=q.query||'';
+        // [IMP3] Dùng lookback_hours của saved query nếu có
+        if(q.lookback_hours){
+          var sel=document.getElementById('hunt-hours');
+          // Tìm option gần nhất
+          var opts=Array.from(sel.options);
+          var best=opts.reduce(function(prev,curr){
+            return Math.abs(parseInt(curr.value)-q.lookback_hours)<Math.abs(parseInt(prev.value)-q.lookback_hours)?curr:prev;
+          });
+          sel.value=best.value;
+        }
         runHunt();
       };
       // Right-click → run via PRO endpoint (uses substring match against findings).
@@ -293,10 +324,30 @@ async function loadProSavedQueries(){
         e.preventDefault();
         runProSavedQuery(q.id, q.name);
       };
-      // Tiny delete (×) appended next to button label
+      // Toggle enable/disable button
+      var togBtn=document.createElement('span');
+      togBtn.textContent=q.enabled===false?' ▶':' ⏸';
+      togBtn.style.cssText='color:'+(q.enabled===false?'#10b981':'#f59e0b')+';cursor:pointer;font-weight:bold;padding-left:4px';
+      togBtn.title=(q.enabled===false?'Enable':'Disable')+' this query';
+      togBtn.onclick=function(e){
+        e.stopPropagation();
+        toggleProSavedQuery(q.id, q.name, q.enabled!==false);
+      };
+      btn.appendChild(togBtn);
+      // Edit button
+      var editBtn=document.createElement('span');
+      editBtn.textContent=' ✎';
+      editBtn.style.cssText='color:#06b6d4;cursor:pointer;font-weight:bold;padding-left:4px';
+      editBtn.title='Edit saved query';
+      editBtn.onclick=function(e){
+        e.stopPropagation();
+        editProSavedQuery(q.id, q.name, q.description, q.enabled);
+      };
+      btn.appendChild(editBtn);
+      // Delete button
       var del=document.createElement('span');
       del.textContent=' ×';
-      del.style.cssText='color:#ef4444;cursor:pointer;font-weight:bold;padding-left:4px';
+      del.style.cssText='color:#ef4444;cursor:pointer;font-weight:bold;padding-left:2px';
       del.title='Delete saved query';
       del.onclick=function(e){
         e.stopPropagation();
@@ -379,9 +430,8 @@ async function saveCurrentQuery(){
 async function doSaveQuery(name, desc, q, sev, lang){
   var r=await fetch('/api/v1/threat-hunt/queries',{
     method:'POST',
-    credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name:name, description:desc||'', query:q, min_match_severity:sev||'medium', language:lang||'vsp'})
+    headers:hdr(),
+    body:JSON.stringify({name:name, description:desc||'', query:q, min_match_severity:sev||'medium'})
   });
   if(r.status===402){ throw new Error('Saved-query persistence requires a PRO plan.'); }
   if(!r.ok){ throw new Error('Save failed: HTTP '+r.status); }
@@ -389,26 +439,164 @@ async function doSaveQuery(name, desc, q, sev, lang){
 }
 
 async function runProSavedQuery(id, name){
+  document.getElementById('hunt-status').textContent='Running: '+name+'...';
+  document.getElementById('hunt-status').className='pill pill-amber';
+  if(typeof VSPUXState!=='undefined') VSPUXState.skeleton('#results-wrap',{rows:5,kind:'card'});
   try{
     var r=await fetch('/api/v1/threat-hunt/queries/'+encodeURIComponent(id)+'/run',{
-      method:'POST', credentials:'same-origin'});
-    if(!r.ok){ alert('Run failed: '+r.status); return; }
+      method:'POST', headers:hdr()});
+    if(!r.ok){ showToast('Run failed: HTTP '+r.status,'error'); return; }
     var d=await r.json();
-    alert('Saved hunt "'+name+'" ran:\n  '+d.match_count+' matches in '+d.duration_ms+'ms\n\n(See result in DB; UI display TODO)');
-  }catch(e){ alert('Run error: '+e.message); }
+    var count=d.match_count||0;
+    document.getElementById('k-results').textContent=count;
+    document.getElementById('k-total').textContent=count;
+    document.getElementById('k-time').textContent=(d.duration_ms||0)+'ms';
+    document.getElementById('hunt-status').textContent=count+' matches';
+    document.getElementById('hunt-status').className='pill pill-'+(count>0?'blue':'gray');
+    showToast('Hunt "'+name+'": '+count+' matches in '+(d.duration_ms||0)+'ms', count>0?'success':'info');
+    // Render samples nếu có
+    if(d.samples && d.samples.length){
+      _results = d.samples.map(function(s){ return {
+        id: s.id, ts: s.detected_at||'—', host: s.file||'—',
+        process: s.rule_id||'—', severity: s.severity||'INFO',
+        facility: '—', message: s.description||'—', source_ip:'—'
+      };});
+      renderResults(name);
+    } else {
+      document.getElementById('results-wrap').innerHTML=
+        '<div class="empty">✓ Hunt ran — 0 matches in findings for query: "'+name+'"</div>';
+    }
+    // Reload saved queries để update last_run_at
+    var wrap=document.getElementById('saved-queries');
+    Array.from(wrap.querySelectorAll('span,button')).slice(SAVED_QUERIES.length+2).forEach(function(el){el.remove();});
+    loadProSavedQueries();
+  }catch(e){ showToast('Run error: '+e.message,'error'); }
 }
 
 async function deleteProSavedQuery(id, name){
   if(!confirm('Delete saved query "'+name+'"?')) return;
   try{
     var r=await fetch('/api/v1/threat-hunt/queries/'+encodeURIComponent(id),{
-      method:'DELETE', credentials:'same-origin'});
-    if(!r.ok && r.status!==204){ alert('Delete failed: '+r.status); return; }
-    // Reload
+      method:'DELETE', headers:hdr()});
+    if(!r.ok && r.status!==204){
+      showToast('Delete failed: HTTP '+r.status,'error'); return;
+    }
+    showToast('"'+name+'" deleted','success');
     var wrap=document.getElementById('saved-queries');
-    Array.from(wrap.querySelectorAll('span,button')).slice(SAVED_QUERIES.length+2).forEach(function(el){ el.remove(); });
+    Array.from(wrap.querySelectorAll('span,button')).slice(SAVED_QUERIES.length+2).forEach(function(el){el.remove();});
     loadProSavedQueries();
-  }catch(e){ alert('Delete error: '+e.message); }
+  }catch(e){ showToast('Delete error: '+e.message,'error'); }
+}
+
+// PATCH — edit saved query name/description/enabled
+async function editProSavedQuery(id, name, currentDesc, currentEnabled){
+  var newName = prompt('Query name:', name);
+  if(!newName || !newName.trim()) return;
+  var newDesc = prompt('Description:', currentDesc||'');
+  try{
+    var r=await fetch('/api/v1/threat-hunt/queries/'+encodeURIComponent(id),{
+      method:'PATCH', headers:hdr(),
+      body:JSON.stringify({name:newName.trim(), description:newDesc||''})
+    });
+    if(!r.ok){ showToast('Update failed: HTTP '+r.status,'error'); return; }
+    showToast('"'+newName.trim()+'" updated','success');
+    reloadProChips();
+  }catch(e){ showToast('Update error: '+e.message,'error'); }
+}
+
+async function toggleProSavedQuery(id, name, currentEnabled){
+  var newEnabled = !currentEnabled;
+  try{
+    var r=await fetch('/api/v1/threat-hunt/queries/'+encodeURIComponent(id),{
+      method:'PATCH', headers:hdr(),
+      body:JSON.stringify({enabled:newEnabled})
+    });
+    if(!r.ok){ showToast('Toggle failed: HTTP '+r.status,'error'); return; }
+    showToast('"'+name+'" '+(newEnabled?'enabled':'disabled'),'success');
+    reloadProChips();
+  }catch(e){ showToast('Toggle error: '+e.message,'error'); }
+}
+
+function reloadProChips(){
+  var wrap=document.getElementById('saved-queries');
+  Array.from(wrap.querySelectorAll('span,button')).slice(SAVED_QUERIES.length+2).forEach(function(el){el.remove();});
+  loadProSavedQueries();
+}
+
+// GET /threat-hunt/results — run history modal
+async function showHuntHistory(){
+  try{
+    // Lấy query map để show tên
+    var qMap={};
+    try{
+      var qr=await fetch('/api/v1/threat-hunt/queries',{headers:hdr()});
+      if(qr.ok){ var qd=await qr.json(); (qd.queries||[]).forEach(function(q){qMap[q.id]=q.name;}); }
+    }catch(_){}
+
+    var r=await fetch('/api/v1/threat-hunt/results?limit=50',{headers:hdr()});
+    if(!r.ok){ showToast('Failed to load history','error'); return; }
+    var d=await r.json();
+    var items=d.results||[];
+
+    // Render modal với table
+    var modalDiv=document.getElementById('hunt-history-modal');
+    if(!modalDiv){
+      modalDiv=document.createElement('div');
+      modalDiv.id='hunt-history-modal';
+      modalDiv.className='modal-overlay';
+      modalDiv.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;padding-top:32px;overflow-y:auto';
+      var _hclose="document.getElementById('hunt-history-modal').style.display='none'";
+      modalDiv.innerHTML=
+        '<div class="modal" style="width:min(800px,95vw)">'+
+          '<div class="modal-head">'+
+            '<div><div class="modal-title">&#128337; Hunt Run History</div>'+
+            '<div class="modal-sub" id="hunt-hist-sub"></div></div>'+
+            '<button class="modal-close" onclick="'+_hclose+'">&#10005;</button>'+
+          '</div>'+
+          '<div class="modal-body" style="padding:0">'+
+            '<div style="overflow-x:auto">'+
+              '<table class="results-table" id="hunt-hist-table">'+
+                '<thead><tr>'+
+                  '<th>Ran At</th><th>Query</th><th>Matches</th>'+
+                  '<th>Duration</th><th>Triggered By</th><th>Status</th>'+
+                '</tr></thead>'+
+                '<tbody id="hunt-hist-tbody"></tbody>'+
+              '</table>'+
+            '</div>'+
+          '</div>'+
+          '<div class="modal-footer">'+
+            '<button class="btn btn-sm" onclick="'+_hclose+'">Close</button>'+
+          '</div>'+
+        '</div>';
+      document.body.appendChild(modalDiv);
+    }
+
+    var tbody=document.getElementById('hunt-hist-tbody');
+    var sub=document.getElementById('hunt-hist-sub');
+    sub.textContent=(d.total||items.length)+' total runs';
+
+    if(!items.length){
+      tbody.innerHTML='<tr><td colspan="6" class="empty">No hunt history yet — run a saved query first</td></tr>';
+    } else {
+      tbody.innerHTML=items.map(function(x){
+        var t=new Date(x.ran_at).toLocaleString();
+        var qname=qMap[x.query_id]||x.query_id.slice(0,8)+'…';
+        var hasErr=x.error&&x.error.length>0;
+        var statusBadge=hasErr
+          ?'<span class="pill pill-red">ERROR</span>'
+          :(x.match_count>0?'<span class="pill pill-blue">'+x.match_count+' hits</span>':'<span class="pill pill-gray">0 hits</span>');
+        return '<tr>'+
+          '<td class="ts">'+t+'</td>'+
+          '<td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">'+qname+'</td>'+
+          '<td style="font-family:var(--font-mono);font-weight:600;color:'+(x.match_count>0?'var(--amber)':'var(--t3)')+'">'+x.match_count+'</td>'+
+          '<td class="ts">'+x.duration_ms+'ms</td>'+
+          '<td style="font-size:10px;color:var(--t3)">'+x.triggered_by+'</td>'+
+          '<td>'+statusBadge+(hasErr?'<div style="font-size:9px;color:var(--red);margin-top:2px">'+x.error+'</div>':'')+'</td>'+
+          '</tr>';
+      }).join('');
+    }
+    modalDiv.style.display='flex';
+  }catch(e){ showToast('History error: '+e.message,'error'); }
 }
 
 async function runHunt(){
@@ -425,17 +613,19 @@ async function runHunt(){
   if(typeof VSPUXState!=='undefined'){VSPUXState.skeleton('#results-wrap',{rows:5,kind:'card'});}
   else{document.getElementById('results-wrap').innerHTML='<div class="loading">&#9203; Querying log_events...</div>';}
 
+  var host=document.getElementById('hunt-host') ? document.getElementById('hunt-host').value.trim() : '';
   var params=new URLSearchParams();
   if(q)    params.set('q',q);
   if(sev)  params.set('severity',sev);
   if(proc) params.set('process',proc);
   if(ip)   params.set('source_ip',ip);
+  if(host) params.set('host',host);
   params.set('hours',hours);
   params.set('limit',limit);
 
   var t0=Date.now();
   try{
-    var d=await fetch(API+'/api/v1/logs/hunt?'+params.toString(), {credentials:'same-origin'}).then(function(r){return r.json();});
+    var d=await fetch(API+'/api/v1/logs/hunt?'+params.toString(), {headers:hdr()}).then(function(r){return r.json();});
     var elapsed=Date.now()-t0;
 
     _results=d.events||[];
@@ -452,7 +642,7 @@ async function runHunt(){
 
     if(_results.length===0){
       var emptyMsg = d.total === 0 && q
-        ? 'No log events found for "' + q + '" — ensure log sources are configured and ingesting data (<a href="#" onclick="window.parent.showPanel&&window.parent.showPanel('soc')">→ Log Sources</a>)'
+        ? 'No log events found for "' + q + '" — ensure log sources are configured and ingesting data (<a href="#" onclick="window.parent.showPanel&&window.parent.showPanel(\'soc\')">→ Log Sources</a>)'
         : 'No events match these filters';
       if(typeof VSPUXState!=='undefined'){VSPUXState.empty('#results-wrap', emptyMsg, runHunt);}
       else{document.getElementById('results-wrap').innerHTML='<div class="empty">'+emptyMsg+'</div>';}
@@ -538,8 +728,9 @@ function huntByHost(){
   if(!_currentEv)return;
   closeModal();
   document.getElementById('hunt-ip').value='';
+  if(document.getElementById('hunt-host')) document.getElementById('hunt-host').value='';
   document.getElementById('hunt-process').value='';
-  document.getElementById('hunt-q').value=_currentEv.host||'';;
+  document.getElementById('hunt-q').value=_currentEv.host||'';
   runHunt();
 }
 
@@ -562,7 +753,7 @@ function copyEvent(){
 function huntByIP(){
   if(!_currentEv)return;
   closeModal();
-  document.getElementById('hunt-ip').value=_currentEv.source_ip||'';;
+  document.getElementById('hunt-ip').value=_currentEv.source_ip||'';
   document.getElementById('hunt-q').value='';
   runHunt();
 }
@@ -599,25 +790,44 @@ function exportCSV(){
 function copyToClipboard(){
   if(!_results.length)return;
   var text=_results.map(function(e){return e.ts+' ['+e.severity+'] '+e.host+' '+e.process+': '+e.message;}).join('\n');
-  navigator.clipboard.writeText(text).then(function(){alert('Copied '+_results.length+' events');});
+  navigator.clipboard.writeText(text).then(function(){showToast('Copied '+_results.length+' events','success');});
 }
 
 window.addEventListener('message', function(e) {
-
-  if (!window.VSPOrigin.check(e)) return;
-  if(!e.data)return;
-  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){
-    TOKEN=e.data.token;
-    // Dùng origin của parent frame để tránh CORS
-    API=window.parent!==window?(window.location.origin==='null'?'':window.location.origin):(window.location.origin);
+  // [FIX-5] Guard VSPOrigin defensively
+  if(window.VSPOrigin && typeof window.VSPOrigin.check==='function' && !window.VSPOrigin.check(e)) return;
+  if(!e.data) return;
+  if(e.data.type==='vsp:token' && e.data.token && e.data.token.length>20){
+    TOKEN = e.data.token;
+    window.TOKEN = TOKEN;
+    try{ localStorage.setItem('vsp_token', TOKEN); }catch(_){}
+    API = window.parent!==window
+      ? (window.location.origin==='null'?'':window.location.origin)
+      : window.location.origin;
     renderSavedQueries();
-    document.getElementById('hunt-q').value='Failed password';
-    document.getElementById('hunt-process').value='sshd';
+    // [FIX-6] Không hardcode query — chạy hunt rỗng để show tất cả events
+    // Smart helper (VSP-TH-SMART-V4) sẽ auto-detect time range phù hợp
+    document.getElementById('hunt-q').value='';
+    document.getElementById('hunt-process').value='';
+    document.getElementById('hunt-hours').value='168'; // 7 ngày để cover data cũ
     runHunt();
   }
-  if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
+  if(e.data.type==='vsp:theme') _applyTheme(e.data.theme);
 });
-if(window.parent!==window)window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
+if(window.parent!==window){
+  window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
+  // Fallback: lấy token từ localStorage ngay
+  try{
+    var _t = localStorage.getItem('vsp_token') || window.parent.TOKEN || '';
+    if(_t && _t.length>20 && !TOKEN){
+      TOKEN = _t; window.TOKEN = TOKEN;
+      API = window.location.origin;
+      renderSavedQueries();
+      document.getElementById('hunt-hours').value='168';
+      setTimeout(runHunt, 300);
+    }
+  }catch(_){}
+}
 
 function _applyTheme(t){
   var r=document.documentElement;
@@ -626,7 +836,7 @@ function _applyTheme(t){
 }
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 </script>
-<script src="vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
 <!-- VSP-UNI2-POLISH-START -->
 <script>

@@ -263,6 +263,7 @@ func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
 		Trigger     string          `json:"trigger"`
 		SevFilter   string          `json:"sev_filter"`
 		Steps       json.RawMessage `json:"steps"`
+		Graph       json.RawMessage `json:"graph"`
 		Enabled     bool            `json:"enabled"`
 	}
 	if !decodeJSON(w, r, &req) {
@@ -294,6 +295,12 @@ func (h *SOAR) CreatePlaybook(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusCreated)
 	logAudit(r, h.DB, "PLAYBOOK_CREATED", "playbooks/create")
+	// Auto-update graph if provided
+	if req.Graph != nil && string(req.Graph) != "null" {
+		if _, err := h.DB.UpdatePlaybookGraph(r.Context(), claims.TenantID, id, req.Graph, claims.UserID); err != nil {
+			_ = err // non-fatal
+		}
+	}
 	jsonOK(w, map[string]any{"id": id, "name": req.Name, "status": "created"})
 }
 
@@ -564,6 +571,29 @@ func (h *LogSources) Delete(w http.ResponseWriter, r *http.Request) {
 	h.DB.DeleteLogSource(r.Context(), claims.TenantID, chi.URLParam(r, "id")) //nolint:errcheck
 	logAudit(r, h.DB, "LOG_SOURCE_DELETED", "log_sources/delete")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *LogSources) Update(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok { jsonError(w, "unauthorized", http.StatusUnauthorized); return }
+	id := chi.URLParam(r, "id")
+	var req store.LogSource
+	if !decodeJSON(w, r, &req) { return }
+	_, err := h.DB.Pool().Exec(r.Context(), `
+		UPDATE log_sources SET
+		  name=COALESCE(NULLIF($3,''), name),
+		  host=COALESCE(NULLIF($4,''), host),
+		  port=CASE WHEN $5=0 THEN port ELSE $5 END,
+		  protocol=COALESCE(NULLIF($6,''), protocol),
+		  format=COALESCE(NULLIF($7,''), format),
+		  enabled=$8,
+		  updated_at=NOW()
+		WHERE id=$1 AND tenant_id=$2`,
+		id, claims.TenantID, req.Name, req.Host, req.Port,
+		req.Protocol, req.Format, req.Enabled)
+	if err != nil { jsonError(w, "update failed", http.StatusInternalServerError); return }
+	logAudit(r, h.DB, "LOG_SOURCE_UPDATED", "log_sources/"+id)
+	jsonOK(w, map[string]any{"id": id, "status": "updated"})
 }
 
 func (h *LogSources) Test(w http.ResponseWriter, r *http.Request) {

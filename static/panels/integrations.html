@@ -522,47 +522,208 @@ async function saveConfig(name,data){
     var r=await fetch('/api/v1/integrations/'+name,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(data)});
     if(r.ok){showToast(name+' config saved','success');log(name+' · config saved','ok');}
     else throw new Error('HTTP '+r.status);
-  }catch(e){showToast(name+' saved (offline mode)','success');log(name+' · saved locally (backend offline)','warn');}
+  }catch(e){showToast(name+' save failed: '+e.message,'error');log(name+' · ✗ save failed: '+e.message,'error');}
 }
 async function testConn(name,endpoint){
   await ensureToken();
   log(name+' · testing connection…','info');
   try{
     var r=await fetch(endpoint||'/api/v1/integrations/'+name+'/test',{method:'POST',headers:{'Authorization':'Bearer '+TOKEN}});
-    if(r.ok){log(name+' · ✓ connected','ok');showToast(name+' connected','success');}
-    else{log(name+' · ✗ HTTP '+r.status,'error');showToast(name+' test failed: HTTP '+r.status,'error');}
+    var data={};
+    try{data=await r.json();}catch(_){}
+    if(r.ok && data.ok===true){
+      log(name+' · ✓ connected','ok');showToast(name+' connected','success');
+    } else {
+      var msg=data.error||data.hint||('HTTP '+r.status);
+      log(name+' · ✗ '+msg,'error');showToast(name+' test failed: '+msg,'error');
+    }
   }catch(e){log(name+' · ✗ '+e.message,'error');showToast(name+' test failed','error');}
 }
 
-function saveSlack(){saveConfig('slack',{url:document.getElementById('slack-url').value,channel:document.getElementById('slack-channel').value});}
-function testSlack(){testConn('Slack');}
-function saveSMTP(){saveConfig('smtp',{host:document.getElementById('smtp-host').value,port:document.getElementById('smtp-port').value,user:document.getElementById('smtp-user').value,password:document.getElementById('smtp-pass').value,to:document.getElementById('smtp-to').value});}
-function testSMTP(){log('SMTP · sending test email to '+document.getElementById('smtp-to').value+'…','info');testConn('SMTP');}
-function saveTeams(){saveConfig('teams',{url:document.getElementById('teams-url').value,min_sev:document.getElementById('teams-sev').value});}
-function testTeams(){testConn('Teams');}
-function savePD(){saveConfig('pagerduty',{key:document.getElementById('pd-key').value,policy:document.getElementById('pd-policy').value});}
-function testPD(){testConn('PagerDuty');}
-function saveWebhook(){saveConfig('webhook',{url:document.getElementById('wh-url').value,secret:document.getElementById('wh-secret').value});}
-function testWebhook(){testConn('Webhook');}
-function saveJira(){saveConfig('jira',{url:document.getElementById('jira-url').value,email:document.getElementById('jira-email').value,token:document.getElementById('jira-token').value,project:document.getElementById('jira-project').value,issue_type:document.getElementById('jira-type').value});}
-function testJira(){testConn('Jira');}
-function testCreateJiraTicket(){log('Jira · creating test ticket in project '+document.getElementById('jira-project').value+'…','info');testConn('Jira ticket create','/api/v1/integrations/jira/test-ticket');}
-function saveSN(){saveConfig('servicenow',{url:document.getElementById('sn-url').value,user:document.getElementById('sn-user').value,password:document.getElementById('sn-pass').value,table:document.getElementById('sn-table').value});}
-function testSN(){testConn('ServiceNow');}
-function saveGitHub(){saveConfig('github',{token:document.getElementById('gh-token').value,org:document.getElementById('gh-org').value,repo:document.getElementById('gh-repo').value,pr_comment:document.getElementById('gh-pr-comment').checked,status_check:document.getElementById('gh-status-check').checked,sarif_upload:document.getElementById('gh-sarif').checked});}
-function testGitHub(){testConn('GitHub');}
-function testPRComment(){log('GitHub · posting test PR comment…','info');testConn('GitHub PR comment','/api/v1/integrations/github/test-pr-comment');}
-function saveGitLab(){saveConfig('gitlab',{url:document.getElementById('gl-url').value,token:document.getElementById('gl-token').value,project_id:document.getElementById('gl-project').value});}
-function testGitLab(){testConn('GitLab');}
-function saveVT(){saveConfig('virustotal',{api_key:document.getElementById('vt-key').value});}
-function testVT(){log('VirusTotal · hash lookup test…','info');testConn('VirusTotal');}
-function saveNVD(){saveConfig('nvd',{api_key:document.getElementById('nvd-key').value});}
+function saveSlack(){
+  var url=document.getElementById('slack-url').value;
+  if(!url){log('Slack · ✗ Webhook URL is required','error');showToast('Slack: enter Webhook URL first','error');return;}
+  saveConfig('slack',{url:url,channel:document.getElementById('slack-channel').value});
+}
+function testSlack(){
+  var url=document.getElementById('slack-url').value;
+  if(!url){log('Slack · ✗ Webhook URL is required','error');showToast('Slack: enter URL first','error');return;}
+  testConn('Slack','/api/v1/integrations/slack/test');
+}
+function saveSMTP(){
+  var host=document.getElementById('smtp-host').value;
+  var user=document.getElementById('smtp-user').value;
+  var pass=document.getElementById('smtp-pass').value;
+  var to=document.getElementById('smtp-to').value;
+  if(!host){log('SMTP · ✗ SMTP host is required','error');showToast('SMTP: enter host first','error');return;}
+  if(!user){log('SMTP · ✗ SMTP user is required','error');showToast('SMTP: enter user first','error');return;}
+  if(!pass){log('SMTP · ✗ App password is required','error');showToast('SMTP: enter app password first','error');return;}
+  if(!to){log('SMTP · ✗ Alert recipients required','error');showToast('SMTP: enter recipients first','error');return;}
+  saveConfig('smtp',{host:host,port:document.getElementById('smtp-port').value,user:user,password:pass,to:to});
+}
+function testSMTP(){
+  var host=document.getElementById('smtp-host').value;
+  var user=document.getElementById('smtp-user').value;
+  var pass=document.getElementById('smtp-pass').value;
+  var to=document.getElementById('smtp-to').value;
+  if(!host){log('SMTP · ✗ SMTP host is required','error');showToast('SMTP: enter host first','error');return;}
+  if(!user){log('SMTP · ✗ SMTP user is required','error');showToast('SMTP: enter user first','error');return;}
+  if(!pass){log('SMTP · ✗ App password is required','error');showToast('SMTP: enter app password first','error');return;}
+  if(!to){log('SMTP · ✗ Alert recipients required','error');showToast('SMTP: enter recipients first','error');return;}
+  log('SMTP · sending test email to '+to+'…','info');
+  testConn('SMTP','/api/v1/integrations/smtp/test');
+}
+function saveTeams(){
+  var url=document.getElementById('teams-url').value;
+  if(!url){log('Teams · ✗ Webhook URL is required','error');showToast('Teams: enter Webhook URL first','error');return;}
+  saveConfig('teams',{url:url,min_sev:document.getElementById('teams-sev').value});
+}
+function testTeams(){
+  var url=document.getElementById('teams-url').value;
+  if(!url){log('Teams · ✗ Webhook URL is required','error');showToast('Teams: enter URL first','error');return;}
+  testConn('Teams','/api/v1/integrations/teams/test');
+}
+function savePD(){
+  var key=document.getElementById('pd-key').value;
+  if(!key){log('PagerDuty · ✗ Integration key is required','error');showToast('PagerDuty: enter integration key first','error');return;}
+  saveConfig('pagerduty',{key:key,policy:document.getElementById('pd-policy').value});
+}
+function testPD(){
+  var key=document.getElementById('pd-key').value;
+  if(!key){log('PagerDuty · ✗ Integration key is required','error');showToast('PagerDuty: enter key first','error');return;}
+  testConn('PagerDuty','/api/v1/integrations/pagerduty/test');
+}
+function saveWebhook(){
+  var url=document.getElementById('wh-url').value;
+  if(!url){log('Webhook · ✗ URL is required','error');showToast('Webhook: enter URL first','error');return;}
+  saveConfig('webhook',{url:url,secret:document.getElementById('wh-secret').value});
+}
+function testWebhook(){
+  var url=document.getElementById('wh-url').value;
+  if(!url){log('Webhook · ✗ URL is required','error');showToast('Webhook: enter URL first','error');return;}
+  testConn('Webhook','/api/v1/integrations/webhook/test');
+}
+function saveJira(){
+  var url=document.getElementById('jira-url').value;
+  var token=document.getElementById('jira-token').value;
+  var email=document.getElementById('jira-email').value;
+  if(!url){log('Jira · ✗ Jira URL is required','error');showToast('Jira: enter URL first','error');return;}
+  if(!email){log('Jira · ✗ Email is required','error');showToast('Jira: enter email first','error');return;}
+  if(!token){log('Jira · ✗ API token is required','error');showToast('Jira: enter API token first','error');return;}
+  saveConfig('jira',{url:url,email:email,token:token,project:document.getElementById('jira-project').value,issue_type:document.getElementById('jira-type').value});
+}
+function testJira(){
+  var url=document.getElementById('jira-url').value;
+  if(!url){log('Jira · ✗ URL is required','error');showToast('Jira: enter URL first','error');return;}
+  testConn('Jira','/api/v1/integrations/jira/test');
+}
+function testCreateJiraTicket(){
+  var url=document.getElementById('jira-url').value;
+  var token=document.getElementById('jira-token').value;
+  var project=document.getElementById('jira-project').value;
+  if(!url){log('Jira · ✗ URL is required','error');showToast('Jira: enter URL first','error');return;}
+  if(!token){log('Jira · ✗ API token is required','error');showToast('Jira: enter token first','error');return;}
+  if(!project){log('Jira · ✗ Project key is required','error');showToast('Jira: enter project key first','error');return;}
+  log('Jira · creating test ticket in project '+project+'…','info');
+  testConn('Jira ticket create','/api/v1/integrations/jira/test-ticket');
+}
+function saveSN(){
+  var url=document.getElementById('sn-url').value;
+  var user=document.getElementById('sn-user').value;
+  var pass=document.getElementById('sn-pass').value;
+  if(!url){log('ServiceNow · ✗ Instance URL is required','error');showToast('ServiceNow: enter URL first','error');return;}
+  if(!user){log('ServiceNow · ✗ Username is required','error');showToast('ServiceNow: enter username first','error');return;}
+  if(!pass){log('ServiceNow · ✗ Password/OAuth is required','error');showToast('ServiceNow: enter password first','error');return;}
+  saveConfig('servicenow',{url:url,user:user,password:pass,table:document.getElementById('sn-table').value});
+}
+function testSN(){
+  var url=document.getElementById('sn-url').value;
+  var user=document.getElementById('sn-user').value;
+  if(!url){log('ServiceNow · ✗ Instance URL is required','error');showToast('ServiceNow: enter URL first','error');return;}
+  if(!user){log('ServiceNow · ✗ Username is required','error');showToast('ServiceNow: enter username first','error');return;}
+  testConn('ServiceNow','/api/v1/integrations/servicenow/test');
+}
+function saveGitHub(){
+  var token=document.getElementById('gh-token').value;
+  var org=document.getElementById('gh-org').value;
+  var repo=document.getElementById('gh-repo').value;
+  if(!token){log('GitHub · ✗ Personal access token is required','error');showToast('GitHub: enter token first','error');return;}
+  if(!org){log('GitHub · ✗ Org/Owner is required','error');showToast('GitHub: enter org/owner first','error');return;}
+  if(!repo){log('GitHub · ✗ Default repo is required','error');showToast('GitHub: enter repo first','error');return;}
+  saveConfig('github',{token:token,org:org,repo:repo,pr_comment:document.getElementById('gh-pr-comment').checked,status_check:document.getElementById('gh-status-check').checked,sarif_upload:document.getElementById('gh-sarif').checked});
+}
+function testGitHub(){
+  var token=document.getElementById('gh-token').value;
+  if(!token){log('GitHub · ✗ Token is required','error');showToast('GitHub: enter token first','error');return;}
+  testConn('GitHub','/api/v1/integrations/github/test');
+}
+function testPRComment(){
+  var token=document.getElementById('gh-token').value;
+  var repo=document.getElementById('gh-repo').value;
+  if(!token){log('GitHub · ✗ Token is required for PR comment test','error');showToast('GitHub: enter token first','error');return;}
+  if(!repo){log('GitHub · ✗ Repo is required for PR comment test','error');showToast('GitHub: enter repo first','error');return;}
+  log('GitHub · posting test PR comment…','info');
+  testConn('GitHub PR comment','/api/v1/integrations/github/test-pr-comment');
+}
+function saveGitLab(){
+  var token=document.getElementById('gl-token').value;
+  var project=document.getElementById('gl-project').value;
+  if(!token){log('GitLab · ✗ Access token is required','error');showToast('GitLab: enter access token first','error');return;}
+  if(!project){log('GitLab · ✗ Project ID is required','error');showToast('GitLab: enter project ID first','error');return;}
+  saveConfig('gitlab',{url:document.getElementById('gl-url').value,token:token,project_id:project});
+}
+function testGitLab(){
+  var token=document.getElementById('gl-token').value;
+  if(!token){log('GitLab · ✗ Access token is required','error');showToast('GitLab: enter token first','error');return;}
+  testConn('GitLab','/api/v1/integrations/gitlab/test');
+}
+function saveVT(){
+  var key=document.getElementById('vt-key').value;
+  if(!key){log('VirusTotal · ✗ API key is required','error');showToast('VirusTotal: enter API key first','error');return;}
+  saveConfig('virustotal',{api_key:key});
+}
+function testVT(){
+  var key=document.getElementById('vt-key').value;
+  if(!key){log('VirusTotal · ✗ API key is required','error');showToast('VirusTotal: enter API key first','error');return;}
+  log('VirusTotal · hash lookup test…','info');
+  testConn('VirusTotal','/api/v1/integrations/virustotal/test');
+}
+function saveNVD(){
+  var key=document.getElementById('nvd-key').value;
+  if(!key){log('NVD · saving without API key — rate limited to 5 req/30s','warn');showToast('NVD: no API key — rate limited mode','warn');}
+  saveConfig('nvd',{api_key:key});
+}
 function syncNVD(){log('NVD · forcing full sync…','info');showToast('NVD sync triggered','info');}
-function saveMISP(){saveConfig('misp',{url:document.getElementById('misp-url').value,key:document.getElementById('misp-key').value});}
-function testMISP(){testConn('MISP');}
+function saveMISP(){
+  var url=document.getElementById('misp-url').value;
+  var key=document.getElementById('misp-key').value;
+  if(!url){log('MISP · ✗ URL is required','error');showToast('MISP: enter URL first','error');return;}
+  if(!key){log('MISP · ✗ API key is required','error');showToast('MISP: enter API key first','error');return;}
+  saveConfig('misp',{url:url,key:key});
+}
+function testMISP(){
+  var url=document.getElementById('misp-url').value;
+  var key=document.getElementById('misp-key').value;
+  if(!url){log('MISP · ✗ URL is required','error');showToast('MISP: enter URL first','error');return;}
+  if(!key){log('MISP · ✗ API key is required','error');showToast('MISP: enter API key first','error');return;}
+  testConn('MISP','/api/v1/integrations/misp/test');
+}
 async function testAllConnections(){
   log('Testing all configured integrations…','info');
-  ['slack','smtp','jira','github'].forEach(n=>testConn(n));
+  var ran=0;
+  if(document.getElementById('slack-url').value){testConn('Slack','/api/v1/integrations/slack/test');ran++;}
+  if(document.getElementById('smtp-host').value){testConn('SMTP','/api/v1/integrations/smtp/test');ran++;}
+  if(document.getElementById('jira-url').value){testConn('Jira','/api/v1/integrations/jira/test');ran++;}
+  if(document.getElementById('gh-token').value){testConn('GitHub','/api/v1/integrations/github/test');ran++;}
+  if(document.getElementById('teams-url').value){testConn('Teams','/api/v1/integrations/teams/test');ran++;}
+  if(document.getElementById('pd-key').value){testConn('PagerDuty','/api/v1/integrations/pagerduty/test');ran++;}
+  if(document.getElementById('wh-url').value){testConn('Webhook','/api/v1/integrations/webhook/test');ran++;}
+  if(document.getElementById('sn-url').value){testConn('ServiceNow','/api/v1/integrations/servicenow/test');ran++;}
+  if(document.getElementById('gl-token').value){testConn('GitLab','/api/v1/integrations/gitlab/test');ran++;}
+  if(document.getElementById('vt-key').value){testConn('VirusTotal','/api/v1/integrations/virustotal/test');ran++;}
+  if(document.getElementById('misp-url').value){testConn('MISP','/api/v1/integrations/misp/test');ran++;}
+  if(ran===0){log('No integrations configured yet — fill in credentials first','warn');showToast('No integrations configured','warn');}
+  else{log('Running '+ran+' connection test(s)…','info');}
 }
 function clearLog(){document.getElementById('test-log').innerHTML='<span style="color:var(--t3)">Log cleared.</span>';}
 
@@ -869,10 +1030,60 @@ window.addEventListener('message', e => {
   }
 
   // ─── PANEL: integrations ─────────────────────────────────────────────────
+  async function loadIntegrationsStatus() {
+    try {
+      var tk = window.TOKEN || '';
+      var r = await fetch('/api/v1/integrations', {
+        headers: {'Authorization': 'Bearer ' + tk}
+      });
+      if (!r.ok) return;
+      var d = await r.json();
+      var intList = d.integrations || [];
+      // Group by type
+      var byType = {};
+      intList.forEach(function(i) {
+        if (!byType[i.type]) byType[i.type] = [];
+        byType[i.type].push(i);
+      });
+      // Update status indicators per integration type
+      var typeMap = {
+        slack: 'slack-status',
+        smtp: 'smtp-status',
+        teams: 'teams-status',
+        pagerduty: 'pd-status',
+        webhook: 'wh-status',
+        jira: 'jira-status',
+        github: 'github-status',
+      };
+      Object.entries(typeMap).forEach(function(e) {
+        var type = e[0], elId = e[1];
+        var el = document.getElementById(elId);
+        if (!el) return;
+        var items = byType[type] || [];
+        var active = items.filter(function(i) { return i.active; });
+        if (active.length > 0) {
+          el.innerHTML = '<span style="color:var(--green)">● Connected (' + active.length + ')</span>';
+          // Populate URL field if empty
+          var urlField = document.getElementById(type + '-url') || document.getElementById(type === 'slack' ? 'slack-url' : type === 'jira' ? 'jira-url' : null);
+          if (urlField && !urlField.value && active[0].url) {
+            urlField.value = active[0].url;
+          }
+        } else {
+          el.innerHTML = '<span style="color:var(--t3)">○ Not configured</span>';
+        }
+      });
+      // Show count in banner
+      var total = intList.filter(function(i) { return i.active; }).length;
+      var countEl = document.getElementById('integ-active-count');
+      if (countEl) countEl.textContent = total + ' active';
+    } catch(e) { console.warn('loadIntegrationsStatus:', e); }
+  }
   function initIntegrations() {
     setTimeout(() => {
       injectBanner('vsp-integ-banner', infoBanner('#10b981', '🔌 Integrations',
         'Bidirectional connectors: <b>GitHub</b> (PR comments + checks), <b>Jira</b> (ticket auto-create), <b>Slack</b> (alerts), <b>Email</b> (CIRCIA reports). Test endpoints available before activation.'));
+      // Load existing integrations and populate status badges
+      loadIntegrationsStatus();
 
       injectGenericFilter('Search integration / status…', [{
         key: 'st',
