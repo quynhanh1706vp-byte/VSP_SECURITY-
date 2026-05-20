@@ -842,7 +842,7 @@ async function loadInventory() {
 
   await ensureToken();
   try {
-    const r = await fetch(API + SW_BASE, { headers: hdr() });
+    const r = await fetch(API + '/api/v1/software-inventory', { headers: hdr() });
     if (!r.ok) {
       // Real HTTP error — show error state (FEAT-28 behavior change vs old silent mock fallback)
       if (hasUX) {
