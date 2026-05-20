@@ -938,7 +938,7 @@ if(typeof VSPUXState!=='undefined'){
             + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px;font-weight:600">RECENT MATCHES</div>'
             + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:4px;max-height:200px;overflow:auto">'
             +   matchList.slice(0, 10).map(m => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0">
-                  <span style="font-family:var(--font-mono,monospace);color:#ef4444">${esc(m.ioc || m.value || '?')}</span>
+                  <span style="font-family:var(--font-mono,monospace);color:#ef4444">${esc(m.val || m.ioc || m.value || m.cve || '?')}</span>
                   <span style="color:var(--t3)">${esc(relativeTime(m.matched_at || m.created_at))}</span>
                 </div>`).join('')
             + '</div>'
