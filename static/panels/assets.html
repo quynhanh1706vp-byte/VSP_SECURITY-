@@ -714,7 +714,7 @@ updateKPIs();renderHeatmap();renderAssets();
   }
   function row(label, value, copyable) {
     const v = String(value == null ? '—' : value);
-    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspUNI.copy('+esc(v).replace(/'/g,"'")+"'")">📋</button>` : '';
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="this.previousSibling&&navigator.clipboard.writeText(this.dataset.v)" data-v="${esc(v)}">📋</button>` : '';
     return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
       + '<div style="min-width:130px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
       + '<div style="flex:1;font-size:11px;line-height:1.5;word-break:break-word">' + esc(v) + '</div>'
