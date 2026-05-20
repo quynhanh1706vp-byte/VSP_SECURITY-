@@ -73,7 +73,7 @@ func (h *Assets) List(w http.ResponseWriter, r *http.Request) {
 		  AND tool != ''
 		GROUP BY tool
 		ORDER BY crit DESC, high DESC
-		LIMIT 20`, claims.TenantID)
+		LIMIT 50`, claims.TenantID)
 	if err2 == nil {
 		defer rows2.Close()
 		i := len(assets)
