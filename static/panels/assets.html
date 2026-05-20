@@ -573,10 +573,23 @@ async function loadAssets(){
     if(TOKEN){/* loadAssets(); */}else{var tb=document.getElementById('asset-tbody');if(tb)tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">Waiting for authentication…</td></tr>';}
     // Also load findings
     try{
-      var rf=await fetch(API+'/api/v1/vsp/findings?limit=500',{headers:h});
+      // Load findings: lấy đủ per-tool để heatmap có data
+      var rf=await fetch(API+'/api/v1/vsp/findings?limit=500&sort=severity',{headers:h});
       if(rf.ok){
         var df=await rf.json();
-        ALL_FINDINGS=(df.findings||df.items||[]).map(function(f){return Object.assign({asset_id:f.asset_id||'',asset:f.asset||f.tool||'',title:f.rule_id||f.title||f.message||'—',file:f.path||f.file||'?',rule:f.rule_id||f.rule||'—',remediation:f.fix_signal||f.remediation||''},f);});
+        var rawFindings = df.findings||df.items||[];
+        // Đảm bảo mỗi tool có ít nhất 1 finding để heatmap render đúng
+        var toolSeen = {};
+        var prioritized = [];
+        // Pass 1: lấy 1 finding đầu tiên của mỗi tool
+        rawFindings.forEach(function(f){
+          if(!toolSeen[f.tool]){ toolSeen[f.tool]=true; prioritized.push(f); }
+        });
+        // Pass 2: thêm findings còn lại
+        rawFindings.forEach(function(f){
+          if(prioritized.indexOf(f)===-1) prioritized.push(f);
+        });
+        ALL_FINDINGS=prioritized.map(function(f){return Object.assign({asset_id:f.asset_id||'',asset:f.asset||f.tool||'',title:f.rule_id||f.title||f.message||'—',file:f.path||f.file||'?',rule:f.rule_id||f.rule||'—',remediation:f.fix_signal||f.remediation||''},f);});
         if(typeof renderFindings==='function')renderFindings();
       }
     }catch(e){
