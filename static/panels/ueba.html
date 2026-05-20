@@ -494,7 +494,12 @@ function _applyTheme(theme){
 }
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 /* FEAT-06: defer renderScoreBars until loadBaseline returns data */
-renderChecks();loadBaseline();setTimeout(function(){if(TOKEN)loadAnomalies();},1000);
+renderChecks();
+// Set API origin ngay khi init — không chờ postMessage
+API = window.location.origin === "null" ? "" : window.location.origin;
+// Thử lấy token từ localStorage ngay
+try{ var _initT=localStorage.getItem("vsp_token")||""; if(_initT&&_initT.length>20){TOKEN=_initT;window.TOKEN=TOKEN;} }catch(_){}
+loadBaseline();setTimeout(function(){if(TOKEN)loadAnomalies();},1000);
 </script>
 <script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
