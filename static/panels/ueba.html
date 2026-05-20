@@ -189,7 +189,6 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
   <div class="card">
     <div class="card-head"><div class="card-title">30-day baseline</div><div class="card-sub">statistical norms</div></div>
     <div class="card-body" id="baseline-body">
-      <div style="color:var(--t3);font-size:11px;text-align:center;padding:12px">Loading…</div>
     </div>
   </div>
 </div>
@@ -408,7 +407,15 @@ async function loadBaseline(){
     var kBase=document.getElementById('k-base');
     if(kBase && d.avg_score!=null) kBase.textContent=Math.round(d.avg_score);
     renderBaseline(d);
+    // SCORE_HIST có thể đã được set từ loadTimelineData — render bars
     if(typeof renderScoreBars==='function') renderScoreBars();
+    // Nếu SCORE_HIST rỗng, dùng history từ baseline
+    if(SCORE_HIST.length===0 && d.history && d.history.length){
+      SCORE_HIST = d.history.map(function(h){
+        return typeof h==='object'?(h.val||h.score||h.avg||0):Number(h)||0;
+      });
+      if(typeof renderScoreBars==='function') renderScoreBars();
+    }
     loadAnomalies();
     loadTimelineData();
   }catch(e){
@@ -424,15 +431,19 @@ async function loadTimelineData(){
     var d=await r.json();
     var tl=d.timeline||[];
     if(!tl.length) return;
-    // Merge timeline vào SCORE_HIST nếu chưa có đủ data
-    if(!SCORE_HIST.length || SCORE_HIST.length < 5){
-      SCORE_HIST = tl.slice(-30).map(function(t){ return t.score||0; });
-      if(typeof renderScoreBars==='function') renderScoreBars();
+    // Set SCORE_HIST từ timeline data
+    var scores = tl.slice(-30).map(function(t){ return t.score||0; });
+    if(scores.length > 0) SCORE_HIST = scores;
+    // Set BL_SCORE nếu chưa có
+    if(BL_SCORE==null && scores.length > 0){
+      BL_SCORE = scores.reduce(function(s,v){return s+v;},0)/scores.length;
     }
-    // Update k-base từ timeline avg
-    var avg = Math.round(tl.reduce(function(s,t){return s+(t.score||0);},0)/tl.length);
+    // Update k-base
+    var avg = Math.round(BL_SCORE||0);
     var kBase=document.getElementById('k-base');
-    if(kBase && !isNaN(avg)) kBase.textContent=avg;
+    if(kBase && !isNaN(avg) && avg>0) kBase.textContent=avg;
+    // Render cả 2 components
+    if(typeof renderScoreBars==='function') renderScoreBars();
   }catch(e){ console.warn('[UEBA] loadTimelineData error:',e); }
 }
 
