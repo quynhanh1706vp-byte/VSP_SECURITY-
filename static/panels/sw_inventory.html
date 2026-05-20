@@ -1152,18 +1152,18 @@ async function saveToListDirect(listType, payload) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // [FIX-4] runSwScan — đúng endpoint /api/v1/software-inventory/report
+// [FIX] runSwScan — fixed try-catch
 async function runSwScan() {
-  showToast('SW inventory scan triggered — agent collecting…','info');
+  showToast('SW inventory scan triggered…','info');
   await ensureToken();
   try {
-    try { await fetch(API+SW_BASE+'/report', {
+    const r = await fetch(API+SW_BASE+'/report', {
       method:'POST', headers:hdr(),
-      body: JSON.stringify({hostname:'all', mode:'full'}),
+      body: JSON.stringify({hostname:'all'}),
     });
-  } catch(e) {}
+  } catch(e) { console.warn('[SWINV] report:', e); }
   setTimeout(()=>{ loadInventory(); showToast('SW scan complete','success'); }, 1500);
 }
-
 function exportSwReport() {
   const rows = [
     ['Package','Version','Vendor','Host','OS','Status','CVEs','License','EOL'],
