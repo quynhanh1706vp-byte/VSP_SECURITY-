@@ -312,7 +312,7 @@ function renderFindings(){
     src=_activeAsset._api_findings;
   } else {
     // Fallback: filter by tool name for scanner assets
-    var _tname=(_activeAsset.name||'').replace(/ scanner$/i,'').toLowerCase();
+    var _tname=(_activeAsset.id||'').replace(/^scanner-/,'').toLowerCase();
     src=ALL_FINDINGS.filter(function(f){
       return f.asset_id===_activeAsset.id ||
              (f.tool||'').toLowerCase()===_tname ||
@@ -378,13 +378,21 @@ async function openAssetModal(id){
         console.warn('[FEAT-34] modal fetch failed, using seed:', e.message);
       }
     } else {
-      // Slug ID (scanner-xxx) — filter ALL_FINDINGS by tool name
-      var toolName = a.name.replace(' scanner','').replace(' Scanner','').toLowerCase();
+      // Slug ID (scanner-xxx) — extract tool from id: "scanner-gitleaks" → "gitleaks"
+      var toolName = id.replace(/^scanner-/,'').toLowerCase();
       var slugFindings = ALL_FINDINGS.filter(function(f){
-        return (f.tool||'').toLowerCase()===toolName ||
-               (f.tool||'').toLowerCase().includes(toolName);
+        var ft=(f.tool||'').toLowerCase();
+        return ft===toolName || ft.replace(/[^a-z0-9]/g,'')===toolName.replace(/[^a-z0-9]/g,'');
       });
-      if(slugFindings.length) a._api_findings=slugFindings;
+      if(slugFindings.length){
+        a._api_findings=slugFindings.map(function(f){
+          return Object.assign({asset_id:id,asset:a.name,
+            title:f.rule_id||f.title||f.message||'—',
+            file:f.path||f.file||'?',
+            rule:f.rule_id||f.rule||'—',
+            remediation:f.fix_signal||f.remediation||''},f);
+        });
+      }
     }
   }
   document.getElementById('amod-name').textContent=a.name;
