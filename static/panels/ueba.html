@@ -450,6 +450,7 @@ window.addEventListener('message', function(e) {
       try{ localStorage.setItem('vsp_token',TOKEN); }catch(_){}
       API=window.parent!==window?(window.location.origin==='null'?'':window.location.origin):window.location.origin;
       loadBaseline();
+      setTimeout(loadAnomalies,500);
     }
   }
   if(e.data.type==='vsp:theme')_applyTheme(e.data.theme);
@@ -458,7 +459,7 @@ if(window.parent!==window){
   window.parent.postMessage({type:'vsp:request_token'}, window.location.origin);
   try{
     var _t=localStorage.getItem('vsp_token')||window.parent.TOKEN||'';
-    if(_t&&_t.length>20&&!TOKEN){ TOKEN=_t; window.TOKEN=TOKEN; API=window.location.origin; setTimeout(loadBaseline,300); }
+    if(_t&&_t.length>20&&!TOKEN){ TOKEN=_t; window.TOKEN=TOKEN; API=window.location.origin; setTimeout(loadBaseline,300); setTimeout(loadAnomalies,800); }
   }catch(_){}
 }
 function _applyTheme(theme){
@@ -469,7 +470,7 @@ function _applyTheme(theme){
 }
 if(window.parent!==window)window.parent.postMessage({type:'vsp:request_theme'}, window.location.origin);
 /* FEAT-06: defer renderScoreBars until loadBaseline returns data */
-renderChecks();loadBaseline();
+renderChecks();loadBaseline();setTimeout(function(){if(TOKEN)loadAnomalies();},1000);
 </script>
 <script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
