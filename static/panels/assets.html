@@ -254,7 +254,7 @@ function renderHeatmap(){
   var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">';
   s.forEach(function(a){
     var sc=a.risk_score||0,bg=riskBg(sc),co=riskColor(sc);
-    html+='<div class="hm-cell" style="background:'+bg+';color:'+co+'" data-id="'+a.id+'" onclick="openAssetModal(this.dataset.id)" title="'+a.name+' — Risk: '+sc+'">'
+    html+='<div class="hm-cell" style="background:'+bg+';color:'+co+'" data-id="'+a.id+'" onclick="openAssetModal(this.closest('tr,div[data-id]').dataset.id||this.dataset.id)" title="'+a.name+' — Risk: '+sc+'">'
       +'<div class="hm-name" style="color:'+co+'">'+a.name+'</div>'
       +'<div class="hm-score" style="color:'+co+'">'+sc+'</div>'
       +(a.critical>0?'<div style="font-size:9px;color:var(--red)">'+a.critical+' CRIT</div>':'')
@@ -292,7 +292,7 @@ function renderAssets(){
     var sc=a.risk_score||0,rc=riskColor(sc);
     return '<tr data-id="'+a.id+'">'
       +'<td style="width:32px;padding:8px 6px"><input type="checkbox" class="asset-chk" data-id="'+a.id+'" onclick="event.stopPropagation()" style="cursor:pointer"></td>'
-      +'<td onclick="openAssetModal(''+a.id+'')" style="cursor:pointer"><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+(a.ip?' · '+a.ip:'')+(a.env?' · '+a.env:'')+'</div></td>'
+      +'<td onclick="openAssetModal(this.closest('tr,div[data-id]').dataset.id||this.dataset.id)" style="cursor:pointer"><div class="asset-name">'+a.name+'</div><div class="asset-type">'+a.type+(a.ip?' · '+a.ip:'')+(a.env?' · '+a.env:'')+'</div></td>'
       +'<td>'+envBadge(a.env)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--red);font-weight:700">'+(a.critical||0)+'</td>'
       +'<td style="font-family:var(--font-mono);color:var(--amber);font-weight:700">'+(a.high||0)+'</td>'
@@ -328,7 +328,7 @@ function renderFindings(){
   document.getElementById('findings-list').innerHTML=list.map(function(f){
     var sc=sevClass((f.severity||'').toUpperCase());
     return '<div class="finding '+sc+'" data-id="'+f.id+'" onclick="openFindingModal(this.dataset.id)">'
-      +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+f.title+'</span><span class="f-ts">'+f.asset+'</span></div>'
+      +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity||'INFO')+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+(f.rule_id||f.title||f.message||'—')+'</span><span class="f-ts">'+f.asset+'</span></div>'
       +'<div class="f-file">'+(f.tool||'?')+' · '+(f.path||f.file||'?')+':'+(f.line||0)+'</div>'
       +'<div class="f-tags"><span class="pill pill-gray">'+f.rule+'</span>'+(f.cwe?'<span class="pill pill-gray">'+f.cwe+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+f.cvss+'</span>':'')+'</div>'
       +'</div>';
@@ -379,7 +379,7 @@ async function openAssetModal(id){
   var af=(a._api_findings||ALL_FINDINGS.filter(function(f){return f.asset_id===a.id;})).slice(0,4);
   document.getElementById('amod-findings').innerHTML=af.length?af.map(function(f){
     return '<div class="finding '+sevClass((f.severity||'').toUpperCase())+'" data-fid="'+f.id+'" onclick="openFindingModal(this.dataset.fid)">'
-      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+f.title+'</span></div>'
+      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+(f.rule_id||f.title||f.message||'—')+'</span></div>'
       +'<div class="f-file">'+f.file+':'+f.line+' · '+f.rule+'</div></div>';
   }).join(''):(typeof VSPUXState!=='undefined'?(_assetEmpty('#amod-findings','No findings for this asset',null),''):'<div style=\"color:var(--t3);font-size:11px\">No findings for this asset</div>');
   document.getElementById('amod-all-btn').onclick=function(){closeModal('asset-modal');_activeAsset=a;renderFindings();};
@@ -395,13 +395,11 @@ function openFindingModal(id){
     {lbl:'Severity',val:sev,color:sevColor(sev)},{lbl:'CVSS',val:f.cvss||'—',color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
     {lbl:'EPSS',val:f.epss||'—',color:'var(--t1)'},{lbl:'Status',val:f.status||'open',color:f.status==='resolved'?'var(--green)':'var(--amber)'},
   ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
-  document.getElementById('fmod-desc').textContent=f.desc||'';
-  document.getElementById('fmod-location').textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
-
-
-
-
-  document.getElementById('fmod-rem').textContent=f.remediation||'';
+  var _file=f.path||f.file||'?',_asset=f.asset_name||f.asset||'—',_rule=f.rule_id||f.rule||'—',_rem=f.fix_signal||f.remediation||'';
+  document.getElementById('fmod-desc').textContent=f.message||f.desc||'';
+  document.getElementById('fmod-location').textContent='File: '+_file+(f.line?':'+f.line:'')+'\nAsset: '+_asset+'\nTool:  '+(f.tool||'?')+'\nRule:  '+_rule+(f.cwe?'\nCWE:   '+f.cwe:'');
+  document.getElementById('fmod-rem').textContent=_rem;
+  window._currentFinding=f;
   document.getElementById('fmod-refs').innerHTML=(f.refs||[]).map(function(r){return '<div>· '+r+'</div>';}).join('');
   document.getElementById('finding-modal').classList.add('open');
 }
