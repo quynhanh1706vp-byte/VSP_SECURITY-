@@ -169,7 +169,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('ioc-modal')">Close</button>
-      <button class="btn btn-primary btn-sm">Block indicator &#8594;</button>
+      <button class="btn btn-primary btn-sm" onclick="blockCurrentIOC()">Block indicator &#8594;</button>
     </div>
   </div>
 </div>
@@ -254,6 +254,32 @@ function renderFeeds(){
   }).join('');
   document.getElementById('k-feeds').textContent=FEEDS.filter(function(f){return f.status==='ok';}).length;
 }
+async function enrichCVEs(){
+  // Batch enrich tất cả CVEs để lấy CVSS/EPSS
+  if(!TOKEN||!CVES.length) return;
+  try{
+    var ids=CVES.filter(function(c){return c.id&&c.id.startsWith('CVE-');}).map(function(c){return c.id;}).slice(0,20);
+    if(!ids.length) return;
+    var r=await fetch(API+'/api/v1/ti/enrich/batch',{
+      method:'POST', headers:hdr(),
+      body:JSON.stringify({cves:ids})
+    });
+    if(r.ok){
+      var d=await r.json();
+      var enrichments=d.enrichments||{};
+      CVES.forEach(function(c){
+        var e=enrichments[c.id];
+        if(e){
+          c.cvss=e.cvss||c.cvss||0;
+          c.epss=e.epss!=null?e.epss:c.epss;
+          c.kev=e.kev||c.kev||false;
+          c.desc=e.description||c.desc||'';
+        }
+      });
+      renderCVEs();
+    }
+  }catch(err){ console.warn('[TI] batch enrich failed:', err); }
+}
 function renderCVEs(){
   document.getElementById('cve-tbody').innerHTML=CVES.map(function(c){
     var cvssColor=c.cvss>=9?'var(--red)':c.cvss>=7?'var(--amber)':'var(--blue)';
@@ -262,6 +288,8 @@ function renderCVEs(){
       +'<td style="padding:8px 10px;font-size:11px">'+c.desc+'<br><span style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">'+c.component+'</span></td>'
       +'<td style="padding:8px 10px"><span style="font-family:var(--font-mono);font-weight:700;font-size:12px;color:'+cvssColor+'">'+c.cvss+'</span></td>'
       +'<td style="padding:8px 10px;font-family:var(--font-mono);font-size:11px;color:var(--t2)">'+c.epss+'</td>'
+      +'<td style="padding:8px 10px;font-family:var(--font-mono);font-size:11px;color:'+(c.cvss>=9?'var(--red)':c.cvss>=7?'var(--amber)':'var(--blue)')+'">'+( c.cvss>0?c.cvss.toFixed(1):'—')+'</td>'
+      +'<td style="padding:8px 10px;font-family:var(--font-mono);font-size:11px;color:var(--t2)">'+(c.epss!=null?(c.epss*100).toFixed(2)+'%':'—')+'</td>'
       +'<td style="padding:8px 10px">'+(c.kev?'<span class="pill pill-red">KEV</span>':'<span class="pill pill-gray">No</span>')+'</td>'
       +'<td style="padding:8px 10px">'+c.ttp.split(',').map(function(t){return '<span class="pill pill-purple" style="margin-right:2px">'+t.trim()+'</span>';}).join('')+'</td>'
       +'</tr>';
@@ -282,17 +310,30 @@ function renderMITRE(){
 }
 async function openIOCDetail(id){
   var ioc=IOCS.find(function(i){return i.id===id;});
-  // Enrich from API
   if(TOKEN&&ioc){
     try{
-      // Get matched findings via hunt
+      // [FIX] Gọi /ti/enrich để lấy CVSS/EPSS/description thật
+      if(ioc.type==='cve'&&ioc.val){
+        var enr=await fetch(API+'/api/v1/ti/enrich?cve='+encodeURIComponent(ioc.val),
+          {headers:hdr()}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+        if(enr){
+          ioc.cvss = enr.cvss||'N/A';
+          ioc.epss = enr.epss!=null?(enr.epss*100).toFixed(2)+'%':'N/A';
+          ioc.kev  = enr.kev||false;
+          ioc.context = enr.description||ioc.context||'';
+          ioc.refs = enr.references||[];
+          ioc.published = enr.published||'';
+          ioc.risk_score = enr.risk_score||'';
+        }
+      }
+      // Log hits via hunt
       var hunted=await fetch(API+'/api/v1/logs/hunt?q='+encodeURIComponent(ioc.val||'')+'&hours=72&limit=5',
-        {headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({}));
+        {headers:hdr()}).then(function(r){return r.json();}).catch(function(){return {};});
       if(hunted.events&&hunted.events.length){
         ioc._log_hits=hunted.events.length;
         ioc.findings=(hunted.events||[]).slice(0,3).map(function(e){return e.message;});
       }
-    }catch(e){}
+    }catch(e){ console.warn('[TI] openIOCDetail enrich error:', e); }
   }
   if(!ioc)return;
   document.getElementById('imod-title').textContent=ioc.type+': '+ioc.val.slice(0,40)+(ioc.val.length>40?'…':'');
@@ -300,25 +341,55 @@ async function openIOCDetail(id){
   document.getElementById('imod-sev').innerHTML=sevBadge(ioc.severity);
   var kevBadge = (ioc.kev || (window._kevSet && window._kevSet.has(ioc.val))) ? '<span class="pill pill-red" style="margin-left:6px">🔴 CISA KEV</span>' : '';
   document.getElementById('imod-matched').innerHTML=(ioc.matched?'<span class="pill pill-green">&#10003; matched in scans</span>':'<span class="pill pill-gray">not matched</span>')+kevBadge;
-  document.getElementById('imod-kpis').innerHTML=[
-    {lbl:'Type',val:ioc.type,color:'var(--cyan)'},{lbl:'Severity',val:ioc.severity,color:sevColor(ioc.severity)},{lbl:'Feed',val:ioc.feed,color:'var(--t1)'},
-  ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
+  var imodKpis=[
+    {lbl:'Type',val:ioc.type,color:'var(--cyan)'},
+    {lbl:'Severity',val:ioc.severity,color:sevColor(ioc.severity)},
+    {lbl:'Feed',val:ioc.feed,color:'var(--t1)'},
+  ];
+  if(ioc.cvss!=null) imodKpis.push({lbl:'CVSS',val:ioc.cvss,color:ioc.cvss>=9?'var(--red)':ioc.cvss>=7?'var(--amber)':'var(--blue)'});
+  if(ioc.epss!=null) imodKpis.push({lbl:'EPSS',val:ioc.epss,color:'var(--t2)'});
+  if(ioc.kev!=null)  imodKpis.push({lbl:'KEV',val:ioc.kev?'YES':'NO',color:ioc.kev?'var(--red)':'var(--green)'});
+  document.getElementById('imod-kpis').innerHTML=imodKpis
+    .map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
   document.getElementById('imod-val').textContent=ioc.val;
-  document.getElementById('imod-context').textContent=ioc.context||'No additional context available.';
+  var ctx = ioc.context||'';
+  var refsHtml = '';
+  if(ioc.refs&&ioc.refs.length){
+    refsHtml = '<div style="margin-top:8px;font-size:10px;color:var(--t3)">References:</div>'
+      + ioc.refs.slice(0,3).map(function(r){
+          return '<div style="margin-top:3px"><a href="'+r+'" target="_blank" style="color:var(--cyan);font-size:10px;word-break:break-all">'+r+'</a></div>';
+        }).join('');
+  }
+  if(ioc.published) ctx += (ctx?' · ':'')+'Published: '+ioc.published.slice(0,10);
+  if(ioc.risk_score) ctx += ' · Risk score: '+Math.round(ioc.risk_score);
+  document.getElementById('imod-context').innerHTML = (ctx||'No additional context available.')
+    + (refsHtml ? '<br>'+refsHtml : '');
   document.getElementById('imod-findings').innerHTML=(ioc.findings||[]).length
     ?ioc.findings.map(function(f){return '<div style="padding:6px 8px;background:var(--surface);border-radius:5px;font-size:11px;margin-bottom:4px;border-left:2px solid var(--amber)">'+f+'</div>';}).join('')
     :'<div style="color:var(--t3);font-size:11px">No findings matched this indicator</div>';
   document.getElementById('imod-mitre').innerHTML=(ioc.mitre||[]).map(function(m){return '<span class="pill pill-purple">'+m+'</span>';}).join('');
+  _currentIOCId = id;
   document.getElementById('ioc-modal').classList.add('open');
 }
 async function openCVEDetail(id){
   var c=CVES.find(function(x){return x.id===id;});
   if(!c&&TOKEN){
-    // Try fetch from top-cves API
     try{
-      var d=await fetch(API+'/api/v1/vulns/top-cves',{headers:{Authorization:'Bearer '+TOKEN}}).then(r=>r.json()).catch(()=>({cves:[]}));
-      var found=(d.cves||[]).find(function(x){return x.cve===id;});
-      if(found) c={id:found.cve,severity:found.severity,cvss:found.cvss||'N/A',epss:found.epss||'N/A',kev:false,desc:found.cve+' — '+found.severity+' vulnerability',component:found.tools,fix:'Update affected component',ttp:'T1190',refs:[]};
+      // [FIX] Ưu tiên /ti/enrich để lấy real data
+      var enr=await fetch(API+'/api/v1/ti/enrich?cve='+encodeURIComponent(id),
+        {headers:hdr()}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+      if(enr){
+        c={id:id, severity:enr.adjusted_severity||'MEDIUM',
+           cvss:enr.cvss||'N/A', epss:enr.epss!=null?(enr.epss*100).toFixed(3):'N/A',
+           kev:enr.kev||false, desc:enr.description||id,
+           component:'—', fix:'Update to patched version',
+           ttp:'T1190', refs:enr.references||[]};
+      } else {
+        // Fallback: top-cves
+        var d=await fetch(API+'/api/v1/vulns/top-cves',{headers:hdr()}).then(function(r){return r.json();}).catch(function(){return {cves:[]};});
+        var found=(d.cves||[]).find(function(x){return x.cve===id;});
+        if(found) c={id:found.cve,severity:found.severity,cvss:found.cvss||'N/A',epss:'N/A',kev:false,desc:found.cve+' — '+found.severity,component:found.tools||'—',fix:'Update affected component',ttp:'T1190',refs:[]};
+      }
     }catch(e){}
   }
   if(!c) return;
@@ -346,11 +417,41 @@ async function openCVEDetail(id){
 }
 function showMITREDetail(id){
   var m=MITRE.find(function(x){return x.id===id;});
-  if(m&&m.count>0) alert('Tactic: '+m.tactic+' ('+m.id+')\nTechniques: '+m.techniques.join(', ')+'\nFindings mapped: '+m.count);
+  if(!m) return;
+  if(m.count>0){
+    tiToast('Tactic: '+m.tactic+' ('+m.id+') · '+m.count+' findings · Techniques: '+m.techniques.slice(0,3).join(', '),'info');
+  } else {
+    tiToast('No findings mapped to '+m.tactic+' yet','info');
+  }
 }
 
 
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// Block current IOC — suppress via vulns/bulk nếu là CVE, else tiToast
+var _currentIOCId = null;
+function setCurrentIOC(id){ _currentIOCId = id; }
+
+async function blockCurrentIOC(){
+  var ioc = IOCS.find(function(i){ return i.id===_currentIOCId; });
+  if(!ioc){ tiToast('No IOC selected','error'); return; }
+  if(!TOKEN){ tiToast('Not authenticated','error'); return; }
+  try{
+    if(ioc.type==='cve'){
+      // Block via vulns/bulk suppress
+      var r=await fetch(API+'/api/v1/vulns/bulk',{
+        method:'POST', headers:hdr(),
+        body:JSON.stringify({action:'suppress', cve_ids:[ioc.val], metadata:{source:'threat_intel',reason:'IOC block'}})
+      });
+      var d=r.ok?await r.json():null;
+      tiToast(r.ok?'CVE '+ioc.val+' suppressed (undo_token: '+(d&&d.undo_token||'').slice(0,8)+')':'Block failed: HTTP '+r.status, r.ok?'success':'error');
+    } else {
+      // IP/domain/hash — log locally + tiToast (no dedicated block endpoint yet)
+      tiToast('IOC '+ioc.type+':'+ioc.val+' flagged for blocking · Add to firewall/EDR manually','warn');
+    }
+    if(r&&r.ok) closeModal('ioc-modal');
+  }catch(e){ tiToast('Block error: '+e.message,'error'); }
+}
 function hdr(){ return {Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}; }
 function tiToast(msg,type){
   var t=document.createElement('div');
@@ -462,6 +563,7 @@ async function loadFromAPI(){
     if(res[3]&&res[3].cves&&res[3].cves.length){
       CVES=res[3].cves.map(function(c){return Object.assign({id:c.cve||c.id||'CVE-?',matched:false,kev:c.kev||false,findings:[]},c);});
       renderCVEs();
+      enrichCVEs(); // [FIX] batch enrich CVSS/EPSS
     } else if(hasUX){
       VSPUXState.empty('#cve-tbody', 'No CVE data', loadFromAPI);
     }
