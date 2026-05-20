@@ -499,7 +499,14 @@ renderChecks();
 API = window.location.origin === "null" ? "" : window.location.origin;
 // Thử lấy token từ localStorage ngay
 try{ var _initT=localStorage.getItem("vsp_token")||""; if(_initT&&_initT.length>20){TOKEN=_initT;window.TOKEN=TOKEN;} }catch(_){}
-loadBaseline();setTimeout(function(){if(TOKEN)loadAnomalies();},1000);
+// [FIX] Set API + lấy token localStorage trước khi loadBaseline
+API = (window.location.origin === "null" ? "" : window.location.origin);
+try{
+  var _t2 = localStorage.getItem("vsp_token") || "";
+  if(_t2 && _t2.length > 20 && !TOKEN){ TOKEN = _t2; window.TOKEN = TOKEN; }
+}catch(_){}
+loadBaseline();
+setTimeout(function(){ if(TOKEN){ loadAnomalies(); loadTimelineData(); } }, 800);
 </script>
 <script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
 
