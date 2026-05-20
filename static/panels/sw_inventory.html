@@ -1291,7 +1291,7 @@ async function _loadAllSwInv(){
 }
 window.addEventListener('message',function(e){
   if(!e.data)return;
-  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>50){if(!TOKEN){TOKEN=e.data.token;_loadAllSwInv();}}
+  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>20){if(!TOKEN){TOKEN=e.data.token;_loadAllSwInv();}}
 });
 if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
 </script>
