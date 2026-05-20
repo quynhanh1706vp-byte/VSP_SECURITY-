@@ -1011,7 +1011,7 @@ function renderWhitelist() {
     <div class="policy-item approved">
       <div>
         <div class="policy-name">${x.name} <span style="font-size:10px;color:var(--t3);font-weight:400">${x.version}</span></div>
-        <div class="policy-meta">${x.vendor} · ${x.cat} · ${x.reason}</div>
+        <div class="policy-meta">${x.vendor} · ${x.category||x.cat||"—"} · ${x.reason}</div>
       </div>
       <div class="policy-actions">
         <span class="badge badge-ok" style="font-size:9px">APPROVED</span>
@@ -1023,7 +1023,7 @@ function renderWhitelist() {
     <div class="policy-item blocked">
       <div>
         <div class="policy-name">${x.name} <span style="font-size:10px;color:var(--t3);font-weight:400">${x.version}</span></div>
-        <div class="policy-meta">${x.vendor} · ${x.cat} · ${x.reason}</div>
+        <div class="policy-meta">${x.vendor} · ${x.category||x.cat||"—"} · ${x.reason}</div>
       </div>
       <div class="policy-actions">
         <span class="badge badge-danger" style="font-size:9px">BLOCKED</span>
@@ -1031,8 +1031,12 @@ function renderWhitelist() {
       </div>
     </div>`).join('');
 
-  document.getElementById('warning-list').innerHTML = MOCK_WARNING.map(w=>`
-    <span class="badge badge-warn" style="cursor:pointer;font-size:11px" onclick="removeFromList('warning','${w}')">${w} ✕</span>`).join('');
+  const warnHtml = (WARNING_ITEMS&&WARNING_ITEMS.length?WARNING_ITEMS:MOCK_WARNING).map(w=>{
+    const wid=typeof w==='object'?(w.id||0):0;
+    const wname=typeof w==='object'?(w.name||String(w)):String(w);
+    return `<span class="badge badge-warn" style="cursor:pointer;font-size:11px;padding:4px 8px;margin:2px" onclick="removeFromList('warning',${wid},'${wname}')">${wname} ✕</span>`;
+  }).join('');
+  document.getElementById('warning-list').innerHTML = warnHtml || '<span style="color:var(--t3);font-size:11px">No warning items</span>';
 }
 
 // ═══════════════════════════════════
