@@ -158,7 +158,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   <div class="modal">
     <div class="modal-head">
       <div><div class="modal-title" id="amod-name">Asset</div><div class="modal-sub" id="amod-sub"></div></div>
-      <div style="display:flex;gap:8px;align-items:center"><span id="amod-env"></span><span id="amod-risk-badge"></span><button class="modal-close" onclick="closeModal(\"\1\")">&#10005;</button></div>
+      <div style="display:flex;gap:8px;align-items:center"><span id="amod-env"></span><span id="amod-risk-badge"></span><button class="modal-close" onclick="closeModal('asset-modal')">&#10005;</button></div>
     </div>
     <div class="modal-body">
       <div class="detail-grid" id="amod-kpis"></div>
@@ -168,7 +168,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
       <div id="amod-findings"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn" onclick="closeModal(\"\1\")">Close</button>
+      <button class="btn" onclick="closeModal('asset-modal')">Close</button>
       <button class="btn btn-primary btn-sm" id="amod-all-btn">View all findings &#8594;</button>
     </div>
   </div>
@@ -178,7 +178,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
   <div class="modal">
     <div class="modal-head">
       <div><div class="modal-title" id="fmod-title">Finding</div><div class="modal-sub" id="fmod-sub"></div></div>
-      <div style="display:flex;gap:8px;align-items:center"><span id="fmod-sev"></span><button class="modal-close" onclick="closeModal(\"\1\")">&#10005;</button></div>
+      <div style="display:flex;gap:8px;align-items:center"><span id="fmod-sev"></span><button class="modal-close" onclick="closeModal('asset-modal')">&#10005;</button></div>
     </div>
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="fmod-kpis"></div>
