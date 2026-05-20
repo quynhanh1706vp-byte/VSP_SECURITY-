@@ -300,7 +300,7 @@ function renderFindings(){
   var list=src.filter(function(f){
     if(sf&&(f.severity||'').toUpperCase()!==sf)return false;
     if(stf&&(f.status||'open')!==stf)return false;
-    if(q&&!(f.title.toLowerCase().includes(q)||(f.asset||'').toLowerCase().includes(q)))return false;
+    if(q&&!((f.rule_id||f.title||f.message||'').toLowerCase().includes(q)||(f.asset||'').toLowerCase().includes(q)))return false;
     return true;
   });
   document.getElementById('findings-title').textContent=_activeAsset?_activeAsset.name+' findings':'All findings';
@@ -321,7 +321,7 @@ function renderFindings(){
     return '<div class="finding '+sc+'" data-id="'+f.id+'" onclick="openFindingModal(this.dataset.id)">'
       +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+f.title+'</span><span class="f-ts">'+f.asset+'</span></div>'
       +'<div class="f-file">'+f.tool+' · '+f.file+':'+f.line+'</div>'
-      +'<div class="f-tags"><span class="pill pill-gray">'+f.rule+'</span>'+(f.cwe?'<span class="pill pill-gray">'+f.cwe+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+f.cvss+'</span>':'')+'</div>'
+      +'<div class="f-tags"><span class="pill pill-gray">'+(f.rule_id||f.rule||'?')+'</span>'+(f.cwe?'<span class="pill pill-gray">'+f.cwe+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+f.cvss+'</span>':'')+'</div>'
       +'</div>';
   }).join('');
 }
@@ -370,8 +370,8 @@ async function openAssetModal(id){
   var af=(a._api_findings||ALL_FINDINGS.filter(function(f){return f.asset_id===a.id;})).slice(0,4);
   document.getElementById('amod-findings').innerHTML=af.length?af.map(function(f){
     return '<div class="finding '+sevClass((f.severity||'').toUpperCase())+'" data-fid="'+f.id+'" onclick="openFindingModal(this.dataset.fid)">'
-      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+f.title+'</span></div>'
-      +'<div class="f-file">'+f.file+':'+f.line+' · '+f.rule+'</div></div>';
+      +'<div class="f-hdr">'+sevBadge(f.severity)+'<span class="f-title">'+f.rule_id||f.title||f.rule||'—'+'</span></div>'
+      +'<div class="f-file">'+f.path||f.file||'?'+':'+f.line+' · '+f.rule_id||f.rule+'</div></div>';
   }).join(''):(typeof VSPUXState!=='undefined'?(_assetEmpty('#amod-findings','No findings for this asset',null),''):'<div style=\"color:var(--t3);font-size:11px\">No findings for this asset</div>');
   document.getElementById('amod-all-btn').onclick=function(){closeModal('asset-modal');_activeAsset=a;renderFindings();};
   document.getElementById('asset-modal').classList.add('open');
@@ -379,15 +379,18 @@ async function openAssetModal(id){
 function openFindingModal(id){
   var f=ALL_FINDINGS.find(function(x){return x.id===id;});if(!f)return;
   var sev=(f.severity||'').toUpperCase();
-  document.getElementById('fmod-title').textContent=f.title;
-  document.getElementById('fmod-sub').textContent=f.id.slice(0,8)+' · '+f.tool+' · '+f.rule;
+  document.getElementById('fmod-title').textContent=f.rule_id||f.title||f.rule||'—';
+  document.getElementById('fmod-sub').textContent=f.id.slice(0,8)+' · '+(f.tool||'?')+' · '+(f.rule_id||f.rule||'—');
   document.getElementById('fmod-sev').innerHTML=sevBadge(sev);
   document.getElementById('fmod-kpis').innerHTML=[
-    {lbl:'Severity',val:sev,color:sevColor(sev)},{lbl:'CVSS',val:f.cvss||'—',color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
+    {lbl:'Severity',val:sev,color:sevColor(sev)},{lbl:'CVSS',val:f.cvss>0?f.cvss:'—',color:f.cvss>=9?'var(--red)':f.cvss>=7?'var(--amber)':'var(--t1)'},
     {lbl:'EPSS',val:f.epss||'—',color:'var(--t1)'},{lbl:'Status',val:f.status||'open',color:f.status==='resolved'?'var(--green)':'var(--amber)'},
   ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
   document.getElementById('fmod-desc').textContent=f.desc||'';
-  document.getElementById('fmod-location').textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
+  var _file=f.path||f.file||'?', _asset=f.asset_name||f.asset||f.host||'—', _rule=f.rule_id||f.rule||'—', _rem=f.fix_signal||f.remediation||'';
+  document.getElementById('fmod-desc').textContent=f.message||f.desc||'';
+  document.getElementById('fmod-location').textContent='File: '+_file+(f.line?':'+f.line:'')+'\nAsset: '+_asset+'\nTool:  '+(f.tool||'?')+'\nRule:  '+_rule+(f.cwe?'\nCWE:   '+f.cwe:'');
+  document.getElementById('fmod-rem').textContent=_rem;
 
 
 
