@@ -399,15 +399,39 @@ async function loadBaseline(){
     }
     // Apply real data: history -> SCORE_HIST, avg_score -> BL_SCORE
     if(d.history && d.history.length){
-      SCORE_HIST = d.history.map(function(h){return h.val||h.score||h;});
+      SCORE_HIST = d.history.map(function(h){ return typeof h==='object'?(h.val||h.score||h.avg||0):Number(h)||0; });
     }
     if(d.avg_score!=null) BL_SCORE = d.avg_score;
+    // Update BASELINE KPI
+    var kBase=document.getElementById('k-base');
+    if(kBase && d.avg_score!=null) kBase.textContent=Math.round(d.avg_score);
     renderBaseline(d);
     if(typeof renderScoreBars==='function') renderScoreBars();
     loadAnomalies();
+    loadTimelineData();
   }catch(e){
     if(hasUX) VSPUXState.error('#score-bars', 'Network error', loadBaseline);
   }
+}
+
+async function loadTimelineData(){
+  if(!TOKEN) return;
+  try{
+    var r=await fetch(API+'/api/v1/ueba/timeline',{headers:hdr()});
+    if(!r.ok) return;
+    var d=await r.json();
+    var tl=d.timeline||[];
+    if(!tl.length) return;
+    // Merge timeline vào SCORE_HIST nếu chưa có đủ data
+    if(!SCORE_HIST.length || SCORE_HIST.length < 5){
+      SCORE_HIST = tl.slice(-30).map(function(t){ return t.score||0; });
+      if(typeof renderScoreBars==='function') renderScoreBars();
+    }
+    // Update k-base từ timeline avg
+    var avg = Math.round(tl.reduce(function(s,t){return s+(t.score||0);},0)/tl.length);
+    var kBase=document.getElementById('k-base');
+    if(kBase && !isNaN(avg)) kBase.textContent=avg;
+  }catch(e){ console.warn('[UEBA] loadTimelineData error:',e); }
 }
 
 async function loadAnomalies(){
