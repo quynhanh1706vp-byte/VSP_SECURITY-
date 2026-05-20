@@ -285,7 +285,7 @@ function renderScoreBars(){
 function renderChecks(){
   document.getElementById('checks-list').innerHTML=CHECKS.map(function(c){
     var found=ANOMALIES.find(function(a){return a.type===c.type;});
-    return '<div class="check-item" onclick="'+(found?'openAnomDetail(\''+c.type+'\')':'')+'"><div class="check-dot" style="background:'+(found?sevColor(found.severity):'var(--green)')+'"></div><div style="flex:1"><div style="font-size:12px;font-weight:500">'+c.name+'</div><div style="font-size:10px;color:var(--t3)">'+c.desc+'</div></div><div style="text-align:right">'+(found?sevBadge(found.severity):'<span class="pill pill-green">OK</span>')+'<div style="font-size:9px;color:var(--t3);margin-top:2px">'+c.sensitivity+'</div></div></div>';
+    return '<div class="check-item" onclick="openCheckDetail(\''+c.type+'\',\''+c.name+'\')"><div class="check-dot" style="background:'+(found?sevColor(found.severity):'var(--green)')+'"></div><div style="flex:1"><div style="font-size:12px;font-weight:500">'+c.name+'</div><div style="font-size:10px;color:var(--t3)">'+c.desc+'</div></div><div style="text-align:right">'+(found?sevBadge(found.severity):'<span class="pill pill-green">OK</span>')+'<div style="font-size:9px;color:var(--t3);margin-top:2px">'+c.sensitivity+'</div></div></div>';
   }).join('');
 }
 function renderBaseline(b){
@@ -320,6 +320,27 @@ function renderAnomalies(){
   }).join('');
 }
 function openAnomDetail(type){var a=ANOMALIES.find(function(x){return x.type===type;});if(a)openAnomDetailObj(a);}
+function openCheckDetail(type, name){
+  var a=ANOMALIES.find(function(x){return x.type===type;});
+  if(a){ openAnomDetailObj(a); return; }
+  // Check OK — hiện thông tin bình thường
+  var check=CHECKS.find(function(c){return c.type===type;});
+  if(!check) return;
+  document.getElementById('amod-title').textContent=name;
+  document.getElementById('amod-sub').textContent='Status: OK — no anomaly detected';
+  document.getElementById('amod-sev').innerHTML='<span class="pill pill-green">OK</span>';
+  document.getElementById('amod-kpis').innerHTML=[
+    {lbl:'Type',val:check.type.replace(/_/g,' '),color:'var(--cyan)'},
+    {lbl:'Sensitivity',val:check.sensitivity,color:'var(--t2)'},
+    {lbl:'Status',val:'Normal',color:'var(--green)'},
+  ].map(function(k){return '<div class="detail-card"><div class="detail-lbl">'+k.lbl+'</div><div class="detail-val" style="color:'+k.color+'">'+k.val+'</div></div>';}).join('');
+  document.getElementById('amod-compare').innerHTML='';
+  document.getElementById('amod-why').textContent=check.desc+'. No anomalous behavior detected in the current monitoring window.';
+  document.getElementById('amod-history').innerHTML='';
+  document.getElementById('amod-recs').innerHTML='<div style="color:var(--green);font-size:11px">✓ This behavioral monitor is within normal parameters.</div>';
+  document.getElementById('amod-soar-btn').style.display='none';
+  document.getElementById('anom-modal').classList.add('open');
+}
 function openAnomDetailObj(a){
   if(typeof a==='string')a=JSON.parse(a);
   // Normalize source_refs fields → top-level for modal display
@@ -378,6 +399,8 @@ async function runAnalysis(){
   badge.textContent='✓ '+new Date().toLocaleTimeString('en-GB',{hour12:false});badge.className='pill pill-green';
   btn.disabled=false;btn.textContent='▶ Analyze now';
 }
+function hdr(){ return {Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}; }
+
 async function loadBaseline(){
   var hasUX = typeof VSPUXState !== 'undefined';
   if(hasUX) VSPUXState.skeleton('#score-bars', {rows: 1, height: 80});
