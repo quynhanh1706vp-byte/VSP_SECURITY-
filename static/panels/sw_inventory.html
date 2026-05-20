@@ -842,7 +842,7 @@ async function loadInventory() {
 
   await ensureToken();
   try {
-    const r = await fetch(API + '/api/v1/assets', { headers: hdr() });
+    const r = await fetch(API + SW_BASE, { headers: hdr() });
     if (!r.ok) {
       // Real HTTP error — show error state (FEAT-28 behavior change vs old silent mock fallback)
       if (hasUX) {
@@ -873,16 +873,31 @@ async function loadInventory() {
       return;
     }
     // Success path — render real data
+    // software-inventory API returns host-level assets
+    // Map host → package summary row
     _invData = raw.map((a, i) => ({
-      id: a.id || i + 1, name: a.name || 'Unknown', version: a.version || '—',
-      vendor: a.vendor || a.type || '—', host: a.ip || a.name || '—',
-      os: (a.env || a.type || '').toLowerCase().includes('win') ? 'windows' : 'linux',
-      status: (a.critical || 0) > 0 ? 'warning' : (a.high || 0) > 3 ? 'warning' : 'approved',
-      cves: (a.critical || 0) + (a.high || 0) + (a.medium || 0),
-      license: a.license || '—', eol_date: a.eol_date || null,
-      risk_score: a.risk_score || 0, tags: a.tags || [], last_scan: a.last_scan || '—',
-      total_findings: a.total_findings || ((a.critical || 0) + (a.high || 0) + (a.medium || 0) + (a.low || 0)),
-      env: a.env || '—'
+      id: a.id || i + 1,
+      name: a.hostname || a.name || 'Unknown',
+      version: a.agent_version || '—',
+      vendor: a.os || '—',
+      host: a.hostname || '—',
+      os: (a.os || '').toLowerCase().includes('win') ? 'windows' : 'linux',
+      status: a.risk_level === 'critical' ? 'cracked' :
+              a.risk_level === 'high' ? 'warning' :
+              a.eol_count > 0 ? 'eol' :
+              a.crack_count > 0 ? 'cracked' : 'approved',
+      cves: a.suspicious_count || 0,
+      license: '—',
+      eol_date: a.eol_count > 0 ? 'EOL sw: ' + a.eol_count : null,
+      risk_score: a.risk_score || 0,
+      tags: [],
+      last_scan: a.last_seen ? a.last_seen.slice(0,10) : '—',
+      total_findings: (a.suspicious_count||0) + (a.eol_count||0) + (a.crack_count||0),
+      env: a.os || '—',
+      total_software: a.total_software || 0,
+      eol_count: a.eol_count || 0,
+      crack_count: a.crack_count || 0,
+      risk_level: a.risk_level || 'clean'
     }));
     // FIX 2026-05-07: vsp_fe_sync_patch_v2.js F34 overrides renderInventory
     // and reads from window._invData (global), but the IIFE here keeps
