@@ -419,7 +419,7 @@ async function loadBaseline(){
 async function loadTimelineData(){
   if(!TOKEN) return;
   try{
-    var r=await fetch(API+'/api/v1/ueba/timeline',{headers:hdr()});
+    var r=await fetch(API+'/api/v1/ueba/timeline',{headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}});
     if(!r.ok) return;
     var d=await r.json();
     var tl=d.timeline||[];
