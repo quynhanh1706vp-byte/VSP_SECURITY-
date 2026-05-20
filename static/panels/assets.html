@@ -199,6 +199,15 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
 </div>
 <script>
 var TOKEN='',API='',_assetFilter='',_activeAsset=null;
+function hdr(){ return {Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}; }
+function assetToast(msg,type){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;background:var(--bg2);border:1px solid var(--border2);color:var(--t1);max-width:320px';
+  if(type==='success') t.style.borderColor='rgba(34,197,94,.4)';
+  if(type==='error')   t.style.borderColor='rgba(239,68,68,.4)';
+  t.textContent=msg; document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},300);},3000);
+}
 var ASSETS=[];
 var ALL_FINDINGS=[];// lazy-loaded via openAssetModal()
 /* FEAT-34: assets L2 UX states (mirror p4_compliance pattern, override-aware) */
