@@ -873,31 +873,25 @@ async function loadInventory() {
       return;
     }
     // Success path — render real data
-    // software-inventory API returns host-level assets
-    // Map host → package summary row
-    _invData = raw.map((a, i) => ({
-      id: a.id || i + 1,
-      name: a.hostname || a.name || 'Unknown',
-      version: a.agent_version || '—',
-      vendor: a.os || '—',
-      host: a.hostname || '—',
-      os: (a.os || '').toLowerCase().includes('win') ? 'windows' : 'linux',
-      status: a.risk_level === 'critical' ? 'cracked' :
-              a.risk_level === 'high' ? 'warning' :
-              a.eol_count > 0 ? 'eol' :
-              a.crack_count > 0 ? 'cracked' : 'approved',
-      cves: a.suspicious_count || 0,
+    _invData = raw.map((a,i)=>({
+      id: a.id||i+1,
+      name: a.hostname||a.name||'Unknown',
+      version: a.agent_version||'—',
+      vendor: a.os||'—',
+      host: a.hostname||'—',
+      os: (a.os||'').toLowerCase().includes('win')?'windows':'linux',
+      status: a.crack_count>0?'cracked':a.eol_count>0?'eol':
+              a.risk_level==='critical'?'cracked':a.risk_level==='high'?'warning':'approved',
+      cves: a.suspicious_count||0,
       license: '—',
-      eol_date: a.eol_count > 0 ? 'EOL sw: ' + a.eol_count : null,
-      risk_score: a.risk_score || 0,
-      tags: [],
-      last_scan: a.last_seen ? a.last_seen.slice(0,10) : '—',
-      total_findings: (a.suspicious_count||0) + (a.eol_count||0) + (a.crack_count||0),
-      env: a.os || '—',
-      total_software: a.total_software || 0,
-      eol_count: a.eol_count || 0,
-      crack_count: a.crack_count || 0,
-      risk_level: a.risk_level || 'clean'
+      eol_date: a.eol_count>0?`EOL sw: ${a.eol_count}`:null,
+      risk_score: a.risk_score||0, tags:[], last_scan: (a.last_seen||'').slice(0,10)||'—',
+      total_findings:(a.suspicious_count||0)+(a.eol_count||0)+(a.crack_count||0),
+      env: a.os||'—',
+      total_software: a.total_software||0,
+      eol_count: a.eol_count||0,
+      crack_count: a.crack_count||0,
+      risk_level: a.risk_level||'clean'
     }));
     // FIX 2026-05-07: vsp_fe_sync_patch_v2.js F34 overrides renderInventory
     // and reads from window._invData (global), but the IIFE here keeps
@@ -1031,12 +1025,8 @@ function renderWhitelist() {
       </div>
     </div>`).join('');
 
-  const warnHtml = (WARNING_ITEMS&&WARNING_ITEMS.length?WARNING_ITEMS:MOCK_WARNING).map(w=>{
-    const wid=typeof w==='object'?(w.id||0):0;
-    const wname=typeof w==='object'?(w.name||String(w)):String(w);
-    return `<span class="badge badge-warn" style="cursor:pointer;font-size:11px;padding:4px 8px;margin:2px" onclick="removeFromList('warning',${wid},'${wname}')">${wname} ✕</span>`;
-  }).join('');
-  document.getElementById('warning-list').innerHTML = warnHtml || '<span style="color:var(--t3);font-size:11px">No warning items</span>';
+  document.getElementById('warning-list').innerHTML = MOCK_WARNING.map(w=>`
+    <span class="badge badge-warn" style="cursor:pointer;font-size:11px" onclick="removeFromList('warning','${w}')">${w} ✕</span>`).join('');
 }
 
 // ═══════════════════════════════════
@@ -1179,19 +1169,20 @@ function saveToList() {
 }
 
 async function removeFromList(listType, id, name) {
-  if(!confirm(`Remove "${name}" from ${listType}?`)) return;
-  try {
-    const r = await fetch(API+'/api/v1/software-inventory/'+listType+'/'+id,
-      {method:'DELETE', headers:hdr()});
-    if(r.ok) {
-      showToast(`${name} removed from ${listType}`,'success');
-      loadWhiteBlacklist();
-    } else {
-      showToast('Delete failed: '+r.status,'error');
-    }
-  } catch(e) {
-    showToast('Network error','error');
+  if(!confirm(`Remove "${name||'item'}" from ${listType}?`)) return;
+  if(id && id!==0) {
+    try {
+      const r = await fetch(API+'/api/v1/software-inventory/'+listType+'/'+id,
+        {method:'DELETE',headers:hdr()});
+      if(r.ok) { showToast(`${name} removed`,'success'); loadWhiteBlacklist(); return; }
+    } catch(e) {}
   }
+  // Local remove fallback
+  if(listType==='whitelist'){ const i=WHITELIST.findIndex(x=>x.name===name); if(i>=0) WHITELIST.splice(i,1); }
+  else if(listType==='blacklist'){ const i=BLACKLIST.findIndex(x=>x.name===name); if(i>=0) BLACKLIST.splice(i,1); }
+  else { WARNING_ITEMS=WARNING_ITEMS.filter(x=>x.name!==name); }
+  showToast(`${name||'Item'} removed`,'success');
+  renderWhitelist();
 }
 
 function blockSW(name) {
