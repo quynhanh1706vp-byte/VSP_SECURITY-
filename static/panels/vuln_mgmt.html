@@ -49,6 +49,8 @@
     return "";
   }
   
+  var _origFetch = window.fetch;
+
   window.vspAuthFetch = async function(url, opts){
     opts = opts || {};
     var tk = await getToken();
@@ -59,8 +61,7 @@
     }
     return _origFetch(url, opts);
   };
-  
-  var _origFetch = window.fetch;
+
   window.fetch = function(url, opts){
     if (typeof url === "string" && url.indexOf("/api/") >= 0) {
       if (opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization)) {
@@ -132,6 +133,8 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
       <option value="30" selected>Last 30d</option>
       <option value="90">Last 90d</option>
     </select>
+    <button class="btn btn-sm" onclick="bulkMarkResolved('CRITICAL')" style="color:var(--red);border-color:rgba(239,68,68,.3)">✓ Bulk Resolve CRIT</button>
+    <button class="btn btn-sm" onclick="undoLastBulk()" style="color:var(--amber);border-color:rgba(245,158,11,.3)" title="Undo last bulk action (60s window)">↩ Undo</button>
     <button class="btn btn-sm" onclick="loadAll()">↻ Refresh</button>
   </div>
 </div>
@@ -223,7 +226,10 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-ui);padding:16p
       <div style="background:var(--surface);border-radius:7px;padding:10px 12px;font-size:11px;font-family:var(--font-mono)" id="cvd-fix"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-sm btn-primary" onclick="copyCVEId()">📋 Copy CVE ID</button>
+      <button class="btn btn-sm" onclick="markFindingsReviewed()" style="color:var(--amber);border-color:rgba(245,158,11,.3)" title="Suppress this CVE">⛔ Suppress</button>
+      <button class="btn btn-sm" onclick="createPOAM()" style="color:var(--purple);border-color:rgba(139,92,246,.3)" title="Create POA&M item">📋 POA&M</button>
+      <button class="btn btn-sm" onclick="openInThreatHunt()" style="color:var(--cyan);border-color:rgba(6,182,212,.3)">🔍 SIEM Hunt</button>
+      <button class="btn btn-sm btn-primary" onclick="copyCVEId()">📋 Copy ID</button>
       <button class="btn btn-sm" onclick="closeCVEDetail()">Close</button>
     </div>
   </div>
@@ -450,8 +456,14 @@ function renderSampleData() {
 
 // ── Main load ──────────────────────────────────────────────
 async function loadAll() {
-  // FIX B9: always render sample data first so KPIs are never —
-  if (!TOKEN) { renderSampleData(); return; }
+  if (!TOKEN) {
+    // Thử lấy token từ localStorage
+    try {
+      var _t = localStorage.getItem('vsp_token') || '';
+      if (_t && _t.length > 20) { TOKEN = _t; window.TOKEN = TOKEN; }
+    } catch(_) {}
+    if (!TOKEN) { renderSampleData(); setTimeout(loadAll, 1500); return; }
+  }
 
   var days = document.getElementById('days-sel').value;
   var h = { Authorization: 'Bearer ' + TOKEN };
@@ -548,6 +560,115 @@ function closeCVEDetail() {
   document.getElementById('cve-detail-modal').classList.remove('open');
 }
 
+async function createPOAM() {
+  var cve = document.getElementById('cvd-id').textContent;
+  if (!cve) return;
+  try {
+    var r = await fetch(API + '/api/v1/vulns/bulk', {
+      method: 'POST', headers: hdr(),
+      body: JSON.stringify({
+        action: 'create_poam',
+        cve_ids: [cve],
+        metadata: { source: 'vuln_mgmt', created_via: 'cve_detail_modal' }
+      })
+    });
+    var d = r.ok ? await r.json() : null;
+    showVMToast(r.ok
+      ? 'POA&M created for ' + cve + ' (action_id: ' + (d && d.action_id || '') + ')'
+      : 'POA&M failed: HTTP ' + r.status,
+      r.ok ? 'success' : 'error');
+  } catch(e) { showVMToast('Error: ' + e.message, 'error'); }
+}
+
+async function markFindingsReviewed() {
+  var cve = document.getElementById('cvd-id').textContent;
+  if (!cve) return;
+  try {
+    var r = await fetch(API + '/api/v1/vulns/bulk', {
+      method: 'POST', headers: hdr(),
+      body: JSON.stringify({ action: 'suppress', cve_ids: [cve], metadata: { reason: 'reviewed' } })
+    });
+    var d = r.ok ? await r.json() : null;
+    showVMToast(r.ok
+      ? cve + ' suppressed · undo_token: ' + (d && d.undo_token || '')
+      : 'Failed: HTTP ' + r.status,
+      r.ok ? 'success' : 'error');
+    if (r.ok && d && d.undo_token) {
+      // Hiện undo toast 8s
+      var ut = d.undo_token;
+      setTimeout(function() {
+        if (confirm('Undo suppress ' + cve + '?')) {
+          fetch(API + '/api/v1/vulns/bulk/undo', {
+            method: 'POST', headers: hdr(),
+            body: JSON.stringify({ undo_token: ut })
+          }).then(function(r2){ showVMToast(r2.ok ? 'Undo OK' : 'Undo failed', r2.ok?'success':'error'); });
+        }
+      }, 8000);
+    }
+  } catch(e) { showVMToast('Error: ' + e.message, 'error'); }
+}
+
+function openInThreatHunt() {
+  var cve = document.getElementById('cvd-id').textContent;
+  if (!cve) return;
+  closeCVEDetail();
+  try {
+    if (window.parent && typeof window.parent.showPanel === 'function') {
+      window.parent.showPanel('threathunt');
+      setTimeout(function() {
+        window.parent.postMessage({ type: 'vsp-cross-nav', panel: 'threat_hunt', hint: { q: cve } }, window.location.origin);
+      }, 400);
+    }
+  } catch(e) {}
+  showVMToast('Opening Threat Hunt for ' + cve, 'info');
+}
+
+// Bulk action: mark all CRITICAL resolved
+async function bulkMarkResolved(sev) {
+  // Lấy CVE IDs từ list hiện tại theo severity
+  var cveIds = _cveData
+    .filter(function(c){ return !sev || c.severity === sev; })
+    .map(function(c){ return c.cve; })
+    .slice(0, 1000);
+  if (!cveIds.length) { showVMToast('No ' + sev + ' CVEs found', 'warn'); return; }
+  if (!confirm('Resolve ' + cveIds.length + ' ' + sev + ' CVEs?')) return;
+  try {
+    var r = await fetch(API + '/api/v1/vulns/bulk', {
+      method: 'POST', headers: hdr(),
+      body: JSON.stringify({ action: 'resolve', cve_ids: cveIds, metadata: { severity: sev } })
+    });
+    var d = r.ok ? await r.json() : null;
+    if (r.ok) {
+      showVMToast('Resolved ' + (d && d.affected || cveIds.length) + ' CVEs · undo available 60s', 'success');
+      // Store undo token
+      if (d && d.undo_token) {
+        window._lastBulkUndoToken = d.undo_token;
+      }
+      loadAll();
+    } else {
+      showVMToast('Bulk failed: HTTP ' + r.status, 'error');
+    }
+  } catch(e) { showVMToast('Error: ' + e.message, 'error'); }
+}
+
+// Undo last bulk action
+async function undoLastBulk() {
+  var ut = window._lastBulkUndoToken;
+  if (!ut) { showVMToast('No recent bulk action to undo', 'warn'); return; }
+  try {
+    var r = await fetch(API + '/api/v1/vulns/bulk/undo', {
+      method: 'POST', headers: hdr(),
+      body: JSON.stringify({ undo_token: ut })
+    });
+    var d = r.ok ? await r.json() : null;
+    showVMToast(r.ok
+      ? 'Undo OK — reverted ' + (d && d.reverted || 0) + ' findings'
+      : 'Undo failed: HTTP ' + r.status,
+      r.ok ? 'success' : 'error');
+    if (r.ok) { window._lastBulkUndoToken = null; loadAll(); }
+  } catch(e) { showVMToast('Error: ' + e.message, 'error'); }
+}
+
 function copyCVEId() {
   var id = document.getElementById('cvd-id').textContent;
   if (!id) return;
@@ -573,14 +694,15 @@ document.addEventListener('keydown', function(e) {
 // ── Token / theme message bus ──────────────────────────────
 // FIX B10: send vsp:request_theme only ONCE (was sent twice before)
 window.addEventListener('message', function(e) {
-  if (!window.VSPOrigin.check(e)) return;
+  // Guard VSPOrigin defensively
+  if (window.VSPOrigin && typeof window.VSPOrigin.check === 'function' && !window.VSPOrigin.check(e)) return;
   if (!e.data) return;
-  if (e.data.type === 'vsp:token' && e.data.token && e.data.token.length > 50) {
+  if (e.data.type === 'vsp:token' && e.data.token && e.data.token.length > 20) {
     if (!TOKEN) {
       TOKEN = e.data.token;
-      // Dùng origin của parent frame để tránh CORS
-      API = window.location.origin === 'null'
-        ? '' : window.location.origin;
+      window.TOKEN = TOKEN;
+      try { localStorage.setItem('vsp_token', TOKEN); } catch(_) {}
+      API = window.location.origin === 'null' ? '' : window.location.origin;
       loadAll();
     }
   }
@@ -589,7 +711,16 @@ window.addEventListener('message', function(e) {
 
 if (window.parent !== window) {
   window.parent.postMessage({ type: 'vsp:request_token' }, window.location.origin);
-  window.parent.postMessage({ type: 'vsp:request_theme' }, window.location.origin); // FIX B10: only here, not twice
+  window.parent.postMessage({ type: 'vsp:request_theme' }, window.location.origin);
+  // Fallback: lấy token từ localStorage ngay
+  try {
+    var _t = localStorage.getItem('vsp_token') || window.parent.TOKEN || '';
+    if (_t && _t.length > 20 && !TOKEN) {
+      TOKEN = _t; window.TOKEN = TOKEN;
+      API = window.location.origin;
+      setTimeout(loadAll, 300);
+    }
+  } catch(_) {}
 }
 
 function _applyTheme(t) {
@@ -618,7 +749,7 @@ function _applyTheme(t) {
 // ── Init ───────────────────────────────────────────────────
 renderSampleData();
 </script>
-<script src="vsp_fe_sync_patch_v2.js?v=1777463431"></script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777463431"></script>
 
 <!-- VSP-E5-EPSS-KEV: Add EPSS+KEV columns to CVE table (2026-04-29) -->
 <script>
