@@ -448,7 +448,7 @@ async function loadEOLBanner(){
     if (!banner) return;
     if (d && d.eol_total > 0) {
       banner.style.display = '';
-      banner.innerHTML = '<span style="color:var(--amber)">⚠ ' + d.eol_total + ' EOL packages detected across ' + d.total_assets + ' assets</span> — <a href="#" style="color:var(--cyan)" onclick="window.parent.showPanel&&window.parent.showPanel('software_inventory')">View software inventory →</a>';
+      banner.innerHTML = '<span style="color:var(--amber)">⚠ ' + d.eol_total + ' EOL packages detected across ' + d.total_assets + ' assets</span> — <a href="#" style="color:var(--cyan)" onclick="window.parent.showPanel&&window.parent.showPanel(\"software_inventory\")">View software inventory →</a>';
     } else if (banner) {
       banner.style.display = 'none';
     }
