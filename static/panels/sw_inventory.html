@@ -789,7 +789,8 @@ function invPage(d) { _invPage+=d; renderInventory(); }
 //  WHITELIST / BLACKLIST  [FIX-7] real API + mock fallback
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadWhiteBlacklist() {
-  await ensureToken();
+  await ensureToken(3000);
+  if(!TOKEN||TOKEN.length<20){setTimeout(loadWhiteBlacklist,1500);return;}
   try {
     const [wlR, blR, warnR] = await Promise.all([
       fetch(API+SW_BASE+'/whitelist', {headers:hdr()}),
@@ -914,7 +915,8 @@ async function checkHash() {
 //  LICENSE
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadLicenseData() {
-  await ensureToken();
+  await ensureToken(3000);
+  if(!TOKEN||TOKEN.length<20){setTimeout(loadLicenseData,1500);return;}
   try {
     const r = await fetch(API+SW_BASE+'/licenses', {headers:hdr()});
     if(r.ok) {
@@ -961,7 +963,8 @@ function renderLicenseData() {
 //  SCAN HISTORY
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadScanHistory() {
-  await ensureToken();
+  await ensureToken(3000);
+  if(!TOKEN || TOKEN.length < 20) { setTimeout(loadScanHistory, 1500); return; }
   try {
     const r = await fetch(API+SW_BASE+'/scan-history', {headers:hdr()});
     if(r.ok) {
@@ -993,7 +996,8 @@ function renderScanHistory() {
 //  POLICY  [FIX-5] real GET/POST + fallback
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadPolicy() {
-  await ensureToken();
+  await ensureToken(3000);
+  if(!TOKEN||TOKEN.length<20){setTimeout(loadPolicy,1500);return;}
   try {
     const r = await fetch(API+SW_BASE+'/policy', {headers:hdr()});
     if(r.ok) {
