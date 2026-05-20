@@ -784,13 +784,14 @@ async function loadWhiteBlacklist() {
     const wl   = wlR.ok   ? await wlR.json()   : null;
     const bl   = blR.ok   ? await blR.json()   : null;
     // warning: server currently returns via whitelist query or empty
-    WHITELIST     = (wl&&wl.items&&wl.items.length)   ? wl.items   : MOCK_WHITELIST;
-    BLACKLIST     = (bl&&bl.items&&bl.items.length)   ? bl.items   : MOCK_BLACKLIST;
-    WARNING_ITEMS = MOCK_WARNING_ITEMS; // fallback até ter endpoint dedicado
+    WHITELIST     = (wl&&wl.items) ? wl.items : [];
+    BLACKLIST     = (bl&&bl.items) ? bl.items : [];
+    WARNING_ITEMS = []; // no mock fallback
   } catch(e) {
-    WHITELIST = MOCK_WHITELIST;
-    BLACKLIST = MOCK_BLACKLIST;
-    WARNING_ITEMS = MOCK_WARNING_ITEMS;
+    console.warn('[SWINV] loadWhiteBlacklist error:', e);
+    WHITELIST = WHITELIST||[];
+    BLACKLIST = BLACKLIST||[];
+    WARNING_ITEMS = WARNING_ITEMS||[];
   }
   renderWhitelist();
 }
@@ -806,7 +807,7 @@ function renderWhitelist() {
         <span class="badge badge-ok" style="font-size:9px">APPROVED</span>
         <button class="btn btn-sm" onclick="removeFromList('whitelist',${x.id},'${x.name}')">✕</button>
       </div>
-    </div>`).join('') || '<div class="empty">No entries</div>';
+    </div>`).join('') || '<div style="padding:16px;text-align:center;color:var(--t3);font-size:11px">No entries — click + Add to create</div>';
 
   document.getElementById('blacklist-list').innerHTML = BLACKLIST.map(x=>`
     <div class="policy-item blocked">
@@ -818,7 +819,7 @@ function renderWhitelist() {
         <span class="badge badge-danger" style="font-size:9px">BLOCKED</span>
         <button class="btn btn-sm" onclick="removeFromList('blacklist',${x.id},'${x.name}')">✕</button>
       </div>
-    </div>`).join('') || '<div class="empty">No entries</div>';
+    </div>`).join('') || '<div style="padding:16px;text-align:center;color:var(--t3);font-size:11px">No entries — click + Add to create</div>';
 
   document.getElementById('warning-list').innerHTML = WARNING_ITEMS.map(w=>`
     <span class="badge badge-warn" style="cursor:pointer;font-size:11px" onclick="removeFromList('warning',${w.id},'${w.name}')">${w.name} ✕</span>`).join('');
@@ -949,13 +950,17 @@ async function loadScanHistory() {
     const r = await fetch(API+SW_BASE+'/scan-history', {headers:hdr()});
     if(r.ok) {
       const d = await r.json();
-      SCAN_HISTORY = (d.items&&d.items.length) ? d.items : MOCK_SCAN_HISTORY;
-    } else { SCAN_HISTORY = MOCK_SCAN_HISTORY; }
-  } catch(e) { SCAN_HISTORY = MOCK_SCAN_HISTORY; }
+      SCAN_HISTORY = d.items||[];
+    } else { SCAN_HISTORY = []; }
+  } catch(e) { console.warn('[SWINV] loadScanHistory error:', e); SCAN_HISTORY = []; }
   renderScanHistory();
 }
 
 function renderScanHistory() {
+  if(!SCAN_HISTORY||!SCAN_HISTORY.length){
+    document.getElementById('scan-history-tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:20px">No scan history yet</td></tr>';
+    return;
+  }
   document.getElementById('scan-history-tbody').innerHTML = SCAN_HISTORY.map(x=>`<tr>
     <td style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">${x.rid}</td>
     <td style="font-size:11px;color:var(--t2)">${x.host}</td>
