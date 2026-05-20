@@ -1156,7 +1156,7 @@ async function runSwScan() {
   showToast('SW inventory scan triggered — agent collecting…','info');
   await ensureToken();
   try {
-    await fetch(API+SW_BASE+'/report', {
+    try { await fetch(API+SW_BASE+'/report', {
       method:'POST', headers:hdr(),
       body: JSON.stringify({hostname:'all', mode:'full'}),
     });
@@ -1188,7 +1188,7 @@ window.addEventListener('message', function(e) {
     try { localStorage.setItem('vsp_token', TOKEN); } catch(_){}
     _initAll();
   }
-});
+} } catch(_re){ console.warn('[SWINV] /report not available'); });
 if(window.parent !== window) window.parent.postMessage({type:'vsp:request_token'},'*');
 
 // ═══════════════════════════════════════════════════════════════════════════════
