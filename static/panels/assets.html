@@ -185,7 +185,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
       <div class="slbl" style="margin-top:0">&#9656; Description</div>
       <div id="fmod-desc" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:12px"></div>
       <div class="slbl">&#9656; Location</div>
-  document.getElementById('fmod-location').textContent=(f.file||'?')+':'+(f.line||'?')+'\nAsset: '+f.asset+'\nTool: '+f.tool+'\nRule: '+f.rule+(f.cwe?'\nCWE: '+f.cwe:'');
+      <div id="fmod-location" style="font-size:10px;font-family:var(--font-mono);color:var(--t3);padding:6px 8px;background:var(--bg);border-radius:4px;white-space:pre;margin-bottom:12px"></div>
       <div class="slbl">&#9656; Remediation</div>
       <div id="fmod-rem" style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:8px"></div>
       <div class="slbl">&#9656; References</div>
