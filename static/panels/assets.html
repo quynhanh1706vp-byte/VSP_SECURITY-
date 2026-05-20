@@ -328,8 +328,8 @@ function renderFindings(){
   document.getElementById('findings-list').innerHTML=list.map(function(f){
     var sc=sevClass((f.severity||'').toUpperCase());
     return '<div class="finding '+sc+'" data-id="'+f.id+'" onclick="openFindingModal(this.dataset.id)">'
-      +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity)+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+f.title+'</span><span class="f-ts">'+f.asset+'</span></div>'
-      +'<div class="f-file">'+f.tool+' · '+f.file+':'+f.line+'</div>'
+      +'<div class="f-hdr"><span class="f-id">'+f.id.slice(0,8)+'</span>'+sevBadge(f.severity||'INFO')+(f.status==='resolved'?'<span class="pill pill-green">resolved</span>':'')+'<span class="f-title">'+(f.rule_id||f.title||f.message||'—')+'</span><span class="f-ts">'+f.asset+'</span></div>'
+      +'<div class="f-file">'+(f.tool||'?')+' · '+(f.path||f.file||'?')+':'+(f.line||0)+'</div>'
       +'<div class="f-tags"><span class="pill pill-gray">'+(f.rule_id||f.rule||'?')+'</span>'+(f.cwe?'<span class="pill pill-gray">'+f.cwe+'</span>':'')+(f.cvss?'<span class="pill pill-blue">CVSS '+f.cvss+'</span>':'')+'</div>'
       +'</div>';
   }).join('');
@@ -540,7 +540,7 @@ async function loadAssets(){
       var rf=await fetch(API+'/api/v1/vsp/findings?limit=500',{headers:h});
       if(rf.ok){
         var df=await rf.json();
-        ALL_FINDINGS=(df.findings||df.items||[]).map(function(f){return Object.assign({asset_id:f.asset_id||'',asset:f.asset||''},f);});
+        ALL_FINDINGS=(df.findings||df.items||[]).map(function(f){return Object.assign({asset_id:f.asset_id||'',asset:f.asset||f.tool||'',title:f.rule_id||f.title||f.message||'—',file:f.path||f.file||'?',rule:f.rule_id||f.rule||'—',remediation:f.fix_signal||f.remediation||''},f);});
         if(typeof renderFindings==='function')renderFindings();
       }
     }catch(e){
