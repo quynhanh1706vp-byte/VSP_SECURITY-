@@ -533,16 +533,32 @@ const API = '';
 const SW_BASE = '/api/v1/software-inventory';
 let TOKEN = '';
 
-async function ensureToken() {
-  if (TOKEN) return;
-  TOKEN = window.parent?.TOKEN || window.TOKEN || localStorage.getItem('vsp_token') || '';
-  if (!TOKEN) {
-    try {
-      const r = await fetch(API+'/api/v1/auth/check', {credentials:'include'});
-      const d = await r.json();
-      TOKEN = d.access_token || d.token || '';
-    } catch(e) { TOKEN = ''; }
+async function ensureToken(maxWait) {
+  maxWait = maxWait || 3000;
+  if (TOKEN && TOKEN.length > 20) return;
+  // Try localStorage first
+  TOKEN = localStorage.getItem('vsp_token') || '';
+  if (TOKEN && TOKEN.length > 20) { window.TOKEN = TOKEN; return; }
+  // Try parent frame
+  try {
+    TOKEN = window.parent?.TOKEN || window.top?.TOKEN || '';
+    if (TOKEN && TOKEN.length > 20) { window.TOKEN = TOKEN; localStorage.setItem('vsp_token', TOKEN); return; }
+  } catch(e) {}
+  // Wait for postMessage token
+  let waited = 0;
+  while (waited < maxWait) {
+    await new Promise(r => setTimeout(r, 150));
+    waited += 150;
+    TOKEN = window.TOKEN || localStorage.getItem('vsp_token') || '';
+    try { TOKEN = TOKEN || window.parent?.TOKEN || ''; } catch(e) {}
+    if (TOKEN && TOKEN.length > 20) { window.TOKEN = TOKEN; return; }
   }
+  // Last resort: auth check
+  try {
+    const r = await fetch(API+'/api/v1/auth/check', {credentials:'include'});
+    const d = await r.json();
+    TOKEN = d.access_token || d.token || '';
+  } catch(e) { TOKEN = ''; }
 }
 
 function hdr() { return {'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'}; }
@@ -1175,6 +1191,14 @@ if(window.parent !== window) window.parent.postMessage({type:'vsp:request_token'
 //  INIT
 // ═══════════════════════════════════════════════════════════════════════════════
 async function _initAll() {
+  // Đảm bảo có token trước khi load bất kỳ data nào
+  API = API || (window.location.origin === 'null' ? '' : window.location.origin);
+  await ensureToken(3000);
+  if (!TOKEN || TOKEN.length < 20) {
+    // Retry sau 1s nếu chưa có token
+    await new Promise(r => setTimeout(r, 1000));
+    await ensureToken(2000);
+  }
   await loadInventory();
   loadWhiteBlacklist();
   loadCrackFindings();
