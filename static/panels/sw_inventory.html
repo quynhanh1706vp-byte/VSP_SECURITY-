@@ -693,7 +693,7 @@ td{padding:7px 10px;vertical-align:middle}
 // ═══════════════════════════════════
 //  CONFIG
 // ═══════════════════════════════════
-const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+let API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? '' : '';
 let TOKEN = '';
 
@@ -1271,7 +1271,6 @@ function savePolicy() { showToast('Policy saved','success'); }
 //  INIT
 // ═══════════════════════════════════
 document.addEventListener('DOMContentLoaded', async ()=>{
-  if(!API) API=window.location.origin==='null'?'':window.location.origin;
   await ensureToken(3000);
   await loadInventory();
   loadWhiteBlacklist();
