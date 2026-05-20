@@ -193,7 +193,7 @@ html{font-size:13px}body{background:var(--bg);color:var(--t1);font-family:var(--
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('finding-modal')">Close</button>
-      <button class="btn btn-primary btn-sm">Create ticket &#8594;</button>
+      <button class="btn btn-primary btn-sm" onclick="createFindingTicket()">Create ticket &#8594;</button>
     </div>
   </div>
 </div>
@@ -396,6 +396,42 @@ function openFindingModal(id){
   document.getElementById('fmod-refs').innerHTML=(f.refs||[]).map(function(r){return '<div>· '+r+'</div>';}).join('');
   document.getElementById('finding-modal').classList.add('open');
 }
+async function createFindingTicket(){
+  var f = window._currentFinding;
+  if(!f){ assetToast('No finding selected','error'); return; }
+  // Thử POST to SOAR nếu có
+  if(TOKEN){
+    try{
+      var r = await fetch(API+'/api/v1/soar/tickets', {
+        method:'POST', headers:hdr(),
+        body: JSON.stringify({
+          title: (f.rule_id||f.rule||f.title||'Finding')+' — '+f.severity,
+          description: f.message||f.desc||'',
+          severity: f.severity,
+          finding_id: f.id,
+          tool: f.tool,
+          cwe: f.cwe,
+          path: f.path||f.file,
+          source: 'assets_panel'
+        })
+      });
+      if(r.ok){
+        var d = await r.json();
+        assetToast('Ticket created: '+(d.ticket_id||d.id||'OK'),'success');
+        return;
+      }
+    }catch(e){}
+  }
+  // Fallback: copy finding details to clipboard
+  var text = 'Finding: '+(f.rule_id||f.rule||'?')+'\nSeverity: '+f.severity+'\nTool: '+f.tool+'\nPath: '+(f.path||'?')+'\nMessage: '+(f.message||'')+'\nCWE: '+(f.cwe||'N/A');
+  try{
+    await navigator.clipboard.writeText(text);
+    assetToast('Finding details copied to clipboard (no SOAR ticket endpoint)','info');
+  }catch(e){
+    assetToast('Ticket: '+( f.rule_id||'finding')+' — copy details manually','warn');
+  }
+}
+
 async function saveAsset(payload, id){
   if(!TOKEN){ assetToast('Not authenticated','error'); return; }
   try{
