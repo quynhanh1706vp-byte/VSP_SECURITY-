@@ -247,6 +247,9 @@ td{padding:7px 10px;vertical-align:middle}
 .policy-meta{font-size:10px;color:var(--t3);font-family:var(--font-mono)}
 .policy-actions{display:flex;gap:6px;align-items:center}
 
+/* ── Policy row ── */
+.pol-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)}
+
 /* ── Switch ── */
 .sw-wrap{position:relative;width:32px;height:18px;flex-shrink:0}
 .sw-wrap input{opacity:0;position:absolute;inset:0;cursor:pointer;margin:0}
@@ -572,49 +575,93 @@ td{padding:7px 10px;vertical-align:middle}
      TAB 5 — SW POLICY
 ═══════════════════════════════════ -->
 <div class="tab-panel" id="tab-policy">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+  <!-- Row 1: Enforcement + Notifications -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
     <div class="card">
-      <div class="card-head"><div class="card-title">Enforcement Settings</div></div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">Block unauthorized installs</div>
-            <div style="font-size:10px;color:var(--t3)">Alert SOC when unlisted SW detected</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Block" type="checkbox" id="pol-block" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+      <div class="card-head">
+        <div class="card-title">Enforcement Settings</div>
+        <div class="card-sub">Auto-actions khi phát hiện vi phạm</div>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+        <div class="pol-row">
+          <div><div style="font-size:12px;font-weight:500">Block unauthorized installs</div><div style="font-size:10px;color:var(--t3)">Alert SOC khi phát hiện SW ngoài whitelist</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-block" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">Crack / Pirate scan on agent report</div>
-            <div style="font-size:10px;color:var(--t3)">Run hash check when agent reports packages</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Crack" type="checkbox" id="pol-crack" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        <div class="pol-row">
+          <div><div style="font-size:12px;font-weight:500">Crack / Pirate scan on ingest</div><div style="font-size:10px;color:var(--t3)">Hash check khi agent báo cáo package</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-crack" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">EOL software alert</div>
-            <div style="font-size:10px;color:var(--t3)">Warn when package past end-of-life date</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Eol" type="checkbox" id="pol-eol" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        <div class="pol-row">
+          <div><div style="font-size:12px;font-weight:500">EOL software alert</div><div style="font-size:10px;color:var(--t3)">Cảnh báo khi package quá ngày end-of-life</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-eol" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
+        <div class="pol-row" style="border-color:rgba(245,158,11,.35)">
           <div>
-            <div style="font-size:12px;font-weight:500">GPL copyleft enforcement</div>
-            <div style="font-size:10px;color:var(--t3)">Block GPL/AGPL in proprietary products</div>
+            <div style="font-size:12px;font-weight:500;color:var(--amber)">GPL copyleft enforcement</div>
+            <div style="font-size:10px;color:var(--t3)">Block GPL/AGPL trong sản phẩm thương mại</div>
           </div>
-          <label class="sw-wrap"><input aria-label="Pol Gpl" type="checkbox" id="pol-gpl" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          <label class="sw-wrap"><input type="checkbox" id="pol-gpl" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;font-weight:500">VirusTotal enrichment</div>
-            <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Requires VT API key in config</div>
-          </div>
-          <label class="sw-wrap"><input aria-label="Pol Vt" type="checkbox" id="pol-vt" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        <div class="pol-row">
+          <div><div style="font-size:12px;font-weight:500">VirusTotal enrichment</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">Cần VT API key trong config</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-vt" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
         </div>
       </div>
     </div>
 
     <div class="card">
+      <div class="card-head">
+        <div class="card-title">Notification Channels</div>
+        <div class="card-sub">Gửi alert khi vi phạm policy</div>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+        <div class="pol-row">
+          <div><div style="font-size:12px;font-weight:500">Email alert</div><div style="font-size:10px;color:var(--t3)">Gửi email tới Security team</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-notify-email" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div class="pol-row">
+          <div><div style="font-size:12px;font-weight:500">Slack / Teams webhook</div><div style="font-size:10px;color:var(--t3)">Push alert tới channel</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-notify-slack" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div class="pol-row">
+          <div><div style="font-size:12px;font-weight:500">Forward to SIEM</div><div style="font-size:10px;color:var(--t3)">Log event vào SIEM pipeline</div></div>
+          <label class="sw-wrap"><input type="checkbox" id="pol-notify-siem" checked onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:6px;text-transform:uppercase">Risk Score Threshold — Auto Block</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <label class="sw-wrap">
+              <input type="checkbox" id="pol-risk-enable"
+                onchange="savePolicy();document.getElementById('pol-risk-val').disabled=!this.checked">
+              <div class="sw-track"></div><div class="sw-thumb"></div>
+            </label>
+            <span style="font-size:11px;color:var(--t2)">Block nếu risk score ≥</span>
+            <input type="number" id="pol-risk-val" value="70" min="1" max="100" disabled
+              style="width:56px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-md);padding:3px 6px;font-size:12px;color:var(--t1);font-family:var(--font-mono);text-align:center"
+              onchange="savePolicy()">
+            <span style="font-size:10px;color:var(--t3)">/100</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: License Policy Rules -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-head">
+      <div class="card-title">License Policy Rules</div>
+      <div class="card-sub">Quy tắc tự động kiểm tra license compliance</div>
+      <button class="btn btn-sm btn-primary" onclick="openAddLicenseRule()">+ Add Rule</button>
+    </div>
+    <div class="card-body" style="padding:10px 14px">
+      <div id="pol-license-rules" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+  </div>
+
+  <!-- Row 3: API Endpoints + Scan History -->
+  <div style="display:grid;grid-template-columns:380px 1fr;gap:14px">
+    <div class="card" style="align-self:start">
       <div class="card-head"><div class="card-title">API Endpoints</div><div class="card-sub">Backend integration</div></div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:6px">
         <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:4px">SW INVENTORY API</div>
@@ -625,22 +672,72 @@ td{padding:7px 10px;vertical-align:middle}
         <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--amber);color:var(--t2)">POST /api/v1/software-inventory/policy</div>
         <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--purple);color:var(--t2)">GET /api/v1/software-inventory/license-check</div>
         <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--accent);color:var(--t2)">POST /api/v1/software-inventory/report</div>
-        <div style="margin-top:8px;font-size:10px;color:var(--t3);font-family:var(--font-mono)">All endpoints: Bearer token auth required</div>
+        <div style="margin-top:6px;display:flex;gap:6px">
+          <button class="btn btn-sm" style="flex:1" onclick="exportPolicy()">&#8595; Export Policy JSON</button>
+          <button class="btn btn-sm" style="flex:1" onclick="document.getElementById('pol-import-input').click()">&#8593; Import Policy</button>
+          <input type="file" id="pol-import-input" accept=".json" style="display:none" onchange="importPolicy(this)">
+        </div>
+        <div style="margin-top:4px;font-size:10px;color:var(--t3);font-family:var(--font-mono)">All endpoints: Bearer token auth required</div>
       </div>
     </div>
-  </div>
 
-  <div class="card" style="margin-top:0">
-    <div class="card-head"><div class="card-title">Scan History</div><div class="card-sub">SW inventory scans via agent</div></div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Run ID</th><th>Host</th><th>Total SW</th><th>Unauthorized</th><th>Crack Hits</th><th>EOL</th><th>Date</th><th>Status</th></tr></thead>
-        <tbody id="scan-history-tbody"></tbody>
-      </table>
+    <div class="card">
+      <div class="card-head"><div class="card-title">Scan History</div><div class="card-sub">SW inventory scans via agent</div></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Run ID</th><th>Host</th><th>Total SW</th><th>Unauthorized</th><th>Crack Hits</th><th>EOL</th><th>Date</th><th>Status</th></tr></thead>
+          <tbody id="scan-history-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- Add License Rule Modal -->
+<div class="modal-overlay" id="lic-rule-modal">
+  <div class="modal" style="width:min(480px,95vw)">
+    <div class="modal-head">
+      <div><div class="modal-title">Add License Policy Rule</div><div class="modal-sub">Tự động block/warn dựa trên license type</div></div>
+      <button class="modal-close" onclick="document.getElementById('lic-rule-modal').classList.remove('open')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="g2">
+        <div class="form-group">
+          <label class="form-label">License Pattern <span style="color:var(--red)">*</span></label>
+          <input class="form-ctrl" id="lrm-pattern" placeholder="e.g. GPL-3.0, AGPL-*, Proprietary">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Action</label>
+          <select class="form-ctrl" id="lrm-action">
+            <option value="block">Block &#x2715;</option>
+            <option value="warn">Warn &#x26A0;</option>
+            <option value="info">Info &#x2139;</option>
+            <option value="allow">Allow &#x2713;</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input class="form-ctrl" id="lrm-desc" placeholder="e.g. Block GPL copyleft in commercial products">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Applies to</label>
+        <select class="form-ctrl" id="lrm-scope">
+          <option value="commercial">Commercial products only</option>
+          <option value="all">All products</option>
+          <option value="external">External distribution only</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="document.getElementById('lic-rule-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLicenseRule()">Add Rule &#x2192;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     MODALS
 <!-- ═══════════════════════════════════
      MODALS
 ═══════════════════════════════════ -->
@@ -733,11 +830,8 @@ async function ensureToken(maxWait) {
     if (TOKEN && TOKEN.length > 20) return;
     await new Promise(r => setTimeout(r, 200));
   }
-  // Last resort: api-token
-  try {
-    const r = await fetch(API+'/api/v1/auth/api-token', {method:'POST', credentials:'include'});
-    if(r.ok){ const d = await r.json(); TOKEN = d.token || ''; }
-  } catch(e) {}
+  // Last resort: thử lấy token từ top frame một lần nữa
+  try { if(window.top && window.top.TOKEN && window.top.TOKEN.length>20) TOKEN=window.top.TOKEN; } catch(e){}
 }
 
 function hdr() { return {'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'}; }
@@ -1296,9 +1390,20 @@ function renderLicense() {
     <td><span class="badge badge-neutral" style="font-size:9px">${x.type||'—'}</span></td>
     <td>${riskBadge(x.risk)}</td>
     <td><span class="badge ${x.sbom?'badge-ok':'badge-danger'}" style="font-size:9px">${x.sbom?'Yes':'No'}</span></td>
-    <td style="display:flex;gap:4px">
-      <button class="btn btn-sm" onclick="openLicenseDetail('${x.comp}','${x.ver}','${x.license||''}','${x.type||''}','${x.risk}',${x.sbom})">Detail</button>
-      ${(x.license||'').includes('GPL')?'<span class="sev sev-high" style="font-size:9px">GPL</span>':''}
+    <td style="display:flex;gap:4px;align-items:center">
+      <button class="btn btn-sm"
+        data-comp="${x.comp}" data-ver="${x.ver}"
+        data-lic="${(x.license||'').replace(/"/g,'&quot;')}"
+        data-type="${(x.type||'').replace(/"/g,'&quot;')}"
+        data-risk="${x.risk}" data-sbom="${x.sbom}"
+        onclick="openLicenseDetailEl(this)">Detail</button>
+      ${(x.license||'').includes('GPL')?`<span class="sev sev-high" style="font-size:9px;cursor:pointer"
+        title="GPL copyleft — review required before use in commercial products"
+        data-comp="${x.comp}" data-ver="${x.ver}"
+        data-lic="${(x.license||'').replace(/"/g,'&quot;')}"
+        data-type="${(x.type||'').replace(/"/g,'&quot;')}"
+        data-risk="${x.risk}" data-sbom="${x.sbom}"
+        onclick="openLicenseDetailEl(this)">GPL</span>`:''}
     </td>
   </tr>`).join('');
   let pg = document.getElementById('lic-pager');
@@ -1318,6 +1423,18 @@ function renderLicense() {
     <span style="font-size:11px;flex:1;color:var(--t2)">${r.rule}</span>
     <span class="badge ${r.active?'badge-ok':'badge-neutral'}" style="font-size:9px">${r.active?'Active':'Disabled'}</span>
   </div>`).join('');
+}
+
+// openLicenseDetailEl — reads data-* from element, avoids string-escape issues
+function openLicenseDetailEl(el) {
+  openLicenseDetail(
+    el.dataset.comp  || '',
+    el.dataset.ver   || '',
+    el.dataset.lic   || '',
+    el.dataset.type  || '',
+    el.dataset.risk  || '',
+    el.dataset.sbom === 'true'
+  );
 }
 
 function openLicenseDetail(comp, ver, license, type, risk, sbom) {
@@ -1845,6 +1962,154 @@ function exportSwReport() {
 // savePolicy stub removed — using full async version below
 
 // ═══════════════════════════════════
+//  SW POLICY — LICENSE RULES + EXPORT/IMPORT
+// ═══════════════════════════════════
+var _licRules = [
+  {pattern:'GPL-3.0', action:'block', desc:'Block GPL-3.0 / AGPL trong commercial products', scope:'commercial', active:true},
+  {pattern:'AGPL-*',  action:'block', desc:'Block AGPL tất cả variant', scope:'commercial', active:true},
+  {pattern:'GPL-2.0', action:'warn',  desc:'Warn GPL-2.0 — cần review', scope:'all', active:true},
+  {pattern:'LGPL-*',  action:'warn',  desc:'Warn LGPL — kiểm tra dynamic linking', scope:'all', active:false},
+  {pattern:'None',    action:'block', desc:'Block component không khai báo license', scope:'all', active:true},
+  {pattern:'Proprietary', action:'info', desc:'Report proprietary license để audit', scope:'all', active:true},
+];
+
+function renderLicenseRules() {
+  var el = document.getElementById('pol-license-rules');
+  if(!el) return;
+  var AS = {
+    block:{icon:'✕',color:'var(--red)',   badge:'badge-danger'},
+    warn: {icon:'⚠',color:'var(--amber)', badge:'badge-warn'},
+    info: {icon:'ℹ',color:'var(--cyan)',  badge:'badge-info'},
+    allow:{icon:'✓',color:'var(--green)', badge:'badge-ok'},
+  };
+  if(!_licRules.length){
+    el.innerHTML='<div class="empty">No rules — click + Add Rule</div>';return;
+  }
+  el.innerHTML = _licRules.map(function(r,i){
+    var s=AS[r.action]||AS.info;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);border-left:3px solid '+s.color+'">'
+      +'<span style="color:'+s.color+';font-size:14px;width:16px;text-align:center">'+s.icon+'</span>'
+      +'<div style="flex:1;min-width:0">'
+      +  '<div style="font-size:11px;font-weight:600;font-family:var(--font-mono);color:var(--t1)">'+r.pattern
+      +  ' <span class="badge '+s.badge+'" style="font-size:9px;margin-left:4px">'+r.action.toUpperCase()+'</span>'
+      +  ' <span style="font-size:9px;color:var(--t3);font-weight:400">· '+r.scope+'</span></div>'
+      +  '<div style="font-size:10px;color:var(--t3);margin-top:2px">'+r.desc+'</div>'
+      +'</div>'
+      +'<label class="sw-wrap" style="flex-shrink:0"><input type="checkbox"'+(r.active?' checked':'')
+      +' onchange="_licRules['+i+'].active=this.checked;saveLicenseRulesRemote()">'
+      +'<div class="sw-track"></div><div class="sw-thumb"></div></label>'
+      +'<button class="btn btn-sm" title="Remove" onclick="_licRules.splice('+i+',1);renderLicenseRules();saveLicenseRulesRemote()">✕</button>'
+      +'</div>';
+  }).join('');
+}
+
+function openAddLicenseRule() {
+  document.getElementById('lrm-pattern').value='';
+  document.getElementById('lrm-desc').value='';
+  document.getElementById('lrm-action').value='block';
+  document.getElementById('lrm-scope').value='commercial';
+  document.getElementById('lic-rule-modal').classList.add('open');
+}
+
+function saveLicenseRule() {
+  var p=document.getElementById('lrm-pattern').value.trim();
+  if(!p){showToast('License pattern là bắt buộc','error');return;}
+  _licRules.push({
+    pattern:p,
+    action: document.getElementById('lrm-action').value,
+    desc:   document.getElementById('lrm-desc').value.trim()||p+' policy',
+    scope:  document.getElementById('lrm-scope').value,
+    active: true,
+  });
+  renderLicenseRules();
+  saveLicenseRulesRemote();
+  document.getElementById('lic-rule-modal').classList.remove('open');
+  showToast('Rule added','success');
+}
+
+async function saveLicenseRulesRemote() {
+  await ensureToken();
+  try {
+    await fetch(API+'/api/v1/software-inventory/policy/license-rules',{
+      method:'POST',headers:{...hdr(),'Content-Type':'application/json'},
+      body:JSON.stringify({rules:_licRules})
+    });
+  } catch(e){console.warn('[SWINV] saveLicenseRulesRemote:',e);}
+}
+
+async function loadLicenseRules() {
+  await ensureToken(3000);
+  try {
+    var r=await fetch(API+'/api/v1/software-inventory/policy/license-rules',{headers:hdr()});
+    if(r.ok){var d=await r.json();if(d.rules&&d.rules.length>0)_licRules=d.rules;}
+  } catch(e){}
+  renderLicenseRules();
+}
+
+function exportPolicy() {
+  var pol={
+    enforcement:{
+      block_unauthorized:  !!document.getElementById('pol-block')?.checked,
+      crack_scan_on_ingest:!!document.getElementById('pol-crack')?.checked,
+      eol_alert:           !!document.getElementById('pol-eol')?.checked,
+      gpl_enforcement:     !!document.getElementById('pol-gpl')?.checked,
+      vt_enrichment:       !!document.getElementById('pol-vt')?.checked,
+    },
+    notifications:{
+      email:!!document.getElementById('pol-notify-email')?.checked,
+      slack:!!document.getElementById('pol-notify-slack')?.checked,
+      siem: !!document.getElementById('pol-notify-siem')?.checked,
+    },
+    risk_threshold:{
+      enabled:!!document.getElementById('pol-risk-enable')?.checked,
+      value:  parseInt(document.getElementById('pol-risk-val')?.value)||70,
+    },
+    license_rules:_licRules,
+    exported_at:new Date().toISOString(),
+    version:'1.0',
+  };
+  var a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(pol,null,2));
+  a.download='sw_policy_'+new Date().toISOString().split('T')[0]+'.json';
+  a.click();
+  showToast('Policy exported','success');
+}
+
+function importPolicy(input) {
+  var file=input.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try {
+      var pol=JSON.parse(e.target.result);
+      function setChk(id,val){var el=document.getElementById(id);if(el&&val!=null)el.checked=!!val;}
+      if(pol.enforcement){
+        setChk('pol-block', pol.enforcement.block_unauthorized);
+        setChk('pol-crack', pol.enforcement.crack_scan_on_ingest);
+        setChk('pol-eol',   pol.enforcement.eol_alert);
+        setChk('pol-gpl',   pol.enforcement.gpl_enforcement);
+        setChk('pol-vt',    pol.enforcement.vt_enrichment);
+      }
+      if(pol.notifications){
+        setChk('pol-notify-email', pol.notifications.email);
+        setChk('pol-notify-slack', pol.notifications.slack);
+        setChk('pol-notify-siem',  pol.notifications.siem);
+      }
+      if(pol.risk_threshold){
+        var en=document.getElementById('pol-risk-enable');
+        var val=document.getElementById('pol-risk-val');
+        if(en){en.checked=!!pol.risk_threshold.enabled;}
+        if(val){val.value=pol.risk_threshold.value||70;val.disabled=!pol.risk_threshold.enabled;}
+      }
+      if(pol.license_rules&&pol.license_rules.length>0){_licRules=pol.license_rules;renderLicenseRules();}
+      savePolicy();
+      showToast('Policy imported successfully','success');
+    } catch(err){showToast('Invalid policy JSON: '+err.message,'error');}
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════
 //  INIT
 // ═══════════════════════════════════
 async function loadPolicy() {
@@ -1855,14 +2120,15 @@ async function loadPolicy() {
     if(r.ok){
       const p = await r.json();
       const ids = {
-        block_unauthorized:'pol-block-unauth',
-        'block_unauthorized_alt':'pol-block',
-        crack_scan_on_ingest:'pol-crack-scan',
-        'crack_scan_alt':'pol-crack',
-        eol_alert:'pol-eol-alert',
-        'eol_alert_alt':'pol-eol',
+        block_unauthorized:'pol-block',
+        crack_scan_on_ingest:'pol-crack',
+        eol_alert:'pol-eol',
         gpl_enforcement:'pol-gpl',
-        vt_enrichment:'pol-vt'
+        vt_enrichment:'pol-vt',
+        notify_email:'pol-notify-email',
+        notify_slack:'pol-notify-slack',
+        notify_siem:'pol-notify-siem',
+        risk_threshold_enabled:'pol-risk-enable'
       };
       Object.entries(ids).forEach(([k,id])=>{
         const el=document.getElementById(id);
@@ -1918,6 +2184,7 @@ async function _initAllPanels() {
   loadLicenseData();
   loadScanHistory();
   loadPolicy();
+  loadLicenseRules();
 }
 document.addEventListener('DOMContentLoaded', ()=>{
   let _done = false;
@@ -1959,39 +2226,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 <!-- VSP-SIEM-COMPANION -->
 
 
-<script>
-// FEAT-29: Bootstrap fetch from /api/swinv
-TOKEN='';
-async function _loadAllSwInv(){
-  if(!TOKEN) return;
-  var h={Authorization:'Bearer '+TOKEN};
-  try{
-    var [inv,wl,bl,cr,li,sh]=await Promise.all([
-      fetch(API+'/api/swinv/inventory',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/whitelist',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/blacklist',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/cracks',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/licenses',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(API+'/api/swinv/scan-history',{headers:h}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-    ]);
-    if(inv&&inv.items) INVENTORY=inv.items;
-    if(wl&&wl.items) WHITELIST=wl.items;
-    if(bl&&bl.items) BLACKLIST=bl.items;
-    if(cr&&cr.items) CRACKS=cr.items;
-    if(li&&li.items) LICENSE_DATA=li.items;
-    if(sh&&sh.items) SCAN_HISTORY=sh.items;
-    if(typeof loadInventory==='function') loadInventory();
-    if(typeof renderWhitelist==='function') renderWhitelist();
-    if(typeof renderBlacklist==='function') renderBlacklist();
-    if(typeof renderCracks==='function') renderCracks();
-    if(typeof renderLicense==='function') renderLicense();
-  }catch(e){console.warn('[swinv] load failed',e);}
-}
-window.addEventListener('message',function(e){
-  if(!e.data)return;
-  if(e.data.type==='vsp:token'&&e.data.token&&e.data.token.length>20){if(!TOKEN){TOKEN=e.data.token;_loadAllSwInv();}}
-});
-if(window.parent!==window) window.parent.postMessage({type:'vsp:request_token'},'*');
-</script>
+
 </body>
 </html>
