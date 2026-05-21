@@ -543,6 +543,20 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-sub">From SBOM CycloneDX 1.5 · grype/trivy</div>
       <button class="btn btn-sm" onclick="loadLicenseData()">↻ Refresh</button>
     </div>
+    <div style="display:flex;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
+      <input class="form-ctrl" id="lic-search" placeholder="Search component, license…"
+        oninput="_licFilter=this.value.toLowerCase();_licPage=0;renderLicense()"
+        style="flex:1;font-size:11px;padding:4px 8px">
+      <select class="form-ctrl" id="lic-type-filter"
+        onchange="_licType=this.value.toLowerCase();_licPage=0;renderLicense()"
+        style="width:140px;font-size:11px;padding:4px 8px">
+        <option value="">All types</option>
+        <option value="copyleft">Copyleft (GPL)</option>
+        <option value="permissive">Permissive</option>
+        <option value="commercial">Commercial</option>
+        <option value="unknown">Unknown/None</option>
+      </select>
+    </div>
     <div class="tbl-wrap">
       <table>
         <thead><tr>
