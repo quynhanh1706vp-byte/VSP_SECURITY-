@@ -506,8 +506,8 @@ td{padding:7px 10px;vertical-align:middle}
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>Software</th><th>Version</th><th>Host</th><th>Detection Method</th>
-          <th>Risk</th><th>Hash</th><th>Action</th>
+          <th>Software / Detected</th><th>Version</th><th>Host</th><th>Detection Method</th>
+          <th>Risk</th><th>Hash</th><th>Actions</th>
         </tr></thead>
         <tbody id="crack-tbody"></tbody>
       </table>
@@ -1193,15 +1193,18 @@ async function loadCrackFindings() {
   tbody.innerHTML = CRACKS.length === 0
     ? '<tr><td colspan="7" class="empty">No crack/pirate detections found</td></tr>'
     : CRACKS.map(x=>`<tr class="row-danger">
-        <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--orange)">${x.name}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--orange)">${x.name}
+          <div style="font-size:9px;color:var(--t3);margin-top:2px">${x.detected_at||''}</div>
+        </td>
         <td><span class="badge badge-neutral">${x.version||'—'}</span></td>
-        <td style="font-family:var(--font-mono);font-size:10px;color:var(--cyan)">${x.host||'—'}</td>
+        <td><a style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);cursor:pointer" onclick="document.getElementById('inv-search').value='${x.host}';switchTab('tab-inventory');renderInventory()">${x.host||'—'}</a></td>
         <td style="font-size:11px;color:var(--t2)">${x.method||'—'}</td>
         <td>${riskBadge(x.risk)}</td>
-        <td style="font-family:var(--font-mono);font-size:10px;color:var(--t3)">${x.hash||'—'}</td>
-        <td style="display:flex;gap:4px">
-          <button class="btn btn-sm btn-danger" onclick="blockSW('${x.name}')">Block</button>
-          <button class="btn btn-sm" onclick="showToast('Quarantine command sent','success')">Quarantine</button>
+        <td style="font-family:var(--font-mono);font-size:10px;color:${x.hash?'var(--green)':'var(--t3)'}">${x.hash||'no hash'}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-danger" onclick="blockSW('${x.name}')">🚫 Block</button>
+          <button class="btn btn-sm btn-success" onclick="quickAddToList('whitelist','${x.name}','${x.host}')">✓ Allow</button>
+          <button class="btn btn-sm" onclick="showToast('Quarantine: ${x.host} isolated','success')">🔒 Quarantine</button>
         </td>
       </tr>`).join('');
   updateKPIs();
@@ -1547,6 +1550,7 @@ async function blockSW(name) {
     if(r.ok) {
       showToast(`${name} blocked and added to blacklist`, 'error');
       loadWhiteBlacklist();
+      loadCrackFindings();
     } else {
       const e = await r.json().catch(()=>({}));
       showToast(e.error||`${name} already in blacklist`, 'info');
