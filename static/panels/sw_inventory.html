@@ -616,13 +616,26 @@ td{padding:7px 10px;vertical-align:middle}
         <div class="card-sub">Gửi alert khi vi phạm policy</div>
       </div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
-        <div class="pol-row">
-          <div><div style="font-size:12px;font-weight:500">Email alert</div><div style="font-size:10px;color:var(--t3)">Gửi email tới Security team</div></div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-notify-email" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        <div class="pol-row" style="flex-direction:column;align-items:stretch;gap:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div><div style="font-size:12px;font-weight:500">Email alert</div><div style="font-size:10px;color:var(--t3)">Gửi email tới Security team</div></div>
+            <label class="sw-wrap"><input type="checkbox" id="pol-notify-email" onchange="toggleNotifConfig('email',this.checked);savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          </div>
+          <div id="notif-email-cfg" style="display:none;padding-top:4px">
+            <input class="form-ctrl" id="pol-email-addr" placeholder="security@company.com, soc@company.com"
+              style="font-size:10px;font-family:var(--font-mono)" onchange="savePolicy()">
+          </div>
         </div>
-        <div class="pol-row">
-          <div><div style="font-size:12px;font-weight:500">Slack / Teams webhook</div><div style="font-size:10px;color:var(--t3)">Push alert tới channel</div></div>
-          <label class="sw-wrap"><input type="checkbox" id="pol-notify-slack" onchange="savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+        <div class="pol-row" style="flex-direction:column;align-items:stretch;gap:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div><div style="font-size:12px;font-weight:500">Slack / Teams webhook</div><div style="font-size:10px;color:var(--t3)">Push alert tới channel</div></div>
+            <label class="sw-wrap"><input type="checkbox" id="pol-notify-slack" onchange="toggleNotifConfig('slack',this.checked);savePolicy()"><div class="sw-track"></div><div class="sw-thumb"></div></label>
+          </div>
+          <div id="notif-slack-cfg" style="display:none;padding-top:4px;display:flex;gap:6px">
+            <input class="form-ctrl" id="pol-slack-url" placeholder="https://hooks.slack.com/services/..."
+              style="font-size:10px;font-family:var(--font-mono);flex:1" onchange="savePolicy()">
+            <button class="btn btn-sm" onclick="testWebhook()">Test</button>
+          </div>
         </div>
         <div class="pol-row">
           <div><div style="font-size:12px;font-weight:500">Forward to SIEM</div><div style="font-size:10px;color:var(--t3)">Log event vào SIEM pipeline</div></div>
@@ -630,10 +643,10 @@ td{padding:7px 10px;vertical-align:middle}
         </div>
         <div style="border-top:1px solid var(--border);padding-top:10px">
           <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:6px;text-transform:uppercase">Risk Score Threshold — Auto Block</div>
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <label class="sw-wrap">
               <input type="checkbox" id="pol-risk-enable"
-                onchange="savePolicy();document.getElementById('pol-risk-val').disabled=!this.checked">
+                onchange="savePolicy();document.getElementById('pol-risk-val').disabled=!this.checked;document.getElementById('pol-risk-test-btn').disabled=!this.checked">
               <div class="sw-track"></div><div class="sw-thumb"></div>
             </label>
             <span style="font-size:11px;color:var(--t2)">Block nếu risk score ≥</span>
@@ -641,7 +654,10 @@ td{padding:7px 10px;vertical-align:middle}
               style="width:56px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-md);padding:3px 6px;font-size:12px;color:var(--t1);font-family:var(--font-mono);text-align:center"
               onchange="savePolicy()">
             <span style="font-size:10px;color:var(--t3)">/100</span>
+            <button class="btn btn-sm" id="pol-risk-test-btn" disabled onclick="testRiskThreshold()"
+              style="margin-left:4px">▷ Test</button>
           </div>
+          <div id="pol-risk-test-result" style="margin-top:6px;font-family:var(--font-mono);font-size:10px;display:none"></div>
         </div>
       </div>
     </div>
@@ -665,13 +681,37 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-head"><div class="card-title">API Endpoints</div><div class="card-sub">Backend integration</div></div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:6px">
         <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:4px">SW INVENTORY API</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--cyan);color:var(--t2)">GET /api/v1/software-inventory/inventory</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--green);color:var(--t2)">GET /api/v1/software-inventory/whitelist</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--red);color:var(--t2)">GET /api/v1/software-inventory/blacklist</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--orange);color:var(--t2)">POST /api/v1/software-inventory/hash-check</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--amber);color:var(--t2)">POST /api/v1/software-inventory/policy</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--purple);color:var(--t2)">GET /api/v1/software-inventory/license-check</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--accent);color:var(--t2)">POST /api/v1/software-inventory/report</div>
+        <div id="ep-list" style="display:flex;flex-direction:column;gap:4px"></div>
+        <script>
+        (function(){
+          var EPS=[
+            {m:'GET', path:'/api/v1/software-inventory/inventory',   col:'var(--cyan)'},
+            {m:'GET', path:'/api/v1/software-inventory/whitelist',    col:'var(--green)'},
+            {m:'GET', path:'/api/v1/software-inventory/blacklist',    col:'var(--red)'},
+            {m:'GET', path:'/api/v1/software-inventory/policy',       col:'var(--amber)'},
+            {m:'GET', path:'/api/v1/software-inventory/stats',        col:'var(--cyan)'},
+            {m:'GET', path:'/api/v1/software-inventory/scan-history', col:'var(--purple)'},
+            {m:'POST',path:'/api/v1/software-inventory/hash-check',   col:'var(--orange)'},
+            {m:'POST',path:'/api/v1/software-inventory/report',       col:'var(--accent)'},
+          ];
+          window._swEPs = EPS;
+          function renderEPs(){
+            var el=document.getElementById('ep-list');
+            if(!el) return;
+            el.innerHTML=EPS.map(function(e,i){
+              return '<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid '+e.col+'">'
+                +'<span style="font-family:var(--font-mono);font-size:9px;color:'+e.col+';width:32px;font-weight:700">'+e.m+'</span>'
+                +'<span style="font-family:var(--font-mono);font-size:10px;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.path+'</span>'
+                +'<span id="ep-st-'+i+'" style="font-size:9px;font-family:var(--font-mono);width:30px;text-align:right"></span>'
+                +'<button class="btn btn-sm" style="padding:2px 6px;font-size:9px" onclick="testEndpoint('+i+')">Test</button>'
+                +'</div>';
+            }).join('');
+          }
+          // defer until DOM ready
+          if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',renderEPs);
+          else setTimeout(renderEPs,100);
+        })();
+        </script>
         <div style="margin-top:6px;display:flex;gap:6px">
           <button class="btn btn-sm" style="flex:1" onclick="exportPolicy()">&#8595; Export Policy JSON</button>
           <button class="btn btn-sm" style="flex:1" onclick="document.getElementById('pol-import-input').click()">&#8593; Import Policy</button>
@@ -1987,18 +2027,22 @@ function renderLicenseRules() {
   }
   el.innerHTML = _licRules.map(function(r,i){
     var s=AS[r.action]||AS.info;
-    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);border-left:3px solid '+s.color+'">'
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);border-left:3px solid '+s.color+';transition:background .15s"'
+      +' onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='var(--bg3)'">'
       +'<span style="color:'+s.color+';font-size:14px;width:16px;text-align:center">'+s.icon+'</span>'
-      +'<div style="flex:1;min-width:0">'
+      +'<div style="flex:1;min-width:0;cursor:pointer" onclick="editLicenseRule('+i+')" title="Click to edit rule">'
       +  '<div style="font-size:11px;font-weight:600;font-family:var(--font-mono);color:var(--t1)">'+r.pattern
       +  ' <span class="badge '+s.badge+'" style="font-size:9px;margin-left:4px">'+r.action.toUpperCase()+'</span>'
-      +  ' <span style="font-size:9px;color:var(--t3);font-weight:400">· '+r.scope+'</span></div>'
+      +  ' <span style="font-size:9px;color:var(--t3);font-weight:400">· '+r.scope+'</span>'
+      +  ' <span style="font-size:9px;color:var(--t3);opacity:.5;margin-left:4px">✏</span>'
+      +  '</div>'
       +  '<div style="font-size:10px;color:var(--t3);margin-top:2px">'+r.desc+'</div>'
       +'</div>'
-      +'<label class="sw-wrap" style="flex-shrink:0"><input type="checkbox"'+(r.active?' checked':'')
+      +'<label class="sw-wrap" style="flex-shrink:0" onclick="event.stopPropagation()">'
+      +'<input type="checkbox"'+(r.active?' checked':'')
       +' onchange="_licRules['+i+'].active=this.checked;saveLicenseRulesRemote()">'
       +'<div class="sw-track"></div><div class="sw-thumb"></div></label>'
-      +'<button class="btn btn-sm" title="Remove" onclick="_licRules.splice('+i+',1);renderLicenseRules();saveLicenseRulesRemote()">✕</button>'
+      +'<button class="btn btn-sm" title="Remove rule" onclick="event.stopPropagation();_licRules.splice('+i+',1);renderLicenseRules();saveLicenseRulesRemote()">✕</button>'
       +'</div>';
   }).join('');
 }
