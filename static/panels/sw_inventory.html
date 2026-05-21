@@ -1534,13 +1534,13 @@ async function loadScanHistory() {
   if(!tbody) return;
   tbody.innerHTML = SCAN_HISTORY.length === 0
     ? '<tr><td colspan="8" class="empty">No scan history yet</td></tr>'
-    : SCAN_HISTORY.map(x=>`<tr>
+    : SCAN_HISTORY.map((x,i)=>`<tr style="cursor:pointer" onclick="openScanDetail(${i})">
     <td style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">${x.rid}</td>
     <td style="font-size:11px;color:var(--t2)">${x.host}</td>
-    <td style="font-family:var(--font-mono);font-weight:600">${x.total}</td>
-    <td style="font-family:var(--font-mono);color:${x.unauth>0?'var(--red)':'var(--t3)'}">${x.unauth}</td>
-    <td style="font-family:var(--font-mono);color:${x.crack>0?'var(--orange)':'var(--t3)'}">${x.crack}</td>
-    <td style="font-family:var(--font-mono);color:${x.eol>0?'var(--amber)':'var(--t3)'}">${x.eol}</td>
+    <td style="font-family:var(--font-mono);font-weight:600">${x.total||0}</td>
+    <td style="font-family:var(--font-mono);color:${(x.unauth||0)>0?'var(--red)':'var(--t3)'}">${x.unauth||0}</td>
+    <td style="font-family:var(--font-mono);color:${(x.crack||0)>0?'var(--orange)':'var(--t3)'}">${x.crack||0}</td>
+    <td style="font-family:var(--font-mono);color:${(x.eol||0)>0?'var(--amber)':'var(--t3)'}">${x.eol||0}</td>
     <td style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${x.date}</td>
     <td><span class="badge badge-ok" style="font-size:9px">${x.status||'DONE'}</span></td>
   </tr>`).join('');
@@ -2028,7 +2028,7 @@ function renderLicenseRules() {
   el.innerHTML = _licRules.map(function(r,i){
     var s=AS[r.action]||AS.info;
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);border-left:3px solid '+s.color+';transition:background .15s"'
-      +' onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='var(--bg3)'">'
+      +' onmouseenter="this.style.background=\'var(--bg2)\'" onmouseleave="this.style.background=\'var(--bg3)\'">'
       +'<span style="color:'+s.color+';font-size:14px;width:16px;text-align:center">'+s.icon+'</span>'
       +'<div style="flex:1;min-width:0;cursor:pointer" onclick="editLicenseRule('+i+')" title="Click to edit rule">'
       +  '<div style="font-size:11px;font-weight:600;font-family:var(--font-mono);color:var(--t1)">'+r.pattern
@@ -2048,11 +2048,16 @@ function renderLicenseRules() {
 }
 
 function openAddLicenseRule() {
-  document.getElementById('lrm-pattern').value='';
-  document.getElementById('lrm-desc').value='';
-  document.getElementById('lrm-action').value='block';
-  document.getElementById('lrm-scope').value='commercial';
-  document.getElementById('lic-rule-modal').classList.add('open');
+  _editRuleIdx = -1;
+  document.getElementById("lrm-pattern").value = "";
+  document.getElementById("lrm-desc").value    = "";
+  document.getElementById("lrm-action").value  = "block";
+  document.getElementById("lrm-scope").value   = "commercial";
+  var t=document.querySelector("#lic-rule-modal .modal-title");
+  var b=document.querySelector("#lic-rule-modal .btn-primary");
+  if(t) t.textContent="Add License Policy Rule";
+  if(b) { b.textContent="Add Rule"; b.onclick=saveLicenseRule; }
+  document.getElementById("lic-rule-modal").classList.add("open");
 }
 
 function saveLicenseRule() {
