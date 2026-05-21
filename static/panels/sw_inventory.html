@@ -1264,37 +1264,49 @@ Note: Clean hash ≠ safe. Verify license and publisher separately.</div>`;
 // ═══════════════════════════════════
 //  LICENSE
 // ═══════════════════════════════════
-async function loadLicenseData() {
+let _licPage = 0, _licFilter = '', _licType = '';
+const LIC_PAGE = 20;
+
+function renderLicense() {
   const riskBadge = r => ({
     OK:'<span class="badge badge-ok">OK</span>',
     WARN:'<span class="badge badge-warn">WARN</span>',
     CRITICAL:'<span class="sev sev-crit">CRITICAL</span>',
     INFO:'<span class="badge badge-info">INFO</span>',
   }[r]||r);
-
-  // Fetch from API first
-  if(true) { // always refresh
-    try {
-      const r = await fetch(API+'/api/v1/software-inventory/licenses', {headers:hdr()});
-      if(r.ok) { const d = await r.json(); LICENSE_DATA = d.items || []; }
-    } catch(e) { console.warn('[SWINV] loadLicenseData:', e); }
-  }
   const tbody = document.getElementById('license-tbody');
   if(!tbody) return;
-  if(LICENSE_DATA.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty">No license data — run SBOM scan or agent report</td></tr>';
-  } else {
-  tbody.innerHTML = LICENSE_DATA.map(x=>`<tr>
+  let data = LICENSE_DATA;
+  if(_licFilter) data = data.filter(x=>x.comp.toLowerCase().includes(_licFilter)||(x.license||'').toLowerCase().includes(_licFilter));
+  if(_licType) data = data.filter(x=>(x.type||'').toLowerCase().includes(_licType));
+  const total = data.length;
+  const pages = Math.ceil(total/LIC_PAGE)||1;
+  if(_licPage>=pages) _licPage=0;
+  const slice = data.slice(_licPage*LIC_PAGE,(_licPage+1)*LIC_PAGE);
+  document.getElementById('lic-ok').textContent = LICENSE_DATA.filter(x=>x.risk==='OK').length;
+  document.getElementById('lic-gpl').textContent = LICENSE_DATA.filter(x=>(x.license||'').includes('GPL')).length;
+  document.getElementById('lic-none').textContent = LICENSE_DATA.filter(x=>!x.license||x.license==='None').length;
+  document.getElementById('lic-prop').textContent = LICENSE_DATA.filter(x=>x.type==='Commercial').length;
+  tbody.innerHTML = slice.length===0
+    ? '<tr><td colspan="7" class="empty">No matching license data</td></tr>'
+    : slice.map(x=>`<tr>
     <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--t1)">${x.comp}</td>
     <td><span class="badge badge-neutral">${x.ver}</span></td>
-    <td style="font-family:var(--font-mono);font-size:11px;color:${x.license==='None'?'var(--red)':x.license&&x.license.includes('GPL')?'var(--amber)':'var(--t2)'}">${x.license}</td>
-    <td><span class="badge badge-neutral" style="font-size:9px">${x.type}</span></td>
+    <td style="font-family:var(--font-mono);font-size:11px;color:${!x.license||x.license==='None'?'var(--red)':(x.license||'').includes('GPL')?'var(--amber)':'var(--t2)'}">${x.license||'—'}</td>
+    <td><span class="badge badge-neutral" style="font-size:9px">${x.type||'—'}</span></td>
     <td>${riskBadge(x.risk)}</td>
     <td><span class="badge ${x.sbom?'badge-ok':'badge-danger'}" style="font-size:9px">${x.sbom?'Yes':'No'}</span></td>
-    <td><button class="btn btn-sm" onclick="showToast('License detail for ${x.comp}','info')">Detail</button></td>
+    <td style="display:flex;gap:4px">
+      <button class="btn btn-sm" onclick="showToast('${x.comp}: ${x.license||'No license'} · ${x.type||'?'} · Risk: ${x.risk}','info')">Detail</button>
+      ${(x.license||'').includes('GPL')?'<span class="sev sev-high" style="font-size:9px">GPL</span>':''}
+    </td>
   </tr>`).join('');
-
-  }
+  let pg = document.getElementById('lic-pager');
+  if(!pg){ pg=document.createElement('div'); pg.id='lic-pager'; pg.className='pager';
+    const tbl = tbody.closest('table'); if(tbl) tbl.after(pg); }
+  if(pg) pg.innerHTML = `<span class="pager-info">${total} of ${LICENSE_DATA.length} · Page ${_licPage+1}/${pages}</span>
+    <button class="btn btn-sm" onclick="_licPage=Math.max(0,_licPage-1);renderLicense()" ${_licPage===0?'disabled':''}>‹</button>
+    <button class="btn btn-sm" onclick="_licPage=Math.min(${pages}-1,_licPage+1);renderLicense()" ${_licPage>=pages-1?'disabled':''}>›</button>`;
   document.getElementById('license-rules').innerHTML = [
     {icon:'✕',color:'var(--red)',rule:'Block GPL-3.0 / AGPL in commercial products',active:true},
     {icon:'⚠',color:'var(--amber)',rule:'Warn on GPL-2.0 — review required',active:true},
@@ -1306,6 +1318,14 @@ async function loadLicenseData() {
     <span style="font-size:11px;flex:1;color:var(--t2)">${r.rule}</span>
     <span class="badge ${r.active?'badge-ok':'badge-neutral'}" style="font-size:9px">${r.active?'Active':'Disabled'}</span>
   </div>`).join('');
+}
+
+async function loadLicenseData() {
+  try {
+    const r = await fetch(API+'/api/v1/software-inventory/licenses', {headers:hdr()});
+    if(r.ok) { const d = await r.json(); LICENSE_DATA = d.items || []; }
+  } catch(e) { console.warn('[SWINV] loadLicenseData:', e); }
+  renderLicense();
 }
 
 // ═══════════════════════════════════
