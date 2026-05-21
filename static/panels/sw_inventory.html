@@ -604,13 +604,13 @@ td{padding:7px 10px;vertical-align:middle}
       <div class="card-head"><div class="card-title">API Endpoints</div><div class="card-sub">Backend integration</div></div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:6px">
         <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:4px">SW INVENTORY API</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--cyan);color:var(--t2)">GET /api/v1/sw/inventory</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--green);color:var(--t2)">GET /api/v1/sw/whitelist</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--red);color:var(--t2)">GET /api/v1/sw/blacklist</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--orange);color:var(--t2)">POST /api/v1/sw/hash-check</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--amber);color:var(--t2)">POST /api/v1/sw/policy</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--purple);color:var(--t2)">GET /api/v1/sw/license-check</div>
-        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--accent);color:var(--t2)">POST /api/v1/sw/report</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--cyan);color:var(--t2)">GET /api/v1/software-inventory/inventory</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--green);color:var(--t2)">GET /api/v1/software-inventory/whitelist</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--red);color:var(--t2)">GET /api/v1/software-inventory/blacklist</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--orange);color:var(--t2)">POST /api/v1/software-inventory/hash-check</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--amber);color:var(--t2)">POST /api/v1/software-inventory/policy</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--purple);color:var(--t2)">GET /api/v1/software-inventory/license-check</div>
+        <div style="font-family:var(--font-mono);font-size:10px;padding:6px 10px;background:var(--bg3);border-radius:var(--r-md);border-left:2px solid var(--accent);color:var(--t2)">POST /api/v1/software-inventory/report</div>
         <div style="margin-top:8px;font-size:10px;color:var(--t3);font-family:var(--font-mono)">All endpoints: Bearer token auth required</div>
       </div>
     </div>
@@ -1621,7 +1621,7 @@ async function runSwScan() {
   showToast('SW inventory scan triggered — agent collecting…','info');
   await ensureToken();
   try {
-    await fetch(API+'/api/v1/sw/report', {method:'POST',headers:hdr(),body:JSON.stringify({host:'all',mode:'full'})});
+    await fetch(API+'/api/v1/software-inventory/report', {method:'POST',headers:hdr(),body:JSON.stringify({host:'all',mode:'full'})});
   } catch(e) {}
   setTimeout(()=>{ loadInventory(); showToast('SW scan complete','success'); }, 1500);
 }
