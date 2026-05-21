@@ -2028,21 +2028,39 @@ function saveLicenseRule() {
 }
 
 async function saveLicenseRulesRemote() {
+  // Không có route riêng cho license-rules — piggyback vào POST /policy
   await ensureToken();
   try {
-    await fetch(API+'/api/v1/software-inventory/policy/license-rules',{
+    var pol = {
+      block_unauthorized:   !!document.getElementById('pol-block')?.checked,
+      crack_scan_on_ingest: !!document.getElementById('pol-crack')?.checked,
+      eol_alert:            !!document.getElementById('pol-eol')?.checked,
+      gpl_enforcement:      !!document.getElementById('pol-gpl')?.checked,
+      vt_enrichment:        !!document.getElementById('pol-vt')?.checked,
+      notify_email:         !!document.getElementById('pol-notify-email')?.checked,
+      notify_slack:         !!document.getElementById('pol-notify-slack')?.checked,
+      notify_siem:          !!document.getElementById('pol-notify-siem')?.checked,
+      risk_threshold_enabled: !!document.getElementById('pol-risk-enable')?.checked,
+      risk_threshold_value: parseInt(document.getElementById('pol-risk-val')?.value)||70,
+      license_rules: _licRules,
+    };
+    await fetch(API+'/api/v1/software-inventory/policy',{
       method:'POST',headers:{...hdr(),'Content-Type':'application/json'},
-      body:JSON.stringify({rules:_licRules})
+      body:JSON.stringify(pol)
     });
   } catch(e){console.warn('[SWINV] saveLicenseRulesRemote:',e);}
 }
 
 async function loadLicenseRules() {
+  // Đọc license_rules từ GET /policy (không có route riêng)
   await ensureToken(3000);
   try {
-    var r=await fetch(API+'/api/v1/software-inventory/policy/license-rules',{headers:hdr()});
-    if(r.ok){var d=await r.json();if(d.rules&&d.rules.length>0)_licRules=d.rules;}
-  } catch(e){}
+    var r=await fetch(API+'/api/v1/software-inventory/policy',{headers:hdr()});
+    if(r.ok){
+      var d=await r.json();
+      if(d.license_rules && d.license_rules.length>0) _licRules=d.license_rules;
+    }
+  } catch(e){console.warn('[SWINV] loadLicenseRules:',e);}
   renderLicenseRules();
 }
 
@@ -2141,15 +2159,21 @@ async function loadPolicy() {
 async function savePolicy() {
   await ensureToken();
   const policy = {
-    block_unauthorized: document.getElementById('pol-block-unauth')?.checked||document.getElementById('pol-block')?.checked||false,
-    crack_scan_on_ingest: document.getElementById('pol-crack-scan')?.checked||document.getElementById('pol-crack')?.checked||false,
-    eol_alert: document.getElementById('pol-eol-alert')?.checked||document.getElementById('pol-eol')?.checked||false,
-    gpl_enforcement: document.getElementById('pol-gpl')?.checked||false,
-    vt_enrichment: document.getElementById('pol-vt')?.checked||false,
+    block_unauthorized:   document.getElementById('pol-block')?.checked||false,
+    crack_scan_on_ingest: document.getElementById('pol-crack')?.checked||false,
+    eol_alert:            document.getElementById('pol-eol')?.checked||false,
+    gpl_enforcement:      document.getElementById('pol-gpl')?.checked||false,
+    vt_enrichment:        document.getElementById('pol-vt')?.checked||false,
+    notify_email:         document.getElementById('pol-notify-email')?.checked||false,
+    notify_slack:         document.getElementById('pol-notify-slack')?.checked||false,
+    notify_siem:          document.getElementById('pol-notify-siem')?.checked||false,
+    risk_threshold_enabled: document.getElementById('pol-risk-enable')?.checked||false,
+    risk_threshold_value: parseInt(document.getElementById('pol-risk-val')?.value)||70,
+    license_rules: _licRules,
   };
   try {
     const r = await fetch(API+'/api/v1/software-inventory/policy',
-      {method:'POST',headers:hdr(),body:JSON.stringify(policy)});
+      {method:'POST',headers:{...hdr(),'Content-Type':'application/json'},body:JSON.stringify(policy)});
     if(r.ok) showToast('Policy saved','success'); else showToast('Policy save failed','error');
   } catch(e){ showToast('Network error','error'); }
 }
