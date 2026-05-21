@@ -2113,6 +2113,129 @@ async function loadLicenseRules() {
   renderLicenseRules();
 }
 
+// ── Edit License Rule ────────────────────────────────
+var _editRuleIdx = -1;
+function editLicenseRule(i) {
+  _editRuleIdx = i;
+  var r = _licRules[i];
+  if (!r) return;
+  document.getElementById('lrm-pattern').value = r.pattern || '';
+  document.getElementById('lrm-action').value  = r.action  || 'warn';
+  document.getElementById('lrm-desc').value    = r.desc    || '';
+  document.getElementById('lrm-scope').value   = r.scope   || 'all';
+  var t = document.querySelector('#lic-rule-modal .modal-title');
+  var b = document.querySelector('#lic-rule-modal .btn-primary');
+  if (t) t.textContent = 'Edit License Rule';
+  if (b) { b.textContent = 'Save Changes'; b.onclick = saveEditedLicenseRule; }
+  document.getElementById('lic-rule-modal').classList.add('open');
+}
+function saveEditedLicenseRule() {
+  var p = document.getElementById('lrm-pattern').value.trim();
+  if (!p) { showToast('Pattern la bat buoc', 'error'); return; }
+  if (_editRuleIdx >= 0 && _editRuleIdx < _licRules.length) {
+    _licRules[_editRuleIdx] = {
+      pattern: p,
+      action:  document.getElementById('lrm-action').value,
+      desc:    document.getElementById('lrm-desc').value.trim() || p + ' policy',
+      scope:   document.getElementById('lrm-scope').value,
+      active:  _licRules[_editRuleIdx].active,
+    };
+  }
+  _editRuleIdx = -1;
+  renderLicenseRules();
+  saveLicenseRulesRemote();
+  document.getElementById('lic-rule-modal').classList.remove('open');
+  showToast('Rule updated', 'success');
+}
+
+// ── Test Risk Threshold ───────────────────────────────
+async function testRiskThreshold() {
+  var thresh = parseInt((document.getElementById('pol-risk-val') || {}).value) || 70;
+  var el = document.getElementById('pol-risk-test-result');
+  if (el) { el.style.display = 'block'; el.textContent = 'Simulating...'; }
+  var data = [];
+  try { data = _invData || []; } catch(e) {}
+  if (!data.length && window._invData) data = window._invData;
+  var would = data.filter(function(a) { return (a.risk_score || 0) >= thresh; }).length;
+  var msg   = would === 0
+    ? 'No assets would be blocked at threshold ' + thresh
+    : would + ' / ' + data.length + ' assets have risk score >= ' + thresh + ' -- would be auto-blocked';
+  var color = would === 0 ? 'var(--green)' : 'var(--amber)';
+  if (el) { el.style.display = 'block'; el.style.color = color; el.textContent = msg; }
+}
+
+// ── Test API Endpoint ─────────────────────────────────
+async function testEndpoint(i) {
+  var ep = (window._swEPs || [])[i];
+  if (!ep) return;
+  var stEl = document.getElementById('ep-st-' + i);
+  if (stEl) stEl.textContent = '...';
+  await ensureToken();
+  var t0 = Date.now();
+  try {
+    var opts = { headers: hdr() };
+    if (ep.m === 'POST') {
+      opts.method  = 'POST';
+      opts.headers = Object.assign({}, opts.headers, { 'Content-Type': 'application/json' });
+      opts.body    = '{}';
+    }
+    var r  = await fetch(API + ep.path, opts);
+    var ms = Date.now() - t0;
+    var col = r.status < 300 ? 'var(--green)'
+            : r.status < 400 ? 'var(--cyan)'
+            : r.status < 500 ? 'var(--amber)'
+            : 'var(--red)';
+    if (stEl) stEl.innerHTML = '<span style="color:' + col + '">' + r.status + '</span>';
+    showToast(ep.m + ' ' + ep.path + ' -> ' + r.status + ' (' + ms + 'ms)', r.status < 500 ? 'success' : 'error');
+  } catch(e) {
+    if (stEl) stEl.textContent = 'ERR';
+    showToast(ep.path + ' -- ' + e.message, 'error');
+  }
+}
+
+// ── Scan History Detail ───────────────────────────────
+function openScanDetail(i) {
+  var x = SCAN_HISTORY[i];
+  if (!x) return;
+  document.getElementById('dm-title').textContent = 'Scan ' + x.rid;
+  document.getElementById('dm-sub').textContent   = x.host + ' - ' + x.date;
+  var cc = (x.crack  || 0) > 0 ? 'var(--orange)' : 'var(--green)';
+  var uc = (x.unauth || 0) > 0 ? 'var(--red)'    : 'var(--green)';
+  var ec = (x.eol    || 0) > 0 ? 'var(--amber)'  : 'var(--green)';
+  document.getElementById('dm-body').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'
+    + '<div class="stat-box" style="text-align:center"><div class="stat-lbl">Total SW</div>'
+    +   '<div class="stat-val c-cyan" style="font-size:22px">' + (x.total  || 0) + '</div></div>'
+    + '<div class="stat-box" style="text-align:center"><div class="stat-lbl">Unauthorized</div>'
+    +   '<div style="font-size:22px;font-weight:700;color:' + uc + '">' + (x.unauth || 0) + '</div></div>'
+    + '<div class="stat-box" style="text-align:center"><div class="stat-lbl">Crack Hits</div>'
+    +   '<div style="font-size:22px;font-weight:700;color:' + cc + '">' + (x.crack  || 0) + '</div></div>'
+    + '<div class="stat-box" style="text-align:center"><div class="stat-lbl">EOL</div>'
+    +   '<div style="font-size:22px;font-weight:700;color:' + ec + '">' + (x.eol    || 0) + '</div></div>'
+    + '</div>'
+    + '<div style="font-family:var(--font-mono);font-size:11px;padding:12px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);line-height:2">'
+    +   '<span style="color:var(--t3)">Run ID:</span> <span style="color:var(--cyan);font-weight:600">' + x.rid  + '</span><br>'
+    +   '<span style="color:var(--t3)">Host:</span> <span style="color:var(--t1)">'                    + x.host + '</span><br>'
+    +   '<span style="color:var(--t3)">Date:</span> <span style="color:var(--t2)">'                    + x.date + '</span><br>'
+    +   '<span style="color:var(--t3)">Status:</span> <span class="badge badge-ok" style="font-size:9px">' + (x.status || 'DONE') + '</span>'
+    + '</div>'
+    + ((x.crack || 0) > 0 || (x.unauth || 0) > 0
+      ? '<div style="margin-top:12px;padding:10px;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);border-radius:var(--r-md);font-size:11px;color:var(--amber)">'
+        + 'Warning: ' + (x.crack || 0) + ' crack hits, ' + (x.unauth || 0) + ' unauthorized SW detected</div>'
+      : '')
+    + '<div style="margin-top:12px;display:flex;gap:8px">'
+    + '<button class="btn btn-sm btn-primary" style="flex:1" onclick="'
+    +   "document.getElementById('inv-search').value='" + x.host + "';"
+    +   "switchTab('tab-inventory');renderInventory();"
+    +   "document.getElementById('detail-modal').classList.remove('open')"
+    + '">View in Inventory</button>'
+    + '<button class="btn btn-sm" style="flex:1" onclick="document.getElementById(\'detail-modal\').classList.remove(\'open\')">Close</button>'
+    + '</div>';
+  document.getElementById('dm-block-btn').style.display   = 'none';
+  document.getElementById('dm-approve-btn').style.display = 'none';
+  document.getElementById('detail-modal').classList.add('open');
+}
+
 function exportPolicy() {
   var pol={
     enforcement:{
