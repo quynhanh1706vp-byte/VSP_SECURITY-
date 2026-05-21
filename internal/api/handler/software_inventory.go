@@ -37,8 +37,9 @@ type SWPackage struct {
 }
 
 var crackPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)(crack|keygen|patch|activat|serial|bypass|hack|pirat|warez|nulled)`),
-	regexp.MustCompile(`(?i)(kmspico|daz|ratiborus|re-loader|toolkit.*activat)`),
+	regexp.MustCompile(`(?i)(warez|nulled|pirated|kmsauto|kmspico|ratiborus)`),
+	regexp.MustCompile(`(?i)(daz.loader|re.loader|activator.crack|crack.only|keygen.only)`),
+	regexp.MustCompile(`(?i)(-crack-|-keygen-|\.crack\.|\.keygen\.)`),
 }
 
 var suspPatterns = []*regexp.Regexp{
@@ -286,7 +287,7 @@ func (h *SoftwareInventoryHandler) GetAsset(w http.ResponseWriter, r *http.Reque
 	}
 	rows, _ := h.DB.Pool().Query(r.Context(), `
 		SELECT name,version,publisher,sha256,signed,susp_reason,source,detected_at
-		FROM software_findings WHERE hostname=$1 ORDER BY detected_at DESC LIMIT 50`, hostname)
+		FROM software_findings WHERE hostname=$1 ORDER BY detected_at DESC LIMIT 200`, hostname)
 	defer rows.Close()
 	var findings []Finding
 	for rows.Next() {
@@ -357,6 +358,9 @@ func (h *SoftwareInventoryHandler) ListWhitelist(w http.ResponseWriter, r *http.
 }
 func (h *SoftwareInventoryHandler) ListBlacklist(w http.ResponseWriter, r *http.Request) {
 	h.listByType(w, r, "blacklist")
+}
+func (h *SoftwareInventoryHandler) ListWarning(w http.ResponseWriter, r *http.Request) {
+	h.listByType(w, r, "warning")
 }
 
 func (h *SoftwareInventoryHandler) listByType(w http.ResponseWriter, r *http.Request, listType string) {

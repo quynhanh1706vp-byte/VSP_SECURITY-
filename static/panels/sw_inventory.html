@@ -1545,19 +1545,23 @@ async function openDetail(id) {
 
   // Show all packages in detail modal
   const pkgEl = document.getElementById('dm-pkg-list');
-  if(pkgEl && hostFindings.length > 0) {
-    window._dmAllPkgs = hostFindings;
-    pkgEl.innerHTML = '<div style="max-height:180px;overflow-y:auto">'
-      + hostFindings.slice(0,30).map(function(f){
-          var color = f.susp_reason ? 'color:var(--orange)' : '';
-          return '<div style="display:flex;gap:6px;padding:2px 6px;font-family:var(--font-mono);font-size:10px;'+color+'">'
-            + '<span style="flex:1">'+f.name+'</span>'
-            + '<span style="color:var(--t3)">'+(f.version||'')+'</span>'
-            + (f.susp_reason?'<span style="color:var(--orange);font-size:9px"> ⚠</span>':'')
-            + '</div>';
-        }).join('')
-      + (hostFindings.length>30?'<div style="padding:4px;color:var(--t3);font-size:10px">+'+(hostFindings.length-30)+' more</div>':'')
-      + '</div>';
+  if(pkgEl) {
+    if(hostFindings.length > 0) {
+      window._dmAllPkgs = hostFindings;
+      pkgEl.innerHTML = '<div style="max-height:180px;overflow-y:auto">'
+        + hostFindings.slice(0,30).map(function(f){
+            var color = f.susp_reason ? 'color:var(--orange)' : '';
+            return '<div style="display:flex;gap:6px;padding:2px 6px;font-family:var(--font-mono);font-size:10px;'+color+'">'
+              + '<span style="flex:1">'+f.name+'</span>'
+              + '<span style="color:var(--t3)">'+(f.version||'')+'</span>'
+              + (f.susp_reason?'<span style="color:var(--orange);font-size:9px"> ⚠</span>':'')
+              + '</div>';
+          }).join('')
+        + (hostFindings.length>30?'<div style="padding:4px;color:var(--t3);font-size:10px">+'+(hostFindings.length-30)+' more — use search</div>':'')
+        + '</div>';
+    } else {
+      pkgEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--t3);font-size:11px;font-family:var(--font-mono)">No package scan data — agent not yet reporting for this host</div>';
+    }
   }
   if(crackCount > 0 || hostFindings.length > 0) {
     const suspFindings = hostFindings.filter(f=>f.susp_reason&&f.susp_reason.length>0);
