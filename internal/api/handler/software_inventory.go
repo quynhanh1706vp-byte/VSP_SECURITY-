@@ -402,6 +402,7 @@ func (h *SoftwareInventoryHandler) AddToList(w http.ResponseWriter, r *http.Requ
 		Category string `json:"category"`
 		Reason   string `json:"reason"`
 		Hash     string `json:"hash"`
+		AddedBy  string `json:"added_by"`
 	}
 	if !decodeJSON(w, r, &body) {
 		return
@@ -419,6 +420,9 @@ func (h *SoftwareInventoryHandler) AddToList(w http.ResponseWriter, r *http.Requ
 		if s, ok := u.(string); ok && s != "" {
 			addedBy = s
 		}
+	}
+	if body.AddedBy != "" {
+		addedBy = body.AddedBy
 	}
 	var newID int
 	err := h.DB.Pool().QueryRow(r.Context(), `
