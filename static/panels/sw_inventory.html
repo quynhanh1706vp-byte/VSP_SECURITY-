@@ -1118,7 +1118,8 @@ function renderWhitelist() {
         </div>
       </div>
       <div class="policy-actions" style="flex-shrink:0">
-        <span class="badge badge-ok" style="font-size:9px">APPROVED</span>
+        <span class="badge badge-ok" style="font-size:9px;cursor:pointer" onclick="openListDetail('whitelist',${x.id})">APPROVED</span>
+        <button class="btn btn-sm" title="View details" onclick="openListDetail('whitelist',${x.id})">⋯</button>
         <button class="btn btn-sm" title="Remove from whitelist" onclick="removeFromList('whitelist',${x.id},'${x.name}')">✕</button>
       </div>
     </div>`).join('');
@@ -1143,7 +1144,8 @@ function renderWhitelist() {
         </div>
       </div>
       <div class="policy-actions" style="flex-shrink:0">
-        <span class="badge badge-danger" style="font-size:9px">BLOCKED</span>
+        <span class="badge badge-danger" style="font-size:9px;cursor:pointer" onclick="openListDetail('blacklist',${x.id})">BLOCKED</span>
+        <button class="btn btn-sm" title="View details" onclick="openListDetail('blacklist',${x.id})">⋯</button>
         <button class="btn btn-sm" title="Remove from blacklist" onclick="removeFromList('blacklist',${x.id},'${x.name}')">✕</button>
       </div>
     </div>`).join('');
@@ -1164,6 +1166,7 @@ function renderWhitelist() {
           ${w.vendor||''} · Added by ${w.added_by||'system'} · ${(w.added_at||'').slice(0,10)}
         </div>
       </div>
+      <button class="btn btn-sm" title="View details" onclick="openListDetail('warning',${w.id})" style="flex-shrink:0">⋯</button>
       <button class="btn btn-sm" title="Remove from warning list" onclick="removeFromList('warning',${w.id},'${w.name}')" style="flex-shrink:0">✕</button>
     </div>`).join('');
 }
@@ -1404,6 +1407,133 @@ async function removeFromList(listType, id, name) {
   renderWhitelist();
 }
 
+// ═══════════════════════════════════
+//  WHITELIST/BLACKLIST DETAIL
+// ═══════════════════════════════════
+let _listDetailItem = null;
+let _listDetailType = null;
+
+function openListDetail(listType, id) {
+  const lists = {whitelist: WHITELIST, blacklist: BLACKLIST, warning: WARNING_ITEMS};
+  const arr = lists[listType] || [];
+  const item = arr.find(x => x.id === id);
+  if (!item) return;
+  _listDetailItem = item;
+  _listDetailType = listType;
+
+  const typeColors = {whitelist:'var(--green)', blacklist:'var(--red)', warning:'var(--amber)'};
+  const typeLabels = {whitelist:'APPROVED', blacklist:'BLOCKED', warning:'WARNING'};
+  const color = typeColors[listType] || 'var(--cyan)';
+
+  document.getElementById('dm-title').textContent = item.name + (item.version && item.version!=='any' ? ' '+item.version : '');
+  document.getElementById('dm-sub').textContent = (item.vendor||'Unknown') + ' · ' + (item.category||'—') + ' · ' + typeLabels[listType];
+
+  document.getElementById('dm-body').innerHTML = `
+    <!-- Status badge -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span class="badge" style="background:${color}20;color:${color};border:1px solid ${color}40;font-size:12px;padding:4px 12px">${typeLabels[listType]}</span>
+      <span style="font-size:11px;color:var(--t3);font-family:var(--font-mono)">${listType} · ID: ${item.id||'—'}</span>
+    </div>
+
+    <!-- Info grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="font-family:var(--font-mono);font-size:11px;padding:10px;background:var(--bg3);border-radius:var(--r-md);line-height:2;border:1px solid var(--border)">
+        <span style="color:var(--t3)">Package:</span> <span style="color:var(--t1);font-weight:600">${item.name}</span><br>
+        <span style="color:var(--t3)">Version:</span> <span style="color:var(--t2)">${item.version||'any'}</span><br>
+        <span style="color:var(--t3)">Vendor:</span> <span style="color:var(--t2)">${item.vendor||'—'}</span><br>
+        <span style="color:var(--t3)">Category:</span> <span style="color:var(--t2)">${item.category||'—'}</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:11px;padding:10px;background:var(--bg3);border-radius:var(--r-md);line-height:2;border:1px solid var(--border)">
+        <span style="color:var(--t3)">Added by:</span> <span style="color:var(--cyan)">${item.added_by||'system'}</span><br>
+        <span style="color:var(--t3)">Added at:</span> <span style="color:var(--t2)">${(item.added_at||'').slice(0,10)||'—'}</span><br>
+        <span style="color:var(--t3)">List type:</span> <span style="color:${color}">${listType}</span><br>
+        <span style="color:var(--t3)">ID:</span> <span style="color:var(--t2)">${item.id||'—'}</span>
+      </div>
+    </div>
+
+    <!-- Reason -->
+    <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Reason / Notes</div>
+    <div style="font-family:var(--font-mono);font-size:11px;padding:10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--border);color:var(--t2);margin-bottom:14px;line-height:1.6">
+      ${item.reason||'No reason provided'}
+    </div>
+
+    <!-- Hash if present -->
+    ${item.hash ? `
+    <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Known-good SHA-256 Hash</div>
+    <div style="font-family:var(--font-mono);font-size:10px;padding:8px 10px;background:var(--bg3);border-radius:var(--r-md);border:1px solid var(--green)40;color:var(--green);word-break:break-all;margin-bottom:14px">${item.hash}</div>
+    ` : ''}
+
+    <!-- Edit form -->
+    <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Edit Entry</div>
+    <div class="g2" style="margin-bottom:8px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Version</label>
+        <input class="form-ctrl" id="ld-version" value="${item.version||'any'}" style="font-size:11px">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Vendor</label>
+        <input class="form-ctrl" id="ld-vendor" value="${item.vendor||''}" style="font-size:11px">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:8px">
+      <label class="form-label">Reason / Notes</label>
+      <input class="form-ctrl" id="ld-reason" value="${item.reason||''}" style="font-size:11px">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">SHA-256 Hash (optional)</label>
+      <input class="form-ctrl" id="ld-hash" value="${item.hash||''}" placeholder="Leave empty if unknown" style="font-size:11px;font-family:var(--font-mono)">
+    </div>`;
+
+  // Update footer buttons
+  document.getElementById('dm-block-btn').textContent = '🗑 Remove from ' + listType;
+  document.getElementById('dm-block-btn').onclick = () => removeListDetail();
+  document.getElementById('dm-approve-btn').textContent = '💾 Save changes';
+  document.getElementById('dm-approve-btn').onclick = () => saveListDetail();
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+async function saveListDetail() {
+  if (!_listDetailItem || !_listDetailType) return;
+  const version = document.getElementById('ld-version')?.value.trim() || 'any';
+  const vendor = document.getElementById('ld-vendor')?.value.trim() || '';
+  const reason = document.getElementById('ld-reason')?.value.trim() || '';
+  const hash = document.getElementById('ld-hash')?.value.trim() || '';
+  let _userEmail = 'admin';
+  try { const p=JSON.parse(atob(TOKEN.split('.')[1])); _userEmail=p.email||'admin'; } catch(e){}
+  try {
+    const r = await fetch(API+'/api/v1/software-inventory/'+_listDetailType, {
+      method:'POST', headers:{...hdr(),'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: _listDetailItem.name, version, vendor, hash,
+        category: _listDetailItem.category||'other', reason,
+        added_by: _userEmail
+      })
+    });
+    if(r.ok) {
+      showToast(_listDetailItem.name+' updated','success');
+      document.getElementById('detail-modal').classList.remove('open');
+      loadWhiteBlacklist();
+    } else {
+      const e = await r.json().catch(()=>({}));
+      showToast(e.error||'Update failed','error');
+    }
+  } catch(e) { showToast('Network error','error'); }
+}
+
+async function removeListDetail() {
+  if (!_listDetailItem || !_listDetailType) return;
+  if (!confirm('Remove "'+_listDetailItem.name+'" from '+_listDetailType+'?')) return;
+  try {
+    const r = await fetch(API+'/api/v1/software-inventory/'+_listDetailType+'/'+_listDetailItem.id,
+      {method:'DELETE', headers:hdr()});
+    if(r.ok) {
+      showToast(_listDetailItem.name+' removed','success');
+      document.getElementById('detail-modal').classList.remove('open');
+      loadWhiteBlacklist();
+    }
+  } catch(e) { showToast('Network error','error'); }
+}
+
 async function blockSW(name) {
   if(!confirm(`Block "${name}" and add to blacklist?`)) return;
   let _userEmail = 'admin';
@@ -1446,6 +1576,10 @@ async function openDetail(id) {
 
   // Loading state
   document.getElementById('dm-body').innerHTML = `<div style="text-align:center;padding:24px;color:var(--t3);font-size:11px;font-family:var(--font-mono)">Loading details…</div>`;
+  document.getElementById('dm-block-btn').textContent = 'Block this SW';
+  document.getElementById('dm-block-btn').onclick = blockFromDetail;
+  document.getElementById('dm-approve-btn').textContent = 'Approve';
+  document.getElementById('dm-approve-btn').onclick = approveFromDetail;
   document.getElementById('detail-modal').classList.add('open');
 
   // Fetch thêm data từ API (host detail) — API trả {asset:{...}, findings:[...]}
