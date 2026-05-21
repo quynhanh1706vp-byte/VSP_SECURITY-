@@ -2071,6 +2071,17 @@ function showPanel(name, btn) {
   document.getElementById('page-sub').textContent = meta.sub;
 
   // Panel-specific initialization
+  // swinventory handles its own token retry — call immediately
+  if (name === 'swinventory') {
+    const fr = document.getElementById('sw-inventory-frame');
+    if (fr && fr.contentWindow) {
+      fr.contentWindow.TOKEN = window.TOKEN || '';
+      fr.contentWindow.localStorage.setItem('vsp_token', window.TOKEN||'');
+      if (typeof fr.contentWindow._resetAndInit === 'function') {
+        fr.contentWindow._resetAndInit();
+      }
+    }
+  }
   setTimeout(() => {
     if (!window.TOKEN || window.TOKEN === '') return;
     if (name === 'dashboard')   { initDashboardCharts(); loadDashKPIs(); }
@@ -2088,6 +2099,37 @@ function showPanel(name, btn) {
     if (name === 'export') setTimeout(loadExportRuns, 200);
     if (name === 'remediation') loadRemediations();
     if (name === 'soc')         drawSocRadar();
+    if (name === 'swinventory') {
+      const fr = document.getElementById('sw-inventory-frame');
+      if (fr) {
+        const _inject = () => {
+          if (!fr.contentWindow) return;
+          fr.contentWindow.TOKEN = window.TOKEN;
+          fr.contentWindow.localStorage.setItem('vsp_token', window.TOKEN||'');
+        };
+        const _load = () => {
+          if (!fr.contentWindow) return;
+          const cw = fr.contentWindow;
+          // Re-inject token before each load call
+          cw.TOKEN = window.TOKEN;
+          cw.localStorage.setItem('vsp_token', window.TOKEN||'');
+          if (typeof cw._resetAndInit === 'function') { cw._resetAndInit(); return; }
+          if (typeof cw.loadWhiteBlacklist === 'function') cw.loadWhiteBlacklist();
+          if (typeof cw.loadInventory === 'function') cw.loadInventory();
+          if (typeof cw.loadCrackFindings === 'function') cw.loadCrackFindings();
+          if (typeof cw.loadLicenseData === 'function') cw.loadLicenseData();
+          if (typeof cw.loadScanHistory === 'function') cw.loadScanHistory();
+        };
+        _inject();
+        if (fr.contentDocument?.readyState === 'complete') {
+          _inject();
+          setTimeout(_load, 200);
+          setTimeout(_load, 800);  // retry
+        } else {
+          fr.addEventListener('load', ()=>{ _inject(); setTimeout(_load, 300); }, {once:true});
+        }
+      }
+    }
     if (name === 'executive')   { initExecutiveRing(); setTimeout(loadExecutive, 300); }
   }, 100);
 }
@@ -3905,6 +3947,18 @@ async function govLoginSubmit() {
     window.TOKEN = data.token;
     TOKEN = data.token;  // keep `let`-scoped TOKEN in sync with window.TOKEN
     localStorage.setItem('vsp_token', data.token);
+    // Inject token into all panel iframes immediately after login
+    var _tok = data.token;
+    document.querySelectorAll('iframe').forEach(function(fr) {
+      try {
+        if (fr.contentWindow) {
+          fr.contentWindow.TOKEN = _tok;
+          fr.contentWindow.localStorage.setItem('vsp_token', _tok);
+          // Also postMessage for iframes that listen for vsp:token
+          fr.contentWindow.postMessage({type:'vsp:token', token:_tok}, '*');
+        }
+      } catch(e) {}
+    });
     setTimeout(function(){ if(typeof _fetchRealNotifications==='function') _fetchRealNotifications(); }, 800);
 
     // Sync user info to topbar

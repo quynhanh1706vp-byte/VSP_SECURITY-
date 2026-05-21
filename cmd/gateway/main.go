@@ -998,6 +998,7 @@ func main() {
 				return
 			}
 		}
+		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 		http.StripPrefix("/static/panels/",
 			http.FileServer(http.Dir("./static/panels/"))).ServeHTTP(w, r)
 	})
@@ -3345,6 +3346,7 @@ func main() {
 		r.Get("/api/v1/software-inventory/scan-history", swH.ListScanHistory)
 		r.Get("/api/v1/software-inventory/whitelist",    swH.ListWhitelist)
 		r.Get("/api/v1/software-inventory/blacklist",    swH.ListBlacklist)
+		r.Get("/api/v1/software-inventory/warning",     swH.ListWarning)
 		r.Get("/api/v1/software-inventory/policy",       swH.GetPolicy)
 		r.Get("/api/v1/software-inventory/{hostname}",   swH.GetAsset)
 		r.Post("/api/v1/software-inventory/hash-check",         swH.HashCheck)

@@ -31,6 +31,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -45,6 +46,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ── flags ──────────────────────────────────────────────────────────────
@@ -54,7 +57,8 @@ var (
 	storePath = flag.String("store", "/var/lib/vsp/sw-inventory.json", "JSON store path")
 	auditPath = flag.String("audit", "/var/lib/vsp/sw-audit.json", "audit log path (rolling)")
 	keyFile   = flag.String("agent-key-file", "/etc/vsp/sw-agent.key", "agent API key file (autogen if missing)")
-	uiKeyFile = flag.String("ui-key-file", "/etc/vsp/ui.key", "UI API key file (optional; if absent, UI endpoints are open)")
+	uiKeyFile  = flag.String("ui-key-file", "/etc/vsp/ui.key", "UI API key file (optional; if absent, UI endpoints are open)")
+	pgURL     = flag.String("pg", "postgres://vsp:vsp@127.0.0.1:5432/vsp_go", "Postgres DSN for direct sync (empty to disable)")
 	maxAudit  = flag.Int("max-audit", 5000, "keep last N audit events")
 )
 
@@ -72,6 +76,7 @@ var (
 	}{Events: []AuditEvent{}}
 
 	agentKey string
+	pgPool   *pgxpool.Pool
 	uiKey    string // empty = open
 )
 
@@ -359,6 +364,134 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+
+// forwardToGateway syncs an AgentReport to the gateway ReceiveReport handler
+// so that Postgres (software_assets + software_findings) stays in sync with
+// the JSON store.  Runs in a goroutine — never blocks the agent response.
+
+// initPgPool connects to Postgres once at boot (optional — won't crash if unavailable).
+func initPgPool() {
+	if pgURL == nil || *pgURL == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, *pgURL)
+	if err != nil {
+		log.Printf("[pg-sync] connect error (sync disabled): %v", err)
+		return
+	}
+	if err := pool.Ping(ctx); err != nil {
+		log.Printf("[pg-sync] ping error (sync disabled): %v", err)
+		pool.Close()
+		return
+	}
+	pgPool = pool
+	log.Printf("[pg-sync] connected to Postgres — direct sync enabled")
+}
+
+// syncToPostgres upserts host + package findings into Postgres.
+// Mirrors the logic in internal/api/handler/software_inventory.go ReceiveReport.
+// Runs in a goroutine — never blocks the agent response.
+func syncToPostgres(rep AgentReport) {
+	if pgPool == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	crackPatterns := []string{"_crack_", "-crack-", ".crack.", "_keygen", "-keygen", "warez", "nulled", "pirated", "kmspico", "daz-loader", "ratiborus", "re-loader", "kmsauto", "_activator", "activator_", "windows-activat"}
+	suspPatterns := []string{"torrent", "utorrent", "xmrig", "minerd", "cpuminer"}
+
+	crackCount, eolCount, suspCount := 0, 0, 0
+	now := rep.CollectedAt
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+
+	for _, pkg := range rep.Packages {
+		label := strings.ToLower(pkg.Name)
+		isCrack, isSusp := false, false
+		suspReason := ""
+		for _, p := range crackPatterns {
+			if strings.Contains(label, p) {
+				isCrack = true
+				suspReason = "crack/keygen pattern"
+				break
+			}
+		}
+		if !isCrack {
+			for _, p := range suspPatterns {
+				if strings.Contains(label, p) {
+					isSusp = true
+					suspReason = "suspicious pattern"
+					break
+				}
+			}
+		}
+		// EOL check
+		var eolHits int
+		_ = pgPool.QueryRow(ctx,
+			`SELECT COUNT(*) FROM eol_database WHERE product_name ILIKE $1 AND status='eol'`,
+			"%"+strings.Split(pkg.Name, " ")[0]+"%",
+		).Scan(&eolHits)
+		isEOL := eolHits > 0
+
+		if isCrack { crackCount++ } else if isEOL { eolCount++ } else if isSusp { suspCount++ }
+
+		_, err := pgPool.Exec(ctx, `
+			INSERT INTO software_findings
+				(hostname,name,version,publisher,sha256,signed,suspicious,susp_reason,source,detected_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			ON CONFLICT (hostname,name,version) DO UPDATE SET
+				suspicious=EXCLUDED.suspicious, susp_reason=EXCLUDED.susp_reason,
+				detected_at=EXCLUDED.detected_at`,
+			rep.Hostname, pkg.Name, pkg.Version, "", "", false,
+			isCrack||isSusp, suspReason, pkg.Source, now)
+		if err != nil {
+			log.Printf("[pg-sync] findings upsert error: %v", err)
+			return
+		}
+	}
+
+	// Risk score
+	raw := crackCount*30 + eolCount*20 + suspCount*10
+	if raw > 100 { raw = 100 }
+	riskLevel := "clean"
+	switch {
+	case raw >= 70: riskLevel = "critical"
+	case raw >= 40: riskLevel = "high"
+	case raw >= 10: riskLevel = "medium"
+	}
+
+	reportJSON, _ := json.Marshal(rep)
+	_, err := pgPool.Exec(ctx, `
+		INSERT INTO software_assets
+			(hostname,os,os_version,arch,agent_version,
+			 total_software,suspicious_count,eol_count,crack_count,
+			 risk_score,risk_level,last_seen,report_json,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+		ON CONFLICT (hostname) DO UPDATE SET
+			os=EXCLUDED.os, os_version=EXCLUDED.os_version,
+			arch=EXCLUDED.arch, agent_version=EXCLUDED.agent_version,
+			total_software=EXCLUDED.total_software,
+			suspicious_count=EXCLUDED.suspicious_count,
+			eol_count=EXCLUDED.eol_count, crack_count=EXCLUDED.crack_count,
+			risk_score=EXCLUDED.risk_score, risk_level=EXCLUDED.risk_level,
+			last_seen=EXCLUDED.last_seen, report_json=EXCLUDED.report_json,
+			updated_at=NOW()`,
+		rep.Hostname, rep.OS, rep.OSVersion, "", rep.AgentVersion,
+		len(rep.Packages), suspCount, eolCount, crackCount,
+		raw, riskLevel, now, reportJSON)
+	if err != nil {
+		log.Printf("[pg-sync] assets upsert error: %v", err)
+		return
+	}
+	log.Printf("[pg-sync] synced host=%s pkgs=%d risk=%s(%d) crack=%d eol=%d susp=%d",
+		rep.Hostname, len(rep.Packages), riskLevel, raw, crackCount, eolCount, suspCount)
+}
+
+
 func handleAgentReport(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeErr(w, 405, "method not allowed", "")
@@ -404,6 +537,7 @@ func handleAgentReport(w http.ResponseWriter, r *http.Request) {
 	store.Unlock()
 
 	go persistStore()
+	go syncToPostgres(rep)
 
 	writeAudit(rep.Hostname, clientIP(r), "report", "accepted",
 		fmt.Sprintf("%d packages, %d cves, agent=%s", len(rep.Packages), len(h.CVEs), rep.AgentVersion))
@@ -715,6 +849,7 @@ func handleScanHistory(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+	initPgPool()
 
 	_ = os.MkdirAll(filepath.Dir(*storePath), 0o700)
 	loadStore()
