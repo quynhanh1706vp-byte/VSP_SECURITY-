@@ -1297,7 +1297,7 @@ function renderLicense() {
     <td>${riskBadge(x.risk)}</td>
     <td><span class="badge ${x.sbom?'badge-ok':'badge-danger'}" style="font-size:9px">${x.sbom?'Yes':'No'}</span></td>
     <td style="display:flex;gap:4px">
-      <button class="btn btn-sm" onclick="showToast('${x.comp}: ${x.license||'No license'} · ${x.type||'?'} · Risk: ${x.risk}','info')">Detail</button>
+      <button class="btn btn-sm" onclick="openLicenseDetail('${x.comp}','${x.ver}','${x.license||''}','${x.type||''}','${x.risk}',${x.sbom})">Detail</button>
       ${(x.license||'').includes('GPL')?'<span class="sev sev-high" style="font-size:9px">GPL</span>':''}
     </td>
   </tr>`).join('');
@@ -1318,6 +1318,38 @@ function renderLicense() {
     <span style="font-size:11px;flex:1;color:var(--t2)">${r.rule}</span>
     <span class="badge ${r.active?'badge-ok':'badge-neutral'}" style="font-size:9px">${r.active?'Active':'Disabled'}</span>
   </div>`).join('');
+}
+
+function openLicenseDetail(comp, ver, license, type, risk, sbom) {
+  const riskColor = risk==='CRITICAL'?'var(--red)':risk==='WARN'?'var(--amber)':risk==='INFO'?'var(--cyan)':'var(--green)';
+  const licColor = !license||license==='None'?'var(--red)':license.includes('GPL')?'var(--amber)':'var(--t2)';
+  document.getElementById('dm-title').textContent = comp + ' ' + ver;
+  document.getElementById('dm-sub').textContent = type + ' · ' + license + ' · Risk: ' + risk;
+  document.getElementById('dm-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="font-family:var(--font-mono);font-size:11px;padding:10px;background:var(--bg3);border-radius:var(--r-md);line-height:2;border:1px solid var(--border)">
+        <span style="color:var(--t3)">Component:</span> <span style="color:var(--t1);font-weight:600">${comp}</span><br>
+        <span style="color:var(--t3)">Version:</span> <span style="color:var(--t2)">${ver}</span><br>
+        <span style="color:var(--t3)">License:</span> <span style="color:${licColor};font-weight:600">${license||'No license'}</span><br>
+        <span style="color:var(--t3)">Type:</span> <span style="color:var(--t2)">${type||'Unknown'}</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:11px;padding:10px;background:var(--bg3);border-radius:var(--r-md);line-height:2;border:1px solid var(--border)">
+        <span style="color:var(--t3)">Risk:</span> <span style="color:${riskColor};font-weight:700">${risk}</span><br>
+        <span style="color:var(--t3)">In SBOM:</span> <span style="color:${sbom?'var(--green)':'var(--red)'}">${sbom?'Yes ✓':'No ✗'}</span><br>
+        <span style="color:var(--t3)">GPL flag:</span> <span style="color:${license&&license.includes('GPL')?'var(--orange)':'var(--t3)'}">${license&&license.includes('GPL')?'⚠ Review required':'—'}</span>
+      </div>
+    </div>
+    ${!license||license==='None'?'<div style="padding:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:var(--r-md);font-size:11px;color:var(--red);margin-bottom:10px">⚠ No license declared — blocked by policy</div>':''}
+    ${license&&license.includes('GPL')?'<div style="padding:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-md);font-size:11px;color:var(--amber);margin-bottom:10px">⚠ GPL copyleft — review required before use in commercial products</div>':''}
+    <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:8px;text-transform:uppercase">Quick Actions</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm btn-success" onclick="quickAddToList('whitelist','${comp}','');document.getElementById('detail-modal').classList.remove('open')">✓ Add to Whitelist</button>
+      <button class="btn btn-sm btn-danger" onclick="quickAddToList('blacklist','${comp}','');document.getElementById('detail-modal').classList.remove('open')">✕ Add to Blacklist</button>
+      <button class="btn btn-sm" onclick="quickAddToList('warning','${comp}','');document.getElementById('detail-modal').classList.remove('open')">⚠ Add to Warning</button>
+    </div>`;
+  document.getElementById('dm-block-btn').style.display='none';
+  document.getElementById('dm-approve-btn').style.display='none';
+  document.getElementById('detail-modal').classList.add('open');
 }
 
 async function loadLicenseData() {
