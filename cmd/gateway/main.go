@@ -2669,10 +2669,13 @@ func main() {
 			if period == "7d" { days = 7 } else if period == "90d" { days = 90 }
 			if period == "" { period = "30d" }
 			type entry struct {
-				User     string `json:"user"`
-				Fixed    int    `json:"fixes_applied"`
-				Verified int    `json:"verified"`
-				Score    int    `json:"score"`
+				Actor     string  `json:"actor"`
+				Rank      int     `json:"rank"`
+				Fixed     int     `json:"applied_count"`
+				Verified  int     `json:"verified_count"`
+				Score     int     `json:"score"`
+				OptedIn   bool    `json:"opted_in"`
+				AvgMTTR   float64 `json:"avg_mttr_hours"`
 			}
 			rows, err := db.Pool().Query(req.Context(), `
 				SELECT COALESCE(resolved_by,'unknown'), 
@@ -2689,8 +2692,10 @@ func main() {
 				defer rows.Close()
 				for rows.Next() {
 					var e entry
-					rows.Scan(&e.User, &e.Fixed, &e.Verified) //nolint:errcheck
+					rows.Scan(&e.Actor, &e.Fixed, &e.Verified) //nolint:errcheck
+					e.Rank = len(entries) + 1
 					e.Score = e.Fixed*10 + e.Verified*25
+					e.OptedIn = true
 					entries = append(entries, e)
 				}
 			}
