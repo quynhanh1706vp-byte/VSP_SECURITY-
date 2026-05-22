@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -363,4 +364,66 @@ func handlePipelineSchedules(w http.ResponseWriter, r *http.Request) {
 	pipeStore.mu.RLock()
 	defer pipeStore.mu.RUnlock()
 	_ = json.NewEncoder(w).Encode(pipeStore.Schedules)
+}
+
+// handlePipelineScheduleToggle — PATCH /api/p4/pipeline/schedules/{id}/toggle
+func handlePipelineScheduleToggle(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
+	id := ""
+	for i, p := range parts {
+		if p == "schedules" && i+2 < len(parts) { id = parts[i+1]; break }
+	}
+	if id == "" { http.Error(w, `{"error":"missing id"}`, 400); return }
+
+	var body struct { Enabled bool `json:"enabled"` }
+	json.NewDecoder(r.Body).Decode(&body)
+
+	pipeStore.mu.Lock()
+	found := false
+	for i := range pipeStore.Schedules {
+		if pipeStore.Schedules[i].ID == id {
+			pipeStore.Schedules[i].Enabled = body.Enabled
+			found = true
+			break
+		}
+	}
+	pipeStore.mu.Unlock()
+	if !found { http.Error(w, `{"error":"schedule not found"}`, 404); return }
+	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "id": id, "enabled": body.Enabled})
+}
+
+// handlePipelineScheduleRun — POST /api/p4/pipeline/schedules/{id}/run
+func handlePipelineScheduleRun(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
+	id := ""
+	for i, p := range parts {
+		if p == "schedules" && i+2 < len(parts) { id = parts[i+1]; break }
+	}
+	if id == "" { http.Error(w, `{"error":"missing id"}`, 400); return }
+
+	pipeStore.mu.RLock()
+	found := false
+	var schedName string
+	for _, s := range pipeStore.Schedules {
+		if s.ID == id { found = true; schedName = s.Name; break }
+	}
+	pipeStore.mu.RUnlock()
+	if !found { http.Error(w, `{"error":"schedule not found"}`, 404); return }
+
+	runID := fmt.Sprintf("RUN-SCH-%s", time.Now().Format("20060102150405"))
+	now := time.Now()
+	go func() {
+		time.Sleep(3 * time.Second)
+		tests := buildTestSuite(runID)
+		end := time.Now()
+		run := PipelineRun{ID: runID, TriggerType: "schedule", TriggerRef: id, Branch: "main", Status: "pass", StartedAt: now, CompletedAt: &end, DurationSec: 3, Tests: tests, Summary: buildSummary(tests)}
+		pipeStore.mu.Lock()
+		pipeStore.Runs = append([]PipelineRun{run}, pipeStore.Runs...)
+		if len(pipeStore.Runs) > 100 { pipeStore.Runs = pipeStore.Runs[:100] }
+		pipeStore.mu.Unlock()
+	}()
+	_ = schedName
+	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "run_id": runID, "schedule_id": id})
 }

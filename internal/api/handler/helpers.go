@@ -3,6 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/rs/zerolog/log"
 )
 
 func jsonOK(w http.ResponseWriter, v any) {
@@ -14,6 +16,34 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// jsonInternalError responds with a safe generic message AND logs the
+// real err server-side. Use this instead of `jsonError(w, "db error: "
+// + err.Error(), 500)` — that pattern leaks internal info to the
+// client (PostgreSQL error text exposes table/column names; OS errors
+// expose paths; DNS errors expose internal hostnames).
+//
+// The structured log line carries enough detail for operators to
+// diagnose without paging the user. err == nil is treated as a no-op
+// so the helper is safe to call defensively.
+//
+// Use for status >= 500 cases. 4xx responses with user-facing messages
+// (e.g. "name must be 1-200 chars") can keep using jsonError — those
+// are deliberate validation feedback, not leaks.
+func jsonInternalError(w http.ResponseWriter, r *http.Request, userMsg string, err error) {
+	if err != nil {
+		// zerolog adds the call site automatically; include the route
+		// for ops trace.
+		log.Error().
+			Err(err).
+			Str("path", r.URL.Path).
+			Str("method", r.Method).
+			Msg(userMsg)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": userMsg})
 }
 
 // ── Input validation helpers ──────────────────────────────────────────────────

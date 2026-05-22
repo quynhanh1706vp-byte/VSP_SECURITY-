@@ -23,7 +23,7 @@ func TestProfileConstants(t *testing.T) {
 }
 
 func TestStatusConstants(t *testing.T) {
-	statuses := []Status{StatusQueued, StatusRunning, StatusDone, StatusFailed, StatusCancelled}
+	statuses := []Status{StatusQueued, StatusRunning, StatusDone, StatusFailed, StatusCanceled}
 	for _, s := range statuses {
 		if string(s) == "" {
 			t.Errorf("status constant is empty")

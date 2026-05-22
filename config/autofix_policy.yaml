@@ -1,0 +1,39 @@
+# H3.N Autofix Policy
+# Controls per-rule LLM behavior for AI-generated fix suggestions.
+#
+# Default: rules not listed here are ALLOWED to use LLM.
+# Set rules to llm_allowed: false to force manual review.
+
+global:
+  llm_enabled: true               # master kill-switch
+
+rules:
+  # Secrets — never let LLM "fix" by guessing values
+  gitleaks-aws-access-key:
+    llm_allowed: false
+    note: "Hardcoded credentials must be rotated, not auto-generated"
+  gitleaks-private-key:
+    llm_allowed: false
+    note: "Private keys must be rotated"
+  gitleaks-jwt-token:
+    llm_allowed: false
+    note: "Tokens must be rotated"
+  gitleaks-generic-api-key:
+    llm_allowed: false
+    note: "API keys must be rotated"
+  bandit-hardcoded-password:
+    llm_allowed: false
+    note: "Credentials in source — manual rotation only"
+
+  # SCA / CVE — LLM doesn't know patched versions, just direct user
+  trivy-cve-go-mod:
+    llm_allowed: false
+    note: "Use trivy report to find patched versions"
+  trivy-cve-package-json:
+    llm_allowed: false
+    note: "Use npm audit fix"
+
+  # Cryptographic config — too risky for AI to recommend
+  kics-tls-min-version:
+    llm_allowed: false
+    note: "Cryptographic config — manual review per CMMC SC-13"

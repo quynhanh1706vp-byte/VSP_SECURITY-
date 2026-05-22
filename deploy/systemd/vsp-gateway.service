@@ -1,0 +1,61 @@
+[Unit]
+Description=VSP Security Gateway
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=test
+Group=test
+WorkingDirectory=/home/test/Data/GOLANG_VSP
+EnvironmentFile=-/etc/vsp/env.production
+ExecStartPre=/bin/sh -c 'fuser -k 8921/tcp 2>/dev/null || true'
+ExecStartPre=/bin/sleep 2
+ExecStart=/usr/local/bin/vsp-gateway
+
+# L30 2026-05-09: process-level hardening. Defense-in-depth on top of
+# the application's own auth + RLS + container layers. The directives
+# below are widely supported (systemd >= 232) and don't break the
+# gateway's normal operations (file serving, network IO, journal).
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/log/vsp /tmp /var/tmp /home/test/Data/GOLANG_VSP/static /home/test/Data/GOLANG_VSP/audit-bundles
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+# Capabilities — the binary uses CAP_NET_RAW and CAP_NET_ADMIN
+# (set via setcap during deploy). Bound the set so a future bug
+# can't ask for more.
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+
+# Resource caps — bound RAM and FDs so a runaway leak doesn't OOM
+# the host. Adjust per environment.
+LimitNOFILE=65536
+MemoryHigh=2G
+MemoryMax=4G
+
+# Logging.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vsp-gateway
+
+# Restart policy.
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

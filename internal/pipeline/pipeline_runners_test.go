@@ -153,3 +153,66 @@ func TestRunnersFor_FullSOCMatchesFull(t *testing.T) {
 			len(full), len(soc))
 	}
 }
+
+// TestToolNamesForMode_MatchesRunnersFor pins the FE-name registry
+// against the BE-runner registry. Drift here surfaces in the UI as
+// "X/Y" mismatches in the run-history badge: tools_total comes from
+// ToolNamesForMode (FE-aligned), tools_done from the actual dispatch
+// of RunnersFor. On 2026-05-11 we found:
+//
+//	ModeSCA       — ToolNamesForMode=7, RunnersFor=8 (cosign missing)
+//	ModeFullSOC   — runs_enqueue.go hardcoded 18 vs registry 26
+//
+// This test guarantees the two stay in sync.
+func TestToolNamesForMode_MatchesRunnersFor(t *testing.T) {
+	for _, mode := range []Mode{
+		ModeSAST, ModeSCA, ModeSecrets, ModeIAC, ModeDAST,
+		ModeNetwork, ModeFull, ModeFullSOC,
+	} {
+		names := ToolNamesForMode(mode)
+		runners := RunnersFor(mode)
+
+		// Build sets for symmetric-difference reporting.
+		nameSet := make(map[string]bool, len(names))
+		for _, n := range names {
+			nameSet[n] = true
+		}
+		runnerSet := make(map[string]bool, len(runners))
+		for _, r := range runners {
+			runnerSet[r.Name()] = true
+		}
+
+		// NETWORK is the only mode where the runner count depends on
+		// whether netcap.Engine has been registered. Tests run without
+		// that registration, so the runner list omits netcap. Allow
+		// ToolNamesForMode to advertise it (steady-state) and treat
+		// it as a known exemption.
+		if mode == ModeNetwork {
+			delete(nameSet, "netcap")
+			delete(runnerSet, "netcap")
+		}
+		// Same exemption for FULL/FULL_SOC: netcap rides along via
+		// the network sub-group, so when no engine is registered
+		// the runner list is 25 instead of 26.
+		if mode == ModeFull || mode == ModeFullSOC {
+			delete(nameSet, "netcap")
+			delete(runnerSet, "netcap")
+		}
+
+		var inNamesOnly, inRunnersOnly []string
+		for n := range nameSet {
+			if !runnerSet[n] {
+				inNamesOnly = append(inNamesOnly, n)
+			}
+		}
+		for n := range runnerSet {
+			if !nameSet[n] {
+				inRunnersOnly = append(inRunnersOnly, n)
+			}
+		}
+		if len(inNamesOnly) > 0 || len(inRunnersOnly) > 0 {
+			t.Errorf("mode=%s drift: ToolNamesForMode only=%v RunnersFor only=%v",
+				mode, inNamesOnly, inRunnersOnly)
+		}
+	}
+}

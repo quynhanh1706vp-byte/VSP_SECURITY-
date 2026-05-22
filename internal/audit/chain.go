@@ -98,3 +98,100 @@ func Write(ctx context.Context, store Store, e Entry, prevHash string) (int64, e
 	e.StoredHash = Hash(e)
 	return store.WriteAudit(ctx, e)
 }
+
+// ── Repair ────────────────────────────────────────────────────────────────────
+
+// Repairer is the optional interface a Store can implement to support chain
+// repair. UpdateAuditHashes rewrites the prev_hash + hash columns for the
+// given entries (in the order provided). It must be transactional.
+type Repairer interface {
+	UpdateAuditHashes(ctx context.Context, tenantID string, entries []Entry) error
+}
+
+// RepairResult is returned by RepairChain. RepairedFromSeq is the first seq
+// where divergence was detected; entries from there onward had their hashes
+// rewritten to restore chain continuity. The caller is expected to write a
+// follow-up CHAIN_REPAIRED audit entry recording who initiated the repair.
+type RepairResult struct {
+	BrokenAtSeq    int64
+	EntriesScanned int
+	EntriesFixed   int
+	NewTipHash     string
+	DryRun         bool
+}
+
+// RepairChain finds the first divergence in the hash chain and rewrites all
+// entries from there forward with recomputed hashes. The original entry data
+// (action, resource, ip, etc.) is preserved — only the cryptographic chain is
+// re-anchored. Use dryRun=true to preview without committing.
+//
+// Compliance note (FedRAMP AU-9, NIST 800-53): chain repair MUST itself be
+// audited. Caller writes a CHAIN_REPAIRED entry with broken_at_seq + actor
+// AFTER this returns successfully. Rebuilding tampered audit logs without
+// recording the rebuild is itself a violation.
+func RepairChain(ctx context.Context, store Store, tenantID string, dryRun bool) (RepairResult, error) {
+	entries, err := store.ListAuditByTenant(ctx, tenantID)
+	if err != nil {
+		return RepairResult{}, fmt.Errorf("repair: list entries: %w", err)
+	}
+	if len(entries) == 0 {
+		return RepairResult{DryRun: dryRun}, nil
+	}
+
+	// Find first divergence
+	breakIdx := -1
+	for i, e := range entries {
+		expected := Hash(e)
+		if expected != e.StoredHash {
+			breakIdx = i
+			break
+		}
+		if i > 0 && e.PrevHash != entries[i-1].StoredHash {
+			breakIdx = i
+			break
+		}
+	}
+
+	res := RepairResult{
+		EntriesScanned: len(entries),
+		DryRun:         dryRun,
+	}
+	if breakIdx == -1 {
+		// Chain intact — nothing to repair
+		if len(entries) > 0 {
+			res.NewTipHash = entries[len(entries)-1].StoredHash
+		}
+		return res, nil
+	}
+
+	res.BrokenAtSeq = entries[breakIdx].Seq
+
+	// Rebuild from the break point. The previous entry (if any) is the anchor.
+	var prevHash string
+	if breakIdx > 0 {
+		prevHash = entries[breakIdx-1].StoredHash
+	}
+	rebuilt := make([]Entry, 0, len(entries)-breakIdx)
+	for i := breakIdx; i < len(entries); i++ {
+		e := entries[i]
+		e.PrevHash = prevHash
+		e.StoredHash = Hash(e)
+		rebuilt = append(rebuilt, e)
+		prevHash = e.StoredHash
+	}
+	res.EntriesFixed = len(rebuilt)
+	res.NewTipHash = prevHash
+
+	if dryRun {
+		return res, nil
+	}
+
+	rep, ok := store.(Repairer)
+	if !ok {
+		return res, fmt.Errorf("repair: store does not implement Repairer interface")
+	}
+	if err := rep.UpdateAuditHashes(ctx, tenantID, rebuilt); err != nil {
+		return res, fmt.Errorf("repair: update hashes: %w", err)
+	}
+	return res, nil
+}

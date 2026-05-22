@@ -81,7 +81,7 @@ VSP is a monorepo with 8 binaries, each deployable independently.
    │ Scanner      │   │ Scheduler        │   │ SOC Shell :8922  │
    │ cmd/scanner  │   │ cmd/gateway      │   │ cmd/soc-shell    │
    │              │   │ (embedded)       │   │                  │
-   │ 19 tools:    │   │                  │   │ Interactive      │
+   │ 26 tools:    │   │                  │   │ Interactive      │
    │ SAST(5):     │   │ Cron-based scans │   │ investigator     │
    │  gosec,      │   │ Next run         │   │ for SOC analysts │
    │  semgrep,    │   │ persisted in DB  │   │                  │

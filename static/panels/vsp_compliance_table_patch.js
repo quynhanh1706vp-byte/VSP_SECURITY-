@@ -269,7 +269,7 @@
   /* ─── 1. CREATE MODAL DOM ──────────────────────────────────────────── */
   const overlay = document.createElement('div');
   overlay.id = 'ctrl-detail-overlay';
-  overlay.textContent = `
+  overlay.innerHTML = `
     <div id="ctrl-detail-box">
       <div id="ctrl-detail-head">
         <div>
@@ -327,7 +327,7 @@
       ovPanel.appendChild(mount);
     }
 
-    mount.textContent = `
+    mount.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div style="font-size:11px;font-weight:700;color:var(--t2);letter-spacing:.08em;text-transform:uppercase">
           ▸ FedRAMP / CMMC — Controls Detail
@@ -338,12 +338,12 @@
       </div>
       <div id="ctrl-table-wrap">
         <div id="ctrl-toolbar">
-          <input id="ctrl-search" placeholder="Search ID, control, family…" oninput="window._ctrlSearch(this.value)">
+          <input aria-label="Search ID, control, family…" id="ctrl-search" placeholder="Search ID, control, family…" oninput="window._ctrlSearch(this.value)">
           <button class="ctrl-filter-btn f-all active" onclick="window._ctrlSetFilter('all',this)">All</button>
           <button class="ctrl-filter-btn f-pass"       onclick="window._ctrlSetFilter('pass',this)">PASS</button>
           <button class="ctrl-filter-btn f-warn"       onclick="window._ctrlSetFilter('warn',this)">WARN</button>
           <button class="ctrl-filter-btn f-fail"       onclick="window._ctrlSetFilter('fail',this)">FAIL</button>
-          <select id="ctrl-family-select" onchange="window._ctrlSetFamily(this.value)">
+          <select aria-label="Ctrl Family Select" id="ctrl-family-select" onchange="window._ctrlSetFamily(this.value)">
             <option value="all">All Families</option>
           </select>
         </div>
@@ -415,12 +415,12 @@
 
   async function loadControlsData() {
     // Wait for token if not ready yet (up to 3s)
-    if (!window.TOKEN && !window.VSP_P4_API_KEY) {
+    if (!window.TOKEN) {
       await new Promise(resolve => {
         let attempts = 0;
         const check = setInterval(() => {
           attempts++;
-          if (window.TOKEN || window.VSP_P4_API_KEY || attempts > 30) {
+          if (window.TOKEN || attempts > 30) {
             clearInterval(check); resolve();
           }
         }, 100);
@@ -432,9 +432,7 @@
       const apiBase = window.VSP_API_BASE || window.location.origin;
       // P4 page blocks localStorage — use window.TOKEN or API key directly
       const tok = window.TOKEN || '';
-      const p4key = window.VSP_P4_API_KEY || '';
-      const headers = tok ? {'Authorization': 'Bearer ' + tok}
-                    : p4key ? {'X-API-Key': p4key} : {};
+      const headers = tok ? {'Authorization': 'Bearer ' + tok} : {};
       const res = await fetch(apiBase + '/api/p4/pipeline/latest', { headers });
       if (res.ok) {
         const d = await res.json();
@@ -598,7 +596,7 @@
       }
     }
 
-    el.textContent = `
+    el.innerHTML = `
       <div class="ctrl-page-info">${total === 0 ? 'No results' : `${start}–${end} of ${total}`}</div>
       <div class="ctrl-page-btns">
         <button class="ctrl-page-btn" onclick="window._ctrlGoPage(${_ctrlPage - 1})" ${_ctrlPage <= 1 ? 'disabled' : ''}>‹</button>
@@ -617,6 +615,9 @@
   };
 
   window._ctrlOpenDetail = function(idx) {
+  // Null guard: if any DOM element missing, abort to prevent textContent error
+  try {
+
     const r = _ctrlFiltered[idx];
     if (!r) return;
     const overlay = document.getElementById('ctrl-detail-overlay');
@@ -652,7 +653,8 @@
       </div>`).join('');
 
     overlay.classList.add('open');
-  };
+    } catch(e) { console.warn('_ctrlOpenDetail:', e); }
+};
 
   /* ─── 5. ALSO PATCH renderTests for Pipeline tab ──────────────────── */
   window.renderTests = function(tests) {
@@ -738,6 +740,6 @@
     {id:'SR-11',family:'Supply Chain',   control:'Component Authenticity',           tools:['trivy'],            status:'warn', score:68, evidence:'trivy: SBOM attestation missing', framework:'CMMC', autofix:false},
   ];
 
-  console.log('[VSP ComplianceTable Patch v1.0] Loaded ✓');
+  (window.VSP_DEBUG && console.log('[VSP ComplianceTable Patch v1.0] Loaded ✓'));
 
 })();

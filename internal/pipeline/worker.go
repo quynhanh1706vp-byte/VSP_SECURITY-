@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -60,9 +61,75 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	// Mark RUNNING
 	h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "RUNNING", 0)
 
+	// Pre-flight: validate src path exists and is non-empty.
+	// Prevents scheduler-triggered scans against missing/empty dirs from
+	// reporting "DONE 17/17 tools, 0 findings, gate=PASS" — which polluted
+	// 286/488 historical runs (~58%) with false-positive clean status.
+	// SAST/IAC/SCA/SECRETS/FULL all require a source dir; DAST/NETWORK use URL.
+	requiresSrc := payload.Mode != "DAST" && payload.Mode != "NETWORK"
+	if requiresSrc && payload.Src != "" {
+		info, statErr := os.Stat(payload.Src)
+		if statErr != nil || !info.IsDir() {
+			h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "FAILED", 0)
+			h.DB.UpdateRunGateReason(ctx, payload.TenantID, payload.RID,
+				fmt.Sprintf("pre-flight: src not found or not a directory: %s", payload.Src))
+			log.Warn().
+				Str("rid", payload.RID).Str("src", payload.Src).Str("mode", string(payload.Mode)).
+				Msg("scan aborted: src missing")
+			return nil //nolint:nilerr
+		}
+		entries, _ := os.ReadDir(payload.Src)
+		if len(entries) == 0 {
+			h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "FAILED", 0)
+			h.DB.UpdateRunGateReason(ctx, payload.TenantID, payload.RID,
+				fmt.Sprintf("pre-flight: src directory is empty: %s", payload.Src))
+			log.Warn().
+				Str("rid", payload.RID).Str("src", payload.Src).Str("mode", string(payload.Mode)).
+				Msg("scan aborted: src empty")
+			return nil
+		}
+	}
+
 	// Execute — apply profile filtering + timeout per profile
 	profileRunners := RunnersForProfile(payload.Mode, payload.Profile)
 	payload.TimeoutSec = TimeoutForProfile(payload.Profile)
+
+	// Phase B Step 2 — apply per-tenant tool config (disable opt-out).
+	// Tools the tenant explicitly disabled in Settings are filtered out here.
+	// Best-effort: if DB query fails, fall back to all tools (don't block scan).
+	if h.DB != nil && payload.TenantID != "" {
+		disabled, dbErr := h.DB.GetDisabledTools(ctx, payload.TenantID)
+		if dbErr != nil {
+			log.Warn().Err(dbErr).Str("rid", payload.RID).Msg("tool config: read disabled list failed (continuing with all tools)")
+		} else if len(disabled) > 0 {
+			disabledSet := make(map[string]bool, len(disabled))
+			for _, name := range disabled {
+				disabledSet[name] = true
+			}
+			filtered := make([]scanner.Runner, 0, len(profileRunners))
+			skipped := make([]string, 0, len(disabled))
+			for _, r := range profileRunners {
+				if disabledSet[r.Name()] {
+					skipped = append(skipped, r.Name())
+					continue
+				}
+				filtered = append(filtered, r)
+			}
+			if len(skipped) > 0 {
+				log.Info().
+					Str("rid", payload.RID).
+					Int("skipped_count", len(skipped)).
+					Strs("skipped_tools", skipped).
+					Int("remaining", len(filtered)).
+					Msg("tool config: filtered out tenant-disabled tools")
+			}
+			profileRunners = filtered
+		}
+	}
+	if len(profileRunners) == 0 {
+		log.Warn().Str("rid", payload.RID).Msg("tool config: ALL tools disabled by tenant — scan will produce no findings")
+	}
+
 	result, err := h.Exec.ExecuteWith(ctx, payload, profileRunners)
 	if err != nil {
 		h.DB.UpdateRunStatus(ctx, payload.TenantID, payload.RID, "FAILED", 0)
@@ -154,11 +221,64 @@ func (h *ScanHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		"SCORE":       eval.Score,
 	})
 
+	// L6-A 7.3.1 fix (2026-05-09): use the POST-dedup count
+	// (`len(saved)`) instead of the pre-storage scanner-emit count
+	// (`len(result.Findings)`). The findings table dedups on
+	// fingerprint UNIQUE (tool|rule|path|line) so the stored row count
+	// is always ≤ the emit count. The L6-A db-integrity watchdog
+	// caught the drift at every dashboard refresh: total_findings
+	// reported by the scoreboard differed from what /findings returned.
+	// toolsDone = number of tool runners the worker dispatched in
+	// this run. Every runner contributes either a finding set or an
+	// entry in ToolErrors, so len(profileRunners) is the canonical
+	// "completed" count regardless of per-tool success/fail.
 	h.DB.UpdateRunResult(dbCtx, payload.TenantID, payload.RID,
 		string(eval.Decision), eval.Posture,
-		len(result.Findings), summaryJSON)
+		len(saved), len(profileRunners), summaryJSON)
 	// Store gate reason for audit trail
 	h.DB.UpdateRunGateReason(dbCtx, payload.TenantID, payload.RID, eval.Reason)
+
+	// Post-scan: fill conmon_schedules.last_verdict for any ConMon
+	// schedule that fired this run. Pre-2026-05-12 conmon_schedules
+	// stored last_run_id BIGINT (always 0 — runs use UUIDs), so this
+	// hook had nothing to match against; migration 021 added
+	// last_run_rid TEXT and the conmon scheduler now writes the RID
+	// when firing. Match here and set the verdict from the gate
+	// decision — that's the user-visible "LAST VERDICT" column.
+	// Best-effort: a missing column on older deploys silently no-ops.
+	go func(tenantID, rid, verdict string) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, _ = h.DB.Pool().Exec(bgCtx, `
+			UPDATE conmon_schedules
+			   SET last_verdict = $1, updated_at = now()
+			 WHERE tenant_id    = $2
+			   AND last_run_rid = $3
+		`, verdict, tenantID, rid)
+	}(payload.TenantID, payload.RID, string(eval.Decision))
+
+	// Post-scan hook: auto-resolve orphan remediations whose finding fingerprint
+	// is no longer present in this newer same-mode run. Non-fatal — log and continue.
+	// Only triggers on PASS/WARN paths (FAILED runs return early above).
+	if len(result.Findings) > 0 {
+		go func(tenantID, runID string) {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			res, err := h.DB.AutoResolveOrphans(bgCtx, tenantID)
+			if err != nil {
+				log.Warn().Err(err).
+					Str("tenant", tenantID).Str("run_id", runID).
+					Msg("post-scan auto-resolve failed (non-fatal)")
+				return
+			}
+			log.Info().
+				Int("resolved", res.Resolved).
+				Int("checked", res.Checked).
+				Int("skipped", res.Skipped).
+				Str("tenant", tenantID).Str("run_id", runID).
+				Msg("post-scan auto-resolve completed")
+		}(payload.TenantID, payload.RID)
+	}
 	// Audit: log scan completion (synchronous - context.Background avoids cancellation)
 	{
 		auditCtx := context.Background()

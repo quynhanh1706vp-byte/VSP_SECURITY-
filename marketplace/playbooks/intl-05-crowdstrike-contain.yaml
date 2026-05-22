@@ -1,0 +1,56 @@
+id: pb-intl-crowdstrike-contain
+name: CrowdStrike host containment
+description: When CrowdStrike detects malicious activity, contain host via Falcon API
+trigger: critical_finding
+sev_filter: CRITICAL
+enabled: true
+tags: [crowdstrike, edr, containment, ir]
+steps:
+  - type: condition
+    name: Filter EDR source
+    desc: Only handle CrowdStrike-originated findings
+    config: |
+      expr: finding.source=crowdstrike AND finding.severity_score >= 70
+  - type: enrich
+    name: Pull device + detection details
+    desc: Hostname, AD groups, last user, detection chain
+    config: |
+      provider: crowdstrike
+      api_endpoint: ${CROWDSTRIKE_API}
+      client_id: ${CROWDSTRIKE_CLIENT_ID}
+      client_secret: ${CROWDSTRIKE_CLIENT_SECRET}
+      include: [device, user, process_tree, network_connections]
+  - type: condition
+    name: Skip if production critical
+    desc: Don't contain production critical hosts without approval
+    config: |
+      expr: NOT (asset.tag=prod_critical AND incident.auto_contain=false)
+      else_action: ticket_for_approval
+  - type: block
+    name: Network containment
+    desc: Falcon network containment (preserves logging, blocks data)
+    config: |
+      provider: crowdstrike
+      action: contain_host
+      device_id: "${device.id}"
+      preserve_console: true
+  - type: ticket
+    name: P0 IR ticket with timeline
+    desc: Full investigation ticket with process tree
+    config: |
+      provider: jira
+      project: IR
+      priority: P0
+      labels: [crowdstrike, contained, ir-investigation]
+      attach_process_tree: true
+      attach_network_connections: true
+  - type: notify
+    name: IR war-room + manager
+    desc: Slack #ir-war-room + manager email
+    config: |
+      provider: slack
+      channel: "#ir-war-room"
+      bot_token: ${SLACK_BOT_TOKEN}
+      ping: ["@ir-oncall", "@ir-manager"]
+      additional_email: [ir-manager@company.com]
+      template: crowdstrike_contain

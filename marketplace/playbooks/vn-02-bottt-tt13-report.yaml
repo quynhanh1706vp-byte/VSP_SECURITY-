@@ -1,0 +1,46 @@
+id: pb-vn-bottt-compliance-report
+name: Bộ TT&TT — báo cáo sự cố an toàn thông tin
+description: Tự động tạo báo cáo sự cố theo TT13/2023 khi gate=FAIL với incident
+trigger: gate_fail
+sev_filter: CRITICAL
+enabled: true
+tags: [vn, compliance, tt13, bottt, regulation]
+steps:
+  - type: condition
+    name: Kiểm tra điều kiện báo cáo
+    desc: Chỉ báo cáo khi CRITICAL + gate FAIL + có dữ liệu cá nhân ảnh hưởng
+    config: |
+      expr: gate=FAIL AND severity=CRITICAL AND (tag=pii OR tag=phi)
+  - type: enrich
+    name: Tổng hợp evidence
+    desc: Gom findings + asset + scope ảnh hưởng
+    config: |
+      include: [findings, assets, blast_radius, sbom_diff]
+      format: tt13_2023
+      lang: vi
+  - type: remediate
+    name: Tạo báo cáo TT13 PDF
+    desc: Render báo cáo HTML + PDF tiếng Việt
+    config: |
+      template: tt13_2023_incident_vi
+      output_format: [html, pdf]
+      output_path: /var/vsp/reports/tt13/${run_id}.pdf
+  - type: ticket
+    name: Lưu báo cáo + CISO sign-off
+    desc: Tạo ticket nội bộ chờ CISO ký duyệt trước khi gửi
+    config: |
+      provider: jira
+      project: VSP-COMPLIANCE
+      priority: P1
+      labels: [tt13, bottt, sign-off-required]
+      assignee: ${CISO_EMAIL}
+      sla_hours: 24
+  - type: notify
+    name: Email CISO + Trưởng phòng pháp chế
+    desc: Email kèm link báo cáo, đính kèm PDF
+    config: |
+      to: [${CISO_EMAIL}, legal@agency.gov]
+      cc: [soc-lead@agency.gov]
+      subject_vi: "[TT13] Báo cáo sự cố ATTT cần ký duyệt"
+      template: tt13_signoff_request_vi
+      attach: ${report_path}

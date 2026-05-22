@@ -9,7 +9,7 @@ import (
 // GET /api/v1/tenants — list tenants the current user can access
 // Hiện tại: single-tenant, trả về tenant hiện tại
 // Sau này: khi multi-tenant, query bảng user_tenants
-func (h *Users) ListTenants(w http.ResponseWriter, r *http.Request) {
+func (u *Users) ListTenants(w http.ResponseWriter, r *http.Request) {
 	claims, _ := auth.FromContext(r.Context())
 
 	type TenantItem struct {
@@ -20,7 +20,7 @@ func (h *Users) ListTenants(w http.ResponseWriter, r *http.Request) {
 		Current bool   `json:"current"`
 	}
 
-	rows, err := h.DB.Pool().Query(r.Context(),
+	rows, err := u.DB.Pool().Query(r.Context(),
 		`SELECT id, slug, name, plan FROM tenants WHERE active = true ORDER BY name`)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)

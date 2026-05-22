@@ -1,0 +1,56 @@
+id: pb-intl-cf-waf-ratelimit
+name: Cloudflare WAF — adaptive rate-limit on attack pattern
+description: When a WAF rule fires repeatedly from same source, auto-tighten rate limit
+trigger: sla_breach
+sev_filter: any
+enabled: true
+tags: [cloudflare, waf, ratelimit, ddos]
+steps:
+  - type: condition
+    name: Detect attack pattern
+    desc: Same source IP triggers same rule >100 times in 5 min
+    config: |
+      expr: waf.same_source_count > 100 AND waf.window_minutes <= 5
+  - type: enrich
+    name: IP reputation check
+    desc: Skip if IP belongs to known good (corp egress, partners)
+    config: |
+      allowlist_check: true
+      allowlist_sources: [corp_egress, partner_ips, monitoring_services]
+      reputation_sources: [abuseipdb, ip_reputation_db]
+      abuseipdb_key: ${ABUSEIPDB_KEY}
+  - type: condition
+    name: IP confirmed hostile
+    desc: Branch — proceed only on confirmed bad reputation
+    config: |
+      expr: ip.reputation_score < 30 AND NOT ip.in_allowlist
+  - type: block
+    name: Apply Cloudflare rate-limit rule
+    desc: Tighten to 10 req/min for this IP, ttl 1h
+    config: |
+      provider: cloudflare
+      api_token: ${CLOUDFLARE_API_TOKEN}
+      zone_id: ${CLOUDFLARE_ZONE_ID}
+      action: create_rate_limit
+      threshold: 10
+      period_seconds: 60
+      ttl_seconds: 3600
+      ip: "${attack.source_ip}"
+  - type: ticket
+    name: Audit ticket
+    desc: Auto-close in 7d ticket for audit trail
+    config: |
+      provider: jira
+      project: WAF-OPS
+      priority: P3
+      labels: [cloudflare, ratelimit, auto-block]
+      auto_close_days: 7
+  - type: notify
+    name: Slack ops digest
+    desc: Throttled — max 1 message per 5 min per source
+    config: |
+      provider: slack
+      channel: "#waf-ops"
+      webhook_url: ${SLACK_OPS_WEBHOOK}
+      throttle_minutes: 5
+      template: cf_ratelimit_applied

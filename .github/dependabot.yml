@@ -1,0 +1,45 @@
+# Dependabot config — keeps Go deps and GitHub Action versions fresh.
+# L63 probe verifies both ecosystems are registered.
+#
+# Update interval is weekly to keep PR noise reasonable; security
+# updates ignore the cadence and open immediately.
+
+version: 2
+updates:
+  # Go modules — primary dependency surface
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "deps"
+      - "go"
+    commit-message:
+      prefix: "deps(go)"
+    groups:
+      # Group minor + patch updates together to reduce PR churn.
+      # Majors stay as individual PRs (they often need review).
+      go-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions — workflow YAML pinned-version updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "ci"
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"

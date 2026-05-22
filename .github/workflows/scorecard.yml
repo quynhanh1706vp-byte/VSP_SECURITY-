@@ -1,0 +1,62 @@
+# OpenSSF Scorecard analysis
+#
+# Runs the OSSF Scorecards action weekly + on every push to main, uploading
+# results to the GitHub Security tab and to OpenSSF's public scorecard
+# database (api.securityscorecards.dev). The badge can be embedded in the
+# README to give external consumers a one-glance trust signal.
+#
+# Reference: https://github.com/ossf/scorecard
+
+name: OpenSSF Scorecard
+
+on:
+  branch_protection_rule:
+  schedule:
+    # Weekly Monday 06:00 UTC.
+    - cron: '0 6 * * 1'
+  push:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for uploading SARIF results.
+      security-events: write
+      # Required for OIDC token (no secrets needed).
+      id-token: write
+      # Read repo contents.
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@0864cf19026789058feabb7e87baa5f140aac736 # v2.3.1
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Publish to OpenSSF's public DB so the badge endpoint can serve
+          # api.securityscorecards.dev/projects/<repo>/badge. Requires
+          # the repository to be public; private repos can drop this flag
+          # and the workflow becomes results-only.
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to GitHub code scanning
+        uses: github/codeql-action/upload-sarif@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.22.12
+        with:
+          sarif_file: results.sarif

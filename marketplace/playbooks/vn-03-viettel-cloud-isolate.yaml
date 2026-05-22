@@ -1,0 +1,47 @@
+id: pb-vn-viettel-cloud-isolate
+name: Viettel Cloud — cô lập VM bị compromise
+description: Khi phát hiện compromise trên Viettel Cloud VM, tự động cô lập network
+trigger: critical_finding
+sev_filter: CRITICAL
+enabled: true
+tags: [vn, viettel, cloud, isolation, ir]
+steps:
+  - type: condition
+    name: Kiểm tra cloud provider
+    desc: Chỉ chạy trên asset gắn nhãn viettel_cloud
+    config: |
+      expr: asset.provider=viettel_cloud AND severity=CRITICAL
+  - type: enrich
+    name: Lookup VM metadata
+    desc: Lấy thông tin VPC, security group, instance ID
+    config: |
+      provider: viettel_cloud
+      api_endpoint: ${VIETTEL_CLOUD_API}
+      api_key: ${VIETTEL_CLOUD_KEY}
+      fields: [instance_id, vpc_id, sg_ids, region]
+  - type: block
+    name: Áp dụng quarantine SG
+    desc: Đổi security group sang quarantine-only (chỉ SOC truy cập)
+    config: |
+      provider: viettel_cloud
+      action: replace_security_group
+      target_sg: sg-quarantine-soc
+      preserve_original_sg: true
+  - type: ticket
+    name: Tạo P0 IR ticket
+    desc: P0 ticket cho IR team với evidence chain
+    config: |
+      provider: jira
+      project: VSP-IR
+      priority: P0
+      labels: [viettel-cloud, isolation, p0]
+      assignee_group: ir-tier3
+  - type: notify
+    name: Page IR oncall
+    desc: PagerDuty + Zalo cho IR oncall
+    config: |
+      channels: [pagerduty, zalo]
+      pagerduty_key: ${PD_IR_KEY}
+      zalo_oa_token: ${ZALO_OA_TOKEN}
+      zalo_template: ir_alert_vi
+      message_vi: "Cảnh báo P0 — VM Viettel Cloud bị cô lập, cần điều tra ngay"

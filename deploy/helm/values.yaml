@@ -1,0 +1,139 @@
+# Default values for vsp-platform.
+# All security-relevant defaults are intentionally restrictive — operators
+# loosen these explicitly rather than tightening them later.
+
+image:
+  repository: ghcr.io/vsp/gateway
+  tag: ""           # defaults to .Chart.appVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# Where this gateway is deployed. Used by the residency middleware to
+# decide which tenants' requests it may serve. Set per-environment.
+region: ""          # e.g. "vn-1", "eu-frankfurt"
+
+# Secrets backend for JWT, DB password, webhook signing key.
+# "vault" requires a sidecar / Vault Agent injector; "env" reads
+# Kubernetes Secrets. We default to "env" because it's universal —
+# but production deployments should switch to "vault".
+secrets:
+  provider: env     # env | vault
+  vault:
+    addr: ""
+    token: ""       # use Vault Agent for tokenless auth in production
+    path: secret/data/vsp
+    namespace: ""
+
+# Database — operator brings their own Postgres. We do NOT ship a
+# default Postgres because production deployments need HA + backup
+# story that a Helm chart subchart can't provide responsibly.
+database:
+  url: ""           # postgres://user:pass@host:5432/vsp?sslmode=require
+  existingSecret:   # name of a Secret with key "DATABASE_URL"
+
+redis:
+  addr: redis-master:6379
+  existingSecret:
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# ── Security context ─────────────────────────────────────────────────
+# Restrictive by default. The container image MUST be built with a
+# non-root user (see Dockerfile). Override only if the image cannot run
+# unprivileged.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+  capabilities:
+    drop:
+      - ALL
+
+# ── Network policy ───────────────────────────────────────────────────
+# Egress is restricted to: DNS, the configured database, Redis, Vault,
+# and tenant-configured webhook destinations. Operator must add custom
+# egress rules for additional outbound integrations.
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # DB + Redis + Vault — operator configures via additionalEgress.
+
+  additionalEgress: []
+  # - to:
+  #     - ipBlock:
+  #         cidr: 10.0.5.0/24   # postgres
+  #   ports:
+  #     - port: 5432
+  #       protocol: TCP
+
+# ── Pod Disruption Budget ────────────────────────────────────────────
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ── Service ──────────────────────────────────────────────────────────
+service:
+  type: ClusterIP
+  port: 8080
+
+# ── Ingress ──────────────────────────────────────────────────────────
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts: []
+
+# ── Autoscaling ──────────────────────────────────────────────────────
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# ── Probes ───────────────────────────────────────────────────────────
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10

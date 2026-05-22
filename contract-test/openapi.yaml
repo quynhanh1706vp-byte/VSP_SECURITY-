@@ -1,0 +1,1776 @@
+openapi: "3.0.3"
+info:
+  title: VSP Security Platform API
+  version: "2.0.0"
+  description: |
+    VSP (Vulnerability Scanning Platform) — Enterprise Security API.
+
+    Authentication: Bearer JWT token từ POST /api/v1/auth/login.
+
+    ## Versioning
+    - **2.0.0** — Synced with frontend reality (Phase T2). Adds P4 compliance,
+      Zero Trust, RMF/ATO, SOAR, threat intel, UEBA, governance, log pipeline,
+      remediation, OSCAL exports, scheduler, assets, AI analyst, vuln management.
+    - **1.0.0** — Initial spec. Core auth + scan + admin only.
+
+    ## Contract Testing
+    This spec is enforced by `vsp_contract_test.js`. Any drift between
+    frontend calls and this document fails CI.
+  contact:
+    name: VSP Security Team
+    email: soc@agency.gov
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8921
+    description: Development
+  - url: http://127.0.0.1:8921
+    description: Local loopback
+  - url: https://vsp.agency.gov
+    description: Production
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    LimitParam:
+      in: query
+      name: limit
+      schema: { type: integer, default: 50, maximum: 2000 }
+    OffsetParam:
+      in: query
+      name: offset
+      schema: { type: integer, default: 0, minimum: 0 }
+    RunIdQueryParam:
+      in: query
+      name: run_id
+      schema: { type: string }
+    SeverityParam:
+      in: query
+      name: severity
+      schema: { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW, INFO] }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:   { type: string }
+        code:    { type: string }
+        details: { type: object, additionalProperties: true }
+
+    PaginatedResponse:
+      type: object
+      properties:
+        total:  { type: integer }
+        limit:  { type: integer }
+        offset: { type: integer }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        mfa_code: { type: string, pattern: "^[0-9]{6}$" }
+
+    LoginResponse:
+      type: object
+      required: [token, email, role]
+      properties:
+        token:       { type: string }
+        user_id:     { type: string, format: uuid }
+        email:       { type: string }
+        role:        { type: string, enum: [admin, analyst, dev, auditor, viewer] }
+        tenant_id:   { type: string }
+        expires_at:  { type: string, format: date-time }
+        mfa_enabled: { type: boolean }
+        clearance:   { type: string, enum: [UNCLASS, CUI, CONFIDENTIAL, SECRET, TOP_SECRET] }
+
+    MFARequired:
+      type: object
+      required: [mfa_required]
+      properties:
+        mfa_required: { type: boolean }
+        message:      { type: string }
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:    { type: string, enum: [ok, degraded, error] }
+        version:   { type: string }
+        timestamp: { type: string, format: date-time }
+        uptime:    { type: string }
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:  { type: string }
+              latency: { type: string }
+              error:   { type: string }
+
+    Run:
+      type: object
+      required: [id, mode, status]
+      properties:
+        id:             { type: string, format: uuid }
+        rid:            { type: string }
+        tenant_id:      { type: string }
+        mode:           { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, FULL, FULL_SOC] }
+        profile:        { type: string, enum: [FAST, STANDARD, DEEP, FULL_SOC] }
+        status:         { type: string, enum: [QUEUED, RUNNING, DONE, FAILED, CANCELLED] }
+        gate:           { type: string, enum: [PASS, WARN, FAIL] }
+        score:          { type: number }
+        total_findings: { type: integer }
+        created_at:     { type: string, format: date-time }
+        completed_at:   { type: string, format: date-time }
+
+    Finding:
+      type: object
+      required: [id, severity]
+      properties:
+        id:         { type: string, format: uuid }
+        run_id:     { type: string, format: uuid }
+        tool:       { type: string }
+        severity:   { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW, INFO] }
+        rule_id:    { type: string }
+        message:    { type: string }
+        path:       { type: string }
+        line_num:   { type: integer }
+        cwe:        { type: string }
+        cve:        { type: string }
+        fix_signal: { type: string }
+        status:     { type: string, enum: [open, in_progress, resolved, accepted, false_positive] }
+
+    User:
+      type: object
+      required: [id, email, role]
+      properties:
+        id:          { type: string, format: uuid }
+        email:       { type: string }
+        name:        { type: string }
+        role:        { type: string, enum: [admin, analyst, dev, auditor, viewer] }
+        mfa_enabled: { type: boolean }
+        last_login:  { type: string, format: date-time }
+        created_at:  { type: string, format: date-time }
+        status:      { type: string, enum: [active, suspended, locked] }
+
+    P4PipelineSummary:
+      type: object
+      required: [total, pass, fail, score]
+      properties:
+        total: { type: integer }
+        pass:  { type: integer }
+        fail:  { type: integer }
+        warn:  { type: integer }
+        score: { type: number }
+        frameworks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              pass:    { type: integer }
+              total:   { type: integer }
+              percent: { type: number }
+
+    P4PipelineRun:
+      type: object
+      properties:
+        run_id:    { type: string }
+        timestamp: { type: string, format: date-time }
+        status:    { type: string, enum: [running, completed, failed] }
+        summary:   { $ref: "#/components/schemas/P4PipelineSummary" }
+        controls:  { type: array, items: { type: object, additionalProperties: true } }
+
+    P4ZTStatus:
+      type: object
+      required: [overall_score]
+      properties:
+        overall_score: { type: integer, minimum: 0, maximum: 100 }
+        pillars:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              score:        { type: integer }
+              capabilities: { type: array, items: { type: object, additionalProperties: true } }
+
+    P4RaspEvent:
+      type: object
+      required: [id, timestamp, severity]
+      properties:
+        id:          { type: string }
+        timestamp:   { type: string, format: date-time }
+        severity:    { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW] }
+        attack_type: { type: string }
+        service:     { type: string }
+        endpoint:    { type: string }
+        source_ip:   { type: string }
+        action:      { type: string, enum: [blocked, allowed, alert] }
+        cve:         { type: string }
+
+    RMFPackage:
+      type: object
+      required: [system_id, ato_status]
+      properties:
+        system_id:          { type: string }
+        system_name:        { type: string }
+        ato_status:         { type: string, enum: [authorized, ato_in_progress, expired, revoked] }
+        authorization_type: { type: string }
+        authorization_date: { type: string, format: date-time }
+        expiration_date:    { type: string, format: date-time }
+        rmf_steps:          { type: array, items: { type: object, additionalProperties: true } }
+        poam_items:         { type: array, items: { type: object, additionalProperties: true } }
+        artifacts:          { type: array, items: { type: object, additionalProperties: true } }
+        conmon_score:       { type: integer, minimum: 0, maximum: 100 }
+        assessor:           { type: string }
+
+    ATOExpiry:
+      type: object
+      required: [days_remaining, expiry_level]
+      properties:
+        days_remaining:   { type: integer }
+        expiry_level:     { type: string, enum: [ok, warning, critical, expired] }
+        renewal_required: { type: boolean }
+        renewal_checklist:
+          type: array
+          items:
+            type: object
+            properties:
+              task:     { type: string }
+              due_week: { type: integer }
+              status:   { type: string }
+
+    Incident:
+      type: object
+      required: [id, severity, status]
+      properties:
+        id:         { type: string }
+        title:      { type: string }
+        severity:   { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW] }
+        status:     { type: string, enum: [open, investigating, resolved, false_positive] }
+        rule_id:    { type: string }
+        created_at: { type: string, format: date-time }
+        events:     { type: array, items: { type: object, additionalProperties: true } }
+
+    CorrelationRule:
+      type: object
+      required: [id, name]
+      properties:
+        id:        { type: string }
+        name:      { type: string }
+        enabled:   { type: boolean }
+        severity:  { type: string }
+        query:     { type: string }
+        threshold: { type: integer }
+
+    SIEMWebhook:
+      type: object
+      required: [id, type, url]
+      properties:
+        id:      { type: string }
+        label:   { type: string }
+        type:    { type: string, enum: [slack, teams, generic] }
+        url:     { type: string, format: uri }
+        min_sev: { type: string, enum: [CRITICAL, HIGH, MEDIUM] }
+        enabled: { type: boolean }
+
+    Playbook:
+      type: object
+      required: [id, name]
+      properties:
+        id:      { type: string }
+        name:    { type: string }
+        trigger: { type: string }
+        steps:   { type: array, items: { type: object, additionalProperties: true } }
+        enabled: { type: boolean }
+
+    SoarRun:
+      type: object
+      required: [id, playbook_id, status]
+      properties:
+        id:           { type: string }
+        playbook_id:  { type: string }
+        status:       { type: string, enum: [pending, running, success, failed] }
+        started_at:   { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        steps_log:    { type: array, items: { type: object, additionalProperties: true } }
+
+    Feed:
+      type: object
+      properties:
+        id:        { type: string }
+        name:      { type: string }
+        url:       { type: string, format: uri }
+        type:      { type: string }
+        last_sync: { type: string, format: date-time }
+        ioc_count: { type: integer }
+        enabled:   { type: boolean }
+
+    IOC:
+      type: object
+      required: [type, value]
+      properties:
+        id:         { type: string }
+        type:       { type: string, enum: [ip, domain, url, hash, email] }
+        value:      { type: string }
+        feed:       { type: string }
+        confidence: { type: integer, minimum: 0, maximum: 100 }
+        first_seen: { type: string, format: date-time }
+        tags:       { type: array, items: { type: string } }
+
+    UEBABaseline:
+      type: object
+      properties:
+        user_id:        { type: string }
+        baseline_score: { type: number }
+        anomalies:      { type: array, items: { type: object, additionalProperties: true } }
+        last_updated:   { type: string, format: date-time }
+
+    Asset:
+      type: object
+      required: [id, name, type]
+      properties:
+        id:           { type: string }
+        name:         { type: string }
+        type:         { type: string, enum: [host, container, service, repository, cloud_resource] }
+        owner:        { type: string }
+        criticality:  { type: string, enum: [critical, high, medium, low] }
+        tags:         { type: array, items: { type: string } }
+        last_scanned: { type: string, format: date-time }
+
+    LogSource:
+      type: object
+      properties:
+        id:         { type: string }
+        name:       { type: string }
+        type:       { type: string }
+        status:     { type: string, enum: [active, inactive, error] }
+        events_24h: { type: integer }
+        last_event: { type: string, format: date-time }
+
+    NetworkFlow:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        src_ip:    { type: string }
+        dst_ip:    { type: string }
+        src_port:  { type: integer }
+        dst_port:  { type: integer }
+        protocol:  { type: string }
+        bytes:     { type: integer }
+        action:    { type: string, enum: [allowed, blocked] }
+
+    Remediation:
+      type: object
+      required: [id, status]
+      properties:
+        id:         { type: string }
+        finding_id: { type: string }
+        status:     { type: string, enum: [open, in_progress, resolved, accepted_risk] }
+        owner:      { type: string }
+        sla_due:    { type: string, format: date-time }
+        notes:      { type: string }
+
+    RemediationStats:
+      type: object
+      properties:
+        total:        { type: integer }
+        open:         { type: integer }
+        in_progress:  { type: integer }
+        resolved:     { type: integer }
+        sla_breached: { type: integer }
+        rate:         { type: number }
+
+    Schedule:
+      type: object
+      required: [id, name, cron]
+      properties:
+        id:        { type: string }
+        name:      { type: string }
+        cron:      { type: string }
+        scan_mode: { type: string }
+        next_run:  { type: string, format: date-time }
+        last_run:  { type: string, format: date-time }
+        enabled:   { type: boolean }
+
+    RACIEntry:
+      type: object
+      properties:
+        control:     { type: string }
+        responsible: { type: string }
+        accountable: { type: string }
+        consulted:   { type: string }
+        informed:    { type: string }
+
+    RiskRegisterItem:
+      type: object
+      properties:
+        id:         { type: string }
+        risk:       { type: string }
+        likelihood: { type: string, enum: [low, medium, high, critical] }
+        impact:     { type: string, enum: [low, medium, high, critical] }
+        owner:      { type: string }
+        mitigation: { type: string }
+
+    Notification:
+      type: object
+      required: [id, type]
+      properties:
+        id:        { type: string }
+        type:      { type: string, enum: [scan, fail, warn, pass, audit, sla] }
+        title:     { type: string }
+        desc:      { type: string }
+        timestamp: { type: string, format: date-time }
+        unread:    { type: boolean }
+
+    VulnTrendPoint:
+      type: object
+      properties:
+        date:     { type: string, format: date }
+        critical: { type: integer }
+        high:     { type: integer }
+        medium:   { type: integer }
+        low:      { type: integer }
+
+    TopCVE:
+      type: object
+      properties:
+        cve:             { type: string }
+        cvss:            { type: number }
+        affected_assets: { type: integer }
+        first_seen:      { type: string, format: date-time }
+
+    PolicyRule:
+      type: object
+      required: [id, name]
+      properties:
+        id:       { type: string }
+        name:     { type: string }
+        enabled:  { type: boolean }
+        category: { type: string }
+        rego:     { type: string }
+
+    PolicyEvalRequest:
+      type: object
+      required: [input]
+      properties:
+        rule_id: { type: string }
+        input:   { type: object, additionalProperties: true }
+
+    PolicyEvalResult:
+      type: object
+      properties:
+        allowed: { type: boolean }
+        reasons: { type: array, items: { type: string } }
+        score:   { type: number }
+
+    AIAnalysisRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:  { type: string }
+        context: { type: string }
+        run_id:  { type: string }
+
+    AIAnalysisResult:
+      type: object
+      properties:
+        response:  { type: string }
+        citations: { type: array, items: { type: object, additionalProperties: true } }
+        usage:     { type: object, additionalProperties: true }
+
+paths:
+  /health:
+    get:
+      summary: Deep health check
+      security: []
+      tags: [System]
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+        "503": { description: Unhealthy }
+
+  /api/p4/health:
+    get:
+      summary: P4 compliance subsystem health
+      security: []
+      tags: [P4 Compliance]
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+
+  /api/v1/auth/login:
+    post:
+      summary: Login (returns token or MFA challenge)
+      security: []
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Login successful or MFA required
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/LoginResponse"
+                  - $ref: "#/components/schemas/MFARequired"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/auth/logout:
+    post:
+      summary: Logout
+      tags: [Auth]
+      responses:
+        "200": { description: Logged out }
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Refresh JWT token
+      tags: [Auth]
+      responses:
+        "200":
+          description: New token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:      { type: string }
+                  expires_at: { type: string, format: date-time }
+
+  /api/v1/auth/password/change:
+    post:
+      summary: Change password
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password:     { type: string, minLength: 8 }
+                mfa_code:         { type: string }
+      responses:
+        "200": { description: Password changed }
+        "400": { description: Validation error }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/auth/mfa/setup:
+    post:
+      summary: Setup MFA — generate TOTP secret
+      tags: [Auth]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:           { type: string }
+                  provisioning_uri: { type: string }
+
+  /api/v1/auth/mfa/verify:
+    post:
+      summary: Verify and enable MFA
+      tags: [Auth]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200": { description: MFA enabled }
+        "400": { description: Invalid code }
+
+  /api/v1/vsp/run:
+    post:
+      summary: Trigger a scan
+      tags: [Scans]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:    { type: string, enum: [SAST, DAST, SCA, SECRETS, IAC, FULL, FULL_SOC] }
+                profile: { type: string, enum: [FAST, STANDARD, DEEP, FULL_SOC] }
+                src:     { type: string, description: "Path or URL to scan" }
+      responses:
+        "200": { description: Scan queued }
+
+  /api/v1/vsp/run/latest:
+    get:
+      summary: Get most recent run
+      tags: [Scans]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+
+  /api/v1/vsp/run/{rid}:
+    get:
+      summary: Get a specific run by ID
+      tags: [Scans]
+      parameters:
+        - in: path
+          name: rid
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/vsp/runs:
+    get:
+      summary: List scan runs (paginated)
+      tags: [Scans]
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      runs:
+                        type: array
+                        items: { $ref: "#/components/schemas/Run" }
+
+  /api/v1/vsp/runs/index:
+    get:
+      summary: Compact runs index for list views
+      tags: [Scans]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Run" }
+
+  /api/v1/vsp/findings:
+    get:
+      summary: List findings
+      tags: [Findings]
+      parameters:
+        - $ref: "#/components/parameters/SeverityParam"
+        - { in: query, name: tool, schema: { type: string } }
+        - $ref: "#/components/parameters/RunIdQueryParam"
+        - { in: query, name: q, schema: { type: string, description: "Search in message, rule_id, path" } }
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  findings:
+                    type: array
+                    items: { $ref: "#/components/schemas/Finding" }
+                  total: { type: integer }
+
+  /api/v1/vsp/findings/summary:
+    get:
+      summary: Findings rollup by severity/tool
+      tags: [Findings]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/vsp/gate/latest:
+    get:
+      summary: Latest CI gate result (PASS/WARN/FAIL)
+      tags: [Scans]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [gate]
+                properties:
+                  gate:    { type: string, enum: [PASS, WARN, FAIL] }
+                  score:   { type: number }
+                  run_id:  { type: string }
+
+  /api/v1/vsp/sla_tracker:
+    get:
+      summary: SLA tracking per finding severity
+      tags: [Findings]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/vsp/metrics_slos:
+    get:
+      summary: Platform metrics + SLOs
+      tags: [System]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/vsp/executive_report_pdf/{rid}:
+    get:
+      summary: Executive report PDF for a run
+      tags: [Reports]
+      parameters:
+        - in: path
+          name: rid
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+
+  /api/v1/sbom/{rid}:
+    get:
+      summary: SBOM for a specific run
+      tags: [SBOM]
+      parameters:
+        - in: path
+          name: rid
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/admin/users:
+    get:
+      summary: List users (admin only)
+      tags: [Admin]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      summary: Create user (admin only)
+      tags: [Admin]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, role]
+              properties:
+                email:    { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                role:     { type: string, enum: [admin, analyst, dev, auditor, viewer] }
+      responses:
+        "201": { description: User created }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/admin/users/{id}:
+    delete:
+      summary: Delete user (admin only)
+      tags: [Admin]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/audit/log:
+    get:
+      summary: Audit log entries
+      tags: [Audit]
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/correlation/incidents:
+    get:
+      summary: List security incidents
+      tags: [SIEM]
+      parameters:
+        - { in: query, name: status,   schema: { type: string, enum: [open, resolved, all] } }
+        - { in: query, name: severity, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Incident" }
+
+  /api/v1/correlation/incidents/{id}:
+    get:
+      summary: Get incident detail
+      tags: [SIEM]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Incident" }
+
+  /api/v1/correlation/rules:
+    get:
+      summary: List correlation rules
+      tags: [SIEM]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CorrelationRule" }
+
+  /api/v1/correlation/rules/{id}:
+    get:
+      summary: Get rule detail
+      tags: [SIEM]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CorrelationRule" }
+
+  /api/v1/siem/webhooks:
+    get:
+      summary: List SIEM webhooks
+      tags: [SIEM]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SIEMWebhook" }
+    post:
+      summary: Create SIEM webhook
+      tags: [SIEM]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label, type, url]
+              properties:
+                label:   { type: string }
+                type:    { type: string, enum: [slack, teams, generic] }
+                url:     { type: string, format: uri }
+                min_sev: { type: string, enum: [CRITICAL, HIGH, MEDIUM] }
+      responses:
+        "200": { description: Webhook created }
+
+  /api/v1/siem/report.pdf:
+    get:
+      summary: SIEM report (PDF)
+      tags: [SIEM, Reports]
+      responses:
+        "200":
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+
+  /api/v1/siem/report.xlsx:
+    get:
+      summary: SIEM report (Excel)
+      tags: [SIEM, Reports]
+      responses:
+        "200":
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+
+  /api/p4/pipeline/latest:
+    get:
+      summary: Latest compliance pipeline run
+      tags: [P4 Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/P4PipelineRun" }
+
+  /api/p4/pipeline/trigger:
+    post:
+      summary: Trigger manual compliance scan
+      tags: [P4 Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:  { type: string, enum: [queued, running] }
+                  run_id:  { type: string }
+                  message: { type: string }
+
+  /api/p4/pipeline/drift:
+    get:
+      summary: Configuration drift detection
+      tags: [P4 Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/p4/pipeline/schedules:
+    get:
+      summary: Pipeline schedule definitions
+      tags: [P4 Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Schedule" }
+
+  /api/p4/conmon/report:
+    get:
+      summary: Continuous monitoring report
+      tags: [P4 Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/p4/findings/sync:
+    post:
+      summary: Sync findings into POAM
+      tags: [P4 Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  synced:  { type: integer }
+                  skipped: { type: integer }
+
+  /api/p4/oscal/ssp:
+    get:
+      summary: Export OSCAL System Security Plan
+      tags: [P4 Compliance, OSCAL]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/p4/sbom/view:
+    get:
+      summary: P4 SBOM viewer data
+      tags: [P4 Compliance, SBOM]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/p4/zt/status:
+    get:
+      summary: Zero Trust pillar scoring
+      tags: [P4 Compliance, Zero Trust]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/P4ZTStatus" }
+
+  /api/p4/zt/microseg:
+    get:
+      summary: Zero Trust micro-segmentation status
+      tags: [P4 Compliance, Zero Trust]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/p4/zt/api-policy:
+    get:
+      summary: Zero Trust API policy enforcement state
+      tags: [P4 Compliance, Zero Trust]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/p4/zt/rasp:
+    get:
+      summary: RASP attack event feed
+      tags: [P4 Compliance, Zero Trust]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/P4RaspEvent" }
+
+  /api/p4/rmf:
+    get:
+      summary: Full ATO package with all 6 RMF steps
+      tags: [RMF]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RMFPackage" }
+
+  /api/p4/rmf/conmon:
+    get:
+      summary: ConMon score detail
+      tags: [RMF]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/p4/rmf/ato-letter:
+    get:
+      summary: Generate ATO authorization letter
+      tags: [RMF]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/p4/rmf/task:
+    post:
+      summary: Update RMF task status
+      tags: [RMF]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, status]
+              properties:
+                task_id: { type: string }
+                status:  { type: string, enum: [pending, in_progress, complete] }
+      responses:
+        "200": { description: Updated }
+
+  /api/p4/ato/expiry:
+    get:
+      summary: ATO expiration tracking + renewal checklist
+      tags: [RMF]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ATOExpiry" }
+
+  /api/p4/alerts/history:
+    get:
+      summary: P4 compliance alert history
+      tags: [P4 Compliance, Alerts]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
+
+  /api/p4/alerts/test:
+    post:
+      summary: Send test alert
+      tags: [P4 Compliance, Alerts]
+      responses:
+        "200": { description: Test sent }
+
+  /api/v1/compliance/cmmc:
+    get:
+      summary: CMMC framework scorecard
+      tags: [Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/compliance/fedramp:
+    get:
+      summary: FedRAMP framework scorecard
+      tags: [Compliance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/compliance/oscal/ar:
+    get:
+      summary: OSCAL Assessment Results export
+      tags: [Compliance, OSCAL]
+      parameters:
+        - $ref: "#/components/parameters/RunIdQueryParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/compliance/oscal/poam:
+    get:
+      summary: OSCAL POAM export
+      tags: [Compliance, OSCAL]
+      parameters:
+        - $ref: "#/components/parameters/RunIdQueryParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/soar/playbooks:
+    get:
+      summary: List SOAR playbooks
+      tags: [SOAR]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Playbook" }
+
+  /api/v1/soar/playbooks/{id}:
+    get:
+      summary: Get playbook detail
+      tags: [SOAR]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playbook" }
+
+  /api/v1/soar/runs:
+    get:
+      summary: List SOAR playbook executions
+      tags: [SOAR]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SoarRun" }
+
+  /api/v1/soar/trigger:
+    post:
+      summary: Trigger a playbook
+      tags: [SOAR]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playbook_id]
+              properties:
+                playbook_id: { type: string }
+                input:       { type: object, additionalProperties: true }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SoarRun" }
+
+  /api/v1/ti/feeds:
+    get:
+      summary: List threat intel feeds
+      tags: [Threat Intel]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Feed" }
+
+  /api/v1/ti/feeds/sync:
+    post:
+      summary: Force-sync all feeds
+      tags: [Threat Intel]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  synced: { type: integer }
+
+  /api/v1/ti/iocs:
+    get:
+      summary: List IOCs
+      tags: [Threat Intel]
+      parameters:
+        - { in: query, name: type, schema: { type: string, enum: [ip, domain, url, hash, email] } }
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/IOC" }
+
+  /api/v1/ti/matches:
+    get:
+      summary: IOC match events
+      tags: [Threat Intel]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
+
+  /api/v1/ueba/baseline:
+    get:
+      summary: User behavior baselines
+      tags: [UEBA]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UEBABaseline" }
+
+  /api/v1/ueba/analyze:
+    post:
+      summary: Analyze user activity for anomalies
+      tags: [UEBA]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id: { type: string }
+                window:  { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UEBABaseline" }
+
+  /api/v1/assets:
+    get:
+      summary: List assets
+      tags: [Assets]
+      parameters:
+        - { in: query, name: type, schema: { type: string } }
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Asset" }
+
+  /api/v1/assets/{id}:
+    get:
+      summary: Get asset detail
+      tags: [Assets]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Asset" }
+
+  /api/v1/logs/sources:
+    get:
+      summary: List log sources
+      tags: [Logs]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LogSource" }
+
+  /api/v1/logs/sources/{id}:
+    get:
+      summary: Get log source detail
+      tags: [Logs]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LogSource" }
+
+  /api/v1/logs/stats:
+    get:
+      summary: Log pipeline aggregate stats
+      tags: [Logs]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/logs/network-flow:
+    get:
+      summary: Network flow records
+      tags: [Logs, Network]
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NetworkFlow" }
+
+  /api/v1/logs/hunt:
+    post:
+      summary: Threat hunt query
+      tags: [Logs, Threat Hunt]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string }
+                window: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/remediation:
+    get:
+      summary: List remediations
+      tags: [Remediation]
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Remediation" }
+
+  /api/v1/remediation/finding/{id}:
+    get:
+      summary: Remediation for a specific finding
+      tags: [Remediation]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Remediation" }
+
+  /api/v1/remediation/stats:
+    get:
+      summary: Remediation aggregate stats
+      tags: [Remediation]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RemediationStats" }
+
+  /api/v1/schedules:
+    get:
+      summary: List scheduled scans
+      tags: [Scheduler]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Schedule" }
+    post:
+      summary: Create schedule
+      tags: [Scheduler]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Schedule" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Schedule" }
+
+  /api/v1/schedules/{id}:
+    delete:
+      summary: Delete schedule
+      tags: [Scheduler]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Deleted }
+
+  /api/v1/governance/raci:
+    get:
+      summary: RACI matrix
+      tags: [Governance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RACIEntry" }
+
+  /api/v1/governance/risk-register:
+    get:
+      summary: Risk register entries
+      tags: [Governance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RiskRegisterItem" }
+
+  /api/v1/governance/traceability:
+    get:
+      summary: Requirement traceability matrix
+      tags: [Governance]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/notifications:
+    get:
+      summary: List notifications
+      tags: [Notifications]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Notification" }
+
+  /api/v1/policy/rules:
+    get:
+      summary: List policy rules (OPA/Rego)
+      tags: [Policy]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PolicyRule" }
+    post:
+      summary: Create policy rule
+      tags: [Policy]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PolicyRule" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PolicyRule" }
+
+  /api/v1/policy/rules/{id}:
+    delete:
+      summary: Delete policy rule
+      tags: [Policy]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Deleted }
+
+  /api/v1/policy/evaluate:
+    post:
+      summary: Evaluate input against a rule
+      tags: [Policy]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PolicyEvalRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PolicyEvalResult" }
+
+  /api/v1/ai/analyze:
+    post:
+      summary: AI analyst — natural language analysis on findings
+      tags: [AI Analyst]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AIAnalysisRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AIAnalysisResult" }
+
+  /api/v1/soc/zero-trust:
+    get:
+      summary: SOC dashboard ZT score
+      tags: [SOC]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/soc/framework-scorecard:
+    get:
+      summary: SOC dashboard multi-framework scorecard
+      tags: [SOC]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/vulns/trend:
+    get:
+      summary: Vulnerability trend over time
+      tags: [Vulnerability Mgmt]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VulnTrendPoint" }
+
+  /api/v1/vulns/by-tool:
+    get:
+      summary: Findings grouped by tool
+      tags: [Vulnerability Mgmt]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/vulns/top-cves:
+    get:
+      summary: Top open CVEs
+      tags: [Vulnerability Mgmt]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TopCVE" }
+
+  /api/v1/events:
+    get:
+      summary: SSE event stream (server-sent events)
+      tags: [System]
+      responses:
+        "200":
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  /api/v1/export/{kind}:
+    get:
+      summary: Generic export endpoint (csv|json|pdf)
+      tags: [Reports]
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema: { type: string, enum: [findings, runs, incidents, audit] }
+      responses:
+        "200":
+          description: Export file
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+
+tags:
+  - { name: System,             description: "Health, metrics, SSE" }
+  - { name: Auth,               description: "Authentication, MFA, password" }
+  - { name: Scans,              description: "Scan runs management" }
+  - { name: Findings,           description: "Security findings" }
+  - { name: SBOM,               description: "Software bill of materials" }
+  - { name: Reports,            description: "PDF/Excel report exports" }
+  - { name: Admin,              description: "User management (admin only)" }
+  - { name: Audit,              description: "Audit log" }
+  - { name: SIEM,               description: "Security incidents, webhooks, correlation" }
+  - { name: P4 Compliance,      description: "P4 compliance pipeline + Zero Trust" }
+  - { name: Zero Trust,         description: "Zero Trust scoring per pillar" }
+  - { name: Compliance,         description: "Framework scorecards (CMMC, FedRAMP)" }
+  - { name: OSCAL,              description: "OSCAL 1.1.2 exports" }
+  - { name: RMF,                description: "Risk Management Framework / ATO" }
+  - { name: Alerts,             description: "Alert configuration" }
+  - { name: SOAR,               description: "Security orchestration playbooks" }
+  - { name: Threat Intel,       description: "Feeds + IOCs" }
+  - { name: UEBA,               description: "User & entity behavior analytics" }
+  - { name: Assets,             description: "Asset inventory" }
+  - { name: Logs,               description: "Log pipeline + network flow" }
+  - { name: Network,            description: "Network flow analysis" }
+  - { name: Threat Hunt,        description: "Hunt queries on log data" }
+  - { name: Remediation,        description: "Remediation tracking + SLA" }
+  - { name: Scheduler,          description: "Scheduled scan jobs" }
+  - { name: Governance,         description: "RACI, risk register, traceability" }
+  - { name: Notifications,      description: "User notifications" }
+  - { name: Policy,             description: "OPA/Rego policy rules" }
+  - { name: AI Analyst,         description: "LLM-powered analysis" }
+  - { name: SOC,                description: "SOC dashboard rollups" }
+  - { name: Vulnerability Mgmt, description: "Vuln trends, top CVEs" }

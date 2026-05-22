@@ -1,0 +1,11 @@
+# RFC 9116 — security contact for the VSP platform.
+# Update Expires every 6 months; refresh PGP fingerprint when keyrolled.
+
+Contact: mailto:security@vsp.vn
+Contact: https://vsp.vn/security/report
+Expires: 2026-11-08T00:00:00Z
+Encryption: https://vsp.vn/.well-known/pgp-key.txt
+Preferred-Languages: vi, en
+Canonical: https://vsp.vn/.well-known/security.txt
+Policy: https://vsp.vn/security/policy
+Hiring: https://vsp.vn/careers

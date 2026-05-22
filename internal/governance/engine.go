@@ -110,6 +110,17 @@ func BuildFrameworkScorecard(findings []store.Finding) []FrameworkScore {
 		domainPenalty := penaltyTotal / len(fw.Domains)
 		for i := range fw.Domains {
 			fw.Domains[i].Score = max0(100 - domainPenalty)
+			// Pass = items that score above threshold (score >= 70 means most pass)
+			domainScore := fw.Domains[i].Score
+			if domainScore >= 90 {
+				fw.Domains[i].Pass = fw.Domains[i].Items // all pass
+			} else if domainScore >= 70 {
+				fw.Domains[i].Pass = fw.Domains[i].Items * domainScore / 100
+			} else if domainScore >= 50 {
+				fw.Domains[i].Pass = fw.Domains[i].Items * domainScore / 120
+			} else {
+				fw.Domains[i].Pass = fw.Domains[i].Items * domainScore / 150
+			}
 		}
 	}
 

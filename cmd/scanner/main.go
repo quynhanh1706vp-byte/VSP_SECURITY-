@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"github.com/vsp/platform/internal/netcap"
 	"github.com/vsp/platform/internal/pipeline"
 	"github.com/vsp/platform/internal/store"
 )
@@ -44,6 +45,16 @@ func main() {
 	defer db.Close()
 
 	handler := pipeline.NewScanHandler(db)
+
+	// Wire netcap engine into pipeline so RunnersFor(FULL/FULL_SOC/NETWORK)
+	// includes the netcap anomaly runner. NetCap requires CAP_NET_RAW;
+	// engine init is best-effort — skip silently if unavailable.
+	if eng := netcap.NewEngine(); eng != nil {
+		pipeline.SetNetcapEngine(eng)
+		log.Info().Msg("netcap engine wired into pipeline")
+	} else {
+		log.Warn().Msg("netcap engine unavailable — skipping (tool count will be 25 not 26)")
+	}
 
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {

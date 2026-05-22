@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -15,12 +17,26 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// emailHash returns the first 8 hex chars of SHA256(email) for use as
+// a log correlation field. Enough to follow a session across log lines
+// without shipping raw PII (L66.4.1 / GDPR). Full email lives in
+// audit_log which has retention + access controls.
+func emailHash(email string) string {
+	h := sha256.Sum256([]byte(email))
+	return hex.EncodeToString(h[:4])
+}
+
 // Auth bundles dependencies for auth handlers.
 type Auth struct {
 	DB         *store.DB
 	JWTSecret  string
 	JWTTTL     time.Duration
 	DefaultTID string // default tenant for single-tenant dev setup
+	// IPLock is a process-wide sliding-window per-IP fail counter. nil-
+	// safe: methods on it tolerate a zero IPLockout, but the gateway
+	// initializes one at startup so the field is always populated in
+	// production.
+	IPLock *auth.IPLockout
 }
 
 // ── POST /api/v1/auth/login ───────────────────────────────────────────────────
@@ -70,21 +86,56 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// IP lockout — defends against credential stuffing across many
+	// usernames from one source. Checked BEFORE user lookup so a locked
+	// IP doesn't get to enumerate emails via timing.
+	clientIP := auth.ClientIP(r)
+	if a.IPLock != nil && a.IPLock.IsLocked(clientIP) {
+		log.Warn().Str("ip", clientIP).Msg("login: IP locked")
+		jsonError(w, "too many failed attempts from this IP — try again later",
+			http.StatusTooManyRequests)
+		return
+	}
+
 	// Lookup user
 	user, err := a.DB.GetUserByEmail(r.Context(), tenantID, req.Email)
 	if err != nil {
-		log.Error().Err(err).Str("email", req.Email).Msg("login: db error")
+		log.Error().Err(err).Str("email_hash", emailHash(req.Email)).Msg("login: db error")
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if user == nil {
+		// Constant-time defense: run a real bcrypt compare against a
+		// dummy hash so the wall-clock time of "user not found" matches
+		// "user found but wrong password". This eliminates the timing
+		// side-channel that previously let attackers enumerate valid
+		// emails.
+		_ = auth.CompareDummyPassword(req.Password)
+		if a.IPLock != nil {
+			if locked, _ := a.IPLock.RecordFail(clientIP); locked {
+				LoginAttempts.WithLabelValues("ip_locked").Inc()
+				go a.writeAudit(r.Clone(context.Background()), tenantID, nil, "LOGIN_IP_LOCKED", "/auth/login")
+			}
+		}
+		// Sprint 12.7: backoff also on missing-user path. Pre-12.7 the
+		// found-user path slept exponentially via BackoffSleep(count)
+		// while missing-user returned immediately — a 1-2s timing diff
+		// the L3 user-enum probe caught. Match the sleep using the
+		// same per-IP fail counter (best proxy when there's no per-
+		// account state to read).
+		var ipFails int
+		if a.IPLock != nil {
+			ipFails = a.IPLock.FailCount(clientIP)
+		}
+		auth.BackoffSleep(ipFails)
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
 	// Check account lockout
 	if user.LockedUntil != nil && time.Now().Before(*user.LockedUntil) {
-		log.Warn().Str("email", req.Email).Msg("login: account locked")
+		log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: account locked")
+		LoginAttempts.WithLabelValues("locked").Inc()
 		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_LOCKED", "/auth/login")
 		jsonError(w, "account temporarily locked — too many failed attempts", http.StatusTooManyRequests)
 		return
@@ -95,6 +146,15 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		log.Warn().Msg("login: wrong password") // email not logged to prevent user enumeration
 		// Record failed login + possible lockout
 		count, _ := a.DB.RecordFailedLogin(r.Context(), user.ID)
+		// Exponential backoff on the failure path — slows online
+		// guessing without affecting successful logins.
+		auth.BackoffSleep(count)
+		if a.IPLock != nil {
+			if locked, _ := a.IPLock.RecordFail(clientIP); locked {
+				go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_IP_LOCKED", "/auth/login")
+			}
+		}
+		LoginAttempts.WithLabelValues("failed").Inc()
 		go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_FAILED", "/auth/login")
 		if count >= 5 {
 			jsonError(w, "account locked for 15 minutes after too many failed attempts", http.StatusTooManyRequests)
@@ -103,18 +163,23 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	// Successful password compare — clear the IP fail counter so a
+	// legitimate user doesn't carry forward someone else's misses.
+	if a.IPLock != nil {
+		a.IPLock.Clear(clientIP)
+	}
 
 	// Enforce MFA for admin role — admin MUST have MFA enabled (production only).
 	// Uses viper.server.env (bound to SERVER_ENV) to match auth.mode pattern.
 	if user.Role == "admin" && (!user.MFAEnabled || !user.MFAVerified) {
 		env := viper.GetString("server.env")
 		if env == "production" || env == "staging" {
-			log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured")
+			log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: admin MFA not configured")
 			jsonError(w, "admin accounts require MFA — please set up TOTP before logging in",
 				http.StatusForbidden)
 			return
 		}
-		log.Warn().Str("email", req.Email).Msg("login: admin MFA not configured (dev — allowed)")
+		log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: admin MFA not configured (dev — allowed)")
 	}
 
 	// Verify MFA if enabled
@@ -130,15 +195,24 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !auth.VerifyTOTP(user.MFASecret, req.MFACode) {
-			log.Warn().Str("email", req.Email).Msg("login: invalid MFA code")
+			log.Warn().Str("email_hash", emailHash(req.Email)).Msg("login: invalid MFA code")
+			LoginAttempts.WithLabelValues("mfa_failed").Inc()
 			go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_MFA_FAILED", "/auth/login")
 			jsonError(w, "invalid MFA code", http.StatusUnauthorized)
 			return
 		}
 	}
 
-	// Reset failed logins on success
-	go a.DB.ResetFailedLogins(r.Context(), user.ID)
+	// Reset failed logins on success. MUST use background ctx — same
+	// race-with-response-cancel pattern as last_login. Without this,
+	// successful logins under load may not clear the counter and a
+	// legitimate user gradually approaches the lockout threshold.
+	userIDForReset := user.ID
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = a.DB.ResetFailedLogins(ctx, userIDForReset)
+	}()
 
 	// Issue JWT
 	ttl := a.JWTTTL
@@ -158,10 +232,21 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update last_login (best-effort)
-	go a.DB.UpdateLastLogin(r.Context(), user.ID) //nolint:errcheck
+	// Update last_login (best-effort). MUST use a fresh background
+	// context — r.Context() is cancelled the instant the response is
+	// flushed, so the goroutine racing the response writer would see
+	// "context canceled" before pgx executes the UPDATE. That bug
+	// made every users.last_login stay NULL → the Users panel showed
+	// "—" for every row regardless of actual login activity.
+	userID := user.ID
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = a.DB.UpdateLastLogin(ctx, userID)
+	}()
 
 	// Write audit log (best-effort)
+	LoginAttempts.WithLabelValues("success").Inc()
 	go a.writeAudit(r.Clone(context.Background()), tenantID, &user.ID, "LOGIN_OK", "/auth/login")
 
 	// Set httpOnly cookie for browser clients (OWASP A07 — prevents XSS token theft)
@@ -202,6 +287,8 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request) {
 func (a *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
 	if ok {
+		// Revoke token via blacklist — JTI added to Redis until natural expiry
+		auth.RevokeCurrentToken(r.Context(), claims.JTI, claims.ExpiresAt)
 		go a.writeAudit(r.Clone(context.Background()), claims.TenantID, &claims.UserID, "LOGOUT", "/auth/logout")
 	}
 	// Clear httpOnly cookie on logout
@@ -234,6 +321,12 @@ func (a *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// L8 2026-05-09: emit audit. Token refresh is a security event —
+	// without an audit row a stolen-token scenario where the attacker
+	// keeps renewing has no signal. SOC 2 CC6.1 also requires session
+	// re-issuance be logged.
+	tenantUUID := resolveTenantUUID(r.Context(), a.DB, claims.TenantID)
+	go a.writeAudit(r.Clone(context.Background()), tenantUUID, &claims.UserID, "TOKEN_REFRESHED", "/auth/refresh")
 	jsonOK(w, map[string]any{
 		"token":      token,
 		"expires_at": time.Now().Add(ttl),
@@ -243,9 +336,41 @@ func (a *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func (a *Auth) writeAudit(r *http.Request, tenantID string, userID *string, action, resource string) {
-	prevHash, _ := a.DB.GetLastAuditHash(r.Context(), tenantID)
+	if a.DB == nil {
+		return
+	}
+	// L9 2026-05-09: callers historically passed claims.TenantID
+	// directly which is often the slug "default" not a UUID. The
+	// audit_log.tenant_id column is uuid; the slug-typed bind silently
+	// errored ("invalid input syntax for type uuid"), the //nolint
+	// errcheck dropped it, and the row never landed. Logout, refresh,
+	// and the API-token issuance handlers all hit this. Fix once at
+	// the helper so every caller is automatically covered.
+	tid := tenantID
+	if tid != "" && !looksLikeUUID(tid) {
+		tid = resolveTenantUUID(r.Context(), a.DB, tid)
+	}
+	if tid == "" {
+		// Last-ditch fallback so an unresolved slug doesn't silently
+		// drop the row — pin to the gateway's default tenant.
+		tid = a.DefaultTID
+	}
+	// L9 2026-05-09: dev-mint tokens carry sub=email which becomes
+	// claims.UserID. Real login flow sets UserID = users.id (uuid)
+	// before calling writeAudit, so production is fine; dev probes
+	// that pass through here would otherwise fail with
+	// "invalid input syntax for type uuid". Resolve email → UUID;
+	// fall back to NULL (the column is nullable) if no match.
+	if userID != nil && *userID != "" && !looksLikeUUID(*userID) {
+		if uid := resolveUserUUID(r.Context(), a.DB, *userID); uid != "" {
+			userID = &uid
+		} else {
+			userID = nil
+		}
+	}
+	prevHash, _ := a.DB.GetLastAuditHash(r.Context(), tid)
 	e := audit.Entry{
-		TenantID: tenantID,
+		TenantID: tid,
 		UserID:   derefStr(userID),
 		Action:   action,
 		Resource: resource,
@@ -253,7 +378,7 @@ func (a *Auth) writeAudit(r *http.Request, tenantID string, userID *string, acti
 		PrevHash: prevHash,
 	}
 	e.StoredHash = audit.Hash(e)
-	a.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: tenantID, UserID: userID, Action: action, Resource: resource, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
+	a.DB.InsertAudit(r.Context(), store.AuditWriteParams{TenantID: tid, UserID: userID, Action: action, Resource: resource, IP: r.RemoteAddr, PrevHash: prevHash}) //nolint:errcheck
 }
 
 func derefStr(s *string) string {
@@ -295,6 +420,12 @@ func (a *Auth) CreateAPIToken(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "token generation failed", http.StatusInternalServerError)
 		return
 	}
+	// L8 2026-05-09: API token issuance must be audited. NIST 800-63B
+	// + OWASP ASVS V3.4.3 — every credential creation event leaves a
+	// trace so a compromised account's token activity is forensically
+	// reconstructable.
+	tenantUUID := resolveTenantUUID(r.Context(), a.DB, claims.TenantID)
+	go a.writeAudit(r.Clone(context.Background()), tenantUUID, &claims.UserID, "API_TOKEN_CREATED", "/auth/api-token")
 	jsonOK(w, map[string]any{
 		"token":      token,
 		"expires_in": 3600,

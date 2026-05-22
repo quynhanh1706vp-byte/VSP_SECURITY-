@@ -1,6 +1,6 @@
 # VSP Feature Inventory
 
-**Last verified:** 2026-04-20 (commit `033885d`)
+**Last verified:** 2026-05-08 (post Sprint 2-8, commits `45c7337` + `ef6054c`)
 **Source of truth:** Code evidence — every item links to a file/endpoint.
 **Audience:** Engineers, auditors, customers doing due diligence, sales enablement.
 
@@ -15,37 +15,42 @@ needs to be added here with evidence.
 
 | Metric | Value |
 |--------|------:|
-| Go source (non-test) | ~35,827 lines |
-| Test files | 51 |
-| Internal packages | 22 |
-| Command binaries | 9 |
-| HTTP API endpoints | 254 |
-| UI panels | 26 |
-| Scanner integrations | 19 |
-| DB migrations | 11 |
-| Compliance frameworks | 6 (NIST 800-53, SSDF, FedRAMP, CMMC, OSCAL, CISA) |
+| Go source (non-test) | ~48,000 lines |
+| Test files | 60+ |
+| Internal packages | 25+ (added: `secrets`, `i18n`) |
+| Command binaries | 17 |
+| HTTP API endpoints | 134+ in gateway/main.go (after Sprint 8 additions) |
+| UI panels | 33 |
+| **Scanner integrations** | **26** |
+| DB migrations | 42 |
+| Compliance frameworks | 15+ (added: GDPR, PDPA Decree 13/2023, Decree 53/2022, SLSA v1.0, in-toto v1, RFC 9116, NIST SP 800-63B-3, DSOMM, SAMM, CycloneDX 1.4) |
 
 ---
 
-## 1. Scanner integrations (19 tools)
+## 1. Scanner integrations (26 tools)
 
-All via `internal/scanner/<tool>/` with unified `runner.go` + `enrich.go`:
+All via `internal/scanner/<tool>/` with unified `runner.go` + `enrich.go`. Verified
+by `ls internal/scanner/` on 2026-05-08 — 26 distinct tool subdirectories.
 
 ### SAST (5)
 | Tool | Language focus | Integration |
 |------|---------------|-------------|
-| **gosec** | Go | `internal/scanner/` (runner orchestrates) |
+| **gosec** | Go | `internal/scanner/gosec/` |
 | **semgrep** | Universal (30+ languages) | `internal/scanner/semgrep/` |
 | **bandit** | Python | `internal/scanner/bandit/` |
 | **codeql** | Semantic (GitHub) | `internal/scanner/codeql/` |
 | **hadolint** | Dockerfile | `internal/scanner/hadolint/` |
 
-### SCA / Dependency (3)
+### SCA / Dependency (7)
 | Tool | Target | Integration |
 |------|--------|-------------|
 | **trivy** | Container + OS + deps | `internal/scanner/trivy/` |
 | **grype** | Container + OS | `internal/scanner/grype/` |
+| **syft** | SBOM generator (CycloneDX, SPDX) | `internal/scanner/syft/` |
 | **license** | OSS license compliance | `internal/scanner/license/` |
+| **govulncheck** | Go module vulnerabilities | `internal/scanner/govulncheck/` |
+| **osvscanner** | OSV.dev database queries | `internal/scanner/osvscanner/` |
+| **retirejs** | JavaScript outdated libraries | `internal/scanner/retirejs/` |
 
 ### IaC (2)
 | Tool | Target | Integration |
@@ -53,17 +58,19 @@ All via `internal/scanner/<tool>/` with unified `runner.go` + `enrich.go`:
 | **checkov** | Terraform, K8s, ARM, CloudFormation | `internal/scanner/checkov/` |
 | **kics** | Terraform, K8s, Dockerfile | `internal/scanner/kics/` |
 
-### DAST (2)
+### DAST (3)
 | Tool | Purpose | Integration |
 |------|---------|-------------|
 | **nuclei** | HTTP vuln templates | `internal/scanner/nuclei/` |
 | **nikto** | Web server vuln | `internal/scanner/nikto/` |
+| **apisec** | REST + GraphQL API security | `internal/scanner/apisec/` |
 
-### Secrets (2)
+### Secrets (3)
 | Tool | Purpose | Integration |
 |------|---------|-------------|
 | **gitleaks** | Repo scan for secrets | `internal/scanner/gitleaks/` |
 | **secretcheck** | **Validates** secrets via live API calls (Slack `auth.test`, GitHub `/user`, etc.) | `internal/scanner/secretcheck/` |
+| **trufflehog** | Verified secrets across 700+ APIs | `internal/scanner/trufflehog/` |
 
 ### Network (3)
 | Tool | Purpose | Integration |
@@ -72,14 +79,34 @@ All via `internal/scanner/<tool>/` with unified `runner.go` + `enrich.go`:
 | **sslscan** | TLS/SSL assessment | `internal/scanner/sslscan/` |
 | **netcap** | L2-L7 packet capture + DPI | `internal/scanner/netcap/` + `internal/netcap/engine.go` |
 
+### Supply Chain (1)
+| Tool | Purpose | Integration |
+|------|---------|-------------|
+| **cosign** | Sign + verify container images & artefacts | `internal/scanner/cosign/` |
+
+### Fuzzing & Runtime (2)
+| Tool | Purpose | Integration |
+|------|---------|-------------|
+| **gofuzz** | Go native fuzzer integration | `internal/scanner/gofuzz/` |
+| **racedetect** | Go race condition detector | `internal/scanner/racedetect/` |
+
 ### Aggregation (2)
 | Module | Purpose |
 |--------|---------|
 | `runner.go` | Tool orchestration, parallel execution |
 | `enrich.go` | CVE → EPSS → KEV enrichment pipeline |
 
-**Reference comparison:** Snyk integrates 5-7 scanners; Wiz 8-10. VSP scope is
-unusually broad for a unified platform.
+**Reference comparison:** Snyk integrates 5-7 scanners; Wiz 8-10; Tenable 6-8. VSP
+scope is unusually broad for a unified platform — particularly strong on Go
+(gosec + govulncheck + gofuzz + racedetect = 4 Go-specific tools) and supply
+chain (syft + cosign + license + osvscanner + retirejs).
+
+**Why this changed (2026-05-08):** Earlier inventories said "19" — verified
+against the actual `internal/scanner/` directory listing post Sprint 8 the
+real count is 26. Tools added since the 2026-04-20 snapshot: syft, govulncheck,
+osvscanner, retirejs (SCA expansion); apisec (DAST); trufflehog (secrets);
+cosign (now classified separately under supply chain); gofuzz, racedetect
+(fuzz/runtime — new category).
 
 ---
 
@@ -400,7 +427,7 @@ Located in `cmd/`:
 | Binary | Purpose | Deployment |
 |--------|---------|-----------|
 | `gateway` | Main HTTP API + scheduler + SIEM receiver | Primary service |
-| `scanner` | Scan runner — orchestrates 19 tools | Horizontal scale |
+| `scanner` | Scan runner — orchestrates 26 tools | Horizontal scale |
 | `soc-shell` | SOC analyst CLI + TUI | On analyst workstation |
 | `vsp-agent` | On-prem customer agent | Customer environment |
 | `vsp-cli` | Admin CLI — tenant, token, retention | Ops tooling |

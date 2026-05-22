@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script>
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500; var waited = 0;
+    while (waited < maxWait) {
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      try { tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || ""; if (tk && tk.length >= 20) { window.TOKEN = tk; try { localStorage.setItem("vsp_token", tk); } catch(e){} return tk; } } catch(e) {}
+      await new Promise(r=>setTimeout(r, 100)); waited += 100;
+    }
+    return "";
+  }
+  var _origFetch = window.fetch;
+  window.vspAuthFetch = async function(url, opts){ opts = opts || {}; var tk = await getToken(); if (tk) opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk}); return _origFetch(url, opts); };
+  window.fetch = function(url, opts){ if (typeof url==="string" && url.indexOf("/api/")>=0){ if (opts && opts.headers && (opts.headers.Authorization||opts.headers.authorization)) return _origFetch(url,opts); return window.vspAuthFetch(url,opts); } return _origFetch(url,opts); };
+})();
+</script>
+<meta charset="utf-8">
+<title>MITRE ATT&amp;CK Heatmap</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+  body { margin:0; background:var(--bg0); color:var(--t1); font:13px/1.5 var(--font-sans, -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif); }
+  .wrap { max-width:1500px; margin:0 auto; padding:24px; }
+  h1 { font-family:Georgia,serif; font-weight:400; font-size:32px; margin:0 0 4px; }
+  .subtitle { color:var(--t3); font-size:13px; margin-bottom:24px; }
+  .controls { display:flex; gap:12px; align-items:center; margin-bottom:20px; }
+  .controls select, .controls button {
+    background:var(--bg2); color:var(--t1); border:1px solid var(--border);
+    padding:6px 12px; border-radius:4px; font:12px monospace; cursor:pointer;
+  }
+  .stats { display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+  .stat { background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:12px 16px; min-width:140px; }
+  .stat .v { font-family:Georgia,serif; font-size:24px; }
+  .stat .l { font-size:10px; color:var(--t3); letter-spacing:2px; text-transform:uppercase; }
+  .heatmap-scroll { overflow-x:auto; padding-bottom:8px; }
+  .heatmap { display:grid; grid-auto-flow:column; gap:8px; min-width:1400px; }
+  .col { display:flex; flex-direction:column; gap:4px; min-width:170px; }
+  .col-header {
+    background:var(--bg2); border:1px solid var(--border); border-radius:4px;
+    padding:8px 10px; min-height:48px;
+  }
+  .col-header .tac-id { font-family:monospace; font-size:10px; color:var(--t3); letter-spacing:1px; }
+  .col-header .tac-name { font-size:12px; font-weight:500; line-height:1.3; }
+  .col-header .tac-count { font-family:monospace; font-size:11px; color:var(--accent); margin-top:2px; }
+  .cell {
+    background:var(--bg2); border:1px solid var(--border); border-radius:4px;
+    padding:8px 10px; font-size:11px; cursor:default;
+    transition:transform .1s;
+  }
+  .cell:hover { transform:scale(1.03); }
+  .cell .t-id { font-family:monospace; font-size:9px; color:var(--t3); }
+  .cell .t-name { font-size:11px; line-height:1.25; margin-top:1px; }
+  .cell .t-meta { display:flex; justify-content:space-between; align-items:center; margin-top:4px; font-family:monospace; font-size:10px; }
+  .cell.critical { background:rgba(184,80,66,.45);  border-color:var(--red); }
+  .cell.high     { background:rgba(184,80,66,.25);  border-color:var(--red); }
+  .cell.medium   { background:rgba(201,169,97,.25); border-color:var(--amber); }
+  .cell.low      { background:rgba(58,106,154,.20); border-color:var(--accent); }
+  .cell.info     { background:rgba(138,128,104,.18); }
+  .cell.empty    { opacity:.4; }
+  .legend { display:flex; gap:14px; margin-top:18px; font-size:11px; align-items:center; flex-wrap:wrap; }
+  .legend .sw { display:inline-block; width:14px; height:14px; border-radius:3px; vertical-align:middle; margin-right:6px; border:1px solid var(--border); }
+  .skeleton { color:var(--t3); font-style:italic; padding:32px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MITRE ATT&amp;CK Heatmap</h1>
+  <div class="subtitle">Coverage of ATT&amp;CK Enterprise (v15) techniques inferred from your findings.</div>
+
+  <div class="controls">
+    <label style="font-size:11px;color:var(--t3)" for="window-sel">WINDOW</label>
+    <select id="window-sel" onchange="loadHeatmap()">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="180">Last 180 days</option>
+    </select>
+    <button onclick="loadHeatmap()">Refresh</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+  <div class="heatmap-scroll"><div class="heatmap" id="heatmap"><div class="skeleton">Loading…</div></div></div>
+
+  <div class="legend">
+    <span><span class="sw" style="background:rgba(184,80,66,.45);border-color:var(--red)"></span>critical</span>
+    <span><span class="sw" style="background:rgba(184,80,66,.25);border-color:var(--red)"></span>high</span>
+    <span><span class="sw" style="background:rgba(201,169,97,.25);border-color:var(--amber)"></span>medium</span>
+    <span><span class="sw" style="background:rgba(58,106,154,.20);border-color:var(--accent)"></span>low</span>
+    <span style="color:var(--t3);margin-left:auto">Mapping rules: see <code>internal/api/handler/mitre_mapping.go</code></span>
+  </div>
+</div>
+
+<script>
+const AUTH_HEADERS = {};
+
+function escapeHtml(s){ return (s||'').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+
+function renderTactic(t) {
+  if (!t.techniques || t.techniques.length === 0) {
+    return `<div class="col">
+      <div class="col-header" onclick="showTacticDetail('${t.id}')" style="cursor:pointer;transition:background .15s" title="Click to view details">
+        <div class="tac-id">${t.id}</div>
+        <div class="tac-name">${escapeHtml(t.name)}</div>
+        <div class="tac-count" style="color:var(--t3)">no findings</div>
+      </div>
+    </div>`;
+  }
+  const sorted = [...t.techniques].sort((a,b) => b.count - a.count);
+  return `<div class="col">
+    <div class="col-header" onclick="showTacticDetail('${t.id}')" style="cursor:pointer;transition:background .15s" title="Click to view details">
+      <div class="tac-id">${t.id}</div>
+      <div class="tac-name">${escapeHtml(t.name)}</div>
+      <div class="tac-count">${t.count} finding${t.count===1?'':'s'} 🔍</div>
+    </div>
+    ${sorted.map(c => `
+      <div class="cell ${c.max_severity || 'info'}" title="${c.id}: ${c.count} findings (max severity ${c.max_severity || 'info'})">
+        <div class="t-id">${c.id}</div>
+        <div class="t-name">${escapeHtml(c.name)}</div>
+        <div class="t-meta">
+          <span>${c.count}</span>
+          <span style="color:var(--t3)">${(c.max_severity||'').toUpperCase()}</span>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+async function loadHeatmap() {
+  const days = document.getElementById('window-sel').value;
+  const grid = document.getElementById('heatmap');
+  grid.innerHTML = '<div class="skeleton">Loading…</div>';
+  try {
+    const r = await fetch(`/api/v1/attack/heatmap?days=${days}`, { headers: AUTH_HEADERS });
+    if (r.status === 402) {
+      grid.innerHTML = '<div class="skeleton">PRO feature — upgrade required.</div>';
+      return;
+    }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    document.getElementById('stats').innerHTML = `
+      <div class="stat"><div class="v">${d.total_findings.toLocaleString()}</div><div class="l">Total findings</div></div>
+      <div class="stat"><div class="v" style="color:var(--green)">${(d.mapped_findings||0).toLocaleString()}</div><div class="l">Mapped to ATT&CK</div></div>
+      <div class="stat"><div class="v" style="color:var(--t3)">${(d.unmapped||0).toLocaleString()}</div><div class="l">Unmapped</div></div>
+      <div class="stat"><div class="v" style="color:var(--amber)">${d.total_findings>0?Math.round((d.mapped_findings||0)/d.total_findings*100):0}%</div><div class="l">Coverage</div></div>
+      <div class="stat"><div class="v" style="color:var(--accent)">${d.tactics_covered}/14</div><div class="l">Tactics seen</div></div>
+      <div class="stat"><div class="v" style="color:var(--accent)">${d.techniques_covered}</div><div class="l">Techniques seen</div></div>`;
+    grid.innerHTML = (d.tactics || []).map(renderTactic).join('');
+    // Store tactics for drill-down
+    window._attackTactics = d.tactics || [];
+  } catch (e) {
+    grid.innerHTML = `<div class="skeleton">Error: ${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div>`;
+  }
+}
+
+loadHeatmap();
+
+// ─── Tactic drill-down ──────────────────────────────────────
+function showTacticDetail(tacticId) {
+  var t = (window._attackTactics||[]).find(function(x){return x.id===tacticId;});
+  if (!t) return;
+  var modal = document.getElementById('tactic-modal');
+  var body = document.getElementById('tactic-modal-body');
+  if (!modal || !body) return;
+  var techs = t.techniques || [];
+  body.innerHTML =
+    '<div style="margin-bottom:12px">' +
+      '<span style="font-size:13px;font-weight:600;color:var(--t1)">' + t.name + '</span>' +
+      '<span style="margin-left:8px;font-size:11px;color:var(--t3)">' + t.id + '</span>' +
+      '<span style="margin-left:8px;font-size:11px;color:var(--amber)">' + (t.count||0) + ' findings</span>' +
+    '</div>' +
+    (techs.length ?
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">' + techs.length + ' techniques mapped:</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+      techs.map(function(tech){
+        return '<a href="https://attack.mitre.org/techniques/' + tech + '" target="_blank" ' +
+          'style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(99,102,241,.15);color:#818cf8;text-decoration:none;font-family:var(--font-mono)">' +
+          tech + '</a>';
+      }).join('') + '</div>'
+    : '<div style="color:var(--t3);font-size:11px">No techniques mapped yet</div>') +
+    '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">' +
+      '<a href="https://attack.mitre.org/tactics/' + t.id + '" target="_blank" ' +
+         'style="color:var(--cyan);font-size:11px">🔗 MITRE ATT&CK: ' + t.name + '</a>' +
+    '</div>';
+  modal.style.display = 'flex';
+}
+document.addEventListener('keydown', function(e){
+  if (e.key==='Escape') { var m=document.getElementById('tactic-modal'); if(m) m.style.display='none'; }
+});
+</script>
+<!-- Tactic detail modal -->
+<div id="tactic-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:var(--t1)">Tactic Detail</div>
+      <button onclick="document.getElementById('tactic-modal').style.display='none'" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px">×</button>
+    </div>
+    <div id="tactic-modal-body"></div>
+  </div>
+</div>
+</body>
+</html>
+</body>
+</html>

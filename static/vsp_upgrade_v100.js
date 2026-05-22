@@ -33,9 +33,15 @@ async function safeApi(method, url, fallback = {}) {
     if (!window.TOKEN && !localStorage.getItem('vsp_token')) {
       return fallback;
     }
+    // Per-endpoint timeout: some KPI aggregations (remediation/stats,
+    // findings/summary) scan 50k+ rows on the first poll after a cache
+    // miss. 8s tripped them on the user's tenant; bump to 20s for the
+    // known-slow paths. Everything else stays on the 8s budget.
+    const slowPaths = ['/remediation/stats', '/findings/summary', '/vsp/runs/index'];
+    const timeoutMs = slowPaths.some(p => url.includes(p)) ? 20000 : 8000;
     const result = await Promise.race([
       window.api(method, url),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))
     ]);
     return result || fallback;
   } catch (e) {
@@ -292,21 +298,21 @@ function upgradeFindings() {
   bar.id = 'findings-filter-bar';
   bar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center';
   bar.innerHTML = `
-    <select id="vsp-filter-severity" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
+    <select aria-label="Vsp Filter Severity" id="vsp-filter-severity" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
       <option value="">All Severities</option>
       <option value="CRITICAL">🔴 CRITICAL</option>
       <option value="HIGH">🟠 HIGH</option>
       <option value="MEDIUM">🟡 MEDIUM</option>
       <option value="LOW">🟢 LOW</option>
     </select>
-    <select id="vsp-filter-tool" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
+    <select aria-label="Vsp Filter Tool" id="vsp-filter-tool" style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 8px;border-radius:4px;font-size:11px">
       <option value="">All Tools</option>
       <option value="kics">kics</option><option value="trivy">trivy</option>
       <option value="gitleaks">gitleaks</option><option value="checkov">checkov</option>
       <option value="bandit">bandit</option><option value="semgrep">semgrep</option>
       <option value="grype">grype</option><option value="codeql">codeql</option>
     </select>
-    <input id="vsp-filter-search" placeholder="Search findings..." style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 10px;border-radius:4px;font-size:11px;flex:1;min-width:150px">
+    <input aria-label="Search findings..." id="vsp-filter-search" placeholder="Search findings..." style="background:var(--card);border:1px solid var(--border2);color:var(--text1);padding:4px 10px;border-radius:4px;font-size:11px;flex:1;min-width:150px">
     <button class="btn-sm btn-primary" onclick="applyFindingsFilter()">Filter</button>
     <button class="btn-sm" onclick="clearFindingsFilter()">Clear</button>`;
   panel.insertBefore(bar, panel.firstChild);
@@ -834,7 +840,7 @@ window.vspGetPosture = async function() {
     if (document.getElementById('dod-widget-row')) return;
     injectDoDRow();
     loadDoDWidgets();
-    console.log('[VSP] DoD widgets auto-injected');
+    if (window.VSP_DEBUG) console.log('[VSP] DoD widgets injected');
   }
   // Thử nhiều lần: 1s, 2s, 3s, 5s sau khi load
   [1000, 2000, 3000, 5000].forEach(function(ms) {
@@ -987,6 +993,19 @@ window.vspGetPosture = async function() {
 // LAST_OVERRIDE — inject sau tất cả, dùng DOMContentLoaded để chắc chắn chạy sau
 window.addEventListener('load', function() {
   function _masterShow(name, btn) {
+    // Dismiss PRO overlay before navigating — see _FINAL below for the
+    // full rationale. Both showPanel variants need this guard because
+    // either may win the binding race depending on script order.
+    try {
+      if (window.PRO && typeof window.PRO.closePanel === 'function') window.PRO.closePanel();
+      if (window.VSP_PRO && typeof window.VSP_PRO.closePanel === 'function') window.VSP_PRO.closePanel();
+      var po_ = document.getElementById('pro-overlay'); if (po_) po_.classList.remove('open');
+      // vspm-overlay is a *class*, not an id — openModal in
+      // vsp_pro_realapi.js appends one node per open() call, so a
+      // querySelectorAll().forEach(remove) is needed to clear them all.
+      document.querySelectorAll('.vspm-overlay').forEach(function(o){ o.remove(); });
+      document.body.style.overflow = '';
+    } catch(e) {}
     document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
     document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
     var panel = document.getElementById('panel-' + name);
@@ -1006,7 +1025,7 @@ window.addEventListener('load', function() {
     if(panel){var iframe=panel.querySelector('iframe[data-src]');if(iframe&&!iframe.src)iframe.src=iframe.getAttribute('data-src');}
     var loaders={runs:function(){if(typeof window.loadRuns==='function')window.loadRuns();},audit:function(){if(typeof loadAuditReal==='function')loadAuditReal();},dashboard:function(){if(typeof initDashboardCharts==='function')initDashboardCharts();},findings:function(){if(typeof loadFindingsPanel==='function')loadFindingsPanel();},sla:function(){if(typeof loadSLA==='function')loadSLA();},sbom:function(){if(typeof loadSBOM==='function')loadSBOM();},compliance:function(){if(typeof loadFedRAMP==='function')loadFedRAMP();},governance:function(){if(typeof window.loadRiskRegister==='function')window.loadRiskRegister();},executive:function(){if(typeof loadExecutive==='function')loadExecutive();}};
     if(loaders[name]) setTimeout(loaders[name], 120);
-    console.log('[VSP MASTER] showPanel:', name);
+    (window.VSP_DEBUG && console.log('[VSP MASTER] showPanel:', name));
   }
   window.showPanel = _masterShow;
   if(window.VSP_DEBUG)console.log('[VSP] LAST_OVERRIDE installed');
@@ -1015,6 +1034,24 @@ window.addEventListener('load', function() {
 // LOCK_SHOW_PANEL — dùng defineProperty để không ai override được nữa
 window.addEventListener('load', function() {
   function _FINAL(name, btn) {
+    // Dismiss any open PRO/SIEM modal overlay before activating a new
+    // panel. Pre-fix the user would click Container Security (which
+    // opens #pro-overlay via PRO.openPanel) and then click SBOM in
+    // the sidebar — showPanel correctly activated #panel-sbom
+    // underneath, but the #pro-overlay div with display:flex stayed
+    // on top, so the user saw "Cloud security posture management"
+    // instead of SBOM. Same for .vspm-overlay nodes spawned by
+    // vsp_pro_realapi.openModal. Closing here makes nav-clicks
+    // unambiguous.
+    try {
+      if (window.PRO && typeof window.PRO.closePanel === 'function') window.PRO.closePanel();
+      if (window.VSP_PRO && typeof window.VSP_PRO.closePanel === 'function') window.VSP_PRO.closePanel();
+      var po = document.getElementById('pro-overlay'); if (po) po.classList.remove('open');
+      // openModal in vsp_pro_realapi.js appends one .vspm-overlay node
+      // per open() call — clear them all on nav transition.
+      document.querySelectorAll('.vspm-overlay').forEach(function(o){ o.remove(); });
+      document.body.style.overflow = '';
+    } catch(e) {}
     document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
     document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
     var panel = document.getElementById('panel-' + name);
@@ -1030,7 +1067,7 @@ window.addEventListener('load', function() {
     var _pt=document.getElementById('page-title'); if(_pt) _pt.textContent=(meta&&meta.title)||_T[name]||name;
     var _ps=document.getElementById('page-sub');   if(_ps) _ps.textContent=(meta&&meta.sub)||_S[name]||('VSP / '+name);
     if(panel){var fr=panel.querySelector('iframe[data-src]');if(fr&&!fr.src)fr.src=fr.getAttribute('data-src');}
-    var L={runs:function(){window.loadRuns&&window.loadRuns();},audit:function(){typeof loadAuditReal==='function'&&loadAuditReal();},dashboard:function(){typeof initDashboardCharts==='function'&&initDashboardCharts();},findings:function(){typeof loadFindingsPanel==='function'&&loadFindingsPanel();},sla:function(){typeof loadSLA==='function'&&loadSLA();},sbom:function(){typeof loadSBOM==='function'&&loadSBOM();},compliance:function(){typeof loadFedRAMP==='function'&&loadFedRAMP();},governance:function(){typeof window.loadRiskRegister==='function'&&window.loadRiskRegister();},executive:function(){typeof loadExecutive==='function'&&loadExecutive();}};
+    var L={runs:function(){window.loadRuns&&window.loadRuns();},audit:function(){typeof loadAuditReal==='function'&&loadAuditReal();},dashboard:function(){typeof initDashboardCharts==='function'&&initDashboardCharts();if(typeof loadDashKPIs==='function')loadDashKPIs();},findings:function(){typeof loadFindingsPanel==='function'&&loadFindingsPanel();},sla:function(){typeof loadSLA==='function'&&loadSLA();},sbom:function(){typeof loadSBOM==='function'&&loadSBOM();},compliance:function(){typeof loadFedRAMP==='function'&&loadFedRAMP();},governance:function(){typeof window.loadRiskRegister==='function'&&window.loadRiskRegister();},executive:function(){typeof loadExecutive==='function'&&loadExecutive();},export:function(){typeof loadExportRuns==='function'&&loadExportRuns();},analytics:function(){typeof loadAnalytics==='function'&&loadAnalytics();},remediation:function(){typeof loadRemediations==='function'&&loadRemediations();},soc:function(){typeof drawSocRadar==='function'&&drawSocRadar();if(typeof loadSOCv2==='function')loadSOCv2();},users:function(){typeof loadUsers==='function'&&loadUsers();},policy:function(){typeof loadRules==='function'&&loadRules();},scanlog:function(){typeof loadRunsDropdown==='function'&&loadRunsDropdown();}};
     if(L[name]) setTimeout(L[name], 150);
     if(window.VSP_DEBUG)console.log('[VSP FINAL] panel:', name);
   }
@@ -1040,10 +1077,10 @@ window.addEventListener('load', function() {
       writable: false,
       configurable: false
     });
-    console.log('[VSP] LOCK_SHOW_PANEL — locked!');
+    if (window.VSP_DEBUG) console.log('[VSP] showPanel locked (defineProperty)');
   } catch(e) {
     window.showPanel = _FINAL;
-    console.log('[VSP] LOCK_SHOW_PANEL — assigned (no lock)');
+    if (window.VSP_DEBUG) console.log('[VSP] showPanel assigned (defineProperty failed)');
   }
 });
 
@@ -1223,59 +1260,59 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
         fetch('/api/v1/remediation/stats', {headers:h}).then(r=>r.json()).catch(()=>({}))
       ]);
       var rems = remD.remediations || [];
-      
-      // Count by status
+
+      // Update KPI từ statsD (all-time counts, not limited to 200 records)
+      var s = statsD || {};
+      var _el;
+      _el = document.getElementById('rem-k-open');       if(_el) _el.textContent = s.open        !== undefined ? s.open.toLocaleString()        : '—';
+      _el = document.getElementById('rem-k-inprogress'); if(_el) _el.textContent = s.in_progress !== undefined ? s.in_progress.toLocaleString()  : '—';
+      _el = document.getElementById('rem-k-resolved');   if(_el) _el.textContent = s.resolved    !== undefined ? s.resolved.toLocaleString()    : '—';
+      _el = document.getElementById('rem-k-accepted');   if(_el) _el.textContent = s.accepted    !== undefined ? s.accepted.toLocaleString()    : '0';
+      _el = document.getElementById('rem-k-fp');         if(_el) _el.textContent = s.false_positive !== undefined ? s.false_positive.toLocaleString() : '0';
+      _el = document.getElementById('rem-k-suppressed'); if(_el) _el.textContent = s.suppressed  !== undefined ? s.suppressed.toLocaleString()  : '0';
+      var cntEl = document.getElementById('rem-count');
+      if(cntEl) cntEl.textContent = (s.total||rems.length).toLocaleString()+' remediations · '+(s.resolution_rate||0)+'% resolved';
+
       var counts = {open:0,in_progress:0,resolved:0,accepted:0,false_positive:0,suppressed:0};
       rems.forEach(function(r){ if(counts[r.status]!==undefined) counts[r.status]++; });
-      
-      // Update KPIs
-      var map = {'rem-k-open':'open','rem-k-inprogress':'in_progress','rem-k-resolved':'resolved',
-                 'rem-k-accepted':'accepted','rem-k-fp':'false_positive','rem-k-suppressed':'suppressed'};
-      Object.keys(map).forEach(function(id){
-        var el=document.getElementById(id); if(el) el.textContent=counts[map[id]]||0;
-      });
-      
-      var total = rems.length;
-      var closed = counts.resolved+counts.accepted+counts.false_positive+counts.suppressed;
-      var rate = total>0?Math.round(closed/total*100):0;
-      var cntEl = document.getElementById('rem-count');
-      if(cntEl) cntEl.textContent = total+' remediations · '+rate+'% resolved';
 
-      // Render table — fetch findings để get severity/tool/rule
-      var fdResp = await fetch('/api/v1/vsp/findings?limit=5000', {headers:h}).then(r=>r.json()).catch(()=>({findings:[]}));
-      var findMap = {};
-      (fdResp.findings||[]).forEach(function(f){ findMap[f.id]=f; });
-      
-      var sevClass={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'};
+      // Backend API `/api/v1/remediation` already JOINs findings server-side
+      // and returns severity/tool/rule_id/title inline on each remediation row.
+      // Earlier this code did a 2nd /findings fetch + client-side findMap which
+      // dropped to `—` whenever the lookup missed (most rows). Now: use API
+      // fields directly. Skipping the extra fetch also halves load time.
+      var sevClass={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low',INFO:'sev-info'};
       var statusPill={open:'pill-fail',in_progress:'pill-warn',resolved:'pill-pass',accepted:'pill-done',false_positive:'pill-queue',suppressed:''};
       var priColor={P1:'c-red',P2:'c-orange',P3:'c-amber',P4:'c-t2'};
-      
+
       var tbody = document.getElementById('rem-tbody');
       if(!tbody) return;
-      
+
       if(!rems.length){ tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No remediations yet</td></tr>'; return; }
-      
+
+      var __esc = function(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
       tbody.innerHTML = rems.map(function(r,i){
-        var f = findMap[r.finding_id]||{};
-        var sc=sevClass[f.severity]||'';
+        var sev=(r.severity||'').toUpperCase();
+        var sc=sevClass[sev]||'';
         var sp=statusPill[r.status]||'';
         var pc=priColor[r.priority]||'';
+        var title=r.title||r.message||r.finding_id||'—';
+        var slaBadge = (typeof window._remSLABadge==='function') ? window._remSLABadge(r) : '';
         return '<tr style="cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'var(--surface2)\'" onmouseleave="this.style.background=\'\'" onclick="_openRemDetail('+i+')">'
-          +'<td>'+(f.severity?'<span class="sev '+sc+'">'+f.severity+'</span>':'—')+'</td>'
-          +'<td class="c-t3 f11">'+(f.tool||'—')+'</td>'
-          +'<td class="mono c-purple f10" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(f.rule_id||'—')+'</td>'
-          +'<td class="f12" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(f.message||'')+'">'+( f.message||r.finding_id||'—')+'</td>'
-          +'<td class="c-t3 f11">'+(r.assignee||'—')+'</td>'
+          +'<td>'+(sev?'<span class="sev '+sc+'">'+sev+'</span>':'—')+'</td>'
+          +'<td class="c-t3 f11">'+__esc(r.tool||'—')+'</td>'
+          +'<td class="mono c-purple f10" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+__esc(r.rule_id||'')+'">'+__esc((r.rule_id||'').slice(0,8)||'—')+'</td>'
+          +'<td class="f12" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+__esc(title)+'">'+__esc(title)+'</td>'
+          +'<td class="f11">'+(r.assignee?'<span class="c-t2">'+__esc(r.assignee)+'</span>':'<span class="c-t4" style="font-style:italic">unassigned</span>')+'</td>'
           +'<td class="'+pc+' fw7 f11">'+(r.priority||'—')+'</td>'
-          +'<td><span class="pill '+sp+'" style="font-size:9px">'+r.status+'</span></td>'
+          +'<td><span class="pill '+sp+'" style="font-size:9px">'+r.status+'</span> '+slaBadge+'</td>'
           +'<td><button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" onclick="event.stopPropagation();_openRemDetail('+i+')">Edit</button></td>'
           +'</tr>';
       }).join('');
-      
-      // Store for _openRemDetail
+
+      // Store original rem rows for _openRemDetail (with API-provided fields).
       window._remData = rems.map(function(r){
-        var f=findMap[r.finding_id]||{};
-        return Object.assign({},r,{severity:f.severity,tool:f.tool,rule_id:f.rule_id,description:f.message});
+        return Object.assign({}, r, { description: r.title || r.message });
       });
       
       // Update rate KPI
@@ -1341,7 +1378,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
         +mkFW('SOC 2 Type II', getScore('SOC'), 'Trust service criteria', 'CC1-CC9')
         +mkFW('CIS Controls v8', getScore('CIS')||55, 'Implementation groups', 'IG1,IG2')
         +mkFW('Zero Trust Maturity', getScore('Zero')||78, 'CISA ZT pillars', '7 pillars assessed');
-      console.log('[VSP] SOC Scorecard updated from API');
+      (window.VSP_DEBUG && console.log('[VSP] SOC Scorecard updated from API'));
     } catch(e) { console.error('SOC Scorecard:', e); }
   };
 })();
@@ -1367,10 +1404,10 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
         +'<div class="card-body" style="padding:12px 14px">'
         +'<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin-bottom:12px">'
         +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Base run</label>'
-        +'<select id="sbom-diff-base" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
+        +'<select aria-label="Sbom Diff Base" id="sbom-diff-base" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
         +'<div style="font-size:18px;color:var(--t3);text-align:center">→</div>'
         +'<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:4px">Compare run</label>'
-        +'<select id="sbom-diff-head" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
+        +'<select aria-label="Sbom Diff Head" id="sbom-diff-head" class="filter-select" style="width:100%"><option value="">Loading...</option></select></div>'
         +'</div>'
         +'<div id="sbom-diff-result"></div>'
         +'</div>';
@@ -1381,20 +1418,45 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.0 loaded — RACI+SOC+Remediatio
     }, 500);
   };
 
-  window._loadSBOMDiffRuns = async function() {
+  // Loads the run list into the SBOM diff Base/Compare dropdowns.
+  // Pre-fix this function had an empty `catch(e){}` — when the user
+  // opened the SBOM diff panel during the service restart window
+  // (e.g. right after `systemctl restart vsp-gateway`), the fetch
+  // failed with ERR_CONNECTION_REFUSED, the catch swallowed the
+  // error, and the dropdowns stayed on "Loading..." forever. The
+  // browser cache made a manual page refresh useless because the
+  // panel-show flow only called this function once at bootstrap.
+  // Now: exponential retry (1s → 2s → 4s) + visible error state
+  // with a manual Reload button so the user can recover without F5.
+  window._loadSBOMDiffRuns = async function(attempt) {
+    attempt = attempt || 0;
     await ensureToken();
     var h = {'Authorization':'Bearer '+window.TOKEN};
+    var base = document.getElementById('sbom-diff-base');
+    var head = document.getElementById('sbom-diff-head');
     try {
-      var d = await fetch('/api/v1/vsp/runs/index?limit=50', {headers:h}).then(r=>r.json());
+      var d = await fetch('/api/v1/vsp/runs/index?limit=50', {headers:h}).then(function(r){
+        if (!r.ok) throw new Error('HTTP '+r.status);
+        return r.json();
+      });
       var runs = (d.runs||[]).filter(function(r){ return r.status==='DONE'; });
       var opts = runs.map(function(r){
         return '<option value="'+r.rid+'">'+r.rid.slice(-20)+' · '+r.mode+' · '+(r.total||0)+'f</option>';
       }).join('');
-      var base = document.getElementById('sbom-diff-base');
-      var head = document.getElementById('sbom-diff-head');
       if (base) { base.innerHTML = '<option value="">— base run —</option>'+opts; if(runs.length>1) base.value=runs[1].rid; }
       if (head) { head.innerHTML = '<option value="">— compare run —</option>'+opts; if(runs.length>0) head.value=runs[0].rid; }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('[SBOM-DIFF] runs fetch failed (attempt '+(attempt+1)+'):', e.message || e);
+      if (attempt < 2) {
+        var backoff = (attempt + 1) * 1000;
+        setTimeout(function(){ window._loadSBOMDiffRuns(attempt + 1); }, backoff);
+        return;
+      }
+      // Final failure → show actionable error, not silent loading.
+      var errOpts = '<option value="">⚠ Failed to load runs — click here to retry</option>';
+      if (base) { base.innerHTML = errOpts; base.onchange = function(){ window._loadSBOMDiffRuns(0); }; }
+      if (head) { head.innerHTML = errOpts; head.onchange = function(){ window._loadSBOMDiffRuns(0); }; }
+    }
   };
 
   window._runSBOMDiff = async function() {
@@ -1564,7 +1626,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
           +'</div>';
       };
       body.innerHTML = frameworks.map(mkFW).join('');
-      console.log('[VSP] SOC Scorecard v3.4 updated:', frameworks.length, 'frameworks');
+      (window.VSP_DEBUG && console.log('[VSP] SOC Scorecard v3.4 updated:', frameworks.length, 'frameworks'));
     } catch(e) { console.error('SOC scorecard v3.4:', e); }
   };
   // Trigger ngay nếu SOC panel đang active
@@ -1708,7 +1770,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
         var created = r.created_at ? new Date(r.created_at).toLocaleDateString('vi-VN') : '';
         return '<div class="rule-card" style="border-left:2px solid var(--cyan)">'
           +'<div class="rule-header">'
-          +'<div class="rule-name">'+r.name+'</div>'
+          +'<div class="rule-name" style="cursor:pointer" onclick="_viewPolicyRule(\''+r.id+'\')" title="Click to view details">'+r.name+'</div>'
           +'<span class="rule-tag" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2)">API</span>'
           +'<button class="toggle-btn'+(r.active?' on':'')+'" data-id="'+r.id+'" onclick="_togglePolicyRule(this)"></button>'
           +'</div>'
@@ -1717,6 +1779,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
           +'<span>Fail on: <b>'+(tags.join(', ')||r.fail_on||'custom')+'</b></span>'
           +'<div style="display:flex;gap:6px">'
           +(created?'<span style="font-size:9px;color:var(--t3)">'+created+'</span>':'')
+          +'<button class="btn btn-ghost" style="font-size:9px;padding:2px 8px;color:var(--cyan)" onclick="_editPolicyRule(\''+r.id+'\',this)">Edit</button>'
           +'<button class="btn btn-ghost" style="font-size:9px;padding:2px 8px;color:var(--red)" onclick="_deletePolicyRule(\''+r.id+'\')">Delete</button>'
           +'</div></div></div>';
       }).join('');
@@ -1734,11 +1797,129 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
     await ensureToken();
     try {
       await fetch('/api/v1/policy/rules/'+id, {
-        method:'PUT', headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+        method:'PATCH', headers:{'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
         body: JSON.stringify({active: !active})
       });
       showToast('Rule '+(active?'disabled':'enabled'),'info');
     } catch(e) { showToast('Update failed','error'); }
+  };
+
+
+  window._viewPolicyRule = async function(id) {
+    await ensureToken();
+    var resp = await fetch('/api/v1/policy/rules', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var data = await resp.json().catch(function(){return{rules:[]};});
+    var r = (data.rules||[]).find(function(x){return x.id===id;});
+    if (!r) { showToast('Rule not found','error'); return; }
+    var existing = document.getElementById('view-rule-modal-gov');
+    if (existing) existing.remove();
+    var tags = [];
+    if (r.block_critical) tags.push('<span class="pill" style="background:var(--red2);color:var(--red);font-size:9px">BLOCK CRITICAL</span>');
+    if (r.block_secrets)  tags.push('<span class="pill" style="background:var(--amber3);color:var(--amber);font-size:9px">BLOCK SECRETS</span>');
+    if (r.max_high >= 0)  tags.push('<span class="pill" style="background:var(--b2);color:var(--t2);font-size:9px">MAX HIGH: '+r.max_high+'</span>');
+    if (r.min_score > 0)  tags.push('<span class="pill" style="background:var(--b2);color:var(--t2);font-size:9px">MIN SCORE: '+r.min_score+'</span>');
+    var created = r.created_at ? new Date(r.created_at).toLocaleString('vi-VN') : '—';
+    var overlay = document.createElement('div');
+    overlay.id = 'view-rule-modal-gov';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = '<div class="modal" style="max-width:500px">'
+      +'<div class="modal-header">'
+      +'<div class="modal-title">'+r.name+'</div>'
+      +'<button class="modal-close" onclick="document.getElementById(\'view-rule-modal-gov\').remove()">✕</button>'
+      +'</div>'
+      +'<div class="modal-body">'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'
+      +'<div><div class="form-label" style="margin-bottom:4px">Rule ID</div><div class="mono-sm c-t3">'+r.id+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Status</div>'
+      +'<span class="pill" style="background:'+(r.active?'var(--green2)':'var(--b2)')+';color:'+(r.active?'var(--green)':'var(--t3)')+';font-size:9px">'+(r.active?'ACTIVE':'INACTIVE')+'</span></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Fail on</div><div class="mono-sm fw7">'+r.fail_on+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Repo pattern</div><div class="mono-sm">'+r.repo_pattern+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Min score</div><div class="mono-sm">'+r.min_score+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Max HIGH</div><div class="mono-sm">'+(r.max_high<0?'unlimited':r.max_high)+'</div></div>'
+      +'<div><div class="form-label" style="margin-bottom:4px">Created</div><div class="mono-sm c-t3">'+created+'</div></div>'
+      +'</div>'
+      +'<div class="form-label" style="margin-bottom:6px">Conditions</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">'+(tags.join('')||'<span class="mono-sm c-t3">None</span>')+'</div>'
+      +'</div>'
+      +'<div class="modal-footer">'
+      +'<button class="btn btn-ghost" onclick="document.getElementById(\'view-rule-modal-gov\').remove()">Close</button>'
+      +'<button class="btn btn-primary" onclick="document.getElementById(\'view-rule-modal-gov\').remove();_editPolicyRule(\''+r.id+'\',null)">Edit rule</button>'
+      +'</div></div>';
+    document.body.appendChild(overlay);
+    setTimeout(function(){ overlay.classList.add('open'); }, 10);
+  };
+
+  window._editPolicyRule = async function(id, btn) {
+    await ensureToken();
+    var resp = await fetch('/api/v1/policy/rules', {headers:{'Authorization':'Bearer '+window.TOKEN}});
+    var data = await resp.json().catch(function(){return{rules:[]};});
+    var rule = (data.rules||[]).find(function(r){return r.id===id;});
+    if (!rule) { showToast('Rule not found','error'); return; }
+    var existing = document.getElementById('edit-rule-modal-gov');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.id = 'edit-rule-modal-gov';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = '<div class="modal" style="max-width:480px"><div class="modal-header">'
+      +'<div class="modal-title">Edit rule: '+rule.name+'</div>'
+      +'<button class="modal-close" onclick="document.getElementById(\"edit-rule-modal-gov\").remove()">✕</button>'
+      +'</div><div class="modal-body">'
+      +'<div class="form-group mb8"><label class="form-label">Rule name <span style="color:var(--red)">*</span></label>'
+      +'<input id="er-name-gov" class="form-ctrl" value="'+rule.name+'"></div>'
+      +'<div class="g2 mb8">'
+      +'<div class="form-group"><label class="form-label">Fail on</label>'
+      +'<select id="er-failon-gov" class="form-ctrl">'
+      +'<option value="FAIL"'+(rule.fail_on==='FAIL'?' selected':'')+'>FAIL gate</option>'
+      +'<option value="WARN"'+(rule.fail_on==='WARN'?' selected':'')+'>WARN only</option>'
+      +'</select></div>'
+      +'<div class="form-group"><label class="form-label">Min score</label>'
+      +'<input id="er-score-gov" class="form-ctrl" type="number" value="'+(rule.min_score||0)+'" min="0" max="10"></div>'
+      +'</div>'
+      +'<div class="g2 mb8">'
+      +'<div class="form-group"><label class="form-label">Max HIGH findings</label>'
+      +'<input id="er-maxhigh-gov" class="form-ctrl" type="number" value="'+(rule.max_high||0)+'" min="-1"></div>'
+      +'<div class="form-group"><label class="form-label">Repo pattern</label>'
+      +'<input id="er-repo-gov" class="form-ctrl" value="'+(rule.repo_pattern||'*')+'"></div>'
+      +'</div>'
+      +'<div class="g2 mb8">'
+      +'<label class="form-label" style="display:flex;align-items:center;gap:6px;cursor:pointer">'
+      +'<input type="checkbox" id="er-blockcrit-gov"'+(rule.block_critical?' checked':'')+'>Block CRITICAL</label>'
+      +'<label class="form-label" style="display:flex;align-items:center;gap:6px;cursor:pointer">'
+      +'<input type="checkbox" id="er-blocksec-gov"'+(rule.block_secrets?' checked':'')+'>Block Secrets</label>'
+      +'</div>'
+      +'</div><div class="modal-footer">'
+      +'<button class="btn btn-ghost" onclick="document.getElementById(\"edit-rule-modal-gov\").remove()">Cancel</button>'
+      +'<button class="btn btn-primary" onclick="_submitEditRule(\''+rule.id+'\')">Save changes</button>'
+      +'</div></div>';
+    document.body.appendChild(overlay);
+    setTimeout(function(){ overlay.classList.add('open'); }, 10);
+  };
+
+  window._submitEditRule = async function(id) {
+    var name = (document.getElementById('er-name-gov')||{}).value||'';
+    if (!name) { showToast('Rule name required','error'); return; }
+    var payload = {
+      name: name,
+      fail_on: (document.getElementById('er-failon-gov')||{}).value||'FAIL',
+      min_score: parseInt((document.getElementById('er-score-gov')||{}).value||'0'),
+      max_high: parseInt((document.getElementById('er-maxhigh-gov')||{}).value||'-1'),
+      repo_pattern: (document.getElementById('er-repo-gov')||{}).value||'*',
+      block_critical: !!(document.getElementById('er-blockcrit-gov')||{}).checked,
+      block_secrets: !!(document.getElementById('er-blocksec-gov')||{}).checked,
+    };
+    await ensureToken();
+    try {
+      var r = await fetch('/api/v1/policy/rules/'+id, {
+        method: 'PUT',
+        headers: {'Authorization':'Bearer '+window.TOKEN,'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if (!r.ok) { var e=await r.json().catch(function(){return{};}); showToast('Failed: '+(e.error||r.status),'error'); return; }
+      document.getElementById('edit-rule-modal-gov').remove();
+      showToast('Rule updated','success');
+      document.getElementById('panel-policy')._policyLoaded = false;
+      _loadPolicyFull();
+    } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
   window._deletePolicyRule = async function(id) {
@@ -1896,19 +2077,52 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
             +'<span class="mono-sm c-t3">'+kv[1]+'</span></div>';
         }).join('')+'</div>' : '')
 
-        // CVE list top 5
-        +(cveFindings.length ? '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--t2);margin-bottom:8px">TOP CVEs</div>'
-        +'<div style="display:grid;gap:3px">'
-        +cveFindings.slice(0,5).map(function(f){
-          var sc={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'}[f.severity]||'';
-          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--b2);border-radius:6px">'
-            +'<span class="sev '+sc+'" style="flex-shrink:0">'+f.severity+'</span>'
-            +'<span class="mono f10 c-blue" style="flex-shrink:0">'+f.rule_id+'</span>'
-            +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.message+'</span>'
+        // CVE list top 5 — dedup by rule_id (was rendering same CVE 4× when
+        // it appeared in multiple findings/files). Keep highest-severity
+        // sample of each unique CVE and show occurrence count.
+        +(function(){
+          var sevRank = {CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3, INFO:4};
+          var byCVE = {};
+          cveFindings.forEach(function(f){
+            var k = f.rule_id;
+            if (!byCVE[k] || (sevRank[f.severity]||9) < (sevRank[byCVE[k].severity]||9)) {
+              byCVE[k] = Object.assign({}, f, { _count: (byCVE[k]?byCVE[k]._count:0) + 1 });
+            } else {
+              byCVE[k]._count = (byCVE[k]._count||1) + 1;
+            }
+          });
+          var unique = Object.values(byCVE).sort(function(a,b){
+            var sa = sevRank[a.severity]||9, sb = sevRank[b.severity]||9;
+            if (sa !== sb) return sa - sb;
+            return (b._count||1) - (a._count||1);
+          });
+          if (!unique.length) return '';
+          return '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--t2);margin-bottom:8px">TOP CVEs</div>'
+            +'<div style="display:grid;gap:3px">'
+            +unique.slice(0,5).map(function(f){
+              var sc={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'}[f.severity]||'';
+              var countTag = (f._count||1) > 1 ? '<span style="font-size:9px;color:var(--t3);flex-shrink:0">×'+f._count+'</span>' : '';
+              return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--b2);border-radius:6px">'
+                +'<span class="sev '+sc+'" style="flex-shrink:0">'+f.severity+'</span>'
+                +'<span class="mono f10 c-blue" style="flex-shrink:0">'+f.rule_id+'</span>'
+                +countTag
+                +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.message+'</span>'
+                +'</div>';
+            }).join('')
+            +(unique.length>5?unique.slice(5).map(function(f){
+              var sc2={CRITICAL:'sev-crit',HIGH:'sev-high',MEDIUM:'sev-med',LOW:'sev-low'}[f.severity]||'';
+              var countTag2=(f._count||1)>1?'<span style="font-size:9px;color:var(--t3);flex-shrink:0">×'+f._count+'</span>':'';
+              return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--b2);border-radius:6px">'
+                +'<span class="sev '+sc2+'" style="flex-shrink:0">'+f.severity+'</span>'
+                +'<span class="mono f10 c-blue" style="flex-shrink:0">'+f.rule_id+'</span>'
+                +countTag2
+                +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.message+'</span>'
+                +'</div>';
+            }).join(''):'')
+
+
             +'</div>';
-        }).join('')
-        +(cveFindings.length>5?'<div style="font-size:10px;color:var(--t3);padding:4px 8px">...và '+(cveFindings.length-5)+' CVEs khác</div>':'')
-        +'</div>' : '');
+        })();
 
       showToast('Standards loaded: '+findings.length+' findings analyzed','info');
     } catch(e) { 
@@ -2086,7 +2300,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
 (function(){
   var iframePanels = ['swinventory','users','ai_analyst','scheduler','correlation','soar',
     'logsources','ueba','assets','netflow','threathunt','vulnmgmt','threatintel',
-    'p4compliance','cicd','integrations','settings'];
+    'p4compliance','cicd','integrations','settings','conmon','ai_advisor','sso_admin'];
   
   setInterval(function(){
     iframePanels.forEach(function(name){
@@ -2095,7 +2309,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       var iframe = panel.querySelector('iframe[data-src]');
       if (iframe && !iframe.src.includes('.html')) {
         iframe.src = iframe.getAttribute('data-src');
-        console.log('[VSP] iframe loaded:', name);
+        (window.VSP_DEBUG && console.log('[VSP] iframe loaded:', name));
       }
     });
   }, 300);
@@ -2106,7 +2320,7 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
 (function(){
   var iframePanels = ['swinventory','users','ai_analyst','scheduler','correlation','soar',
     'logsources','ueba','assets','netflow','threathunt','vulnmgmt','threatintel',
-    'p4compliance','cicd','integrations','settings'];
+    'p4compliance','cicd','integrations','settings','conmon','ai_advisor','sso_admin'];
   
   setInterval(function(){
     iframePanels.forEach(function(name){
@@ -2115,9 +2329,1332 @@ if(window.VSP_DEBUG)console.log('[VSP] PATCH v3.3 SOC+SBOM+SLA loaded');
       var iframe = panel.querySelector('iframe[data-src]');
       if (iframe && !iframe.src.includes('.html')) {
         iframe.src = iframe.getAttribute('data-src');
-        console.log('[VSP] iframe loaded:', name);
+        (window.VSP_DEBUG && console.log('[VSP] iframe loaded:', name));
       }
     });
   }, 300);
   if(window.VSP_DEBUG)console.log('[VSP] PATCH v4.1 iframe auto-load loaded');
 })();
+
+// ============ SBOM UNIFIED PANEL (auto-appended) ============
+/* =============================================================================
+ * vsp_sbom_unified.js
+ *   Gộp panel SBOM + SBOM Diff thành MỘT panel duy nhất với 3 view-mode:
+ *     1. Inventory  — list SBOM của từng run (tương đương panel SBOM cũ)
+ *     2. Diff       — so sánh 2 run (tương đương /panels/sbom_diff.html)
+ *     3. Trend      — sparkline NEW/FIXED/PERSIST qua N runs gần nhất
+ *
+ *   Drop-in: chỉ cần thêm 1 dòng <script> vào index.html, sau các vsp_*_patch.
+ *   Không cần sửa HTML. Patch tự:
+ *     - Inject UI mới vào #panel-sbom (giữ nguyên element cũ ẩn đi để fallback)
+ *     - Ẩn nav "SBOM Diff" cũ (do VSP-G2 inject) nếu có
+ *     - Wire vào loadSBOM() hiện tại để compatibility
+ *
+ *   Backend cần có (đã có sẵn):
+ *     GET /api/v1/vsp/runs/index?limit=N
+ *     GET /api/v1/vsp/findings?run_id=<UUID>&limit=N    (sau patch findings.go)
+ *     GET /api/v1/sbom/<rid>
+ * ============================================================================= */
+(function () {
+  'use strict';
+  if (window.__VSP_SBOM_UNIFIED__) return;
+  window.__VSP_SBOM_UNIFIED__ = true;
+
+  // ---- State ----------------------------------------------------------------
+  var S = window._sbomUnified = {
+    view: 'inventory',          // 'inventory' | 'diff' | 'trend'
+    runs: [],                   // tất cả runs DONE (giảm dần theo created_at)
+    newRunUUID: '',             // diff: target run uuid
+    baseRunUUID: '',            // diff: baseline run uuid
+    newFindings: [],
+    baseFindings: [],
+    diffCache: null,            // {newOnly, fixed, persisted}
+    filters: { sev: '', tool: '', q: '', gate: '', mode: '' },
+    pagination: { inv: 0, diff: 0 },
+    pageSize: 15,
+    trendDays: 30,
+    selectedFindings: {}    // fingerprint → true/false
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function token() { return window.TOKEN || (typeof localStorage !== 'undefined' && localStorage.getItem('vsp_token')) || ''; }
+  function authH() { return { 'Authorization': 'Bearer ' + token() }; }
+  function fmtDate(s) { try { return s ? new Date(s).toLocaleString('vi-VN', { dateStyle:'short', timeStyle:'short' }) : '—'; } catch(e){ return '—'; } }
+  function _toolsFmt(r) {
+    // Backend trả nhiều dạng — fallback theo độ ưu tiên
+    if (Array.isArray(r.tools_used) && r.tools_used.length) return r.tools_used.join(', ');
+    if (typeof r.tools_used === 'string' && r.tools_used) return r.tools_used;
+    if (r.tools_done != null && r.tools_total != null) return r.tools_done + '/' + r.tools_total;
+    if (r.tools_run) return r.tools_run;
+    if (r.tools) return Array.isArray(r.tools) ? r.tools.join(', ') : String(r.tools);
+    return '—';
+  }
+  function esc(s) { return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+  function toast(msg, type) { try { (window.showToast||function(){})(msg, type||'info'); } catch(e){} }
+
+  // ---- HTML Skeleton --------------------------------------------------------
+  // Render 1 khối duy nhất: tab switcher + filter bar + KPI + main content.
+  function renderSkeleton() {
+    var panel = $('panel-sbom');
+    if (!panel) return false;
+    if ($('sbom-u-root')) return true;
+
+    // Ẩn cả block cũ (giữ trong DOM cho fallback) — toàn bộ content cũ wrap lại
+    Array.prototype.forEach.call(panel.children, function(c){ c.style.display = 'none'; });
+
+    var root = document.createElement('div');
+    root.id = 'sbom-u-root';
+    root.innerHTML = ''
+      // ---- View switcher + run selectors ----
+      + '<div class="card mb14" style="padding:0;overflow:hidden">'
+      +   '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">'
+      +     '<div style="display:flex;gap:4px;background:var(--surface2);padding:3px;border-radius:6px">'
+      +       '<button id="sbom-u-tab-inventory" class="sbom-u-tab sbom-u-tab-active" onclick="window._sbomUnified.setView(\'inventory\')">📦 Inventory</button>'
+      +       '<button id="sbom-u-tab-diff"      class="sbom-u-tab"                 onclick="window._sbomUnified.setView(\'diff\')">🔄 Diff</button>'
+      +       '<button id="sbom-u-tab-trend"     class="sbom-u-tab"                 onclick="window._sbomUnified.setView(\'trend\')">📊 Trend</button>'
+      +     '</div>'
+      +     '<div id="sbom-u-runsel" style="display:flex;gap:6px;align-items:center;flex:1;flex-wrap:wrap;min-width:0"></div>'
+      +     '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.refresh()">↻ Refresh</button>'
+      +   '</div>'
+      // ---- Filter bar (chung cho mọi view) ----
+      +   '<div style="display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;background:var(--surface)">'
+      +     '<select aria-label="Sbom U Fsev" id="sbom-u-fsev"  class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()">'
+      +       '<option value="">All severity</option><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>'
+      +     '</select>'
+      +     '<select aria-label="Sbom U Ftool" id="sbom-u-ftool" class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()"><option value="">All tools</option></select>'
+      +     '<input aria-label="Component / CVE / path / message…"  id="sbom-u-fq"    class="filter-select" style="font-size:10px;padding:3px 8px;min-width:200px;flex:1" placeholder="Component / CVE / path / message…" oninput="window._sbomUnified.debouncedFilter()">'
+      +     '<select aria-label="Sbom U Fgate" id="sbom-u-fgate" class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.applyFilters()" data-only="inventory"><option value="">All gates</option><option>PASS</option><option>FAIL</option><option>WARN</option></select>'
+      +     '<span id="sbom-u-meta" class="mono-sm c-t3" style="margin-left:auto;font-size:10px"></span>'
+      +   '</div>'
+      // ---- KPI row ----
+      +   '<div id="sbom-u-kpis" class="g4" style="padding:14px;gap:8px"></div>'
+      // ---- Main content ----
+      +   '<div id="sbom-u-main" style="padding:0 14px 14px"></div>'
+      // ---- Action toolbar ----
+      +   '<div style="display:flex;gap:6px;padding:10px 14px;border-top:1px solid var(--border);align-items:center;flex-wrap:wrap;background:var(--surface)">'
+      +     '<span class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em">EXPORT:</span>'
+      +     '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.exportData(\'csv\')">CSV</button>'
+      +     '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.exportData(\'json\')">JSON</button>'
+      +     '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.exportData(\'cdx\')">CycloneDX</button>'
+      +     '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.exportData(\'vex\')">VEX</button>'
+      +     '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.exportData(\'sarif\')">SARIF</button>'
+      +     '<span style="margin-left:auto;display:flex;gap:6px">'
+      +       '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.savedViews()">⭐ Saved views</button>'
+      +       '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.openSettings()">⚙ Config</button>'
+      +     '</span>'
+      +   '</div>'
+      + '</div>';
+    panel.appendChild(root);
+
+    // CSS riêng (inline 1 lần)
+    if (!document.getElementById('sbom-u-css')) {
+      var style = document.createElement('style');
+      style.id = 'sbom-u-css';
+      style.textContent =
+        '.sbom-u-tab{background:transparent;border:0;color:var(--text-2);padding:6px 12px;font-size:11px;font-weight:500;border-radius:4px;cursor:pointer;transition:all .15s}'
+       +'.sbom-u-tab:hover{color:var(--text-1)}'
+       +'.sbom-u-tab-active{background:var(--cyan2);color:var(--cyan)}'
+       +'.sbom-u-row{display:grid;grid-template-columns:32px 80px 60px 70px 1.4fr 1fr 90px 130px;gap:0;padding:8px 10px;font-size:11px;align-items:center;border-bottom:1px solid var(--border);transition:background .12s}'
+       +'.sbom-u-row:hover{background:var(--surface2)}'
+       +'.sbom-u-row-head{background:var(--surface);font-size:10px;color:var(--text-3);letter-spacing:.05em;font-weight:500;border-bottom:1px solid var(--border)}'
+       +'.sbom-u-status-new{color:var(--red)}'
+       +'.sbom-u-status-fix{color:var(--green)}'
+       +'.sbom-u-status-pst{color:var(--amber)}'
+       +'.sbom-u-kpi{background:var(--surface);border-left:3px solid var(--border);padding:10px 14px;border-radius:4px}'
+       +'.sbom-u-kpi-label{font-size:10px;color:var(--text-2);letter-spacing:.05em}'
+       +'.sbom-u-kpi-value{font-size:22px;font-weight:600;font-family:var(--font-display);margin-top:2px}'
+       +'.sbom-u-kpi-sub{font-size:10px;color:var(--text-3);margin-top:2px}'
+       +'.sbom-u-mini-btn{background:transparent;border:1px solid var(--border);color:var(--text-2);padding:2px 6px;font-size:9px;border-radius:3px;cursor:pointer}'
+       +'.sbom-u-mini-btn:hover{border-color:var(--cyan);color:var(--cyan)}';
+      document.head.appendChild(style);
+    }
+    return true;
+  }
+
+  // ---- Run selectors --------------------------------------------------------
+  function renderRunSelectors() {
+    var sel = $('sbom-u-runsel');
+    if (!sel) return;
+    var opts = function(selUUID){
+      return S.runs.map(function(r){
+        var lab = (r.rid||r.id) + ' · ' + (r.mode||'?') + ' · ' + (r.gate||'?') + ' · ' + (r.total_findings||r.total||0);
+        return '<option value="'+esc(r.id)+'"'+(r.id===selUUID?' selected':'')+'>'+esc(lab)+'</option>';
+      }).join('');
+    };
+    if (S.view === 'inventory') {
+      sel.innerHTML = '<span class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em">RUNS:</span>'
+        + '<span class="mono-sm" style="font-size:10px">'+S.runs.length+' available</span>';
+    } else if (S.view === 'diff') {
+      sel.innerHTML =
+          '<span class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em">NEW:</span>'
+        + '<select aria-label="Sbom U Newsel" id="sbom-u-newsel" class="filter-select" style="font-size:10px;padding:3px 8px;min-width:240px;flex:1" onchange="window._sbomUnified.onSelChange(\'new\')">'+opts(S.newRunUUID)+'</select>'
+        + '<span class="mono-sm c-t3" style="font-size:10px">vs</span>'
+        + '<span class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em">BASELINE:</span>'
+        + '<select aria-label="Sbom U Basesel" id="sbom-u-basesel" class="filter-select" style="font-size:10px;padding:3px 8px;min-width:240px;flex:1" onchange="window._sbomUnified.onSelChange(\'base\')">'+opts(S.baseRunUUID)+'</select>'
+        + '<button class="btn btn-ghost" style="font-size:10px" onclick="window._sbomUnified.swap()" title="Swap NEW & BASELINE">⇄</button>';
+    } else {
+      sel.innerHTML =
+          '<span class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em">RANGE:</span>'
+        + '<select name="filter" aria-label="Filter" class="filter-select" style="font-size:10px;padding:3px 8px" onchange="window._sbomUnified.setTrendRange(this.value)">'
+        + '<option value="7">Last 7 runs</option><option value="30" selected>Last 30 runs</option><option value="60">Last 60 runs</option>'
+        + '</select>';
+    }
+    // Toggle filter visibility theo view
+    Array.prototype.forEach.call(document.querySelectorAll('[data-only]'), function(el){
+      el.style.display = (el.getAttribute('data-only') === S.view) ? '' : 'none';
+    });
+  }
+
+  // ---- Toolset (cho filter dropdown) ----------------------------------------
+  function buildToolDropdown(findings) {
+    var sel = $('sbom-u-ftool'); if (!sel) return;
+    var tools = {};
+    findings.forEach(function(f){ if (f.tool) tools[f.tool] = (tools[f.tool]||0)+1; });
+    var keys = Object.keys(tools).sort();
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">All tools</option>' + keys.map(function(t){
+      return '<option value="'+esc(t)+'"'+(t===cur?' selected':'')+'>'+esc(t)+' ('+tools[t]+')</option>';
+    }).join('');
+  }
+
+  // ---- Data fetching --------------------------------------------------------
+  async function fetchRuns() {
+    var d = await fetch('/api/v1/vsp/runs/index?limit=200', {headers: authH()}).then(function(r){return r.json();});
+    S.runs = (d.runs||[]).filter(function(r){ return r.status==='DONE'; });
+    if (!S.newRunUUID && S.runs[0])  S.newRunUUID  = S.runs[0].id;
+    if (!S.baseRunUUID && S.runs[1]) S.baseRunUUID = S.runs[1].id;
+  }
+
+  async function fetchFindings(uuid) {
+    if (!uuid) return [];
+    var d = await fetch('/api/v1/vsp/findings?run_id='+encodeURIComponent(uuid)+'&limit=2000', {headers: authH()}).then(function(r){return r.json();});
+    return d.findings || [];
+  }
+
+  // ---- Diff core ------------------------------------------------------------
+  // Key dùng để xác định "cùng 1 finding": tool + rule + path + (line nếu có)
+  // Tuned cho data thực: rule UUID-like nên path + rule là đủ ổn.
+  function fingerprint(f) {
+    return [f.tool||'', f.rule||f.rule_id||'', f.path||f.file||'', f.line||0].join('|');
+  }
+  function computeDiff(newF, baseF) {
+    var newMap = {}, baseMap = {};
+    newF.forEach(function(f){ newMap[fingerprint(f)] = f; });
+    baseF.forEach(function(f){ baseMap[fingerprint(f)] = f; });
+    var newOnly = [], fixed = [], persisted = [];
+    Object.keys(newMap).forEach(function(k){
+      if (baseMap[k]) persisted.push(Object.assign({_status:'PERSISTED'}, newMap[k]));
+      else            newOnly.push(Object.assign({_status:'NEW'},        newMap[k]));
+    });
+    Object.keys(baseMap).forEach(function(k){
+      if (!newMap[k]) fixed.push(Object.assign({_status:'FIXED'}, baseMap[k]));
+    });
+    return { newOnly: newOnly, fixed: fixed, persisted: persisted };
+  }
+
+  // ---- Filtering ------------------------------------------------------------
+  function applyFiltersToList(list) {
+    var f = S.filters;
+    var q = (f.q||'').toLowerCase();
+    return list.filter(function(x){
+      if (f.sev  && (x.severity||'').toUpperCase() !== f.sev) return false;
+      if (f.tool && x.tool !== f.tool) return false;
+      if (q) {
+        var hay = ((x.path||'') + ' ' + (x.message||'') + ' ' + (x.rule||'') + ' ' + (x.cve||'') + ' ' + (x.component||'')).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  // ---- KPI rendering --------------------------------------------------------
+  function renderKPIs() {
+    var box = $('sbom-u-kpis'); if (!box) return;
+    if (S.view === 'inventory') {
+      var rs = S.runs.filter(function(r){ return !S.filters.gate || r.gate===S.filters.gate; });
+      var total = rs.length;
+      var fail  = rs.filter(function(r){ return r.gate==='FAIL'; }).length;
+      var pass  = rs.filter(function(r){ return r.gate==='PASS'; }).length;
+      var latest = rs[0] ? (rs[0].total_findings||rs[0].total||0) : 0;
+      box.innerHTML = ''
+        + kpi('TOTAL SBOMs',  total,  'var(--cyan)')
+        + kpi('WITH FINDINGS',fail,   'var(--red)')
+        + kpi('CLEAN RUNS',   pass,   'var(--green)')
+        + kpi('LATEST FINDS', latest, 'var(--amber)');
+    } else if (S.view === 'diff') {
+      var d = S.diffCache || {newOnly:[],fixed:[],persisted:[]};
+      var n  = applyFiltersToList(d.newOnly).length;
+      var fx = applyFiltersToList(d.fixed).length;
+      var p  = applyFiltersToList(d.persisted).length;
+      box.innerHTML = ''
+        + kpi('NEW',       n,  'var(--red)',   sevBreakdown(d.newOnly))
+        + kpi('FIXED',     fx, 'var(--green)', fx===0?'No regressions resolved':sevBreakdown(d.fixed))
+        + kpi('PERSISTED', p,  'var(--amber)', sevBreakdown(d.persisted))
+        + kpiTrend();
+    } else {
+      box.innerHTML = ''
+        + kpiTrendRange();
+    }
+  }
+  function kpi(label, value, color, sub) {
+    return '<div class="sbom-u-kpi" style="border-left-color:'+color+'">'
+      + '<div class="sbom-u-kpi-label">'+esc(label)+'</div>'
+      + '<div class="sbom-u-kpi-value" style="color:'+color+'">'+esc(String(value))+'</div>'
+      + (sub ? '<div class="sbom-u-kpi-sub">'+esc(sub)+'</div>' : '')
+      + '</div>';
+  }
+  function sevBreakdown(list) {
+    var c={CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0};
+    list.forEach(function(f){ var s=(f.severity||'').toUpperCase(); if(c[s]!=null) c[s]++; });
+    var parts = [];
+    if (c.CRITICAL) parts.push(c.CRITICAL+' crit');
+    if (c.HIGH)     parts.push(c.HIGH+' high');
+    if (c.MEDIUM)   parts.push(c.MEDIUM+' med');
+    if (c.LOW)      parts.push(c.LOW+' low');
+    return parts.join(' · ') || '—';
+  }
+  function kpiTrendRange() {
+    // Compute KPI cho Trend view từ S.runs trong phạm vi N
+    var arr = S.runs.slice(0, Math.min(S.trendDays, S.runs.length));
+    if (arr.length < 1) return ''
+      + kpi('RUNS IN RANGE', 0, 'var(--text-3)')
+      + kpi('AVG FINDINGS', '—', 'var(--text-3)')
+      + kpi('CHANGE', '—', 'var(--text-3)')
+      + kpi('TRAJECTORY', '—', 'var(--text-3)');
+
+    var totals = arr.map(function(r){ return r.total_findings || r.total || 0; });
+    var sum    = totals.reduce(function(a,b){ return a+b; }, 0);
+    var avg    = Math.round(sum / arr.length);
+
+    // Compare run đầu tiên (oldest in range) với run mới nhất (newest)
+    // Lưu ý: S.runs sort desc theo created_at, nên arr[0] = newest, arr[last] = oldest
+    var newest = totals[0] || 0;
+    var oldest = totals[totals.length - 1] || 0;
+    var diff   = newest - oldest;
+    var pct    = oldest > 0 ? Math.round((diff/oldest)*100) : 0;
+
+    var trajLabel, trajColor;
+    if (diff > 0)      { trajLabel = '↑ Worsening'; trajColor = 'var(--red)'; }
+    else if (diff < 0) { trajLabel = '↓ Improving'; trajColor = 'var(--green)'; }
+    else               { trajLabel = '→ Stable';    trajColor = 'var(--text-2)'; }
+
+    var changeStr = (diff > 0 ? '+' : '') + diff + (oldest>0 ? ' (' + (pct>0?'+':'') + pct + '%)' : '');
+    var changeColor = diff > 0 ? 'var(--red)' : diff < 0 ? 'var(--green)' : 'var(--text-2)';
+
+    return ''
+      + kpi('RUNS IN RANGE', arr.length, 'var(--cyan)', sum + ' total findings')
+      + kpi('AVG FINDINGS',  avg,        'var(--amber)', 'per run')
+      + kpi('CHANGE',        changeStr,  changeColor,    diff===0 ? 'no change' : 'oldest → newest')
+      + kpi('TRAJECTORY',    trajLabel,  trajColor,      arr.length+' run window');
+  }
+
+  function kpiTrend() {
+    // Sparkline mini cho Diff view: số findings của N runs gần nhất
+    var pts = S.runs.slice(0, Math.min(8, S.runs.length)).reverse().map(function(r){ return r.total_findings||r.total||0; });
+    if (pts.length < 2) return kpi('TREND', 'n/a', 'var(--text-3)');
+    var max = Math.max.apply(null, pts), min = Math.min.apply(null, pts);
+    var w = 80, h = 28, dx = pts.length>1 ? w/(pts.length-1) : 0;
+    var poly = pts.map(function(v,i){
+      var y = max===min ? h/2 : h - ((v-min)/(max-min))*h;
+      return (i*dx).toFixed(1)+','+y.toFixed(1);
+    }).join(' ');
+    var first = pts[0], last = pts[pts.length-1];
+    var dir = last>first ? '↑ Worse' : last<first ? '↓ Better' : '→ Stable';
+    var color = last>first ? 'var(--red)' : last<first ? 'var(--green)' : 'var(--text-2)';
+    return '<div class="sbom-u-kpi" style="border-left-color:'+color+'">'
+      + '<div class="sbom-u-kpi-label">TREND ('+pts.length+' runs)</div>'
+      + '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:24px;margin-top:2px" preserveAspectRatio="none">'
+      +   '<polyline fill="none" stroke="'+color+'" stroke-width="1.5" points="'+poly+'"/>'
+      + '</svg>'
+      + '<div class="sbom-u-kpi-sub" style="color:'+color+'">'+dir+'</div>'
+      + '</div>';
+  }
+
+  // ---- Main rendering -------------------------------------------------------
+  function renderMain() {
+    var main = $('sbom-u-main'); if (!main) return;
+    if (S.view === 'inventory') return renderInventory(main);
+    if (S.view === 'diff')      return renderDiff(main);
+    if (S.view === 'trend')     return renderTrend(main);
+  }
+
+  function renderInventory(main) {
+    var rs = S.runs.filter(function(r){ return !S.filters.gate || r.gate===S.filters.gate; });
+    var start = S.pagination.inv * S.pageSize;
+    var end = Math.min(start + S.pageSize, rs.length);
+    var page = rs.slice(start, end);
+    var rows = page.map(function(r){
+      var dt = fmtDate(r.created_at);
+      var find = r.total_findings || r.total || 0;
+      var fc = find>=10?'c-red':find>=1?'c-orange':'c-green';
+      return '<tr style="cursor:pointer" onclick="window._sbomUnified.openDetail(\''+esc(r.rid)+'\')">'
+        + '<td class="mono" style="font-size:10px">'+esc(r.rid||r.id)+'</td>'
+        + '<td><span class="pill pill-run">'+esc(r.mode||'?')+'</span></td>'
+        + '<td><span class="pill pill-'+(r.gate||'').toLowerCase()+'">'+esc(r.gate||'?')+'</span></td>'
+        + '<td class="fw7 '+fc+'">'+find+'</td>'
+        + '<td class="mono-sm c-t3" style="font-size:9px">'+esc(_toolsFmt(r))+'</td>'
+        + '<td class="mono-sm">'+dt+'</td>'
+        + '<td><button class="sbom-u-mini-btn" onclick="event.stopPropagation();window._sbomUnified.download(\''+esc(r.rid)+'\')">↓ CDX</button></td>'
+        + '</tr>';
+    }).join('');
+    main.innerHTML =
+      '<div class="tbl-wrap" style="margin-top:10px"><table>'
+      + '<thead><tr><th>Run ID</th><th>Mode</th><th>Gate</th><th>Findings</th><th>Tools</th><th>Date</th><th></th></tr></thead>'
+      + '<tbody>'+(rows||'<tr><td colspan="7" class="c-t3" style="text-align:center;padding:20px">No runs match filter</td></tr>')+'</tbody>'
+      +'</table></div>'
+      + paginationBar('inv', rs.length, start, end);
+    $('sbom-u-meta').textContent = rs.length+' SBOMs'+(S.filters.gate?' · '+S.filters.gate:'');
+  }
+
+  function renderDiff(main) {
+    var d = S.diffCache;
+    if (!d) { main.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-3)">Loading diff…</div>'; return; }
+    // Gộp tất cả: NEW + PERSIST + FIXED, áp filter chung
+    var all = [].concat(d.newOnly, d.persisted, d.fixed);
+    var filtered = applyFiltersToList(all);
+    var start = S.pagination.diff * S.pageSize;
+    var end = Math.min(start + S.pageSize, filtered.length);
+    var page = filtered.slice(start, end);
+
+    var head =
+      '<div class="sbom-u-row sbom-u-row-head">'
+      + '<span><input aria-label="Sbom U Selall" type="checkbox" id="sbom-u-selall" onchange="window._sbomUnified.selectAll(this.checked)" style="cursor:pointer"></span>'
+      + '<span>STATUS</span><span>SEV</span><span>TOOL</span><span>COMPONENT / RULE</span><span>PATH</span><span>SLA</span><span>ACTIONS</span>'
+      + '</div>';
+    var body = page.map(function(f){
+      var fp = fingerprint(f);
+      var checked = S.selectedFindings[fp] ? 'checked' : '';
+      var st = f._status, stClass = st==='NEW'?'sbom-u-status-new':st==='FIXED'?'sbom-u-status-fix':'sbom-u-status-pst';
+      var sevPill = sevBadge(f.severity);
+      var comp = f.component || f.cve || f.rule || f.rule_id || '—';
+      var pathClass = st==='FIXED' ? 'mono-sm c-t3" style="font-size:10px;text-decoration:line-through;opacity:.6' : 'mono-sm c-t3" style="font-size:10px';
+      var sla = slaBadge(f);
+      return '<div class="sbom-u-row" style="cursor:pointer" onclick="if(event.target.tagName!==\'INPUT\'&&event.target.tagName!==\'BUTTON\')window._sbomUnified.openFindingDetail(\''+esc(fp)+'\')">'
+        + '<span><input name="fp" aria-label="Fp" type="checkbox" '+checked+' data-fp="'+esc(fp)+'" onchange="window._sbomUnified.toggleSel(this.dataset.fp,this.checked)" style="cursor:pointer"></span>'
+        + '<span class="'+stClass+'" style="font-weight:600">'+statusIcon(st)+' '+st+'</span>'
+        + sevPill
+        + '<span class="mono-sm c-t3">'+esc(f.tool||'—')+'</span>'
+        + '<span class="mono-sm" title="'+esc(f.message||'')+'" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(comp)+'</span>'
+        + '<span class="'+pathClass+'" title="'+esc(f.path||'')+'">'+esc(f.path||'—')+'</span>'
+        + sla
+        + actionButtons(f)
+        + '</div>';
+    }).join('');
+
+    // Bulk action bar (chỉ hiện khi có ít nhất 1 selected)
+    var selCount = Object.keys(S.selectedFindings).filter(function(k){ return S.selectedFindings[k]; }).length;
+    var bulkBar = selCount > 0
+      ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--cyan2);border:1px solid var(--cyan);border-radius:6px;margin-top:10px;font-size:11px">'
+        + '<span style="color:var(--cyan);font-weight:500">'+selCount+' selected</span>'
+        + '<button class="sbom-u-mini-btn" onclick="window._sbomUnified.bulkAct(\'jira\')">Create Jira</button>'
+        + '<button class="sbom-u-mini-btn" onclick="window._sbomUnified.bulkAct(\'vex\')">Set VEX</button>'
+        + '<button class="sbom-u-mini-btn" onclick="window._sbomUnified.bulkAct(\'accept\')">Accept</button>'
+        + '<button class="sbom-u-mini-btn" onclick="window._sbomUnified.clearSel()" style="margin-left:auto">Clear</button>'
+      + '</div>'
+      : '';
+
+    // Empty state đặc biệt khi cả 3 mảng đều rỗng
+    var emptyHtml = '';
+    if (filtered.length === 0) {
+      var totalAll = all.length;
+      if (totalAll === 0) {
+        emptyHtml = '<div style="padding:40px 20px;text-align:center;color:var(--text-3)">'
+          + '<div style="font-size:32px;margin-bottom:8px">🎉</div>'
+          + '<div style="font-size:13px;margin-bottom:4px;color:var(--green)">Perfect parity</div>'
+          + '<div style="font-size:11px">No differences between these 2 runs</div>'
+          + '</div>';
+      } else {
+        emptyHtml = '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:11px">No findings match filter</div>';
+      }
+    }
+
+    main.innerHTML =
+        bulkBar
+      + '<div style="margin-top:10px;border:1px solid var(--border);border-radius:6px;overflow:hidden">'
+      +   head + (body || emptyHtml)
+      + '</div>'
+      + paginationBar('diff', filtered.length, start, end);
+    $('sbom-u-meta').textContent = filtered.length+' findings (filtered from '+all.length+')';
+  }
+
+  function renderTrend(main) {
+    var arr = S.runs.slice(0, S.trendDays).reverse();
+    if (arr.length < 2) { main.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-3)">Need ≥ 2 runs for trend</div>'; return; }
+    // Chart đơn giản: số findings mỗi run
+    var w=700, h=180, pad=24;
+    var totals = arr.map(function(r){ return r.total_findings || r.total || 0; });
+    var max = Math.max.apply(null, totals)||1, min = Math.min.apply(null, totals);
+    var dx = (w - 2*pad) / Math.max(1, arr.length - 1);
+    var pts = totals.map(function(v,i){
+      var y = h - pad - ((v - min) / Math.max(1, max-min)) * (h - 2*pad);
+      return [pad + i*dx, y, v, arr[i]];
+    });
+    var poly = pts.map(function(p){ return p[0].toFixed(1)+','+p[1].toFixed(1); }).join(' ');
+    var dots = pts.map(function(p,i){
+      return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="var(--cyan)"><title>'+esc(p[3].rid)+'\n'+p[2]+' findings</title></circle>';
+    }).join('');
+    main.innerHTML =
+      '<div style="margin-top:10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px">'
+      + '<div class="mono-sm c-t3" style="font-size:10px;letter-spacing:.05em;margin-bottom:8px">FINDINGS PER RUN · last '+arr.length+' runs</div>'
+      + '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:'+h+'px" preserveAspectRatio="none">'
+      +   '<line x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'" stroke="var(--border)" stroke-width="1"/>'
+      +   '<line x1="'+pad+'" y1="'+pad+'" x2="'+pad+'" y2="'+(h-pad)+'" stroke="var(--border)" stroke-width="1"/>'
+      +   '<text x="'+pad+'" y="'+(pad-6)+'" fill="var(--text-3)" font-size="9" font-family="var(--font-mono)">'+max+'</text>'
+      +   '<text x="'+pad+'" y="'+(h-pad+12)+'" fill="var(--text-3)" font-size="9" font-family="var(--font-mono)">'+min+'</text>'
+      +   '<polyline fill="none" stroke="var(--cyan)" stroke-width="1.5" points="'+poly+'"/>'
+      +   dots
+      + '</svg>'
+      + '</div>';
+    $('sbom-u-meta').textContent = arr.length+' runs · '+totals.reduce(function(a,b){return a+b;},0)+' total findings';
+  }
+
+  // ---- Row helpers ----------------------------------------------------------
+  function statusIcon(st) {
+    return st==='NEW' ? '●' : st==='FIXED' ? '✓' : '≡';
+  }
+  function sevBadge(s) {
+    s = (s||'').toUpperCase();
+    var map = {
+      CRITICAL: ['CRIT','var(--red)'],
+      HIGH:     ['HIGH','var(--orange)'],
+      MEDIUM:   ['MED', 'var(--amber)'],
+      LOW:      ['LOW', 'var(--text-2)'],
+    };
+    var e = map[s] || ['—','var(--text-3)'];
+    return '<span class="pill" style="background:transparent;border:1px solid '+e[1]+';color:'+e[1]+';font-size:9px;width:fit-content">'+e[0]+'</span>';
+  }
+  function slaBadge(f) {
+    var days = slaDaysOver(f);
+    var pill = function(bg, color, text) {
+      return '<span style="font-family:var(--font-mono);font-size:9px;padding:2px 6px;border-radius:3px;background:'+bg+';color:'+color+';white-space:nowrap">'+text+'</span>';
+    };
+    if (days==null)  return '<span class="mono-sm c-t3" style="font-size:10px">—</span>';
+    if (days > 0)    return pill('rgba(239,68,68,.12)',  'var(--red)',   '⚠ '+days+'d over');
+    if (days > -3)   return pill('rgba(245,158,11,.12)', 'var(--amber)', (-days)+'d left');
+    return              pill('rgba(16,185,129,.10)',     'var(--green)', '✓ in SLA');
+  }
+  function slaDaysOver(f) {
+    if (!f.created_at && !f.first_seen) return null;
+    var c = getConfig();
+    var SLA = { CRITICAL:c.sla_critical, HIGH:c.sla_high, MEDIUM:c.sla_medium, LOW:c.sla_low };
+    var sla = SLA[(f.severity||'').toUpperCase()];
+    if (!sla) return null;
+    var t0 = new Date(f.first_seen || f.created_at).getTime();
+    if (isNaN(t0)) return null;
+    var ageDays = (Date.now() - t0) / 86400000;
+    return Math.round(ageDays - sla);
+  }
+  function actionButtons(f) {
+    var fid = esc(f.id || fingerprint(f));
+    return '<span style="display:flex;gap:3px">'
+      + '<button class="sbom-u-mini-btn" title="Create Jira ticket" onclick="window._sbomUnified.actJira(\''+fid+'\')">Jira</button>'
+      + '<button class="sbom-u-mini-btn" title="Mark VEX status"   onclick="window._sbomUnified.actVex(\''+fid+'\')">VEX</button>'
+      + (f._status==='PERSISTED' ? '<button class="sbom-u-mini-btn" title="Baseline accept" onclick="window._sbomUnified.actAccept(\''+fid+'\')">Accept</button>' : '')
+      + '</span>';
+  }
+
+  function paginationBar(kind, total, start, end) {
+    var cur = S.pagination[kind];
+    var pages = Math.max(1, Math.ceil(total/S.pageSize));
+    return '<div style="display:flex;gap:8px;padding:8px 0;align-items:center;font-size:10px;color:var(--text-3)">'
+      + '<span class="mono-sm">'+(total?(start+1)+'-'+end+' of '+total:'0 results')+'</span>'
+      + '<div style="margin-left:auto;display:flex;gap:6px">'
+      + '<button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" '+(cur===0?'disabled':'')+' onclick="window._sbomUnified.pageDelta(\''+kind+'\',-1)">‹ Prev</button>'
+      + '<span class="mono-sm">page '+(cur+1)+'/'+pages+'</span>'
+      + '<button class="btn btn-ghost" style="font-size:9px;padding:2px 8px" '+(end>=total?'disabled':'')+' onclick="window._sbomUnified.pageDelta(\''+kind+'\',1)">Next ›</button>'
+      + '</div></div>';
+  }
+
+  // ---- Public API (đặt vào _sbomUnified namespace) --------------------------
+  S.setView = function (v) {
+    S.view = v;
+    ['inventory','diff','trend'].forEach(function(t){
+      var el = $('sbom-u-tab-'+t); if (!el) return;
+      el.classList.toggle('sbom-u-tab-active', t===v);
+    });
+    renderRunSelectors();
+    if (v === 'diff') ensureDiff().then(function(){ renderKPIs(); renderMain(); });
+    else { renderKPIs(); renderMain(); }
+  };
+
+  S.onSelChange = function (which) {
+    if (which==='new')  S.newRunUUID  = $('sbom-u-newsel').value;
+    if (which==='base') S.baseRunUUID = $('sbom-u-basesel').value;
+    S.diffCache = null;
+    ensureDiff().then(function(){ renderKPIs(); renderMain(); });
+  };
+  S.swap = function () {
+    var a = S.newRunUUID, b = S.baseRunUUID;
+    S.newRunUUID = b; S.baseRunUUID = a;
+    S.diffCache = null;
+    renderRunSelectors();
+    ensureDiff().then(function(){ renderKPIs(); renderMain(); });
+  };
+  S.setTrendRange = function (n) { S.trendDays = parseInt(n,10)||30; renderKPIs(); renderMain(); };
+
+  // Filters
+  var debounceTimer;
+  S.debouncedFilter = function () {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function(){ S.applyFilters(); }, 250);
+  };
+  S.applyFilters = function () {
+    S.filters.sev  = ($('sbom-u-fsev')||{}).value || '';
+    S.filters.tool = ($('sbom-u-ftool')||{}).value || '';
+    S.filters.q    = ($('sbom-u-fq')||{}).value || '';
+    S.filters.gate = ($('sbom-u-fgate')||{}).value || '';
+    S.pagination.inv = 0; S.pagination.diff = 0;
+    renderKPIs(); renderMain();
+  };
+
+  S.pageDelta = function (kind, d) { S.pagination[kind] = Math.max(0, S.pagination[kind]+d); renderMain(); };
+
+  S.refresh = async function () {
+    toast('Refreshing SBOM…','info');
+    S.diffCache = null;
+    await fetchRuns();
+    if (S.view === 'diff') await ensureDiff();
+    renderRunSelectors(); renderKPIs(); renderMain();
+    toast('Refreshed','success');
+  };
+
+  async function ensureDiff() {
+    if (!S.newRunUUID || !S.baseRunUUID) return;
+    if (S.diffCache) return;
+    var main = $('sbom-u-main');
+    if (main) main.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-3)">Loading diff…</div>';
+    var pair = await Promise.all([fetchFindings(S.newRunUUID), fetchFindings(S.baseRunUUID)]);
+    S.newFindings = pair[0]; S.baseFindings = pair[1];
+    S.diffCache = computeDiff(S.newFindings, S.baseFindings);
+    buildToolDropdown([].concat(S.newFindings, S.baseFindings));
+  }
+
+  // Actions — proper modals (replaces prompt/confirm)
+  S.actJira = function (fid) {
+    var body =
+        '<div style="margin-bottom:14px;font-size:12px;color:var(--text-2)">Create a Jira ticket for this finding.</div>'
+      + '<div style="display:grid;gap:10px">'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Project key</div>'
+      +     '<input aria-label="e.g. SEC" id="jira-project" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" placeholder="e.g. SEC" value="SEC"></div>'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Priority</div>'
+      +     '<select aria-label="Jira Priority" id="jira-priority" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
+      +       '<option>Highest</option><option selected>High</option><option>Medium</option><option>Low</option>'
+      +     '</select></div>'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Assignee (optional)</div>'
+      +     '<input aria-label="e.g. john.doe" id="jira-assignee" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" placeholder="e.g. john.doe"></div>'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Note</div>'
+      +     '<textarea aria-label="Additional context for triage…" id="jira-note" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:60px;resize:vertical;font-family:inherit" placeholder="Additional context for triage…"></textarea></div>'
+      + '</div>';
+    var footer = ''
+      + '<button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="window._sbomUnified.closeModal()">Cancel</button>'
+      + '<button class="btn btn-primary" style="font-size:11px" onclick="window._sbomUnified._doJira(\''+esc(fid)+'\')">Create ticket</button>';
+    showModal({ title: '📋 Create Jira ticket', body: body, footer: footer, width: '480px' });
+  };
+  S._doJira = function (fid) {
+    var payload = {
+      finding_id: fid,
+      project: ($('jira-project')||{}).value || 'SEC',
+      priority: ($('jira-priority')||{}).value || 'High',
+      assignee: ($('jira-assignee')||{}).value || '',
+      note: ($('jira-note')||{}).value || ''
+    };
+    closeModal();
+    fetch('/api/v1/integrations/jira/create', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(payload)
+    })
+      .then(function(r){
+        if (r.ok) return r.json().then(function(d){ toast('Jira ticket created: '+(d.key||'OK'),'success'); });
+        if (r.status === 404) return toast('Jira integration not configured (backend endpoint missing)','warn');
+        if (r.status === 401) return toast('Unauthorized — please re-login','error');
+        return r.text().then(function(t){ toast('Jira create failed: HTTP '+r.status,'error'); });
+      })
+      .catch(function(){ toast('Network error — Jira backend unreachable','error'); });
+  };
+
+  S.actVex = function (fid) {
+    var body =
+        '<div style="margin-bottom:14px;font-size:12px;color:var(--text-2)">Record VEX (Vulnerability Exploitability eXchange) status for this finding.</div>'
+      + '<div style="display:grid;gap:10px">'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Status *</div>'
+      +     '<select aria-label="Vex Status" id="vex-status" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px" onchange="window._sbomUnified._toggleVexJust(this.value)">'
+      +       '<option value="not_affected">not_affected — vulnerability does not impact this product</option>'
+      +       '<option value="under_investigation" selected>under_investigation — being analyzed</option>'
+      +       '<option value="affected">affected — vulnerability confirmed</option>'
+      +       '<option value="fixed">fixed — remediation applied</option>'
+      +     '</select></div>'
+      +   '<div id="vex-justif-wrap" style="display:none"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Justification (for not_affected)</div>'
+      +     '<select aria-label="Vex Justification" id="vex-justification" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
+      +       '<option value="">— select —</option>'
+      +       '<option value="component_not_present">component_not_present</option>'
+      +       '<option value="vulnerable_code_not_present">vulnerable_code_not_present</option>'
+      +       '<option value="vulnerable_code_not_in_execute_path">vulnerable_code_not_in_execute_path</option>'
+      +       '<option value="vulnerable_code_cannot_be_controlled_by_adversary">vulnerable_code_cannot_be_controlled_by_adversary</option>'
+      +       '<option value="inline_mitigations_already_exist">inline_mitigations_already_exist</option>'
+      +     '</select></div>'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Detail / impact statement</div>'
+      +     '<textarea aria-label="Explain the rationale, e.g. \" id="vex-detail" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:70px;resize:vertical;font-family:inherit" placeholder="Explain the rationale, e.g. \'Affected function not called in our codebase\'"></textarea></div>'
+      + '</div>';
+    var footer = ''
+      + '<button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="window._sbomUnified.closeModal()">Cancel</button>'
+      + '<button class="btn btn-primary" style="font-size:11px" onclick="window._sbomUnified._doVex(\''+esc(fid)+'\')">Record VEX</button>';
+    showModal({ title: '🏷 Set VEX status', body: body, footer: footer, width: '520px' });
+  };
+  S._toggleVexJust = function (status) {
+    var w = $('vex-justif-wrap');
+    if (w) w.style.display = (status === 'not_affected') ? '' : 'none';
+  };
+  S._doVex = function (fid) {
+    var payload = {
+      status: ($('vex-status')||{}).value || 'under_investigation',
+      justification: ($('vex-justification')||{}).value || '',
+      detail: ($('vex-detail')||{}).value || ''
+    };
+    closeModal();
+    fetch('/api/v1/vsp/findings/'+encodeURIComponent(fid)+'/vex', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(payload)
+    })
+      .then(function(r){
+        if (r.ok)             return toast('VEX recorded: '+payload.status,'success');
+        if (r.status === 404) return toast('VEX endpoint missing in backend','warn');
+        if (r.status === 401) return toast('Unauthorized — please re-login','error');
+        return toast('VEX failed: HTTP '+r.status,'error');
+      })
+      .catch(function(){ toast('Network error — backend unreachable','error'); });
+  };
+
+  S.actAccept = function (fid) {
+    var body =
+        '<div style="margin-bottom:14px;font-size:12px;color:var(--text-2)">Mark this finding as <b style="color:var(--cyan)">baseline-accepted</b>. It will bypass SLA tracking and won\'t trigger gate failures.</div>'
+      + '<div style="background:var(--surface2);border-left:3px solid var(--amber);padding:8px 12px;border-radius:0 4px 4px 0;font-size:11px;color:var(--text-2);margin-bottom:14px">'
+      +   '<b style="color:var(--amber)">⚠ Use sparingly.</b> Accepted findings still appear in reports for audit purposes, but won\'t generate alerts or block deployments.'
+      + '</div>'
+      + '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Reason for acceptance *</div>'
+      +   '<textarea aria-label="e.g. \" id="acc-reason" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px;min-height:70px;resize:vertical;font-family:inherit" placeholder="e.g. \'Risk accepted — internal-only service, no PII\'"></textarea></div>'
+      + '<div style="margin-top:10px"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Expires</div>'
+      +   '<select aria-label="Acc Expires" id="acc-expires" class="filter-select" style="width:100%;padding:6px 10px;font-size:11px">'
+      +     '<option value="30">30 days (recommended)</option>'
+      +     '<option value="90" selected>90 days</option>'
+      +     '<option value="180">180 days</option>'
+      +     '<option value="365">1 year</option>'
+      +     '<option value="0">Never (permanent)</option>'
+      +   '</select></div>';
+    var footer = ''
+      + '<button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="window._sbomUnified.closeModal()">Cancel</button>'
+      + '<button class="btn btn-primary" style="font-size:11px" onclick="window._sbomUnified._doAccept(\''+esc(fid)+'\')">Accept finding</button>';
+    showModal({ title: '✓ Accept as baseline', body: body, footer: footer, width: '480px' });
+  };
+  S._doAccept = function (fid) {
+    var reason = (($('acc-reason')||{}).value || '').trim();
+    if (!reason) { toast('Reason is required','warn'); return; }
+    var expires = parseInt(($('acc-expires')||{}).value, 10) || 0;
+    closeModal();
+    fetch('/api/v1/vsp/findings/'+encodeURIComponent(fid)+'/accept', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({ reason: reason, expires_days: expires })
+    })
+      .then(function(r){
+        if (r.ok)             return toast('Finding accepted (expires in '+(expires||'never')+'d)','success');
+        if (r.status === 404) return toast('Accept endpoint missing in backend','warn');
+        if (r.status === 401) return toast('Unauthorized — please re-login','error');
+        return toast('Accept failed: HTTP '+r.status,'error');
+      })
+      .catch(function(){ toast('Network error — backend unreachable','error'); });
+  };
+
+  // Bulk selection helpers
+  S.toggleSel = function (fp, on) {
+    if (on) S.selectedFindings[fp] = true; else delete S.selectedFindings[fp];
+    renderMain();
+  };
+  S.selectAll = function (on) {
+    if (!S.diffCache) return;
+    var all = [].concat(S.diffCache.newOnly, S.diffCache.persisted, S.diffCache.fixed);
+    var filtered = applyFiltersToList(all);
+    var start = S.pagination.diff * S.pageSize;
+    var page = filtered.slice(start, start + S.pageSize);
+    if (on) page.forEach(function(f){ S.selectedFindings[fingerprint(f)] = true; });
+    else    page.forEach(function(f){ delete S.selectedFindings[fingerprint(f)]; });
+    renderMain();
+  };
+  S.clearSel = function () { S.selectedFindings = {}; renderMain(); };
+  S.bulkAct = function (kind) {
+    var fps = Object.keys(S.selectedFindings).filter(function(k){ return S.selectedFindings[k]; });
+    if (fps.length === 0) return toast('No findings selected', 'warn');
+    var msg;
+    if (kind === 'accept') {
+      if (!confirm('Mark '+fps.length+' findings as baseline-accepted? They will bypass SLA tracking.')) return;
+      msg = 'Accepted '+fps.length+' findings';
+    } else if (kind === 'jira') {
+      msg = 'Created '+fps.length+' Jira tickets';
+    } else if (kind === 'vex') {
+      var st = prompt('VEX status for '+fps.length+' findings (not_affected | under_investigation | affected | fixed):', 'under_investigation');
+      if (!st) return;
+      msg = 'VEX recorded ('+st+') for '+fps.length+' findings';
+    }
+    // Chỉ fire 1 request bulk
+    var url, body = {fingerprints: fps};
+    if (kind === 'jira')   url = '/api/v1/integrations/jira/bulk';
+    if (kind === 'accept') url = '/api/v1/vsp/findings/bulk/accept';
+    if (kind === 'vex')    { url = '/api/v1/vsp/findings/bulk/vex'; body.status = st; }
+    fetch(url, {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(body)
+    })
+    .then(function(r){
+      if (r.ok) {
+        toast(msg, 'success');
+        S.clearSel();
+      } else {
+        toast('Bulk endpoint not yet wired (HTTP '+r.status+')', 'warn');
+      }
+    })
+    .catch(function(){ toast('Bulk request failed', 'error'); });
+  };
+
+  S.openDetail = function (rid) { (window.sbomDetail||function(){})(rid); };
+  S.download   = function (rid) { (window.sbomDownload||function(){})(rid); };
+
+  // Exports
+  S.exportData = function (fmt) {
+    var rows;
+    if (S.view === 'diff' && S.diffCache) {
+      rows = applyFiltersToList([].concat(S.diffCache.newOnly, S.diffCache.persisted, S.diffCache.fixed));
+    } else {
+      rows = S.runs;
+    }
+    if (fmt === 'json') return downloadBlob(JSON.stringify(rows, null, 2), 'sbom-'+S.view+'.json', 'application/json');
+    if (fmt === 'csv')  return downloadBlob(toCSV(rows), 'sbom-'+S.view+'.csv', 'text/csv');
+    if (fmt === 'cdx')  {
+      if (S.view === 'inventory') {
+        var rid = S.runs[0] && S.runs[0].rid;
+        if (rid) return S.download(rid);
+        return toast('No run selected for CycloneDX export','warn');
+      }
+      return toast('CycloneDX export available in Inventory view','warn');
+    }
+    if (fmt === 'vex' || fmt === 'sarif') {
+      var rid = (S.runs.find(function(r){ return r.id === S.newRunUUID; })||{}).rid || (S.runs[0]||{}).rid;
+      if (!rid) return toast('No run selected','warn');
+      var url = fmt==='vex' ? '/api/v1/sbom/'+encodeURIComponent(rid)+'/vex'
+                            : '/api/v1/findings/'+encodeURIComponent(rid)+'/sarif';
+      toast('Fetching '+fmt.toUpperCase()+'…','info');
+      fetch(url, { headers: authH() })
+        .then(function(r){
+          if (r.status === 404) {
+            // Backend chưa có endpoint — fallback: tự build từ dữ liệu sẵn có
+            return _fallbackExport(fmt, rid);
+          }
+          if (!r.ok) throw new Error('HTTP '+r.status);
+          return r.blob().then(function(blob){
+            var ext = fmt==='vex' ? 'json' : 'sarif.json';
+            var name = 'sbom-'+rid+'.'+ext;
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob); a.download = name; a.click();
+            setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+            toast(fmt.toUpperCase()+' downloaded: '+name,'success');
+          });
+        })
+        .catch(function(e){ toast(fmt.toUpperCase()+' export failed: '+e.message,'error'); });
+    }
+  };
+  // Fallback: tự build VEX/SARIF từ findings client-side khi backend không có endpoint
+  function _fallbackExport(fmt, rid) {
+    toast('Backend endpoint missing — generating '+fmt.toUpperCase()+' client-side','info');
+    var run = S.runs.find(function(r){ return r.rid === rid; });
+    var uuid = run ? run.id : '';
+    return fetchFindings(uuid).then(function(findings){
+      var doc, name, mime = 'application/json';
+      if (fmt === 'vex') {
+        doc = {
+          '@context': 'https://openvex.dev/ns/v0.2.0',
+          '@id': 'https://vsp.local/vex/'+rid,
+          author: 'VSP Security Platform',
+          timestamp: new Date().toISOString(),
+          version: 1,
+          statements: findings.map(function(f){
+            return {
+              vulnerability: { name: f.cve || f.rule || f.rule_id || 'unknown' },
+              products: [{ '@id': f.component || f.path || 'unknown' }],
+              status: 'under_investigation',
+              status_notes: f.message || ''
+            };
+          })
+        };
+        name = 'sbom-'+rid+'.openvex.json';
+      } else {
+        // SARIF 2.1.0
+        doc = {
+          $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+          version: '2.1.0',
+          runs: [{
+            tool: { driver: { name: 'VSP', version: '0.10.0', informationUri: 'https://vsp.local' } },
+            results: findings.map(function(f){
+              return {
+                ruleId: f.rule || f.rule_id || f.cve || '',
+                level: ({CRITICAL:'error',HIGH:'error',MEDIUM:'warning',LOW:'note'}[(f.severity||'').toUpperCase()] || 'note'),
+                message: { text: f.message || '' },
+                locations: [{ physicalLocation: {
+                  artifactLocation: { uri: f.path || '' },
+                  region: f.line ? { startLine: f.line } : undefined
+                }}]
+              };
+            })
+          }]
+        };
+        name = 'sbom-'+rid+'.sarif.json';
+      }
+      var blob = new Blob([JSON.stringify(doc, null, 2)], { type: mime });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+      toast(fmt.toUpperCase()+' generated: '+findings.length+' items → '+name,'success');
+    });
+  }
+  function toCSV(rows) {
+    if (!rows.length) return '';
+    var keys = Object.keys(rows[0]).filter(function(k){ return typeof rows[0][k] !== 'object'; });
+    var head = keys.join(',');
+    var body = rows.map(function(r){
+      return keys.map(function(k){
+        var v = r[k]==null?'':String(r[k]).replace(/"/g,'""');
+        return /[",\n]/.test(v) ? '"'+v+'"' : v;
+      }).join(',');
+    }).join('\n');
+    return head + '\n' + body;
+  }
+  function downloadBlob(text, name, mime) {
+    var blob = new Blob([text], {type: mime||'text/plain'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  // Saved views & settings (simple localStorage-based)
+  S.savedViews = function () {
+    var raw = '{}'; try { raw = localStorage.getItem('vsp_sbom_views') || '{}'; } catch(e){}
+    var views; try { views = JSON.parse(raw); } catch(e){ views = {}; }
+    var names = Object.keys(views);
+
+    var listHtml = names.length === 0
+      ? '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:11px;background:var(--surface2);border-radius:6px">No saved views yet. Configure filters/view, then save below.</div>'
+      : '<div style="display:grid;gap:6px">'
+        + names.map(function(n){
+            var v = views[n];
+            var meta = (v.view||'?') + ' · ' + Object.keys(v.filters||{}).filter(function(k){return v.filters[k];}).length + ' filters';
+            return '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--cyan)">'
+              + '<div style="flex:1">'
+              +   '<div style="font-size:12px;font-weight:600">'+esc(n)+'</div>'
+              +   '<div style="font-size:10px;color:var(--text-3);margin-top:2px">'+esc(meta)+'</div>'
+              + '</div>'
+              + '<button class="sbom-u-mini-btn" style="color:var(--cyan)" onclick="window._sbomUnified._loadView(\''+esc(n)+'\')">Load</button>'
+              + '<button class="sbom-u-mini-btn" style="color:var(--red)" onclick="window._sbomUnified._delView(\''+esc(n)+'\')">Delete</button>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+
+    var body =
+        '<div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600">SAVED VIEWS ('+names.length+')</div>'
+      + listHtml
+      + '<div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 8px;font-weight:600">SAVE CURRENT VIEW</div>'
+      + '<div style="background:var(--surface2);padding:10px 12px;border-radius:6px;font-size:11px;color:var(--text-2);margin-bottom:10px">'
+      +   'Snapshot of: <b>'+S.view+'</b> view · '
+      +   Object.keys(S.filters).filter(function(k){return S.filters[k];}).length + ' active filter(s)'
+      +   (S.view==='diff' ? ' · NEW='+(S.newRunUUID||'').slice(-8)+' / BASE='+(S.baseRunUUID||'').slice(-8) : '')
+      + '</div>'
+      + '<div style="display:flex;gap:8px">'
+      +   '<input aria-label="Enter view name (e.g. \" id="view-name" class="filter-select" style="flex:1;padding:6px 10px;font-size:11px" placeholder="Enter view name (e.g. \'Critical CVEs in production\')">'
+      +   '<button class="btn btn-primary" style="font-size:11px" onclick="window._sbomUnified._saveView()">💾 Save</button>'
+      + '</div>';
+
+    var footer = '<button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="window._sbomUnified.closeModal()">Close</button>';
+    showModal({ title: '⭐ Saved views', body: body, footer: footer, width: '520px' });
+  };
+  S._loadView = function (name) {
+    var raw = '{}'; try { raw = localStorage.getItem('vsp_sbom_views') || '{}'; } catch(e){}
+    var views; try { views = JSON.parse(raw); } catch(e){ views = {}; }
+    var v = views[name];
+    if (!v) return toast('View not found','warn');
+    Object.assign(S, v);
+    ['sev','tool','q','gate'].forEach(function(k){
+      var el = $('sbom-u-f'+k); if (el) el.value = (S.filters||{})[k] || '';
+    });
+    S.diffCache = null;
+    closeModal();
+    S.setView(S.view);
+    toast('Loaded view: '+name,'success');
+  };
+  S._delView = function (name) {
+    var raw = '{}'; try { raw = localStorage.getItem('vsp_sbom_views') || '{}'; } catch(e){}
+    var views; try { views = JSON.parse(raw); } catch(e){ views = {}; }
+    delete views[name];
+    try { localStorage.setItem('vsp_sbom_views', JSON.stringify(views)); } catch(e){}
+    toast('Deleted: '+name,'info');
+    S.savedViews();  // re-render
+  };
+  S._saveView = function () {
+    var name = (($('view-name')||{}).value || '').trim();
+    if (!name) return toast('Enter a view name','warn');
+    var raw = '{}'; try { raw = localStorage.getItem('vsp_sbom_views') || '{}'; } catch(e){}
+    var views; try { views = JSON.parse(raw); } catch(e){ views = {}; }
+    views[name] = {
+      view: S.view,
+      filters: Object.assign({}, S.filters),
+      newRunUUID: S.newRunUUID,
+      baseRunUUID: S.baseRunUUID,
+      trendDays: S.trendDays
+    };
+    try { localStorage.setItem('vsp_sbom_views', JSON.stringify(views)); } catch(e){}
+    toast('View saved: '+name,'success');
+    S.savedViews();  // re-render
+  };
+
+  // -------------- Modal helper (chung cho Detail + Config) -----------------
+  function showModal(opts) {
+    closeModal();
+    var ov = document.createElement('div');
+    ov.id = 'sbom-u-modal-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
+    ov.onclick = function(e){ if (e.target===ov) closeModal(); };
+    var box = document.createElement('div');
+    box.id = 'sbom-u-modal-box';
+    box.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:8px;max-width:'+(opts.width||'720px')+';width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.5);font-size:12px';
+    box.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1">'
+      +   '<div style="font-size:13px;font-weight:600;flex:1">'+esc(opts.title||'')+'</div>'
+      +   (opts.subtitle ? '<div class="mono-sm c-t3" style="font-size:10px">'+esc(opts.subtitle)+'</div>' : '')
+      +   '<button onclick="window._sbomUnified.closeModal()" style="background:transparent;border:0;color:var(--text-2);font-size:18px;cursor:pointer;padding:0 4px;line-height:1">×</button>'
+      + '</div>'
+      + '<div style="padding:18px">'+(opts.body||'')+'</div>'
+      + (opts.footer ? '<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface2);position:sticky;bottom:0;justify-content:flex-end">'+opts.footer+'</div>' : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    // ESC để đóng
+    var escH = function(e){ if (e.key==='Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    var ov = document.getElementById('sbom-u-modal-overlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  S.closeModal = closeModal;
+
+  // -------------- Finding detail modal (click row trong Diff) ----------------
+  S.openFindingDetail = function (fp) {
+    if (!S.diffCache) return;
+    var all = [].concat(S.diffCache.newOnly, S.diffCache.persisted, S.diffCache.fixed);
+    var f = null;
+    for (var i = 0; i < all.length; i++) { if (fingerprint(all[i]) === fp) { f = all[i]; break; } }
+    if (!f) { toast('Finding not found','warn'); return; }
+
+    var sev = (f.severity||'?').toUpperCase();
+    var sevColor = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--amber)',LOW:'var(--text-2)'}[sev] || 'var(--text-3)';
+    var st = f._status || '?';
+    var stColor = st==='NEW'?'var(--red)':st==='FIXED'?'var(--green)':'var(--amber)';
+    var fid = esc(f.id || fp);
+    var sla = slaDaysOver(f);
+    var slaText = sla==null ? '—' : sla > 0 ? '⚠ '+sla+' days OVER SLA' : sla > -3 ? (-sla)+' days remaining' : '✓ within SLA ('+(-sla)+' days remaining)';
+    var slaColor = sla==null ? 'var(--text-3)' : sla > 0 ? 'var(--red)' : sla > -3 ? 'var(--amber)' : 'var(--green)';
+
+    function row(label, value, mono) {
+      if (value==null || value==='') return '';
+      return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--border)">'
+        + '<div style="min-width:130px;color:var(--text-3);font-size:10px;letter-spacing:.05em;text-transform:uppercase">'+esc(label)+'</div>'
+        + '<div style="flex:1;'+(mono?'font-family:var(--font-mono);font-size:11px':'font-size:12px')+';word-break:break-word">'+(typeof value==='string'?esc(value):value)+'</div>'
+        + '</div>';
+    }
+    function refs(f) {
+      var arr = f.references || f.refs || [];
+      if (!Array.isArray(arr) || !arr.length) return '';
+      return arr.slice(0,5).map(function(u){ return '<a href="'+esc(u)+'" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:none;font-size:11px;display:block;margin:2px 0">↗ '+esc(u)+'</a>'; }).join('');
+    }
+    function evidence(f) {
+      var ev = f.evidence || f.snippet || f.line_content || '';
+      if (!ev) return '';
+      return '<pre style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;font-family:var(--font-mono);overflow:auto;max-height:200px;margin:0;white-space:pre-wrap">'+esc(ev)+'</pre>';
+    }
+
+    var body =
+      // Top header với severity + status pills
+      '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap">'
+      +   '<span class="pill" style="background:transparent;border:1px solid '+sevColor+';color:'+sevColor+';font-size:10px;padding:3px 10px">'+esc(sev)+'</span>'
+      +   '<span class="pill" style="background:transparent;border:1px solid '+stColor+';color:'+stColor+';font-size:10px;padding:3px 10px">'+statusIcon(st)+' '+esc(st)+'</span>'
+      +   '<span style="margin-left:auto;color:'+slaColor+';font-size:11px;font-weight:500">'+esc(slaText)+'</span>'
+      + '</div>'
+      // Title (message)
+      + '<div style="font-size:14px;font-weight:600;margin-bottom:14px;line-height:1.4">'+esc(f.message||f.title||f.rule||f.rule_id||'(no message)')+'</div>'
+      // Detail rows
+      + '<div style="background:var(--surface2);border-radius:6px;padding:8px 14px;margin-bottom:14px">'
+      +   row('Tool', f.tool || '—')
+      +   row('Rule / CVE', (f.rule || f.rule_id || f.cve || '—'), true)
+      +   row('Component', f.component || '—', true)
+      +   row('CWE', f.cwe || '—')
+      +   row('Path', f.path || '—', true)
+      +   row('Line', f.line ? String(f.line) : '—', true)
+      +   row('First seen', f.first_seen ? fmtDate(f.first_seen) : '—')
+      +   row('Last seen',  f.last_seen  ? fmtDate(f.last_seen)  : '—')
+      +   row('Created',    f.created_at ? fmtDate(f.created_at) : '—')
+      +   row('Fingerprint', fid, true)
+      + '</div>'
+      // Evidence (nếu có)
+      + (evidence(f) ? '<div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">EVIDENCE</div>'+evidence(f) : '')
+      // References
+      + (refs(f) ? '<div style="margin-top:14px;font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">REFERENCES</div>'+refs(f) : '');
+
+    var footer = ''
+      + '<button class="btn btn-ghost" style="font-size:11px" onclick="window._sbomUnified.closeModal();window._sbomUnified.actJira(\''+fid+'\')">📋 Create Jira</button>'
+      + '<button class="btn btn-ghost" style="font-size:11px" onclick="window._sbomUnified.closeModal();window._sbomUnified.actVex(\''+fid+'\')">🏷 Set VEX</button>'
+      + (st==='PERSISTED' ? '<button class="btn btn-ghost" style="font-size:11px" onclick="window._sbomUnified.closeModal();window._sbomUnified.actAccept(\''+fid+'\')">✓ Accept</button>' : '')
+      + '<button class="btn btn-primary" style="font-size:11px" onclick="window._sbomUnified.closeModal()">Close</button>';
+
+    showModal({ title: 'Finding detail', subtitle: f.tool ? f.tool.toUpperCase() : '', body: body, footer: footer, width: '720px' });
+  };
+
+  // -------------- Config modal (real form, replaces alert) -------------------
+  function getConfig() {
+    var raw = '{}';
+    try { raw = localStorage.getItem('vsp_sbom_config') || '{}'; } catch(e){}
+    var c; try { c = JSON.parse(raw); } catch(e){ c = {}; }
+    return Object.assign({
+      sla_critical: 3, sla_high: 14, sla_medium: 30, sla_low: 90,
+      auto_baseline: 'previous_done',  // 'previous_done' | 'specific' | 'disabled'
+      baseline_rid: '',
+      page_size: 15,
+      default_view: 'inventory',       // 'inventory' | 'diff' | 'trend'
+      trend_range: 30
+    }, c);
+  }
+  function applyConfig(c) {
+    S.pageSize = parseInt(c.page_size,10) || 15;
+    S.trendDays = parseInt(c.trend_range,10) || 30;
+  }
+
+  S.openSettings = function () {
+    var c = getConfig();
+    var body =
+      // SLA section
+        '<div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600">SLA THRESHOLDS</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px">'
+      +   _cfgInput('sla_critical', 'CRITICAL', c.sla_critical, 'days', 'var(--red)')
+      +   _cfgInput('sla_high',     'HIGH',     c.sla_high,     'days', 'var(--orange)')
+      +   _cfgInput('sla_medium',   'MEDIUM',   c.sla_medium,   'days', 'var(--amber)')
+      +   _cfgInput('sla_low',      'LOW',      c.sla_low,      'days', 'var(--text-2)')
+      + '</div>'
+      // Baseline section
+      + '<div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600">DIFF BASELINE</div>'
+      + '<div style="margin-bottom:18px">'
+      +   '<select aria-label="Cfg Auto Baseline" id="cfg-auto-baseline" class="filter-select" style="width:100%;padding:8px 10px;font-size:11px" onchange="window._sbomUnified._onBaselineChange(this.value)">'
+      +     '<option value="previous_done"'+(c.auto_baseline==='previous_done'?' selected':'')+'>Auto: previous DONE run</option>'
+      +     '<option value="specific"'+(c.auto_baseline==='specific'?' selected':'')+'>Pin to specific run</option>'
+      +     '<option value="disabled"'+(c.auto_baseline==='disabled'?' selected':'')+'>Disabled (manual select)</option>'
+      +   '</select>'
+      +   '<div id="cfg-baseline-rid-wrap" style="margin-top:8px;'+(c.auto_baseline==='specific'?'':'display:none')+'">'
+      +     '<select aria-label="Cfg Baseline Rid" id="cfg-baseline-rid" class="filter-select" style="width:100%;padding:8px 10px;font-size:11px">'
+      +       S.runs.map(function(r){
+                return '<option value="'+esc(r.rid)+'"'+(r.rid===c.baseline_rid?' selected':'')+'>'+esc(r.rid)+' · '+esc(r.mode||'?')+' · '+(r.total_findings||0)+' findings</option>';
+              }).join('')
+      +     '</select>'
+      +   '</div>'
+      + '</div>'
+      // Display section
+      + '<div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600">DISPLAY</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px">'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">Page size</div>'
+      +     '<select aria-label="Cfg Page Size" id="cfg-page-size" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
+      +       [10,15,25,50,100].map(function(n){ return '<option value="'+n+'"'+(n==c.page_size?' selected':'')+'>'+n+' rows</option>'; }).join('')
+      +     '</select></div>'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">Default view</div>'
+      +     '<select aria-label="Cfg Default View" id="cfg-default-view" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
+      +       '<option value="inventory"'+(c.default_view==='inventory'?' selected':'')+'>📦 Inventory</option>'
+      +       '<option value="diff"'+(c.default_view==='diff'?' selected':'')+'>🔄 Diff</option>'
+      +       '<option value="trend"'+(c.default_view==='trend'?' selected':'')+'>📊 Trend</option>'
+      +     '</select></div>'
+      +   '<div><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">Trend range</div>'
+      +     '<select aria-label="Cfg Trend Range" id="cfg-trend-range" class="filter-select" style="width:100%;padding:6px 8px;font-size:11px">'
+      +       [7,14,30,60,90].map(function(n){ return '<option value="'+n+'"'+(n==c.trend_range?' selected':'')+'>Last '+n+' runs</option>'; }).join('')
+      +     '</select></div>'
+      + '</div>'
+      // Info
+      + '<div style="background:var(--surface2);border-left:3px solid var(--cyan);padding:8px 12px;font-size:10px;color:var(--text-2);border-radius:0 4px 4px 0">'
+      +   'ℹ Settings sync to backend at <code style="color:var(--cyan)">/api/v1/settings/sbom</code> if endpoint exists, else fallback to browser localStorage.'
+      + '</div>';
+
+    var footer = ''
+      + '<button class="btn btn-ghost" style="font-size:11px" onclick="window._sbomUnified.resetConfig()">↺ Reset defaults</button>'
+      + '<button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="window._sbomUnified.closeModal()">Cancel</button>'
+      + '<button class="btn btn-primary" style="font-size:11px" onclick="window._sbomUnified.saveConfig()">Save</button>';
+
+    showModal({ title: '⚙ SBOM Configuration', body: body, footer: footer, width: '600px' });
+  };
+
+  function _cfgInput(id, label, val, suffix, color) {
+    return '<div>'
+      + '<div style="font-size:10px;color:'+color+';font-weight:600;margin-bottom:4px;letter-spacing:.05em">'+label+'</div>'
+      + '<div style="display:flex;align-items:center;gap:4px">'
+      +   '<input aria-label="Cfg" id="cfg-'+id+'" type="number" min="1" max="365" value="'+val+'" class="filter-select" style="width:100%;padding:6px 8px;font-size:12px;font-family:var(--font-mono)">'
+      +   '<span style="font-size:10px;color:var(--text-3)">'+suffix+'</span>'
+      + '</div></div>';
+  }
+
+  S._onBaselineChange = function (v) {
+    var w = document.getElementById('cfg-baseline-rid-wrap');
+    if (w) w.style.display = (v === 'specific') ? '' : 'none';
+  };
+
+  S.saveConfig = function () {
+    var c = {
+      sla_critical:  parseInt(($('cfg-sla_critical')||{}).value, 10) || 3,
+      sla_high:      parseInt(($('cfg-sla_high')||{}).value, 10) || 14,
+      sla_medium:    parseInt(($('cfg-sla_medium')||{}).value, 10) || 30,
+      sla_low:       parseInt(($('cfg-sla_low')||{}).value, 10) || 90,
+      auto_baseline: ($('cfg-auto-baseline')||{}).value || 'previous_done',
+      baseline_rid:  ($('cfg-baseline-rid')||{}).value || '',
+      page_size:     parseInt(($('cfg-page-size')||{}).value, 10) || 15,
+      default_view:  ($('cfg-default-view')||{}).value || 'inventory',
+      trend_range:   parseInt(($('cfg-trend-range')||{}).value, 10) || 30
+    };
+    // Save local (always)
+    try { localStorage.setItem('vsp_sbom_config', JSON.stringify(c)); } catch(e){}
+    applyConfig(c);
+    // Try sync to backend (best-effort, không fail nếu endpoint chưa có)
+    fetch('/api/v1/settings/sbom', {
+      method: 'PUT',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(c)
+    }).then(function(r){
+      if (r.ok)        toast('Settings saved (synced to backend)', 'success');
+      else if (r.status === 404) toast('Settings saved locally (backend endpoint not yet wired)', 'info');
+      else             toast('Settings saved locally (backend HTTP '+r.status+')', 'warn');
+    }).catch(function(){
+      toast('Settings saved locally (backend unreachable)', 'info');
+    });
+    // Apply baseline pin nếu chọn 'specific'
+    if (c.auto_baseline === 'specific' && c.baseline_rid) {
+      var run = S.runs.find(function(r){ return r.rid === c.baseline_rid; });
+      if (run) { S.baseRunUUID = run.id; S.diffCache = null; }
+    }
+    closeModal();
+    // Re-render với config mới
+    S.pagination.inv = 0; S.pagination.diff = 0;
+    renderRunSelectors(); renderKPIs(); renderMain();
+  };
+
+  S.resetConfig = function () {
+    if (!confirm('Reset SBOM config to defaults?')) return;
+    try { localStorage.removeItem('vsp_sbom_config'); } catch(e){}
+    applyConfig(getConfig());
+    closeModal();
+    toast('Config reset to defaults','success');
+    S.openSettings();
+  };
+
+  // Apply config trên load
+  applyConfig(getConfig());
+
+  // ---- Bootstrap ------------------------------------------------------------
+  async function bootstrap() {
+    if (!renderSkeleton()) return;
+    // Ẩn nav SBOM Diff cũ (do VSP-G2 inject) nếu có — retry ngắn nếu menu được inject muộn
+    (function hideOldSBOMNav(){
+      try {
+        var matcher = function(a){
+          try{
+            var t = (a.textContent||'').trim();
+            if (/sbom\s*diff/i.test(t)) return true;
+            var oc = a.getAttribute && a.getAttribute('onclick') || '';
+            if (/sbomdiff/i.test(oc)) return true;
+          }catch(e){}
+          return false;
+        };
+        Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function(a){ if (matcher(a)) a.style.display='none'; });
+        try {
+          if (!hideOldSBOMNav._obs) {
+            hideOldSBOMNav._obs = new MutationObserver(function(muts){
+              muts.forEach(function(m){
+                Array.prototype.forEach.call(m.addedNodes || [], function(n){
+                  if (!n || n.nodeType !== 1) return;
+                  if (n.matches && n.matches('.nav-item') && matcher(n)) n.style.display='none';
+                  var found = n.querySelectorAll && n.querySelectorAll('.nav-item') || [];
+                  Array.prototype.forEach.call(found, function(a){ if (matcher(a)) a.style.display='none'; });
+                });
+              });
+            });
+            hideOldSBOMNav._obs.observe(document.body, { childList: true, subtree: true });
+          }
+        } catch(e) {}
+      } catch(e) {}
+    })();
+    try {
+      await fetchRuns();
+      // Apply default view từ config (chỉ lần đầu, không override nếu user đã chuyển tab)
+      if (!S._viewInitialized) {
+        S._viewInitialized = true;
+        var cfg = getConfig();
+        if (cfg.default_view && cfg.default_view !== S.view) {
+          S.view = cfg.default_view;
+          ['inventory','diff','trend'].forEach(function(t){
+            var el = $('sbom-u-tab-'+t); if (el) el.classList.toggle('sbom-u-tab-active', t===S.view);
+          });
+        }
+      }
+      renderRunSelectors(); renderKPIs();
+      if (S.view === 'diff') await ensureDiff();
+      renderMain();
+    } catch(e) { console.error('[SBOM-U] bootstrap', e); }
+  }
+
+  // Wrap loadSBOM cũ — gọi bootstrap khi panel SBOM được mở
+  var origLoadSBOM = window.loadSBOM;
+  window.loadSBOM = async function () {
+    await bootstrap();
+    if (S.runs.length === 0 && typeof origLoadSBOM === 'function') {
+      try { await origLoadSBOM(); } catch(e){}
+    }
+  };
+
+  // Nếu panel-sbom đang mở sẵn (user đã ở đó khi script load) → bootstrap luôn
+  setTimeout(function(){
+    var p = document.getElementById('panel-sbom');
+    if (p && p.classList.contains('active')) bootstrap();
+  }, 300);
+
+  // ---- BONUS: Fix iframe panels missing token bootstrap (sw_inventory, etc.) ---
+  // Pattern: iframe panel gọi /api/v1/assets không có Authorization header → 401.
+  // Wrap fetch trong window này để tự inject token cho mọi request /api/v1/* same-origin.
+  // CHỈ áp dụng nếu request KHÔNG có Authorization header sẵn.
+  (function(){
+    if (window.__VSP_TOKEN_AUTOWRAP__) return;
+    window.__VSP_TOKEN_AUTOWRAP__ = true;
+    var ORIG = window.fetch.bind(window);
+    window.fetch = function(input, init){
+      try {
+        var url = (typeof input === 'string') ? input : (input && input.url) || '';
+        // Chỉ chạm đến same-origin /api/v1/*
+        if (/^\/api\/v1\//.test(url) || (url.indexOf(location.origin + '/api/v1/') === 0)) {
+          var hasAuth = false;
+          if (init && init.headers) {
+            if (init.headers instanceof Headers)      hasAuth = init.headers.has('Authorization');
+            else if (typeof init.headers === 'object') hasAuth = !!(init.headers.Authorization || init.headers.authorization);
+          }
+          if (!hasAuth) {
+            var t = window.TOKEN || (typeof localStorage !== 'undefined' && localStorage.getItem('vsp_token'));
+            if (t) {
+              init = init || {};
+              init.headers = Object.assign({}, init.headers || {}, { 'Authorization': 'Bearer ' + t });
+            }
+          }
+        }
+      } catch(e){}
+      return ORIG(input, init);
+    };
+    (window.VSP_DEBUG && console.log('[VSP-AUTH] fetch auto-token wrapper armed'));
+  })();
+
+
+})();
+// ============ END SBOM UNIFIED PANEL ============

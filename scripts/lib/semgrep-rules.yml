@@ -1,0 +1,98 @@
+# Hand-rolled semgrep rules for VSP — patterns gosec doesn't catch
+# or that we want a second opinion on. All rules are STRUCTURAL
+# (AST-level), not regex.
+rules:
+  # ────────────────────────────────────────────────────────────────
+  # SQL string concatenation — bypasses parameterization.
+  - id: sql-string-concat
+    pattern-either:
+      - pattern: $DB.Query(fmt.Sprintf(...))
+      - pattern: $DB.QueryRow(fmt.Sprintf(...))
+      - pattern: $DB.Exec(fmt.Sprintf(...))
+      - pattern: $TX.Query(fmt.Sprintf(...))
+      - pattern: $TX.QueryRow(fmt.Sprintf(...))
+      - pattern: $TX.Exec(fmt.Sprintf(...))
+    message: "SQL via fmt.Sprintf — verify the format string contains only parameter placeholders ($N), never user data"
+    severity: WARNING
+    languages: [go]
+
+  # ────────────────────────────────────────────────────────────────
+  # Hardcoded admin/test credentials.
+  - id: hardcoded-admin-password
+    patterns:
+      - pattern-either:
+          - pattern: |
+              password = "$X"
+          - pattern: |
+              Password = "$X"
+      - pattern-not: |
+              password = ""
+      - pattern-not: |
+              Password = ""
+    message: "Hardcoded password literal — use env var or secret manager"
+    severity: ERROR
+    languages: [go]
+
+  # ────────────────────────────────────────────────────────────────
+  # exec.Command with user input — RCE risk.
+  - id: exec-command-user-input
+    patterns:
+      - pattern: exec.Command($X, ...)
+      - pattern-not: exec.Command("...", ...)
+    message: "exec.Command with non-literal — verify caller is trusted; preferably use exec.LookPath + literal binary"
+    severity: WARNING
+    languages: [go]
+
+  # ────────────────────────────────────────────────────────────────
+  # http.Client without explicit Timeout — can hang forever.
+  - id: http-client-no-timeout
+    pattern: |
+      $C := &http.Client{}
+    message: "http.Client without Timeout — set explicit Timeout to avoid goroutine leaks under upstream slowdown"
+    severity: WARNING
+    languages: [go]
+
+  # ────────────────────────────────────────────────────────────────
+  # math/rand used in security-sensitive paths. Match only when the
+  # `math/rand` import is present in the SAME file (otherwise rand.X
+  # refers to crypto/rand which is fine).
+  - id: math-rand-in-auth
+    patterns:
+      - pattern-either:
+          - pattern: rand.Read($X)
+          - pattern: rand.Intn(...)
+          - pattern: rand.Int63(...)
+          - pattern: rand.Int31(...)
+      - pattern-inside: |
+          import "math/rand"
+          ...
+    paths:
+      include:
+        - "internal/auth/**"
+        - "internal/api/handler/auth*.go"
+    message: "math/rand used in auth path — switch to crypto/rand for token / nonce generation"
+    severity: ERROR
+    languages: [go]
+
+  # ────────────────────────────────────────────────────────────────
+  # context.Background in HTTP handler — discards request cancellation.
+  - id: ctx-background-in-handler
+    patterns:
+      - pattern-inside: |
+          func ($H $T) $M(w http.ResponseWriter, r *http.Request) { ... }
+      - pattern: context.Background()
+      - pattern-not: |
+          $X := r.Clone(context.Background())
+      - pattern-not-inside: |
+          go func() { ... }()
+    message: "context.Background() in HTTP handler — should use r.Context() so cancellation propagates"
+    severity: INFO
+    languages: [go]
+
+  # ────────────────────────────────────────────────────────────────
+  # Hardcoded TODO that smells like security debt.
+  - id: security-todo
+    pattern-regex: "(?i)// (TODO|FIXME|XXX).*(security|auth|crypto|password|secret|token|leak|bypass)"
+    message: "Security-tagged TODO — track in an issue rather than leaving in source"
+    severity: INFO
+    languages: [go]

@@ -1,0 +1,32 @@
+title: VSP — Brute force login from a single IP
+id: 7b9fa3a2-4ec1-4b2e-9d0a-vsp001
+status: stable
+description: |
+  Detects sustained failed-login attempts from one IP, regardless of
+  username. VSP's IP lockout already mitigates this at 20 fails/10min,
+  but the Sigma rule lets a customer SIEM correlate VSP's audit_log
+  with their own perimeter logs (WAF, CDN) for cross-system telemetry.
+references:
+  - https://attack.mitre.org/techniques/T1110/
+author: VSP Engineering (security@vsp.vn)
+date: 2026-05-08
+modified: 2026-05-08
+tags:
+  - attack.credential_access
+  - attack.t1110
+  - attack.t1110.001
+logsource:
+  product: vsp
+  service: audit_log
+detection:
+  selection:
+    action:
+      - LOGIN_FAILED
+      - LOGIN_LOCKED
+  timeframe: 10m
+  condition: selection | count(ip) by ip > 15
+falsepositives:
+  - Legitimate user with forgotten password retrying
+  - Automated retry loop in customer CI/CD
+  - Penetration test (should be coordinated; check 3PAO engagement window)
+level: medium

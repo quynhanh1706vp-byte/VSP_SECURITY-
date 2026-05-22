@@ -10,21 +10,18 @@ import (
 
 // IssueToken creates a JWT for SSO-authenticated users.
 // Finds or creates user in DB by email.
-func (h *Auth) IssueToken(ctx context.Context, email, name, role string) (string, error) {
-	// Find existing user or use default tenant
+// NOTE: This is the legacy SSO path used by /auth/sso/* routes.
+// New SSO flows use sso_oidc.go → resolveOrProvisionUser instead.
+func (a *Auth) IssueToken(ctx context.Context, email, name, role string) (string, error) {
 	userID := "sso-" + email
-	tenantID := h.DefaultTID
+	tenantID := a.DefaultTID
 
-	// Try to find existing user
-	if users, _, err := h.DB.ListUsers(ctx, tenantID, 100, 0); err == nil {
-		for _, u := range users {
-			if u.Email == email {
-				userID = u.ID
-				tenantID = u.TenantID
-				role = u.Role
-				break
-			}
-		}
+	// Use direct email lookup instead of O(N) ListUsers scan.
+	// ListUsers has a hard cap of 100 rows — misses users beyond that.
+	if u, err := a.DB.GetUserByEmail(ctx, tenantID, email); err == nil && u != nil {
+		userID = u.ID
+		tenantID = u.TenantID
+		role = u.Role
 	}
 
 	claims := jwt.MapClaims{
@@ -32,12 +29,12 @@ func (h *Auth) IssueToken(ctx context.Context, email, name, role string) (string
 		"email":     email,
 		"tenant_id": tenantID,
 		"role":      role,
-		"exp":       time.Now().Add(h.JWTTTL).Unix(),
+		"exp":       time.Now().Add(a.JWTTTL).Unix(),
 		"iat":       time.Now().Unix(),
 		"sso":       true,
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := tok.SignedString([]byte(h.JWTSecret))
+	signed, err := tok.SignedString([]byte(a.JWTSecret))
 	if err != nil {
 		return "", fmt.Errorf("sign token: %w", err)
 	}

@@ -39,7 +39,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 			jsonError(w, "malformed JSON: unexpected end of input", http.StatusBadRequest)
 		default:
 			// Unknown field từ DisallowUnknownFields
-			jsonError(w, fmt.Sprintf("invalid request: %s", err.Error()),
+			jsonError(w, fmt.Sprintf("invalid request: %s", err.Error()), // safe-err-leak: JSON decode validation
 				http.StatusBadRequest)
 		}
 		return false

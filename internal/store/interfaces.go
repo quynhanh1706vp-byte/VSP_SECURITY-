@@ -111,10 +111,11 @@ type RefreshTokenStore interface {
 type RunStore interface {
 	CreateRun(ctx context.Context, rid, tenantID, mode, profile, src, targetURL string, toolsTotal int) (*Run, error)
 	GetRunByRID(ctx context.Context, tenantID, rid string) (*Run, error)
+	GetRunByID(ctx context.Context, tenantID, id string) (*Run, error)
 	GetLatestRun(ctx context.Context, tenantID string) (*Run, error)
 	ListRuns(ctx context.Context, tenantID string, limit, offset int) ([]Run, error)
 	UpdateRunStatus(ctx context.Context, tenantID, rid, status string, toolsDone int) error
-	UpdateRunResult(ctx context.Context, tenantID, rid, gate, posture string, total int, summary json.RawMessage) error
+	UpdateRunResult(ctx context.Context, tenantID, rid, gate, posture string, total, toolsDone int, summary json.RawMessage) error
 }
 
 type Store interface {

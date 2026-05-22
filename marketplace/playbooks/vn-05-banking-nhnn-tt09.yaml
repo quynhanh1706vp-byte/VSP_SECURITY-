@@ -1,0 +1,56 @@
+id: pb-vn-banking-pci-incident
+name: Ngân hàng — PCI-DSS + NHNN incident response
+description: Sự cố trên hệ thống core banking — báo cáo NHNN trong 4h theo Thông tư 09
+trigger: critical_finding
+sev_filter: CRITICAL
+enabled: true
+tags: [vn, banking, pci, nhnn, tt09, regulation]
+steps:
+  - type: condition
+    name: Phạm vi PCI scope
+    desc: Chỉ áp dụng cho asset gắn nhãn pci_scope hoặc core_banking
+    config: |
+      expr: (asset.tag=pci_scope OR asset.tag=core_banking) AND severity=CRITICAL
+  - type: enrich
+    name: Tổng hợp scope ảnh hưởng
+    desc: PII + thẻ + tài khoản bị ảnh hưởng (số liệu, không kèm data)
+    config: |
+      include: [affected_count, data_classes, transaction_window]
+      compliance: [pci_dss_v4, nhnn_tt09]
+      redact: true
+  - type: block
+    name: Cô lập service
+    desc: Drain traffic khỏi service bị ảnh hưởng (canary off)
+    config: |
+      provider: kubernetes
+      action: scale_to_zero
+      namespace: ${asset.namespace}
+      preserve_logs: true
+  - type: ticket
+    name: P0 IR + compliance ticket
+    desc: Dual ticket — IR team và Compliance team
+    config: |
+      provider: jira
+      tickets:
+        - project: VSP-IR
+          priority: P0
+          assignee_group: ir-tier3
+        - project: COMPLIANCE
+          priority: P0
+          labels: [nhnn-tt09, pci-dss, 4h-deadline]
+          sla_hours: 4
+  - type: notify
+    name: Page CISO + Compliance Officer
+    desc: Page ngay, không chờ tự động
+    config: |
+      channels: [pagerduty, sms, email]
+      pagerduty_key: ${PD_CISO_KEY}
+      sms_to: [${CISO_PHONE}, ${COMPLIANCE_OFFICER_PHONE}]
+      message_vi: "P0 — Sự cố PCI scope. NHNN deadline 4h. Cần CISO duyệt báo cáo."
+  - type: remediate
+    name: Render báo cáo NHNN TT09
+    desc: Báo cáo bản nháp tiếng Việt theo mẫu NHNN
+    config: |
+      template: nhnn_tt09_incident_vi
+      output_format: [docx, pdf]
+      classification: confidential

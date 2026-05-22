@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+
+	"github.com/vsp/platform/internal/auth"
 )
 
 // GET /api/v1/ws — WebSocket upgrade with SSE fallback
@@ -65,8 +67,16 @@ func wsServe(w http.ResponseWriter, r *http.Request) {
 	buf.WriteString(hs) //nolint
 	buf.Flush()         //nolint
 
+	// L5 fix: tenant-scope this WS subscriber. Auth middleware already
+	// populated claims; resolve to UUID via the same hook the SSE path
+	// uses so broadcast routing keys line up.
+	subscriberTenantID := ""
+	if c, ok := auth.FromContext(r.Context()); ok {
+		subscriberTenantID = tenantResolver(c.TenantID)
+	}
+
 	ch := make(chan []byte, 16)
-	Hub.register(ch)
+	Hub.register(ch, subscriberTenantID)
 	defer Hub.unregister(ch)
 
 	ActiveSSEClients.Inc()

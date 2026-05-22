@@ -1,0 +1,51 @@
+id: pb-intl-pagerduty-escalation
+name: PagerDuty severity-based escalation
+description: Tiered escalation — page L1 first, escalate L2+CISO if no ack in 10min
+trigger: critical_finding
+sev_filter: CRITICAL
+enabled: true
+tags: [pagerduty, escalation, oncall, ir]
+steps:
+  - type: condition
+    name: Check finding severity threshold
+    desc: Only escalate for CRITICAL with EPSS > 0.5 or KEV listed
+    config: |
+      expr: severity=CRITICAL AND (epss > 0.5 OR kev=true)
+  - type: ticket
+    name: Page L1 oncall
+    desc: First-tier page with 10-minute ack window
+    config: |
+      provider: pagerduty
+      service_id: ${PD_L1_SERVICE_ID}
+      api_key: ${PD_API_KEY}
+      urgency: high
+      ack_timeout_minutes: 10
+      escalation_policy: ${PD_ESCALATION_POLICY_ID}
+  - type: condition
+    name: Wait for ack
+    desc: Branch on ack status after timeout
+    config: |
+      wait_for: ack_or_timeout
+      timeout_minutes: 10
+      poll_endpoint: pagerduty_status
+  - type: ticket
+    name: Escalate L2 if no ack
+    desc: Page L2 + notify CISO via SMS
+    config: |
+      only_if: ack.received=false
+      provider: pagerduty
+      service_id: ${PD_L2_SERVICE_ID}
+      api_key: ${PD_API_KEY}
+      urgency: high
+      include_history: true
+  - type: notify
+    name: SMS CISO on L2 escalation
+    desc: Out-of-band SMS, not email
+    config: |
+      only_if: ack.received=false
+      provider: twilio
+      account_sid: ${TWILIO_SID}
+      auth_token: ${TWILIO_TOKEN}
+      from: ${TWILIO_FROM}
+      to: [${CISO_PHONE}]
+      message: "VSP P0 escalation — no L1 ack in 10min. Inc ${incident.id}. Slack #inc-${incident.id}"

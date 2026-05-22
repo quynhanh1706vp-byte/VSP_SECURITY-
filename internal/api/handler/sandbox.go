@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -43,7 +44,11 @@ func (h *Sandbox) List(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/vsp/sandbox/test-fire
 func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req struct {
 		EventType string `json:"event_type"`
 		Gate      string `json:"gate"`
@@ -65,7 +70,13 @@ func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 		Src:       "sandbox",
 	}
-	go siem.Deliver(r.Context(), h.DB, event)
+	// Background ctx — webhook POST may take a few seconds; r.Context()
+	// would race the response flush and silently drop deliveries.
+	go func(ev siem.Event) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		siem.Deliver(ctx, h.DB, ev)
+	}(event)
 
 	h.mu.Lock()
 	h.events = append(h.events, sandboxEvent{
@@ -81,6 +92,7 @@ func (h *Sandbox) TestFire(w http.ResponseWriter, r *http.Request) {
 	}
 	h.mu.Unlock()
 
+	logAudit(r, h.DB, "SANDBOX_TEST_FIRE", "sandbox/test_fire")
 	jsonOK(w, map[string]any{
 		"status": "fired",
 		"rid":    event.RID,
@@ -100,5 +112,6 @@ func (h *Sandbox) Clear(w http.ResponseWriter, r *http.Request) {
 	}
 	h.events = keep
 	h.mu.Unlock()
+	logAudit(r, h.DB, "SANDBOX_CLEAR", "sandbox/clear")
 	w.WriteHeader(http.StatusNoContent)
 }

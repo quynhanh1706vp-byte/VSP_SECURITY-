@@ -54,9 +54,10 @@ func (h *Export) CSV(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "run not found", http.StatusNotFound)
 		return
 	}
+	limit := queryInt(r, "limit", 10000)
 
 	findings, _, _ := h.DB.ListFindings(r.Context(), claims.TenantID,
-		store.FindingFilter{RunID: run.ID, Limit: 10000})
+		store.FindingFilter{RunID: run.ID, Limit: limit, Severity: r.URL.Query().Get("severity"), Tool: r.URL.Query().Get("tool")})
 
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition",
@@ -84,9 +85,10 @@ func (h *Export) JSON(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "run not found", http.StatusNotFound)
 		return
 	}
+	limit := queryInt(r, "limit", 10000)
 
 	runFindings, total, _ := h.DB.ListFindings(r.Context(), claims.TenantID,
-		store.FindingFilter{RunID: run.ID, Limit: 10000})
+		store.FindingFilter{RunID: run.ID, Limit: limit, Severity: r.URL.Query().Get("severity"), Tool: r.URL.Query().Get("tool")})
 	if runFindings == nil {
 		runFindings = []store.Finding{}
 	}

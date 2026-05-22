@@ -1,0 +1,40 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: vsp-deny-unsigned-images
+  annotations:
+    policies.kyverno.io/title: Deny unsigned images
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: |
+      Blocks any pod whose image is not signed by the VSP cosign key.
+      Closes the supply-chain gap — every image that lands on the
+      cluster must have a verifiable provenance attestation.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: check-image-signature
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      verifyImages:
+        # Allow any image registered in approved registries that has
+        # been signed by VSP's cosign public key. The key is fetched
+        # from the in-cluster Secret created by Helm:
+        #   kubectl get secret vsp-cosign-pub -o yaml
+        - imageReferences:
+            - "ghcr.io/vsp/*"
+            - "registry.vsp.vn/*"
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      <REPLACE_AT_DEPLOY_TIME_WITH_OPERATOR_KEY>
+                      -----END PUBLIC KEY-----
+          mutateDigest: true
+          verifyDigest: true
+          required: true

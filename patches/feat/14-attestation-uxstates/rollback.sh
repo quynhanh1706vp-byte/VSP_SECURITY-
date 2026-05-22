@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)" || cd /home/test/Data/GOLANG_VSP
+cp static/panels/attestation.html.bak.feat14 static/panels/attestation.html

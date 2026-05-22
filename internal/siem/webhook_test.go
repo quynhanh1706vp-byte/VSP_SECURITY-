@@ -28,13 +28,15 @@ func makeEvent(critical, high, medium int) siem.Event {
 // ── ValidateWebhookURL ────────────────────────────────────────────────────────
 
 func TestValidateWebhookURL_OK(t *testing.T) {
-	if err := siem.ValidateWebhookURL("https://hooks.example.com/abc"); err != nil {
-		t.Errorf("want nil, got %v", err)
+	// Use a literal public IP so the test is hermetic — no DNS dependency.
+	// 1.1.1.1 is Cloudflare DNS, unambiguously public-routable.
+	if err := siem.ValidateWebhookURL("https://1.1.1.1/abc"); err != nil {
+		t.Errorf("want nil for public IP literal, got %v", err)
 	}
 }
 
 func TestValidateWebhookURL_HTTP_Blocked(t *testing.T) {
-	if err := siem.ValidateWebhookURL("http://hooks.example.com/abc"); err == nil {
+	if err := siem.ValidateWebhookURL("http://1.1.1.1/abc"); err == nil {
 		t.Error("want error for http://, got nil")
 	}
 }
@@ -48,6 +50,43 @@ func TestValidateWebhookURL_Localhost_Blocked(t *testing.T) {
 	for _, u := range cases {
 		if err := siem.ValidateWebhookURL(u); err == nil {
 			t.Errorf("want SSRF block for %s, got nil", u)
+		}
+	}
+}
+
+// TestValidateWebhookURL_FailClosed pins the fail-closed posture
+// introduced in the 2026-05-12 SSRF hardening. Pre-fix an unresolvable
+// hostname returned nil (allow), enabling a DNS-rebind attack: an
+// attacker registers attacker.example, points it at NXDOMAIN at
+// validation time, then flips it to 127.0.0.1 by the time net/http
+// dials. The fix denies any hostname that doesn't resolve so the
+// rebind has nothing to anchor on.
+func TestValidateWebhookURL_FailClosed(t *testing.T) {
+	// example.com TLD is RFC2606-reserved with no A record on the
+	// `hooks.` subdomain — guaranteed NXDOMAIN.
+	if err := siem.ValidateWebhookURL("https://hooks.example.com/abc"); err == nil {
+		t.Error("want SSRF block on NXDOMAIN (fail-closed), got nil")
+	}
+}
+
+// TestValidateWebhookURL_PrivateBypass pins the bypass cases that
+// were possible against the old prefix-list implementation:
+//   - IPv6 mapped IPv4 form
+//   - 192.0.2.x (TEST-NET-1) and other ranges the old list missed —
+//     not actually private but reserved; we let those through
+//   - .local / .internal TLD aliases
+//
+// The new implementation rejects these via direct net.IP parsing +
+// alias suffix matching.
+func TestValidateWebhookURL_AliasBlocked(t *testing.T) {
+	cases := []string{
+		"https://kube-apiserver.cluster.local/api",
+		"https://vault.svc.internal/v1/secret",
+		"https://metadata.example.test/latest", // metadata.* prefix
+	}
+	for _, u := range cases {
+		if err := siem.ValidateWebhookURL(u); err == nil {
+			t.Errorf("want alias block for %s, got nil", u)
 		}
 	}
 }

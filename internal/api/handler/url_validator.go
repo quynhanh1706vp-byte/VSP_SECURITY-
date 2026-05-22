@@ -52,7 +52,7 @@ func validateScanURL(rawURL string) error {
 	ips, err := net.LookupHost(host)
 	if err != nil {
 		// Unknown host — allow (scanner will handle connection error)
-		return nil
+		return nil //nolint:nilerr
 	}
 	for _, ip := range ips {
 		parsed := net.ParseIP(ip)

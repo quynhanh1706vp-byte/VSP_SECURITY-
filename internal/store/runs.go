@@ -49,6 +49,15 @@ func (db *DB) GetRunByRID(ctx context.Context, tenantID, rid string) (*Run, erro
 	return scanRun(row)
 }
 
+// GetRunByID — same as GetRunByRID but matches the UUID primary key.
+// Used when UI dropdowns expose run.id (UUID) instead of run.rid (string).
+func (db *DB) GetRunByID(ctx context.Context, tenantID, id string) (*Run, error) {
+	row := db.pool.QueryRow(ctx,
+		`SELECT `+runCols+` FROM runs WHERE id=$1 AND tenant_id=$2 LIMIT 1`,
+		id, tenantID)
+	return scanRun(row)
+}
+
 func (db *DB) GetLatestRun(ctx context.Context, tenantID string) (*Run, error) {
 	row := db.pool.QueryRow(ctx,
 		`SELECT `+runCols+` FROM runs WHERE tenant_id=$1 AND status='DONE' ORDER BY created_at DESC LIMIT 1`,
@@ -85,6 +94,39 @@ func (db *DB) ListRuns(ctx context.Context, tenantID string, limit, offset int) 
 	return runs, nil
 }
 
+// CountRuns returns the true row count for the tenant — used by the
+// /vsp/runs/index handler so the FE "Total Runs" KPI shows the real
+// number instead of `len(page)` which jumped between 50/200 depending
+// on which fetch site asked. Cheap: backed by idx_runs_tenant.
+func (db *DB) CountRuns(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM runs WHERE tenant_id = $1`, tenantID).Scan(&n)
+	return n, err
+}
+
+// CountSBOMRuns — true count of DONE runs (SBOM index handler page-cap=50).
+func (db *DB) CountSBOMRuns(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM runs WHERE tenant_id = $1 AND status = 'DONE'`,
+		tenantID).Scan(&n)
+	return n, err
+}
+
+// CountDastTargets — distinct target_urls observed for the tenant.
+// Powers the DAST settings panel total (SettingsDastTargets cap=50).
+func (db *DB) CountDastTargets(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT target_url) FROM runs
+		WHERE tenant_id = $1
+		  AND target_url IS NOT NULL
+		  AND target_url != ''
+	`, tenantID).Scan(&n)
+	return n, err
+}
+
 func (db *DB) UpdateRunStatus(ctx context.Context, tenantID, rid, status string, toolsDone int) error {
 	_, err := db.pool.Exec(ctx,
 		`UPDATE runs SET status=$3, tools_done=$4,
@@ -95,13 +137,20 @@ func (db *DB) UpdateRunStatus(ctx context.Context, tenantID, rid, status string,
 	return err
 }
 
-func (db *DB) UpdateRunResult(ctx context.Context, tenantID, rid, gate, posture string, total int, summary json.RawMessage) error {
+// UpdateRunResult finalises a run row. toolsDone is the actual number
+// of tool runners the worker dispatched (success + fail combined) —
+// it must NOT be clamped to tools_total. Pre-2026-05-11 this query
+// did `tools_done = tools_total`, which papered over the FULL_SOC
+// drift bug: stale tools_total=18 caused the UI to show "18/18"
+// regardless of how many tools actually ran. Pass the real count
+// from the worker so the operator sees ground truth.
+func (db *DB) UpdateRunResult(ctx context.Context, tenantID, rid, gate, posture string, total, toolsDone int, summary json.RawMessage) error {
 	_, err := db.pool.Exec(ctx,
 		`UPDATE runs
 		 SET status='DONE', gate=$3, posture=$4, total_findings=$5,
-		     summary=$6, tools_done=tools_total, finished_at=NOW()
+		     summary=$6, tools_done=$7, finished_at=NOW()
 		 WHERE rid=$1 AND tenant_id=$2`,
-		rid, tenantID, gate, posture, total, summary)
+		rid, tenantID, gate, posture, total, summary, toolsDone)
 	return err
 }
 

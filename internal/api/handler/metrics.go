@@ -65,6 +65,21 @@ var (
 		Name: "vsp_webhook_deliveries_total",
 		Help: "SIEM webhook delivery attempts.",
 	}, []string{"type", "status"})
+
+	// L27 2026-05-09: previously declared as "audit_log_inserts_total" but
+	// never wired. Now incremented in the InsertAudit happy path so
+	// operators can observe audit-write rate per tenant.
+	AuditInserts = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "vsp_audit_inserts_total",
+		Help: "Successful audit_log row inserts by action.",
+	}, []string{"action"})
+
+	// AuditChainBreaks fires when verify reports ok=false — operators
+	// page on this. Increment is in handler.Audit.Verify.
+	AuditChainBreaks = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "vsp_audit_chain_breaks_total",
+		Help: "Times audit chain integrity verify returned ok=false.",
+	})
 )
 
 // MetricsHandler returns the Prometheus HTTP handler.

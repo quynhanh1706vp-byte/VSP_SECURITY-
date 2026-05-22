@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>VSP — Trust Center</title>
+<meta name="description" content="VSP security posture, compliance attestations, vulnerability disclosure, and transparency reports.">
+<style>
+  :root {
+    --bg: #0b0d12; --bg2: #14171f; --bg3: #1c2029;
+    --t1: #e8eaed; --t2: #b8bcc8; --t3: #6e7280;
+    --green: #3dd68c; --amber: #f0b352; --red: #e5484d;
+    --accent: #4f8cff; --border: #2a2e38;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--t1);
+         font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  header { padding: 32px 0 24px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+  h1 { font: 400 36px/1.2 Georgia, serif; margin: 0 0 8px; }
+  .lede { color: var(--t2); font-size: 16px; max-width: 720px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 24px 0; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 20px 22px; }
+  .card h2 { font: 500 17px/1.3 -apple-system, sans-serif; margin: 0 0 10px; color: var(--t1); }
+  .card p { margin: 0 0 8px; color: var(--t2); font-size: 14px; }
+  .card a { color: var(--accent); text-decoration: none; font-size: 13px; font-family: monospace; }
+  .card a:hover { text-decoration: underline; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .badge {
+    display: inline-block; padding: 4px 10px; border-radius: 4px;
+    font: 600 11px/1 monospace; letter-spacing: 0.5px; text-transform: uppercase;
+    background: rgba(58,106,154,.2); color: var(--accent); border: 1px solid var(--accent);
+  }
+  .badge.green { background: rgba(74,124,89,.2); color: var(--green); border-color: var(--green); }
+  .badge.amber { background: rgba(201,169,97,.2); color: var(--amber); border-color: var(--amber); }
+  section { margin: 40px 0; }
+  section h2 { font: 400 26px/1.2 Georgia, serif; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; background: var(--bg2); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  th { font: 600 11px/1 monospace; letter-spacing: 1px; color: var(--t3); text-transform: uppercase; }
+  tr:last-child td { border-bottom: none; }
+  .stat-row { display: flex; gap: 24px; flex-wrap: wrap; margin: 16px 0; }
+  .stat { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; min-width: 180px; }
+  .stat .num { font: 400 26px/1 Georgia, serif; }
+  .stat .lbl { font: 600 10px/1 monospace; letter-spacing: 1px; color: var(--t3); text-transform: uppercase; margin-top: 4px; }
+  footer { margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--t3); font-size: 13px; text-align: center; }
+  footer a { color: var(--t2); }
+  code { background: var(--bg3); padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  .live-pill { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+               background: var(--green); animation: pulse 2s infinite; margin-right: 6px; vertical-align: middle; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Trust Center</h1>
+  <div class="lede">
+    VSP commits to security and transparency. This page lists our active
+    attestations, public commitments, and live operational status. Every
+    claim links back to verifiable evidence.
+  </div>
+</header>
+
+<section>
+  <h2>Attestations &amp; Recognition</h2>
+  <div class="grid">
+    <div class="card">
+      <h2>NIST Cybersecurity Framework 2.0</h2>
+      <p>VSP self-attested Organisational Profile across all 22 categories of
+      CSF 2.0. Average maturity tier 3.2 / 4.0.</p>
+      <div class="badges"><span class="badge green">Self-Attested</span><span class="badge">22/22 Categories</span></div>
+      <a href="/api/v1/nist-csf/profile">Live profile JSON →</a>
+    </div>
+
+    <div class="card">
+      <h2>SOC 2 Type I Readiness</h2>
+      <p>AICPA Trust Services Criteria 2017 (rev. 2022) mapped across CC, A, C,
+      PI, P. Type I attestation engagement targeted Q3 2026.</p>
+      <div class="badges"><span class="badge amber">Readiness</span><span class="badge">25 Criteria</span></div>
+      <a href="/api/v1/recognition/soc2-readiness">Readiness map →</a>
+    </div>
+
+    <div class="card">
+      <h2>ISO/IEC 27001:2022</h2>
+      <p>30 highest-impact Annex A controls mapped to VSP evidence.
+      Certification engagement planned post Type I.</p>
+      <div class="badges"><span class="badge amber">Stage 1 Ready</span><span class="badge">Annex A 30/93</span></div>
+      <a href="/api/v1/recognition/iso27001-mapping">Control mapping →</a>
+    </div>
+
+    <div class="card">
+      <h2>CISA Secure Software Self-Attestation</h2>
+      <p>NIST SSDF Common Form 2024 — 19 practices auto-populated from live
+      tenant evidence. Submittable to <code>saf.cisa.gov</code> after executive sign.</p>
+      <div class="badges"><span class="badge green">19/19 Practices</span><span class="badge">EO 14028</span></div>
+      <a href="/api/v1/cisa-attestation/ssdf/draft">Generate draft →</a>
+    </div>
+
+    <div class="card">
+      <h2>SLSA Build Provenance</h2>
+      <p>Per-run signed in-toto v1 / DSSE attestations. Cosign verify-attestation
+      compatible. Public Rekor publishing available on opt-in.</p>
+      <div class="badges"><span class="badge green">L3 Ready</span><span class="badge">DSSE / in-toto v1</span></div>
+      <a href="/api/v1/runs/{rid}/provenance">Verify endpoint →</a>
+    </div>
+
+    <div class="card">
+      <h2>DevSecOps Maturity (DSOMM)</h2>
+      <p>3.9 / 4.0 honest, verified by audit evidence bundle. 4.0 conditional
+      on 3PAO + audit firm engagement (Q3-Q4 2026).</p>
+      <div class="badges"><span class="badge green">3.9 / 4.0</span><span class="badge amber">4.0 Q4 target</span></div>
+      <a href="/api/v1/audit/bundle">Audit bundle →</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Live Operational Status</h2>
+  <p style="color:var(--t2);font-size:14px">
+    <span class="live-pill"></span>
+    Real-time, anonymous, cached 30 s. Refreshes from
+    <code>/api/v1/status</code>.
+  </p>
+  <div class="stat-row" id="status-row">
+    <div class="stat"><div class="num" id="s-overall">…</div><div class="lbl">Overall</div></div>
+    <div class="stat"><div class="num" id="s-availability">…</div><div class="lbl">Availability 30d</div></div>
+    <div class="stat"><div class="num" id="s-p95">…</div><div class="lbl">p95 latency</div></div>
+    <div class="stat"><div class="num" id="s-incidents">…</div><div class="lbl">Open incidents</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Vulnerability Disclosure</h2>
+  <p style="color:var(--t2)">
+    We welcome security research within the scope of our published Vulnerability
+    Disclosure Policy. Safe-harbour applies.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Channel</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Security email</td><td><code>security@vsp.vn</code></td></tr>
+      <tr><td>PGP key</td><td><a href="/.well-known/pgp-key.txt">/.well-known/pgp-key.txt</a></td></tr>
+      <tr><td>RFC 9116 contact</td><td><a href="/.well-known/security.txt">/.well-known/security.txt</a></td></tr>
+      <tr><td>Disclosure policy</td><td><a href="/docs/security/VULNERABILITY_DISCLOSURE_POLICY.md">VULNERABILITY_DISCLOSURE_POLICY.md</a></td></tr>
+      <tr><td>Anonymous intake</td><td><code>POST /api/v1/security/disclose</code></td></tr>
+      <tr><td>Bounty range</td><td>$50 – $5,000 (CVSS v3.1)</td></tr>
+      <tr><td>Ack SLA</td><td>1 business day</td></tr>
+      <tr><td>Triage SLA</td><td>5 business days</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Compliance Frameworks Covered</h2>
+  <table>
+    <thead>
+      <tr><th>Framework</th><th>Coverage</th><th>Evidence</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>NIST SP 800-53 Rev.5</td><td>Core controls</td><td><code>/api/p4/oscal/catalog</code></td></tr>
+      <tr><td>NIST SSDF (SP 800-218)</td><td>PS.1, PS.2, PS.3</td><td>Supply-chain signing</td></tr>
+      <tr><td>NIST 800-61r3</td><td>IR lifecycle phases</td><td>Incident Response panel</td></tr>
+      <tr><td>FedRAMP Moderate</td><td>Baseline mapped</td><td><code>/api/p4/oscal/profile</code></td></tr>
+      <tr><td>CMMC L2</td><td>110 NIST 800-171 practices</td><td>OSCAL extended</td></tr>
+      <tr><td>OSCAL 1.1.2</td><td>SSP, AP, AR, POA&M</td><td><code>/api/p4/oscal/*</code></td></tr>
+      <tr><td>CISA SSDF</td><td>19/19 practices auto-populated</td><td><code>/api/v1/cisa-attestation/ssdf/draft</code></td></tr>
+      <tr><td>CIRCIA</td><td>72h reporting</td><td><code>circia_reports</code></td></tr>
+      <tr><td>EO 14028</td><td>Improving Nation's Cybersecurity</td><td>Multi-component</td></tr>
+      <tr><td>SLSA v1.0</td><td>L3 readiness</td><td>DSSE attestations</td></tr>
+      <tr><td>GDPR</td><td>Art.15, Art.17</td><td>DSAR + erasure</td></tr>
+      <tr><td>Decree 13/2023 (PDPA Vietnam)</td><td>Art.5, Art.9-12</td><td>DSAR + erasure</td></tr>
+      <tr><td>Decree 53/2022 (Vietnam)</td><td>Data localization</td><td>Residency middleware</td></tr>
+      <tr><td>Luật An ninh mạng 2018 (Vietnam)</td><td>Compliance mapping</td><td>Documentation</td></tr>
+      <tr><td>SOC 2 Type I</td><td>Readiness mapped</td><td><code>/api/v1/recognition/soc2-readiness</code></td></tr>
+      <tr><td>ISO/IEC 27001:2022</td><td>Annex A 30/93 mapped</td><td><code>/api/v1/recognition/iso27001-mapping</code></td></tr>
+      <tr><td>NIST CSF 2.0</td><td>22/22 categories</td><td><code>/api/v1/nist-csf/profile</code></td></tr>
+      <tr><td>RFC 9116</td><td>security.txt</td><td><code>/.well-known/security.txt</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Transparency Reports</h2>
+  <p style="color:var(--t2)">
+    Quarterly transparency reports cover incident counts, disclosure SLA hits,
+    audit chain integrity events, and recovery times.
+  </p>
+  <div class="grid">
+    <div class="card">
+      <h2>Quarterly Improvement Metrics</h2>
+      <p>4-quarter rollup of DORA, MTTR, audit chain, disclosure SLA hits,
+      posture median.</p>
+      <a href="/api/v1/improvement/quarters">Live JSON →</a>
+    </div>
+    <div class="card">
+      <h2>Auditor Evidence Bundle</h2>
+      <p>Single ZIP with audit log + evidence files + SLSA attestations +
+      cATO snapshot + DORA metrics + tabletop log + manifest with SHA-256.</p>
+      <a href="/api/v1/audit/bundle">Download bundle →</a>
+    </div>
+    <div class="card">
+      <h2>Public Status Feed</h2>
+      <p>Anonymous JSON endpoint suitable for external status pages
+      (Statuspage, Cachet, Atlassian).</p>
+      <a href="/api/v1/status">Status JSON →</a>
+    </div>
+    <div class="card">
+      <h2>KPI Sanity Check</h2>
+      <p>5 invariant assertions on internal scoring. HTTP 409 = release
+      blocker; CI integration recommended.</p>
+      <a href="/api/v1/kpi/sanity">Sanity check →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>
+    Last updated: <span id="last-updated">…</span> ·
+    Page version 1.0 · Sprint 9 deliverable ·
+    <a href="/.well-known/security.txt">security.txt</a> ·
+    <a href="mailto:security@vsp.vn">security@vsp.vn</a>
+  </p>
+</footer>
+
+</div>
+
+<script>
+(async function loadStatus() {
+  document.getElementById('last-updated').textContent = new Date().toLocaleString();
+  try {
+    const r = await fetch('/api/v1/status', { headers: { 'Accept': 'application/json' } });
+    if (!r.ok) return;
+    const d = await r.json();
+    const overall = (d.status || '').replace('_', ' ').toUpperCase();
+    document.getElementById('s-overall').textContent = overall || '—';
+    if (d.status === 'operational') document.getElementById('s-overall').style.color = 'var(--green)';
+    else if (d.status === 'degraded') document.getElementById('s-overall').style.color = 'var(--amber)';
+    else document.getElementById('s-overall').style.color = 'var(--red)';
+    if (d.slo) {
+      document.getElementById('s-availability').textContent = (d.slo.availability_30d_pct || 0).toFixed(1) + '%';
+      document.getElementById('s-p95').textContent = (d.slo.p95_latency_ms || 0) + 'ms';
+    }
+    document.getElementById('s-incidents').textContent = d.open_incidents || 0;
+  } catch (e) {
+    document.getElementById('s-overall').textContent = 'unknown';
+  }
+})();
+</script>
+</body>
+</html>

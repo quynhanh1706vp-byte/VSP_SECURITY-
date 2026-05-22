@@ -1,0 +1,38 @@
+id: pb-vn-cmc-soc-handoff
+name: SOC alert → CMC SOC ticketing
+description: Forward CRITICAL/HIGH findings tới CMC SOC ticketing system kèm enrichment
+trigger: critical_finding
+sev_filter: HIGH
+enabled: true
+tags: [vn, soc, cmc, ticketing]
+steps:
+  - type: condition
+    name: Check severity gate
+    desc: Forward chỉ khi severity = CRITICAL hoặc HIGH
+    config: |
+      expr: severity IN [CRITICAL, HIGH]
+  - type: enrich
+    name: Enrich with VN threat feeds
+    desc: Bổ sung context từ VNCERT/BKAV/ViettelCS
+    config: |
+      sources: [vncert, bkav, viettelcs, nvd]
+      fields: [cvss, epss, kev, vn_actor]
+  - type: ticket
+    name: Create CMC SOC ticket
+    desc: P1 ticket vào CMC SOC queue
+    config: |
+      provider: cmc_soc
+      endpoint: ${CMC_SOC_API_URL}
+      api_key: ${CMC_SOC_API_KEY}
+      queue: VSP-SECURITY
+      priority: P1
+      assignee_group: cmc-tier2
+      template: vsp_security_alert_vi
+  - type: notify
+    name: Slack — SOC channel
+    desc: Mention oncall analyst
+    config: |
+      channel: "#soc-alerts"
+      webhook_url: ${SLACK_SOC_WEBHOOK}
+      ping: "@soc-oncall"
+      lang: vi

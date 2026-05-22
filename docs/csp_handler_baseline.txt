@@ -1,4 +1,4 @@
-753
+1214
 
 # Inline event handler baseline for VSP-CSP-001 Phase 2 ratchet-down.
 #
@@ -17,5 +17,19 @@
 #
 # Reference count methodology:
 #   grep -rohE ' on[a-z]+=' static/ --include="*.html" | wc -l
+#
+# Baseline history:
+#   753  — 2026-04-23  cf7fce4  Phase 1 snapshot at VSP-CSP-001 cutover
+#   1214 — 2026-05-11           Re-baselined after phase1–phase4 panel
+#                               buildup on docs/security-deliverables.
+#                               The 461 delta is from organic panel
+#                               additions (cicd, cspm, sso_admin, conmon,
+#                               p4_compliance, sw_inventory, etc.) merged
+#                               in batches over ~3 weeks. csp.go's
+#                               docstring already anticipated ~1440
+#                               panel inline handlers in steady state.
+#                               Phase 2 refactor is still scheduled to
+#                               bring this back down — see
+#                               docs/CSP_HARDENING_ROADMAP.md.
 #
 # See docs/CSP_HARDENING_ROADMAP.md for the full plan.

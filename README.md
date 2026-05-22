@@ -1,199 +1,91 @@
-# VSP Security Platform
+# Phase 7D — DAST (nuclei)
 
-**Enterprise-grade vulnerability scanning and security operations platform.**
+VSP Dynamic Application Security Testing microservice (port 8093).
 
-[![CI](https://github.com/vsp/platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vsp/platform/actions)
-[![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://golang.org)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
+Wraps `nuclei` CLI for production-grade DAST scans with async runner,
+JSONL parser, and live progress polling.
 
----
+## Components
 
-## Overview
+| File | Lines | Purpose |
+|---|---|---|
+| `cmd/dast-api/main.go` | 600 | Microservice + nuclei runner |
+| `frontend/vsp_dast_panel.js` | 580 | Full UI w/ live polling |
+| `scripts/start-dast-api.sh` | 60 | Launcher |
 
-VSP (Vulnerability Scanning Platform) is a comprehensive security platform providing:
+**Total: ~1240 lines, stdlib only.**
 
-- **Multi-tool SAST/DAST/SCA scanning** — Bandit, Trivy, Gitleaks, Semgrep, Checkov, KICS, Grype, Nuclei, Nikto, CodeQL
-- **Real-time SIEM** — Log ingestion, correlation engine, incident management
-- **SOAR** — Automated playbook execution, webhook integrations
-- **Compliance** — FedRAMP, CMMC, OSCAL AR/POAM generation
-- **Governance** — Risk register, RACI, traceability matrix, zero trust scorecard
-- **UEBA** — User and entity behavior analytics, anomaly detection
+## Profiles
 
-## Architecture
+| Profile | Templates | Severity | Timeout |
+|---|---|---|---|
+| `quick` | CVE only | critical, high | 2 min |
+| `standard` | All | critical, high, medium | 8 min |
+| `deep` | All | all | 30 min |
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     VSP Gateway :8921                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐   │
-│  │   Auth   │  │   SIEM   │  │ Pipeline │  │Compliance │   │
-│  │  JWT/MFA │  │Correlator│  │ Scanners │  │  OSCAL    │   │
-│  └──────────┘  └──────────┘  └──────────┘  └───────────┘   │
-│         │            │              │               │        │
-│  ┌──────▼────────────▼──────────────▼───────────────▼────┐  │
-│  │              PostgreSQL + Redis                        │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+## Endpoints
 
-## Quick Start
+| Method | Path | Purpose |
+|---|---|---|
+| GET | /healthz | Liveness + nuclei detection |
+| GET | /tools/check | nuclei version + path |
+| POST | /scan | `{target, profile}` → returns scan_id (async) |
+| GET | /scans | List (without findings — fast) |
+| GET | /scans/{id} | Full detail with findings |
+| GET | /scans/{id}/findings | Findings only |
+| POST | /scans/{id}/cancel | Cancel running |
+| DELETE | /scans/{id} | Delete record |
+| GET | /stats | KPIs |
 
-### Prerequisites
-- Go 1.25+
-- PostgreSQL 16+
-- Redis 7+
-
-### Development
+## Install nuclei first
 
 ```bash
-# Clone and setup
-git clone https://github.com/vsp/platform
-cd platform
-cp .env.example .env
-# Edit .env — set JWT_SECRET, POSTGRES_PASSWORD, REDIS_PASSWORD
-
-# Run with make
-make run
-
-# Or directly
-export JWT_SECRET=$(openssl rand -hex 32)
-go run ./cmd/gateway
+go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+nuclei -update-templates
+which nuclei  # → /home/test/go/bin/nuclei or similar
 ```
 
-### Docker
+If `nuclei` not in PATH for the service, set `PATH` in the systemd unit
+or restart your shell after `go install`.
+
+## Install service
 
 ```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f gateway
+go build -o vsp-dast-api ./cmd/dast-api
+./scripts/start-dast-api.sh
+curl -s http://127.0.0.1:8093/healthz | jq
 ```
 
-### API
+## Run a scan
 
 ```bash
-# Login
-curl -X POST http://localhost:8921/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@vsp.local","password":"admin123"}'
+# Submit
+curl -s -XPOST http://127.0.0.1:8093/scan \
+     -H 'content-type: application/json' \
+     -d '{"target":"https://scanme.nmap.org","profile":"quick"}' | jq
+# → {"id":"dast-...", "status":"queued"}
 
-# Health check
-curl http://localhost:8921/health
-
-# Trigger scan
-curl -X POST http://localhost:8921/api/v1/vsp/run \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"FULL","src":"/path/to/code"}'
+# Poll
+SCAN_ID=...
+curl -s http://127.0.0.1:8093/scans/$SCAN_ID | jq '{status, stats, findings: .findings[0:3]}'
 ```
 
-Full API documentation: see `api/openapi.yaml` or `GET /api/docs`
-
-## Development
-
-### Commands
+## Wire frontend
 
 ```bash
-make test              # Run unit tests
-make test-all          # Run all tests
-make test-integration  # Integration tests (requires DB)
-make test-coverage     # Tests with HTML coverage report
-make test-load         # k6 load test (requires k6)
-make lint              # go vet + staticcheck
-make vuln              # govulncheck
-make build             # Build binary
-make docker-build      # Build Docker image
-make docker-up         # Start with docker-compose
+cp frontend/vsp_dast_panel.js static/
+sed -i '/vsp_email_panel\.js/a\    <script src="/vsp_dast_panel.js"></script>' static/index.html
 ```
 
-### Testing
+## UI features
 
-```bash
-# Unit tests (no dependencies needed)
-go test ./internal/auth/... ./internal/gate/... -v
+- **5 KPI cards**: Scans / Critical / High / Medium / Findings
+- **+ New scan** modal with 3-card profile picker (visual selection)
+- **Live progress**: scan list refreshes every 5s, detail modal polls every 2s
+- **Animated progress bar** for running scans (CSS keyframe pulse)
+- **Finding viewer**: severity pills, CVE badges, CVSS, references, tags
+- **Drill-down**: click finding for full description + reference URLs
 
-# All tests
-go test ./...
+## Authorization warning
 
-# With coverage
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
-```
-
-### Project Structure
-
-```
-.
-├── cmd/
-│   ├── gateway/        # Main API server
-│   └── scanner/        # Scanner worker
-├── internal/
-│   ├── api/
-│   │   ├── handler/    # HTTP handlers
-│   │   └── middleware/ # CSP, logging, rate limit
-│   ├── auth/           # JWT, MFA/TOTP, blacklist
-│   ├── audit/          # Immutable audit log chain
-│   ├── cache/          # Redis API cache
-│   ├── compliance/     # OSCAL AR/POAM generation
-│   ├── gate/           # Security gate evaluation
-│   ├── governance/     # Risk register, RACI, scorecard
-│   ├── migrate/        # Database migrations (goose)
-│   ├── pipeline/       # Scan pipeline orchestration
-│   ├── report/         # SARIF, PDF, HTML reports
-│   ├── safe/           # Panic-recovering goroutine wrapper
-│   ├── scanner/        # Scanner adapters (10 tools)
-│   ├── siem/           # SIEM, correlator, UEBA, SOAR
-│   └── store/          # PostgreSQL data layer
-├── api/
-│   └── openapi.yaml    # OpenAPI 3.0 specification
-├── config/
-│   ├── config.yaml     # Application config
-│   └── prometheus_rules.yml  # Alert rules
-├── migrations/         # Legacy SQL migrations
-├── tests/
-│   └── load/           # k6 load test scripts
-├── static/             # Frontend SPA
-├── Dockerfile
-├── docker-compose.yml
-└── Makefile
-```
-
-## Security
-
-- JWT authentication with configurable TTL
-- TOTP-based MFA (Google Authenticator compatible)
-- Per-user rate limiting (300 req/min after auth)
-- CSP nonce-based Content Security Policy
-- Refresh token rotation with reuse detection
-- Password history (prevent reuse of last 5 passwords)
-- Account lockout after 5 failed attempts
-
-## Database Migrations
-
-Migrations run automatically on startup via [goose](https://github.com/pressly/goose):
-
-```
-001_init.sql              — Core tables
-002_remediations_unique   — Remediation constraints  
-003_mfa.sql               — MFA columns
-004_password_and_refresh  — Password history + refresh tokens
-005_siem_indexes.sql      — SIEM performance indexes
-```
-
-## Monitoring
-
-- **Metrics**: `GET /metrics` (Prometheus format)
-- **Health**: `GET /health` (DB ping, Redis ping, uptime)
-- **Alert rules**: `config/prometheus_rules.yml`
-
-Key metrics:
-- `vsp_scans_total` — Scan count by mode/status
-- `vsp_findings_current` — Current findings by severity
-- `vsp_gate_decisions_total` — Gate pass/warn/fail rate
-- `vsp_login_attempts_total` — Auth attempts (brute force detection)
-- `vsp_cache_hits_total` — Redis cache hit rate
-- `vsp_db_pool_connections` — Connection pool health
-
-## License
-
-Proprietary — VSP Security Team. All rights reserved.
+Built-in: scan modal shows ⚠ banner reminding user to only scan owned/permitted targets. This is **mandatory** for ethical use.

@@ -1,0 +1,49 @@
+id: pb-vn-malicious-ip-block
+name: Block IP từ VN threat feeds
+description: Tự động block IP có trong VNCERT/BKAV blocklist tại WAF/firewall
+trigger: manual
+sev_filter: any
+enabled: true
+tags: [vn, waf, firewall, blocklist, threat-intel]
+steps:
+  - type: enrich
+    name: Pull VN blocklists
+    desc: Aggregate từ VNCERT, BKAV, ViettelCS, custom
+    config: |
+      sources: [vncert, bkav, viettelcs, custom]
+      vncert_endpoint: ${VNCERT_FEED_URL}
+      bkav_endpoint: ${BKAV_FEED_URL}
+      dedupe: true
+      max_ips: 10000
+  - type: condition
+    name: Có IP mới?
+    desc: Skip nếu blocklist không thay đổi
+    config: |
+      expr: blocklist.diff_count > 0
+  - type: block
+    name: Sync to WAF + Firewall
+    desc: Đẩy lên Cloudflare WAF và iptables
+    config: |
+      providers: [cloudflare, iptables]
+      cloudflare_token: ${CLOUDFLARE_API_TOKEN}
+      cloudflare_zone: ${CLOUDFLARE_ZONE_ID}
+      list_name: vsp-vn-blocklist
+      action: block
+      ttl_hours: 168
+  - type: ticket
+    name: Audit log ticket
+    desc: Tạo ticket cho audit trail (read-only, auto-close 7d)
+    config: |
+      provider: jira
+      project: VSP-AUDIT
+      priority: P4
+      labels: [waf-sync, blocklist, auto-close]
+      auto_close_days: 7
+  - type: notify
+    name: Slack ops summary
+    desc: Daily digest summary
+    config: |
+      channel: "#ops-waf"
+      webhook_url: ${SLACK_OPS_WEBHOOK}
+      digest: daily
+      template_vi: "WAF blocklist sync — added: ${added_count}, removed: ${removed_count}"

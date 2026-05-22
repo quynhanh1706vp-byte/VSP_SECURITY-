@@ -8,11 +8,15 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/vsp/platform/internal/netcap"
 	"github.com/vsp/platform/internal/scanner"
+	"github.com/vsp/platform/internal/scanner/apisec"
 	"github.com/vsp/platform/internal/scanner/bandit"
 	"github.com/vsp/platform/internal/scanner/checkov"
 	"github.com/vsp/platform/internal/scanner/codeql"
+	"github.com/vsp/platform/internal/scanner/cosign"
 	"github.com/vsp/platform/internal/scanner/gitleaks"
+	"github.com/vsp/platform/internal/scanner/gofuzz"
 	"github.com/vsp/platform/internal/scanner/gosec"
+	"github.com/vsp/platform/internal/scanner/govulncheck"
 	"github.com/vsp/platform/internal/scanner/grype"
 	"github.com/vsp/platform/internal/scanner/hadolint"
 	"github.com/vsp/platform/internal/scanner/kics"
@@ -21,9 +25,13 @@ import (
 	"github.com/vsp/platform/internal/scanner/nikto"
 	"github.com/vsp/platform/internal/scanner/nmap"
 	"github.com/vsp/platform/internal/scanner/nuclei"
+	"github.com/vsp/platform/internal/scanner/osvscanner"
+	"github.com/vsp/platform/internal/scanner/racedetect"
+	"github.com/vsp/platform/internal/scanner/retirejs"
 	"github.com/vsp/platform/internal/scanner/secretcheck"
 	"github.com/vsp/platform/internal/scanner/semgrep"
 	"github.com/vsp/platform/internal/scanner/sslscan"
+	"github.com/vsp/platform/internal/scanner/syft"
 	"github.com/vsp/platform/internal/scanner/trivy"
 	"github.com/vsp/platform/internal/scanner/trufflehog"
 )
@@ -33,11 +41,11 @@ import (
 type Status string
 
 const (
-	StatusQueued    Status = "QUEUED"
-	StatusRunning   Status = "RUNNING"
-	StatusDone      Status = "DONE"
-	StatusFailed    Status = "FAILED"
-	StatusCancelled Status = "CANCELLED"
+	StatusQueued   Status = "QUEUED"
+	StatusRunning  Status = "RUNNING"
+	StatusDone     Status = "DONE"
+	StatusFailed   Status = "FAILED"
+	StatusCanceled Status = "CANCELED"
 )
 
 // ── Mode / Profile ────────────────────────────────────────────────────────────
@@ -88,7 +96,7 @@ type Run struct {
 
 // ── JobPayload ────────────────────────────────────────────────────────────────
 
-// JobPayload is serialised into the asynq task and consumed by the worker.
+// JobPayload is serialized into the asynq task and consumed by the worker.
 type JobPayload struct {
 	RunID      string              `json:"run_id"`
 	RID        string              `json:"rid"`
@@ -131,6 +139,11 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		grype.New(),
 		trivy.New(),
 		license.NewRunner(),
+		osvscanner.New(),
+		cosign.New(),
+		retirejs.New(),
+		syft.New(),
+		govulncheck.New(),
 	}
 	secrets := []scanner.Runner{
 		gitleaks.New(),
@@ -146,6 +159,11 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		nikto.New(),
 		nuclei.New(),
 		sslscan.New(),
+	}
+	phase4 := []scanner.Runner{
+		apisec.NewAdapter(),
+		gofuzz.NewAdapter(),
+		racedetect.NewAdapter(),
 	}
 
 	switch mode {
@@ -172,7 +190,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 		// FULL and FULL_SOC both run all scanners across every mode group.
 		// FULL_SOC additionally feeds findings into SIEM correlation (handled downstream).
 		seen := make(map[string]bool)
-		all := make([]scanner.Runner, 0, 18)
+		all := make([]scanner.Runner, 0, 26)
 
 		// Build network group matching the ModeNetwork case exactly.
 		network := []scanner.Runner{sslscan.New(), nmap.New()}
@@ -180,7 +198,7 @@ func RunnersFor(mode Mode) []scanner.Runner {
 			network = append(network, netcapscanner.New(netcapEngine))
 		}
 
-		for _, group := range [][]scanner.Runner{sast, sca, secrets, iac, dast, network} {
+		for _, group := range [][]scanner.Runner{sast, sca, secrets, iac, dast, phase4, network} {
 			for _, r := range group {
 				if !seen[r.Name()] {
 					seen[r.Name()] = true
@@ -266,7 +284,7 @@ func (e *Executor) Execute(ctx context.Context, payload JobPayload) (*ExecuteRes
 	return &ExecuteResult{
 		Findings:   allFindings,
 		ToolErrors: toolErrors,
-		Summary:    scanner.Summarise(allFindings),
+		Summary:    scanner.Summarize(allFindings),
 		Duration:   time.Since(start),
 	}, nil
 }
@@ -293,7 +311,7 @@ func (e *Executor) ExecuteWith(ctx context.Context, payload JobPayload, runners 
 	return &ExecuteResult{
 		Findings:   allFindings,
 		ToolErrors: toolErrors,
-		Summary:    scanner.Summarise(allFindings),
+		Summary:    scanner.Summarize(allFindings),
 		Duration:   time.Since(start),
 	}, nil
 }

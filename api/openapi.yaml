@@ -1,3 +1,126 @@
+openapi: 3.0.3
+info:
+  title: VSP Dev API
+  version: '0.1.0'
+servers:
+  - url: http://localhost:8090/api/v1
+paths:
+  /auth/mint:
+    post:
+      summary: Mint dev JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+      responses:
+        '200':
+          description: token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+  /container/images:
+    get:
+      summary: List container images (dev-stub)
+      responses:
+        '200':
+          description: list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  images:
+                    type: array
+                    items:
+                      type: object
+  /container/scan/{id}:
+  /container/scan/{id}:
+    get:
+      summary: Container scan status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: scan result
+  /sbom/{rid}:
+    get:
+      summary: SBOM for run
+      parameters:
+        - in: path
+          name: rid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: sbom
+  /sbom/{rid}/diff:
+    get:
+      summary: SBOM diff
+      parameters:
+        - in: path
+          name: rid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: diff
+  /admin/users:
+    get:
+      summary: Admin users (role-aware)
+      responses:
+        '200':
+          description: users
+  /mock/findings:
+    get:
+      summary: Mock findings list
+      responses:
+        '200':
+          description: mock findings
+  /mock/findings/summary:
+    get:
+      summary: Mock findings summary
+      responses:
+        '200':
+          description: summary
+  /mock/builds:
+    get:
+      summary: Mock builds list
+      responses:
+        '200':
+          description: builds
+  /mock/cspm/summary:
+    get:
+      summary: Mock CSPM summary
+      responses:
+        '200':
+          description: cspm summary
+  /mock/secrets:
+    get:
+      summary: Mock secrets list
+      responses:
+        '200':
+          description: secrets
+  /mock/metrics:
+    get:
+      summary: Mock metrics
+      responses:
+        '200':
+          description: metrics
 openapi: "3.0.3"
 info:
   title: VSP Security Platform API
@@ -150,6 +273,16 @@ components:
       properties:
         error: { type: string }
         request_id: { type: string, format: uuid }
+
+    # Returned by RequirePro middleware when a starter tenant calls a PRO endpoint.
+    # Frontend reads required_plan/current_plan to render the upgrade overlay.
+    PaymentRequired:
+      type: object
+      required: [error, required_plan]
+      properties:
+        error:         { type: string, example: "feature requires pro plan" }
+        required_plan: { type: string, enum: [pro, enterprise] }
+        current_plan:  { type: string, enum: [free, starter, pro, enterprise] }
 
     # ── FIX: password minLength 8 → 12 (NIST SP 800-63B) ─────────────────
     LoginRequest:
@@ -749,6 +882,124 @@ paths:
         "401": { description: Missing or invalid session cookie }
 
 
+  # ─── PRO features (gated by RequirePro middleware) ────────────────────────
+  # All endpoints below return 402 PaymentRequired to tenants on free/starter
+  # plans. The frontend overlay reads the required_plan/current_plan fields
+  # to prompt upgrade.
+
+  /api/v1/cspm/accounts:
+    get:
+      summary: List CSPM cloud accounts (PRO)
+      tags: [Pro]
+      responses:
+        "200": { description: ok }
+        "402": { description: Plan upgrade required, content: { application/json: { schema: { $ref: "#/components/schemas/PaymentRequired" } } } }
+    post:
+      summary: Register a CSPM cloud account (PRO)
+      tags: [Pro]
+      responses:
+        "201": { description: created }
+        "402": { description: Plan upgrade required }
+
+  /api/v1/cspm/accounts/{id}:
+    delete:
+      summary: Remove a CSPM cloud account (PRO)
+      tags: [Pro]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: deleted }
+        "402": { description: Plan upgrade required }
+
+  /api/v1/cspm/findings:
+    get:
+      summary: List CSPM findings (PRO)
+      tags: [Pro]
+      parameters:
+        - { name: account, in: query, schema: { type: string, format: uuid } }
+        - { name: severity, in: query, schema: { type: string, enum: [critical, high, medium, low, info] } }
+        - { name: status, in: query, schema: { type: string, enum: [open, suppressed, resolved] } }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 1000 } }
+      responses:
+        "200": { description: ok }
+        "402": { description: Plan upgrade required }
+
+  /api/v1/cspm/posture:
+    get:
+      summary: Aggregated posture score per provider (PRO)
+      tags: [Pro]
+      responses:
+        "200": { description: ok }
+        "402": { description: Plan upgrade required }
+
+  /api/v1/cspm/config:
+    get:
+      summary: Get CSPM tenant config (PRO view-details panel)
+      tags: [Pro]
+      responses: { "200": { description: ok }, "402": { description: Plan upgrade required } }
+    put:
+      summary: Update CSPM tenant config (PRO)
+      tags: [Pro]
+      responses: { "200": { description: ok }, "402": { description: Plan upgrade required } }
+
+  /api/v1/soar/secrets/{name}/rotate:
+    post:
+      summary: Rotate a stored secret value (PRO)
+      tags: [Pro]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: rotated }
+        "402": { description: Plan upgrade required }
+        "404": { description: secret does not exist — use POST /secrets to create }
+
+  /api/v1/soar/secrets/audit:
+    get:
+      summary: Secret access audit log (PRO)
+      tags: [Pro]
+      parameters:
+        - { name: name, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 1000 } }
+      responses:
+        "200": { description: ok }
+        "402": { description: Plan upgrade required }
+
+  /api/v1/soar/secrets/config:
+    get:
+      summary: Get secret-vault tenant config (PRO view-details panel)
+      tags: [Pro]
+      responses: { "200": { description: ok }, "402": { description: Plan upgrade required } }
+    put:
+      summary: Update secret-vault tenant config (PRO)
+      tags: [Pro]
+      responses: { "200": { description: ok }, "402": { description: Plan upgrade required } }
+
+  /api/v1/soar/secrets/summary:
+    get:
+      summary: Vault summary — total / stale / overdue counts (PRO)
+      tags: [Pro]
+      responses:
+        "200": { description: ok }
+        "402": { description: Plan upgrade required }
+
+  /api/v1/tenants/quota:
+    get:
+      summary: Per-tenant resource usage panel (PRO)
+      tags: [Pro]
+      responses:
+        "200": { description: ok }
+        "402": { description: Plan upgrade required }
+
+  /api/v1/observability/config:
+    get:
+      summary: Get observability tenant config (PRO view-details panel)
+      tags: [Pro]
+      responses: { "200": { description: ok }, "402": { description: Plan upgrade required } }
+    put:
+      summary: Update observability tenant config (PRO)
+      tags: [Pro]
+      responses: { "200": { description: ok }, "402": { description: Plan upgrade required } }
+
 tags:
   - name: System
     description: Health check, metrics
@@ -762,3 +1013,9 @@ tags:
     description: "User management — requires role: admin"
   - name: SIEM
     description: Security incidents, webhooks, correlation rules
+  - name: Pro
+    description: |
+      Cloud-native security PRO features (Container, Cloud posture, Supply chain,
+      PR/repo bot, Secret vault, Observability, Tenants, SSO/SAML). Gated by the
+      RequirePro middleware — starter-tier callers get HTTP 402 PaymentRequired
+      with `required_plan` / `current_plan` in the response body.

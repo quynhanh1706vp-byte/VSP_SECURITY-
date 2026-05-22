@@ -1,0 +1,33 @@
+/* Minimal placeholder styles for injected UX snippet */
+:root {
+  --inject-toast-bg: rgba(0,0,0,0.86);
+  --inject-toast-color: #fff;
+  --inject-toast-radius: 8px;
+}
+#inject-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 99999;
+  padding: 10px 14px;
+  border-radius: var(--inject-toast-radius);
+  background: var(--inject-toast-bg);
+  color: var(--inject-toast-color);
+  font-size: 13px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  display: none;
+  opacity: 0;
+  transition: opacity .22s ease, transform .22s ease;
+}
+#inject-toast.show {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+#inject-toast.hide {
+  opacity: 0;
+  transform: translateY(6px);
+}
+#inject-toast.success { background: #16a34a; }
+#inject-toast.error { background: #dc2626; }
+#inject-toast.info { background: #2563eb; }

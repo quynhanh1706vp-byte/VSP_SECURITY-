@@ -1,0 +1,54 @@
+id: pb-intl-slack-ir-channel
+name: Slack-based incident response
+description: Auto-create dedicated #inc-* Slack channel for CRITICAL findings, invite responders
+trigger: critical_finding
+sev_filter: CRITICAL
+enabled: true
+tags: [slack, incident-response, war-room]
+steps:
+  - type: enrich
+    name: Resolve incident metadata
+    desc: Generate incident ID, severity, blast radius
+    config: |
+      generate_inc_id: true
+      include: [asset, severity, cve, blast_radius, oncall]
+  - type: notify
+    name: Create Slack incident channel
+    desc: Auto-provision #inc-<id> channel, invite responders
+    config: |
+      provider: slack
+      action: create_channel
+      bot_token: ${SLACK_BOT_TOKEN}
+      channel_name: "inc-${incident.id}"
+      topic: "${incident.severity} · ${incident.title} · status: investigating"
+      invite:
+        - "@security-oncall"
+        - "@sre-oncall"
+        - "${asset.owner_slack}"
+  - type: notify
+    name: Post incident brief
+    desc: Pin a structured message with severity, asset, runbook link
+    config: |
+      provider: slack
+      action: post_pinned
+      channel: "inc-${incident.id}"
+      template: incident_brief
+      include_runbook: true
+      runbook_url: "${vsp_url}/runbooks/${finding.rule_id}"
+  - type: ticket
+    name: Create PagerDuty incident
+    desc: Page primary oncall, link to Slack channel
+    config: |
+      provider: pagerduty
+      service_id: ${PD_SERVICE_ID}
+      api_key: ${PD_API_KEY}
+      urgency: high
+      title: "${incident.title}"
+      slack_link: "https://${SLACK_WORKSPACE}.slack.com/archives/inc-${incident.id}"
+  - type: remediate
+    name: Auto-assign incident commander
+    desc: Round-robin from IR rotation
+    config: |
+      source: oncall_rotation
+      team: incident-commanders
+      notify_via: slack_dm

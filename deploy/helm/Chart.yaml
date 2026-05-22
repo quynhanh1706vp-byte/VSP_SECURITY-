@@ -1,0 +1,21 @@
+apiVersion: v2
+name: vsp-platform
+description: |
+  Vietnamese Security Platform — DevSecOps suite (gateway, scheduler,
+  scanners, agents). Default values run hardened: non-root, read-only
+  filesystem, restrictive NetworkPolicy, PodSecurity restricted profile,
+  no host PID/network/IPC.
+type: application
+version: 0.1.0
+appVersion: "1.4.0"
+keywords:
+  - security
+  - devsecops
+  - sast
+  - dast
+  - sbom
+  - compliance
+home: https://vsp.vn
+maintainers:
+  - name: VSP Platform Team
+    email: security@vsp.vn

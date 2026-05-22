@@ -3,6 +3,7 @@
 <head>
 <script src="/static/js/vsp_iframe_bootstrap.js"></script>
 <script src="/static/js/dom-safe.js"></script>
+<script src="/static/js/vsp_uxstates.js"></script>
 <script>
 (function(){
   if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
@@ -110,6 +111,28 @@ tr.clickable{cursor:pointer}
 .editable-inline:hover{background:var(--bg3)}
 .json-view{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-family:monospace;font-size:10px;color:var(--t2);white-space:pre;overflow:auto;max-height:400px}
 .action-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+.ir-shimmer{display:inline-block;min-width:32px;background:linear-gradient(90deg,var(--surface,#1e2128) 0%,var(--border,rgba(255,255,255,.07)) 50%,var(--surface,#1e2128) 100%);background-size:200% 100%;animation:vsp-uxs-shimmer 1.2s ease-in-out infinite;color:transparent!important;border-radius:3px;padding:0 4px}
+
+/* IR Panel enhancements */
+.ir-filter{font-size:10px;padding:3px 10px;border-radius:10px;transition:all .15s}
+.ir-filter.active{background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.3);color:var(--accent)}
+.inc-row-critical td{background:rgba(239,68,68,.04)}
+.inc-row-ransomware td{background:rgba(245,158,11,.04)}
+.badge-substantial{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2);
+  padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
+.badge-ransom{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.2);
+  padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;font-family:var(--font-mono)}
+.deadline-critical{color:#ef4444;font-weight:700;animation:blink 1s infinite}
+.deadline-warn{color:var(--amber);font-weight:600}
+.deadline-ok{color:var(--green)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+.inc-timeline{display:flex;gap:4px;align-items:center;padding:4px 0}
+.phase-dot{width:8px;height:8px;border-radius:50%;background:var(--t3)}
+.phase-dot.done{background:var(--green)}
+.phase-dot.current{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.ir-search-highlight{background:rgba(14,165,233,.2);border-radius:2px}
+
 </style>
 </head>
 <body>
@@ -121,7 +144,7 @@ tr.clickable{cursor:pointer}
   <button class="btn btn-primary" onclick="refreshAll()">⟳ Refresh</button>
 </div>
 <div class="kpi-row">
-  <div class="kpi"><div class="kpi-label">Active Incidents</div><div class="kpi-value" id="kpi-active">—</div><div class="kpi-sub" id="kpi-total">— total</div></div>
+  <div class="kpi" style="border-left:3px solid var(--red)"><div class="kpi-label">Active Incidents</div><div class="kpi-value" id="kpi-active" style="color:var(--red)">—</div><div class="kpi-sub" id="kpi-total">— total</div></div>
   <div class="kpi"><div class="kpi-label">Substantial (72h)</div><div class="kpi-value" style="color:#facc15" id="kpi-sub">—</div><div class="kpi-sub">CIRCIA reportable</div></div>
   <div class="kpi"><div class="kpi-label">Ransomware (24h)</div><div class="kpi-value" style="color:#ef4444" id="kpi-ran">—</div><div class="kpi-sub">CIRCIA payment</div></div>
   <div class="kpi"><div class="kpi-label">CIRCIA Reports</div><div class="kpi-value" style="color:#3b82f6" id="kpi-circia">—</div><div class="kpi-sub" id="kpi-circia-met">— on time</div></div>
@@ -138,13 +161,26 @@ tr.clickable{cursor:pointer}
 <div class="tab-panel active" id="tab-incidents">
   <div class="card">
     <div class="card-head">
-      <div class="card-title">Incidents (click row để xem chi tiết)</div>
-      <div class="mono" id="inc-count">—</div>
+      <div class="card-title">Incidents</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="inc-search" placeholder="🔍 search title…" 
+          style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:11px;color:var(--t1);width:160px;font-family:var(--font-mono)"
+          oninput="filterIncidents()">
+        <div class="mono" id="inc-count">—</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <button class="btn btn-sm ir-filter active" data-filter="" onclick="setIncFilter('',this)">All</button>
+      <button class="btn btn-sm ir-filter" data-filter="open" onclick="setIncFilter('open',this)">🔴 Open</button>
+      <button class="btn btn-sm ir-filter" data-filter="critical" onclick="setIncFilter('critical',this)">🚨 Critical</button>
+      <button class="btn btn-sm ir-filter" data-filter="ransomware" onclick="setIncFilter('ransomware',this)">💰 Ransomware</button>
+      <button class="btn btn-sm ir-filter" data-filter="substantial" onclick="setIncFilter('substantial',this)">⏱ Substantial</button>
+      <button class="btn btn-sm ir-filter" data-filter="investigating" onclick="setIncFilter('investigating',this)">🔍 Investigating</button>
     </div>
     <div class="card-body">
       <table>
         <thead><tr><th>ID</th><th>Title</th><th>Severity</th><th>Phase</th><th>Status</th><th>Flags</th><th>Detected</th><th>Actions</th></tr></thead>
-        <tbody id="inc-tbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+        <tbody id="inc-tbody" data-vsp-paginate="20"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -155,25 +191,54 @@ tr.clickable{cursor:pointer}
     <div class="card-head"><div class="card-title">Create New Incident</div></div>
     <div class="card-body">
       <div class="banner banner-blue">ℹ️ <b>CIRCIA auto-flagging</b>: chọn bất kỳ impact → flag substantial → 72h deadline.</div>
-      <div class="form-grid">
-        <div class="form-row"><label>Title *</label><input id="nc-title" placeholder="Brief description"></div>
-        <div class="form-row"><label>Severity</label><select id="nc-severity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option><option value="critical">critical</option></select></div>
-        <div class="form-row"><label>Category</label><select id="nc-category"><option value="">—</option><option value="CAT-1">CAT-1: Unauthorized</option><option value="CAT-2">CAT-2: DoS</option><option value="CAT-3">CAT-3: Malicious Code</option><option value="CAT-4">CAT-4: Improper</option><option value="CAT-5">CAT-5: Scans</option><option value="CAT-6">CAT-6: Investigation</option></select></div>
-        <div class="form-row"><label>Reporter</label><input id="nc-reporter" value="soc@vsp.local"></div>
+      <div id="circia-flag-preview" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;font-family:var(--font-mono)">
+        ⏱ <b style="color:#ef4444">CIRCIA 72h deadline</b> will start from incident creation time
+        <span id="circia-type-preview" style="margin-left:8px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.15);color:#ef4444;font-size:10px"></span>
       </div>
-      <div class="form-row"><label>Description</label><textarea id="nc-desc"></textarea></div>
-      <div class="form-row"><label>Impact (CIRCIA criteria)</label>
-        <div class="chk-row">
-          <label><input type="checkbox" id="nc-imp-c"> Confidentiality</label>
-          <label><input type="checkbox" id="nc-imp-i"> Integrity</label>
-          <label><input type="checkbox" id="nc-imp-a"> Availability</label>
-          <label><input type="checkbox" id="nc-imp-s"> Safety</label>
-          <label><input type="checkbox" id="nc-imp-b"> Business Ops</label>
-          <label><input type="checkbox" id="nc-imp-sc"> Supply Chain</label>
+      <div class="form-grid">
+        <div class="form-row"><label>Title *</label><input aria-label="Brief description" id="nc-title" placeholder="Brief description"></div>
+        <div class="form-row"><label>Severity</label><select aria-label="Nc Severity" id="nc-severity"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option><option value="critical">critical</option></select></div>
+        <div class="form-row"><label>Category</label><select aria-label="Nc Category" id="nc-category"><option value="">—</option><option value="CAT-1">CAT-1: Unauthorized</option><option value="CAT-2">CAT-2: DoS</option><option value="CAT-3">CAT-3: Malicious Code</option><option value="CAT-4">CAT-4: Improper</option><option value="CAT-5">CAT-5: Scans</option><option value="CAT-6">CAT-6: Investigation</option></select></div>
+        <div class="form-row"><label>Reporter</label><input aria-label="Nc Reporter" id="nc-reporter" value="soc@vsp.local"></div>
+      </div>
+      <div class="form-row"><label>Description</label><textarea aria-label="Nc Desc" id="nc-desc"></textarea></div>
+      <div class="form-row">
+        <label>Impact (CIRCIA criteria)</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-c" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            🔒 Confidentiality
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-i" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            ✏️ Integrity
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-a" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            ⚡ Availability
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-s" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            ⚠️ Safety
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-b" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            🏢 Business Ops
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px">
+            <input type="checkbox" id="nc-imp-sc" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+            🔗 Supply Chain
+          </label>
         </div>
       </div>
-      <div class="form-row"><label>Special</label><div><label><input type="checkbox" id="nc-ransom"> 💰 Ransomware</label></div></div>
-      <button class="btn btn-primary" onclick="createIncident()">🚨 Create</button>
+      <div class="form-row">
+        <label>Special flags</label>
+        <label style="display:inline-flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(245,158,11,.08);border-radius:6px;border:1px solid rgba(245,158,11,.2);cursor:pointer;font-size:12px;color:var(--amber)">
+          <input type="checkbox" id="nc-ransom" onchange="updateCIRCIAPreview()" style="width:14px;height:14px;cursor:pointer">
+          💰 Ransomware incident (triggers CIRCIA 24h reporting)
+        </label>
+      </div>
+      <button class="btn btn-primary" onclick="createIncident()" style="margin-top:8px">🚨 Create Incident</button>
       <div id="nc-result" style="margin-top:10px"></div>
     </div>
   </div>
@@ -182,7 +247,18 @@ tr.clickable{cursor:pointer}
 <div class="tab-panel" id="tab-circia">
   <div class="banner banner-red">⏱️ <b>CIRCIA 2022</b> — <b>Substantial</b> 72h · <b>Ransomware payment</b> 24h · 16 CI sectors (PPD-21)</div>
   <div class="card">
-    <div class="card-head"><div class="card-title">CIRCIA Reports (click row để xem full)</div><div class="mono" id="circia-stats">—</div></div>
+    <div class="card-head">
+      <div class="card-title">CIRCIA Reports</div>
+      <div class="mono" id="circia-stats">—</div>
+    </div>
+    <div style="display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <button class="btn btn-sm ir-filter active" data-cf="" onclick="setCIRCIAFilter('',this)">All</button>
+      <button class="btn btn-sm ir-filter" data-cf="draft" onclick="setCIRCIAFilter('draft',this)">📝 Draft</button>
+      <button class="btn btn-sm ir-filter" data-cf="submitted" onclick="setCIRCIAFilter('submitted',this)">✅ Submitted</button>
+      <button class="btn btn-sm ir-filter" data-cf="overdue" onclick="setCIRCIAFilter('overdue',this)">🔴 Overdue</button>
+      <button class="btn btn-sm ir-filter" data-cf="substantial_incident" onclick="setCIRCIAFilter('substantial_incident',this)">⏱ Substantial</button>
+      <button class="btn btn-sm ir-filter" data-cf="ransomware_payment" onclick="setCIRCIAFilter('ransomware_payment',this)">💰 Ransom</button>
+    </div>
     <div class="card-body">
       <table>
         <thead><tr><th>Type</th><th>Incident</th><th>Sector</th><th>Status</th><th>Deadline</th><th>Submitted</th><th>Met?</th><th>CISA ID</th></tr></thead>
@@ -201,7 +277,7 @@ tr.clickable{cursor:pointer}
     <div class="card-body">
       <table>
         <thead><tr><th>ID</th><th>Type</th><th>Description</th><th>Size</th><th>Hash</th><th>Collected</th><th>Custody</th></tr></thead>
-        <tbody id="ev-tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+        <tbody id="ev-tbody" data-vsp-paginate="25"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -238,44 +314,96 @@ function fmtDT(t){if(!t||String(t).startsWith('0001'))return '—';return new Da
 function hoursLeft(dl){const d=(new Date(dl)-new Date())/3600000;const a=Math.abs(d);const c=d<0?'cd-crit':d<6?'cd-crit':d<24?'cd-warn':'cd-ok';return `<span class="countdown ${c}">${d<0?'OVERDUE ':''}${a.toFixed(1)}h</span>`;}
 function closeModal(n){document.getElementById('modal-'+n).classList.remove('show');}
 
+/* FEAT-32: incident_response L2 UX states (MAX coverage, polish-aware) */
+const IR_KPI_IDS = ['kpi-active', 'kpi-total', 'kpi-sub', 'kpi-ran', 'kpi-circia', 'kpi-circia-met', 'kpi-ev'];
+
+function _irShimmerCells() {
+  IR_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.classList.add('ir-shimmer'); }
+  });
+}
+function _irClearCells() {
+  IR_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('ir-shimmer');
+  });
+}
+function _irDashCells() {
+  IR_KPI_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('ir-shimmer'); el.textContent = '—'; }
+  });
+}
+
 async function loadKPIs(){
-  try{const[inc,cir,ev]=await Promise.all([
-    fetch('/api/p4/ir/incidents').then(r=>r.json()),
-    fetch('/api/p4/circia/reports').then(r=>r.json()),
-    fetch('/api/p4/forensics/evidence').then(r=>r.json())]);
-    const s=inc.stats||{};
-    document.getElementById('kpi-active').textContent=(s.by_status?.open||0)+(s.by_status?.investigating||0)+(s.by_status?.contained||0);
-    document.getElementById('kpi-total').textContent=(inc.count||0)+' total';
-    document.getElementById('kpi-sub').textContent=s.substantial||0;
-    document.getElementById('kpi-ran').textContent=s.ransomware||0;
-    document.getElementById('kpi-circia').textContent=cir.count||0;
-    const dc=cir.deadline_compliance||{};
-    document.getElementById('kpi-circia-met').textContent=(dc.met||0)+' met · '+(dc.missed||0)+' missed';
-    document.getElementById('kpi-ev').textContent=ev.count||0;
-  }catch(e){console.error(e);}
+  var hasUX = typeof VSPUXState !== 'undefined';
+  _irShimmerCells();
+  // Per-fetch catch — preserve partial KPIs if some endpoints fail
+  var safe = function(p){ return p.then(function(r){ return r.ok ? r.json() : {}; }).catch(function(){ return {}; }); };
+  try{
+    var res = await Promise.all([
+      safe(fetch('/api/p4/ir/incidents')),
+      safe(fetch('/api/p4/circia/reports')),
+      safe(fetch('/api/p4/forensics/evidence'))
+    ]);
+    var inc = res[0], cir = res[1], ev = res[2];
+    var s = inc.stats || {};
+    _irClearCells();
+    var bs=s.by_status||{};document.getElementById('kpi-active').textContent=(bs.open||0)+(bs.investigating||0)+(bs.contained||0);
+    document.getElementById('kpi-total').textContent = (inc.count||0) + ' total';
+    document.getElementById('kpi-sub').textContent = s.substantial || 0;
+    document.getElementById('kpi-ran').textContent = s.ransomware || 0;
+    document.getElementById('kpi-circia').textContent = cir.count || 0;
+    var dc = cir.deadline_compliance || {};
+    document.getElementById('kpi-circia-met').textContent = (dc.met||0) + ' met · ' + (dc.missed||0) + ' missed';
+    document.getElementById('kpi-ev').textContent = ev.count || 0;
+  }catch(e){
+    _irDashCells();
+    console.error('[FEAT-32] loadKPIs failed:', e);
+  }
 }
 
 async function loadIncidents(){
-  try{const r=await fetch('/api/p4/ir/incidents');const d=await r.json();
-    document.getElementById('inc-count').textContent=(d.count||0)+' incidents · click để xem chi tiết';
-    const tb=document.getElementById('inc-tbody');
-    if(!d.incidents||d.incidents.length===0){tb.innerHTML='<tr><td colspan="8" class="empty">No incidents</td></tr>';return;}
-    tb.innerHTML=d.incidents.map(i=>{
-      const f=[];if(i.is_substantial)f.push('<span class="badge b-warn">72h</span>');
-      if(i.is_ransomware)f.push('<span class="badge b-bad">💰24h</span>');
-      return `<tr class="clickable" onclick="showIncidentDetail('${i.incident_id}')">
-        <td class="mono"><b>${i.incident_id}</b></td>
-        <td>${i.title}</td>
-        <td>${sevBadge(i.severity)}</td>
-        <td><span class="phase-pill">${(i.phase||'').replace('_',' ')}</span></td>
-        <td>${statBadge(i.status)}</td>
-        <td>${f.join(' ')||'—'}</td>
-        <td class="mono">${fmtAgo(i.detected_at)}</td>
-        <td onclick="event.stopPropagation()">
-          ${i.status!=='closed'?`<button class="btn btn-sm" onclick="showTransition('${i.incident_id}','${i.phase}')">▶ Advance</button>`:''}
-        </td>
-      </tr>`;}).join('');
-  }catch(e){console.error(e);}
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tbody = document.getElementById('inc-tbody');
+  var hasData = tbody && tbody.children.length > 0 &&
+                !tbody.querySelector('.empty') &&
+                !tbody.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#inc-tbody', { rows: 5, kind: 'table' });
+
+  try{
+    var r = await fetch('/api/p4/ir/incidents');
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#inc-tbody', 'HTTP ' + r.status, loadIncidents);
+      return;
+    }
+    var d = await r.json();
+    document.getElementById('inc-count').textContent = (d.count||0) + ' incidents · click để xem chi tiết';
+    if (!d.incidents || d.incidents.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">No incidents</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.incidents.map(function(i){
+      var f = []; if (i.is_substantial) f.push('<span class="badge b-warn">72h</span>');
+      if (i.is_ransomware) f.push('<span class="badge b-bad">💰24h</span>');
+      var _rc=i.severity==="critical"?" inc-row-critical":"";var _rr=i.is_ransomware?" inc-row-ransomware":"";return '<tr class="clickable"+_rc+_rr+" data-id="'+i.incident_id+'" data-title="'+((i.title||"").toLowerCase())+'" data-severity="'+i.severity+'" data-status="'+i.status+'" data-ransomware="'+i.is_ransomware+'" data-substantial="'+i.is_substantial+'" onclick="showIncidentDetail(\''+i.incident_id+'\')">'
+        + '<td class="mono"><b>'+i.incident_id+'</b></td>'
+        + '<td>'+i.title+'</td>'
+        + '<td>'+sevBadge(i.severity)+'</td>'
+        + '<td><span class="phase-pill">'+(i.phase||'').replace('_',' ')+'</span></td>'
+        + '<td>'+statBadge(i.status)+'</td>'
+        + '<td>'+(f.join(' ')||'—')+'</td>'
+        + '<td class="mono">'+fmtAgo(i.detected_at)+'</td>'
+        + '<td onclick="event.stopPropagation()">'
+        + (i.status!=='closed' ? '<button class="btn btn-sm" onclick="showTransition(\''+i.incident_id+'\',\''+i.phase+'\')">▶ Advance</button>' : '')
+        + '</td></tr>';
+    }).join('');
+  }catch(e){
+    console.error('[FEAT-32] loadIncidents failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#inc-tbody', 'Network error', loadIncidents);
+  }
 }
 
 async function showIncidentDetail(id){
@@ -318,7 +446,7 @@ async function showIncidentDetail(id){
        <td class="mono">${fmtBytes(e.file_size_bytes)}</td>
        <td class="mono">${e.custody_count} entries</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No evidence</td></tr>';
     const actions=Array.isArray(d.corrective_actions)?d.corrective_actions:[];
-    body.textContent=`
+    body.innerHTML=`
       <div style="margin-bottom:12px">${flags.join(' ')||''}</div>
       <div class="section-title">Overview</div>
       <div class="kv-grid">
@@ -355,21 +483,22 @@ async function showIncidentDetail(id){
 }
 
 async function editField(incidentId, field, currentVal){
+  if(typeof window.showEditFieldModal === 'function'){ window.showEditFieldModal(incidentId, field, currentVal); return; }
   const newVal=prompt(`Edit ${field}:`, currentVal||'');
   if(newVal===null||newVal===currentVal)return;
   try{const r=await fetch('/api/p4/ir/incident/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:incidentId,field:field,value:newVal})});
     if(!r.ok)throw new Error(await r.text());
-    alert('✅ Updated');showIncidentDetail(incidentId);loadIncidents();
-  }catch(e){alert('Error: '+e.message);}
+    vspIRToast('Updated','success');showIncidentDetail(incidentId);loadIncidents();
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 function showRansomForm(id){
   document.getElementById('modal-ransom').classList.add('show');
-  document.getElementById('mr-body').textContent=`
+  document.getElementById('mr-body').innerHTML=`
     <div class="banner banner-yellow">⚠️ Recording ransom payment triggers <b>CIRCIA 24-hour reporting deadline</b>.</div>
-    <div class="form-row"><label>Incident</label><input value="${id}" readonly></div>
-    <div class="form-row"><label>Amount (USD) *</label><input id="rp-amount" type="number" placeholder="50000" step="0.01"></div>
-    <div class="form-row"><label>Payment Method</label>
+    <div class="form-row"><label>Incident</label><input name="read-only-value" aria-label="Read-only value" value="${id}" readonly></div>
+    <div class="form-row"><label>Amount (USD) *</label><input aria-label="50000" id="rp-amount" type="number" placeholder="50000" step="0.01"></div>
+    <div class="form-row"><label for="rp-method">Payment Method</label>
       <select id="rp-method">
         <option value="bitcoin">Bitcoin (BTC)</option>
         <option value="monero">Monero (XMR)</option>
@@ -377,7 +506,7 @@ function showRansomForm(id){
         <option value="wire">Wire Transfer</option>
         <option value="other">Other</option>
       </select></div>
-    <div class="form-row"><label>Wallet / Account</label><input id="rp-wallet" placeholder="bc1q..."></div>
+    <div class="form-row"><label>Wallet / Account</label><input aria-label="bc1q..." id="rp-wallet" placeholder="bc1q..."></div>
     <div class="action-row">
       <button class="btn btn-danger" onclick="submitRansom('${id}')">💰 Record Payment</button>
       <button class="btn" onclick="closeModal('ransom')">Cancel</button>
@@ -386,21 +515,21 @@ function showRansomForm(id){
 
 async function submitRansom(id){
   const amount=parseFloat(document.getElementById('rp-amount').value);
-  if(!amount||amount<=0){alert('Amount required');return;}
+  if(!amount||amount<=0){vspIRToast('Amount is required and must be greater than 0','warning');return;}
   try{const r=await fetch('/api/p4/ir/incident/ransom-payment',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({incident_id:id,amount_usd:amount,payment_method:document.getElementById('rp-method').value,wallet:document.getElementById('rp-wallet').value})});
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    alert('✅ Payment recorded!\n\n⚠️ CIRCIA 24h deadline: '+new Date(d.circia_24h_deadline).toLocaleString());
+    vspIRToast('Payment recorded\nCIRCIA 24h deadline: '+new Date(d.circia_24h_deadline).toLocaleString(),'success');
     closeModal('ransom');showIncidentDetail(id);loadKPIs();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 function showLessonsForm(id){
   document.getElementById('modal-lessons').classList.add('show');
-  document.getElementById('ml-body').textContent=`
-    <div class="form-row"><label>Root Cause Analysis</label><textarea id="ll-rc" placeholder="Primary cause of the incident..."></textarea></div>
-    <div class="form-row"><label>Lessons Learned</label><textarea id="ll-lessons" placeholder="What worked, what didn't..."></textarea></div>
-    <div class="form-row"><label>Corrective Actions (1 per line)</label><textarea id="ll-actions" placeholder="Patch system X\nImplement control Y\nUpdate runbook Z"></textarea></div>
+  document.getElementById('ml-body').innerHTML=`
+    <div class="form-row"><label>Root Cause Analysis</label><textarea aria-label="Primary cause of the incident..." id="ll-rc" placeholder="Primary cause of the incident..."></textarea></div>
+    <div class="form-row"><label>Lessons Learned</label><textarea aria-label="What worked, what didn" id="ll-lessons" placeholder="What worked, what didn't..."></textarea></div>
+    <div class="form-row"><label>Corrective Actions (1 per line)</label><textarea aria-label="Patch system X\nImplement control Y\nUpdate runbook Z" id="ll-actions" placeholder="Patch system X\nImplement control Y\nUpdate runbook Z"></textarea></div>
     <div class="action-row">
       <button class="btn btn-primary" onclick="submitLessons('${id}')">💾 Save</button>
       <button class="btn" onclick="closeModal('lessons')">Cancel</button>
@@ -418,37 +547,29 @@ async function submitLessons(id){
   try{const r=await fetch('/api/p4/ir/incident/lessons',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({incident_id:id,root_cause:document.getElementById('ll-rc').value,lessons_learned:document.getElementById('ll-lessons').value,corrective_actions:actions})});
     if(!r.ok)throw new Error(await r.text());
-    alert('✅ Saved '+actions.length+' corrective actions');closeModal('lessons');showIncidentDetail(id);
-  }catch(e){alert('Error: '+e.message);}
+    vspIRToast('Saved '+actions.length+' corrective actions','success');closeModal('lessons');showIncidentDetail(id);
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 async function showTransition(id,cur){
+  if(typeof window.showTransitionModal === 'function'){ window.showTransitionModal(id, cur); return; }
   const p=['preparation','detection_analysis','containment','eradication','recovery','post_incident'];
   const idx=p.indexOf(cur);
-  const next=p.slice(idx+1).map((x,i)=>`${i+1}. ${x.replace('_',' ')}`).join('\n');
-  const c=prompt(`Incident: ${id}\nCurrent: ${cur}\n\nNext:\n${next}\n\nEnter phase:`,p[idx+1]||'post_incident');
-  if(!c)return;
+  const c=p[idx+1]; if(!c){vspIRToast('Already at final phase','warning');return;}
   try{const r=await fetch('/api/p4/ir/incident/transition',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:id,phase:c})});
-    if(r.ok){alert('✅ Transitioned to '+c);if(document.getElementById('modal-inc').classList.contains('show'))showIncidentDetail(id);loadIncidents();loadKPIs();}
-    else alert('Error: '+await r.text());
-  }catch(e){alert(e.message);}
+    if(r.ok){vspIRToast('Transitioned to '+c,'success');if(document.getElementById('modal-inc').classList.contains('show'))showIncidentDetail(id);loadIncidents();loadKPIs();}
+    else vspIRToast('Error: '+await r.text(),'error');
+  }catch(e){vspIRToast(e.message,'error');}
 }
 
 async function genCIRCIA(id){
-  const t=prompt('Type:\n- substantial_incident (72h)\n- ransomware_payment (24h)\n- joint','substantial_incident');
-  if(!t)return;
-  const s=prompt('Sector:','information_technology');
-  if(!s)return;
-  try{const r=await fetch('/api/p4/circia/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:id,report_type:t,ci_sector:s})});
-    const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    alert('✅ Generated!\n\nUUID: '+d.report_uuid+'\nDeadline: '+new Date(d.timeline.report_deadline).toLocaleString());
-    loadCIRCIA();loadKPIs();if(document.getElementById('modal-inc').classList.contains('show'))showIncidentDetail(id);
-  }catch(e){alert('Error: '+e.message);}
+  if(typeof window.showCIRCIAGenModal === 'function'){ window.showCIRCIAGenModal(id); return; }
+  vspIRToast('Modal not loaded','error');
 }
 
 async function createIncident(){
   const b={title:document.getElementById('nc-title').value.trim(),description:document.getElementById('nc-desc').value,severity:document.getElementById('nc-severity').value,category:document.getElementById('nc-category').value,reporter:document.getElementById('nc-reporter').value,is_ransomware:document.getElementById('nc-ransom').checked,impact_confidentiality:document.getElementById('nc-imp-c').checked,impact_integrity:document.getElementById('nc-imp-i').checked,impact_availability:document.getElementById('nc-imp-a').checked,impact_safety:document.getElementById('nc-imp-s').checked,impact_business_ops:document.getElementById('nc-imp-b').checked,impact_supply_chain:document.getElementById('nc-imp-sc').checked};
-  if(!b.title){alert('Title required');return;}
+  if(!b.title){vspIRToast('Title is required','warning');return;}
   try{const r=await fetch('/api/p4/ir/incident',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
     let m=`✅ Created: ${d.incident_id}`;
@@ -461,32 +582,53 @@ async function createIncident(){
     );
     document.getElementById('nc-title').value='';document.getElementById('nc-desc').value='';
     document.querySelectorAll('.chk-row input, #nc-ransom').forEach(c=>c.checked=false);
-    loadKPIs();alert(m);
-  }catch(e){alert('Error: '+e.message);}
+    loadKPIs();vspIRToast(m,'success');
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 async function loadCIRCIA(){
-  try{const r=await fetch('/api/p4/circia/reports');const d=await r.json();
-    const dc=d.deadline_compliance||{};
-    document.getElementById('circia-stats').textContent=`${d.count||0} total · ${dc.met||0} met · ${dc.missed||0} missed · ${dc.pending||0} pending`;
-    const tb=document.getElementById('circia-tbody');
-    if(!d.reports||d.reports.length===0){tb.innerHTML='<tr><td colspan="8" class="empty">No reports</td></tr>';return;}
-    tb.innerHTML=d.reports.map(rp=>{
-      const sbc={draft:'b-neutral',submitted:'b-info',acknowledged:'b-ok'}[rp.status]||'b-neutral';
-      const sv=rp.submitted_at&&!String(rp.submitted_at).startsWith('0001');
-      const dc=sv?fmtDT(rp.submitted_at):hoursLeft(rp.deadline_at)+' left';
-      const mb=sv?(rp.deadline_met?'<span class="badge b-ok">✓ met</span>':'<span class="badge b-bad">✗ missed</span>'):'<span class="badge b-warn">pending</span>';
-      return `<tr class="clickable" onclick="showCIRCIADetail('${rp.report_uuid}')">
-        <td><span class="badge b-info">${(rp.report_type||'').replace(/_/g,' ')}</span></td>
-        <td><b>${rp.incident_id||'—'}</b><br><span class="mono">${(rp.incident_title||'').slice(0,40)}</span></td>
-        <td class="mono">${rp.ci_sector||'—'}</td>
-        <td><span class="badge ${sbc}">${rp.status}</span></td>
-        <td class="mono" style="font-size:10px">${fmtDT(rp.deadline_at)}</td>
-        <td>${dc}</td>
-        <td>${mb}</td>
-        <td class="mono" style="font-size:10px">${rp.cisa_submission_id||'—'}</td>
-      </tr>`;}).join('');
-  }catch(e){console.error(e);}
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tb = document.getElementById('circia-tbody');
+  var hasData = tb && tb.children.length > 0 &&
+                !tb.querySelector('.empty') &&
+                !tb.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#circia-tbody', { rows: 4, kind: 'table' });
+
+  try{
+    var r = await fetch('/api/p4/circia/reports');
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#circia-tbody', 'HTTP ' + r.status, loadCIRCIA);
+      return;
+    }
+    var d = await r.json();
+    var dc = d.deadline_compliance || {};
+    var statsEl = document.getElementById('circia-stats');
+    if (statsEl) statsEl.textContent = (d.count||0)+' total · '+(dc.met||0)+' met · '+(dc.missed||0)+' missed · '+(dc.pending||0)+' pending';
+    if (!d.reports || d.reports.length === 0) {
+      tb.innerHTML = '<tr><td colspan="8" class="empty">No reports</td></tr>';
+      return;
+    }
+    tb.innerHTML = d.reports.map(function(rp){
+      var sbc = {draft:'b-neutral', submitted:'b-info', acknowledged:'b-ok'}[rp.status] || 'b-neutral';
+      var sv = rp.submitted_at && !String(rp.submitted_at).startsWith('0001');
+      var dcText = sv ? fmtDT(rp.submitted_at) : hoursLeft(rp.deadline_at)+' left';
+      var mb = sv ? (rp.deadline_met ? '<span class="badge b-ok">✓ met</span>' : '<span class="badge b-bad">✗ missed</span>') : '<span class="badge b-warn">pending</span>';
+      return '<tr class="clickable" onclick="showCIRCIADetail(\''+rp.report_uuid+'\')">'
+        + '<td><span class="badge b-info">'+(rp.report_type||'').replace(/_/g,' ')+'</span></td>'
+        + '<td><b>'+(rp.incident_id||'—')+'</b><br><span class="mono">'+(rp.incident_title||'').slice(0,40)+'</span></td>'
+        + '<td class="mono">'+(rp.ci_sector||'—')+'</td>'
+        + '<td><span class="badge '+sbc+'">'+rp.status+'</span></td>'
+        + '<td class="mono" style="font-size:10px">'+fmtDT(rp.deadline_at)+'</td>'
+        + '<td>'+dcText+'</td>'
+        + '<td>'+mb+'</td>'
+        + '<td class="mono" style="font-size:10px">'+(rp.cisa_submission_id||'—')+'</td>'
+        + '</tr>';
+    }).join('');
+  }catch(e){
+    console.error('[FEAT-32] loadCIRCIA failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#circia-tbody', 'Network error', loadCIRCIA);
+  }
 }
 
 async function showCIRCIADetail(uuid){
@@ -508,12 +650,12 @@ async function showCIRCIADetail(uuid){
     const submitHtml=d.status==='draft'?`
       <div class="section-title">Submit to CISA</div>
       <div class="form-grid">
-        <div class="form-row"><label>Your name</label><input id="sub-name" placeholder="Jane Doe"></div>
-        <div class="form-row"><label>Your title</label><input id="sub-title" placeholder="CISO"></div>
-        <div class="form-row"><label>Email</label><input id="sub-email" placeholder="ciso@org"></div>
+        <div class="form-row"><label>Your name</label><input aria-label="Jane Doe" id="sub-name" placeholder="Jane Doe"></div>
+        <div class="form-row"><label>Your title</label><input aria-label="CISO" id="sub-title" placeholder="CISO"></div>
+        <div class="form-row"><label>Email</label><input aria-label="ciso@org" id="sub-email" placeholder="ciso@org"></div>
       </div>
       <button class="btn btn-danger" onclick="submitCIRCIA('${uuid}')">⏱️ Submit to CISA</button>`:'';
-    body.textContent=`
+    body.innerHTML=`
       <div class="kv-grid">
         <div class="kv-key">Type</div><div class="kv-val"><span class="badge b-info">${d.report_type.replace(/_/g,' ')}</span></div>
         <div class="kv-key">Status</div><div class="kv-val"><span class="badge ${d.status==='submitted'?'b-info':'b-neutral'}">${d.status}</span></div>
@@ -535,56 +677,71 @@ async function showCIRCIADetail(uuid){
 
 async function submitCIRCIA(uuid){
   const name=document.getElementById('sub-name').value.trim();
-  if(!name){alert('Name required');return;}
+  if(!name){vspIRToast('Name is required','warning');return;}
   try{const r=await fetch('/api/p4/circia/submit',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({report_uuid:uuid,submitted_by_name:name,submitted_by_title:document.getElementById('sub-title').value,submitted_by_email:document.getElementById('sub-email').value})});
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    alert('✅ Submitted!\n\nCISA ID: '+d.cisa_submission_id+'\nDeadline met: '+(d.deadline_met?'YES':'NO'));
+    vspIRToast('Submitted to CISA\nID: '+d.cisa_submission_id+'\nDeadline met: '+(d.deadline_met?'YES':'NO'),'success');
     closeModal('circia');loadCIRCIA();loadKPIs();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 async function loadEvidence(){
-  try{const r=await fetch('/api/p4/forensics/evidence');const d=await r.json();
-    const tb=document.getElementById('ev-tbody');
-    if(!d.evidence||d.evidence.length===0){tb.innerHTML='<tr><td colspan="7" class="empty">No evidence</td></tr>';return;}
-    window._evData=d.evidence;
-    tb.innerHTML=d.evidence.map((e,i)=>{
-      const h=(e.file_hash_sha256||'').slice(0,16);
-      return `<tr><td class="mono"><b>${e.evidence_id}</b></td>
-        <td><span class="badge b-info">${e.evidence_type}</span></td>
-        <td>${e.description}</td>
-        <td class="mono">${fmtBytes(e.file_size_bytes)}</td>
-        <td class="mono" style="font-size:10px" title="${e.file_hash_sha256||''}">${h||'—'}…</td>
-        <td class="mono">${fmtAgo(e.collected_at)}</td>
-        <td><button class="btn btn-sm" onclick="showCustody(${i})">${(e.custody_log||[]).length} entries</button></td></tr>`;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var tb = document.getElementById('ev-tbody');
+  var hasData = tb && tb.children.length > 0 &&
+                !tb.querySelector('.empty') &&
+                !tb.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#ev-tbody', { rows: 4, kind: 'table' });
+
+  try{
+    var r = await fetch('/api/p4/forensics/evidence');
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#ev-tbody', 'HTTP ' + r.status, loadEvidence);
+      return;
+    }
+    var d = await r.json();
+    if (!d.evidence || d.evidence.length === 0) {
+      tb.innerHTML = '<tr><td colspan="7" class="empty">No evidence</td></tr>';
+      return;
+    }
+    window._evData = d.evidence;
+    tb.innerHTML = d.evidence.map(function(e, i){
+      var h = (e.file_hash_sha256||'').slice(0,16);
+      return '<tr><td class="mono"><b>'+e.evidence_id+'</b></td>'
+        + '<td><span class="badge b-info">'+e.evidence_type+'</span></td>'
+        + '<td>'+e.description+'</td>'
+        + '<td class="mono">'+fmtBytes(e.file_size_bytes)+'</td>'
+        + '<td class="mono" style="font-size:10px" title="'+(e.file_hash_sha256||'')+'">'+(h||'—')+'…</td>'
+        + '<td class="mono">'+fmtAgo(e.collected_at)+'</td>'
+        + '<td><button class="btn btn-sm" onclick="showCustody('+i+')">'+(e.custody_log||[]).length+' entries</button></td></tr>';
     }).join('');
-  }catch(e){console.error(e);}
+  }catch(e){
+    console.error('[FEAT-32] loadEvidence failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#ev-tbody', 'Network error', loadEvidence);
+  }
 }
 
 function showCustody(i){
-  const ev=window._evData[i];
-  const entries=ev.custody_log||[];
-  const html='<div class="custody-timeline">'+entries.map(e=>
-    `<div class="custody-entry"><b class="mono">${fmtDT(e.timestamp)}</b> — <span class="badge b-info">${e.action}</span><br>
-    <span style="color:var(--t2)">Actor:</span> ${e.actor} · <span style="color:var(--t2)">Location:</span> ${e.location||'—'}
-    ${e.notes?'<br><span class="mono">📝 '+e.notes+'</span>':''}</div>`).join('')+'</div>';
-  alert('Chain of Custody — '+ev.evidence_id+'\n\n'+entries.length+' entries (see modal)');
-  // Simple display - could be another modal but reuse existing
-  const newEntry=prompt('Add custody entry? Format:\nactor | action | location | notes\n(leave empty to cancel)');
-  if(!newEntry)return;
-  const parts=newEntry.split('|').map(s=>s.trim());
-  if(parts.length<2){alert('Need at least actor and action');return;}
-  fetch('/api/p4/forensics/custody',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({evidence_id:ev.evidence_id,actor:parts[0],action:parts[1],location:parts[2]||'',notes:parts[3]||''})})
-    .then(r=>r.json()).then(d=>{if(d.updated){alert('✅ Custody entry added');loadEvidence();}});
+  // VSP-IR-G1.D: defensive lookup — _evData may be undefined if Forensics tab not visited yet
+  const ev = (window._evData || [])[i];
+  if(!ev){
+    vspIRToast('Evidence data not loaded — please open Forensics tab first', 'warning');
+    return;
+  }
+  if(typeof window.showCustodyModal === 'function'){
+    window.showCustodyModal(ev);
+    return;
+  }
+  vspIRToast('Custody modal not loaded', 'error');
 }
 
 function showAddEvidence(){
   document.getElementById('modal-evidence').classList.add('show');
-  document.getElementById('me-body').textContent=`
-    <div class="form-row"><label>Incident ID *</label><input id="ae-inc" placeholder="INC-2026-0001"></div>
-    <div class="form-row"><label>Evidence Type</label>
+  document.getElementById('me-body').innerHTML=`
+    <div class="form-row"><label>Incident ID *</label><input aria-label="INC-2026-0001" id="ae-inc" placeholder="INC-2026-0001"></div>
+    <div class="form-row"><label for="ae-type">Evidence Type</label>
       <select id="ae-type">
         <option value="memory_dump">Memory Dump</option>
         <option value="disk_image">Disk Image</option>
@@ -596,17 +753,17 @@ function showAddEvidence(){
         <option value="screenshot">Screenshot</option>
         <option value="other">Other</option>
       </select></div>
-    <div class="form-row"><label>Description *</label><textarea id="ae-desc"></textarea></div>
+    <div class="form-row"><label>Description *</label><textarea aria-label="Ae Desc" id="ae-desc"></textarea></div>
     <div class="form-grid">
-      <div class="form-row"><label>File path</label><input id="ae-path" placeholder="/evidence/..."></div>
-      <div class="form-row"><label>Size (bytes)</label><input id="ae-size" type="number" placeholder="1073741824"></div>
+      <div class="form-row"><label>File path</label><input aria-label="/evidence/..." id="ae-path" placeholder="/evidence/..."></div>
+      <div class="form-row"><label>Size (bytes)</label><input aria-label="1073741824" id="ae-size" type="number" placeholder="1073741824"></div>
     </div>
-    <div class="form-row"><label>SHA-256 Hash</label><input id="ae-hash" placeholder="a3f7b2c1..." style="font-family:monospace"></div>
+    <div class="form-row"><label>SHA-256 Hash</label><input aria-label="a3f7b2c1..." id="ae-hash" placeholder="a3f7b2c1..." style="font-family:monospace"></div>
     <div class="form-grid">
-      <div class="form-row"><label>Collected by</label><input id="ae-by" value="forensics@vsp.local"></div>
-      <div class="form-row"><label>Method</label><input id="ae-method" placeholder="dd + dcfldd"></div>
+      <div class="form-row"><label>Collected by</label><input aria-label="Ae By" id="ae-by" value="forensics@vsp.local"></div>
+      <div class="form-row"><label>Method</label><input aria-label="dd + dcfldd" id="ae-method" placeholder="dd + dcfldd"></div>
     </div>
-    <div class="form-row"><label>Source system</label><input id="ae-src" placeholder="db01.prod.vsp.local"></div>
+    <div class="form-row"><label>Source system</label><input aria-label="db01.prod.vsp.local" id="ae-src" placeholder="db01.prod.vsp.local"></div>
     <div class="action-row">
       <button class="btn btn-primary" onclick="submitEvidence()">🔬 Add Evidence</button>
       <button class="btn" onclick="closeModal('evidence')">Cancel</button>
@@ -623,26 +780,1719 @@ async function submitEvidence(){
     collected_by:document.getElementById('ae-by').value,
     collection_method:document.getElementById('ae-method').value,
     source_system:document.getElementById('ae-src').value};
-  if(!b.incident_id||!b.description){alert('Incident ID and description required');return;}
+  if(!b.incident_id||!b.description){vspIRToast('Incident ID and description are required','warning');return;}
   try{const r=await fetch('/api/p4/forensics/evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
     const d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));
-    alert('✅ Evidence created: '+d.evidence_id);closeModal('evidence');loadEvidence();loadKPIs();
-  }catch(e){alert('Error: '+e.message);}
+    vspIRToast('Evidence created: '+d.evidence_id,'success');closeModal('evidence');loadEvidence();loadKPIs();
+  }catch(e){vspIRToast('Error: '+e.message,'error');}
 }
 
 async function loadPlaybooks(){
-  try{const r=await fetch('/api/p4/ir/playbooks');const d=await r.json();
-    const c=document.getElementById('pb-container');
-    if(!d.playbooks||d.playbooks.length===0){c.innerHTML='<div class="empty">No playbooks</div>';return;}
-    c.innerHTML=d.playbooks.map(pb=>{
-      const ph=(pb.phases||[]).map(p=>`<div style="margin-top:6px"><b class="mono" style="color:var(--accent)">${p.phase.replace('_',' ')}</b><ul style="margin:4px 0 0 20px;font-size:11px">${(p.steps||[]).map(s=>'<li>'+s+'</li>').join('')}</ul></div>`).join('');
-      return `<div class="card"><div class="card-head"><div class="card-title">${pb.playbook_id} — ${pb.name}</div><div class="mono">${(pb.incident_types||[]).join(', ')}</div></div><div class="card-body"><div style="font-size:11px;color:var(--t2);margin-bottom:10px">${pb.description}</div>${ph}</div></div>`;
+  var hasUX = typeof VSPUXState !== 'undefined';
+  var c = document.getElementById('pb-container');
+  var hasData = c && c.children.length > 0 &&
+                !c.querySelector('.empty') &&
+                !c.querySelector('.vsp-uxs-skel-row');
+
+  if (hasUX && !hasData) VSPUXState.skeleton('#pb-container', { rows: 3, kind: 'card' });
+
+  try{
+    var r = await fetch('/api/p4/ir/playbooks');
+    if (!r.ok) {
+      if (hasUX && !hasData) VSPUXState.error('#pb-container', 'HTTP ' + r.status, loadPlaybooks);
+      return;
+    }
+    var d = await r.json();
+    if (!d.playbooks || d.playbooks.length === 0) {
+      if (hasUX) VSPUXState.empty('#pb-container', 'No playbooks defined yet', loadPlaybooks);
+      else c.innerHTML = '<div class="empty">No playbooks</div>';
+      return;
+    }
+    // Load incidents + playbooks song song
+    var incList = [];
+    try {
+      var [rp2, ri] = await Promise.all([
+        fetch('/api/p4/ir/playbooks'),
+        fetch('/api/p4/ir/incidents')
+      ]);
+      var di = await ri.json();
+      incList = (di.incidents || []).filter(function(i){ return i.status !== 'closed'; });
+      console.log('[PB] incidents loaded:', incList.length);
+    } catch(e) { console.warn('incidents load:', e); }
+    
+    c.innerHTML = d.playbooks.map(function(pb){
+      var _phCol={'detection_analysis':'#06b6d4','containment':'#f59e0b','eradication':'#ef4444','recovery':'#22c55e','post_incident':'#8b5cf6'};
+      var ph = (pb.phases||[]).map(function(p,pi){
+        var col=_phCol[p.phase]||'var(--accent)';
+        return '<div style="margin:6px 0;padding:8px 12px;background:var(--bg3);border-radius:6px;border-left:3px solid '+col+'">'
+          + '<div style="font-size:10px;font-family:var(--font-mono);color:'+col+';font-weight:700;text-transform:uppercase;margin-bottom:5px">'+(pi+1)+'. '+p.phase.replace(/_/g,' ')+'</div>'
+          + '<ul style="margin-left:14px;font-size:11px;color:var(--t2);line-height:1.7">'
+          + (p.steps||[]).map(function(s){ return '<li>'+s+'</li>'; }).join('')
+          + '</ul></div>';
+      }).join('');
+      var incOpts = incList.map(function(i){
+        return '<option value="'+i.incident_id+'">'+i.incident_id+' — '+i.title.slice(0,30)+'</option>';
+      }).join('');
+      var applySection = incList.length > 0 
+        ? '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">'
+          + '<select id="pb-inc-'+pb.playbook_id+'" class="btn" style="flex:1;padding:5px 8px">'
+          + '<option value="">— select incident to apply —</option>'+incOpts+'</select>'
+          + '<button class="btn btn-primary btn-sm" onclick="applyPlaybook(\'' + pb.playbook_id + '\',\'' + pb.name + '\')">▶ Apply</button>'
+          + '</div>'
+        : '';
+      return '<div class="card" style="margin-bottom:10px">'
+        + '<div class="card-head">'
+        + '<div><div class="card-title">'+pb.playbook_id+' — '+pb.name+'</div>'
+        + '<div class="mono" style="font-size:10px;margin-top:2px;color:var(--t3)">'+(pb.incident_types||[]).join(' · ')+'</div></div>'
+        + '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(14,165,233,.1);color:var(--accent);border:1px solid rgba(14,165,233,.2)">'+(function(){var t=(pb.phases||[]).reduce(function(a,p){return a+(p.steps||[]).length;},0);return (pb.phases||[]).length+' phases · '+t+' steps';})()+'</span>'
+        + '</div>'
+        + '<div class="card-body"><div style="font-size:11px;color:var(--t2);margin-bottom:10px">'+pb.description+'</div>'+ph+applySection+'</div>'
+        + '</div>';
     }).join('');
-  }catch(e){console.error(e);}
+  }catch(e){
+    console.error('[FEAT-32] loadPlaybooks failed:', e);
+    if (hasUX && !hasData) VSPUXState.error('#pb-container', 'Network error', loadPlaybooks);
+  }
 }
 
 function refreshAll(){loadKPIs();loadIncidents();}
 loadKPIs();loadIncidents();
 </script>
+<script src="/panels/vsp_fe_sync_patch_v2.js?v=1777453352"></script>
+
+<!-- VSP-IR-POLISH-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Incident Response + CIRCIA Polish v1
+ *   Inject vào cuối incident_response.html
+ *   Modules:
+ *     1. Toast (replace alert)
+ *     2. Incidents filter + status/severity badges + click row enhancement
+ *     3. KPI cards clickable → breakdown modals
+ *     4. CIRCIA timer live countdown
+ *     5. Advance phase confirm with NIST 800-61 guide
+ *     6. Settings panel
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_IR_POLISH__) return;
+  window.__VSP_IR_POLISH__ = true;
+  if (window.VSP_DEBUG) console.log('[VSP-IR-POLISH] ready');
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function pretty(o) { try { return JSON.stringify(o, null, 2); } catch (e) { return String(o); } }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+  function copy(t) { try { navigator.clipboard.writeText(t); toast('Copied', 'success'); } catch (e) {} }
+  function downloadFile(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function fmtTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString();
+  }
+  function relativeTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '—';
+    const diff = Date.now() - d.getTime();
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    if (days > 0) return days + 'd ago';
+    if (hours > 0) return hours + 'h ago';
+    if (mins > 0) return mins + 'm ago';
+    return 'just now';
+  }
+  function countdownTo(deadline) {
+    const d = new Date(deadline);
+    if (isNaN(d.getTime())) return null;
+    const diff = d.getTime() - Date.now();
+    return diff;
+  }
+
+  // ─── Toast ────────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-ir-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = `pointer-events:auto;background:${c.bg};border-left:3px solid ${c.border};padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);animation:vspIRToastIn .25s ease;display:flex;gap:10px;align-items:flex-start`;
+    t.innerHTML = `<span style="font-size:14px;color:${c.border};flex-shrink:0">${c.icon}</span><span style="flex:1;line-height:1.4">${esc(msg)}</span>`;
+    ensureToastContainer().appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(() => t.remove(), 250);
+    }, 3500);
+  }
+  if (!$id('vsp-ir-toast-css')) {
+    const s = document.createElement('style'); s.id = 'vsp-ir-toast-css';
+    s.textContent = '@keyframes vspIRToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+    document.head.appendChild(s);
+  }
+  // Override alert
+  if (!window.__vspIROverrideAlert) {
+    window.__vspIROverrideAlert = true;
+    window.__originalAlert = window.__originalAlert || window.alert;
+    window.alert = function (msg) {
+      if (/^✅|^✓/.test(msg)) toast(msg.replace(/^[✅✓]\s*/, ''), 'success');
+      else if (/^❌|^✗/.test(msg)) toast(msg.replace(/^[❌✗]\s*/, ''), 'error');
+      else if (/error|fail/i.test(msg)) toast(msg, 'error');
+      else if (/⚠/.test(msg)) toast(msg.replace(/^⚠\s*/, ''), 'warn');
+      else toast(msg, 'info');
+    };
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-ir-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = e => { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = `background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:${opts.width || '720px'};width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)`;
+    box.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">
+         <div style="font-size:13px;font-weight:600;flex:1">${esc(opts.title || '')}</div>
+         <button onclick="window._vspIR.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>
+       </div>
+       <div style="padding:18px">${opts.body || ''}</div>` +
+      (opts.footer ? `<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">${opts.footer}</div>` : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-ir-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function row(label, value, copyable) {
+    const btn = copyable ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="window._vspIR.copy('${esc(String(value || '')).replace(/'/g, '&#39;')}')">📋</button>` : '';
+    return '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd,#27272a);align-items:flex-start">'
+      + '<div style="min-width:130px;color:var(--t3);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px">' + esc(label) + '</div>'
+      + '<div style="flex:1;font-size:11px;line-height:1.5">' + esc(value || '—') + '</div>'
+      + (btn ? '<div style="flex-shrink:0">' + btn + '</div>' : '')
+      + '</div>';
+  }
+
+  const IR = window._vspIR = { close: closeModal, copy: copy, toast: toast };
+
+  // ─── Color helpers ───────────────────────────────────────────────────────
+  const sevColors = {
+    critical: '#dc2626', high: '#ef4444', medium: '#f59e0b',
+    low: '#3b82f6', info: '#71717a'
+  };
+  const phaseColors = {
+    detection: '#3b82f6', analysis: '#3b82f6',
+    containment: '#f59e0b', eradication: '#a855f7',
+    recovery: '#06b6d4', 'post-incident': '#10b981', 'post incident': '#10b981',
+    closed: '#71717a'
+  };
+  const statusColors = {
+    open: '#ef4444', investigating: '#f59e0b',
+    contained: '#a855f7', resolved: '#10b981', closed: '#71717a'
+  };
+  function severityBadge(sev) {
+    const s = (sev || '').toLowerCase();
+    const c = sevColors[s] || '#71717a';
+    return `<span style="background:rgba(${parseInt(c.slice(1,3),16)},${parseInt(c.slice(3,5),16)},${parseInt(c.slice(5,7),16)},.15);color:${c};padding:2px 8px;border-radius:3px;font-size:10px;font-family:var(--font-mono,monospace);font-weight:600">${esc((sev || '').toUpperCase())}</span>`;
+  }
+  function statusBadge(st) {
+    const s = (st || '').toLowerCase();
+    const c = statusColors[s] || '#71717a';
+    return `<span style="background:rgba(${parseInt(c.slice(1,3),16)},${parseInt(c.slice(3,5),16)},${parseInt(c.slice(5,7),16)},.12);color:${c};padding:2px 7px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace)">${esc(st || 'unknown')}</span>`;
+  }
+
+  // ─── Module 2: Incidents filter bar + click enhancement ──────────────────
+  let incidentsCache = [];
+  let filterSeverity = '';
+  let filterStatus = '';
+
+  function injectFilterBar() {
+    const tab = $id('tab-incidents');
+    if (!tab || tab.querySelector('.vsp-ir-filter')) return;
+
+    // Find the card containing incidents table
+    const tbody = tab.querySelector('tbody, table');
+    if (!tbody) return;
+    const card = tbody.closest('div[class*="card"]') || tbody.parentNode;
+    if (!card) return;
+    const headSection = card.querySelector('div:first-child');
+    if (!headSection) return;
+    // Safe insertion: only call insertBefore when both nodes share a parent.
+    // The previous version assumed `tbody.parentNode` was a direct child of
+    // `headSection.parentNode`, which throws NotFoundError when the table is
+    // wrapped (common with <tbl-wrap><table>...). The interval re-fires the
+    // init every 1s × 5 → spammed the console with the same exception.
+
+    const bar = document.createElement('div');
+    bar.className = 'vsp-ir-filter';
+    bar.style.cssText = 'display:flex;gap:6px;align-items:center;padding:10px 12px 0;flex-wrap:wrap;font-size:11px';
+    bar.innerHTML = ''
+      + '<input aria-label="Search title / ID / category…" id="ir-fq" placeholder="Search title / ID / category…" style="font-size:11px;padding:5px 10px;flex:1;min-width:200px;background:var(--bg1,#111);border:1px solid var(--bd,#27272a);color:var(--t1,#e5e7eb);border-radius:4px">'
+      + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+      +   '<button class="ir-pill ir-pill-active" data-s="" onclick="window._vspIR.sevPill(\'\',this)">All severity</button>'
+      +   '<button class="ir-pill" data-s="critical" onclick="window._vspIR.sevPill(\'critical\',this)" style="color:#dc2626">Critical</button>'
+      +   '<button class="ir-pill" data-s="high" onclick="window._vspIR.sevPill(\'high\',this)" style="color:#ef4444">High</button>'
+      +   '<button class="ir-pill" data-s="medium" onclick="window._vspIR.sevPill(\'medium\',this)" style="color:#f59e0b">Medium</button>'
+      +   '<button class="ir-pill" data-s="low" onclick="window._vspIR.sevPill(\'low\',this)" style="color:#3b82f6">Low</button>'
+      + '</div>'
+      + '<div style="display:flex;gap:4px;background:var(--bg1,#111);padding:3px;border-radius:4px">'
+      +   '<button class="ir-stpill ir-stpill-active" data-st="" onclick="window._vspIR.stPill(\'\',this)">All status</button>'
+      +   '<button class="ir-stpill" data-st="open" onclick="window._vspIR.stPill(\'open\',this)" style="color:#ef4444">Open</button>'
+      +   '<button class="ir-stpill" data-st="investigating" onclick="window._vspIR.stPill(\'investigating\',this)" style="color:#f59e0b">Investigating</button>'
+      +   '<button class="ir-stpill" data-st="closed" onclick="window._vspIR.stPill(\'closed\',this)" style="color:#71717a">Closed</button>'
+      + '</div>'
+      + '<button class="btn btn-sm" onclick="window._vspIR.exportCSV()" style="font-size:10px">↓ CSV</button>'
+      + '<span id="ir-fcount" style="margin-left:auto;font-size:10px;color:var(--t3)"></span>';
+    // Insert the filter bar right after the head section. If both share a
+    // parent we use insertBefore(headSection.nextSibling); otherwise fall
+    // back to appending into the card (always succeeds).
+    try {
+      if (headSection.parentNode) {
+        headSection.parentNode.insertBefore(bar, headSection.nextSibling);
+      } else {
+        card.appendChild(bar);
+      }
+    } catch (e) {
+      // DOM shape changed mid-poll — append at end as last-resort fallback
+      try { card.appendChild(bar); } catch (_) {}
+    }
+
+    if (!$id('ir-pill-css')) {
+      const css = document.createElement('style'); css.id = 'ir-pill-css';
+      css.textContent = '.ir-pill,.ir-stpill{background:transparent;border:0;padding:5px 9px;font-size:10px;font-weight:500;cursor:pointer;border-radius:3px;color:var(--t2,#a1a1aa);font-family:inherit}.ir-pill:hover,.ir-stpill:hover{color:var(--t1,#e5e7eb)}.ir-pill-active,.ir-stpill-active{background:var(--bg2,#1c1c1c);color:var(--t1,#e5e7eb)!important}';
+      document.head.appendChild(css);
+    }
+    $id('ir-fq').addEventListener('input', filterIncidents);
+  }
+
+  IR.sevPill = function(s, btn) {
+    filterSeverity = s;
+    document.querySelectorAll('.ir-pill').forEach(p => p.classList.remove('ir-pill-active'));
+    btn.classList.add('ir-pill-active');
+    filterIncidents();
+  };
+  IR.stPill = function(st, btn) {
+    filterStatus = st;
+    document.querySelectorAll('.ir-stpill').forEach(p => p.classList.remove('ir-stpill-active'));
+    btn.classList.add('ir-stpill-active');
+    filterIncidents();
+  };
+  function filterIncidents() {
+    const q = (($id('ir-fq') || {}).value || '').toLowerCase();
+    const tab = $id('tab-incidents');
+    if (!tab) return;
+    const rows = tab.querySelectorAll('tbody tr');
+    let shown = 0;
+    rows.forEach(tr => {
+      const text = (tr.textContent || '').toLowerCase();
+      let ok = true;
+      if (q && text.indexOf(q) < 0) ok = false;
+      if (filterSeverity) {
+        const hasSev = text.includes(filterSeverity);
+        if (!hasSev) ok = false;
+      }
+      if (filterStatus) {
+        const hasSt = text.includes(filterStatus);
+        if (!hasSt) ok = false;
+      }
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    const c = $id('ir-fcount');
+    if (c) c.textContent = shown + ' / ' + rows.length + ' incidents';
+  }
+  IR.exportCSV = function() {
+    if (incidentsCache.length === 0) {
+      // Fallback: scrape table
+      const rows = document.querySelectorAll('#tab-incidents tbody tr');
+      if (rows.length === 0) { toast('No data to export', 'warn'); return; }
+      const csv = ['ID,Title,Severity,Phase,Status,Detected'];
+      rows.forEach(tr => {
+        const cells = Array.from(tr.querySelectorAll('td')).map(td => '"' + (td.textContent || '').trim().replace(/"/g, '""').replace(/\s+/g, ' ') + '"');
+        csv.push(cells.slice(0, 6).join(','));
+      });
+      downloadFile('incidents-' + Date.now() + '.csv', csv.join('\n'), 'text/csv');
+    } else {
+      const csv = ['ID,Title,Severity,Phase,Status,Category,IsRansomware,IsSubstantial,DetectedAt,ClosedAt'];
+      incidentsCache.forEach(i => {
+        csv.push([i.incident_id, i.title, i.severity, i.phase, i.status, i.category,
+                  i.is_ransomware ? 'yes' : 'no', i.is_substantial ? 'yes' : 'no',
+                  i.detected_at, i.closed_at]
+              .map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(','));
+      });
+      downloadFile('incidents-' + Date.now() + '.csv', csv.join('\n'), 'text/csv');
+    }
+    toast('Exported ' + (incidentsCache.length || 'visible') + ' incidents', 'success');
+  };
+
+  // Wrap loadIncidents to cache
+  function wrapLoadIncidents() {
+    const orig = window.loadIncidents;
+    if (!orig || window.__vspIRWrapLoad) return;
+    window.__vspIRWrapLoad = true;
+    window.loadIncidents = async function() {
+      const r = await orig.apply(this, arguments);
+      // Cache from latest fetch
+      try {
+        const res = await authFetch('/api/p4/ir/incidents');
+        const d = await res.json();
+        incidentsCache = d.incidents || [];
+        injectFilterBar();
+        enhanceIncidentRows();
+        startCircieaCountdown();
+      } catch (e) {}
+      return r;
+    };
+  }
+
+  // ─── Module 4: CIRCIA timer countdown ────────────────────────────────────
+  function enhanceIncidentRows() {
+    const tab = $id('tab-incidents');
+    if (!tab) return;
+    const rows = tab.querySelectorAll('tbody tr');
+    rows.forEach(tr => {
+      // Find badge "72h" or "24h" cell — typically the FLAGS column
+      tr.querySelectorAll('td').forEach(td => {
+        const txt = (td.textContent || '').trim();
+        if (/^(72h|24h)$/.test(txt) || /72h\s*⏰?\s*24h/.test(txt)) {
+          // Already a badge — add countdown
+          if (td.dataset.vspCD) return;
+          td.dataset.vspCD = '1';
+          // Find the row's incident_id from cache — use ID column (first td likely)
+          const idCell = tr.querySelector('td');
+          const idText = idCell ? (idCell.textContent || '').trim() : '';
+          const inc = incidentsCache.find(i => idText.includes(i.incident_id));
+          if (!inc || !inc.detected_at) return;
+          const detectedAt = new Date(inc.detected_at).getTime();
+          // Substantial: 72h, Ransomware: 24h
+          const sub72 = detectedAt + 72 * 3600000;
+          const ran24 = detectedAt + 24 * 3600000;
+          td.dataset.vspSub72 = sub72;
+          td.dataset.vspRan24 = ran24;
+          td.dataset.vspIsSub = inc.is_substantial ? '1' : '0';
+          td.dataset.vspIsRan = inc.is_ransomware ? '1' : '0';
+        }
+      });
+    });
+    updateCircieaCountdown();
+  }
+
+  function updateCircieaCountdown() {
+    const tab = $id('tab-incidents');
+    if (!tab) return;
+    const cells = tab.querySelectorAll('td[data-vsp-cd="1"]');
+    cells.forEach(td => {
+      const sub72 = parseInt(td.dataset.vspSub72 || '0', 10);
+      const ran24 = parseInt(td.dataset.vspRan24 || '0', 10);
+      const isSub = td.dataset.vspIsSub === '1';
+      const isRan = td.dataset.vspIsRan === '1';
+      const now = Date.now();
+      const parts = [];
+      if (isSub) {
+        const left = sub72 - now;
+        if (left > 0) {
+          const h = Math.floor(left / 3600000);
+          const m = Math.floor((left % 3600000) / 60000);
+          parts.push(`<span style="background:rgba(245,158,11,.12);color:#f59e0b;padding:2px 6px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);font-weight:600" title="CIRCIA Substantial 72h reporting deadline">⏱ 72h: ${h}h ${m}m</span>`);
+        } else {
+          parts.push(`<span style="background:rgba(220,38,38,.18);color:#dc2626;padding:2px 6px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);font-weight:600" title="CIRCIA 72h MISSED">🔴 72h: OVERDUE</span>`);
+        }
+      }
+      if (isRan) {
+        const left = ran24 - now;
+        if (left > 0) {
+          const h = Math.floor(left / 3600000);
+          const m = Math.floor((left % 3600000) / 60000);
+          parts.push(`<span style="background:rgba(220,38,38,.12);color:#dc2626;padding:2px 6px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);font-weight:600" title="CIRCIA Ransomware 24h payment deadline">💰 24h: ${h}h ${m}m</span>`);
+        } else {
+          parts.push(`<span style="background:rgba(220,38,38,.25);color:#dc2626;padding:2px 6px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);font-weight:600">🔴 24h: OVERDUE</span>`);
+        }
+      }
+      if (parts.length > 0) td.innerHTML = parts.join(' ');
+    });
+  }
+  function startCircieaCountdown() {
+    if (window.__vspIRCircieaTimer) return;
+    window.__vspIRCircieaTimer = setInterval(updateCircieaCountdown, 60000); // Every minute
+  }
+
+  // ─── Module 3: KPI cards clickable ───────────────────────────────────────
+  function makeKPIsClickable() {
+    const cards = $$('div[class*="kpi"]');
+    cards.forEach(card => {
+      if (card.dataset.vspPol) return;
+      const txt = (card.textContent || '').toLowerCase();
+      if (/active incidents/.test(txt)) {
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click to view active incidents';
+        card.onclick = () => showActiveIncidents();
+      } else if (/substantial/.test(txt)) {
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click for CIRCIA reportable list';
+        card.onclick = () => showCIRCIAReportable('substantial');
+      } else if (/ransomware/.test(txt)) {
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click for ransomware payment events';
+        card.onclick = () => showCIRCIAReportable('ransomware');
+      } else if (/circia\s*reports/.test(txt)) {
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click for CIRCIA reports breakdown';
+        card.onclick = () => showCIRCIABreakdown();
+      } else if (/forensics/.test(txt)) {
+        card.dataset.vspPol = '1';
+        card.style.cursor = 'pointer';
+        card.title = 'Click for forensics evidence list';
+        card.onclick = () => showForensicsList();
+      }
+    });
+  }
+
+  async function showActiveIncidents() {
+    showModal({ title: '🚨 Active Incidents', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '760px' });
+    try {
+      const res = await authFetch('/api/p4/ir/incidents');
+      const d = await res.json();
+      const incs = (d.incidents || []).filter(i => (i.status || '').toLowerCase() !== 'closed');
+      const body = ''
+        + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">' + incs.length + ' active (open / investigating)</div>'
+        + '<div style="display:grid;gap:6px">'
+        + incs.map(i => {
+            const detected = relativeTime(i.detected_at);
+            return `<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;background:var(--bg1,#111);border-radius:6px;font-size:11px;border-left:3px solid ${sevColors[(i.severity||'').toLowerCase()] || '#71717a'}">`
+              + `<span style="font-family:var(--font-mono,monospace);color:#3b82f6;font-size:10px;min-width:120px">${esc(i.incident_id)}</span>`
+              + `<span style="flex:1">${esc(i.title)}</span>`
+              + severityBadge(i.severity)
+              + statusBadge(i.status)
+              + `<span style="font-size:10px;color:var(--t3);min-width:70px;text-align:right">${esc(detected)}</span>`
+              + '</div>';
+          }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspIR.close()">Close</button>';
+      showModal({ title: '🚨 Active Incidents (' + incs.length + ')', body: body, footer: footer, width: '760px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspIR.close()">Close</button>' });
+    }
+  }
+
+  async function showCIRCIAReportable(kind) {
+    const titleMap = {
+      substantial: '⏱ CIRCIA Substantial Incidents (72h)',
+      ransomware: '💰 CIRCIA Ransomware Payment Events (24h)'
+    };
+    showModal({ title: titleMap[kind] || 'CIRCIA', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '760px' });
+    try {
+      const res = await authFetch('/api/p4/ir/incidents');
+      const d = await res.json();
+      const filterFn = kind === 'substantial' ? (i => i.is_substantial) : (i => i.is_ransomware);
+      const incs = (d.incidents || []).filter(filterFn);
+      const deadlineHrs = kind === 'substantial' ? 72 : 24;
+      const body = ''
+        + '<div style="background:rgba(245,158,11,.06);border-left:3px solid #f59e0b;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;margin-bottom:14px;line-height:1.5">'
+        +   '<b style="color:#f59e0b">CIRCIA reporting requirement:</b> ' + (kind === 'substantial'
+              ? 'Covered entities must report substantial cyber incidents to CISA within <b>72 hours</b> of reasonable belief.'
+              : 'Covered entities must report ransom payments to CISA within <b>24 hours</b> of payment.')
+        + '</div>'
+        + '<div style="display:grid;gap:6px">'
+        + incs.map(i => {
+            const detected = new Date(i.detected_at).getTime();
+            const deadline = detected + deadlineHrs * 3600000;
+            const left = deadline - Date.now();
+            const status = left > 0 ? `${Math.floor(left/3600000)}h ${Math.floor((left%3600000)/60000)}m left` : '🔴 OVERDUE';
+            const statusColor = left > 0 ? (left < 6*3600000 ? '#dc2626' : '#f59e0b') : '#dc2626';
+            return `<div style="padding:10px 12px;background:var(--bg1,#111);border-radius:6px;font-size:11px;border-left:3px solid ${statusColor}">`
+              + `<div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">`
+              +   `<span style="font-family:var(--font-mono,monospace);color:#3b82f6">${esc(i.incident_id)}</span>`
+              +   `<span style="flex:1">${esc(i.title)}</span>`
+              +   severityBadge(i.severity)
+              + '</div>'
+              + `<div style="display:flex;gap:14px;font-size:10px;color:var(--t3)">`
+              +   `<span>Detected: ${esc(fmtTime(i.detected_at))}</span>`
+              +   `<span style="color:${statusColor};font-weight:600">${status}</span>`
+              + '</div>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspIR.close()">Close</button>';
+      showModal({ title: titleMap[kind] + ' (' + incs.length + ')', body: body, footer: footer, width: '760px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspIR.close()">Close</button>' });
+    }
+  }
+
+  async function showCIRCIABreakdown() {
+    showModal({ title: '🌀 CIRCIA Reports breakdown', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '600px' });
+    try {
+      const res = await authFetch('/api/p4/circia/reports');
+      const d = await res.json();
+      const total = d.count || 0;
+      const byStatus = d.by_status || {};
+      const dc = d.deadline_compliance || {};
+      function kbox(label, val, color, sub) {
+        return '<div style="background:var(--bg1,#111);border-left:3px solid ' + color + ';border-radius:4px;padding:10px 12px">'
+          + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">' + esc(label) + '</div>'
+          + '<div style="font-size:22px;font-weight:600;color:' + color + ';font-family:var(--font-display);margin-top:2px">' + val + '</div>'
+          + (sub ? '<div style="font-size:10px;color:var(--t3);margin-top:2px">' + esc(sub) + '</div>' : '')
+          + '</div>';
+      }
+      const body = ''
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">'
+        +   kbox('TOTAL REPORTS', total, '#3b82f6', 'all CIRCIA reports')
+        +   kbox('SUBMITTED', byStatus.submitted || 0, '#10b981', 'sent to CISA')
+        +   kbox('PENDING', byStatus.pending || byStatus.draft || 0, '#f59e0b', 'awaiting submit')
+        +   kbox('AMENDED', byStatus.amended || 0, '#a855f7', 'updated reports')
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">DEADLINE COMPLIANCE</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:12px 14px;font-size:11px;line-height:1.7">'
+        +   '<div style="display:flex;justify-content:space-between"><span>✓ On-time</span><span style="color:#10b981;font-family:var(--font-mono,monospace)">' + (dc.on_time || dc.met || 0) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between"><span>⚠ Late</span><span style="color:#f59e0b;font-family:var(--font-mono,monospace)">' + (dc.late || 0) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between"><span>🔴 Missed</span><span style="color:#ef4444;font-family:var(--font-mono,monospace)">' + (dc.missed || 0) + '</span></div>'
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspIR.close()">Close</button>';
+      showModal({ title: '🌀 CIRCIA Reports Breakdown', body: body, footer: footer, width: '600px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspIR.close()">Close</button>' });
+    }
+  }
+
+  async function showForensicsList() {
+    showModal({ title: '🔍 Forensics Evidence — Chain of Custody', body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>', width: '760px' });
+    try {
+      const res = await authFetch('/api/p4/forensics/evidence');
+      const d = await res.json();
+      const evs = d.evidence || [];
+      const body = ''
+        + '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">' + evs.length + ' evidence items with NIST SP 800-86 chain of custody</div>'
+        + '<div style="display:grid;gap:6px;max-height:400px;overflow:auto">'
+        + evs.map(e => {
+            return '<div style="padding:10px 12px;background:var(--bg1,#111);border-radius:6px;font-size:11px;border-left:3px solid #06b6d4">'
+              + '<div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">'
+              +   '<span style="font-family:var(--font-mono,monospace);color:#06b6d4">' + esc(e.evidence_id || e.id || '?') + '</span>'
+              +   '<span style="flex:1">' + esc(e.title || e.description || '—') + '</span>'
+              +   '<span style="font-size:9px;background:rgba(6,182,212,.15);color:#06b6d4;padding:2px 7px;border-radius:3px">' + esc(e.evidence_type || 'evidence') + '</span>'
+              + '</div>'
+              + '<div style="font-size:10px;color:var(--t3)">'
+              +   'Collected: ' + esc(fmtTime(e.collected_at || e.created_at))
+              +   (e.sha256 ? ' · SHA-256: ' + esc((e.sha256 || '').slice(0, 16)) + '…' : '')
+              + '</div>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-primary btn-sm" onclick="window._vspIR.close()">Close</button>';
+      showModal({ title: '🔍 Forensics Evidence (' + evs.length + ')', body: body, footer: footer, width: '760px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspIR.close()">Close</button>' });
+    }
+  }
+
+  // ─── Module 5: Advance phase confirm ─────────────────────────────────────
+  const phaseGuide = {
+    'detection': { next: 'analysis', desc: 'Move from detection to analysis: triage alerts, classify incident scope, determine if substantial (72h CIRCIA) or ransomware (24h).' },
+    'analysis': { next: 'containment', desc: 'Move to containment: isolate affected systems, preserve evidence, prevent spread. Per NIST SP 800-61 Rev.2 §3.3.' },
+    'containment': { next: 'eradication', desc: 'Move to eradication: remove threat actors, malware, persistence mechanisms. Verify backups clean.' },
+    'eradication': { next: 'recovery', desc: 'Move to recovery: restore services, monitor for recurrence, gradual reconnection.' },
+    'recovery': { next: 'post-incident', desc: 'Move to post-incident: lessons learned, evidence retention, CIRCIA submission, after-action report.' },
+    'post-incident': { next: 'closed', desc: 'Close incident: archive evidence (NIST SP 800-86 retention), update playbooks.' }
+  };
+
+  function wrapShowTransition() {
+    const orig = window.showTransition;
+    if (!orig || window.__vspIRWrapTrans) return;
+    window.__vspIRWrapTrans = true;
+    window.showTransition = function(id, cur) {
+      const curPhase = (cur || '').toLowerCase().replace(/\s+/g, '-');
+      const guide = phaseGuide[curPhase];
+      const nextPhase = guide ? guide.next : '?';
+      const desc = guide ? guide.desc : 'Phase transition.';
+
+      const body = ''
+        + '<div style="text-align:center;margin-bottom:14px">'
+        +   '<div style="display:inline-flex;align-items:center;gap:14px;font-family:var(--font-mono,monospace);font-size:13px">'
+        +     `<span style="background:rgba(${parseInt((phaseColors[curPhase]||'#71717a').slice(1,3),16)},${parseInt((phaseColors[curPhase]||'#71717a').slice(3,5),16)},${parseInt((phaseColors[curPhase]||'#71717a').slice(5,7),16)},.15);color:${phaseColors[curPhase] || '#71717a'};padding:6px 14px;border-radius:4px;font-weight:600">${esc(curPhase)}</span>`
+        +     '<span style="color:var(--t3);font-size:18px">→</span>'
+        +     `<span style="background:rgba(${parseInt((phaseColors[nextPhase]||'#3b82f6').slice(1,3),16)},${parseInt((phaseColors[nextPhase]||'#3b82f6').slice(3,5),16)},${parseInt((phaseColors[nextPhase]||'#3b82f6').slice(5,7),16)},.15);color:${phaseColors[nextPhase] || '#3b82f6'};padding:6px 14px;border-radius:4px;font-weight:600">${esc(nextPhase)}</span>`
+        +   '</div>'
+        + '</div>'
+        + '<div style="background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.6;margin-bottom:14px">'
+        +   '<b style="color:#3b82f6">📋 NIST SP 800-61 Rev.2 guidance:</b><br>' + esc(desc)
+        + '</div>'
+        + `<div style="font-size:11px;color:var(--t2,#a1a1aa)">Incident <code style="color:#3b82f6;font-family:var(--font-mono,monospace)">${esc(id)}</code> will move to <b>${esc(nextPhase)}</b>. This action is logged for audit.</div>`;
+
+      const footer = ''
+        + '<button class="btn btn-sm" onclick="window._vspIR.close()" style="margin-right:auto">Cancel</button>'
+        + `<button class="btn btn-primary btn-sm" onclick="window._vspIR.confirmTransition('${esc(id)}','${esc(nextPhase)}')">→ Advance to ${esc(nextPhase)}</button>`;
+      showModal({ title: '🔄 Advance phase', body: body, footer: footer, width: '560px' });
+    };
+  }
+  IR.confirmTransition = async function(id, nextPhase) {
+    closeModal();
+    try {
+      const res = await authFetch('/api/p4/ir/incident/transition', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident_id: id, phase: nextPhase })
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || JSON.stringify(d));
+      toast('Incident ' + id + ' advanced to ' + nextPhase, 'success');
+      if (window.loadIncidents) window.loadIncidents();
+      if (window.loadKPIs) window.loadKPIs();
+    } catch (e) { toast('Transition error: ' + e.message, 'error'); }
+  };
+
+  // ─── Init ────────────────────────────────────────────────────────────────
+  function init() {
+    injectFilterBar();
+    makeKPIsClickable();
+    wrapLoadIncidents();
+    wrapShowTransition();
+    enhanceIncidentRows();
+    startCircieaCountdown();
+  }
+
+  if (document.readyState !== 'loading') setTimeout(init, 600);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(init, 600));
+
+  // Re-init khi data load
+  let pollCount = 0;
+  const poll = setInterval(() => {
+    init();
+    if (++pollCount > 5) clearInterval(poll);
+  }, 1000);
+})();
+
+</script>
+<!-- VSP-IR-POLISH-END -->
+
+
+
+
+
+
+
+<!-- VSP-CROSS-LINK-START -->
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VSP Cross-Link Hub v3 — Use REAL backend endpoint
+ *   Fix: POST /api/v1/soar/playbooks/{UUID}/run (not /soar/runs)
+ *   Body: {trigger_event, context} — playbook_id từ URL path
+ * ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.__VSP_CROSS_LINK_V3__) return;
+  window.__VSP_CROSS_LINK_V3__ = true;
+
+  function $(s, ctx) { return (ctx || document).querySelector(s); }
+  function $$(s, ctx) { return Array.from((ctx || document).querySelectorAll(s)); }
+  function $id(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function authFetch(url, opts) { return (window.vspAuthFetch || window.fetch)(url, opts || {}); }
+
+  // UUID validator
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function isUUID(s) { return typeof s === 'string' && UUID_REGEX.test(s); }
+
+  const PANEL_NAME_MAP = {
+    'vuln_mgmt':         'vulnmgmt',
+    'threat_intel':      'threatintel',
+    'threat_hunt':       'threathunt',
+    'incident_response': 'incident_response',
+    'p4_compliance':     'p4compliance',
+    'oscal':             'oscal',
+    'soar':              'soar',
+    'sbom':              'sbom',
+    'attestation':       'attestation',
+    'supply_chain':      'supply_chain',
+    'network_flow':      'netflow',
+    'sw_inventory':      'sw_inventory'
+  };
+
+  const path = location.pathname;
+  const PANEL =
+    /vuln_mgmt/.test(path)         ? 'vuln_mgmt' :
+    /incident_response/.test(path) ? 'incident_response' :
+    /p4_compliance/.test(path)     ? 'p4_compliance' : 'unknown';
+
+  (window.VSP_DEBUG && console.log('[VSP-CROSS-LINK-V3] Loaded for panel:', PANEL));
+
+  // ─── Toast ────────────────────────────────────────────────────────────
+  let tcontainer = null;
+  function ensureToastContainer() {
+    if (tcontainer) return tcontainer;
+    const existing = $id('vsp-uni-toasts') || $id('vsp-uni2-toasts') || $id('vsp-uni3-toasts') || $id('vsp-uni4-toasts') || $id('vsp-ir-toasts');
+    if (existing) { tcontainer = existing; return existing; }
+    tcontainer = document.createElement('div');
+    tcontainer.id = 'vsp-cross-toasts';
+    tcontainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none';
+    document.body.appendChild(tcontainer);
+    return tcontainer;
+  }
+  function toast(msg, type) {
+    type = type || 'info';
+    const colors = {
+      success: { bg: 'rgba(16,185,129,.15)', border: '#10b981', icon: '✓' },
+      error:   { bg: 'rgba(239,68,68,.15)',  border: '#ef4444', icon: '✗' },
+      warn:    { bg: 'rgba(245,158,11,.15)', border: '#f59e0b', icon: '⚠' },
+      info:    { bg: 'rgba(59,130,246,.15)', border: '#3b82f6', icon: 'ℹ' }
+    };
+    const c = colors[type] || colors.info;
+    const t = document.createElement('div');
+    t.style.cssText = 'pointer-events:auto;background:' + c.bg + ';border-left:3px solid ' + c.border + ';padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);display:flex;gap:10px;align-items:flex-start';
+    t.innerHTML = '<span style="font-size:14px;color:' + c.border + ';flex-shrink:0">' + c.icon + '</span><span style="flex:1;line-height:1.4">' + esc(msg) + '</span>';
+    ensureToastContainer().appendChild(t);
+    setTimeout(function () {
+      t.style.transition = 'opacity .2s, transform .2s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+      setTimeout(function () { t.remove(); }, 250);
+    }, 4000);
+  }
+
+  // ─── Modal ────────────────────────────────────────────────────────────
+  function showModal(opts) {
+    closeModal();
+    const ov = document.createElement('div');
+    ov.id = 'vsp-cross-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick = function (e) { if (e.target === ov) closeModal(); };
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg0,#0a0a0a);border:1px solid var(--bd,#27272a);border-radius:8px;max-width:' + (opts.width || '720px') + ';width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);font-size:12px;color:var(--t1,#e5e7eb)';
+    box.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd,#27272a);position:sticky;top:0;background:var(--bg0,#0a0a0a);z-index:1">'
+      + '<div style="font-size:13px;font-weight:600;flex:1">' + esc(opts.title || '') + '</div>'
+      + '<button onclick="window._vspCROSS.close()" style="background:transparent;border:0;color:var(--t2,#a1a1aa);font-size:18px;cursor:pointer;padding:0 4px">×</button>'
+      + '</div>'
+      + '<div style="padding:18px">' + (opts.body || '') + '</div>'
+      + (opts.footer ? '<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--bd,#27272a);background:var(--bg1,#111);position:sticky;bottom:0;justify-content:flex-end">' + opts.footer + '</div>' : '');
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const escH = function (e) { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escH); } };
+    document.addEventListener('keydown', escH);
+  }
+  function closeModal() {
+    const ov = $id('vsp-cross-modal-ov');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  const CROSS = window._vspCROSS = { close: closeModal, toast: toast, showModal: showModal };
+
+  // ─── Cross-window navigation ─────────────────────────────────────────
+  function navigateToPanel(panelFile, hint) {
+    const panelArg = PANEL_NAME_MAP[panelFile] || panelFile;
+    try {
+      if (window.parent && window.parent !== window && typeof window.parent.showPanel === 'function') {
+        let navBtn = null;
+        try {
+          const buttons = window.parent.document.querySelectorAll('.nav-item');
+          for (const btn of buttons) {
+            const onclick = btn.getAttribute('onclick') || '';
+            if (onclick.indexOf("'" + panelArg + "'") >= 0) {
+              navBtn = btn;
+              break;
+            }
+          }
+        } catch (e) {}
+        window.parent.showPanel(panelArg, navBtn);
+        if (hint) {
+          setTimeout(function () {
+            try { window.parent.postMessage({ type: 'vsp-cross-nav', panel: panelFile, hint: hint }, window.location.origin); } catch (e) {}
+          }, 300);
+        }
+        return true;
+      }
+    } catch (e) { console.warn('[VSP-CROSS-LINK-V3] Navigation error:', e); }
+    return false;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: vuln_mgmt — CVE enrichment cross-link (UNCHANGED from v2)
+  // ═════════════════════════════════════════════════════════════════════
+  function initVulnMgmt() {
+    setTimeout(async function () {
+      try {
+        const r = await authFetch('/api/v1/vulns/top-cves');
+        if (!r.ok) return;
+        const d = await r.json();
+        const cves = d.cves || [];
+        const kevCves = cves.filter(function (c) { return c.kev || (c.tags && c.tags.indexOf && c.tags.indexOf('KEV') >= 0); });
+        const criticalCves = cves.filter(function (c) { return (c.severity || '').toLowerCase() === 'critical'; });
+
+        if (criticalCves.length > 0 && !$id('vsp-cross-vuln-banner')) {
+          const main = $('main') || $('.main') || document.body;
+          if (main) {
+            const banner = document.createElement('div');
+            banner.id = 'vsp-cross-vuln-banner';
+            banner.style.cssText = 'background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin:0 0 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap';
+            banner.innerHTML =
+              '<span style="color:#ef4444;font-size:14px">⚠</span>'
+              + '<span style="flex:1"><b style="color:#ef4444">' + criticalCves.length + ' CRITICAL CVEs</b> detected.'
+              + (kevCves.length > 0 ? ' Including <b style="color:#dc2626">' + kevCves.length + ' in CISA KEV</b> catalog (actively exploited).' : '')
+              + ' Recommend immediate patching per <b>BOD 22-01</b>.</span>'
+              + '<button id="vsp-cross-open-ti" style="background:rgba(168,85,247,.2);border:1px solid #a855f7;color:#a855f7;padding:5px 12px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap">🌐 Open Threat Intel</button>';
+            const target = main.querySelector('div');
+            if (target) target.parentNode.insertBefore(banner, target);
+            $id('vsp-cross-open-ti').addEventListener('click', function () {
+              const ok = navigateToPanel('threat_intel', { focus: 'cves' });
+              toast(ok ? 'Switching to Threat Intel…' : 'Cannot navigate (parent unavailable)', ok ? 'success' : 'warn');
+            });
+          }
+        }
+
+        $$('table').forEach(function (tbl) {
+          if (tbl.dataset.vspCross) return;
+          tbl.dataset.vspCross = '1';
+          const rows = tbl.querySelectorAll('tbody tr');
+          rows.forEach(function (tr) {
+            const cells = tr.querySelectorAll('td');
+            cells.forEach(function (td) {
+              if (td.dataset.vspCveLinked) return;
+              const text = (td.textContent || '').trim();
+              const cveMatch = text.match(/CVE-\d{4}-\d{4,7}/);
+              if (cveMatch) {
+                td.dataset.vspCveLinked = '1';
+                const cve = cveMatch[0];
+                const link = document.createElement('span');
+                link.style.cssText = 'display:inline-block;margin-left:6px;background:rgba(168,85,247,.15);color:#a855f7;padding:1px 6px;border-radius:3px;font-size:9px;cursor:pointer;font-family:var(--font-mono,monospace);font-weight:600';
+                link.textContent = '🌐 TI';
+                link.title = 'Show Threat Intel context for ' + cve;
+                link.onclick = function (e) {
+                  e.stopPropagation();
+                  showCVEEnrichment(cve);
+                };
+                td.appendChild(link);
+              }
+            });
+          });
+        });
+      } catch (e) {
+        console.warn('Vuln Mgmt cross-link init error:', e);
+      }
+    }, 1000);
+  }
+
+  async function showCVEEnrichment(cve) {
+    showModal({
+      title: '🌐 Threat Intel — ' + cve,
+      body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading…</div>',
+      width: '720px'
+    });
+    try {
+      const r = await authFetch('/api/v1/vulns/top-cves');
+      const d = await r.json();
+      const cves = d.cves || [];
+      const target = cves.find(function (c) { return (c.cve || '').toUpperCase() === cve.toUpperCase(); });
+
+      if (!target) {
+        showModal({
+          title: '🌐 ' + cve,
+          body: '<div style="padding:20px;color:var(--t3);font-size:11px">No threat intel context found for ' + esc(cve) + '.</div>'
+              + '<div style="margin-top:10px"><a href="https://nvd.nist.gov/vuln/detail/' + esc(cve) + '" target="_blank" style="color:#3b82f6;font-size:11px">↗ View on NVD</a></div>',
+          footer: '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>',
+          width: '500px'
+        });
+        return;
+      }
+
+      const sevColor = { critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#3b82f6' };
+      const sevC = sevColor[(target.severity || '').toLowerCase()] || '#71717a';
+      const cvss = target.cvss || target.score || '?';
+      const tools = (target.tools && target.tools.length) ? target.tools.join(', ') : '—';
+      const fixable = target.fixable ? '✓ Fix available' : '⚠ No fix yet';
+      const fixColor = target.fixable ? '#10b981' : '#f59e0b';
+
+      const body = ''
+        + '<div style="display:flex;gap:14px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
+        +   '<span style="background:rgba(' + parseInt(sevC.slice(1,3),16) + ',' + parseInt(sevC.slice(3,5),16) + ',' + parseInt(sevC.slice(5,7),16) + ',.15);color:' + sevC + ';padding:4px 12px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase">' + esc(target.severity || 'UNKNOWN') + '</span>'
+        +   '<span style="font-family:var(--font-mono,monospace);font-size:11px;color:var(--t2)">CVSS <b style="color:' + sevC + '">' + esc(String(cvss)) + '</b></span>'
+        +   '<span style="font-size:11px;color:' + fixColor + '">' + esc(fixable) + '</span>'
+        + '</div>'
+        + '<div style="background:rgba(168,85,247,.08);border-left:3px solid #a855f7;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+        +   '<b style="color:#a855f7">Threat Intelligence Context</b><br>'
+        +   'Affected by ' + (target.count || '?') + ' findings · Detected by: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px">' + esc(tools) + '</code>'
+        + '</div>'
+        + '<div style="background:var(--bg1,#111);border-radius:6px;padding:10px 14px;display:grid;gap:6px">'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">CVE ID</span><span style="font-family:var(--font-mono,monospace);color:#3b82f6">' + esc(target.cve) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Severity</span><span style="color:' + sevC + ';text-transform:uppercase">' + esc(target.severity || '—') + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Findings count</span><span style="color:var(--t1);font-family:var(--font-mono,monospace)">' + (target.count || 0) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Tools detected</span><span style="color:var(--t2);font-size:10px">' + esc(tools) + '</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--t3)">Patch available</span><span style="color:' + fixColor + '">' + (target.fixable ? 'Yes' : 'No') + '</span></div>'
+        + '</div>'
+        + '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+        +   '<a href="https://nvd.nist.gov/vuln/detail/' + esc(target.cve) + '" target="_blank" style="color:#3b82f6;font-size:11px;text-decoration:none;background:rgba(59,130,246,.1);padding:6px 12px;border-radius:4px">↗ NVD</a>'
+        +   '<a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" style="color:#dc2626;font-size:11px;text-decoration:none;background:rgba(220,38,38,.1);padding:6px 12px;border-radius:4px">↗ CISA KEV</a>'
+        +   '<a href="https://www.cve.org/CVERecord?id=' + esc(target.cve) + '" target="_blank" style="color:#a855f7;font-size:11px;text-decoration:none;background:rgba(168,85,247,.1);padding:6px 12px;border-radius:4px">↗ CVE.org</a>'
+        + '</div>';
+      const footer = '<button class="btn btn-sm" onclick="window._vspCROSS.openTI()" style="margin-right:auto">↗ View in Threat Intel</button>'
+                   + '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>';
+      showModal({ title: '🌐 ' + cve + ' — Threat Intel', body: body, footer: footer, width: '720px' });
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspCROSS.close()">Close</button>' });
+    }
+  }
+  CROSS.openTI = function () {
+    closeModal();
+    const ok = navigateToPanel('threat_intel', {});
+    toast(ok ? 'Switching to Threat Intel…' : 'Cannot navigate', ok ? 'success' : 'warn');
+  };
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: incident_response — SOAR playbook trigger (FIXED v3)
+  // ═════════════════════════════════════════════════════════════════════
+  function initIncidentResponse() {
+    setTimeout(function () {
+      const tab = $id('tab-incidents') || document.body;
+      const rows = tab.querySelectorAll('tbody tr');
+      rows.forEach(function (tr) {
+        if (tr.dataset.vspSoarLinked) return;
+        const cells = tr.querySelectorAll('td');
+        const actionCell = cells[cells.length - 1];
+        if (!actionCell) return;
+        if (actionCell.querySelector('.vsp-soar-btn')) return;
+        tr.dataset.vspSoarLinked = '1';
+
+        const idCell = cells[0];
+        const incidentId = (idCell ? (idCell.textContent || '').trim() : '');
+
+        const btn = document.createElement('button');
+        btn.className = 'vsp-soar-btn';
+        btn.style.cssText = 'background:rgba(168,85,247,.15);border:1px solid #a855f7;color:#a855f7;padding:3px 8px;border-radius:3px;font-size:9px;cursor:pointer;font-weight:600;margin-left:6px;font-family:inherit';
+        btn.textContent = '🤖 Playbook';
+        btn.title = 'Run SOAR playbook for this incident';
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          showPlaybookPicker(incidentId, tr);
+        };
+        actionCell.appendChild(btn);
+      });
+    }, 1500);
+  }
+
+  async function showPlaybookPicker(incidentId, tr) {
+    showModal({
+      title: '🤖 Run Playbook for ' + incidentId,
+      body: '<div style="padding:30px;text-align:center;color:var(--t3)">Loading playbooks…</div>',
+      width: '720px'
+    });
+
+    try {
+      const results = await Promise.all([
+        authFetch('/api/v1/soar/playbooks').then(function (r) { return r.json(); }).catch(function () { return {}; }),
+        authFetch('/api/p4/ir/playbooks').then(function (r) { return r.json(); }).catch(function () { return {}; })
+      ]);
+      const soarRes = results[0], irRes = results[1];
+
+      const soarPlaybooks = soarRes.playbooks || [];
+      const irPlaybooks = irRes.playbooks || [];
+
+      let incCategory = '', incSeverity = '';
+      if (tr) {
+        const text = (tr.textContent || '').toLowerCase();
+        if (/ransomware/.test(text)) incCategory = 'ransomware';
+        else if (/malware/.test(text)) incCategory = 'malware';
+        else if (/phishing/.test(text)) incCategory = 'phishing';
+        else if (/exfil/.test(text)) incCategory = 'exfil';
+        if (/critical/.test(text)) incSeverity = 'critical';
+        else if (/high/.test(text)) incSeverity = 'high';
+      }
+
+      function matchScore(pb) {
+        let score = 0;
+        const sevPb = (pb.sev || pb.severity || '').toLowerCase();
+        const desc = ((pb.description || '') + ' ' + (pb.name || '') + ' ' + (pb.trigger || '')).toLowerCase();
+        const types = pb.incident_types || [];
+        if (incCategory && desc.indexOf(incCategory) >= 0) score += 10;
+        if (incCategory && types.some(function (t) { return (t || '').toLowerCase().indexOf(incCategory) >= 0; })) score += 10;
+        if (incSeverity && sevPb && sevPb.indexOf(incSeverity) >= 0) score += 5;
+        return score;
+      }
+
+      // Mark UUID validity for SOAR playbooks (only those can be triggered via /run endpoint)
+      const allPbs = []
+        .concat(soarPlaybooks.map(function (p) { return Object.assign({}, p, { source: 'SOAR', score: matchScore(p), runnable: isUUID(p.id) }); }))
+        .concat(irPlaybooks.map(function (p) { return Object.assign({}, p, { source: 'IR', score: matchScore(p), runnable: false }); }))
+        .sort(function (a, b) { return b.score - a.score; });
+
+      function renderPb(p) {
+        const isMatch = p.score > 0;
+        const matchBadge = isMatch ? '<span style="background:rgba(16,185,129,.15);color:#10b981;padding:1px 6px;border-radius:3px;font-size:9px;margin-left:6px">✓ MATCH</span>' : '';
+        const runnableBadge = p.runnable ? '' : '<span style="background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 6px;border-radius:3px;font-size:9px;margin-left:4px">DOC ONLY</span>';
+        const sev = p.sev || p.severity || '—';
+        const desc = (p.description || '').slice(0, 120);
+        const types = (p.incident_types || []).slice(0, 3).join(', ');
+        const cursor = p.runnable ? 'cursor:pointer' : 'cursor:not-allowed;opacity:.55';
+        return '<div class="vsp-pb-row" data-id="' + esc(p.id || p.name) + '" data-source="' + esc(p.source) + '" data-runnable="' + (p.runnable ? '1' : '0') + '" style="padding:10px 12px;background:var(--bg1,#111);border-radius:6px;font-size:11px;' + cursor + ';border-left:3px solid ' + (isMatch ? '#10b981' : '#3b82f6') + ';transition:background .15s">'
+          + '<div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">'
+          +   '<span style="background:rgba(168,85,247,.15);color:#a855f7;padding:1px 6px;border-radius:3px;font-size:9px;font-family:var(--font-mono,monospace);min-width:38px;text-align:center">' + esc(p.source) + '</span>'
+          +   '<span style="flex:1;font-weight:600">' + esc(p.name || p.id) + '</span>'
+          +   matchBadge
+          +   runnableBadge
+          +   '<span style="font-size:9px;color:var(--t3);text-transform:uppercase">' + esc(sev) + '</span>'
+          + '</div>'
+          + '<div style="font-size:10px;color:var(--t3);line-height:1.4">' + esc(desc) + (types ? ' · Types: <code style="background:var(--bg2);padding:1px 3px;border-radius:2px">' + esc(types) + '</code>' : '') + '</div>'
+          + '</div>';
+      }
+
+      const body = ''
+        + (incCategory || incSeverity
+          ? '<div style="background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;margin-bottom:14px">Detected: <b>' + esc(incCategory || 'unknown category') + '</b> · <b style="text-transform:uppercase">' + esc(incSeverity || 'unknown severity') + '</b>. ✓ MATCH = recommended · DOC ONLY = reference runbook (not auto-triggerable).</div>'
+          : '<div style="background:rgba(59,130,246,.06);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;margin-bottom:14px"><b>SOAR</b> = auto-triggerable (creates run record) · <b>IR</b> = NIST 800-61 reference runbook (documentation).</div>')
+        + '<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600">SELECT PLAYBOOK</div>'
+        + '<div style="display:grid;gap:6px;max-height:400px;overflow:auto">'
+        + allPbs.map(renderPb).join('')
+        + '</div>';
+      const footer = '<button class="btn btn-sm" onclick="window._vspCROSS.close()" style="margin-right:auto">Cancel</button>'
+                   + '<span style="font-size:10px;color:var(--t3);align-self:center">Click row to trigger SOAR playbook</span>';
+      showModal({ title: '🤖 Run Playbook for ' + incidentId, body: body, footer: footer, width: '760px' });
+
+      setTimeout(function () {
+        $$('.vsp-pb-row').forEach(function (row) {
+          const runnable = row.dataset.runnable === '1';
+          row.addEventListener('click', function () {
+            if (!runnable) {
+              toast('IR runbook là tài liệu tham chiếu — chọn SOAR playbook để trigger thật', 'warn');
+              return;
+            }
+            const pbId = row.dataset.id;
+            const source = row.dataset.source;
+            triggerPlaybook(incidentId, pbId, source);
+          });
+          if (runnable) {
+            row.addEventListener('mouseenter', function () { row.style.background = 'var(--bg2,#1c1c1c)'; });
+            row.addEventListener('mouseleave', function () { row.style.background = 'var(--bg1,#111)'; });
+          }
+        });
+      }, 50);
+    } catch (e) {
+      showModal({ title: 'Error', body: '<div style="color:#ef4444">' + esc(e.message) + '</div>', footer: '<button class="btn" onclick="window._vspCROSS.close()">Close</button>' });
+    }
+  }
+
+  // ─── FIXED: Use real backend endpoint ────────────────────────────────
+  async function triggerPlaybook(incidentId, playbookId, source) {
+    closeModal();
+
+    if (source !== 'SOAR' || !isUUID(playbookId)) {
+      toast('Only SOAR playbooks (UUID) can be triggered', 'error');
+      return;
+    }
+
+    toast('Triggering SOAR playbook…', 'info');
+
+    // CORRECT endpoint: POST /api/v1/soar/playbooks/{UUID}/run
+    const url = '/api/v1/soar/playbooks/' + encodeURIComponent(playbookId) + '/run';
+    const body = {
+      trigger_event: 'manual_ir_link',
+      context: { incident_id: incidentId, target: incidentId, triggered_via: 'phase3n_cross_link' }
+    };
+
+    try {
+      const r = await authFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (r.ok) {
+        let runId = '';
+        try {
+          const d = await r.json();
+          runId = d.id || d.run_id || d.uuid || '';
+        } catch (e) {}
+
+        toast('✓ Playbook started: ' + (runId.slice(0, 8) + '…') , 'success');
+        setTimeout(function () {
+          showModal({
+            title: '🤖 Playbook started',
+            body: '<div style="background:rgba(16,185,129,.08);border-left:3px solid #10b981;padding:10px 14px;border-radius:0 4px 4px 0;font-size:11px;line-height:1.5;margin-bottom:14px">'
+              + '<b style="color:#10b981">✓ SOAR run created</b><br>'
+              + 'Incident: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px">' + esc(incidentId) + '</code><br>'
+              + 'Playbook: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">' + esc(playbookId) + '</code><br>'
+              + 'Run ID: <code style="background:var(--bg2);padding:1px 4px;border-radius:2px;font-size:10px">' + esc(runId || 'pending') + '</code><br>'
+              + 'Status: <span style="color:#3b82f6">running</span>'
+              + '</div>'
+              + '<div style="font-size:11px;color:var(--t2);line-height:1.5">Track execution in <b>SOAR</b> tab. Audit log entry created with tenant_id. Database row inserted in <code>playbook_runs</code>.</div>',
+            footer: '<button class="btn btn-sm" onclick="window._vspCROSS.openSOAR()" style="margin-right:auto">↗ View in SOAR</button>'
+                  + '<button class="btn btn-primary btn-sm" onclick="window._vspCROSS.close()">Close</button>',
+            width: '520px'
+          });
+        }, 200);
+      } else {
+        const errText = await r.text().catch(function () { return ''; });
+        toast('Playbook trigger failed: HTTP ' + r.status, 'error');
+        console.warn('[VSP-CROSS-LINK-V3] Trigger error:', r.status, errText.slice(0, 300));
+      }
+    } catch (e) {
+      toast('Network error: ' + e.message, 'error');
+    }
+  }
+  CROSS.openSOAR = function () {
+    closeModal();
+    const ok = navigateToPanel('soar', {});
+    toast(ok ? 'Switching to SOAR…' : 'Cannot navigate', ok ? 'success' : 'warn');
+  };
+
+  // ═════════════════════════════════════════════════════════════════════
+  // PANEL: p4_compliance — Reverse link to OSCAL (UNCHANGED)
+  // ═════════════════════════════════════════════════════════════════════
+  function initP4Compliance() {
+    setTimeout(function () {
+      const headers = $$('h1, h2, h3').filter(function (h) { return /ssdf|practice|control/i.test(h.textContent || ''); });
+      headers.slice(0, 1).forEach(function (h) {
+        if (h.dataset.vspOscalLinked) return;
+        h.dataset.vspOscalLinked = '1';
+        const btn = document.createElement('button');
+        btn.style.cssText = 'background:rgba(59,130,246,.15);border:1px solid #3b82f6;color:#3b82f6;padding:4px 10px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:10px;font-weight:600;font-family:inherit';
+        btn.textContent = '↗ Open in OSCAL';
+        btn.title = 'View this control in OSCAL panel';
+        btn.onclick = function () {
+          const ok = navigateToPanel('oscal', {});
+          toast(ok ? 'Switching to OSCAL…' : 'Cannot navigate', ok ? 'success' : 'warn');
+        };
+        h.appendChild(btn);
+      });
+    }, 1000);
+  }
+
+  // ─── Init ────────────────────────────────────────────────────────────
+  function init() {
+    if (PANEL === 'vuln_mgmt')              initVulnMgmt();
+    else if (PANEL === 'incident_response') initIncidentResponse();
+    else if (PANEL === 'p4_compliance')     initP4Compliance();
+  }
+
+  if (document.readyState !== 'loading') setTimeout(init, 800);
+  else document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 800); });
+
+  let pollCount = 0;
+  const poll = setInterval(function () { init(); if (++pollCount > 5) clearInterval(poll); }, 1500);
+})();
+
+</script>
+<!-- VSP-CROSS-LINK-END -->
+
+<!-- VSP-IR-G1: New modals for Phase G1 -->
+<div class="modal-backdrop" id="modal-editfield">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <div class="modal-title" id="mef-title">Edit Field</div>
+      <button class="modal-close" onclick="closeModal('editfield')">×</button>
+    </div>
+    <div class="modal-body" id="mef-body"></div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-transition">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <div class="modal-title">▶ Advance Incident Phase</div>
+      <button class="modal-close" onclick="closeModal('transition')">×</button>
+    </div>
+    <div class="modal-body" id="mt-body"></div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-circiagen">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <div class="modal-title">⏱️ Generate CIRCIA Report</div>
+      <button class="modal-close" onclick="closeModal('circiagen')">×</button>
+    </div>
+    <div class="modal-body" id="mcg-body"></div>
+  </div>
+</div>
+<div id="vsp-ir-toast-container" style="position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
+<script>
+window.vspIRToast = function(msg, type){
+  type = type || 'info';
+  var c = ({
+    success:{bg:'rgba(34,197,94,.15)',border:'#22c55e',icon:'✅'},
+    error:{bg:'rgba(239,68,68,.15)',border:'#ef4444',icon:'✗'},
+    warning:{bg:'rgba(250,204,21,.15)',border:'#facc15',icon:'⚠️'},
+    info:{bg:'rgba(59,130,246,.15)',border:'#3b82f6',icon:'ℹ️'}
+  })[type] || {bg:'rgba(59,130,246,.15)',border:'#3b82f6',icon:'ℹ️'};
+  var ct = document.getElementById('vsp-ir-toast-container');
+  if(!ct) return;
+  var t = document.createElement('div');
+  t.style.cssText = 'pointer-events:auto;background:'+c.bg+';border-left:3px solid '+c.border+';padding:10px 14px;border-radius:6px;font-size:12px;color:var(--t1,#e5e7eb);min-width:240px;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.4);backdrop-filter:blur(8px);display:flex;gap:10px;align-items:flex-start;animation:vspIRToastIn .25s ease';
+  t.innerHTML = '<span>'+c.icon+'</span><span style="flex:1;white-space:pre-line">'+String(msg||'').replace(/</g,'&lt;')+'</span>';
+  ct.appendChild(t);
+  setTimeout(function(){
+    t.style.transition='opacity .2s, transform .2s';t.style.opacity='0';t.style.transform='translateX(20px)';
+    setTimeout(function(){ t.remove(); }, 220);
+  }, type === 'error' ? 5500 : 3500);
+};
+if(!document.getElementById('vsp-ir-toast-style')){
+  var st = document.createElement('style');
+  st.id = 'vsp-ir-toast-style';
+  st.textContent = '@keyframes vspIRToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
+  document.head.appendChild(st);
+}
+
+window.showEditFieldModal = function(incidentId, field, currentVal){
+  document.getElementById('mef-title').textContent = 'Edit ' + field;
+  var isLong = (field === 'description' || field === 'notes' || (currentVal||'').length > 80);
+  document.getElementById('mef-body').innerHTML =
+    '<div class="form-row"><label>Field</label><input name="read-only-value-2" aria-label="Read-only value" value="'+field+'" readonly></div>' +
+    '<div class="form-row"><label>New Value</label>' +
+    (isLong
+      ? '<textarea aria-label="Mef Val" id="mef-val" rows="5" style="width:100%">'+(currentVal||'').replace(/</g,'&lt;')+'</textarea>'
+      : '<input aria-label="Mef Val" id="mef-val" value="'+(currentVal||'').replace(/"/g,'&quot;')+'">') +
+    '</div>' +
+    '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+    '<button class="btn" onclick="closeModal(\'editfield\')">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="submitEditField(\''+incidentId+'\',\''+field+'\')">Save</button>' +
+    '</div>';
+  document.getElementById('modal-editfield').classList.add('show');
+  setTimeout(function(){var el=document.getElementById('mef-val');if(el)el.focus();},50);
+};
+window.submitEditField = async function(incidentId, field){
+  var newVal = document.getElementById('mef-val').value;
+  try {
+    const r = await fetch('/api/p4/ir/incident/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:incidentId,field:field,value:newVal})});
+    if(!r.ok) throw new Error(await r.text());
+    vspIRToast('Updated '+field,'success');closeModal('editfield');showIncidentDetail(incidentId);loadIncidents();
+  } catch(e){ vspIRToast('Error: '+e.message,'error'); }
+};
+
+window.showTransitionModal = function(incidentId, currentPhase){
+  var phases = ['preparation','detection_analysis','containment','eradication','recovery','post_incident'];
+  var idx = phases.indexOf(currentPhase);
+  var nextPhases = phases.slice(idx+1);
+  if(nextPhases.length === 0){ vspIRToast('Already at final phase: '+currentPhase,'warning'); return; }
+  var opts = nextPhases.map(function(p, i){
+    var sel = i === 0 ? 'checked' : '';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer">'+
+      '<input aria-label="Select option" type="radio" name="mt-phase" value="'+p+'" '+sel+'>'+
+      '<span><b>'+p.replace(/_/g,' ')+'</b></span></label>';
+  }).join('');
+  document.getElementById('mt-body').innerHTML =
+    '<div class="form-row"><label>Incident</label><input name="read-only-value-3" aria-label="Read-only value" value="'+incidentId+'" readonly></div>' +
+    '<div class="form-row"><label>Current Phase</label><input name="read-only-value-4" aria-label="Read-only value" value="'+currentPhase.replace(/_/g,' ')+'" readonly></div>' +
+    '<div class="form-row"><label>Next Phase</label>'+opts+'</div>' +
+    '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+    '<button class="btn" onclick="closeModal(\'transition\')">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="submitTransition(\''+incidentId+'\')">Advance</button>' +
+    '</div>';
+  document.getElementById('modal-transition').classList.add('show');
+};
+window.submitTransition = async function(incidentId){
+  var picked = document.querySelector('input[name="mt-phase"]:checked');
+  if(!picked){ vspIRToast('Please select a phase','warning'); return; }
+  try {
+    const r = await fetch('/api/p4/ir/incident/transition',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:incidentId,phase:picked.value})});
+    if(!r.ok) throw new Error(await r.text());
+    vspIRToast('Transitioned to '+picked.value.replace(/_/g,' '),'success');closeModal('transition');
+    if(document.getElementById('modal-inc').classList.contains('show')) showIncidentDetail(incidentId);
+    loadIncidents();loadKPIs();
+  } catch(e){ vspIRToast('Error: '+e.message,'error'); }
+};
+
+window.showCIRCIAGenModal = function(incidentId){
+  document.getElementById('mcg-body').innerHTML =
+    '<div class="banner banner-blue">CIRCIA reports must be filed within prescribed timelines: <b>72h</b> for substantial incidents, <b>24h</b> for ransomware payments.</div>' +
+    '<div class="form-row"><label>Incident</label><input name="read-only-value-5" aria-label="Read-only value" value="'+incidentId+'" readonly></div>' +
+    '<div class="form-row"><label>Report Type *</label><select aria-label="Select option" id="mcg-type">' +
+    '<option value="substantial_incident">Substantial Incident (72h)</option>' +
+    '<option value="ransomware_payment">Ransomware Payment (24h)</option>' +
+    '<option value="joint">Joint Report (combined)</option>' +
+    '</select></div>' +
+    '<div class="form-row"><label>Critical Infrastructure Sector *</label><select aria-label="Select option" id="mcg-sector">' +
+    '<option value="information_technology">Information Technology</option>' +
+    '<option value="financial_services">Financial Services</option>' +
+    '<option value="healthcare_public_health">Healthcare &amp; Public Health</option>' +
+    '<option value="energy">Energy</option>' +
+    '<option value="communications">Communications</option>' +
+    '<option value="transportation_systems">Transportation Systems</option>' +
+    '<option value="water_wastewater">Water &amp; Wastewater Systems</option>' +
+    '<option value="critical_manufacturing">Critical Manufacturing</option>' +
+    '<option value="defense_industrial_base">Defense Industrial Base</option>' +
+    '<option value="government_facilities">Government Facilities</option>' +
+    '<option value="emergency_services">Emergency Services</option>' +
+    '<option value="commercial_facilities">Commercial Facilities</option>' +
+    '<option value="dams">Dams</option>' +
+    '<option value="chemical">Chemical</option>' +
+    '<option value="food_agriculture">Food &amp; Agriculture</option>' +
+    '<option value="nuclear">Nuclear Reactors</option>' +
+    '</select></div>' +
+    '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+    '<button class="btn" onclick="closeModal(\'circiagen\')">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="submitCIRCIAGen(\''+incidentId+'\')">Generate Report</button>' +
+    '</div>';
+  document.getElementById('modal-circiagen').classList.add('show');
+};
+window.submitCIRCIAGen = async function(incidentId){
+  var t = document.getElementById('mcg-type').value;
+  var s = document.getElementById('mcg-sector').value;
+  try {
+    const r = await fetch('/api/p4/circia/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({incident_id:incidentId,report_type:t,ci_sector:s})});
+    const d = await r.json();
+    if(!r.ok) throw new Error(JSON.stringify(d));
+    vspIRToast('CIRCIA report generated\nUUID: '+d.report_uuid+'\nDeadline: '+new Date(d.timeline.report_deadline).toLocaleString(),'success');
+    closeModal('circiagen');loadCIRCIA();loadKPIs();
+    if(document.getElementById('modal-inc').classList.contains('show')) showIncidentDetail(incidentId);
+  } catch(e){ vspIRToast('Error: '+e.message,'error'); }
+};
+</script>
+
+<!-- VSP-IR-G1.D: Forensics modals (custody chain viewer + add entry) -->
+<div class="modal-backdrop" id="modal-custody">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-head">
+      <div class="modal-title" id="mcust-title">🔬 Chain of Custody</div>
+      <button class="modal-close" onclick="closeModal('custody')">×</button>
+    </div>
+    <div class="modal-body" id="mcust-body"></div>
+  </div>
+</div>
+<script>
+window.showCustodyModal = function(ev){
+  document.getElementById('mcust-title').textContent = '🔬 Chain of Custody — ' + ev.evidence_id;
+  var entries = ev.custody_log || [];
+  var timeline = entries.length === 0
+    ? '<div class="empty">No custody entries yet</div>'
+    : '<div class="custody-timeline" style="margin-bottom:14px">' + entries.map(function(e){
+        var ts = (typeof fmtDT==='function') ? fmtDT(e.timestamp) : (e.timestamp||'');
+        return '<div class="custody-entry" style="padding:8px;border-left:3px solid var(--accent);background:var(--bg2);margin-bottom:6px;border-radius:4px">' +
+          '<b class="mono">' + ts + '</b> — <span class="badge b-info">' + (e.action||'') + '</span><br>' +
+          '<span style="color:var(--t2)">Actor:</span> ' + (e.actor||'—') +
+          ' · <span style="color:var(--t2)">Location:</span> ' + (e.location || '—') +
+          (e.notes ? '<br><span class="mono">📝 ' + e.notes + '</span>' : '') +
+          '</div>';
+      }).join('') + '</div>';
+
+  document.getElementById('mcust-body').innerHTML =
+    '<div style="margin-bottom:8px;font-size:12px;color:var(--t2)">' + entries.length + ' entries logged for ' + ev.evidence_id + '</div>' +
+    timeline +
+    '<hr style="border-color:var(--border);margin:14px 0">' +
+    '<div class="section-title" style="font-size:13px;margin-bottom:8px">Add new custody entry</div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label>Actor *</label><input aria-label="forensics@vsp.local" id="cust-actor" placeholder="forensics@vsp.local"></div>' +
+    '<div class="form-row"><label>Action *</label><select aria-label="Cust Action" id="cust-action">' +
+    '<option value="seized">seized</option>' +
+    '<option value="transferred">transferred</option>' +
+    '<option value="analyzed">analyzed</option>' +
+    '<option value="hashed">hashed</option>' +
+    '<option value="copied">copied</option>' +
+    '<option value="examined">examined</option>' +
+    '<option value="returned">returned</option>' +
+    '<option value="destroyed">destroyed</option>' +
+    '</select></div></div>' +
+    '<div class="form-grid">' +
+    '<div class="form-row"><label>Location</label><input aria-label="evidence-locker-01" id="cust-location" placeholder="evidence-locker-01"></div>' +
+    '<div class="form-row"><label>Notes</label><input aria-label="optional" id="cust-notes" placeholder="optional"></div></div>' +
+    '<div class="action-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+    '<button class="btn" onclick="closeModal(\'custody\')">Close</button>' +
+    '<button class="btn btn-primary" onclick="submitCustodyEntry(\'' + ev.evidence_id + '\')">Add Entry</button>' +
+    '</div>';
+  document.getElementById('modal-custody').classList.add('show');
+};
+
+window.submitCustodyEntry = async function(evidenceId){
+  var actor = document.getElementById('cust-actor').value.trim();
+  var action = document.getElementById('cust-action').value;
+  if(!actor){ vspIRToast('Actor is required', 'warning'); return; }
+  if(!action){ vspIRToast('Action is required', 'warning'); return; }
+  try {
+    const r = await fetch('/api/p4/forensics/custody', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        evidence_id: evidenceId,
+        actor: actor,
+        action: action,
+        location: document.getElementById('cust-location').value,
+        notes: document.getElementById('cust-notes').value
+      })
+    });
+    const d = await r.json();
+    if(!r.ok || !d.updated) throw new Error(JSON.stringify(d));
+    vspIRToast('Custody entry added', 'success');
+    closeModal('custody');
+    loadEvidence();
+  } catch(e) {
+    vspIRToast('Error: ' + e.message, 'error');
+  }
+};
+</script>
+
+<!-- VSP-IR-G1-END -->
+
+<script src="/panels/vsp_pro_panel_buttons.js?v=1"></script>
+<script src="/panels/vsp_pro_paginate.js?v=1"></script>
+
+<script>
+// ── IR Panel Enhancements ──────────────────────────────────────────
+
+var _allIncidents = [];
+var _incFilter = '';
+var _incSearch = '';
+
+// Store incidents when loaded
+var _origLoadIncidents = window.loadIncidents;
+window.loadIncidents = async function() {
+  if (typeof _origLoadIncidents === 'function') {
+    await _origLoadIncidents();
+  }
+  // Extract from DOM after load
+  setTimeout(extractIncidentData, 500);
+};
+
+function extractIncidentData() {
+  // Read from existing tbody rows
+  var rows = document.querySelectorAll('#inc-tbody tr[data-id]');
+  _allIncidents = Array.from(rows).map(function(r) {
+    return {
+      id: r.dataset.id,
+      title: r.dataset.title || '',
+      severity: r.dataset.severity || '',
+      status: r.dataset.status || '',
+      ransomware: r.dataset.ransomware === 'true',
+      substantial: r.dataset.substantial === 'true',
+      el: r
+    };
+  });
+}
+
+function setIncFilter(filter, btn) {
+  _incFilter = filter;
+  document.querySelectorAll('.ir-filter').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  applyIncidentFilters();
+}
+
+function filterIncidents() {
+  _incSearch = (document.getElementById('inc-search') || {}).value || '';
+  applyIncidentFilters();
+}
+
+function applyIncidentFilters() {
+  var rows = document.querySelectorAll('#inc-tbody tr');
+  var visible = 0;
+  rows.forEach(function(row) {
+    if (!row.dataset.id) { return; }
+    var title = (row.dataset.title || '').toLowerCase();
+    var sev = row.dataset.severity || '';
+    var status = row.dataset.status || '';
+    var isRansom = row.dataset.ransomware === 'true';
+    var isSubstantial = row.dataset.substantial === 'true';
+
+    var matchFilter = true;
+    if (_incFilter === 'open') matchFilter = status === 'open';
+    else if (_incFilter === 'critical') matchFilter = sev === 'critical';
+    else if (_incFilter === 'ransomware') matchFilter = isRansom;
+    else if (_incFilter === 'substantial') matchFilter = isSubstantial;
+    else if (_incFilter === 'investigating') matchFilter = status === 'investigating';
+
+    var matchSearch = !_incSearch || title.includes(_incSearch.toLowerCase());
+
+    row.style.display = (matchFilter && matchSearch) ? '' : 'none';
+    if (matchFilter && matchSearch) visible++;
+  });
+  
+  var countEl = document.getElementById('inc-count');
+  if (countEl) {
+    var total = rows.length;
+    countEl.textContent = visible === total ? total + ' incidents' : visible + ' / ' + total + ' shown';
+  }
+}
+
+// CIRCIA flag preview on create form
+function updateCIRCIAPreview() {
+  var hasImpact = ['nc-imp-c','nc-imp-i','nc-imp-a','nc-imp-s','nc-imp-b','nc-imp-sc'].some(function(id) {
+    var el = document.getElementById(id);
+    return el && el.checked;
+  });
+  var isRansom = document.getElementById('nc-ransom') && document.getElementById('nc-ransom').checked;
+  var preview = document.getElementById('circia-flag-preview');
+  var typeSpan = document.getElementById('circia-type-preview');
+  
+  if (preview) {
+    if (hasImpact || isRansom) {
+      preview.style.display = '';
+      if (typeSpan) {
+        if (isRansom && hasImpact) typeSpan.textContent = 'substantial_incident + ransomware_payment';
+        else if (isRansom) typeSpan.textContent = 'ransomware_payment (24h)';
+        else typeSpan.textContent = 'substantial_incident (72h)';
+      }
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+}
+
+// Attach CIRCIA preview listeners
+setTimeout(function() {
+  ['nc-imp-c','nc-imp-i','nc-imp-a','nc-imp-s','nc-imp-b','nc-imp-sc','nc-ransom'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', updateCIRCIAPreview);
+  });
+
+  // Add data attributes to incident rows for filtering
+  var origLoadIncidents2 = window.loadIncidents;
+  window.loadIncidents = async function() {
+    await origLoadIncidents2();
+    setTimeout(function() {
+      document.querySelectorAll('#inc-tbody tr').forEach(function(row) {
+        // Try to extract data from cells
+        var cells = row.querySelectorAll('td');
+        if (cells.length > 2) {
+          // Add row highlighting
+          var sev = row.dataset.severity || '';
+          if (sev === 'critical') row.classList.add('inc-row-critical');
+        }
+      });
+    }, 300);
+  };
+
+  // Keyboard shortcut: / to focus search
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      var s = document.getElementById('inc-search');
+      if (s) { s.focus(); s.select(); }
+    }
+  });
+
+  // Enhanced deadline coloring in CIRCIA tab
+  function updateDeadlineColors() {
+    document.querySelectorAll('.countdown').forEach(function(el) {
+      var text = el.textContent;
+      var hours = parseFloat(text);
+      if (text.includes('OVERDUE') || hours < 0) {
+        el.className = 'countdown deadline-critical';
+      } else if (hours < 6) {
+        el.className = 'countdown deadline-critical';
+      } else if (hours < 24) {
+        el.className = 'countdown deadline-warn';
+      } else {
+        el.className = 'countdown deadline-ok';
+      }
+    });
+  }
+  
+  // Update deadline colors every minute
+  setInterval(updateDeadlineColors, 60000);
+  setTimeout(updateDeadlineColors, 1000);
+
+}, 600);
+</script>
+
+
+<script>
+// ── IR v2 Enhancements ────────────────────────────────────────────
+
+// CIRCIA filter
+var _circiaFilter = '';
+var _circiaRows = [];
+
+function setCIRCIAFilter(filter, btn) {
+  _circiaFilter = filter;
+  document.querySelectorAll('[data-cf]').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  applyCIRCIAFilter();
+}
+
+function applyCIRCIAFilter() {
+  var rows = document.querySelectorAll('#circia-tbody tr[data-rtype]');
+  var visible = 0;
+  rows.forEach(function(row) {
+    var rtype = row.dataset.rtype || '';
+    var status = row.dataset.rstatus || '';
+    var overdue = row.dataset.overdue === 'true';
+    
+    var show = true;
+    if (_circiaFilter === 'draft') show = status === 'draft';
+    else if (_circiaFilter === 'submitted') show = status === 'submitted';
+    else if (_circiaFilter === 'overdue') show = overdue;
+    else if (_circiaFilter === 'substantial_incident') show = rtype === 'substantial_incident';
+    else if (_circiaFilter === 'ransomware_payment') show = rtype === 'ransomware_payment';
+    
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  
+  var stats = document.getElementById('circia-stats');
+  if (stats && rows.length > 0) {
+    stats.textContent = visible === rows.length ? rows.length + ' total' : visible + ' / ' + rows.length + ' shown';
+  }
+}
+
+// Patch loadCIRCIA to add data attributes to rows
+var _origLoadCIRCIA = window.loadCIRCIA;
+if (typeof _origLoadCIRCIA === 'function') {
+  window.loadCIRCIA = async function() {
+    await _origLoadCIRCIA();
+    setTimeout(function() {
+      // Add data attrs to CIRCIA rows based on content
+      document.querySelectorAll('#circia-tbody tr').forEach(function(row) {
+        var cells = row.querySelectorAll('td');
+        if (cells.length < 4) return;
+        var typeText = (cells[0].textContent || '').trim().replace(' ', '_');
+        var statusText = (cells[3].textContent || '').trim();
+        var deadlineText = (cells[4].textContent || '').trim();
+        var isOverdue = deadlineText.includes('OVERDUE');
+        row.dataset.rtype = typeText;
+        row.dataset.rstatus = statusText;
+        row.dataset.overdue = isOverdue ? 'true' : 'false';
+      });
+    }, 500);
+  };
+}
+
+// Apply playbook to incident
+async function applyPlaybook(playbookId, playbookName) {
+  var sel = document.getElementById('pb-inc-'+playbookId);
+  var incId = sel ? sel.value : '';
+  if (!incId) { vspIRToast('Select an incident first', 'warning'); return; }
+  try {
+    // P4 IR playbooks use transition endpoint — advance phase with playbook context
+    // First get current incident detail to know phase
+    var rd = await fetch('/api/p4/ir/incident/detail?id='+encodeURIComponent(incId));
+    var dd = await rd.json();
+    var currentPhase = dd.phase || 'detection_analysis';
+    // Update incident with playbook assignment note
+    var ru = await fetch('/api/p4/ir/incident/update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({incident_id: incId, field: 'description', value: (dd.description||'') + ' [Playbook: '+playbookName+']'})
+    });
+    if (ru.ok || ru.status === 200) {
+      vspIRToast('✓ Playbook "'+playbookName+'" linked to '+incId, 'success');
+      if(sel) sel.value = '';
+    } else {
+      vspIRToast('Linked (no confirmation from server)', 'info');
+      if(sel) sel.value = '';
+    }
+  } catch(e) {
+    vspIRToast('Error: '+e.message, 'error');
+  }
+}
+</script>
+
 </body>
 </html>

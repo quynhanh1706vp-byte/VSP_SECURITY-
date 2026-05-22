@@ -85,6 +85,18 @@ var toolCategory = map[string]SourceCategory{
 	"checkov":     SourceIAC,
 	"kics":        SourceIAC,
 	"hadolint":    SourceIAC,
+	// Added by Phase 1 registry sync
+	"gosec":      SourceSAST,
+	"nmap":       SourceNetwork,
+	"trufflehog": SourceSecrets,
+	"netcap":     SourceNetwork,
+	// Phase 2: SBOM family
+	"syft":        SourceSCA,
+	"govulncheck": SourceSCA,
+	// Phase 3: supply chain scanners
+	"osv-scanner": SourceSCA,
+	"cosign":      SourceSCA,
+	"retire-js":   SourceSCA,
 }
 
 // CategoryOf returns the SourceCategory for a given tool name.
@@ -215,7 +227,7 @@ func RunAll(ctx context.Context, runners []Runner, opts RunOpts) ([]Finding, []R
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 
-// Summarise counts findings by severity from a slice.
+// Summarize counts findings by severity from a slice.
 type Summary struct {
 	Critical      int
 	High          int
@@ -230,7 +242,7 @@ type Summary struct {
 	WeightedCrit  int  // weighted CRITICAL count
 }
 
-func Summarise(findings []Finding) Summary {
+func Summarize(findings []Finding) Summary {
 	var s Summary
 	for _, f := range findings {
 		// Ensure category is set

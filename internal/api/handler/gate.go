@@ -95,6 +95,13 @@ func (h *Gate) Evaluate(w http.ResponseWriter, r *http.Request) {
 	s := runSummary(run)
 	result := gate.Evaluate(policyRule, s)
 
+	// L8 fix: gate evaluation drives release decisions in CI/CD; an
+	// auditable record of "who asked, what decision came back, on
+	// which run/commit" lets a reviewer trace deploy outcomes back
+	// to the gate that approved/blocked them.
+	logAudit(r, h.DB, "GATE_EVALUATED",
+		"runs/"+run.RID+":decision="+string(result.Decision))
+
 	jsonOK(w, map[string]any{
 		"decision": result.Decision,
 		"reason":   result.Reason,
@@ -122,7 +129,11 @@ func (h *Gate) ListRules(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/policy/rules
 func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	var req store.PolicyRule
 	if !decodeJSON(w, r, &req) {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -149,6 +160,10 @@ func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	// L8 fix: gate-policy mutations directly affect release decisions;
+	// reviewer must be able to trace "build was suddenly blocked /
+	// allowed" back to a specific rule edit.
+	logAudit(r, h.DB, "POLICY_RULE_CREATED", "policy_rules/"+rule.ID+":"+rule.Name)
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, rule)
 }
@@ -156,7 +171,11 @@ func (h *Gate) CreateRule(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/v1/policy/rules/{id}
 func (h *Gate) DeleteRule(w http.ResponseWriter, r *http.Request) {
 	defer logAudit(r, h.DB, "POLICY_RULE_DELETED", "/policy/rules/"+chi.URLParam(r, "id"))
-	claims, _ := auth.FromContext(r.Context())
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	if !validateUUID(id) {
 		jsonError(w, "invalid id", http.StatusBadRequest)
@@ -198,4 +217,66 @@ func runSummary(run *store.Run) scanner.Summary {
 		Info:       toInt(m["INFO"]),
 		HasSecrets: toBool(m["HAS_SECRETS"]),
 	}
+}
+
+// PATCH /api/v1/policy/rules/{id}
+func (h *Gate) ToggleRule(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !validateUUID(id) {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Active bool `json:"active"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if err := h.DB.SetPolicyRuleActive(r.Context(), claims.TenantID, id, req.Active); err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	logAudit(r, h.DB, "POLICY_RULE_TOGGLED", "policy_rules/"+id)
+	jsonOK(w, map[string]any{"id": id, "active": req.Active})
+}
+
+// PUT /api/v1/policy/rules/{id}
+func (h *Gate) UpdateRule(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !validateUUID(id) {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req store.PolicyRule
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.ID = id
+	req.TenantID = claims.TenantID
+	if req.Name == "" {
+		jsonError(w, "name required", http.StatusBadRequest)
+		return
+	}
+	if req.RepoPattern == "" {
+		req.RepoPattern = "*"
+	}
+	if req.FailOn == "" {
+		req.FailOn = "FAIL"
+	}
+	if err := h.DB.UpdatePolicyRule(r.Context(), claims.TenantID, req); err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	logAudit(r, h.DB, "POLICY_RULE_UPDATED", "policy_rules/"+id)
+	jsonOK(w, map[string]any{"ok": true, "id": id})
 }

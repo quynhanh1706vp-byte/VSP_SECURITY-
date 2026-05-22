@@ -1,0 +1,18 @@
+[Unit]
+Description=VSP Scanner Worker (asynq consumer)
+After=network.target redis-server.service postgresql.service vsp-gateway.service
+Requires=vsp-gateway.service
+
+[Service]
+Type=simple
+User=test
+WorkingDirectory=/home/test/Data/GOLANG_VSP
+EnvironmentFile=/home/test/Data/GOLANG_VSP/.env.production
+ExecStart=/usr/local/bin/vsp-scanner
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

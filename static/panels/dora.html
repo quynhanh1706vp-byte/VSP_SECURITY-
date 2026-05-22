@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script src="/static/js/vsp_iframe_bootstrap.js"></script>
+<script>
+(function(){
+  if (window.vspAuthFetch && window.vspAuthFetchVersion === 2) return;
+  window.vspAuthFetchVersion = 2;
+  async function getToken(maxWait){
+    maxWait = maxWait || 2500; var waited = 0;
+    while (waited < maxWait) {
+      var tk = window.TOKEN || localStorage.getItem("vsp_token") || "";
+      if (tk && tk.length >= 20) return tk;
+      try { tk = window.parent.TOKEN || window.parent.localStorage.getItem("vsp_token") || ""; if (tk && tk.length >= 20) { window.TOKEN = tk; try { localStorage.setItem("vsp_token", tk); } catch(e){} return tk; } } catch(e) {}
+      await new Promise(r=>setTimeout(r, 100)); waited += 100;
+    }
+    return "";
+  }
+  var _origFetch = window.fetch;
+  window.vspAuthFetch = async function(url, opts){ opts = opts || {}; var tk = await getToken(); if (tk) opts.headers = Object.assign({}, opts.headers||{}, {"Authorization":"Bearer "+tk}); return _origFetch(url, opts); };
+  window.fetch = function(url, opts){ if (typeof url==="string" && url.indexOf("/api/")>=0){ if (opts && opts.headers && (opts.headers.Authorization||opts.headers.authorization)) return _origFetch(url,opts); return window.vspAuthFetch(url,opts); } return _origFetch(url,opts); };
+})();
+</script>
+<meta charset="utf-8">
+<title>DORA Metrics</title>
+<link rel="stylesheet" href="/vsp_enterprise_ui.css">
+<style>
+  body { margin:0; background:var(--bg0); color:var(--t1); font:13px/1.5 var(--font-sans, -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif); }
+  .wrap { max-width:1400px; margin:0 auto; padding:24px; }
+  h1 { font-family:Georgia,serif; font-weight:400; font-size:32px; margin:0 0 4px; }
+  .subtitle { color:var(--t3); font-size:13px; margin-bottom:24px; }
+  .controls { display:flex; gap:8px; align-items:center; margin-bottom:20px; }
+  .controls select, .controls button {
+    background:var(--bg2); color:var(--t1); border:1px solid var(--border);
+    padding:6px 12px; border-radius:4px; font:12px monospace; cursor:pointer;
+  }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+  @media (max-width:1100px){ .grid { grid-template-columns:repeat(2,1fr); } }
+  .card { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:20px; position:relative; }
+  .card .label { font-size:10px; color:var(--t3); letter-spacing:2px; text-transform:uppercase; }
+  .card .value { font-family:Georgia,serif; font-size:36px; font-weight:400; margin-top:6px; line-height:1; }
+  .card .unit { font-size:14px; color:var(--t3); font-family:monospace; margin-left:6px; }
+  .card .insight { font-size:12px; color:var(--t2); margin-top:10px; min-height:32px; }
+  .card .footer { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--t3); margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); }
+  .tier { display:inline-block; padding:3px 10px; border-radius:12px; font-size:10px; font-family:monospace; letter-spacing:2px; text-transform:uppercase; font-weight:600; }
+  .tier-elite  { background:rgba(74,124,89,.25);  color:var(--green); }
+  .tier-high   { background:rgba(58,106,154,.25); color:var(--accent); }
+  .tier-medium { background:rgba(201,169,97,.25); color:var(--amber); }
+  .tier-low    { background:rgba(184,80,66,.25);  color:var(--red); }
+  .tier-na     { background:rgba(138,128,104,.2); color:var(--t3); }
+  .trend-up   { color:var(--green); }
+  .trend-down { color:var(--red); }
+  .trend-flat { color:var(--t3); }
+  .legend { background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:14px 18px; margin-top:24px; font-size:12px; color:var(--t2); line-height:1.7; }
+  .legend strong { color:var(--t1); }
+  .skeleton { color:var(--t3); font-style:italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DORA Metrics</h1>
+  <div class="subtitle">DevOps Research &amp; Assessment — the four key indicators of software delivery performance.</div>
+
+  <div class="controls">
+    <label style="font-size:11px;color:var(--t3)" for="window-sel">WINDOW</label>
+    <select id="window-sel" onchange="loadDORA()">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="180">Last 180 days</option>
+    </select>
+    <button onclick="loadDORA()">Refresh</button>
+    <span id="last-updated" style="margin-left:auto;font-size:11px;color:var(--t3)"></span>
+  </div>
+
+  <div class="grid" id="cards">
+    <div class="card"><div class="label">Deployment Frequency</div><div class="value skeleton">…</div></div>
+    <div class="card"><div class="label">Lead Time for Changes</div><div class="value skeleton">…</div></div>
+    <div class="card"><div class="label">Mean Time to Restore</div><div class="value skeleton">…</div></div>
+    <div class="card"><div class="label">Change Failure Rate</div><div class="value skeleton">…</div></div>
+  </div>
+
+  <div class="legend">
+    <strong>How VSP computes these:</strong> Deploy frequency = passing scan runs / day · Lead time = median hours from auto-fix PR opened to merged · MTTR = median hours from incident detected to recovered · Change failure rate = % of completed PRs ending in failed/conflict/closed-without-merge.
+    <br><strong>Tier thresholds (DORA 2023):</strong>
+    <span class="tier tier-elite">elite</span> ≥ 1 deploy/day · &lt; 1d lead · &lt; 1h MTTR · ≤ 5% CFR &nbsp;
+    <span class="tier tier-high">high</span> 1/wk · &lt; 1wk · &lt; 1d · ≤ 10% &nbsp;
+    <span class="tier tier-medium">medium</span> 1/mo · &lt; 1mo · &lt; 1wk · ≤ 15% &nbsp;
+    <span class="tier tier-low">low</span> &lt; 1/mo · &gt; 1mo · &gt; 1wk · &gt; 15%
+  </div>
+</div>
+
+<script>
+const AUTH_HEADERS = {};
+function fmtTrend(pct) {
+  if (pct === 0 || pct == null) return '<span class="trend-flat">·</span>';
+  const arrow = pct > 0 ? '↑' : '↓';
+  const cls = pct > 0 ? 'trend-up' : 'trend-down';
+  return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+}
+function fmtValue(m) {
+  if (m.unit === 'per_day') {
+    const v = m.value;
+    if (v >= 1) return `${v.toFixed(2)}<span class="unit">/day</span>`;
+    if (v >= 1/7) return `${(v*7).toFixed(1)}<span class="unit">/week</span>`;
+    if (v > 0)   return `${(v*30).toFixed(1)}<span class="unit">/month</span>`;
+    return `0<span class="unit">/day</span>`;
+  }
+  if (m.unit === 'hours') {
+    const h = m.value;
+    if (h === 0) return `—<span class="unit"></span>`;
+    if (h < 1)   return `${(h*60).toFixed(0)}<span class="unit">min</span>`;
+    if (h < 24)  return `${h.toFixed(1)}<span class="unit">hr</span>`;
+    return `${(h/24).toFixed(1)}<span class="unit">days</span>`;
+  }
+  if (m.unit === 'percent') return `${m.value.toFixed(1)}<span class="unit">%</span>`;
+  return `${m.value}`;
+}
+function tierBadge(tier) {
+  const cls = 'tier-' + (tier === 'n/a' ? 'na' : tier);
+  return `<span class="tier ${cls}">${tier}</span>`;
+}
+function renderCard(label, m) {
+  if (!m) return `<div class="card"><div class="label">${label}</div><div class="value skeleton">no data</div></div>`;
+  return `
+    <div class="card">
+      <div class="label">${label}</div>
+      <div class="value">${fmtValue(m)}</div>
+      <div class="insight">${m.insight || ''}</div>
+      <div class="footer">
+        <span>${tierBadge(m.tier)}</span>
+        <span>${m.samples} sample${m.samples === 1 ? '' : 's'} · ${fmtTrend(m.trend_pct)}</span>
+      </div>
+    </div>`;
+}
+async function loadDORA() {
+  const days = document.getElementById('window-sel').value;
+  const grid = document.getElementById('cards');
+  grid.innerHTML = `<div class="card"><div class="label">Deployment Frequency</div><div class="value skeleton">…</div></div>
+                    <div class="card"><div class="label">Lead Time for Changes</div><div class="value skeleton">…</div></div>
+                    <div class="card"><div class="label">Mean Time to Restore</div><div class="value skeleton">…</div></div>
+                    <div class="card"><div class="label">Change Failure Rate</div><div class="value skeleton">…</div></div>`;
+  try {
+    const r = await fetch(`/api/v1/dora?days=${days}`, { headers: AUTH_HEADERS });
+    if (r.status === 402) {
+      grid.innerHTML = `<div class="card" style="grid-column:1/-1"><div class="label">PRO feature</div><div class="value">Upgrade required</div><div class="insight">DORA metrics are part of the VSP PRO plan.</div></div>`;
+      return;
+    }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    grid.innerHTML = [
+      renderCard('Deployment Frequency', d.deploy_frequency),
+      renderCard('Lead Time for Changes', d.lead_time),
+      renderCard('Mean Time to Restore', d.mttr),
+      renderCard('Change Failure Rate', d.change_failure_rate),
+    ].join('');
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    grid.innerHTML = `<div class="card" style="grid-column:1/-1"><div class="label">Error</div><div class="value">—</div><div class="insight">${String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div></div>`;
+  }
+}
+loadDORA();
+</script>
+<div style="margin:24px 0 0">
+  <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:12px">📈 Quarterly Trend (MTTR · Deploy Freq · Change Fail Rate)</div>
+  <div id="dora-quarterly-chart" style="height:180px;background:var(--bg2);border-radius:10px;border:1px solid var(--border);padding:16px">
+    <div style="color:var(--t3);font-size:12px;text-align:center;padding-top:60px">Loading quarterly data...</div>
+  </div>
+</div>
+<script>
+async function loadDoraQuarterly() {
+  var tok = window.TOKEN || (typeof getToken==='function'?getToken():'') || '';
+  var h = { Authorization: 'Bearer ' + tok };
+  try {
+    var r = await fetch('/api/v1/improvement/quarters', { headers: h });
+    if (!r.ok) return;
+    var data = await r.json();
+    var quarters = (data.quarters||[]).filter(function(q){return q.quarter;});
+    if (!quarters.length) return;
+    var container = document.getElementById('dora-quarterly-chart');
+    if (!container) return;
+    container.innerHTML = '<canvas id="dora-q-canvas"></canvas>';
+    var ctx = document.getElementById('dora-q-canvas').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: quarters.map(function(q){return q.quarter;}),
+        datasets: [
+          {label:'MTTR (h)', data:quarters.map(function(q){return +(q.mttr_hours||0).toFixed(1);}), borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.08)', tension:.3, pointRadius:4},
+          {label:'Deploy/day', data:quarters.map(function(q){return +(q.deploy_freq_per_day||0).toFixed(3);}), borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.08)', tension:.3, pointRadius:4},
+          {label:'CFR %', data:quarters.map(function(q){return +(q.change_fail_rate_pct||0).toFixed(1);}), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.08)', tension:.3, pointRadius:4}
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#8899bb',font:{size:10}}}},
+        scales:{x:{ticks:{color:'#8899bb',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+                y:{ticks:{color:'#8899bb',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}}}}
+    });
+  } catch(e) { console.warn('[DORA quarterly]', e); }
+}
+setTimeout(loadDoraQuarterly, 800);
+</script>
+</body>
+</html>

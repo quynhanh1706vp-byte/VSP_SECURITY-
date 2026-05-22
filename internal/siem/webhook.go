@@ -17,7 +17,29 @@ import (
 	"github.com/vsp/platform/internal/store"
 )
 
-// validateWebhookURL chặn SSRF — chỉ cho phép HTTPS đến external hosts
+// ValidateWebhookURL chặn SSRF — chỉ cho phép HTTPS đến external hosts.
+//
+// Threat model: tenant operator can configure arbitrary webhook URLs in
+// the SIEM panel. Without these checks they could pivot the gateway to
+// attack internal services (169.254.169.254 cloud metadata, RFC1918
+// admin UIs, localhost ports).
+//
+// Defense layers (each layer alone has a bypass; together they close it):
+//  1. Scheme must be https.
+//  2. Reject hostnames that are well-known internal aliases (localhost,
+//     *.internal, *.local, metadata.*) — case-insensitive.
+//  3. If the host parses as a literal IP, check it directly against the
+//     RFC1918 / loopback / link-local / CGN ruleset.
+//  4. If the host is a name, resolve via LookupIP and check EVERY A/AAAA
+//     answer. **Fail closed on resolution failure** (pre-fix it returned
+//     nil — an attacker-controlled name that NXDOMAIN'd at validation
+//     time and resolved at send time passed the check).
+//
+// Residual risk: DNS rebinding across the validate→send window. The
+// caller (send()) re-validates on every send, narrowing the window to
+// the time between the second validate and net/http's own dial. Closing
+// it fully requires a Dialer that pins the validated IP — tracked
+// separately.
 func ValidateWebhookURL(rawURL string) error {
 	u, err := url.ParseRequestURI(rawURL)
 	if err != nil {
@@ -27,32 +49,73 @@ func ValidateWebhookURL(rawURL string) error {
 		return fmt.Errorf("scheme must be https")
 	}
 	host := u.Hostname()
-	// Chặn localhost và private ranges
-	blocked := []string{"localhost", "127.", "0.0.0.0", "::1",
-		"169.254.", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
-		"172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
-		"172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
-		"192.168.", "metadata.google", "metadata.aws"}
-	for _, b := range blocked {
-		if strings.HasPrefix(host, b) || host == strings.TrimSuffix(b, ".") {
-			return fmt.Errorf("URL host %q is not allowed (private/internal)", host)
-		}
+	if host == "" {
+		return fmt.Errorf("URL host is empty")
 	}
-	// Resolve DNS và check IP
-	ips, err := net.LookupHost(host)
-	if err != nil {
-		return nil
-	} // nếu không resolve được thì skip check này
-	for _, ip := range ips {
-		parsed := net.ParseIP(ip)
-		if parsed == nil {
-			continue
+
+	lh := strings.ToLower(host)
+	if lh == "localhost" || lh == "ip6-localhost" || lh == "ip6-loopback" ||
+		strings.HasSuffix(lh, ".internal") || strings.HasSuffix(lh, ".local") ||
+		strings.HasSuffix(lh, ".localhost") ||
+		strings.HasPrefix(lh, "metadata.") {
+		return fmt.Errorf("URL host %q is not allowed (internal alias)", host)
+	}
+
+	// Host is a literal IP? Check directly (DNS doesn't apply).
+	if ip := net.ParseIP(host); ip != nil {
+		if isPrivateIP(ip) {
+			return fmt.Errorf("URL host IP %s is private/loopback/link-local", ip)
 		}
-		if parsed.IsLoopback() || parsed.IsPrivate() || parsed.IsLinkLocalUnicast() {
-			return fmt.Errorf("URL resolves to private IP %s — blocked", ip)
+		return nil
+	}
+
+	// Host is a name. Resolve and check every answer. Fail CLOSED on
+	// resolution failure — pre-fix returned nil which let attacker-
+	// controlled NXDOMAIN-then-resolve flips through.
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("URL host %q failed DNS resolution: %w", host, err)
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("URL host %q has no DNS answers", host)
+	}
+	for _, ip := range ips {
+		if isPrivateIP(ip) {
+			return fmt.Errorf("URL host %q resolves to private IP %s — blocked", host, ip)
 		}
 	}
 	return nil
+}
+
+// isPrivateIP — RFC1918 + loopback + link-local + CGN + IPv6 ULA.
+// Mirrors the soar/http_client.go ruleset; kept duplicated to avoid an
+// internal/siem ↔ internal/soar import cycle.
+func isPrivateIP(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return true
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		if ip4[0] == 10 {
+			return true
+		}
+		if ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31 {
+			return true
+		}
+		if ip4[0] == 192 && ip4[1] == 168 {
+			return true
+		}
+		if ip4[0] == 169 && ip4[1] == 254 {
+			return true
+		}
+		if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
+			return true
+		}
+	}
+	if len(ip) == 16 && (ip[0] == 0xfc || ip[0] == 0xfd) {
+		return true
+	}
+	return false
 }
 
 // WebhookType defines the payload format.

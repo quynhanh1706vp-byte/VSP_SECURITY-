@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-alpine@sha256:5caaf1cca9dc351e13deafbc3879fd4754801acba8653fa9540cea125d01a71f AS builder
 RUN apk add --no-cache git ca-certificates tzdata libpcap-dev
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -8,7 +8,7 @@ RUN CGO_ENABLED=0 GOOS=linux \
     go build -ldflags="-s -w" -trimpath \
     -o gateway ./cmd/gateway/
 
-FROM alpine:3.21
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
 # Use Alpine's built-in 'nobody' user (UID/GID 65534)
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app

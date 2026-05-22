@@ -27,6 +27,10 @@ type ScanCompletePayload struct {
 	Findings   []store.Finding   `json:"findings"`
 	ToolErrors map[string]string `json:"tool_errors"`
 	DurationMs int64             `json:"duration_ms"`
+	// ToolsDone is the number of tool runners the external scanner
+	// dispatched (success + fail). Optional; if 0, we derive it from
+	// the union of distinct tool names in Findings and ToolErrors.
+	ToolsDone int `json:"tools_done,omitempty"`
 }
 
 func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
@@ -112,10 +116,22 @@ func (h *InternalScan) Complete(w http.ResponseWriter, r *http.Request) {
 		"HAS_SECRETS": s.HasSecrets,
 	})
 
-	// 5. Update run record
+	// 5. Update run record — toolsDone reflects actual dispatch count.
+	// Fall back to distinct-tool union if the caller didn't send it.
+	toolsDone := payload.ToolsDone
+	if toolsDone == 0 {
+		distinct := map[string]struct{}{}
+		for _, f := range payload.Findings {
+			distinct[f.Tool] = struct{}{}
+		}
+		for t := range payload.ToolErrors {
+			distinct[t] = struct{}{}
+		}
+		toolsDone = len(distinct)
+	}
 	if err := h.DB.UpdateRunResult(ctx, payload.TenantID, payload.RID,
 		string(result.Decision), result.Posture,
-		len(payload.Findings), summaryJSON); err != nil {
+		len(payload.Findings), toolsDone, summaryJSON); err != nil {
 		log.Error().Err(err).Str("rid", payload.RID).Msg("update run result failed")
 	}
 

@@ -1,0 +1,20 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: VSPPodSecurity
+metadata:
+  name: vsp-pod-security-baseline
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: [Pod]
+    excludedNamespaces:
+      # Exclude system namespaces — applying baseline to kube-system
+      # creates more problems than it solves; CIS Benchmark agrees.
+      - kube-system
+      - kyverno
+      - gatekeeper-system
+      - cert-manager
+  parameters:
+    allowPrivileged: false
+    requiredSeccompProfile: RuntimeDefault

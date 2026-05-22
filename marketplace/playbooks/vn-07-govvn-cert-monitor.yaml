@@ -1,0 +1,44 @@
+id: pb-vn-govvn-cert-monitor
+name: Giám sát chứng chỉ TLS domain *.gov.vn
+description: Cảnh báo khi cert *.gov.vn sắp hết hạn hoặc CA không hợp lệ
+trigger: sla_breach
+sev_filter: any
+enabled: true
+tags: [vn, gov-vn, tls, certificate, monitoring]
+steps:
+  - type: condition
+    name: Lọc gov.vn assets
+    desc: Chỉ áp dụng cho asset có domain *.gov.vn hoặc *.org.vn
+    config: |
+      expr: asset.domain MATCHES "*.gov.vn" OR asset.domain MATCHES "*.org.vn"
+  - type: enrich
+    name: Check cert chain
+    desc: Validate chain + check days_until_expiry
+    config: |
+      check: tls_expiry
+      threshold_days: 30
+      validate_chain: true
+      validate_ct_log: true
+  - type: condition
+    name: Cert expiring or invalid
+    desc: Branch theo loại vấn đề
+    config: |
+      expr: cert.days_until_expiry < 30 OR cert.chain_invalid=true
+  - type: ticket
+    name: Tạo renewal ticket
+    desc: Ticket cho ops team renew cert
+    config: |
+      provider: jira
+      project: VSP-OPS
+      priority: P2
+      labels: [tls, gov-vn, cert-renewal]
+      assignee_group: ops-tls
+      sla_hours: 168
+  - type: notify
+    name: Email ops + Slack
+    desc: Gửi notify với CN + expiry date
+    config: |
+      to: [ops@agency.gov, security@agency.gov]
+      slack_channel: "#ops-tls"
+      slack_webhook: ${SLACK_OPS_WEBHOOK}
+      template_vi: "Cert ${cert.cn} hết hạn sau ${cert.days_until_expiry} ngày"
