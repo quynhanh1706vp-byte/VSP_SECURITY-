@@ -391,7 +391,7 @@ function addSource(){
   var newSrc={id:'s'+Date.now(),name:name,proto:_selectedType,format:'json-raw',addr:addr,eps:0,lastEvent:'never',parseRate:0,status:'ok',events:0};
   SOURCES.push(newSrc);
   closeModal('add-source-modal');renderSources();
-  if(TOKEN)fetch(API+'/api/v1/logs/sources', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,protocol:_selectedType,address:addr})})
+  if(TOKEN)fetch(API+'/api/v1/logs/sources', {credentials:"same-origin", method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,proto:_selectedType,host:addr.split(':')[0],port:parseInt(addr.split(':')[1])||514,format:'syslog'})})
     .then(function(r){
       if(!r.ok)throw new Error(r.status);
       return r.json();
