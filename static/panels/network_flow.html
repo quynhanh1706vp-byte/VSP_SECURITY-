@@ -196,7 +196,7 @@ async function startNetcap(e) {
     } catch(e3) {}
     var iface = prompt('Select interface:\n' + ifaceList.join('\n'), ifaceList[0]||'eth0');
     if (!iface) return;
-    var r = await fetch(API + '/api/v1/netcap/start', {method:'POST', headers:h, body:JSON.stringify({iface:iface})});
+    var r = await fetch(API + '/api/v1/netcap/start', {method:'POST', headers:h, body:JSON.stringify({interface:iface})});
     if (r.ok) {
       alert('Network capture started on ' + iface);
       loadNetworkFlow();
