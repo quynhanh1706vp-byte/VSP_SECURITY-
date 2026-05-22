@@ -9121,7 +9121,7 @@ window.loadRuns = async function() {
     var lastGateColor = lastGate === 'PASS' ? 'var(--green)' : lastGate === 'FAIL' ? 'var(--red)' : lastGate === 'WARN' ? 'var(--amber)' : 'var(--t3)';
 
     function _setEl(id, val) { var e = document.getElementById(id); if(e) e.textContent = val; }
-    _setEl('rk-total', runs.length);
+    _setEl('rk-total', d.total || runs.length);
     _setEl('rk-passrate', passRate + '%');
     _setEl('rk-pass-sub', pass.length + ' pass / ' + fail.length + ' fail');
     _setEl('rk-avgfindings', avgFindings);
@@ -9413,7 +9413,7 @@ window.loadRuns = async function() {
     var lastGateColor = lastGate==='PASS'?'var(--green)':lastGate==='FAIL'?'var(--red)':lastGate==='WARN'?'var(--amber)':'var(--t3)';
 
     function setEl(id, val) { var e=document.getElementById(id); if(e) e.textContent=val; }
-    setEl('rk-total', runs.length);
+    setEl('rk-total', d.total || runs.length);
     setEl('rk-passrate', passRate + '%');
     setEl('rk-pass-sub', pass.length + ' pass / ' + fail.length + ' fail');
     setEl('rk-avgfindings', avgF);
