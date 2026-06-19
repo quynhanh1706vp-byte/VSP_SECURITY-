@@ -298,10 +298,20 @@ function sevClass(s){
   return {CRITICAL:'pill-red',HIGH:'pill-amber',MEDIUM:'pill-blue',LOW:'pill-green'}[s]||'pill-gray';
 }
 
+function escapeHTML(s){
+  if(s==null) return '';
+  return String(s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
 function highlight(text, q){
-  if(!q||!text) return text||'';
-  var re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
-  return text.replace(re,'<span class="highlight">$1</span>');
+  if(!q||!text) return escapeHTML(text||'');
+  var safe = escapeHTML(text);
+  var safeQ = escapeHTML(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  if(!safeQ) return safe;
+  var re = new RegExp('('+safeQ+')','gi');
+  return safe.replace(re,'<span class="highlight">$1</span>');
 }
 
 function buildTimeline(events){
@@ -332,12 +342,12 @@ function renderResults(q){
     '</tr></thead><tbody>';
   _results.forEach(function(e,i){
     html+='<tr onclick="openEvent('+i+')">'+
-      '<td class="ts">'+e.ts+'</td>'+
-      '<td><span class="pill '+sevClass(e.severity)+'">'+( e.severity||'INFO')+'</span></td>'+
-      '<td class="host">'+( e.host||'—')+'</td>'+
-      '<td class="proc">'+( e.process||'—')+'</td>'+
+      '<td class="ts">'+escapeHTML(e.ts)+'</td>'+
+      '<td><span class="pill '+sevClass(e.severity)+'">'+escapeHTML(e.severity||'INFO')+'</span></td>'+
+      '<td class="host">'+escapeHTML(e.host||'—')+'</td>'+
+      '<td class="proc">'+escapeHTML(e.process||'—')+'</td>'+
       '<td class="msg">'+highlight(e.message||'—',q)+'</td>'+
-      '<td class="ts">'+( e.source_ip||'—')+'</td>'+
+      '<td class="ts">'+escapeHTML(e.source_ip||'—')+'</td>'+
       '</tr>';
   });
   html+='</tbody></table></div>';
